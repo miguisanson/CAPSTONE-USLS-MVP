@@ -1,0 +1,23 @@
+import axios from "axios";
+
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
+
+export const api = axios.create({
+  baseURL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("usls_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export const handleApiError = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    return String(error.response?.data?.message ?? error.message);
+  }
+  return "Unexpected error occurred.";
+};
+

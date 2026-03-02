@@ -1,0 +1,542 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  ADMIN
+  GRADUATE_SCHOOL_STAFF
+  ACADEMIC_COORDINATOR
+  RESEARCH_COORDINATOR
+  ADVISER
+  PANEL_MEMBER
+  STUDENT
+}
+
+enum LifecycleStage {
+  ADMISSION
+  COURSEWORK
+  PROPOSAL_DEVELOPMENT
+  PROPOSAL_DEFENSE
+  DATA_COLLECTION
+  DISSERTATION_WRITING
+  ORAL_DEFENSE
+  LOA
+  COMPLETED
+}
+
+enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum TaskDecision {
+  APPROVE
+  REVISE
+  RETURN
+}
+
+enum DocumentStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  NEEDS_REVISION
+}
+
+enum ScheduleStatus {
+  REQUESTED
+  CONFIRMED
+  RESCHEDULED
+  CANCELLED
+}
+
+enum AlertType {
+  PROLONGED_STAGE
+  UNRESOLVED_HANDOFF
+  DELAYED_SCHEDULING
+  INACTIVITY
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  CLOSED
+}
+
+enum InterventionStatus {
+  OPEN
+  CLOSED
+}
+
+enum NotificationChannel {
+  EMAIL
+  PORTAL
+}
+
+enum AuditActionType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  ACCESS_DENIED
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_TRANSITION
+  DECISION
+  SUBMISSION
+  UPLOAD
+  CONFIG_CHANGE
+  ALERT_TRIGGER
+  ALERT_RESOLVED
+  NOTIFICATION_SENT
+}
+
+model UserAccount {
+  id                      Int                      @id @default(autoincrement())
+  email                   String                   @unique
+  passwordHash            String
+  fullName                String
+  isActive                Boolean                  @default(true)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  roles                   UserRole[]
+  studentProfile          Student?                 @relation("StudentUser")
+  advisedStudents         Student[]                @relation("StudentAdviser")
+  researchStudents        Student[]                @relation("StudentResearchCoordinator")
+  panelAssignments        StudentPanelAssignment[]
+  createdMilestones       MilestoneDefinition[]    @relation("MilestoneCreatedBy")
+  updatedMilestoneStatus  StudentMilestoneStatus[] @relation("MilestoneUpdatedBy")
+  createdTasks            Task[]                   @relation("TaskCreatedBy")
+  assignedTasks           Task[]                   @relation("TaskAssignedTo")
+  decisionLogs            DecisionLog[]            @relation("DecisionBy")
+  uploadedVersions        DocumentVersion[]        @relation("DocumentUploadedBy")
+  revisionNotes           RevisionNote[]           @relation("RevisionAuthor")
+  createdScheduleRequests ScheduleRequest[]        @relation("ScheduleRequestedBy")
+  availabilities          Availability[]           @relation("AvailabilityUser")
+  scheduleEvents          ScheduleEvent[]          @relation("ScheduleDecidedBy")
+  interventions           Intervention[]           @relation("InterventionBy")
+  sentNotifications       NotificationAlert[]
+  createdThresholds       AlertThreshold[]         @relation("ThresholdCreatedBy")
+  updatedThresholds       AlertThreshold[]         @relation("ThresholdUpdatedBy")
+  createdRoutingRules     RoutingRule[]            @relation("RoutingCreatedBy")
+  updatedRoutingRules     RoutingRule[]            @relation("RoutingUpdatedBy")
+  createdAlerts           Alert[]                  @relation("AlertCreatedBy")
+  closedAlerts            Alert[]                  @relation("AlertClosedBy")
+  timelineEvents          TimelineEvent[]          @relation("TimelinePerformedBy")
+  auditLogs               AuditLog[]               @relation("AuditActor")
+}
+
+model Role {
+  id          Int        @id @default(autoincrement())
+  name        RoleName   @unique
+  description String?
+  userRoles   UserRole[]
+}
+
+model UserRole {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  roleId    Int
+  user      UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+}
+
+model Program {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique
+  name      String
+  students  Student[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Student {
+  id                    Int                      @id @default(autoincrement())
+  studentNumber         String                   @unique
+  firstName             String
+  lastName              String
+  email                 String                   @unique
+  programId             Int
+  userAccountId         Int?                     @unique
+  currentStage          LifecycleStage           @default(ADMISSION)
+  riskFlag              Boolean                  @default(false)
+  loaStart              DateTime?
+  loaEnd                DateTime?
+  adviserId             Int?
+  researchCoordinatorId Int?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  program               Program                  @relation(fields: [programId], references: [id])
+  userAccount           UserAccount?             @relation("StudentUser", fields: [userAccountId], references: [id])
+  adviser               UserAccount?             @relation("StudentAdviser", fields: [adviserId], references: [id])
+  researchCoordinator   UserAccount?             @relation("StudentResearchCoordinator", fields: [researchCoordinatorId], references: [id])
+  panelAssignments      StudentPanelAssignment[]
+  lifecycleHistory      StudentLifecycle[]
+  milestoneStatuses     StudentMilestoneStatus[]
+  tasks                 Task[]
+  decisionLogs          DecisionLog[]
+  documents             DocumentRecord[]
+  scheduleRequests      ScheduleRequest[]
+  alerts                Alert[]
+  timelineEvents        TimelineEvent[]
+
+  @@index([programId])
+  @@index([currentStage])
+  @@index([adviserId])
+  @@index([researchCoordinatorId])
+}
+
+model StudentPanelAssignment {
+  id            Int         @id @default(autoincrement())
+  studentId     Int
+  panelMemberId Int
+  assignedAt    DateTime    @default(now())
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  panelMember   UserAccount @relation(fields: [panelMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, panelMemberId])
+  @@index([panelMemberId])
+}
+
+model StudentLifecycle {
+  id          Int            @id @default(autoincrement())
+  studentId   Int
+  stage       LifecycleStage
+  enteredAt   DateTime       @default(now())
+  exitedAt    DateTime?
+  notes       String?
+  changedById Int?
+  student     Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, enteredAt])
+  @@index([stage])
+}
+
+model MilestoneDefinition {
+  id              Int                      @id @default(autoincrement())
+  name            String
+  stage           LifecycleStage
+  description     String?
+  expectedDays    Int                      @default(14)
+  criticality     Int                      @default(1)
+  active          Boolean                  @default(true)
+  sortOrder       Int                      @default(0)
+  createdById     Int?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  createdBy       UserAccount?             @relation("MilestoneCreatedBy", fields: [createdById], references: [id])
+  studentStatuses StudentMilestoneStatus[]
+  tasks           Task[]
+  documents       DocumentRecord[]
+
+  @@index([stage, active])
+}
+
+model StudentMilestoneStatus {
+  id                    Int                 @id @default(autoincrement())
+  studentId             Int
+  milestoneDefinitionId Int
+  status                MilestoneStatus     @default(NOT_STARTED)
+  dueAt                 DateTime?
+  completedAt           DateTime?
+  updatedById           Int?
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  student               Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  milestoneDefinition   MilestoneDefinition @relation(fields: [milestoneDefinitionId], references: [id], onDelete: Cascade)
+  updatedBy             UserAccount?        @relation("MilestoneUpdatedBy", fields: [updatedById], references: [id])
+
+  @@unique([studentId, milestoneDefinitionId])
+  @@index([status, dueAt])
+}
+
+model Task {
+  id                    Int                  @id @default(autoincrement())
+  title                 String
+  description           String?
+  studentId             Int?
+  milestoneDefinitionId Int?
+  assignedToId          Int?
+  assignedRole          RoleName?
+  nextActionOwnerRole   RoleName?
+  status                TaskStatus           @default(PENDING)
+  dueAt                 DateTime?
+  priorityScore         Int                  @default(0)
+  recommendedAction     String?
+  escalationPrompt      String?
+  closedAt              DateTime?
+  createdById           Int
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  student               Student?             @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  milestoneDefinition   MilestoneDefinition? @relation(fields: [milestoneDefinitionId], references: [id], onDelete: SetNull)
+  assignedTo            UserAccount?         @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy             UserAccount          @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  decisionLogs          DecisionLog[]
+  alerts                Alert[]
+
+  @@index([status, dueAt])
+  @@index([assignedToId, status])
+  @@index([studentId])
+}
+
+model DecisionLog {
+  id          Int          @id @default(autoincrement())
+  taskId      Int
+  studentId   Int?
+  decision    TaskDecision
+  rationale   String?
+  decidedById Int
+  createdAt   DateTime     @default(now())
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  student     Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  decidedBy   UserAccount  @relation("DecisionBy", fields: [decidedById], references: [id])
+
+  @@index([taskId, createdAt])
+  @@index([studentId, createdAt])
+}
+
+model DocumentRecord {
+  id                       Int                  @id @default(autoincrement())
+  studentId                Int
+  milestoneDefinitionId    Int?
+  checklistItem            String
+  status                   DocumentStatus       @default(PENDING)
+  outstandingRevisionCount Int                  @default(0)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  student                  Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  milestoneDefinition      MilestoneDefinition? @relation(fields: [milestoneDefinitionId], references: [id], onDelete: SetNull)
+  versions                 DocumentVersion[]
+  revisionNotes            RevisionNote[]
+
+  @@index([studentId, status])
+}
+
+model DocumentVersion {
+  id               Int            @id @default(autoincrement())
+  documentRecordId Int
+  versionNumber    Int
+  fileName         String
+  filePath         String
+  mimeType         String
+  sizeBytes        Int
+  uploadedById     Int
+  uploadedAt       DateTime       @default(now())
+  isCurrent        Boolean        @default(true)
+  documentRecord   DocumentRecord @relation(fields: [documentRecordId], references: [id], onDelete: Cascade)
+  uploadedBy       UserAccount    @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  revisionNotes    RevisionNote[]
+
+  @@unique([documentRecordId, versionNumber])
+  @@index([documentRecordId, isCurrent])
+}
+
+model RevisionNote {
+  id               Int              @id @default(autoincrement())
+  documentRecordId Int
+  versionId        Int?
+  authorId         Int
+  note             String
+  isResolved       Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  resolvedAt       DateTime?
+  documentRecord   DocumentRecord   @relation(fields: [documentRecordId], references: [id], onDelete: Cascade)
+  version          DocumentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  author           UserAccount      @relation("RevisionAuthor", fields: [authorId], references: [id])
+
+  @@index([documentRecordId, isResolved])
+}
+
+model ScheduleRequest {
+  id             Int             @id @default(autoincrement())
+  studentId      Int
+  requestedById  Int
+  preferredDate  DateTime?
+  reason         String?
+  status         ScheduleStatus  @default(REQUESTED)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  student        Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  requestedBy    UserAccount     @relation("ScheduleRequestedBy", fields: [requestedById], references: [id])
+  availabilities Availability[]
+  scheduleEvents ScheduleEvent[]
+
+  @@index([studentId, status])
+}
+
+model Availability {
+  id                Int             @id @default(autoincrement())
+  scheduleRequestId Int
+  userId            Int
+  availableFrom     DateTime
+  availableTo       DateTime
+  notes             String?
+  createdAt         DateTime        @default(now())
+  scheduleRequest   ScheduleRequest @relation(fields: [scheduleRequestId], references: [id], onDelete: Cascade)
+  user              UserAccount     @relation("AvailabilityUser", fields: [userId], references: [id])
+
+  @@index([scheduleRequestId])
+}
+
+model ScheduleEvent {
+  id                Int             @id @default(autoincrement())
+  scheduleRequestId Int
+  eventStatus       ScheduleStatus
+  scheduledAt       DateTime?
+  decidedById       Int?
+  notes             String?
+  createdAt         DateTime        @default(now())
+  scheduleRequest   ScheduleRequest @relation(fields: [scheduleRequestId], references: [id], onDelete: Cascade)
+  decidedBy         UserAccount?    @relation("ScheduleDecidedBy", fields: [decidedById], references: [id])
+
+  @@index([scheduleRequestId, eventStatus])
+}
+
+model AlertThreshold {
+  id            Int             @id @default(autoincrement())
+  key           String          @unique
+  stage         LifecycleStage?
+  thresholdDays Int
+  enabled       Boolean         @default(true)
+  description   String
+  createdById   Int?
+  updatedById   Int?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  createdBy     UserAccount?    @relation("ThresholdCreatedBy", fields: [createdById], references: [id])
+  updatedBy     UserAccount?    @relation("ThresholdUpdatedBy", fields: [updatedById], references: [id])
+}
+
+model RoutingRule {
+  id            Int            @id @default(autoincrement())
+  fromStage     LifecycleStage
+  decision      TaskDecision?
+  nextOwnerRole RoleName
+  taskTemplate  String
+  active        Boolean        @default(true)
+  createdById   Int?
+  updatedById   Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdBy     UserAccount?   @relation("RoutingCreatedBy", fields: [createdById], references: [id])
+  updatedBy     UserAccount?   @relation("RoutingUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([fromStage, decision, active])
+}
+
+model Alert {
+  id            Int                 @id @default(autoincrement())
+  studentId     Int
+  taskId        Int?
+  alertType     AlertType
+  severity      AlertSeverity
+  status        AlertStatus         @default(OPEN)
+  message       String
+  thresholdDays Int?
+  triggeredAt   DateTime            @default(now())
+  resolvedAt    DateTime?
+  createdById   Int?
+  closedById    Int?
+  student       Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task          Task?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdBy     UserAccount?        @relation("AlertCreatedBy", fields: [createdById], references: [id])
+  closedBy      UserAccount?        @relation("AlertClosedBy", fields: [closedById], references: [id])
+  interventions Intervention[]
+  notifications NotificationAlert[]
+
+  @@index([status, severity, triggeredAt])
+  @@index([studentId, status])
+}
+
+model Intervention {
+  id              Int                @id @default(autoincrement())
+  alertId         Int
+  actionTaken     String
+  evidenceNote    String?
+  performedById   Int
+  status          InterventionStatus @default(OPEN)
+  performedAt     DateTime           @default(now())
+  closedAt        DateTime?
+  closureEvidence String?
+  alert           Alert              @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  performedBy     UserAccount        @relation("InterventionBy", fields: [performedById], references: [id])
+
+  @@index([alertId, status])
+}
+
+model NotificationAlert {
+  id       Int                 @id @default(autoincrement())
+  alertId  Int?
+  userId   Int?
+  email    String
+  reason   String
+  channel  NotificationChannel @default(EMAIL)
+  sentAt   DateTime            @default(now())
+  success  Boolean             @default(true)
+  metadata Json?
+  alert    Alert?              @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  user     UserAccount?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([sentAt])
+}
+
+model TimelineEvent {
+  id                Int          @id @default(autoincrement())
+  studentId         Int
+  eventType         String
+  title             String
+  details           String?
+  relatedEntityType String?
+  relatedEntityId   Int?
+  performedById     Int?
+  occurredAt        DateTime     @default(now())
+  student           Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  performedBy       UserAccount? @relation("TimelinePerformedBy", fields: [performedById], references: [id])
+
+  @@index([studentId, occurredAt])
+}
+
+model AuditLog {
+  id          BigInt          @id @default(autoincrement())
+  actorUserId Int?
+  actionType  AuditActionType
+  entityType  String
+  entityId    String?
+  description String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime        @default(now())
+  actor       UserAccount?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actionType, createdAt])
+  @@index([actorUserId, createdAt])
+}
