@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "import:sql": "powershell -ExecutionPolicy Bypass -File scripts/import-sql.ps1"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +32,7 @@
     "multer": "^2.1.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.1",
+    "openai": "^6.25.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -50,8 +52,5 @@
     "ts-jest": "^29.4.6",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   }
 }

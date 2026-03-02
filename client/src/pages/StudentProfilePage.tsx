@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { milestonesApi, studentsApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
+import { useAuth } from "../app/AuthContext";
 import type { LifecycleStage, MilestoneDefinition, StudentDetail } from "../types/domain";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
@@ -22,6 +23,7 @@ const STAGES: LifecycleStage[] = [
 const MILESTONE_STATUS_OPTIONS = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "BLOCKED"];
 
 export const StudentProfilePage = () => {
+  const { user } = useAuth();
   const { id } = useParams();
   const studentId = Number(id);
   const [student, setStudent] = useState<StudentDetail | null>(null);
@@ -32,6 +34,13 @@ export const StudentProfilePage = () => {
   const [stageNotes, setStageNotes] = useState("");
   const [riskFlag, setRiskFlag] = useState(false);
   const [busy, setBusy] = useState(false);
+  const roles = user?.roles ?? [];
+  const canUpdateStage = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER"].includes(role)
+  );
+  const canUpdateMilestones = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER"].includes(role)
+  );
 
   const fetchData = async () => {
     try {
@@ -115,36 +124,42 @@ export const StudentProfilePage = () => {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <select
-            value={stage}
-            onChange={(event) => setStage(event.target.value as LifecycleStage)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-          >
-            {STAGES.map((item) => (
-              <option key={item} value={item}>
-                {readableEnum(item)}
-              </option>
-            ))}
-          </select>
-          <input
-            value={stageNotes}
-            onChange={(event) => setStageNotes(event.target.value)}
-            placeholder="Transition note"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2"
-          />
-          <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700">
-            <input type="checkbox" checked={riskFlag} onChange={(event) => setRiskFlag(event.target.checked)} />
-            Risk Flag
-          </label>
-        </div>
-        <button
-          onClick={() => void onUpdateStage()}
-          disabled={busy}
-          className="mt-3 rounded-md bg-[var(--gs-primary)] px-3 py-1.5 text-sm text-white hover:bg-[var(--gs-dark)] disabled:opacity-60"
-        >
-          Update Stage
-        </button>
+        {canUpdateStage ? (
+          <>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <select
+                value={stage}
+                onChange={(event) => setStage(event.target.value as LifecycleStage)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                {STAGES.map((item) => (
+                  <option key={item} value={item}>
+                    {readableEnum(item)}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={stageNotes}
+                onChange={(event) => setStageNotes(event.target.value)}
+                placeholder="Transition note"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2"
+              />
+              <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700">
+                <input type="checkbox" checked={riskFlag} onChange={(event) => setRiskFlag(event.target.checked)} />
+                Risk Flag
+              </label>
+            </div>
+            <button
+              onClick={() => void onUpdateStage()}
+              disabled={busy}
+              className="mt-3 rounded-md bg-[var(--gs-primary)] px-3 py-1.5 text-sm text-white hover:bg-[var(--gs-dark)] disabled:opacity-60"
+            >
+              Update Stage
+            </button>
+          </>
+        ) : (
+          <p className="mt-3 text-xs text-slate-500">Lifecycle stage updates are restricted by role.</p>
+        )}
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -157,17 +172,21 @@ export const StudentProfilePage = () => {
                 <p className="text-xs text-slate-500">{readableEnum(milestone.stage)}</p>
               </div>
               <div className="text-xs text-slate-500">Criticality: {milestone.criticality}</div>
-              <select
-                value={milestoneLookup.get(milestone.id) ?? "NOT_STARTED"}
-                onChange={(event) => void onUpdateMilestone(milestone.id, event.target.value)}
-                className="rounded-md border border-slate-300 px-2 py-1 text-xs"
-              >
-                {MILESTONE_STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {readableEnum(status)}
-                  </option>
-                ))}
-              </select>
+              {canUpdateMilestones ? (
+                <select
+                  value={milestoneLookup.get(milestone.id) ?? "NOT_STARTED"}
+                  onChange={(event) => void onUpdateMilestone(milestone.id, event.target.value)}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                >
+                  {MILESTONE_STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>
+                      {readableEnum(status)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-slate-600">{readableEnum(milestoneLookup.get(milestone.id) ?? "NOT_STARTED")}</p>
+              )}
             </div>
           ))}
         </div>
@@ -216,4 +235,3 @@ export const StudentProfilePage = () => {
     </div>
   );
 };
-

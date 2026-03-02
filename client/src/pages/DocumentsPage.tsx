@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { documentsApi, studentsApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
+import { useAuth } from "../app/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
 import type { DocumentRecord, StudentListItem } from "../types/domain";
 import { formatDateTime } from "../utils/format";
 
 export const DocumentsPage = () => {
+  const { user } = useAuth();
   const [students, setStudents] = useState<StudentListItem[]>([]);
   const [studentId, setStudentId] = useState<number | null>(null);
   const [records, setRecords] = useState<DocumentRecord[]>([]);
@@ -14,8 +16,42 @@ export const DocumentsPage = () => {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const roles = user?.roles ?? [];
+  const isStudent = roles.includes("STUDENT");
+  const canCreateChecklist = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER"].includes(role)
+  );
+  const canUpload = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER", "STUDENT"].includes(
+      role
+    )
+  );
+  const canComment = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER", "PANEL_MEMBER"].includes(
+      role
+    )
+  );
 
   const loadStudents = async () => {
+    if (isStudent) {
+      const me = await studentsApi.me();
+      const studentRow: StudentListItem = {
+        id: me.id,
+        studentNumber: me.studentNumber,
+        firstName: me.firstName,
+        lastName: me.lastName,
+        email: me.email,
+        currentStage: me.currentStage,
+        riskFlag: me.riskFlag,
+        program: me.program,
+        adviser: me.adviser,
+        researchCoordinator: me.researchCoordinator,
+      };
+      setStudents([studentRow]);
+      setStudentId(me.id);
+      return;
+    }
+
     const response = await studentsApi.list({ pageSize: 50 });
     setStudents(response.items);
     if (!studentId && response.items.length > 0) {
@@ -24,7 +60,7 @@ export const DocumentsPage = () => {
   };
 
   const loadDocuments = async (nextStudentId: number) => {
-    const response = await documentsApi.byStudent(nextStudentId);
+    const response = isStudent ? await documentsApi.my() : await documentsApi.byStudent(nextStudentId);
     setRecords(response);
   };
 
@@ -40,7 +76,7 @@ export const DocumentsPage = () => {
       }
     };
     void init();
-  }, []);
+  }, [isStudent]);
 
   useEffect(() => {
     const run = async () => {
@@ -71,6 +107,22 @@ export const DocumentsPage = () => {
     try {
       await documentsApi.uploadVersion(documentId, file);
       if (studentId) await loadDocuments(studentId);
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  };
+
+  const downloadVersion = async (versionId: number, fileName: string) => {
+    try {
+      const blob = await documentsApi.downloadVersion(versionId);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       setError(handleApiError(err));
     }
@@ -110,12 +162,14 @@ export const DocumentsPage = () => {
             onChange={(event) => setChecklistItem(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          <button
-            onClick={() => void createRecord()}
-            className="rounded-md bg-[var(--gs-primary)] px-3 py-2 text-sm text-white hover:bg-[var(--gs-dark)]"
-          >
-            Add Checklist Item
-          </button>
+          {canCreateChecklist ? (
+            <button
+              onClick={() => void createRecord()}
+              className="rounded-md bg-[var(--gs-primary)] px-3 py-2 text-sm text-white hover:bg-[var(--gs-dark)]"
+            >
+              Add Checklist Item
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -135,19 +189,21 @@ export const DocumentsPage = () => {
                       Status: {record.status} | Outstanding revisions: {record.outstandingRevisionCount}
                     </p>
                   </div>
-                  <label className="cursor-pointer rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">
-                    Upload Version
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) {
-                          void uploadVersion(record.id, file);
-                        }
-                      }}
-                    />
-                  </label>
+                  {canUpload ? (
+                    <label className="cursor-pointer rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">
+                      Upload Version
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) {
+                            void uploadVersion(record.id, file);
+                          }
+                        }}
+                      />
+                    </label>
+                  ) : null}
                 </div>
 
                 <div className="mt-2 grid gap-3 md:grid-cols-2">
@@ -159,7 +215,17 @@ export const DocumentsPage = () => {
                       <ul className="space-y-1 text-xs">
                         {record.versions.map((version) => (
                           <li key={version.id} className="rounded-md bg-slate-50 px-2 py-1 text-slate-700">
-                            v{version.versionNumber} - {version.fileName} ({formatDateTime(version.uploadedAt)})
+                            <div className="flex items-center justify-between gap-2">
+                              <span>
+                                v{version.versionNumber} - {version.fileName} ({formatDateTime(version.uploadedAt)})
+                              </span>
+                              <button
+                                onClick={() => void downloadVersion(version.id, version.fileName)}
+                                className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] hover:bg-white"
+                              >
+                                Download
+                              </button>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -181,20 +247,22 @@ export const DocumentsPage = () => {
                   </div>
                 </div>
 
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                    placeholder="Add revision note"
-                    className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs"
-                  />
-                  <button
-                    onClick={() => void addComment(record.id)}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                  >
-                    Add Note
-                  </button>
-                </div>
+                {canComment ? (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={comment}
+                      onChange={(event) => setComment(event.target.value)}
+                      placeholder="Add revision note"
+                      className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs"
+                    />
+                    <button
+                      onClick={() => void addComment(record.id)}
+                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    >
+                      Add Note
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

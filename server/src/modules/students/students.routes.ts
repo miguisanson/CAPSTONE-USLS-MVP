@@ -1,6 +1,11 @@
 import { AuditActionType, LifecycleStage, MilestoneStatus, RoleName } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
+import {
+  canReadStudent,
+  canUpdateStudentLifecycle,
+  logAccessDenied,
+} from "../../auth/policy";
 import { logAudit, logTimelineEvent } from "../../lib/audit";
 import { prisma } from "../../lib/prisma";
 import { authorize } from "../../middleware/authorize";
@@ -23,11 +28,102 @@ const updateMilestoneSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+const loadStudentProfile = async (studentId: number) => {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    include: {
+      program: true,
+      adviser: { select: { id: true, fullName: true, email: true } },
+      researchCoordinator: { select: { id: true, fullName: true, email: true } },
+      panelAssignments: {
+        include: { panelMember: { select: { id: true, fullName: true, email: true } } },
+      },
+      panelAssignmentsV2: {
+        include: { panelUser: { select: { id: true, fullName: true, email: true } } },
+      },
+      adviserAssignments: {
+        include: { adviserUser: { select: { id: true, fullName: true, email: true } } },
+      },
+      lifecycleHistory: {
+        orderBy: { enteredAt: "desc" },
+      },
+      milestoneStatuses: {
+        include: { milestoneDefinition: true },
+        orderBy: { updatedAt: "desc" },
+      },
+      tasks: {
+        where: { status: { not: "COMPLETED" } },
+        include: { milestoneDefinition: true, assignedTo: { select: { id: true, fullName: true } } },
+        orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
+      },
+      documents: {
+        include: {
+          versions: {
+            orderBy: { versionNumber: "desc" },
+            take: 1,
+          },
+          revisionNotes: {
+            where: { isResolved: false },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      },
+      scheduleRequests: {
+        include: {
+          availabilities: true,
+          scheduleEvents: { orderBy: { createdAt: "desc" } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      alerts: {
+        where: { status: { not: "CLOSED" } },
+        include: { interventions: true },
+        orderBy: { triggeredAt: "desc" },
+      },
+      timelineEvents: {
+        orderBy: { occurredAt: "desc" },
+        take: 100,
+      },
+    },
+  });
+
+  if (!student) return null;
+
+  const enrichedTasks = student.tasks.map((task) => {
+    const priorityScore = computePriorityScore({
+      dueAt: task.dueAt,
+      stage: student.currentStage,
+      milestoneCriticality: task.milestoneDefinition?.criticality,
+      taskStatus: task.status,
+    });
+    const recommendation = buildRecommendation({
+      dueAt: task.dueAt,
+      nextActionOwnerRole: task.nextActionOwnerRole,
+    });
+    return {
+      ...task,
+      priorityScore,
+      recommendedAction: recommendation.recommendedAction,
+      escalationPrompt: recommendation.escalationPrompt,
+    };
+  });
+
+  return {
+    ...student,
+    tasks: enrichedTasks,
+  };
+};
+
 export const studentsRouter = Router();
 
 studentsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
+    if (req.user!.roles.includes(RoleName.STUDENT)) {
+      await logAccessDenied(req, "Student attempted to list all/scoped students.");
+      throw new HttpError(403, "Students are only allowed to read their own profile.");
+    }
+
     const { skip, take, page, pageSize } = getPagination(req);
     const stage = req.query.stage ? (String(req.query.stage) as LifecycleStage) : undefined;
     const program = req.query.program ? String(req.query.program) : undefined;
@@ -84,6 +180,26 @@ studentsRouter.get(
 );
 
 studentsRouter.get(
+  "/me",
+  authorize(RoleName.STUDENT),
+  asyncHandler(async (req, res) => {
+    const mine = await prisma.student.findFirst({
+      where: { userAccountId: req.user!.id },
+      select: { id: true },
+    });
+    if (!mine) {
+      throw new HttpError(404, "No student profile is linked to this account.");
+    }
+
+    const student = await loadStudentProfile(mine.id);
+    if (!student) {
+      throw new HttpError(404, "Student profile not found.");
+    }
+    res.json(student);
+  })
+);
+
+studentsRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     const studentId = Number(req.params.id);
@@ -91,88 +207,20 @@ studentsRouter.get(
       throw new HttpError(400, "Invalid student ID.");
     }
 
-    const scope = buildStudentScopeWhere(req.user!);
-    const student = await prisma.student.findFirst({
-      where: {
-        AND: [scope, { id: studentId }],
-      },
-      include: {
-        program: true,
-        adviser: { select: { id: true, fullName: true, email: true } },
-        researchCoordinator: { select: { id: true, fullName: true, email: true } },
-        panelAssignments: {
-          include: { panelMember: { select: { id: true, fullName: true, email: true } } },
-        },
-        lifecycleHistory: {
-          orderBy: { enteredAt: "desc" },
-        },
-        milestoneStatuses: {
-          include: { milestoneDefinition: true },
-          orderBy: { updatedAt: "desc" },
-        },
-        tasks: {
-          where: { status: { not: "COMPLETED" } },
-          include: { milestoneDefinition: true, assignedTo: { select: { id: true, fullName: true } } },
-          orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
-        },
-        documents: {
-          include: {
-            versions: {
-              orderBy: { versionNumber: "desc" },
-              take: 1,
-            },
-            revisionNotes: {
-              where: { isResolved: false },
-              orderBy: { createdAt: "desc" },
-            },
-          },
-        },
-        scheduleRequests: {
-          include: {
-            availabilities: true,
-            scheduleEvents: { orderBy: { createdAt: "desc" } },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-        alerts: {
-          where: { status: { not: "CLOSED" } },
-          include: { interventions: true },
-          orderBy: { triggeredAt: "desc" },
-        },
-        timelineEvents: {
-          orderBy: { occurredAt: "desc" },
-          take: 100,
-        },
-      },
-    });
-
-    if (!student) {
-      throw new HttpError(404, "Student not found or not accessible.");
+    const allowed = await canReadStudent(req.user!, studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Student profile access denied by row-level policy.", {
+        studentId,
+      });
+      throw new HttpError(403, "You are not authorized to access this student record.");
     }
 
-    const enrichedTasks = student.tasks.map((task) => {
-      const priorityScore = computePriorityScore({
-        dueAt: task.dueAt,
-        stage: student.currentStage,
-        milestoneCriticality: task.milestoneDefinition?.criticality,
-        taskStatus: task.status,
-      });
-      const recommendation = buildRecommendation({
-        dueAt: task.dueAt,
-        nextActionOwnerRole: task.nextActionOwnerRole,
-      });
-      return {
-        ...task,
-        priorityScore,
-        recommendedAction: recommendation.recommendedAction,
-        escalationPrompt: recommendation.escalationPrompt,
-      };
-    });
+    const student = await loadStudentProfile(studentId);
+    if (!student) {
+      throw new HttpError(404, "Student not found.");
+    }
 
-    res.json({
-      ...student,
-      tasks: enrichedTasks,
-    });
+    res.json(student);
   })
 );
 
@@ -196,13 +244,21 @@ studentsRouter.patch(
       throw new HttpError(400, "Invalid stage update payload.");
     }
 
-    const scope = buildStudentScopeWhere(req.user!);
-    const existing = await prisma.student.findFirst({
-      where: { AND: [scope, { id: studentId }] },
+    const allowed = await canUpdateStudentLifecycle(req.user!, studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Lifecycle stage update blocked by policy.", {
+        studentId,
+      });
+      throw new HttpError(403, "You are not authorized to update lifecycle stage for this student.");
+    }
+
+    const existing = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true, riskFlag: true },
     });
 
     if (!existing) {
-      throw new HttpError(404, "Student not found or not accessible.");
+      throw new HttpError(404, "Student not found.");
     }
 
     await prisma.$transaction(async (tx) => {
@@ -266,8 +322,7 @@ studentsRouter.patch(
     RoleName.GRADUATE_SCHOOL_STAFF,
     RoleName.ACADEMIC_COORDINATOR,
     RoleName.RESEARCH_COORDINATOR,
-    RoleName.ADVISER,
-    RoleName.STUDENT
+    RoleName.ADVISER
   ),
   asyncHandler(async (req, res) => {
     const studentId = Number(req.params.id);
@@ -281,13 +336,13 @@ studentsRouter.patch(
       throw new HttpError(400, "Invalid milestone update payload.");
     }
 
-    const scope = buildStudentScopeWhere(req.user!);
-    const accessibleStudent = await prisma.student.findFirst({
-      where: { AND: [scope, { id: studentId }] },
-      select: { id: true },
-    });
-    if (!accessibleStudent) {
-      throw new HttpError(404, "Student not found or not accessible.");
+    const allowed = await canReadStudent(req.user!, studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Milestone update denied by row-level policy.", {
+        studentId,
+        milestoneDefinitionId,
+      });
+      throw new HttpError(403, "You are not authorized to update milestones for this student.");
     }
 
     const updated = await prisma.studentMilestoneStatus.upsert({
@@ -341,4 +396,3 @@ studentsRouter.patch(
     res.json(updated);
   })
 );
-

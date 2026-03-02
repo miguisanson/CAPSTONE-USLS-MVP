@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { studentsApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
+import { useAuth } from "../app/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
 import type { LifecycleStage, Paginated, StudentListItem } from "../types/domain";
@@ -20,6 +21,7 @@ const STAGES: LifecycleStage[] = [
 ];
 
 export const StudentsPage = () => {
+  const { user } = useAuth();
   const [data, setData] = useState<Paginated<StudentListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,18 +29,42 @@ export const StudentsPage = () => {
   const [program, setProgram] = useState<string>("");
   const [riskFlag, setRiskFlag] = useState<string>("");
   const [q, setQ] = useState<string>("");
+  const isStudent = (user?.roles ?? []).includes("STUDENT");
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const result = await studentsApi.list({
-        stage: stage || undefined,
-        program: program || undefined,
-        riskFlag: riskFlag || undefined,
-        q: q || undefined,
-        pageSize: 25,
-      });
-      setData(result);
+      if (isStudent) {
+        const me = await studentsApi.me();
+        setData({
+          items: [
+            {
+              id: me.id,
+              studentNumber: me.studentNumber,
+              firstName: me.firstName,
+              lastName: me.lastName,
+              email: me.email,
+              currentStage: me.currentStage,
+              riskFlag: me.riskFlag,
+              program: me.program,
+              adviser: me.adviser,
+              researchCoordinator: me.researchCoordinator,
+            },
+          ],
+          page: 1,
+          pageSize: 1,
+          total: 1,
+        });
+      } else {
+        const result = await studentsApi.list({
+          stage: stage || undefined,
+          program: program || undefined,
+          riskFlag: riskFlag || undefined,
+          q: q || undefined,
+          pageSize: 25,
+        });
+        setData(result);
+      }
       setError(null);
     } catch (err) {
       setError(handleApiError(err));
@@ -49,7 +75,7 @@ export const StudentsPage = () => {
 
   useEffect(() => {
     void fetchStudents();
-  }, []); // initial only
+  }, [isStudent]); // initial + role-aware load
 
   const students = useMemo(() => data?.items ?? [], [data]);
 
@@ -177,4 +203,3 @@ export const StudentsPage = () => {
     </div>
   );
 };
-

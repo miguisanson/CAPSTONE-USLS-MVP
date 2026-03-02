@@ -2,7 +2,6 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import path from "node:path";
 import { env } from "./config/env";
 import { authenticate } from "./middleware/authenticate";
 import { errorHandler } from "./middleware/error-handler";
@@ -34,7 +33,6 @@ export const createApp = (): express.Express => {
   app.use(express.json({ limit: "5mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
-  app.use("/uploads", express.static(path.resolve(process.cwd(), env.UPLOAD_DIR)));
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true, timestamp: new Date().toISOString() });
@@ -52,6 +50,7 @@ export const createApp = (): express.Express => {
   app.use("/api/scheduling", schedulingRouter);
   app.use("/api/alerts", alertsRouter);
   app.use("/api/analytics", analyticsRouter);
+  app.use("/api/audit", auditRouter);
   app.use("/api/audit-logs", auditRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/assistant", assistantRouter);
@@ -61,4 +60,3 @@ export const createApp = (): express.Express => {
 
   return app;
 };
-

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Reports</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<header>
+  <div class="brand">USLS Graduate School Monitoring MVP</div>
+  
+<nav>
+  <a href="dashboard.html" class="">Dashboard</a>
+  <a href="queue.html" class="">Queues</a>
+  <a href="student.html" class="">Student</a>
+  <a href="case.html" class="">Research Case</a>
+  <a href="reports.html" class="active">Reports</a>
+  <a href="alerts.html" class="">Alerts</a>
+  <a href="audit.html" class="">Audit</a>
+  <a href="config.html" class="">Admin Config</a>
+</nav>
+
+</header>
+<main>
+
+<div class="grid cols-3">
+  <div class="card"><h3>Counts per Stage</h3><div class="kpi"><div class="num">54</div><div class="lbl">proposal</div></div></div>
+  <div class="card"><h3>LOA Visibility</h3><div class="kpi"><div class="num">7</div><div class="lbl">active LOA (sample)</div></div></div>
+  <div class="card"><h3>Workload</h3><div class="kpi"><div class="num">23</div><div class="lbl">items assigned to staff</div></div></div>
+</div>
+<div style="height:14px;"></div>
+<div class="card">
+  <h3>Export (prototype)</h3>
+  <small>In implementation, this exports CSV/PDF summaries based on event history and defined indicators.</small>
+  <div style="height:10px;"></div>
+  <div class="actions">
+    <button>Export CSV</button>
+    <button>Export PDF</button>
+  </div>
+</div>
+
+<div class="footer-note">Prototype only. Values shown are sample data to demonstrate dashboards, queues, and event-based tracking.</div>
+</main>
+</body>
+</html>

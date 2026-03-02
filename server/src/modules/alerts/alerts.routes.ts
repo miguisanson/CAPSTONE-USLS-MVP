@@ -1,6 +1,7 @@
 import { AlertStatus, AuditActionType, InterventionStatus, RoleName } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
+import { logAccessDenied } from "../../auth/policy";
 import { logAudit, logTimelineEvent } from "../../lib/audit";
 import { prisma } from "../../lib/prisma";
 import { authorize } from "../../middleware/authorize";
@@ -108,7 +109,13 @@ alertsRouter.patch(
       where: { AND: [buildStudentScopeWhere(req.user!), { id: alert.studentId }] },
       select: { id: true },
     });
-    if (!access) throw new HttpError(403, "Student scope denied.");
+    if (!access) {
+      await logAccessDenied(req, "Alert status update denied by student scope.", {
+        alertId,
+        studentId: alert.studentId,
+      });
+      throw new HttpError(403, "Student scope denied.");
+    }
 
     const updated = await prisma.alert.update({
       where: { id: alertId },
@@ -170,7 +177,13 @@ alertsRouter.post(
       where: { AND: [buildStudentScopeWhere(req.user!), { id: alert.studentId }] },
       select: { id: true },
     });
-    if (!access) throw new HttpError(403, "Student scope denied.");
+    if (!access) {
+      await logAccessDenied(req, "Intervention creation denied by student scope.", {
+        alertId,
+        studentId: alert.studentId,
+      });
+      throw new HttpError(403, "Student scope denied.");
+    }
 
     const intervention = await prisma.intervention.create({
       data: {
@@ -237,7 +250,13 @@ alertsRouter.patch(
       where: { AND: [buildStudentScopeWhere(req.user!), { id: intervention.alert.studentId }] },
       select: { id: true },
     });
-    if (!access) throw new HttpError(403, "Student scope denied.");
+    if (!access) {
+      await logAccessDenied(req, "Intervention closure denied by student scope.", {
+        interventionId,
+        studentId: intervention.alert.studentId,
+      });
+      throw new HttpError(403, "Student scope denied.");
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const closedIntervention = await tx.intervention.update({
@@ -290,4 +309,3 @@ alertsRouter.patch(
     res.json(updated);
   })
 );
-

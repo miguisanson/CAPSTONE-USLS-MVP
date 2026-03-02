@@ -125,7 +125,9 @@ model UserAccount {
   studentProfile          Student?                 @relation("StudentUser")
   advisedStudents         Student[]                @relation("StudentAdviser")
   researchStudents        Student[]                @relation("StudentResearchCoordinator")
+  adviserAssignments      AdviserAssignment[]
   panelAssignments        StudentPanelAssignment[]
+  panelAssignmentsV2      PanelAssignment[]
   createdMilestones       MilestoneDefinition[]    @relation("MilestoneCreatedBy")
   updatedMilestoneStatus  StudentMilestoneStatus[] @relation("MilestoneUpdatedBy")
   createdTasks            Task[]                   @relation("TaskCreatedBy")
@@ -196,7 +198,9 @@ model Student {
   userAccount           UserAccount?             @relation("StudentUser", fields: [userAccountId], references: [id])
   adviser               UserAccount?             @relation("StudentAdviser", fields: [adviserId], references: [id])
   researchCoordinator   UserAccount?             @relation("StudentResearchCoordinator", fields: [researchCoordinatorId], references: [id])
+  adviserAssignments    AdviserAssignment[]
   panelAssignments      StudentPanelAssignment[]
+  panelAssignmentsV2    PanelAssignment[]
   lifecycleHistory      StudentLifecycle[]
   milestoneStatuses     StudentMilestoneStatus[]
   tasks                 Task[]
@@ -222,6 +226,30 @@ model StudentPanelAssignment {
 
   @@unique([studentId, panelMemberId])
   @@index([panelMemberId])
+}
+
+model AdviserAssignment {
+  id           Int         @id @default(autoincrement())
+  adviserUserId Int
+  studentId    Int
+  assignedAt   DateTime    @default(now())
+  adviserUser  UserAccount @relation(fields: [adviserUserId], references: [id], onDelete: Cascade)
+  student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([adviserUserId, studentId])
+  @@index([studentId])
+}
+
+model PanelAssignment {
+  id          Int         @id @default(autoincrement())
+  panelUserId Int
+  studentId   Int
+  assignedAt  DateTime    @default(now())
+  panelUser   UserAccount @relation(fields: [panelUserId], references: [id], onDelete: Cascade)
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([panelUserId, studentId])
+  @@index([studentId])
 }
 
 model StudentLifecycle {

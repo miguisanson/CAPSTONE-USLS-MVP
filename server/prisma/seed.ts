@@ -39,7 +39,9 @@ const resetDatabase = async (): Promise<void> => {
     prisma.task.deleteMany(),
     prisma.studentMilestoneStatus.deleteMany(),
     prisma.studentLifecycle.deleteMany(),
+    prisma.panelAssignment.deleteMany(),
     prisma.studentPanelAssignment.deleteMany(),
+    prisma.adviserAssignment.deleteMany(),
     prisma.timelineEvent.deleteMany(),
     prisma.student.deleteMany(),
     prisma.milestoneDefinition.deleteMany(),
@@ -217,6 +219,13 @@ const seed = async (): Promise<void> => {
       },
     });
 
+    await prisma.adviserAssignment.create({
+      data: {
+        adviserUserId: adviserId,
+        studentId: student.id,
+      },
+    });
+
     students.push({
       id: student.id,
       stage: student.currentStage,
@@ -255,6 +264,14 @@ const seed = async (): Promise<void> => {
       data: [
         { studentId: student.id, panelMemberId: userIds.panel1 },
         { studentId: student.id, panelMemberId: userIds.panel2 },
+      ],
+      skipDuplicates: true,
+    });
+
+    await prisma.panelAssignment.createMany({
+      data: [
+        { studentId: student.id, panelUserId: userIds.panel1 },
+        { studentId: student.id, panelUserId: userIds.panel2 },
       ],
       skipDuplicates: true,
     });

@@ -199,6 +199,35 @@ export type AnalyticsDashboard = {
   workloadIndicators: Array<{ owner: string; taskCount: number }>;
 };
 
+export type PrescriptiveAnalyticsResponse = {
+  generated_at: string;
+  summary: string;
+  priority_actions: Array<{
+    action: string;
+    why: string;
+    who: string;
+    timeframe: string;
+    confidence: "low" | "med" | "high";
+  }>;
+  top_cases: Array<{
+    student_ref: string;
+    reason: string;
+    recommended_next_action: string;
+    owner_role: string;
+    confidence: "low" | "med" | "high";
+    data_needed: string[];
+    priority_score: number;
+  }>;
+  disclaimer: string;
+  ai: {
+    enabled: boolean;
+    status: "disabled" | "success" | "error";
+    message: string;
+    cached: boolean;
+    prompt_hash?: string;
+  };
+};
+
 export type AuditLogItem = {
   id: string;
   actorUserId?: number | null;
@@ -245,4 +274,3 @@ export type UserAccount = {
   isActive: boolean;
   roles: RoleName[];
 };
-

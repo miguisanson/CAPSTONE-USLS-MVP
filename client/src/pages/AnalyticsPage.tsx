@@ -13,20 +13,38 @@ import { analyticsApi } from "../api/endpoints";
 import { api, handleApiError } from "../api/client";
 import { LoadingBlock } from "../components/LoadingBlock";
 import { EmptyState } from "../components/EmptyState";
-import type { AnalyticsDashboard } from "../types/domain";
+import type { AnalyticsDashboard, PrescriptiveAnalyticsResponse } from "../types/domain";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
+const STAGES = [
+  "ADMISSION",
+  "COURSEWORK",
+  "PROPOSAL_DEVELOPMENT",
+  "PROPOSAL_DEFENSE",
+  "DATA_COLLECTION",
+  "DISSERTATION_WRITING",
+  "ORAL_DEFENSE",
+  "LOA",
+  "COMPLETED",
+];
+
 export const AnalyticsPage = () => {
   const [data, setData] = useState<AnalyticsDashboard | null>(null);
+  const [prescriptive, setPrescriptive] = useState<PrescriptiveAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [prescriptiveLoading, setPrescriptiveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [program, setProgram] = useState("");
+  const [stage, setStage] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const response = await analyticsApi.dashboard();
+        const response = await analyticsApi.descriptive();
         setData(response);
         setError(null);
       } catch (err) {
@@ -82,13 +100,31 @@ export const AnalyticsPage = () => {
     }
   };
 
+  const generatePrescriptive = async () => {
+    try {
+      setPrescriptiveLoading(true);
+      const response = await analyticsApi.prescriptive({
+        program: program || undefined,
+        stage: stage || undefined,
+        from: from || undefined,
+        to: to || undefined,
+      });
+      setPrescriptive(response);
+      setError(null);
+    } catch (err) {
+      setError(handleApiError(err));
+    } finally {
+      setPrescriptiveLoading(false);
+    }
+  };
+
   if (loading) return <LoadingBlock text="Loading analytics dashboard..." />;
 
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-800">Analytics & Reporting</h2>
+          <h2 className="text-sm font-semibold text-slate-800">Descriptive Analytics</h2>
           <div className="flex gap-2">
             <button
               onClick={() => void downloadCsv()}
@@ -174,6 +210,103 @@ export const AnalyticsPage = () => {
           </div>
         </>
       )}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">Prescriptive Decision Support</h3>
+            <p className="text-xs text-slate-500">Rule-based recommendations are always available. AI is advisory-only.</p>
+          </div>
+          <button
+            onClick={() => void generatePrescriptive()}
+            disabled={prescriptiveLoading}
+            className="rounded-md bg-[var(--gs-primary)] px-3 py-1.5 text-sm text-white hover:bg-[var(--gs-dark)] disabled:opacity-60"
+          >
+            {prescriptiveLoading ? "Generating..." : "Generate Recommendations"}
+          </button>
+        </div>
+
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          <input
+            value={program}
+            onChange={(event) => setProgram(event.target.value)}
+            placeholder="Program code/name"
+            className="rounded-md border border-slate-300 px-3 py-2 text-xs"
+          />
+          <select
+            value={stage}
+            onChange={(event) => setStage(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-xs"
+          >
+            <option value="">All stages</option>
+            {STAGES.map((item) => (
+              <option key={item} value={item}>
+                {item.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-xs"
+          />
+          <input
+            type="date"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-xs"
+          />
+        </div>
+
+        {!prescriptive ? (
+          <p className="mt-3 text-xs text-slate-500">Generate prescriptive recommendations to view prioritized actions.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-medium text-slate-800">{prescriptive.summary}</p>
+              <p className="mt-1 text-xs text-slate-600">{prescriptive.disclaimer}</p>
+              <p className="mt-1 text-xs text-slate-600">
+                AI status: <strong>{prescriptive.ai.status.toUpperCase()}</strong> - {prescriptive.ai.message}
+              </p>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-semibold text-slate-600">Priority Actions</p>
+                <div className="space-y-2">
+                  {prescriptive.priority_actions.map((item, index) => (
+                    <div key={`${item.action}-${index}`} className="rounded-lg border border-slate-200 px-3 py-2">
+                      <p className="text-sm font-medium text-slate-800">{item.action}</p>
+                      <p className="text-xs text-slate-600">{item.why}</p>
+                      <p className="text-[11px] text-slate-500">
+                        Owner: {item.who} | Timeframe: {item.timeframe} | Confidence: {item.confidence}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-semibold text-slate-600">Top Cases (De-identified)</p>
+                <div className="space-y-2">
+                  {prescriptive.top_cases.map((item) => (
+                    <div key={item.student_ref} className="rounded-lg border border-slate-200 px-3 py-2">
+                      <p className="text-sm font-medium text-slate-800">
+                        {item.student_ref} | score {item.priority_score}
+                      </p>
+                      <p className="text-xs text-slate-600">{item.reason}</p>
+                      <p className="text-xs text-[var(--gs-dark)]">{item.recommended_next_action}</p>
+                      <p className="text-[11px] text-slate-500">
+                        Owner: {item.owner_role} | Confidence: {item.confidence}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

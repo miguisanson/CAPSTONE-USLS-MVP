@@ -6,7 +6,7 @@ import { LoadingBlock } from "../components/LoadingBlock";
 import { useAuth } from "../app/AuthContext";
 import type { Paginated, TaskDecision, TaskItem } from "../types/domain";
 import { formatDate, readableEnum } from "../utils/format";
-import { canViewTeamQueue } from "../utils/roles";
+import { canSubmitTaskDecisions, canViewTeamQueue } from "../utils/roles";
 
 const DECISIONS: TaskDecision[] = ["APPROVE", "REVISE", "RETURN"];
 
@@ -17,6 +17,7 @@ export const TaskQueuePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [decisionState, setDecisionState] = useState<Record<number, { decision: TaskDecision; rationale: string }>>({});
+  const canDecide = canSubmitTaskDecisions(user?.roles ?? []);
 
   const fetchQueue = async () => {
     try {
@@ -107,7 +108,7 @@ export const TaskQueuePage = () => {
                   ) : null}
                   {task.escalationPrompt ? <p className="mt-1 text-xs text-rose-700">{task.escalationPrompt}</p> : null}
 
-                  {task.status !== "COMPLETED" ? (
+                  {task.status !== "COMPLETED" && canDecide ? (
                     <div className="mt-3 grid gap-2 md:grid-cols-[140px_1fr_auto]">
                       <select
                         value={decisionState[task.id]?.decision ?? "APPROVE"}
@@ -161,4 +162,3 @@ export const TaskQueuePage = () => {
     </div>
   );
 };
-

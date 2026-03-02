@@ -4,13 +4,18 @@ import fs from "node:fs";
 import path from "node:path";
 import multer from "multer";
 import { z } from "zod";
+import {
+  canDownloadDocument,
+  canReadStudent,
+  canUploadDocument,
+  logAccessDenied,
+} from "../../auth/policy";
 import { env } from "../../config/env";
 import { logAudit, logTimelineEvent } from "../../lib/audit";
 import { prisma } from "../../lib/prisma";
 import { authorize } from "../../middleware/authorize";
 import { asyncHandler } from "../../utils/async-handler";
 import { HttpError } from "../../utils/http-error";
-import { buildStudentScopeWhere } from "../../utils/scope";
 
 const uploadDirectory = path.resolve(process.cwd(), env.UPLOAD_DIR);
 if (!fs.existsSync(uploadDirectory)) {
@@ -44,18 +49,53 @@ const resolveCommentSchema = z.object({
 export const documentsRouter = Router();
 
 documentsRouter.get(
+  "/documents/my",
+  authorize(RoleName.STUDENT),
+  asyncHandler(async (req, res) => {
+    const student = await prisma.student.findFirst({
+      where: { userAccountId: req.user!.id },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new HttpError(404, "No student profile is linked to this account.");
+    }
+
+    const docs = await prisma.documentRecord.findMany({
+      where: { studentId: student.id },
+      include: {
+        milestoneDefinition: true,
+        versions: {
+          orderBy: { versionNumber: "desc" },
+        },
+        revisionNotes: {
+          include: {
+            author: { select: { id: true, fullName: true } },
+            version: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    res.json(docs);
+  })
+);
+
+documentsRouter.get(
   "/students/:studentId/documents",
   asyncHandler(async (req, res) => {
     const studentId = Number(req.params.studentId);
     if (!Number.isFinite(studentId)) throw new HttpError(400, "Invalid student ID.");
 
-    const student = await prisma.student.findFirst({
-      where: {
-        AND: [buildStudentScopeWhere(req.user!), { id: studentId }],
-      },
-      select: { id: true },
-    });
-    if (!student) throw new HttpError(404, "Student not found or not accessible.");
+    const allowed = await canReadStudent(req.user!, studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Document list access denied by student relationship check.", {
+        studentId,
+      });
+      throw new HttpError(403, "You are not authorized to access this student's documents.");
+    }
 
     const docs = await prisma.documentRecord.findMany({
       where: { studentId },
@@ -86,8 +126,7 @@ documentsRouter.post(
     RoleName.GRADUATE_SCHOOL_STAFF,
     RoleName.ACADEMIC_COORDINATOR,
     RoleName.RESEARCH_COORDINATOR,
-    RoleName.ADVISER,
-    RoleName.STUDENT
+    RoleName.ADVISER
   ),
   asyncHandler(async (req, res) => {
     const studentId = Number(req.params.studentId);
@@ -96,13 +135,13 @@ documentsRouter.post(
     const parsed = createDocumentSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, "Invalid document payload.");
 
-    const student = await prisma.student.findFirst({
-      where: {
-        AND: [buildStudentScopeWhere(req.user!), { id: studentId }],
-      },
-      select: { id: true },
-    });
-    if (!student) throw new HttpError(404, "Student not found or not accessible.");
+    const allowed = await canReadStudent(req.user!, studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Document checklist creation denied by student relationship check.", {
+        studentId,
+      });
+      throw new HttpError(403, "You are not authorized to create checklist records for this student.");
+    }
 
     const record = await prisma.documentRecord.create({
       data: {
@@ -159,13 +198,15 @@ documentsRouter.post(
 
     if (!document) throw new HttpError(404, "Document record not found.");
 
-    const accessible = await prisma.student.findFirst({
-      where: {
-        AND: [buildStudentScopeWhere(req.user!), { id: document.studentId }],
-      },
-      select: { id: true },
-    });
-    if (!accessible) throw new HttpError(403, "Student scope denied.");
+    const canUpload = await canUploadDocument(req.user!, document.studentId, document.checklistItem);
+    if (!canUpload) {
+      await logAccessDenied(req, "Document upload blocked by row-level/document policy.", {
+        documentId,
+        studentId: document.studentId,
+        checklistItem: document.checklistItem,
+      });
+      throw new HttpError(403, "You are not authorized to upload this document.");
+    }
 
     const latestVersion = await prisma.documentVersion.findFirst({
       where: { documentRecordId: documentId },
@@ -229,6 +270,64 @@ documentsRouter.post(
   })
 );
 
+documentsRouter.get(
+  "/documents/versions/:id/download",
+  asyncHandler(async (req, res) => {
+    const versionId = Number(req.params.id);
+    if (!Number.isFinite(versionId)) throw new HttpError(400, "Invalid document version ID.");
+
+    const allowed = await canDownloadDocument(req.user!, versionId);
+    if (!allowed) {
+      await logAccessDenied(req, "Document download denied by relationship checks.", {
+        versionId,
+      });
+      throw new HttpError(403, "You are not authorized to download this file.");
+    }
+
+    const version = await prisma.documentVersion.findUnique({
+      where: { id: versionId },
+      include: {
+        documentRecord: {
+          select: {
+            studentId: true,
+            checklistItem: true,
+          },
+        },
+      },
+    });
+
+    if (!version) throw new HttpError(404, "Document version not found.");
+
+    const absolutePath = path.resolve(uploadDirectory, version.filePath);
+    if (!absolutePath.startsWith(uploadDirectory)) {
+      await logAccessDenied(req, "Document path traversal blocked.", {
+        versionId,
+      });
+      throw new HttpError(403, "Invalid document path.");
+    }
+
+    if (!fs.existsSync(absolutePath)) {
+      throw new HttpError(404, "File is missing on server.");
+    }
+
+    await logAudit({
+      actorUserId: req.user!.id,
+      actionType: AuditActionType.UPDATE,
+      entityType: "DocumentVersion",
+      entityId: String(version.id),
+      description: "Document version downloaded.",
+      metadata: {
+        versionId: version.id,
+        studentId: version.documentRecord.studentId,
+        checklistItem: version.documentRecord.checklistItem,
+      },
+      req,
+    });
+
+    res.download(absolutePath, version.fileName);
+  })
+);
+
 documentsRouter.post(
   "/documents/:id/comments",
   authorize(
@@ -251,13 +350,14 @@ documentsRouter.post(
     });
     if (!document) throw new HttpError(404, "Document record not found.");
 
-    const access = await prisma.student.findFirst({
-      where: {
-        AND: [buildStudentScopeWhere(req.user!), { id: document.studentId }],
-      },
-      select: { id: true },
-    });
-    if (!access) throw new HttpError(403, "Student scope denied.");
+    const allowed = await canReadStudent(req.user!, document.studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Revision note creation denied by student relationship checks.", {
+        documentId,
+        studentId: document.studentId,
+      });
+      throw new HttpError(403, "You are not authorized to comment on this document.");
+    }
 
     const created = await prisma.$transaction(async (tx) => {
       const note = await tx.revisionNote.create({
@@ -329,13 +429,14 @@ documentsRouter.patch(
     });
     if (!comment) throw new HttpError(404, "Revision note not found.");
 
-    const access = await prisma.student.findFirst({
-      where: {
-        AND: [buildStudentScopeWhere(req.user!), { id: comment.documentRecord.studentId }],
-      },
-      select: { id: true },
-    });
-    if (!access) throw new HttpError(403, "Student scope denied.");
+    const allowed = await canReadStudent(req.user!, comment.documentRecord.studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Revision note resolution denied by student relationship checks.", {
+        commentId,
+        studentId: comment.documentRecord.studentId,
+      });
+      throw new HttpError(403, "You are not authorized to resolve this revision note.");
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const note = await tx.revisionNote.update({
@@ -370,4 +471,3 @@ documentsRouter.patch(
     res.json(updated);
   })
 );
-

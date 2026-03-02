@@ -1,6 +1,7 @@
 import { AuditActionType, RoleName, ScheduleStatus } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
+import { canReadStudent, logAccessDenied } from "../../auth/policy";
 import { logAudit, logTimelineEvent } from "../../lib/audit";
 import { prisma } from "../../lib/prisma";
 import { authorize } from "../../middleware/authorize";
@@ -89,13 +90,13 @@ schedulingRouter.post(
     const parsed = createRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, "Invalid schedule request payload.");
 
-    const student = await prisma.student.findFirst({
-      where: {
-        AND: [buildStudentScopeWhere(req.user!), { id: parsed.data.studentId }],
-      },
-      select: { id: true },
-    });
-    if (!student) throw new HttpError(404, "Student not found or not accessible.");
+    const allowed = await canReadStudent(req.user!, parsed.data.studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Schedule request creation denied by student scope.", {
+        studentId: parsed.data.studentId,
+      });
+      throw new HttpError(403, "You are not authorized to create scheduling requests for this student.");
+    }
 
     const created = await prisma.scheduleRequest.create({
       data: {
@@ -156,11 +157,14 @@ schedulingRouter.post(
     });
     if (!scheduleRequest) throw new HttpError(404, "Schedule request not found.");
 
-    const access = await prisma.student.findFirst({
-      where: { AND: [buildStudentScopeWhere(req.user!), { id: scheduleRequest.studentId }] },
-      select: { id: true },
-    });
-    if (!access) throw new HttpError(403, "Student scope denied.");
+    const allowed = await canReadStudent(req.user!, scheduleRequest.studentId);
+    if (!allowed) {
+      await logAccessDenied(req, "Availability submission denied by student scope.", {
+        scheduleRequestId: scheduleRequest.id,
+        studentId: scheduleRequest.studentId,
+      });
+      throw new HttpError(403, "You are not authorized to submit availability for this request.");
+    }
 
     const created = await prisma.availability.create({
       data: {
@@ -258,4 +262,3 @@ schedulingRouter.post(
     res.status(201).json(event);
   })
 );
-

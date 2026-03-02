@@ -9,6 +9,7 @@ import type {
   LoginResponse,
   MilestoneDefinition,
   Paginated,
+  PrescriptiveAnalyticsResponse,
   RoutingRule,
   ScheduleRequestItem,
   StudentDetail,
@@ -44,6 +45,7 @@ export const usersApi = {
 export const studentsApi = {
   list: (params?: QueryParams) =>
     api.get<Paginated<StudentListItem>>("/api/students", { params }).then((res) => res.data),
+  me: () => api.get<StudentDetail>("/api/students/me").then((res) => res.data),
   detail: (id: number) => api.get<StudentDetail>(`/api/students/${id}`).then((res) => res.data),
   updateStage: (id: number, payload: { stage: string; notes?: string; riskFlag?: boolean }) =>
     api.patch(`/api/students/${id}/stage`, payload).then((res) => res.data),
@@ -76,6 +78,7 @@ export const tasksApi = {
 export const documentsApi = {
   byStudent: (studentId: number) =>
     api.get<DocumentRecord[]>(`/api/students/${studentId}/documents`).then((res) => res.data),
+  my: () => api.get<DocumentRecord[]>("/api/documents/my").then((res) => res.data),
   createRecord: (studentId: number, payload: { checklistItem: string; milestoneDefinitionId?: number }) =>
     api.post<DocumentRecord>(`/api/students/${studentId}/documents`, payload).then((res) => res.data),
   uploadVersion: (documentId: number, file: File) => {
@@ -85,6 +88,8 @@ export const documentsApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+  downloadVersion: (versionId: number) =>
+    api.get(`/api/documents/versions/${versionId}/download`, { responseType: "blob" }).then((res) => res.data),
   addComment: (documentId: number, payload: { note: string; versionId?: number }) =>
     api.post(`/api/documents/${documentId}/comments`, payload).then((res) => res.data),
   resolveComment: (commentId: number, resolved: boolean) =>
@@ -123,14 +128,17 @@ export const alertsApi = {
 };
 
 export const analyticsApi = {
-  dashboard: () => api.get<AnalyticsDashboard>("/api/analytics/dashboard").then((res) => res.data),
+  descriptive: () => api.get<AnalyticsDashboard>("/api/analytics/descriptive").then((res) => res.data),
+  dashboard: () => api.get<AnalyticsDashboard>("/api/analytics/descriptive").then((res) => res.data),
+  prescriptive: (payload?: Record<string, unknown>) =>
+    api.post<PrescriptiveAnalyticsResponse>("/api/analytics/prescriptive", payload ?? {}).then((res) => res.data),
   reportViewUrl: () => `${api.defaults.baseURL}/api/analytics/report-view`,
   reportCsvUrl: () => `${api.defaults.baseURL}/api/analytics/report.csv`,
 };
 
 export const auditApi = {
   list: (params?: QueryParams) =>
-    api.get<Paginated<AuditLogItem>>("/api/audit-logs", { params }).then((res) => res.data),
+    api.get<Paginated<AuditLogItem>>("/api/audit", { params }).then((res) => res.data),
 };
 
 export const adminApi = {

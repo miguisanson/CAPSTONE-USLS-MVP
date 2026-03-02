@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { schedulingApi, studentsApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
+import { useAuth } from "../app/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
 import type { Paginated, ScheduleRequestItem, StudentListItem } from "../types/domain";
 import { formatDateTime, readableEnum } from "../utils/format";
 
 export const SchedulingPage = () => {
+  const { user } = useAuth();
   const [students, setStudents] = useState<StudentListItem[]>([]);
   const [requests, setRequests] = useState<Paginated<ScheduleRequestItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,19 +27,42 @@ export const SchedulingPage = () => {
   const [eventStatus, setEventStatus] = useState("CONFIRMED");
   const [eventAt, setEventAt] = useState("");
   const [eventNotes, setEventNotes] = useState("");
+  const roles = user?.roles ?? [];
+  const isStudent = roles.includes("STUDENT");
+  const canSetScheduleOutcome = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR"].includes(role)
+  );
 
   const loadAll = async () => {
     try {
       setLoading(true);
-      const [studentRes, requestRes] = await Promise.all([
-        studentsApi.list({ pageSize: 50 }),
-        schedulingApi.list({ pageSize: 50 }),
-      ]);
-      setStudents(studentRes.items);
-      setRequests(requestRes);
-      if (studentRes.items[0] && !requestStudentId) {
-        setRequestStudentId(studentRes.items[0].id);
+      const requestRes = await schedulingApi.list({ pageSize: 50 });
+      if (isStudent) {
+        const me = await studentsApi.me();
+        setStudents([
+          {
+            id: me.id,
+            studentNumber: me.studentNumber,
+            firstName: me.firstName,
+            lastName: me.lastName,
+            email: me.email,
+            currentStage: me.currentStage,
+            riskFlag: me.riskFlag,
+            program: me.program,
+            adviser: me.adviser,
+            researchCoordinator: me.researchCoordinator,
+          },
+        ]);
+        setRequestStudentId(me.id);
+      } else {
+        const studentRes = await studentsApi.list({ pageSize: 50 });
+        setStudents(studentRes.items);
+        if (studentRes.items[0] && !requestStudentId) {
+          setRequestStudentId(studentRes.items[0].id);
+        }
       }
+
+      setRequests(requestRes);
       if (requestRes.items[0]) {
         setAvailabilityRequestId(requestRes.items[0].id);
         setEventRequestId(requestRes.items[0].id);
@@ -52,7 +77,7 @@ export const SchedulingPage = () => {
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [isStudent]);
 
   const createRequest = async () => {
     if (!requestStudentId) return;
@@ -180,46 +205,50 @@ export const SchedulingPage = () => {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-800">3. Confirm / Reschedule</h3>
-          <div className="mt-2 space-y-2">
-            <select
-              value={eventRequestId}
-              onChange={(event) => setEventRequestId(Number(event.target.value))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {(requests?.items ?? []).map((request) => (
-                <option key={request.id} value={request.id}>
-                  Request #{request.id}
-                </option>
-              ))}
-            </select>
-            <select
-              value={eventStatus}
-              onChange={(event) => setEventStatus(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="RESCHEDULED">Rescheduled</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-            <input
-              type="datetime-local"
-              value={eventAt}
-              onChange={(event) => setEventAt(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <input
-              value={eventNotes}
-              onChange={(event) => setEventNotes(event.target.value)}
-              placeholder="Outcome notes"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <button
-              onClick={() => void submitEvent()}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-            >
-              Submit Outcome
-            </button>
-          </div>
+          {canSetScheduleOutcome ? (
+            <div className="mt-2 space-y-2">
+              <select
+                value={eventRequestId}
+                onChange={(event) => setEventRequestId(Number(event.target.value))}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                {(requests?.items ?? []).map((request) => (
+                  <option key={request.id} value={request.id}>
+                    Request #{request.id}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={eventStatus}
+                onChange={(event) => setEventStatus(event.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="RESCHEDULED">Rescheduled</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+              <input
+                type="datetime-local"
+                value={eventAt}
+                onChange={(event) => setEventAt(event.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                value={eventNotes}
+                onChange={(event) => setEventNotes(event.target.value)}
+                placeholder="Outcome notes"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <button
+                onClick={() => void submitEvent()}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+              >
+                Submit Outcome
+              </button>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">Schedule outcome updates are restricted to staff/coordinators.</p>
+          )}
         </div>
       </section>
 
@@ -269,4 +298,3 @@ export const SchedulingPage = () => {
     </div>
   );
 };
-

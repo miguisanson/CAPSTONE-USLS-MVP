@@ -1,0 +1,33 @@
+
+:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+body { margin:0; background:#f6f7fb; color:#111; }
+header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; background:#fff; border-bottom:1px solid #e6e8f0; position:sticky; top:0; z-index:10;}
+.brand { font-weight:700; }
+nav a { margin-right:12px; text-decoration:none; color:#2b3a67; font-weight:600; }
+nav a.active { text-decoration:underline; }
+main { padding:18px; max-width:1180px; margin:0 auto; }
+.grid { display:grid; gap:14px; }
+.grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.card { background:#fff; border:1px solid #e6e8f0; border-radius:14px; padding:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.card h3 { margin:0 0 10px 0; font-size:14px; }
+.kpi { display:flex; align-items:baseline; gap:10px; }
+.kpi .num { font-size:28px; font-weight:800; }
+.kpi .lbl { color:#5b647a; font-size:12px; }
+.table { width:100%; border-collapse:collapse; font-size:12px; }
+.table th, .table td { padding:10px 8px; border-bottom:1px solid #eef0f6; text-align:left; }
+.badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; border:1px solid #e6e8f0; background:#fafbff; }
+.badge.due { background:#fff6e6; border-color:#ffe0a3; }
+.badge.overdue { background:#ffecec; border-color:#ffb3b3; }
+.badge.ok { background:#ecfff1; border-color:#b7f2c2; }
+.split { display:flex; gap:14px; }
+.split > .card { flex:1; }
+.actions { display:flex; gap:8px; flex-wrap:wrap; }
+button, .btn { border:1px solid #d7daea; background:#fff; padding:8px 10px; border-radius:10px; font-weight:600; cursor:pointer; text-decoration:none; color:#1b2a57; }
+.btn.primary { background:#2b3a67; color:#fff; border-color:#2b3a67; }
+small { color:#5b647a; }
+.footer-note { margin-top:14px; color:#5b647a; font-size:12px; }
+.formrow { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+label { font-size:12px; color:#5b647a; display:block; margin-bottom:6px; }
+input, select, textarea { width:100%; padding:10px; border:1px solid #d7daea; border-radius:10px; font-size:12px; background:#fff; }
+textarea { min-height:90px; }

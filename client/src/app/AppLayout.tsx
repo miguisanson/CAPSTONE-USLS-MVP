@@ -1,7 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import { canAccessAdmin } from "../utils/roles";
-import { roleLabel } from "../utils/roles";
+import { canAccessAdmin, canAccessAnalytics, canAccessAudit, roleLabel } from "../utils/roles";
 
 type NavItem = {
   to: string;
@@ -15,16 +14,19 @@ const baseNav: NavItem[] = [
   { to: "/documents", label: "Documents" },
   { to: "/scheduling", label: "Scheduling" },
   { to: "/alerts", label: "Monitoring Alerts" },
-  { to: "/analytics", label: "Analytics" },
-  { to: "/audit", label: "Audit Log" },
 ];
 
 export const AppLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const items = canAccessAdmin(user?.roles ?? [])
-    ? [...baseNav, { to: "/admin", label: "Admin Config" }]
-    : baseNav;
+  const roles = user?.roles ?? [];
+
+  const dynamicNav: NavItem[] = [
+    ...baseNav,
+    ...(canAccessAnalytics(roles) ? [{ to: "/analytics", label: "Analytics" }] : []),
+    ...(canAccessAudit(roles) ? [{ to: "/audit", label: "Audit Log" }] : []),
+    ...(canAccessAdmin(roles) ? [{ to: "/admin", label: "Admin Config" }] : []),
+  ];
 
   const onLogout = async () => {
     await logout();
@@ -38,7 +40,7 @@ export const AppLayout = () => {
           <h1 className="text-lg font-semibold text-[var(--gs-dark)]">Graduate Lifecycle</h1>
           <p className="mt-1 text-xs text-slate-500">Monitoring & Analytics Platform</p>
           <nav className="mt-6 space-y-1">
-            {items.map((item) => (
+            {dynamicNav.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -77,4 +79,3 @@ export const AppLayout = () => {
     </div>
   );
 };
-

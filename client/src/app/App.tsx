@@ -29,6 +29,7 @@ export const App = () => (
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/students" element={<StudentsPage />} />
             <Route path="/students/:id" element={<StudentProfilePage />} />
             <Route path="/tasks" element={<TaskQueuePage />} />
@@ -44,7 +45,6 @@ export const App = () => (
                     "GRADUATE_SCHOOL_STAFF",
                     "ACADEMIC_COORDINATOR",
                     "RESEARCH_COORDINATOR",
-                    "ADVISER",
                   ]}
                 />
               }

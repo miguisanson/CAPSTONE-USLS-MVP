@@ -1,6 +1,7 @@
 import { AuditActionType, RoleName, TaskDecision, TaskStatus } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
+import { canDecideTask, canReadStudent, canReadTasks, logAccessDenied } from "../../auth/policy";
 import { logAudit, logTimelineEvent } from "../../lib/audit";
 import { prisma } from "../../lib/prisma";
 import { authorize } from "../../middleware/authorize";
@@ -8,7 +9,7 @@ import { asyncHandler } from "../../utils/async-handler";
 import { buildRecommendation, computePriorityScore } from "../../utils/decision-support";
 import { HttpError } from "../../utils/http-error";
 import { getPagination } from "../../utils/pagination";
-import { buildStudentScopeWhere, buildTaskScopeWhere } from "../../utils/scope";
+import { buildTaskScopeWhere } from "../../utils/scope";
 
 const createTaskSchema = z.object({
   title: z.string().min(3),
@@ -86,6 +87,11 @@ export const tasksRouter = Router();
 tasksRouter.get(
   "/my",
   asyncHandler(async (req, res) => {
+    if (!canReadTasks(req.user!, "my")) {
+      await logAccessDenied(req, "My task queue access denied.");
+      throw new HttpError(403, "You are not authorized to view this queue.");
+    }
+
     const { skip, take, page, pageSize } = getPagination(req);
     const status = queueStatusSchema.parse(req.query.status);
     const scope = buildTaskScopeWhere(req.user!);
@@ -129,6 +135,11 @@ tasksRouter.get(
     RoleName.RESEARCH_COORDINATOR
   ),
   asyncHandler(async (req, res) => {
+    if (!canReadTasks(req.user!, "team")) {
+      await logAccessDenied(req, "Team queue access denied.");
+      throw new HttpError(403, "You are not authorized to view team queue.");
+    }
+
     const { skip, take, page, pageSize } = getPagination(req);
     const status = queueStatusSchema.parse(req.query.status);
 
@@ -178,13 +189,14 @@ tasksRouter.post(
       throw new HttpError(400, "Invalid task payload.");
     }
 
-    const scope = buildStudentScopeWhere(req.user!);
     if (parsed.data.studentId) {
-      const accessible = await prisma.student.findFirst({
-        where: { AND: [scope, { id: parsed.data.studentId }] },
-        select: { id: true },
-      });
-      if (!accessible) throw new HttpError(404, "Student not found or not accessible.");
+      const allowed = await canReadStudent(req.user!, parsed.data.studentId);
+      if (!allowed) {
+        await logAccessDenied(req, "Task creation denied for inaccessible student.", {
+          studentId: parsed.data.studentId,
+        });
+        throw new HttpError(403, "You are not authorized to create tasks for this student.");
+      }
     }
 
     const created = await prisma.task.create({
@@ -247,17 +259,23 @@ tasksRouter.post(
       throw new HttpError(400, "Invalid decision payload.");
     }
 
-    const scopedTask = await prisma.task.findFirst({
-      where: {
-        AND: [buildTaskScopeWhere(req.user!), { id: taskId }],
-      },
+    const canDecide = await canDecideTask(req.user!, taskId);
+    if (!canDecide) {
+      await logAccessDenied(req, "Task decision denied by policy.", {
+        taskId,
+      });
+      throw new HttpError(403, "You are not authorized to decide this task.");
+    }
+
+    const scopedTask = await prisma.task.findUnique({
+      where: { id: taskId },
       include: {
         student: true,
         milestoneDefinition: true,
       },
     });
 
-    if (!scopedTask) throw new HttpError(404, "Task not found or not accessible.");
+    if (!scopedTask) throw new HttpError(404, "Task not found.");
 
     const decisionToStatus: Record<TaskDecision, TaskStatus> = {
       APPROVE: TaskStatus.COMPLETED,
