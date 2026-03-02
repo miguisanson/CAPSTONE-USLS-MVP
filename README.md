@@ -75,6 +75,24 @@ CAPSTONE-USLS-MVP/
 - Audit log page
 - Admin config (milestones, thresholds, routing rules, user management)
 
+## ERD-Aligned Additions (Academic + Research + Evidence)
+
+The schema now includes DBML-aligned monitoring tables:
+
+- `AcademicTerm`
+- `TermEnrollment`
+- `Course`
+- `CourseEnrollment`
+- `Curriculum`
+- `StudyPlanItem`
+- `StudentCurriculumTag`
+- `ResearchCase`
+- `MilestoneEvent`
+- `FormSubmission`
+- `ClearanceRecord`
+
+These are linked to existing `Student`, `Program`, `MilestoneDefinition`, `Task`, and `UserAccount` entities for coursework/enrollment monitoring, case/event history, and evidence/clearance tracking.
+
 ## Setup (Windows / PowerShell)
 
 ### 1) Prerequisites
@@ -230,6 +248,66 @@ After SQL import:
 If files like `USLS_GS_MySQLWorkbench_Schema.sql` or `.mwb` are not in this repo/workspace, re-upload them (or export SQL from Workbench) before using Method 2.  
 Only app migration SQL currently present is:
 [migration.sql](e:/Github_Projects/CAPSTONE-USLS-MVP/server/prisma/migrations/20260302111000_init/migration.sql)
+
+## Schema Change Workflow (Windows)
+
+Use this every time `server/prisma/schema.prisma` changes.
+
+### Local update flow (dev)
+
+```powershell
+cd e:\Github_Projects\CAPSTONE-USLS-MVP\server
+npx prisma migrate dev --name <describe_change>
+npx prisma generate
+npm run seed   # optional, for refreshed demo data
+npm run dev
+```
+
+### Verify in MySQL Workbench
+
+1. Refresh the `usls_gs_mvp` schema.
+2. Confirm tables exist:
+   - `AcademicTerm`, `TermEnrollment`, `Course`, `CourseEnrollment`
+   - `Curriculum`, `StudyPlanItem`, `StudentCurriculumTag`
+   - `ResearchCase`, `MilestoneEvent`, `FormSubmission`, `ClearanceRecord`
+3. Run quick checks:
+
+```sql
+SELECT * FROM AcademicTerm LIMIT 5;
+SELECT * FROM TermEnrollment LIMIT 5;
+SELECT * FROM Course LIMIT 5;
+SELECT * FROM CourseEnrollment LIMIT 5;
+SELECT * FROM Curriculum LIMIT 5;
+SELECT * FROM StudyPlanItem LIMIT 5;
+SELECT * FROM StudentCurriculumTag LIMIT 5;
+SELECT * FROM ResearchCase LIMIT 5;
+SELECT * FROM MilestoneEvent LIMIT 5;
+SELECT * FROM FormSubmission LIMIT 5;
+SELECT * FROM ClearanceRecord LIMIT 5;
+```
+
+### Deploy to another MySQL server
+
+```powershell
+cd e:\Github_Projects\CAPSTONE-USLS-MVP\server
+# update DATABASE_URL in .env first
+npx prisma migrate deploy
+npx prisma generate
+npm run start
+```
+
+### ERD/DBML sync workflow
+
+Option A (recommended for this repo): Prisma-driven
+1. Treat `schema.prisma` as source of truth.
+2. Run `prisma migrate dev` / `prisma migrate deploy`.
+3. Keep `USLS_GS_Lifecycle_ERD_grouped_MERGED_FULL.dbml` updated manually from schema deltas (or generate with an external DBML tool if your team adds one).
+
+Option B: DB/Workbench-driven
+1. Maintain MySQL Workbench model as source of truth and export SQL.
+2. Apply SQL to DB.
+3. Run `npx prisma db pull` to sync Prisma models.
+4. Review/adjust Prisma relations and naming before committing.
 
 ## Automated Tests
 
