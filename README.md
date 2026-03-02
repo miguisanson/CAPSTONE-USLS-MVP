@@ -202,6 +202,7 @@ sudo DOMAIN=your-domain.example BRANCH=main DEMO_SEED=true bash deploy/scripts/s
 ```
 
 This single command installs dependencies, creates DB/user, writes env files, applies migrations, builds server/client, seeds demo users, and starts all services.
+It works with local files already on disk (no `git pull` required).
 
 ### 2) One-time server bootstrap (idempotent)
 
@@ -274,6 +275,9 @@ Notes:
 cd /opt/usls-gs-mvp
 sudo APP_ROOT=/opt/usls-gs-mvp APP_USER=uslsapp bash deploy/scripts/deploy.sh main
 ```
+
+`deploy.sh` defaults to `SOURCE_MODE=local`, so it does not require a git repository.
+If you want git-based updates, run with `SOURCE_MODE=git`.
 
 Demo mode seed (optional, not for real production):
 

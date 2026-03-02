@@ -15,6 +15,7 @@ APP_GROUP="${APP_GROUP:-uslsapp}"
 BRANCH="${BRANCH:-main}"
 INSTALL_MYSQL="${INSTALL_MYSQL:-true}"
 DEMO_SEED="${DEMO_SEED:-true}"
+SOURCE_MODE="${SOURCE_MODE:-local}" # local or git
 
 DOMAIN="${DOMAIN:-localhost}"
 if [[ "${DOMAIN}" =~ ^https?:// ]]; then
@@ -25,8 +26,8 @@ DOMAIN="${DOMAIN%%/*}"
 
 DB_NAME="${DB_NAME:-usls_gs_mvp}"
 DB_USER="${DB_USER:-usls_app}"
-DB_PASSWORD="${DB_PASSWORD:-$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)}"
-JWT_SECRET="${JWT_SECRET:-$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)}"
+DB_PASSWORD="${DB_PASSWORD:-$(openssl rand -hex 12)}"
+JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
 
 CONFIG_DIR="${CONFIG_DIR:-/etc/usls-gs-mvp}"
 SERVER_ENV="${CONFIG_DIR}/server.env"
@@ -102,7 +103,7 @@ nginx -t
 systemctl reload nginx
 
 echo "[5/7] Deploying backend/frontend and running migrations..."
-APP_ROOT="${APP_ROOT}" APP_USER="${APP_USER}" APP_GROUP="${APP_GROUP}" DEMO_SEED="${DEMO_SEED}" \
+APP_ROOT="${APP_ROOT}" APP_USER="${APP_USER}" APP_GROUP="${APP_GROUP}" DEMO_SEED="${DEMO_SEED}" SOURCE_MODE="${SOURCE_MODE}" \
   bash "${SCRIPT_DIR}/deploy.sh" "${BRANCH}"
 
 echo "[6/7] Starting services..."

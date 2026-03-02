@@ -15,9 +15,10 @@ CLIENT_DIR="${APP_ROOT}/client"
 ENV_FILE="${ENV_FILE:-/etc/usls-gs-mvp/server.env}"
 API_SERVICE="${API_SERVICE:-usls-gs-mvp-api}"
 DEMO_SEED="${DEMO_SEED:-false}"
+SOURCE_MODE="${SOURCE_MODE:-local}" # local or git
 
-if [[ ! -d "${APP_ROOT}/.git" ]]; then
-  echo "Repo not found at ${APP_ROOT}. Clone it first."
+if [[ ! -d "${SERVER_DIR}" || ! -d "${CLIENT_DIR}" ]]; then
+  echo "Missing app folders in APP_ROOT=${APP_ROOT}. Expected: ${SERVER_DIR} and ${CLIENT_DIR}"
   exit 1
 fi
 
@@ -26,11 +27,20 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
-echo "[1/8] Updating git working tree..."
+echo "[1/8] Preparing application files..."
 chown -R "${APP_USER}:${APP_GROUP}" "${APP_ROOT}"
-git -C "${APP_ROOT}" fetch --all --prune
-git -C "${APP_ROOT}" checkout "${BRANCH}"
-git -C "${APP_ROOT}" pull --ff-only origin "${BRANCH}"
+
+if [[ "${SOURCE_MODE}" == "git" ]]; then
+  if [[ ! -d "${APP_ROOT}/.git" ]]; then
+    echo "SOURCE_MODE=git but no .git directory found in ${APP_ROOT}"
+    exit 1
+  fi
+  git -C "${APP_ROOT}" fetch --all --prune
+  git -C "${APP_ROOT}" checkout "${BRANCH}"
+  git -C "${APP_ROOT}" pull --ff-only origin "${BRANCH}"
+else
+  echo "SOURCE_MODE=local: skipping git fetch/checkout/pull"
+fi
 
 echo "[2/8] Installing backend dependencies..."
 runuser -u "${APP_USER}" -- bash -lc "cd '${SERVER_DIR}' && npm ci"

@@ -124,7 +124,8 @@ systemctl restart nginx
 
 echo "[8/8] Setup complete."
 echo "Next steps:"
-echo "  1) Clone repo to ${APP_ROOT} and set ownership to ${APP_USER}:${APP_GROUP}"
-echo "  2) Edit ${CONFIG_DIR}/server.env and ${CONFIG_DIR}/backup.env"
-echo "  3) Run deploy/scripts/deploy.sh as root"
-echo "  4) Configure Cloudflare DNS + SSL and install origin cert files"
+echo "  1) Ensure app files exist at ${APP_ROOT} (server/, client/, deploy/)"
+echo "  2) Ensure ownership is ${APP_USER}:${APP_GROUP}: sudo chown -R ${APP_USER}:${APP_GROUP} ${APP_ROOT}"
+echo "  3) Edit ${CONFIG_DIR}/server.env and ${CONFIG_DIR}/backup.env"
+echo "  4) Run deploy/scripts/deploy.sh as root"
+echo "  5) Configure Cloudflare DNS + SSL and install origin cert files"
