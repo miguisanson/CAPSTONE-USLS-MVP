@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { canAccessAdmin, canAccessAnalytics, canAccessAudit, roleLabel } from "../utils/roles";
 
@@ -19,6 +20,8 @@ const baseNav: NavItem[] = [
 export const AppLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const roles = user?.roles ?? [];
 
   const dynamicNav: NavItem[] = [
@@ -32,6 +35,10 @@ export const AppLayout = () => {
     await logout();
     navigate("/login", { replace: true });
   };
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-[var(--gs-bg)] text-slate-800">
@@ -59,8 +66,45 @@ export const AppLayout = () => {
           </nav>
         </aside>
         <main className="flex-1 p-4 md:p-6">
+          <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--gs-dark)]">Graduate Lifecycle</p>
+                <p className="text-[11px] text-slate-500">Monitoring & Analytics Platform</p>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen((prev) => !prev)}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-nav"
+              >
+                {mobileMenuOpen ? "Close Menu" : "Open Menu"}
+              </button>
+            </div>
+            {mobileMenuOpen ? (
+              <nav id="mobile-nav" className="mt-3 grid gap-1">
+                {dynamicNav.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === "/"}
+                    className={({ isActive }) =>
+                      `block rounded-lg px-3 py-2 text-sm ${
+                        isActive
+                          ? "bg-[var(--gs-primary)]/10 text-[var(--gs-dark)]"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      }`
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </nav>
+            ) : null}
+          </section>
+
           <header className="mb-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-[var(--gs-dark)]">{user?.fullName}</p>
                 <p className="text-xs text-slate-500">{(user?.roles ?? []).map(roleLabel).join(", ")}</p>
