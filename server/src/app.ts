@@ -22,10 +22,23 @@ import { usersRouter } from "./modules/users/users.routes";
 
 export const createApp = (): express.Express => {
   const app = express();
+  const allowedOrigins = env.CORS_ORIGINS && env.CORS_ORIGINS.length > 0 ? env.CORS_ORIGINS : [env.CLIENT_URL];
 
   app.use(
     cors({
-      origin: env.CLIENT_URL,
+      origin: (origin, callback) => {
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(null, false);
+      },
       credentials: false,
     })
   );

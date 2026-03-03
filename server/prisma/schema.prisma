@@ -138,6 +138,9 @@ model UserAccount {
   createdScheduleRequests ScheduleRequest[]        @relation("ScheduleRequestedBy")
   availabilities          Availability[]           @relation("AvailabilityUser")
   scheduleEvents          ScheduleEvent[]          @relation("ScheduleDecidedBy")
+  decidedMilestoneEvents  MilestoneEvent[]         @relation("MilestoneEventDecidedBy")
+  submittedForms          FormSubmission[]         @relation("FormSubmissionBy")
+  createdClearanceRecords ClearanceRecord[]        @relation("ClearanceCreatedBy")
   interventions           Intervention[]           @relation("InterventionBy")
   sentNotifications       NotificationAlert[]
   createdThresholds       AlertThreshold[]         @relation("ThresholdCreatedBy")
@@ -170,12 +173,14 @@ model UserRole {
 }
 
 model Program {
-  id        Int       @id @default(autoincrement())
-  code      String    @unique
+  id        Int          @id @default(autoincrement())
+  code      String       @unique
   name      String
   students  Student[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  courses   Course[]
+  curricula Curriculum[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 }
 
 model Student {
@@ -205,6 +210,12 @@ model Student {
   milestoneStatuses     StudentMilestoneStatus[]
   tasks                 Task[]
   decisionLogs          DecisionLog[]
+  termEnrollments       TermEnrollment[]
+  curriculumTags        StudentCurriculumTag[]
+  researchCases         ResearchCase[]
+  milestoneEvents       MilestoneEvent[]
+  formSubmissions       FormSubmission[]
+  clearanceRecords      ClearanceRecord[]
   documents             DocumentRecord[]
   scheduleRequests      ScheduleRequest[]
   alerts                Alert[]
@@ -214,6 +225,110 @@ model Student {
   @@index([currentStage])
   @@index([adviserId])
   @@index([researchCoordinatorId])
+}
+
+model AcademicTerm {
+  id                     Int              @id @default(autoincrement())
+  academicYear           String           @db.VarChar(20)
+  term                   String           @db.VarChar(20)
+  startDate              DateTime?        @db.Date
+  endDate                DateTime?        @db.Date
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  termEnrollments        TermEnrollment[]
+  recommendedInStudyPlan StudyPlanItem[]  @relation("RecommendedTerm")
+}
+
+model TermEnrollment {
+  id                Int                @id @default(autoincrement())
+  studentId         Int
+  termId            Int
+  statusSignal      String?            @db.VarChar(50)
+  confirmedAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  student           Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term              AcademicTerm       @relation(fields: [termId], references: [id], onDelete: Cascade)
+  courseEnrollments CourseEnrollment[]
+
+  @@index([studentId])
+  @@index([termId])
+}
+
+model Course {
+  id                Int                @id @default(autoincrement())
+  programId         Int?
+  code              String             @unique @db.VarChar(50)
+  title             String
+  units             Decimal            @default(0) @db.Decimal(4, 2)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  program           Program?           @relation(fields: [programId], references: [id], onDelete: SetNull)
+  studyPlanItems    StudyPlanItem[]
+  courseEnrollments CourseEnrollment[]
+
+  @@index([programId])
+}
+
+model CourseEnrollment {
+  id               Int            @id @default(autoincrement())
+  termEnrollmentId Int
+  courseId         Int
+  statusSignal     String?        @db.VarChar(50)
+  grade            String?        @db.VarChar(20)
+  updatedAt        DateTime       @default(now())
+  termEnrollment   TermEnrollment @relation(fields: [termEnrollmentId], references: [id], onDelete: Cascade)
+  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([termEnrollmentId])
+  @@index([courseId])
+}
+
+model Curriculum {
+  id                    Int                    @id @default(autoincrement())
+  programId             Int?
+  code                  String                 @db.VarChar(50)
+  version               String?                @db.VarChar(50)
+  effectiveAcademicYear String?                @db.VarChar(20)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  program               Program?               @relation(fields: [programId], references: [id], onDelete: SetNull)
+  studyPlanItems        StudyPlanItem[]
+  studentTags           StudentCurriculumTag[]
+
+  @@index([programId])
+}
+
+model StudyPlanItem {
+  id                Int           @id @default(autoincrement())
+  curriculumId      Int
+  courseId          Int
+  recommendedTermId Int?
+  isRequired        Boolean       @default(true)
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  curriculum        Curriculum    @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  course            Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  recommendedTerm   AcademicTerm? @relation("RecommendedTerm", fields: [recommendedTermId], references: [id], onDelete: SetNull)
+
+  @@index([curriculumId])
+  @@index([courseId])
+  @@index([recommendedTermId])
+}
+
+model StudentCurriculumTag {
+  id           Int        @id @default(autoincrement())
+  studentId    Int
+  curriculumId Int
+  tag          String?    @db.VarChar(50)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  curriculum   Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([curriculumId])
 }
 
 model StudentPanelAssignment {
@@ -229,12 +344,12 @@ model StudentPanelAssignment {
 }
 
 model AdviserAssignment {
-  id           Int         @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   adviserUserId Int
-  studentId    Int
-  assignedAt   DateTime    @default(now())
-  adviserUser  UserAccount @relation(fields: [adviserUserId], references: [id], onDelete: Cascade)
-  student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId     Int
+  assignedAt    DateTime    @default(now())
+  adviserUser   UserAccount @relation(fields: [adviserUserId], references: [id], onDelete: Cascade)
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([adviserUserId, studentId])
   @@index([studentId])
@@ -267,21 +382,24 @@ model StudentLifecycle {
 }
 
 model MilestoneDefinition {
-  id              Int                      @id @default(autoincrement())
-  name            String
-  stage           LifecycleStage
-  description     String?
-  expectedDays    Int                      @default(14)
-  criticality     Int                      @default(1)
-  active          Boolean                  @default(true)
-  sortOrder       Int                      @default(0)
-  createdById     Int?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  createdBy       UserAccount?             @relation("MilestoneCreatedBy", fields: [createdById], references: [id])
-  studentStatuses StudentMilestoneStatus[]
-  tasks           Task[]
-  documents       DocumentRecord[]
+  id                   Int                      @id @default(autoincrement())
+  name                 String
+  stage                LifecycleStage
+  description          String?
+  expectedDays         Int                      @default(14)
+  criticality          Int                      @default(1)
+  active               Boolean                  @default(true)
+  sortOrder            Int                      @default(0)
+  createdById          Int?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  createdBy            UserAccount?             @relation("MilestoneCreatedBy", fields: [createdById], references: [id])
+  studentStatuses      StudentMilestoneStatus[]
+  currentResearchCases ResearchCase[]           @relation("ResearchCaseCurrentMilestone")
+  milestoneEvents      MilestoneEvent[]
+  clearanceRecords     ClearanceRecord[]
+  tasks                Task[]
+  documents            DocumentRecord[]
 
   @@index([stage, active])
 }
@@ -303,6 +421,48 @@ model StudentMilestoneStatus {
 
   @@unique([studentId, milestoneDefinitionId])
   @@index([status, dueAt])
+}
+
+model ResearchCase {
+  id                 Int                  @id @default(autoincrement())
+  studentId          Int
+  caseType           String?              @db.VarChar(50)
+  topicTitle         String?
+  status             String?              @db.VarChar(50)
+  currentMilestoneId Int?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  student            Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  currentMilestone   MilestoneDefinition? @relation("ResearchCaseCurrentMilestone", fields: [currentMilestoneId], references: [id], onDelete: SetNull)
+  milestoneEvents    MilestoneEvent[]
+
+  @@index([studentId])
+  @@index([currentMilestoneId])
+}
+
+model MilestoneEvent {
+  id                    Int                 @id @default(autoincrement())
+  researchCaseId        Int?
+  studentId             Int
+  milestoneDefinitionId Int
+  occurredAt            DateTime            @default(now())
+  outcome               String?             @db.VarChar(50)
+  ownerRole             RoleName?
+  decidedById           Int?
+  taskId                Int?
+  notes                 String?             @db.Text
+  researchCase          ResearchCase?       @relation(fields: [researchCaseId], references: [id], onDelete: SetNull)
+  student               Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  milestoneDefinition   MilestoneDefinition @relation(fields: [milestoneDefinitionId], references: [id], onDelete: Cascade)
+  decidedBy             UserAccount?        @relation("MilestoneEventDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  task                  Task?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  formSubmissions       FormSubmission[]
+
+  @@index([researchCaseId])
+  @@index([studentId])
+  @@index([milestoneDefinitionId])
+  @@index([decidedById])
+  @@index([taskId])
 }
 
 model Task {
@@ -328,6 +488,7 @@ model Task {
   assignedTo            UserAccount?         @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdBy             UserAccount          @relation("TaskCreatedBy", fields: [createdById], references: [id])
   decisionLogs          DecisionLog[]
+  milestoneEvents       MilestoneEvent[]
   alerts                Alert[]
 
   @@index([status, dueAt])
@@ -401,6 +562,46 @@ model RevisionNote {
   author           UserAccount      @relation("RevisionAuthor", fields: [authorId], references: [id])
 
   @@index([documentRecordId, isResolved])
+}
+
+model FormSubmission {
+  id               Int             @id @default(autoincrement())
+  studentId        Int
+  milestoneEventId Int?
+  formType         String          @db.VarChar(50)
+  submittedAt      DateTime?
+  endorsedAt       DateTime?
+  approvedAt       DateTime?
+  routingState     String?         @db.VarChar(50)
+  submittedById    Int?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  student          Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  milestoneEvent   MilestoneEvent? @relation(fields: [milestoneEventId], references: [id], onDelete: SetNull)
+  submittedBy      UserAccount?    @relation("FormSubmissionBy", fields: [submittedById], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([milestoneEventId])
+  @@index([submittedById])
+}
+
+model ClearanceRecord {
+  id                    Int                  @id @default(autoincrement())
+  studentId             Int
+  milestoneDefinitionId Int?
+  submittedAt           DateTime?
+  clearedAt             DateTime?
+  status                String?              @db.VarChar(50)
+  createdById           Int?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  student               Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  milestoneDefinition   MilestoneDefinition? @relation(fields: [milestoneDefinitionId], references: [id], onDelete: SetNull)
+  createdBy             UserAccount?         @relation("ClearanceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([milestoneDefinitionId])
+  @@index([createdById])
 }
 
 model ScheduleRequest {

@@ -5,6 +5,18 @@ const boolFromString = z
   .optional()
   .transform((value) => value === "true");
 
+const listFromCsv = z
+  .string()
+  .optional()
+  .transform((value) =>
+    value
+      ? value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : undefined
+  );
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(4000),
@@ -12,6 +24,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("8h"),
   CLIENT_URL: z.string().url().default("http://localhost:5173"),
+  CORS_ORIGINS: listFromCsv,
   PORTAL_BASE_URL: z.string().url().default("http://localhost:5173"),
   UPLOAD_DIR: z.string().default("uploads"),
   SMTP_HOST: z.string().optional(),
@@ -27,4 +40,3 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
-

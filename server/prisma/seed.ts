@@ -29,14 +29,25 @@ const resetDatabase = async (): Promise<void> => {
     prisma.notificationAlert.deleteMany(),
     prisma.intervention.deleteMany(),
     prisma.alert.deleteMany(),
+    prisma.clearanceRecord.deleteMany(),
+    prisma.formSubmission.deleteMany(),
     prisma.scheduleEvent.deleteMany(),
     prisma.availability.deleteMany(),
     prisma.scheduleRequest.deleteMany(),
     prisma.revisionNote.deleteMany(),
     prisma.documentVersion.deleteMany(),
     prisma.documentRecord.deleteMany(),
+    prisma.milestoneEvent.deleteMany(),
+    prisma.researchCase.deleteMany(),
     prisma.decisionLog.deleteMany(),
     prisma.task.deleteMany(),
+    prisma.courseEnrollment.deleteMany(),
+    prisma.termEnrollment.deleteMany(),
+    prisma.studyPlanItem.deleteMany(),
+    prisma.studentCurriculumTag.deleteMany(),
+    prisma.curriculum.deleteMany(),
+    prisma.course.deleteMany(),
+    prisma.academicTerm.deleteMany(),
     prisma.studentMilestoneStatus.deleteMany(),
     prisma.studentLifecycle.deleteMany(),
     prisma.panelAssignment.deleteMany(),
@@ -185,6 +196,114 @@ const seed = async (): Promise<void> => {
     {} as Record<string, number>
   );
 
+  await prisma.academicTerm.createMany({
+    data: [
+      {
+        academicYear: "2025-2026",
+        term: "Term 1",
+        startDate: dayjs("2025-08-01").toDate(),
+        endDate: dayjs("2025-12-01").toDate(),
+      },
+      {
+        academicYear: "2025-2026",
+        term: "Term 2",
+        startDate: dayjs("2026-01-10").toDate(),
+        endDate: dayjs("2026-05-15").toDate(),
+      },
+      {
+        academicYear: "2026-2027",
+        term: "Term 1",
+        startDate: dayjs("2026-08-01").toDate(),
+        endDate: dayjs("2026-12-05").toDate(),
+      },
+    ],
+  });
+  const academicTerms = await prisma.academicTerm.findMany({
+    orderBy: [{ academicYear: "asc" }, { term: "asc" }],
+  });
+  const termByLabel = academicTerms.reduce(
+    (acc, term) => ({
+      ...acc,
+      [`${term.academicYear}-${term.term}`]: term.id,
+    }),
+    {} as Record<string, number>
+  );
+
+  await prisma.course.createMany({
+    data: [
+      { code: "CS-501", title: "Advanced Algorithms", units: 3, programId: programByCode.MSCS },
+      { code: "CS-520", title: "Research Methods in Computing", units: 3, programId: programByCode.MSCS },
+      { code: "MBA-510", title: "Strategic Management", units: 3, programId: programByCode.MBA },
+      { code: "MBA-525", title: "Applied Business Analytics", units: 3, programId: programByCode.MBA },
+      { code: "ENG-710", title: "Experimental Design", units: 3, programId: programByCode.PHDENG },
+      { code: "EDU-610", title: "Curriculum Development", units: 3, programId: programByCode.MAED },
+    ],
+  });
+  const courses = await prisma.course.findMany();
+  const courseByCode = courses.reduce(
+    (acc, course) => ({
+      ...acc,
+      [course.code]: course.id,
+    }),
+    {} as Record<string, number>
+  );
+
+  await prisma.curriculum.createMany({
+    data: [
+      {
+        programId: programByCode.MSCS,
+        code: "MSCS-2025",
+        version: "v1",
+        effectiveAcademicYear: "2025-2026",
+      },
+      {
+        programId: programByCode.MBA,
+        code: "MBA-2025",
+        version: "v1",
+        effectiveAcademicYear: "2025-2026",
+      },
+    ],
+  });
+  const curricula = await prisma.curriculum.findMany();
+  const curriculumByCode = curricula.reduce(
+    (acc, curriculum) => ({
+      ...acc,
+      [curriculum.code]: curriculum.id,
+    }),
+    {} as Record<string, number>
+  );
+
+  await prisma.studyPlanItem.createMany({
+    data: [
+      {
+        curriculumId: curriculumByCode["MSCS-2025"],
+        courseId: courseByCode["CS-501"],
+        recommendedTermId: termByLabel["2025-2026-Term 1"],
+        isRequired: true,
+        notes: "Core course",
+      },
+      {
+        curriculumId: curriculumByCode["MSCS-2025"],
+        courseId: courseByCode["CS-520"],
+        recommendedTermId: termByLabel["2025-2026-Term 1"],
+        isRequired: true,
+        notes: "Pre-thesis requirement",
+      },
+      {
+        curriculumId: curriculumByCode["MBA-2025"],
+        courseId: courseByCode["MBA-510"],
+        recommendedTermId: termByLabel["2025-2026-Term 1"],
+        isRequired: true,
+      },
+      {
+        curriculumId: curriculumByCode["MBA-2025"],
+        courseId: courseByCode["MBA-525"],
+        recommendedTermId: termByLabel["2025-2026-Term 2"],
+        isRequired: true,
+      },
+    ],
+  });
+
   const studentsSeed = [
     { number: "2024-0001", firstName: "Ana", lastName: "Santos", stage: LifecycleStage.COURSEWORK, program: "MSCS", stageDays: 45, riskFlag: false },
     { number: "2024-0002", firstName: "Ben", lastName: "Reyes", stage: LifecycleStage.PROPOSAL_DEVELOPMENT, program: "MSCS", stageDays: 70, riskFlag: true },
@@ -276,6 +395,117 @@ const seed = async (): Promise<void> => {
       skipDuplicates: true,
     });
   }
+
+  await prisma.studentCurriculumTag.createMany({
+    data: [
+      {
+        studentId: students[0].id,
+        curriculumId: curriculumByCode["MSCS-2025"],
+        tag: "regular-plan",
+      },
+      {
+        studentId: students[1].id,
+        curriculumId: curriculumByCode["MSCS-2025"],
+        tag: "revised-plan",
+      },
+      {
+        studentId: students[2].id,
+        curriculumId: curriculumByCode["MBA-2025"],
+        tag: "bridging",
+      },
+      {
+        studentId: students[7].id,
+        curriculumId: curriculumByCode["MBA-2025"],
+        tag: "conditional",
+      },
+    ],
+  });
+
+  const termEnrollments = await Promise.all([
+    prisma.termEnrollment.create({
+      data: {
+        studentId: students[0].id,
+        termId: termByLabel["2025-2026-Term 1"],
+        statusSignal: "enrolled",
+        confirmedAt: dayjs().subtract(150, "day").toDate(),
+      },
+    }),
+    prisma.termEnrollment.create({
+      data: {
+        studentId: students[0].id,
+        termId: termByLabel["2025-2026-Term 2"],
+        statusSignal: "enrolled",
+        confirmedAt: dayjs().subtract(50, "day").toDate(),
+      },
+    }),
+    prisma.termEnrollment.create({
+      data: {
+        studentId: students[1].id,
+        termId: termByLabel["2025-2026-Term 2"],
+        statusSignal: "enrolled",
+        confirmedAt: dayjs().subtract(60, "day").toDate(),
+      },
+    }),
+    prisma.termEnrollment.create({
+      data: {
+        studentId: students[2].id,
+        termId: termByLabel["2025-2026-Term 1"],
+        statusSignal: "completed",
+        confirmedAt: dayjs().subtract(170, "day").toDate(),
+      },
+    }),
+    prisma.termEnrollment.create({
+      data: {
+        studentId: students[3].id,
+        termId: termByLabel["2025-2026-Term 2"],
+        statusSignal: "enrolled",
+        confirmedAt: dayjs().subtract(65, "day").toDate(),
+      },
+    }),
+    prisma.termEnrollment.create({
+      data: {
+        studentId: students[7].id,
+        termId: termByLabel["2025-2026-Term 2"],
+        statusSignal: "withdrawn",
+        confirmedAt: dayjs().subtract(40, "day").toDate(),
+      },
+    }),
+  ]);
+
+  await prisma.courseEnrollment.createMany({
+    data: [
+      {
+        termEnrollmentId: termEnrollments[0].id,
+        courseId: courseByCode["CS-501"],
+        statusSignal: "completed",
+        grade: "1.75",
+      },
+      {
+        termEnrollmentId: termEnrollments[0].id,
+        courseId: courseByCode["CS-520"],
+        statusSignal: "completed",
+        grade: "1.50",
+      },
+      {
+        termEnrollmentId: termEnrollments[1].id,
+        courseId: courseByCode["CS-520"],
+        statusSignal: "in-progress",
+        grade: null,
+      },
+      {
+        termEnrollmentId: termEnrollments[3].id,
+        courseId: courseByCode["MBA-510"],
+        statusSignal: "completed",
+        grade: "1.25",
+      },
+      {
+        termEnrollmentId: termEnrollments[5].id,
+        courseId: courseByCode["MBA-525"],
+        statusSignal: "incomplete",
+        grade: "INC",
+      },
+    ],
+  });
 
   const milestoneDefinitions = await Promise.all(
     [
@@ -470,6 +700,153 @@ const seed = async (): Promise<void> => {
         rationale: "Need clearer justification in chapter 2.",
         decidedById: userIds.panel1,
         createdAt: dayjs().subtract(2, "day").toDate(),
+      },
+    ],
+  });
+
+  const researchCases = await Promise.all([
+    prisma.researchCase.create({
+      data: {
+        studentId: students[1].id,
+        caseType: "thesis",
+        topicTitle: "AI-Supported Student Risk Monitoring",
+        status: "under-review",
+        currentMilestoneId: milestoneMap["Proposal Draft Submitted"],
+      },
+    }),
+    prisma.researchCase.create({
+      data: {
+        studentId: students[3].id,
+        caseType: "dissertation",
+        topicTitle: "Optimization in Distributed Sensor Networks",
+        status: "data-collection",
+        currentMilestoneId: milestoneMap["Data Collection Ethics Clearance"],
+      },
+    }),
+    prisma.researchCase.create({
+      data: {
+        studentId: students[5].id,
+        caseType: "thesis",
+        topicTitle: "Assessment Rubric Standardization for Oral Defense",
+        status: "for-scheduling",
+        currentMilestoneId: milestoneMap["Final Oral Defense Schedule"],
+      },
+    }),
+  ]);
+
+  const milestoneEvents = await Promise.all([
+    prisma.milestoneEvent.create({
+      data: {
+        researchCaseId: researchCases[0].id,
+        studentId: students[1].id,
+        milestoneDefinitionId: milestoneMap["Proposal Draft Submitted"],
+        occurredAt: dayjs().subtract(18, "day").toDate(),
+        outcome: "submitted",
+        ownerRole: RoleName.STUDENT,
+        taskId: createdTasks[0].id,
+        notes: "Initial draft submitted for adviser review.",
+      },
+    }),
+    prisma.milestoneEvent.create({
+      data: {
+        researchCaseId: researchCases[0].id,
+        studentId: students[1].id,
+        milestoneDefinitionId: milestoneMap["Proposal Draft Submitted"],
+        occurredAt: dayjs().subtract(2, "day").toDate(),
+        outcome: "revise",
+        ownerRole: RoleName.ADVISER,
+        decidedById: userIds.adviser1,
+        taskId: createdTasks[0].id,
+        notes: "Revision requested due to insufficient literature synthesis.",
+      },
+    }),
+    prisma.milestoneEvent.create({
+      data: {
+        researchCaseId: researchCases[1].id,
+        studentId: students[3].id,
+        milestoneDefinitionId: milestoneMap["Data Collection Ethics Clearance"],
+        occurredAt: dayjs().subtract(12, "day").toDate(),
+        outcome: "approved",
+        ownerRole: RoleName.RESEARCH_COORDINATOR,
+        decidedById: userIds.researchCoord,
+        taskId: createdTasks[1].id,
+        notes: "Ethics clearance validated. Proceed to field data collection.",
+      },
+    }),
+    prisma.milestoneEvent.create({
+      data: {
+        researchCaseId: researchCases[2].id,
+        studentId: students[5].id,
+        milestoneDefinitionId: milestoneMap["Final Oral Defense Schedule"],
+        occurredAt: dayjs().subtract(4, "day").toDate(),
+        outcome: "pending",
+        ownerRole: RoleName.GRADUATE_SCHOOL_STAFF,
+        taskId: createdTasks[3].id,
+        notes: "Waiting final panel confirmation for defense slot.",
+      },
+    }),
+  ]);
+
+  await prisma.formSubmission.createMany({
+    data: [
+      {
+        studentId: students[1].id,
+        milestoneEventId: milestoneEvents[1].id,
+        formType: "ProposalRevisionForm",
+        submittedAt: dayjs().subtract(1, "day").toDate(),
+        endorsedAt: null,
+        approvedAt: null,
+        routingState: "awaiting-adviser-endorsement",
+        submittedById: studentUsers[1].id,
+      },
+      {
+        studentId: students[3].id,
+        milestoneEventId: milestoneEvents[2].id,
+        formType: "EthicsClearanceForm",
+        submittedAt: dayjs().subtract(14, "day").toDate(),
+        endorsedAt: dayjs().subtract(13, "day").toDate(),
+        approvedAt: dayjs().subtract(12, "day").toDate(),
+        routingState: "approved",
+        submittedById: studentUsers[3].id,
+      },
+      {
+        studentId: students[5].id,
+        milestoneEventId: milestoneEvents[3].id,
+        formType: "DefenseSchedulingForm",
+        submittedAt: dayjs().subtract(5, "day").toDate(),
+        endorsedAt: dayjs().subtract(4, "day").toDate(),
+        approvedAt: null,
+        routingState: "for-panel-confirmation",
+        submittedById: userIds.staff,
+      },
+    ],
+  });
+
+  await prisma.clearanceRecord.createMany({
+    data: [
+      {
+        studentId: students[3].id,
+        milestoneDefinitionId: milestoneMap["Data Collection Ethics Clearance"],
+        submittedAt: dayjs().subtract(14, "day").toDate(),
+        clearedAt: dayjs().subtract(12, "day").toDate(),
+        status: "cleared",
+        createdById: userIds.researchCoord,
+      },
+      {
+        studentId: students[1].id,
+        milestoneDefinitionId: milestoneMap["Proposal Draft Submitted"],
+        submittedAt: dayjs().subtract(2, "day").toDate(),
+        clearedAt: null,
+        status: "pending",
+        createdById: userIds.adviser1,
+      },
+      {
+        studentId: students[5].id,
+        milestoneDefinitionId: milestoneMap["Final Oral Defense Schedule"],
+        submittedAt: dayjs().subtract(5, "day").toDate(),
+        clearedAt: null,
+        status: "under-review",
+        createdById: userIds.staff,
       },
     ],
   });

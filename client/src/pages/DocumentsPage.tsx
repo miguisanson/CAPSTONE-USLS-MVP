@@ -248,7 +248,7 @@ export const DocumentsPage = () => {
                 </div>
 
                 {canComment ? (
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                     <input
                       value={comment}
                       onChange={(event) => setComment(event.target.value)}
@@ -257,7 +257,7 @@ export const DocumentsPage = () => {
                     />
                     <button
                       onClick={() => void addComment(record.id)}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 sm:w-auto"
                     >
                       Add Note
                     </button>

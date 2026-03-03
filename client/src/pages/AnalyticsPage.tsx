@@ -166,22 +166,24 @@ export const AnalyticsPage = () => {
           <div className="grid gap-4 xl:grid-cols-2">
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-2 text-sm font-semibold text-slate-800">Aging / Time in Stage</h3>
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-xs text-slate-500">
-                  <tr>
-                    <th className="px-2 py-2">Stage</th>
-                    <th className="px-2 py-2">Average Days</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.agingByStage.map((item) => (
-                    <tr key={item.stage} className="border-t border-slate-100">
-                      <td className="px-2 py-2">{item.stage.replace(/_/g, " ")}</td>
-                      <td className="px-2 py-2">{item.averageDays}</td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="text-left text-xs text-slate-500">
+                    <tr>
+                      <th className="px-2 py-2">Stage</th>
+                      <th className="px-2 py-2">Average Days</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.agingByStage.map((item) => (
+                      <tr key={item.stage} className="border-t border-slate-100">
+                        <td className="px-2 py-2">{item.stage.replace(/_/g, " ")}</td>
+                        <td className="px-2 py-2">{item.averageDays}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -190,22 +192,24 @@ export const AnalyticsPage = () => {
                 Scheduling cycle time: <strong>{data.schedulingCycleTimeDays}</strong> days | LOA count:{" "}
                 <strong>{data.loaVisibilityCount}</strong>
               </p>
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-xs text-slate-500">
-                  <tr>
-                    <th className="px-2 py-2">Owner</th>
-                    <th className="px-2 py-2">Task Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.workloadIndicators.map((item) => (
-                    <tr key={item.owner} className="border-t border-slate-100">
-                      <td className="px-2 py-2">{item.owner}</td>
-                      <td className="px-2 py-2">{item.taskCount}</td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="text-left text-xs text-slate-500">
+                    <tr>
+                      <th className="px-2 py-2">Owner</th>
+                      <th className="px-2 py-2">Task Count</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.workloadIndicators.map((item) => (
+                      <tr key={item.owner} className="border-t border-slate-100">
+                        <td className="px-2 py-2">{item.owner}</td>
+                        <td className="px-2 py-2">{item.taskCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           </div>
         </>
