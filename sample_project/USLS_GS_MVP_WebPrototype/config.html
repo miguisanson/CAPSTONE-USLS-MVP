@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Admin Config</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<header>
+  <div class="brand">USLS Graduate School Monitoring MVP</div>
+  
+<nav>
+  <a href="dashboard.html" class="">Dashboard</a>
+  <a href="queue.html" class="">Queues</a>
+  <a href="student.html" class="">Student</a>
+  <a href="case.html" class="">Research Case</a>
+  <a href="reports.html" class="">Reports</a>
+  <a href="alerts.html" class="">Alerts</a>
+  <a href="audit.html" class="">Audit</a>
+  <a href="config.html" class="active">Admin Config</a>
+</nav>
+
+</header>
+<main>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h3>Milestone Definitions (Admin)</h3>
+    <small>Prototype view for editable milestone definitions and required evidence rules.</small>
+    <div style="height:10px;"></div>
+    <table class="table">
+      <thead><tr><th>Milestone</th><th>Requires evidence</th><th>Requires defense</th></tr></thead>
+      <tbody>
+        <tr><td>Title defense</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Proposal defense</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Turnitin certificate</td><td>Yes</td><td>No</td></tr>
+      </tbody>
+    </table>
+    <div class="actions"><button>Add milestone</button><button>Edit rules</button></div>
+  </div>
+  <div class="card">
+    <h3>Indicator Thresholds (Admin)</h3>
+    <small>Thresholds used for prescriptive prompts (no policy changes). Values are placeholders.</small>
+    <div style="height:10px;"></div>
+    <div class="formrow">
+      <div><label>Max days in stage (proposal)</label><input value="30"/></div>
+      <div><label>Max days in stage (scheduling)</label><input value="21"/></div>
+    </div>
+    <div style="height:10px;"></div>
+    <div class="actions"><button>Save thresholds</button></div>
+  </div>
+</div>
+
+<div class="footer-note">Prototype only. Values shown are sample data to demonstrate dashboards, queues, and event-based tracking.</div>
+</main>
+</body>
+</html>
