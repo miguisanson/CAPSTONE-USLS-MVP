@@ -20,6 +20,7 @@ import type {
 } from "../types/domain";
 
 type QueryParams = Record<string, string | number | boolean | undefined>;
+type MonitoringCycleSummary = { alertsCreated: number; notificationsSent: number };
 
 export const authApi = {
   login: (payload: { email: string; password: string }) =>
@@ -90,6 +91,8 @@ export const documentsApi = {
   },
   downloadVersion: (versionId: number) =>
     api.get(`/api/documents/versions/${versionId}/download`, { responseType: "blob" }).then((res) => res.data),
+  deleteVersion: (versionId: number) =>
+    api.delete(`/api/documents/versions/${versionId}`).then((res) => res.data),
   addComment: (documentId: number, payload: { note: string; versionId?: number }) =>
     api.post(`/api/documents/${documentId}/comments`, payload).then((res) => res.data),
   resolveComment: (commentId: number, resolved: boolean) =>
@@ -118,7 +121,7 @@ export const schedulingApi = {
 export const alertsApi = {
   list: (params?: QueryParams) =>
     api.get<Paginated<AlertItem>>("/api/alerts", { params }).then((res) => res.data),
-  runMonitoring: () => api.post("/api/alerts/run-monitoring").then((res) => res.data),
+  runMonitoring: () => api.post<MonitoringCycleSummary>("/api/alerts/run-monitoring").then((res) => res.data),
   updateStatus: (id: number, status: string) =>
     api.patch(`/api/alerts/${id}/status`, { status }).then((res) => res.data),
   addIntervention: (id: number, payload: { actionTaken: string; evidenceNote?: string }) =>

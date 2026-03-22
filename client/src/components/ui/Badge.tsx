@@ -16,5 +16,5 @@ type Props = HTMLAttributes<HTMLSpanElement> & {
 };
 
 export const Badge = ({ className, tone = "neutral", ...props }: Props) => (
-  <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", toneClass[tone], className)} {...props} />
+  <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold", toneClass[tone], className)} {...props} />
 );

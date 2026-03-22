@@ -351,7 +351,7 @@ export const SchedulingPage = () => {
                         <p className="text-sm font-semibold text-slate-900">
                           Request #{request.id} - {request.student ? `${request.student.firstName} ${request.student.lastName}` : `Student #${request.studentId}`}
                         </p>
-                        <p className="text-[11px] text-slate-600">
+                        <p className="text-xs text-slate-600">
                           Created {formatDateTime(request.createdAt)} ({diffDaysFromNow(request.createdAt)} day(s) ago) | Preferred{" "}
                           {formatDateTime(request.preferredDate)}
                         </p>
@@ -367,7 +367,7 @@ export const SchedulingPage = () => {
                         ) : (
                           <ul className="mt-1 space-y-1">
                             {request.availabilities.map((slot) => (
-                              <li key={slot.id} className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-700">
+                              <li key={slot.id} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700">
                                 {slot.user?.fullName ?? "Participant"}: {formatDateTime(slot.availableFrom)} - {formatDateTime(slot.availableTo)}
                               </li>
                             ))}
@@ -381,7 +381,7 @@ export const SchedulingPage = () => {
                         ) : (
                           <ul className="mt-1 space-y-1">
                             {request.scheduleEvents.map((event) => (
-                              <li key={event.id} className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-700">
+                              <li key={event.id} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700">
                                 {readableEnum(event.eventStatus)} | {formatDateTime(event.scheduledAt)} | {event.decidedBy?.fullName ?? "System"}
                               </li>
                             ))}

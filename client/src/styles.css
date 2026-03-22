@@ -13,6 +13,12 @@
   --gs-danger: #b42318;
   --gs-warning: #b54708;
   --gs-success: #067647;
+  --ui-font-meta: 0.8125rem;
+  --ui-line-meta: 1.125rem;
+  --ui-font-body: 0.9375rem;
+  --ui-line-body: 1.375rem;
+  --ui-font-section: 1.0625rem;
+  --ui-line-section: 1.5rem;
 }
 
 * {
@@ -44,6 +50,27 @@ textarea {
   font: inherit;
 }
 
+/* Typography normalization:
+   Keep UI copy on a tight 3-size scale for consistency across cards/pages. */
+.text-xs {
+  font-size: var(--ui-font-meta) !important;
+  line-height: var(--ui-line-meta) !important;
+}
+
+.text-sm,
+.text-base {
+  font-size: var(--ui-font-body) !important;
+  line-height: var(--ui-line-body) !important;
+}
+
+.text-lg,
+.text-xl,
+.text-2xl,
+.text-3xl {
+  font-size: var(--ui-font-section) !important;
+  line-height: var(--ui-line-section) !important;
+}
+
 @layer components {
   .surface-card {
     @apply rounded-2xl border bg-white shadow-sm;
@@ -56,7 +83,7 @@ textarea {
   }
 
   .section-heading {
-    @apply text-sm font-semibold tracking-wide text-slate-800;
+    @apply text-base font-semibold tracking-wide text-slate-800;
   }
 
   .section-subheading {
@@ -64,7 +91,7 @@ textarea {
   }
 
   .table-cell-head {
-    @apply px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500;
+    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
   }
 
   .table-cell {

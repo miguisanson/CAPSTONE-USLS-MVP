@@ -372,7 +372,7 @@ export const DashboardPage = () => {
               title="Priority Task Snapshot"
               subtitle="Top unresolved tasks in your queue"
               actions={
-                <Link to="/tasks" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                <Link to="/tasks" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                   Open Task Queue
                 </Link>
               }
@@ -414,7 +414,7 @@ export const DashboardPage = () => {
               title="At-Risk Student Cases"
               subtitle="Students currently flagged for intervention"
               actions={
-                <Link to="/students" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                <Link to="/students" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                   View Students
                 </Link>
               }
@@ -460,7 +460,7 @@ export const DashboardPage = () => {
               title="Upcoming Defense Schedules"
               subtitle="Confirmed or rescheduled events with set dates"
               actions={
-                <Link to="/scheduling" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                <Link to="/scheduling" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                   Open Scheduling
                 </Link>
               }
@@ -497,7 +497,7 @@ export const DashboardPage = () => {
               title="Open Alert Snapshot"
               subtitle="Most recent open monitoring alerts"
               actions={
-                <Link to="/alerts" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                <Link to="/alerts" className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                   Open Alerts
                 </Link>
               }
@@ -520,7 +520,7 @@ export const DashboardPage = () => {
                       <Badge tone={alertStatusTone(alert.status)}>{readableEnum(alert.status)}</Badge>
                     </div>
                     <p className="mt-1 text-xs text-slate-600">{alert.message}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       {alert.student ? `${alert.student.firstName} ${alert.student.lastName}` : `Student #${alert.studentId}`} | Triggered {formatDate(alert.triggeredAt)}
                     </p>
                   </article>

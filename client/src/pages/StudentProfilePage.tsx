@@ -209,7 +209,7 @@ export const StudentProfilePage = () => {
                       >
                         {index + 1}
                       </div>
-                      <p className={`max-w-[110px] text-center text-[11px] ${current ? "font-semibold text-slate-800" : "text-slate-500"}`}>
+                      <p className={`max-w-[110px] text-center text-xs ${current ? "font-semibold text-slate-800" : "text-slate-500"}`}>
                         {readableEnum(stageName)}
                       </p>
                     </div>
@@ -276,7 +276,7 @@ export const StudentProfilePage = () => {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{milestone.name}</p>
-                        <p className="text-[11px] text-slate-500">
+                        <p className="text-xs text-slate-500">
                           {readableEnum(milestone.stage)} | Criticality {milestone.criticality}
                         </p>
                       </div>
@@ -326,7 +326,7 @@ export const StudentProfilePage = () => {
                       <p className="text-sm font-semibold text-slate-900">{task.title}</p>
                       <Badge tone={taskStatusTone(task.status)}>{readableEnum(task.status)}</Badge>
                     </div>
-                    <p className="mt-1 text-[11px] text-slate-600">
+                    <p className="mt-1 text-xs text-slate-600">
                       Due: {formatDate(task.dueAt)} | Next owner: {task.nextActionOwnerRole ? readableEnum(task.nextActionOwnerRole) : "-"} | Priority {task.priorityScore}
                     </p>
                     {task.recommendedAction ? <p className="mt-1 text-xs text-[var(--gs-primary)]">{task.recommendedAction}</p> : null}
@@ -359,7 +359,7 @@ export const StudentProfilePage = () => {
                 {student.timelineEvents.slice(0, 12).map((event) => (
                   <article key={event.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                     <p className="text-sm font-semibold text-slate-900">{event.title}</p>
-                    <p className="text-[11px] text-slate-500">{formatDateTime(event.occurredAt)}</p>
+                    <p className="text-xs text-slate-500">{formatDateTime(event.occurredAt)}</p>
                     {event.details ? <p className="mt-1 text-xs text-slate-700">{event.details}</p> : null}
                   </article>
                 ))}
@@ -392,7 +392,7 @@ export const StudentProfilePage = () => {
                       <Badge tone={alertStatusTone(alert.status)}>{readableEnum(alert.status)}</Badge>
                     </div>
                     <p className="mt-1 text-xs text-slate-700">{alert.message}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       Triggered {formatDate(alert.triggeredAt)} | Interventions {alert.interventions.length}
                     </p>
                   </article>
@@ -429,7 +429,7 @@ export const StudentProfilePage = () => {
                         {record.outstandingRevisionCount > 0 ? "Needs Revision" : "Current"}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       Status: {readableEnum(record.status)} | Versions: {record.versions.length} | Outstanding revisions: {record.outstandingRevisionCount}
                     </p>
                   </article>
@@ -467,11 +467,11 @@ export const StudentProfilePage = () => {
                           {readableEnum(request.status)}
                         </Badge>
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-600">
+                      <p className="mt-1 text-xs text-slate-600">
                         Preferred: {formatDateTime(request.preferredDate)} | Created: {formatDate(request.createdAt)} ({ageDays} day(s) ago)
                       </p>
                       {latestEvent ? (
-                        <p className="mt-1 text-[11px] text-slate-600">
+                        <p className="mt-1 text-xs text-slate-600">
                           Latest event: {readableEnum(latestEvent.eventStatus)} | {formatDateTime(latestEvent.scheduledAt)}
                         </p>
                       ) : null}

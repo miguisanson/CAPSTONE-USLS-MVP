@@ -291,7 +291,7 @@ export const StudentsPage = () => {
                         <td className="table-cell">{student.openAlertCount ?? "-"}</td>
                         <td className="table-cell">{student.lastActivityAt ? formatDate(student.lastActivityAt) : "-"}</td>
                         <td className="table-cell">
-                          <Link to={`/students/${student.id}`} className="inline-flex items-center rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                          <Link to={`/students/${student.id}`} className="inline-flex h-8 items-center rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                             Open Profile
                           </Link>
                         </td>

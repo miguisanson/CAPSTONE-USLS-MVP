@@ -1,4 +1,4 @@
-import { Download, Upload } from "lucide-react";
+import { Download, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { documentsApi, studentsApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
@@ -25,6 +25,9 @@ export const DocumentsPage = () => {
   const canUpload = roles.some((role) =>
     ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER", "STUDENT"].includes(role)
   );
+  const canDeleteVersion = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER", "PANEL_MEMBER", "STUDENT"].includes(role)
+  );
   const canComment = roles.some((role) =>
     ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR", "ADVISER", "PANEL_MEMBER"].includes(role)
   );
@@ -37,6 +40,7 @@ export const DocumentsPage = () => {
   const [checklistItem, setChecklistItem] = useState("Proposal Manuscript");
   const [search, setSearch] = useState("");
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({});
+  const [deletingVersionIds, setDeletingVersionIds] = useState<Record<number, boolean>>({});
 
   const loadStudents = async () => {
     if (isStudent) {
@@ -180,6 +184,20 @@ export const DocumentsPage = () => {
     }
   };
 
+  const deleteVersion = async (versionId: number) => {
+    if (!studentId) return;
+    if (!window.confirm("Delete this uploaded manuscript version? This cannot be undone.")) return;
+    try {
+      setDeletingVersionIds((prev) => ({ ...prev, [versionId]: true }));
+      await documentsApi.deleteVersion(versionId);
+      await loadDocuments(studentId);
+    } catch (err) {
+      setError(handleApiError(err));
+    } finally {
+      setDeletingVersionIds((prev) => ({ ...prev, [versionId]: false }));
+    }
+  };
+
   const addComment = async (documentId: number) => {
     const note = commentDrafts[documentId]?.trim();
     if (!note) return;
@@ -278,15 +296,15 @@ export const DocumentsPage = () => {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{record.checklistItem}</p>
-                        <p className="text-[11px] text-slate-600">
+                        <p className="text-xs text-slate-600">
                           Status: {readableEnum(record.status)} | Outstanding revisions: {record.outstandingRevisionCount}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {canUpload ? (
-                          <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                          <label className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                             <Upload className="h-3.5 w-3.5" />
-                            Upload
+                            Upload Version
                             <input
                               type="file"
                               className="hidden"
@@ -314,18 +332,27 @@ export const DocumentsPage = () => {
                               <li key={version.id} className="flex items-start justify-between gap-2 rounded-md border border-slate-200 px-2 py-1.5">
                                 <div>
                                   <p className="text-xs font-semibold text-slate-800">
-                                    v{version.versionNumber} - {version.fileName}
+                                    {version.fileName}
                                   </p>
-                                  <p className="text-[11px] text-slate-500">{formatDateTime(version.uploadedAt)}</p>
+                                  <p className="text-xs text-slate-500">{formatDateTime(version.uploadedAt)}</p>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => void downloadVersion(version.id, version.fileName)}
-                                  className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
-                                >
-                                  <Download className="h-3 w-3" />
-                                  Download
-                                </button>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Button size="sm" variant="outline" onClick={() => void downloadVersion(version.id, version.fileName)}>
+                                    <Download className="h-3 w-3" />
+                                    Download
+                                  </Button>
+                                  {canDeleteVersion ? (
+                                    <Button
+                                      size="sm"
+                                      variant="danger"
+                                      onClick={() => void deleteVersion(version.id)}
+                                      disabled={deletingVersionIds[version.id]}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                      Delete
+                                    </Button>
+                                  ) : null}
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -345,15 +372,16 @@ export const DocumentsPage = () => {
                                   <Badge tone={note.isResolved ? "success" : "warning"}>{note.isResolved ? "Resolved" : "Open"}</Badge>
                                 </div>
                                 <p className="mt-0.5 text-xs text-slate-700">{note.note}</p>
-                                <p className="mt-0.5 text-[11px] text-slate-500">{formatDateTime(note.createdAt)}</p>
+                                <p className="mt-0.5 text-xs text-slate-500">{formatDateTime(note.createdAt)}</p>
                                 {canComment ? (
-                                  <button
-                                    type="button"
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="mt-1"
                                     onClick={() => void resolveComment(note.id, !note.isResolved)}
-                                    className="mt-1 rounded border border-slate-300 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
                                   >
-                                    {note.isResolved ? "Reopen" : "Mark Resolved"}
-                                  </button>
+                                    {note.isResolved ? "Reopen Note" : "Mark as Resolved"}
+                                  </Button>
                                 ) : null}
                               </li>
                             ))}

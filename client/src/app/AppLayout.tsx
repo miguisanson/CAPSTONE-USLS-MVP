@@ -104,7 +104,7 @@ export const AppLayout = () => {
   return (
     <div className="min-h-screen">
       <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1680px] items-center justify-between gap-3 px-4 md:px-6">
+        <div className="flex h-16 w-full items-center justify-between gap-3 px-4 md:px-6">
           <div className="flex items-center gap-2.5">
             <button
               type="button"
@@ -122,7 +122,9 @@ export const AppLayout = () => {
             >
               <Menu className="h-4 w-4" />
             </button>
-            <div className="h-8 w-8 rounded-lg bg-[var(--gs-primary)] text-center text-xs font-bold leading-8 text-white">USLS</div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--gs-primary)] text-[11px] font-extrabold leading-none tracking-tight text-white">
+              USLS
+            </div>
             <div>
               <p className="text-sm font-semibold text-slate-900">Graduate School Monitoring Portal</p>
               <p className="text-xs text-slate-500">University of St. La Salle</p>

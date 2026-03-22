@@ -2,18 +2,25 @@ import { Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { analyticsApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
-import type { AnalyticsDashboard } from "../types/domain";
+import { Button } from "../components/ui/Button";
+import type { AnalyticsDashboard, PrescriptiveAnalyticsResponse } from "../types/domain";
+import { buildAnalyticsRecommendedActions } from "../utils/analyticsRecommendations";
 import { readableEnum } from "../utils/format";
 
 export const ReportPrintPage = () => {
   const [data, setData] = useState<AnalyticsDashboard | null>(null);
+  const [prescriptive, setPrescriptive] = useState<PrescriptiveAnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await analyticsApi.descriptive();
-        setData(res);
+        const [descriptive, advisory] = await Promise.all([
+          analyticsApi.descriptive(),
+          analyticsApi.prescriptive().catch(() => null),
+        ]);
+        setData(descriptive);
+        setPrescriptive(advisory);
       } catch (err) {
         setError(handleApiError(err));
       }
@@ -21,25 +28,7 @@ export const ReportPrintPage = () => {
     void load();
   }, []);
 
-  const recommended = useMemo(() => {
-    if (!data) return [];
-    const result: string[] = [];
-    const highAging = data.agingByStage.filter((item) => item.averageDays > 60);
-    if (highAging.length > 0) {
-      result.push(`Prioritize intervention on ${highAging.length} stage(s) with average aging above 60 days.`);
-    }
-    const heavyQueues = data.pendingQueues.filter((item) => item.count > 5);
-    if (heavyQueues.length > 0) {
-      result.push(`Rebalance workloads for ${heavyQueues.length} queue role(s) with high pending counts.`);
-    }
-    if (data.schedulingCycleTimeDays > 10) {
-      result.push(`Reduce scheduling cycle time from current ${data.schedulingCycleTimeDays} days.`);
-    }
-    if (result.length === 0) {
-      result.push("Maintain routine monitoring cadence and continue weekly analytics review.");
-    }
-    return result;
-  }, [data]);
+  const recommended = useMemo(() => buildAnalyticsRecommendedActions(data, prescriptive), [data, prescriptive]);
 
   if (error) return <div className="p-6 text-sm text-rose-700">{error}</div>;
   if (!data) return <div className="p-6 text-sm text-slate-600">Loading printable analytics report...</div>;
@@ -49,14 +38,10 @@ export const ReportPrintPage = () => {
       <div className="mx-auto max-w-5xl">
         <div className="mb-4 flex items-center justify-between print:hidden">
           <p className="text-base font-semibold text-[var(--gs-primary)]">Printable Analytics Report</p>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded-md bg-[var(--gs-primary)] px-3 py-2 text-sm font-semibold text-white"
-          >
+          <Button size="md" onClick={() => window.print()}>
             <Printer className="h-4 w-4" />
             Print / Save PDF
-          </button>
+          </Button>
         </div>
 
         <section className="rounded-xl border border-slate-300 p-5">
@@ -149,11 +134,24 @@ export const ReportPrintPage = () => {
 
           <div className="mt-5 rounded-md border border-slate-300 bg-slate-50 p-3">
             <p className="text-sm font-semibold">Recommended Actions</p>
-            <ol className="mt-1 list-decimal space-y-1 pl-4 text-sm">
-              {recommended.map((item, index) => (
-                <li key={`${item}-${index}`}>{item}</li>
-              ))}
-            </ol>
+            {recommended.length === 0 ? (
+              <p className="mt-1 text-sm">No high-risk actions are currently required. Continue routine monitoring.</p>
+            ) : (
+              <ul className="mt-2 space-y-2 text-sm">
+                {recommended.map((item) => (
+                  <li key={item.id} className="rounded border border-slate-300 bg-white px-3 py-2">
+                    <p className="font-semibold">{item.title}</p>
+                    <p className="mt-0.5">{item.description}</p>
+                    {item.owner || item.eta ? (
+                      <p className="mt-0.5 text-xs text-slate-600">
+                        {item.owner ? `Owner: ${item.owner}` : ""} {item.owner && item.eta ? "| " : ""}
+                        {item.eta ? `Target: ${item.eta}` : ""}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="mt-2 text-xs text-slate-500">
               Advisory only. Final interventions must follow authorized graduate school policy and reviewer validation.
             </p>

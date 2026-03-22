@@ -190,6 +190,37 @@ export const canDownloadDocument = async (user: AuthUser, documentVersionId: num
   return canReadStudent(user, version.documentRecord.studentId);
 };
 
+export const canDeleteDocumentVersion = async (user: AuthUser, documentVersionId: number): Promise<boolean> => {
+  if (!Number.isFinite(documentVersionId)) return false;
+
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    include: {
+      documentRecord: {
+        select: { studentId: true, checklistItem: true },
+      },
+    },
+  });
+
+  if (!version) return false;
+
+  if (canReadAllStudents(user)) return true;
+
+  if (user.roles.includes(RoleName.STUDENT)) {
+    const student = await prisma.student.findUnique({
+      where: { id: version.documentRecord.studentId },
+      select: { userAccountId: true },
+    });
+    return !!student && student.userAccountId === user.id;
+  }
+
+  if (user.roles.includes(RoleName.ADVISER) || user.roles.includes(RoleName.PANEL_MEMBER)) {
+    return canReadStudent(user, version.documentRecord.studentId);
+  }
+
+  return false;
+};
+
 export const canAccessAnalyticsDescriptive = (user: AuthUser): boolean => hasAnyRole(user, ANALYTICS_ROLES);
 
 export const canAccessAnalyticsPrescriptive = (user: AuthUser): boolean => hasAnyRole(user, ANALYTICS_ROLES);

@@ -19,6 +19,7 @@ export const AlertsPage = () => {
   const [data, setData] = useState<Paginated<AlertItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [runSummary, setRunSummary] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
@@ -95,9 +96,13 @@ export const AlertsPage = () => {
 
   const runMonitoring = async () => {
     try {
-      await alertsApi.runMonitoring();
+      const summary = await alertsApi.runMonitoring();
+      setRunSummary(
+        `Monitoring cycle completed: ${summary.alertsCreated} new alert(s) created, ${summary.notificationsSent} notification(s) processed.`
+      );
       await load();
     } catch (err) {
+      setRunSummary(null);
       setError(handleApiError(err));
     }
   };
@@ -222,6 +227,7 @@ export const AlertsPage = () => {
 
       {loading ? <LoadingBlock text="Loading monitoring alerts..." /> : null}
       {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+      {runSummary ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{runSummary}</div> : null}
 
       {!loading && !error ? (
         <Card>
@@ -249,7 +255,7 @@ export const AlertsPage = () => {
                           {alert.student ? `${alert.student.firstName} ${alert.student.lastName}` : `Student #${alert.studentId}`} |{" "}
                           {readableEnum(alert.alertType)}
                         </p>
-                        <p className="text-[11px] text-slate-600">
+                        <p className="text-xs text-slate-600">
                           Severity: {alert.severity} | Triggered: {formatDateTime(alert.triggeredAt)} | Age: {diffDaysFromNow(alert.triggeredAt)} day(s)
                         </p>
                       </div>
@@ -286,7 +292,7 @@ export const AlertsPage = () => {
                                   <p className="text-xs font-semibold text-slate-800">{item.actionTaken}</p>
                                   <Badge tone={item.status === "CLOSED" ? "success" : "warning"}>{item.status}</Badge>
                                 </div>
-                                <p className="mt-0.5 text-[11px] text-slate-600">{item.evidenceNote ?? "No evidence note provided."}</p>
+                                <p className="mt-0.5 text-xs text-slate-600">{item.evidenceNote ?? "No evidence note provided."}</p>
                                 {item.status !== "CLOSED" ? (
                                   <div className="mt-1 flex gap-1.5">
                                     <input
