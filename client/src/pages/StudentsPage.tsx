@@ -118,7 +118,7 @@ export const StudentsPage = () => {
             className="rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             onClick={() => void fetchStudents()}
             className="rounded-md bg-[var(--gs-primary)] px-3 py-1.5 text-sm text-white hover:bg-[var(--gs-dark)]"
