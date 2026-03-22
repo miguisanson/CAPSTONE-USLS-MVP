@@ -52,6 +52,12 @@ export type StudentListItem = {
   email: string;
   currentStage: LifecycleStage;
   riskFlag: boolean;
+  openTaskCount?: number;
+  openAlertCount?: number;
+  pendingMilestoneCount?: number;
+  nextActionOwnerRole?: RoleName | null;
+  latestTaskStatus?: TaskStatus | null;
+  lastActivityAt?: string | null;
   program: {
     code: string;
     name: string;
@@ -72,6 +78,7 @@ export type TaskItem = {
   title: string;
   description?: string | null;
   studentId?: number | null;
+  milestoneDefinitionId?: number | null;
   assignedRole?: RoleName | null;
   assignedToId?: number | null;
   nextActionOwnerRole?: RoleName | null;
@@ -80,11 +87,36 @@ export type TaskItem = {
   priorityScore: number;
   recommendedAction?: string | null;
   escalationPrompt?: string | null;
+  milestoneDefinition?: {
+    id: number;
+    name: string;
+    stage: LifecycleStage;
+    criticality: number;
+  } | null;
   student?: StudentListItem;
   assignedTo?: { id: number; fullName: string } | null;
 };
 
 export type StudentDetail = StudentListItem & {
+  adviserAssignments?: Array<{
+    id: number;
+    adviserUser: { id: number; fullName: string; email: string };
+  }>;
+  panelAssignments?: Array<{
+    id: number;
+    panelMember: { id: number; fullName: string; email: string };
+  }>;
+  panelAssignmentsV2?: Array<{
+    id: number;
+    panelUser: { id: number; fullName: string; email: string };
+  }>;
+  lifecycleHistory?: Array<{
+    id: number;
+    stage: LifecycleStage;
+    enteredAt: string;
+    exitedAt?: string | null;
+    notes?: string | null;
+  }>;
   milestoneStatuses: Array<{
     id: number;
     status: string;
@@ -133,8 +165,14 @@ export type DocumentRecord = {
     id: number;
     note: string;
     isResolved: boolean;
+    resolvedAt?: string | null;
     createdAt: string;
     author?: { id: number; fullName: string } | null;
+    version?: {
+      id: number;
+      versionNumber: number;
+      fileName: string;
+    } | null;
   }>;
 };
 
@@ -145,6 +183,7 @@ export type ScheduleRequestItem = {
   preferredDate?: string | null;
   reason?: string | null;
   createdAt: string;
+  requestedBy?: { id: number; fullName: string } | null;
   student?: StudentListItem;
   availabilities: Array<{
     id: number;
@@ -181,6 +220,7 @@ export type AlertItem = {
     status: string;
     performedAt: string;
     closureEvidence?: string | null;
+    performedBy?: { id: number; fullName: string } | null;
   }>;
   notifications: Array<{
     id: number;

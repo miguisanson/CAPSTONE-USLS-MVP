@@ -1,4 +1,4 @@
-import { AuditActionType, LifecycleStage, MilestoneStatus, RoleName } from "@prisma/client";
+import { AuditActionType, LifecycleStage, MilestoneStatus, RoleName, TaskStatus } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import {
@@ -126,6 +126,7 @@ studentsRouter.get(
 
     const { skip, take, page, pageSize } = getPagination(req);
     const stage = req.query.stage ? (String(req.query.stage) as LifecycleStage) : undefined;
+    const ownerRole = req.query.ownerRole ? (String(req.query.ownerRole) as RoleName) : undefined;
     const program = req.query.program ? String(req.query.program) : undefined;
     const riskFlag =
       req.query.riskFlag === undefined ? undefined : String(req.query.riskFlag).toLowerCase() === "true";
@@ -142,6 +143,16 @@ studentsRouter.get(
             }
           : {},
         riskFlag === undefined ? {} : { riskFlag },
+        ownerRole
+          ? {
+              tasks: {
+                some: {
+                  status: { in: [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.OVERDUE] },
+                  nextActionOwnerRole: ownerRole,
+                },
+              },
+            }
+          : {},
         q
           ? {
               OR: [
@@ -170,8 +181,95 @@ studentsRouter.get(
       prisma.student.count({ where }),
     ]);
 
+    const studentIds = items.map((item) => item.id);
+    const [openTaskCounts, nextOwnerByStudent, openAlertCounts, pendingMilestoneCounts, latestTimelineByStudent] =
+      await Promise.all([
+        prisma.task.groupBy({
+          by: ["studentId"],
+          where: {
+            studentId: { in: studentIds },
+            status: { in: [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.OVERDUE] },
+          },
+          _count: { _all: true },
+        }),
+        prisma.task.findMany({
+          where: {
+            studentId: { in: studentIds },
+            status: { in: [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.OVERDUE] },
+          },
+          orderBy: [{ priorityScore: "desc" }, { dueAt: "asc" }, { createdAt: "asc" }],
+          distinct: ["studentId"],
+          select: {
+            studentId: true,
+            nextActionOwnerRole: true,
+            status: true,
+          },
+        }),
+        prisma.alert.groupBy({
+          by: ["studentId"],
+          where: {
+            studentId: { in: studentIds },
+            status: { in: ["OPEN", "ACKNOWLEDGED"] },
+          },
+          _count: { _all: true },
+        }),
+        prisma.studentMilestoneStatus.groupBy({
+          by: ["studentId"],
+          where: {
+            studentId: { in: studentIds },
+            status: { in: ["NOT_STARTED", "IN_PROGRESS", "BLOCKED"] },
+          },
+          _count: { _all: true },
+        }),
+        prisma.timelineEvent.findMany({
+          where: { studentId: { in: studentIds } },
+          orderBy: [{ occurredAt: "desc" }],
+          distinct: ["studentId"],
+          select: { studentId: true, occurredAt: true },
+        }),
+      ]);
+
+    const taskCountMap = new Map<number, number>(
+      openTaskCounts
+        .filter((item) => item.studentId !== null)
+        .map((item) => [item.studentId as number, item._count._all])
+    );
+    const nextOwnerMap = new Map<number, { nextActionOwnerRole: RoleName | null; status: string }>(
+      nextOwnerByStudent
+        .filter((item) => item.studentId !== null)
+        .map((item) => [item.studentId as number, { nextActionOwnerRole: item.nextActionOwnerRole, status: item.status }])
+    );
+    const alertCountMap = new Map<number, number>(
+      openAlertCounts
+        .filter((item) => item.studentId !== null)
+        .map((item) => [item.studentId as number, item._count._all])
+    );
+    const pendingMilestoneMap = new Map<number, number>(
+      pendingMilestoneCounts
+        .filter((item) => item.studentId !== null)
+        .map((item) => [item.studentId as number, item._count._all])
+    );
+    const lastActivityMap = new Map<number, Date>(
+      latestTimelineByStudent
+        .filter((item) => item.studentId !== null)
+        .map((item) => [item.studentId as number, item.occurredAt])
+    );
+
+    const enrichedItems = items.map((item) => {
+      const nextOwner = nextOwnerMap.get(item.id);
+      return {
+        ...item,
+        openTaskCount: taskCountMap.get(item.id) ?? 0,
+        openAlertCount: alertCountMap.get(item.id) ?? 0,
+        pendingMilestoneCount: pendingMilestoneMap.get(item.id) ?? 0,
+        nextActionOwnerRole: nextOwner?.nextActionOwnerRole ?? null,
+        latestTaskStatus: (nextOwner?.status as "PENDING" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED" | undefined) ?? null,
+        lastActivityAt: lastActivityMap.get(item.id)?.toISOString() ?? null,
+      };
+    });
+
     res.json({
-      items,
+      items: enrichedItems,
       page,
       pageSize,
       total,

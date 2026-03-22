@@ -3,4 +3,3 @@ export const EmptyState = ({ message }: { message: string }) => (
     {message}
   </div>
 );
-

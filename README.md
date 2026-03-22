@@ -101,12 +101,12 @@ Edit `server\.env` and set at minimum:
 
 - `DATABASE_URL="mysql://<user>:<password>@localhost:3306/usls_gs_mvp"`
 - `JWT_SECRET="<at least 32 chars>"`
-- Keep `PRISMA_CLIENT_ENGINE_TYPE=binary`
+- Keep `PRISMA_CLIENT_ENGINE_TYPE=library` (recommended for cross-platform local development)
 
-If your machine has a global env var forcing Prisma JS engine, remove it or set to binary:
+If your machine has a global env var overriding Prisma engine mode, set it to library:
 
 ```powershell
-[Environment]::SetEnvironmentVariable("PRISMA_CLIENT_ENGINE_TYPE","binary","User")
+[Environment]::SetEnvironmentVariable("PRISMA_CLIENT_ENGINE_TYPE","library","User")
 ```
 
 ### 4) Backend install + DB prepare + run
@@ -241,7 +241,7 @@ CLIENT_URL=https://your-domain.example
 CORS_ORIGINS=https://your-domain.example,https://www.your-domain.example
 PORTAL_BASE_URL=https://your-domain.example
 UPLOAD_DIR=/var/lib/usls-gs-mvp/uploads
-PRISMA_CLIENT_ENGINE_TYPE=binary
+PRISMA_CLIENT_ENGINE_TYPE=library
 ENABLE_OPENAI_ASSIST=false
 OPENAI_MODEL=gpt-4.1-mini
 ```

@@ -1,12 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { adminApi, milestonesApi, usersApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Card, CardBody } from "../components/ui/Card";
+import { PageHeader } from "../components/ui/PageHeader";
+import { QuickInsights } from "../components/ui/QuickInsights";
+import { RecommendedActions, type RecommendedActionItem } from "../components/ui/RecommendedActions";
+import { SectionTitle } from "../components/ui/SectionTitle";
 import type { AlertThreshold, MilestoneDefinition, RoutingRule, UserAccount } from "../types/domain";
 import { readableEnum } from "../utils/format";
 
 type Tab = "milestones" | "thresholds" | "routing" | "users";
+
+const STAGE_OPTIONS = [
+  "ADMISSION",
+  "COURSEWORK",
+  "PROPOSAL_DEVELOPMENT",
+  "PROPOSAL_DEFENSE",
+  "DATA_COLLECTION",
+  "DISSERTATION_WRITING",
+  "ORAL_DEFENSE",
+  "LOA",
+  "COMPLETED",
+] as const;
+
+const DECISION_OPTIONS = ["APPROVE", "REVISE", "RETURN"] as const;
 
 export const AdminConfigPage = () => {
   const [tab, setTab] = useState<Tab>("milestones");
@@ -18,33 +39,44 @@ export const AdminConfigPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [milestoneName, setMilestoneName] = useState("Proposal QA Review");
-  const [milestoneStage, setMilestoneStage] = useState("PROPOSAL_DEVELOPMENT");
-  const [thresholdKey, setThresholdKey] = useState("STAGE_PROPOSAL_DEFENSE");
-  const [thresholdDays, setThresholdDays] = useState(20);
-  const [thresholdDescription, setThresholdDescription] = useState("Defense threshold");
-  const [routingTemplate, setRoutingTemplate] = useState("Re-queue student revision task");
-  const [routingStage, setRoutingStage] = useState("PROPOSAL_DEFENSE");
-  const [routingDecision, setRoutingDecision] = useState("REVISE");
-  const [routingRole, setRoutingRole] = useState("STUDENT");
-  const [userName, setUserName] = useState("New Demo User");
-  const [userEmail, setUserEmail] = useState("new.user@gs.local");
-  const [userPassword, setUserPassword] = useState("DemoPass123!");
-  const [userRole, setUserRole] = useState("GRADUATE_SCHOOL_STAFF");
+  const [milestoneDraft, setMilestoneDraft] = useState({
+    name: "Proposal QA Review",
+    stage: "PROPOSAL_DEVELOPMENT",
+    expectedDays: 14,
+    criticality: 3,
+  });
+  const [thresholdDraft, setThresholdDraft] = useState({
+    key: "STAGE_PROPOSAL_DEFENSE",
+    stage: "",
+    thresholdDays: 20,
+    description: "Proposal defense threshold",
+  });
+  const [routingDraft, setRoutingDraft] = useState({
+    fromStage: "PROPOSAL_DEFENSE",
+    decision: "REVISE",
+    nextOwnerRole: "STUDENT",
+    taskTemplate: "Request revisions from student",
+  });
+  const [userDraft, setUserDraft] = useState({
+    fullName: "New User",
+    email: "new.user@gs.local",
+    password: "DemoPass123!",
+    role: "GRADUATE_SCHOOL_STAFF",
+  });
 
   const load = async () => {
     try {
       setLoading(true);
-      const [milestonesRes, thresholdsRes, rulesRes, usersRes, rolesRes] = await Promise.all([
+      const [milestonesRes, thresholdsRes, routingRes, usersRes, rolesRes] = await Promise.all([
         milestonesApi.list({}),
         adminApi.thresholds(),
         adminApi.routingRules(),
-        usersApi.list({ pageSize: 40 }),
+        usersApi.list({ pageSize: 100 }),
         usersApi.roles(),
       ]);
       setMilestones(milestonesRes);
       setThresholds(thresholdsRes);
-      setRules(rulesRes);
+      setRules(routingRes);
       setUsers(usersRes.items);
       setRoles(rolesRes);
       setError(null);
@@ -59,15 +91,54 @@ export const AdminConfigPage = () => {
     void load();
   }, []);
 
+  const recommendedActions = useMemo<RecommendedActionItem[]>(() => {
+    const actions: RecommendedActionItem[] = [];
+    const disabledThresholds = thresholds.filter((item) => !item.enabled);
+    if (disabledThresholds.length > 0) {
+      actions.push({
+        id: "disabled-thresholds",
+        title: "Review disabled monitoring thresholds",
+        description: `${disabledThresholds.length} threshold(s) are currently disabled. Validate whether this is intentional and policy-approved.`,
+        priority: "high",
+      });
+    }
+    const inactiveRules = rules.filter((rule) => !rule.active);
+    if (inactiveRules.length > 0) {
+      actions.push({
+        id: "inactive-rules",
+        title: "Audit inactive routing rules",
+        description: `${inactiveRules.length} routing rule(s) are inactive. Ensure stage-decision paths remain complete.`,
+        priority: "medium",
+      });
+    }
+    const inactiveUsers = users.filter((item) => !item.isActive);
+    if (inactiveUsers.length > 0) {
+      actions.push({
+        id: "inactive-users",
+        title: "Review inactive user accounts",
+        description: `${inactiveUsers.length} user account(s) are inactive. Confirm account lifecycle and role transitions.`,
+        priority: "medium",
+      });
+    }
+    return actions;
+  }, [rules, thresholds, users]);
+
   const createMilestone = async () => {
     try {
       await milestonesApi.create({
-        name: milestoneName,
-        stage: milestoneStage as MilestoneDefinition["stage"],
-        expectedDays: 14,
-        criticality: 3,
+        ...milestoneDraft,
+        stage: milestoneDraft.stage as MilestoneDefinition["stage"],
         active: true,
       });
+      await load();
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  };
+
+  const toggleMilestoneActive = async (item: MilestoneDefinition) => {
+    try {
+      await milestonesApi.update(item.id, { active: !item.active });
       await load();
     } catch (err) {
       setError(handleApiError(err));
@@ -77,11 +148,21 @@ export const AdminConfigPage = () => {
   const createThreshold = async () => {
     try {
       await adminApi.createThreshold({
-        key: thresholdKey,
-        thresholdDays,
-        description: thresholdDescription,
+        key: thresholdDraft.key,
+        stage: thresholdDraft.stage || null,
+        thresholdDays: thresholdDraft.thresholdDays,
+        description: thresholdDraft.description,
         enabled: true,
       });
+      await load();
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  };
+
+  const toggleThreshold = async (item: AlertThreshold) => {
+    try {
+      await adminApi.updateThreshold(item.id, { enabled: !item.enabled });
       await load();
     } catch (err) {
       setError(handleApiError(err));
@@ -91,12 +172,21 @@ export const AdminConfigPage = () => {
   const createRule = async () => {
     try {
       await adminApi.createRoutingRule({
-        fromStage: routingStage,
-        decision: routingDecision,
-        nextOwnerRole: routingRole,
-        taskTemplate: routingTemplate,
+        fromStage: routingDraft.fromStage,
+        decision: routingDraft.decision,
+        nextOwnerRole: routingDraft.nextOwnerRole,
+        taskTemplate: routingDraft.taskTemplate,
         active: true,
       });
+      await load();
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  };
+
+  const toggleRule = async (item: RoutingRule) => {
+    try {
+      await adminApi.updateRoutingRule(item.id, { active: !item.active });
       await load();
     } catch (err) {
       setError(handleApiError(err));
@@ -106,11 +196,20 @@ export const AdminConfigPage = () => {
   const createUser = async () => {
     try {
       await usersApi.create({
-        fullName: userName,
-        email: userEmail,
-        password: userPassword,
-        roles: [userRole],
+        fullName: userDraft.fullName,
+        email: userDraft.email,
+        password: userDraft.password,
+        roles: [userDraft.role],
       });
+      await load();
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  };
+
+  const toggleUser = async (item: UserAccount) => {
+    try {
+      await usersApi.update(item.id, { isActive: !item.isActive });
       await load();
     } catch (err) {
       setError(handleApiError(err));
@@ -120,188 +219,331 @@ export const AdminConfigPage = () => {
   if (loading) return <LoadingBlock text="Loading admin configuration..." />;
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-800">Admin Configuration Console</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(["milestones", "thresholds", "routing", "users"] as Tab[]).map((item) => (
-            <button
-              key={item}
-              onClick={() => setTab(item)}
-              className={`rounded-md px-3 py-1.5 text-sm ${
-                tab === item
-                  ? "bg-[var(--gs-primary)] text-white"
-                  : "border border-slate-300 text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              {readableEnum(item.toUpperCase())}
-            </button>
-          ))}
-        </div>
-      </section>
+    <div className="space-y-5">
+      <PageHeader title="Admin Configuration" subtitle="Milestones, thresholds, routing rules, and user administration for platform operations." />
 
-      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
+      <Card>
+        <CardBody className="p-4 md:p-5">
+          <div className="flex flex-wrap gap-2">
+            {(["milestones", "thresholds", "routing", "users"] as Tab[]).map((item) => (
+              <Button key={item} size="sm" variant={tab === item ? "primary" : "outline"} onClick={() => setTab(item)}>
+                {readableEnum(item.toUpperCase())}
+              </Button>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
+      {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
 
       {tab === "milestones" ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">Milestone Definitions</h3>
-          <div className="mt-2 grid gap-2 md:grid-cols-3">
-            <input
-              value={milestoneName}
-              onChange={(event) => setMilestoneName(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="Milestone Definitions"
+              subtitle="Stage-linked milestone configuration"
+              insight={
+                <QuickInsights
+                  title="Milestone Definitions"
+                  summary="Milestones define expected progression checkpoints per lifecycle stage."
+                  recommendation="Keep expected days and criticality aligned with graduate policy."
+                />
+              }
             />
-            <input
-              value={milestoneStage}
-              onChange={(event) => setMilestoneStage(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <button onClick={() => void createMilestone()} className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
-              Create
-            </button>
-          </div>
-          <ul className="mt-3 space-y-1 text-sm">
-            {milestones.map((item) => (
-              <li key={item.id} className="rounded-md bg-slate-50 px-2 py-1">
-                {item.name} - {readableEnum(item.stage)}
-              </li>
-            ))}
-          </ul>
-        </section>
+            <div className="mb-2 grid gap-2 md:grid-cols-5">
+              <input
+                value={milestoneDraft.name}
+                onChange={(event) => setMilestoneDraft((prev) => ({ ...prev, name: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm md:col-span-2"
+                placeholder="Milestone name"
+              />
+              <select
+                value={milestoneDraft.stage}
+                onChange={(event) => setMilestoneDraft((prev) => ({ ...prev, stage: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+              >
+                {STAGE_OPTIONS.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {readableEnum(stage)}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={milestoneDraft.expectedDays}
+                onChange={(event) => setMilestoneDraft((prev) => ({ ...prev, expectedDays: Number(event.target.value) }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Expected days"
+              />
+              <Button size="sm" onClick={() => void createMilestone()}>
+                Create
+              </Button>
+            </div>
+            {milestones.length === 0 ? (
+              <EmptyState message="No milestone definitions available." />
+            ) : (
+              <div className="space-y-1.5">
+                {milestones.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{item.name}</p>
+                      <p className="text-xs text-slate-600">
+                        {readableEnum(item.stage)} | {item.expectedDays} days | Criticality {item.criticality}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={item.active ? "success" : "warning"}>{item.active ? "Active" : "Inactive"}</Badge>
+                      <Button size="sm" variant="outline" onClick={() => void toggleMilestoneActive(item)}>
+                        {item.active ? "Disable" : "Enable"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       ) : null}
 
       {tab === "thresholds" ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">Alert Thresholds</h3>
-          <div className="mt-2 grid gap-2 md:grid-cols-4">
-            <input
-              value={thresholdKey}
-              onChange={(event) => setThresholdKey(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="Monitoring Thresholds"
+              subtitle="Alert trigger and stage-time threshold settings"
+              insight={
+                <QuickInsights
+                  title="Alert Thresholds"
+                  summary="Thresholds govern monitoring triggers such as inactivity, handoffs, and stage duration."
+                  recommendation="Review threshold changes with incident history before deployment."
+                />
+              }
             />
-            <input
-              value={thresholdDays}
-              type="number"
-              onChange={(event) => setThresholdDays(Number(event.target.value))}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <input
-              value={thresholdDescription}
-              onChange={(event) => setThresholdDescription(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <button onClick={() => void createThreshold()} className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
-              Create
-            </button>
-          </div>
-          {thresholds.length === 0 ? (
-            <EmptyState message="No thresholds configured." />
-          ) : (
-            <ul className="mt-3 space-y-1 text-sm">
-              {thresholds.map((item) => (
-                <li key={item.id} className="rounded-md bg-slate-50 px-2 py-1">
-                  {item.key}: {item.thresholdDays} days ({item.enabled ? "enabled" : "disabled"})
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            <div className="mb-2 grid gap-2 md:grid-cols-5">
+              <input
+                value={thresholdDraft.key}
+                onChange={(event) => setThresholdDraft((prev) => ({ ...prev, key: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Key"
+              />
+              <select
+                value={thresholdDraft.stage}
+                onChange={(event) => setThresholdDraft((prev) => ({ ...prev, stage: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+              >
+                <option value="">No stage</option>
+                {STAGE_OPTIONS.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {readableEnum(stage)}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={thresholdDraft.thresholdDays}
+                onChange={(event) => setThresholdDraft((prev) => ({ ...prev, thresholdDays: Number(event.target.value) }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Days"
+              />
+              <input
+                value={thresholdDraft.description}
+                onChange={(event) => setThresholdDraft((prev) => ({ ...prev, description: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Description"
+              />
+              <Button size="sm" onClick={() => void createThreshold()}>
+                Create
+              </Button>
+            </div>
+            {thresholds.length === 0 ? (
+              <EmptyState message="No thresholds configured." />
+            ) : (
+              <div className="space-y-1.5">
+                {thresholds.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{item.key}</p>
+                      <p className="text-xs text-slate-600">
+                        {item.stage ? readableEnum(item.stage) : "Global"} | {item.thresholdDays} days | {item.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={item.enabled ? "success" : "warning"}>{item.enabled ? "Enabled" : "Disabled"}</Badge>
+                      <Button size="sm" variant="outline" onClick={() => void toggleThreshold(item)}>
+                        {item.enabled ? "Disable" : "Enable"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       ) : null}
 
       {tab === "routing" ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">Routing Rules</h3>
-          <div className="mt-2 grid gap-2 md:grid-cols-4">
-            <input
-              value={routingStage}
-              onChange={(event) => setRoutingStage(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="Routing Rules"
+              subtitle="Decision-driven next-owner transitions"
+              insight={
+                <QuickInsights
+                  title="Routing Rules"
+                  summary="Routing rules determine task ownership after decision outcomes by stage."
+                  recommendation="Ensure every revise/return path has an active next-owner route."
+                />
+              }
             />
-            <input
-              value={routingDecision}
-              onChange={(event) => setRoutingDecision(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <select
-              value={routingRole}
-              onChange={(event) => setRoutingRole(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {readableEnum(role)}
-                </option>
-              ))}
-            </select>
-            <input
-              value={routingTemplate}
-              onChange={(event) => setRoutingTemplate(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <button
-            onClick={() => void createRule()}
-            className="mt-2 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100"
-          >
-            Create Rule
-          </button>
-          <ul className="mt-3 space-y-1 text-sm">
-            {rules.map((item) => (
-              <li key={item.id} className="rounded-md bg-slate-50 px-2 py-1">
-                {readableEnum(item.fromStage)} + {item.decision ? readableEnum(item.decision) : "ANY"} {"->"}{" "}
-                {readableEnum(item.nextOwnerRole)}
-              </li>
-            ))}
-          </ul>
-        </section>
+            <div className="mb-2 grid gap-2 md:grid-cols-5">
+              <select
+                value={routingDraft.fromStage}
+                onChange={(event) => setRoutingDraft((prev) => ({ ...prev, fromStage: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+              >
+                {STAGE_OPTIONS.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {readableEnum(stage)}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={routingDraft.decision}
+                onChange={(event) => setRoutingDraft((prev) => ({ ...prev, decision: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+              >
+                {DECISION_OPTIONS.map((decision) => (
+                  <option key={decision} value={decision}>
+                    {readableEnum(decision)}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={routingDraft.nextOwnerRole}
+                onChange={(event) => setRoutingDraft((prev) => ({ ...prev, nextOwnerRole: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+              >
+                {roles.map((role) => (
+                  <option key={role} value={role}>
+                    {readableEnum(role)}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={routingDraft.taskTemplate}
+                onChange={(event) => setRoutingDraft((prev) => ({ ...prev, taskTemplate: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Task template"
+              />
+              <Button size="sm" onClick={() => void createRule()}>
+                Create
+              </Button>
+            </div>
+            {rules.length === 0 ? (
+              <EmptyState message="No routing rules configured." />
+            ) : (
+              <div className="space-y-1.5">
+                {rules.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {readableEnum(item.fromStage)} + {item.decision ? readableEnum(item.decision) : "ANY"} {"->"}{" "}
+                        {readableEnum(item.nextOwnerRole)}
+                      </p>
+                      <p className="text-xs text-slate-600">{item.taskTemplate}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={item.active ? "success" : "warning"}>{item.active ? "Active" : "Inactive"}</Badge>
+                      <Button size="sm" variant="outline" onClick={() => void toggleRule(item)}>
+                        {item.active ? "Disable" : "Enable"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       ) : null}
 
       {tab === "users" ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">User Management</h3>
-          <div className="mt-2 grid gap-2 md:grid-cols-4">
-            <input
-              value={userName}
-              onChange={(event) => setUserName(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="User Management"
+              subtitle="Role assignments and account activity state"
+              insight={
+                <QuickInsights
+                  title="User Management"
+                  summary="User accounts and role access are managed here for RBAC enforcement."
+                  recommendation="Review inactive accounts and role assignments regularly."
+                />
+              }
             />
-            <input
-              value={userEmail}
-              onChange={(event) => setUserEmail(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <input
-              value={userPassword}
-              onChange={(event) => setUserPassword(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <select
-              value={userRole}
-              onChange={(event) => setUserRole(event.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {readableEnum(role)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={() => void createUser()}
-            className="mt-2 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100"
-          >
-            Create User
-          </button>
-          <ul className="mt-3 space-y-1 text-sm">
-            {users.map((user) => (
-              <li key={user.id} className="rounded-md bg-slate-50 px-2 py-1">
-                {user.fullName} ({user.email}) - {user.roles.map((role) => readableEnum(role)).join(", ")}
-              </li>
-            ))}
-          </ul>
-        </section>
+            <div className="mb-2 grid gap-2 md:grid-cols-5">
+              <input
+                value={userDraft.fullName}
+                onChange={(event) => setUserDraft((prev) => ({ ...prev, fullName: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Full name"
+              />
+              <input
+                value={userDraft.email}
+                onChange={(event) => setUserDraft((prev) => ({ ...prev, email: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Email"
+              />
+              <input
+                value={userDraft.password}
+                onChange={(event) => setUserDraft((prev) => ({ ...prev, password: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Password"
+              />
+              <select
+                value={userDraft.role}
+                onChange={(event) => setUserDraft((prev) => ({ ...prev, role: event.target.value }))}
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+              >
+                {roles.map((role) => (
+                  <option key={role} value={role}>
+                    {readableEnum(role)}
+                  </option>
+                ))}
+              </select>
+              <Button size="sm" onClick={() => void createUser()}>
+                Create
+              </Button>
+            </div>
+            {users.length === 0 ? (
+              <EmptyState message="No user accounts available." />
+            ) : (
+              <div className="space-y-1.5">
+                {users.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{item.fullName}</p>
+                      <p className="text-xs text-slate-600">
+                        {item.email} | {item.roles.map((role) => readableEnum(role)).join(", ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={item.isActive ? "success" : "warning"}>{item.isActive ? "Active" : "Inactive"}</Badge>
+                      <Button size="sm" variant="outline" onClick={() => void toggleUser(item)}>
+                        {item.isActive ? "Deactivate" : "Activate"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       ) : null}
+
+      <RecommendedActions
+        actions={recommendedActions}
+        context="Page-level recommendations based on configuration readiness, disabled controls, and account governance status."
+      />
     </div>
   );
 };

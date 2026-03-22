@@ -1,4 +1,4 @@
-import { AlertStatus, AuditActionType, InterventionStatus, RoleName } from "@prisma/client";
+import { AlertSeverity, AlertStatus, AlertType, AuditActionType, InterventionStatus, RoleName } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { logAccessDenied } from "../../auth/policy";
@@ -31,11 +31,15 @@ alertsRouter.get(
   asyncHandler(async (req, res) => {
     const { skip, take, page, pageSize } = getPagination(req);
     const status = req.query.status ? (String(req.query.status) as AlertStatus) : undefined;
+    const alertType = req.query.alertType ? (String(req.query.alertType) as AlertType) : undefined;
+    const severity = req.query.severity ? (String(req.query.severity) as AlertSeverity) : undefined;
     const studentId = req.query.studentId ? Number(req.query.studentId) : undefined;
     const scope = buildStudentScopeWhere(req.user!);
 
     const where = {
       status: status ?? undefined,
+      alertType: alertType ?? undefined,
+      severity: severity ?? undefined,
       studentId: Number.isFinite(studentId) ? studentId : undefined,
       student: scope,
     };
