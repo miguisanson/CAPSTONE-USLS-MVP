@@ -148,6 +148,11 @@ export const AlertsPage = () => {
       <PageHeader
         title="Monitoring Alerts"
         subtitle="Alert monitoring cycle, interventions, and evidence-based closure workflows."
+        help={{
+          title: "Case Monitoring and Follow-Up",
+          summary: "This module turns threshold breaches into alert cases and tracks intervention actions with closure evidence.",
+          recommendation: "Close alerts only after the follow-up action and evidence are recorded.",
+        }}
         actions={
           <Button size="sm" onClick={() => void runMonitoring()}>
             <Play className="h-3.5 w-3.5" />

@@ -80,7 +80,15 @@ export const AuditLogPage = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Audit Log" subtitle="Append-only activity records for accountability, security, and compliance monitoring." />
+      <PageHeader
+        title="Audit Log"
+        subtitle="Append-only activity records for accountability, security, and compliance monitoring."
+        help={{
+          title: "Audit Trail and Accountability",
+          summary: "This module records important access, decision, upload, lifecycle, configuration, and security events.",
+          recommendation: "Use filters to reconstruct who changed what, when it happened, and which record was affected.",
+        }}
+      />
 
       <Card>
         <CardBody className="p-4 md:p-5">

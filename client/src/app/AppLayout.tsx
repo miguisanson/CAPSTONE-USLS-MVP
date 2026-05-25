@@ -23,6 +23,7 @@ import { roleTone } from "../utils/presentation";
 type NavItem = {
   to: string;
   label: string;
+  description: string;
   icon: typeof LayoutDashboard;
   visible: boolean;
 };
@@ -50,15 +51,69 @@ export const AppLayout = () => {
 
   const items = useMemo<NavItem[]>(
     () => [
-      { to: "/", label: "Dashboard", icon: LayoutDashboard, visible: true },
-      { to: "/students", label: "Students", icon: Users, visible: true },
-      { to: "/tasks", label: "Task Queue", icon: CheckSquare, visible: true },
-      { to: "/documents", label: "Documents", icon: FileText, visible: true },
-      { to: "/scheduling", label: "Scheduling", icon: CalendarClock, visible: true },
-      { to: "/alerts", label: "Monitoring Alerts", icon: AlertTriangle, visible: true },
-      { to: "/analytics", label: "Analytics", icon: BarChart3, visible: canAccessAnalytics(roles) },
-      { to: "/audit", label: "Audit Log", icon: ScrollText, visible: canAccessAudit(roles) },
-      { to: "/admin", label: "Admin Config", icon: Settings, visible: canAccessAdmin(roles) },
+      {
+        to: "/",
+        label: "Dashboard",
+        description: "Operational summary of lifecycle status, tasks, alerts, schedules, and priority follow-ups.",
+        icon: LayoutDashboard,
+        visible: true,
+      },
+      {
+        to: "/students",
+        label: "Students",
+        description: "Student progress records, lifecycle stage, milestones, adviser scope, and risk flags.",
+        icon: Users,
+        visible: true,
+      },
+      {
+        to: "/tasks",
+        label: "Task Queue",
+        description: "Role-based workflow ownership, due dates, decisions, and next required action.",
+        icon: CheckSquare,
+        visible: true,
+      },
+      {
+        to: "/documents",
+        label: "Documents",
+        description: "Checklist requirements, document versions, revision comments, and controlled downloads.",
+        icon: FileText,
+        visible: true,
+      },
+      {
+        to: "/scheduling",
+        label: "Scheduling",
+        description: "Defense requests, availability collection, confirmed outcomes, reschedules, and cancellations.",
+        icon: CalendarClock,
+        visible: true,
+      },
+      {
+        to: "/alerts",
+        label: "Monitoring Alerts",
+        description: "Threshold-triggered case alerts, intervention notes, and evidence-based closure.",
+        icon: AlertTriangle,
+        visible: true,
+      },
+      {
+        to: "/analytics",
+        label: "Analytics",
+        description: "Operational metrics and advisory decision support for queues, aging, workload, and bottlenecks.",
+        icon: BarChart3,
+        visible: canAccessAnalytics(roles),
+      },
+      {
+        to: "/audit",
+        label: "Audit Log",
+        description: "Append-only trace of access, decisions, updates, uploads, and configuration changes.",
+        icon: ScrollText,
+        visible: canAccessAudit(roles),
+      },
+      {
+        to: "/admin",
+        label: "Admin Config",
+        description: "System configuration for milestones, thresholds, routing rules, roles, and user accounts.",
+        icon: Settings,
+        visible: canAccessAdmin(roles),
+      },
     ],
     [roles]
   );
@@ -160,22 +215,36 @@ export const AppLayout = () => {
               .filter((item) => item.visible)
               .map((item) => {
                 const Icon = item.icon;
+                const tooltipId = `nav-tooltip-${item.to.replace(/[^a-z0-9]/gi, "home")}`;
                 return (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     end={item.to === "/"}
                     className={({ isActive }) =>
-                      `flex items-center justify-center rounded-lg border p-2 transition ${
+                      `group relative flex items-center justify-center rounded-lg border p-2 transition ${
                         isActive
                           ? "border-[var(--gs-primary)] bg-[var(--gs-primary)] !text-white hover:!text-white [&>svg]:!text-white"
                           : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50"
                       }`
                     }
                     aria-label={item.label}
-                    title={item.label}
+                    aria-describedby={tooltipId}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.currentTarget.blur();
+                      }
+                    }}
                   >
                     <Icon className="h-4 w-4" />
+                    <span
+                      id={tooltipId}
+                      role="tooltip"
+                      className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden w-72 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 shadow-lg group-hover:block group-focus-visible:block"
+                    >
+                      <span className="block font-semibold text-slate-900">{item.label}</span>
+                      <span className="mt-0.5 block font-normal text-slate-600">{item.description}</span>
+                    </span>
                   </NavLink>
                 );
               })}

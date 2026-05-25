@@ -143,6 +143,13 @@ export const StudentsPage = () => {
             ? "View your graduate lifecycle progress, milestones, and monitored status."
             : "Filter and monitor graduate student records across lifecycle stages."
         }
+        help={{
+          title: "Student Progress Management",
+          summary: isStudent
+            ? "This view shows your monitored graduate record and current lifecycle position."
+            : "This view supports student lookup, lifecycle filtering, program context, adviser scope, and at-risk monitoring.",
+          recommendation: "Start from stage and risk filters when looking for cases that need follow-up.",
+        }}
       />
 
       {!isStudent ? (

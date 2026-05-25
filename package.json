@@ -1,0 +1,28 @@
+{
+  "name": "capstone-usls-mvp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Graduate Student Lifecycle Monitoring and Analytics Platform",
+  "scripts": {
+    "dev": "node scripts/dev-local.cjs",
+    "setup:local": "node scripts/dev-local.cjs",
+    "dev:mac": "bash dev-local.sh",
+    "dev:windows": "powershell -ExecutionPolicy Bypass -File ./dev-local.ps1",
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
+    "test": "npm --prefix server test",
+    "test:server": "npm --prefix server test",
+    "prisma:generate": "npm --prefix server run prisma:generate",
+    "prisma:migrate": "npm --prefix server run prisma:migrate",
+    "prisma:deploy": "npm --prefix server run prisma:deploy",
+    "seed": "npm --prefix server run seed"
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  }
+}

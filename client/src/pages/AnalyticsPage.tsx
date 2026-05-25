@@ -133,6 +133,11 @@ export const AnalyticsPage = () => {
       <PageHeader
         title="Analytics"
         subtitle="Descriptive metrics and advisory decision support for graduate lifecycle operations."
+        help={{
+          title: "Analytics and Decision Support",
+          summary: "This module summarizes stage distribution, queue load, time-in-stage, workload indicators, and rule-based advisory recommendations.",
+          recommendation: "Treat recommendations as decision support; final academic or administrative decisions still belong to authorized roles.",
+        }}
         actions={
           <>
             <Button size="sm" variant="outline" onClick={() => void downloadCsv()}>

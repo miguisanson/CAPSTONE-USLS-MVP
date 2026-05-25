@@ -221,6 +221,11 @@ export const DashboardPage = () => {
       <PageHeader
         title="Dashboard"
         subtitle={`Operational overview for ${user?.fullName ?? "current user"} across graduate student lifecycle workflows.`}
+        help={{
+          title: "Reporting and Dashboards",
+          summary: "This screen combines lifecycle counts, task queues, alerts, risk flags, and scheduled defenses into one operational view.",
+          recommendation: "Use it as the daily starting point for bottlenecks, overdue work, and follow-up priorities.",
+        }}
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

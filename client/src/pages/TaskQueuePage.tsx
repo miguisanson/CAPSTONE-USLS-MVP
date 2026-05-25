@@ -127,7 +127,15 @@ export const TaskQueuePage = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Task Queue" subtitle="Role-based workflow queue with decision submission and routing follow-through." />
+      <PageHeader
+        title="Task Queue"
+        subtitle="Role-based workflow queue with decision submission and routing follow-through."
+        help={{
+          title: "Case Status and Action Tracking",
+          summary: "This module shows who owns the next action, what is due, and which decision moved a case forward.",
+          recommendation: "Use decisions to close workflow items instead of treating tasks as simple to-do notes.",
+        }}
+      />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card>

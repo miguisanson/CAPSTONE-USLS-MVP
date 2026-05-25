@@ -166,7 +166,15 @@ export const SchedulingPage = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Scheduling" subtitle="Defense schedule requests, participant availability, and confirmed or rescheduled outcomes." />
+      <PageHeader
+        title="Scheduling"
+        subtitle="Defense schedule requests, participant availability, and confirmed or rescheduled outcomes."
+        help={{
+          title: "Defense Scheduling Management",
+          summary: "This module records the request, participant availability, and official schedule outcome for defense-related events.",
+          recommendation: "Record reschedules and cancellations here so scheduling delays remain visible in monitoring and analytics.",
+        }}
+      />
 
       <section className="grid gap-4 xl:grid-cols-3">
         <Card>

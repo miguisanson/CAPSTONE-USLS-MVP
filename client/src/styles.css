@@ -73,12 +73,12 @@ textarea {
 
 @layer components {
   .surface-card {
-    @apply rounded-2xl border bg-white shadow-sm;
+    @apply rounded-lg border bg-white shadow-sm;
     border-color: var(--gs-border);
   }
 
   .surface-card-muted {
-    @apply rounded-2xl border bg-slate-50/80 shadow-sm;
+    @apply rounded-lg border bg-slate-50/80 shadow-sm;
     border-color: var(--gs-border);
   }
 

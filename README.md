@@ -18,44 +18,75 @@ Prerequisites:
 - MySQL 8 running locally
 - MySQL CLI available in your terminal as `mysql`
 
-On macOS with Homebrew, the prerequisite setup is usually:
+The local runner creates env files, installs dependencies, prepares the database, seeds demo data if needed, and starts both the API and web app.
+
+### macOS
 
 ```bash
 brew install node mysql
 brew services start mysql
+npm run dev
 ```
 
-Then run the app with one command from the repo root:
+If your MySQL root user has a password:
 
 ```bash
-bash dev-local.sh
-```
-
-The script will:
-
-- create missing `server/.env` and `client/.env` files
-- generate a local JWT secret
-- install backend and frontend dependencies
-- create the MySQL database from `DATABASE_URL`
-- run Prisma migrations
-- seed demo data if the database is empty
-- start both the API and the web app
-
-Local URLs:
-
-- Frontend: `http://localhost:5173`
-- Backend health check: `http://localhost:4000/health`
-
-If your MySQL username or password is different, pass it inline:
-
-```bash
-DATABASE_URL='mysql://root:your_password@localhost:3306/usls_gs_mvp' bash dev-local.sh
+DATABASE_URL='mysql://root:your_password@localhost:3306/usls_gs_mvp' npm run dev
 ```
 
 If your local MySQL root user has no password:
 
 ```bash
-DATABASE_URL='mysql://root:@localhost:3306/usls_gs_mvp' bash dev-local.sh
+DATABASE_URL='mysql://root:@localhost:3306/usls_gs_mvp' npm run dev
+```
+
+### Windows
+
+Install first:
+
+- Node.js 20+ from `https://nodejs.org/`
+- MySQL 8 from the MySQL Installer
+- Make sure `mysql` works in PowerShell. If not, add the MySQL `bin` folder to PATH.
+
+Then run this from the repo root in PowerShell:
+
+```powershell
+npm run dev
+```
+
+If your MySQL root user has a password:
+
+```powershell
+$env:DATABASE_URL="mysql://root:your_password@localhost:3306/usls_gs_mvp"; npm run dev
+```
+
+If your local MySQL root user has no password:
+
+```powershell
+$env:DATABASE_URL="mysql://root:@localhost:3306/usls_gs_mvp"; npm run dev
+```
+
+If PowerShell blocks scripts, use the direct Windows runner:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\dev-local.ps1
+```
+
+### Local URLs
+
+- Frontend: `http://localhost:5173`
+- Backend health check: `http://localhost:4000/health`
+
+Direct platform runners are also available:
+
+```bash
+# macOS / Linux
+bash dev-local.sh
+```
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File .\dev-local.ps1
 ```
 
 ## Demo Login
@@ -82,9 +113,18 @@ Demo accounts:
 CAPSTONE-USLS-MVP/
   client/          React web app
   server/          Express API, Prisma schema, migrations, tests
+  docs/            Architecture and thesis feature mapping
   References/      Design and research references
-  dev-local.sh     One-command local setup and dev runner
+  dev-local.sh     macOS/Linux local setup and dev runner
+  dev-local.ps1    Windows local setup and dev runner
+  scripts/         Cross-platform npm helpers
 ```
+
+## Planning Docs
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Thesis Feature Map](docs/THESIS_FEATURE_MAP.md)
+- [Database Workflow](server/prisma/README.md)
 
 ## Main Features
 
@@ -104,36 +144,32 @@ CAPSTONE-USLS-MVP/
 Run backend only:
 
 ```bash
-cd server
-npm run dev
+npm run dev:server
 ```
 
 Run frontend only:
 
 ```bash
-cd client
-npm run dev
+npm run dev:client
 ```
 
 Run backend tests:
 
 ```bash
-cd server
 npm test
 ```
 
-Build backend:
+Build everything:
 
 ```bash
-cd server
 npm run build
 ```
 
-Build frontend:
+Build only one side:
 
 ```bash
-cd client
-npm run build
+npm run build:server
+npm run build:client
 ```
 
 ## Database Workflow
@@ -143,8 +179,7 @@ The app uses Prisma migrations as the source of truth.
 Apply existing migrations:
 
 ```bash
-cd server
-npx prisma migrate deploy
+npm run prisma:deploy
 ```
 
 Create a new migration after editing `server/prisma/schema.prisma`:
@@ -157,14 +192,12 @@ npx prisma migrate dev --name describe_change
 Regenerate the Prisma client:
 
 ```bash
-cd server
-npx prisma generate
+npm run prisma:generate
 ```
 
 Refresh demo data:
 
 ```bash
-cd server
 npm run seed
 ```
 

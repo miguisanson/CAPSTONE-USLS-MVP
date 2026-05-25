@@ -169,6 +169,11 @@ export const StudentProfilePage = () => {
       <PageHeader
         title={`${student.firstName} ${student.lastName}`}
         subtitle={`${student.studentNumber} | ${student.program.name}`}
+        help={{
+          title: "Student Case Record",
+          summary: "This page consolidates the student's lifecycle stage, milestones, task ownership, documents, schedules, alerts, and event history.",
+          recommendation: "Use the profile to verify current status before changing stages, closing tasks, or recording intervention evidence.",
+        }}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={stageTone(student.currentStage)}>{readableEnum(student.currentStage)}</Badge>

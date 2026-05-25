@@ -220,7 +220,15 @@ export const AdminConfigPage = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Admin Configuration" subtitle="Milestones, thresholds, routing rules, and user administration for platform operations." />
+      <PageHeader
+        title="Admin Configuration"
+        subtitle="Milestones, thresholds, routing rules, and user administration for platform operations."
+        help={{
+          title: "Platform Configuration",
+          summary: "This area controls milestone definitions, monitoring thresholds, routing rules, and user accounts.",
+          recommendation: "Configuration changes affect workflow behavior, so keep them aligned with approved Graduate School process rules.",
+        }}
+      />
 
       <Card>
         <CardBody className="p-4 md:p-5">

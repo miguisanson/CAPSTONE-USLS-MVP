@@ -26,15 +26,26 @@ export const QuickInsights = ({ title, summary, points, recommendation, classNam
     return () => window.removeEventListener("mousedown", onWindowClick);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   return (
     <div ref={rootRef} className={cn("relative inline-flex", className)}>
       <button
         type="button"
-        aria-label="Quick Insights"
+        aria-label={`Quick insights: ${title}`}
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--gs-primary)] text-white shadow-sm transition hover:bg-[var(--gs-primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gs-primary)] focus-visible:ring-offset-2"
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--gs-primary)] text-white shadow-sm transition hover:bg-[var(--gs-primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gs-primary)] focus-visible:ring-offset-2"
       >
         <Info className="h-3.5 w-3.5" />
       </button>
@@ -43,7 +54,7 @@ export const QuickInsights = ({ title, summary, points, recommendation, classNam
           id={id}
           role="dialog"
           aria-label="Quick Insights panel"
-          className="absolute right-0 top-8 z-40 w-80 rounded-xl border border-[var(--gs-border)] bg-white p-3 shadow-xl"
+          className="absolute left-1/2 top-8 z-40 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border border-[var(--gs-border)] bg-white p-3 shadow-xl sm:left-auto sm:right-0 sm:w-80 sm:translate-x-0"
         >
           <div className="mb-2 flex items-start gap-2">
             <Lightbulb className="mt-0.5 h-4 w-4 text-[var(--gs-primary)]" />

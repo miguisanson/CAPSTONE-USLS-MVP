@@ -221,7 +221,15 @@ export const DocumentsPage = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Documents" subtitle="Checklist records, document versions, revision notes, and controlled access operations." />
+      <PageHeader
+        title="Documents"
+        subtitle="Checklist records, document versions, revision notes, and controlled access operations."
+        help={{
+          title: "Evidence and Revision Tracking",
+          summary: "This module tracks required checklist items, submitted file versions, revision notes, and document review status.",
+          recommendation: "Use checklist records as the source for completion evidence before approving milestone progress.",
+        }}
+      />
 
       <Card>
         <CardBody className="p-4 md:p-5">
