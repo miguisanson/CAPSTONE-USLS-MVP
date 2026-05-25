@@ -85,14 +85,61 @@ update_env_value() {
   local key="$2"
   local value="$3"
 
-  KEY="$key" VALUE="$value" perl -0pi -e '
-    my $key = $ENV{"KEY"};
-    my $value = $ENV{"VALUE"};
-    if (s/^$key=.*$/$key="$value"/m) {
-      next;
-    }
-    $_ .= "\n$key=\"$value\"\n";
-  ' "$file"
+  node - "$file" "$key" "$value" <<'NODE'
+const fs = require("fs");
+
+const file = process.argv[2];
+const key = process.argv[3];
+const value = process.argv[4];
+const original = fs.readFileSync(file, "utf8");
+const lines = original.split(/\r?\n/);
+let updated = false;
+
+const nextLines = lines.map((line) => {
+  if (line.match(new RegExp(`^${key}=`))) {
+    updated = true;
+    return `${key}="${value}"`;
+  }
+  return line;
+});
+
+if (!updated) {
+  if (nextLines[nextLines.length - 1] !== "") {
+    nextLines.push("");
+  }
+  nextLines.push(`${key}="${value}"`);
+}
+
+fs.writeFileSync(file, nextLines.join("\n"));
+NODE
+}
+
+read_env_value() {
+  local file="$1"
+  local key="$2"
+
+  node - "$file" "$key" <<'NODE'
+const fs = require("fs");
+
+const file = process.argv[2];
+const key = process.argv[3];
+const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+
+for (const line of lines) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) continue;
+  const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+  if (!match || match[1] !== key) continue;
+
+  let value = match[2].trim();
+  const quote = value[0];
+  if ((quote === '"' || quote === "'") && value.endsWith(quote)) {
+    value = value.slice(1, -1);
+  }
+  console.log(value);
+  process.exit(0);
+}
+NODE
 }
 
 cleanup() {
@@ -130,9 +177,9 @@ if [ ! -f "$CLIENT_ENV" ]; then
   cp "$CLIENT_DIR/.env.example" "$CLIENT_ENV"
 fi
 
-if [ -n "${DATABASE_URL:-}" ]; then
+INPUT_DATABASE_URL="${DATABASE_URL:-}"
+if [ -n "$INPUT_DATABASE_URL" ]; then
   log "Using DATABASE_URL from this shell command"
-  update_env_value "$SERVER_ENV" "DATABASE_URL" "$DATABASE_URL"
 fi
 
 if grep -q 'JWT_SECRET="replace_with_at_least_32_characters_secret"' "$SERVER_ENV"; then
@@ -140,10 +187,7 @@ if grep -q 'JWT_SECRET="replace_with_at_least_32_characters_secret"' "$SERVER_EN
   update_env_value "$SERVER_ENV" "JWT_SECRET" "$(generate_secret)"
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "$SERVER_ENV"
-set +a
+DATABASE_URL="${INPUT_DATABASE_URL:-$(read_env_value "$SERVER_ENV" "DATABASE_URL")}"
 
 if [ -z "${DATABASE_URL:-}" ]; then
   die "DATABASE_URL is missing in server/.env"
@@ -161,14 +205,18 @@ if ! create_database "$MYSQL_DEFAULTS_FILE" "$DATABASE_NAME" >/dev/null 2>&1; th
       die "Update server/.env with your MySQL credentials, then rerun: bash dev-local.sh"
     fi
 
-    update_env_value "$SERVER_ENV" "DATABASE_URL" "$NEW_DATABASE_URL"
     DATABASE_URL="$NEW_DATABASE_URL"
     DATABASE_NAME="$(write_mysql_defaults_file "$DATABASE_URL" "$MYSQL_DEFAULTS_FILE")"
     create_database "$MYSQL_DEFAULTS_FILE" "$DATABASE_NAME" >/dev/null 2>&1 || \
       die "Still could not connect to MySQL. Check that MySQL is running and the credentials are correct."
+    update_env_value "$SERVER_ENV" "DATABASE_URL" "$DATABASE_URL"
   else
     die "Set DATABASE_URL inline, for example: DATABASE_URL='mysql://root:password@localhost:3306/usls_gs_mvp' bash dev-local.sh"
   fi
+fi
+
+if [ -n "$INPUT_DATABASE_URL" ]; then
+  update_env_value "$SERVER_ENV" "DATABASE_URL" "$DATABASE_URL"
 fi
 
 log "Installing backend dependencies"
