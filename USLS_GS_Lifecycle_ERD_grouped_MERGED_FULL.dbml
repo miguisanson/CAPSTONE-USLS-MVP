@@ -1,0 +1,692 @@
+// Updated DBML generated from Actual_USLS-DB.mwb (MySQL Workbench model)
+// Target schema: usls_gs_mvp
+// Paste into https://dbdiagram.io to render ERD
+// NOTE: TableGroup colors and table header colors may require dbdiagram.io paid plan.
+
+// Enums (derived from MySQL enum columns)
+Enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  CLOSED
+}
+
+Enum AlertType {
+  PROLONGED_STAGE
+  UNRESOLVED_HANDOFF
+  DELAYED_SCHEDULING
+  INACTIVITY
+}
+
+Enum AuditActionType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  ACCESS_DENIED
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_TRANSITION
+  DECISION
+  SUBMISSION
+  UPLOAD
+  CONFIG_CHANGE
+  ALERT_TRIGGER
+  ALERT_RESOLVED
+  NOTIFICATION_SENT
+}
+
+Enum DecisionType {
+  APPROVE
+  REVISE
+  RETURN
+}
+
+Enum DocumentReviewStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  NEEDS_REVISION
+}
+
+Enum LifecycleStage {
+  ADMISSION
+  COURSEWORK
+  PROPOSAL_DEVELOPMENT
+  PROPOSAL_DEFENSE
+  DATA_COLLECTION
+  DISSERTATION_WRITING
+  ORAL_DEFENSE
+  LOA
+  COMPLETED
+}
+
+Enum MilestoneProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+Enum NotificationChannel {
+  EMAIL
+  PORTAL
+}
+
+Enum OpenClosedStatus {
+  OPEN
+  CLOSED
+}
+
+Enum RoleName {
+  ADMIN
+  GRADUATE_SCHOOL_STAFF
+  ACADEMIC_COORDINATOR
+  RESEARCH_COORDINATOR
+  ADVISER
+  PANEL_MEMBER
+  STUDENT
+}
+
+Enum ScheduleStatus {
+  REQUESTED
+  CONFIRMED
+  RESCHEDULED
+  CANCELLED
+}
+
+Enum SeverityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+Enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+TableGroup "A. Student & Program Context" [color: #4E79A7, note: 'Core master’s student records and program reference data.'] {
+  program
+  student
+  academicterm
+  termenrollment
+  course
+  courseenrollment
+  curriculum
+  studyplanitem
+  studentcurriculumtag
+}
+
+TableGroup "B. Identity, Roles, and Assignments" [color: #F28E2B, note: 'User accounts, roles, and adviser/panel assignments for row-level access control.'] {
+  useraccount
+  role
+  userrole
+  adviserassignment
+  panelassignment
+  studentpanelassignment
+}
+
+TableGroup "C. Lifecycle & Milestones" [color: #59A14F, note: 'Lifecycle stage tracking, milestone definitions, and derived status/timeline events.'] {
+  studentlifecycle
+  milestonedefinition
+  studentmilestonestatus
+  timelineevent
+  researchcase
+  milestoneevent
+}
+
+TableGroup "D. Workflow Tasks & Decisions" [color: #E15759, note: 'Task queues, decisions (approve/revise/return), and routing rules for next-action ownership.'] {
+  task
+  decisionlog
+  routingrule
+}
+
+TableGroup "E. Documents & Revisions" [color: #B07AA1, note: 'Document checklist, versioning, and revision note loop for evidence completeness.'] {
+  documentrecord
+  documentversion
+  revisionnote
+  formsubmission
+  clearancerecord
+}
+
+TableGroup "F. Scheduling & Coordination" [color: #76B7B2, note: 'Defense scheduling requests, availability collection, and schedule outcomes.'] {
+  schedulerequest
+  availability
+  scheduleevent
+}
+
+TableGroup "G. Monitoring, Alerts, and Interventions" [color: #EDC948, note: 'Rule-based monitoring signals, alerts, interventions, and notification logs.'] {
+  alertthreshold
+  alert
+  intervention
+  notificationalert
+}
+
+TableGroup "H. Auditability" [color: #BAB0AC, note: 'Append-only audit trail of key events and access attempts.'] {
+  auditlog
+}
+
+// Tables
+Table program [headercolor: #4E79A7] {
+  id int [pk, increment]
+  code varchar(191) [unique]
+  name varchar(191)
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table student [headercolor: #4E79A7] {
+  id int [pk, increment]
+  studentNumber varchar(191) [unique]
+  firstName varchar(191)
+  lastName varchar(191)
+  email varchar(191) [unique]
+  programId int
+  userAccountId int [null, unique, default: null]
+  currentStage LifecycleStage [default: "ADMISSION"]
+  riskFlag tinyint [default: 0]
+  loaStart datetime(3) [null, default: null]
+  loaEnd datetime(3) [null, default: null]
+  adviserId int [null, default: null]
+  researchCoordinatorId int [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table useraccount [headercolor: #F28E2B] {
+  id int [pk, increment]
+  email varchar(191) [unique]
+  passwordHash varchar(191)
+  fullName varchar(191)
+  isActive tinyint [default: 1]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table role [headercolor: #F28E2B] {
+  id int [pk, increment]
+  name RoleName [unique]
+  description varchar(191) [null, default: null]
+}
+
+Table userrole [headercolor: #F28E2B] {
+  id int [pk, increment]
+  userId int
+  roleId int
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+
+  indexes {
+    (userId, roleId) [unique]
+  }
+}
+
+Table adviserassignment [headercolor: #F28E2B] {
+  id int [pk, increment]
+  adviserUserId int
+  studentId int
+  assignedAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+
+  indexes {
+    (adviserUserId, studentId) [unique]
+  }
+}
+
+Table panelassignment [headercolor: #F28E2B] {
+  id int [pk, increment]
+  panelUserId int
+  studentId int
+  assignedAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+
+  indexes {
+    (panelUserId, studentId) [unique]
+  }
+}
+
+Table studentpanelassignment [headercolor: #F28E2B] {
+  id int [pk, increment]
+  studentId int
+  panelMemberId int
+  assignedAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+
+  indexes {
+    (studentId, panelMemberId) [unique]
+  }
+}
+
+Table studentlifecycle [headercolor: #59A14F] {
+  id int [pk, increment]
+  studentId int
+  stage LifecycleStage
+  enteredAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  exitedAt datetime(3) [null, default: null]
+  notes varchar(191) [null, default: null]
+  changedById int [null, default: null]
+}
+
+Table milestonedefinition [headercolor: #59A14F] {
+  id int [pk, increment]
+  name varchar(191)
+  stage LifecycleStage
+  description varchar(191) [null, default: null]
+  expectedDays int [default: 14]
+  criticality int [default: 1]
+  active tinyint [default: 1]
+  sortOrder int [default: 0]
+  createdById int [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table studentmilestonestatus [headercolor: #59A14F] {
+  id int [pk, increment]
+  studentId int
+  milestoneDefinitionId int
+  status MilestoneProgressStatus [default: "NOT_STARTED"]
+  dueAt datetime(3) [null, default: null]
+  completedAt datetime(3) [null, default: null]
+  updatedById int [null, default: null]
+  notes varchar(191) [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+
+  indexes {
+    (studentId, milestoneDefinitionId) [unique]
+  }
+}
+
+Table timelineevent [headercolor: #59A14F] {
+  id int [pk, increment]
+  studentId int
+  eventType varchar(191)
+  title varchar(191)
+  details varchar(191) [null, default: null]
+  relatedEntityType varchar(191) [null, default: null]
+  relatedEntityId int [null, default: null]
+  performedById int [null, default: null]
+  occurredAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+}
+
+Table task [headercolor: #E15759] {
+  id int [pk, increment]
+  title varchar(191)
+  description varchar(191) [null, default: null]
+  studentId int [null, default: null]
+  milestoneDefinitionId int [null, default: null]
+  assignedToId int [null, default: null]
+  assignedRole RoleName [null, default: null]
+  nextActionOwnerRole RoleName [null, default: null]
+  status TaskStatus [default: "PENDING"]
+  dueAt datetime(3) [null, default: null]
+  priorityScore int [default: 0]
+  recommendedAction varchar(191) [null, default: null]
+  escalationPrompt varchar(191) [null, default: null]
+  closedAt datetime(3) [null, default: null]
+  createdById int
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table decisionlog [headercolor: #E15759] {
+  id int [pk, increment]
+  taskId int
+  studentId int [null, default: null]
+  decision DecisionType
+  rationale varchar(191) [null, default: null]
+  decidedById int
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+}
+
+Table routingrule [headercolor: #E15759] {
+  id int [pk, increment]
+  fromStage LifecycleStage
+  decision DecisionType [null, default: null]
+  nextOwnerRole RoleName
+  taskTemplate varchar(191)
+  active tinyint [default: 1]
+  createdById int [null, default: null]
+  updatedById int [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table documentrecord [headercolor: #B07AA1] {
+  id int [pk, increment]
+  studentId int
+  milestoneDefinitionId int [null, default: null]
+  checklistItem varchar(191)
+  status DocumentReviewStatus [default: "PENDING"]
+  outstandingRevisionCount int [default: 0]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table documentversion [headercolor: #B07AA1] {
+  id int [pk, increment]
+  documentRecordId int
+  versionNumber int
+  fileName varchar(191)
+  filePath varchar(191)
+  mimeType varchar(191)
+  sizeBytes int
+  uploadedById int
+  uploadedAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  isCurrent tinyint [default: 1]
+
+  indexes {
+    (documentRecordId, versionNumber) [unique]
+  }
+}
+
+Table revisionnote [headercolor: #B07AA1] {
+  id int [pk, increment]
+  documentRecordId int
+  versionId int [null, default: null]
+  authorId int
+  note varchar(191)
+  isResolved tinyint [default: 0]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  resolvedAt datetime(3) [null, default: null]
+}
+
+Table schedulerequest [headercolor: #76B7B2] {
+  id int [pk, increment]
+  studentId int
+  requestedById int
+  preferredDate datetime(3) [null, default: null]
+  reason varchar(191) [null, default: null]
+  status ScheduleStatus [default: "REQUESTED"]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table availability [headercolor: #76B7B2] {
+  id int [pk, increment]
+  scheduleRequestId int
+  userId int
+  availableFrom datetime(3)
+  availableTo datetime(3)
+  notes varchar(191) [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+}
+
+Table scheduleevent [headercolor: #76B7B2] {
+  id int [pk, increment]
+  scheduleRequestId int
+  eventStatus ScheduleStatus
+  scheduledAt datetime(3) [null, default: null]
+  decidedById int [null, default: null]
+  notes varchar(191) [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+}
+
+Table alertthreshold [headercolor: #EDC948] {
+  id int [pk, increment]
+  key varchar(191) [unique]
+  stage LifecycleStage [null, default: null]
+  thresholdDays int
+  enabled tinyint [default: 1]
+  description varchar(191)
+  createdById int [null, default: null]
+  updatedById int [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table alert [headercolor: #EDC948] {
+  id int [pk, increment]
+  studentId int
+  taskId int [null, default: null]
+  alertType AlertType
+  severity SeverityLevel
+  status AlertStatus [default: "OPEN"]
+  message varchar(191)
+  thresholdDays int [null, default: null]
+  triggeredAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  resolvedAt datetime(3) [null, default: null]
+  createdById int [null, default: null]
+  closedById int [null, default: null]
+}
+
+Table intervention [headercolor: #EDC948] {
+  id int [pk, increment]
+  alertId int
+  actionTaken varchar(191)
+  evidenceNote varchar(191) [null, default: null]
+  performedById int
+  status OpenClosedStatus [default: "OPEN"]
+  performedAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  closedAt datetime(3) [null, default: null]
+  closureEvidence varchar(191) [null, default: null]
+}
+
+Table notificationalert [headercolor: #EDC948] {
+  id int [pk, increment]
+  alertId int [null, default: null]
+  userId int [null, default: null]
+  email varchar(191)
+  reason varchar(191)
+  channel NotificationChannel [default: "EMAIL"]
+  sentAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  success tinyint [default: 1]
+  metadata json [null, default: null]
+}
+
+Table auditlog [headercolor: #BAB0AC] {
+  id bigint [pk, increment]
+  actorUserId int [null, default: null]
+  actionType AuditActionType
+  entityType varchar(191)
+  entityId varchar(191) [null, default: null]
+  description varchar(191)
+  metadata json [null, default: null]
+  ipAddress varchar(191) [null, default: null]
+  userAgent varchar(191) [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+}
+
+// Relationships (FKs)
+// Additional tables merged from prototype ERD to cover coursework/enrollment and research case/event history.
+// These tables support the thesis emphasis on timestamped events, evidence completeness, and operational monitoring.
+
+Table academicterm [headercolor: #4E79A7] {
+  id int [pk, increment]
+  academicYear varchar(20)
+  term varchar(20)
+  startDate date [null, default: null]
+  endDate date [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table termenrollment [headercolor: #4E79A7] {
+  id int [pk, increment]
+  studentId int
+  termId int
+  statusSignal varchar(50) [null, default: null] // monitoring signal only (e.g., enrolled/withdrawn)
+  confirmedAt datetime(3) [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table course [headercolor: #4E79A7] {
+  id int [pk, increment]
+  programId int [null, default: null]
+  code varchar(50) [unique]
+  title varchar(191)
+  units decimal(4,2) [default: 0]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table curriculum [headercolor: #4E79A7] {
+  id int [pk, increment]
+  programId int [null, default: null]
+  code varchar(50)
+  version varchar(50) [null, default: null]
+  effectiveAcademicYear varchar(20) [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table studyplanitem [headercolor: #4E79A7] {
+  id int [pk, increment]
+  curriculumId int
+  courseId int
+  recommendedTermId int [null, default: null]
+  isRequired tinyint [default: 1]
+  notes varchar(191) [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table studentcurriculumtag [headercolor: #4E79A7] {
+  id int [pk, increment]
+  studentId int
+  curriculumId int
+  tag varchar(50) [null, default: null] // e.g., bridging, conditional, revised plan
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table courseenrollment [headercolor: #4E79A7] {
+  id int [pk, increment]
+  termEnrollmentId int
+  courseId int
+  statusSignal varchar(50) [null, default: null] // monitoring signal only (e.g., in-progress/completed/incomplete)
+  grade varchar(20) [null, default: null]
+  updatedAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+}
+
+Table researchcase [headercolor: #59A14F] {
+  id int [pk, increment]
+  studentId int
+  caseType varchar(50) [null, default: null] // thesis/capstone/dissertation
+  topicTitle varchar(191) [null, default: null]
+  status varchar(50) [null, default: null]
+  currentMilestoneId int [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table milestoneevent [headercolor: #59A14F] {
+  id int [pk, increment]
+  researchCaseId int [null, default: null]
+  studentId int
+  milestoneDefinitionId int
+  occurredAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  outcome varchar(50) [null, default: null] // pending/approved/revise/returned/completed
+  ownerRole RoleName [null, default: null]
+  decidedById int [null, default: null]
+  taskId int [null, default: null]
+  notes text [null]
+}
+
+Table formsubmission [headercolor: #B07AA1] {
+  id int [pk, increment]
+  studentId int
+  milestoneEventId int [null, default: null]
+  formType varchar(50)
+  submittedAt datetime(3) [null, default: null]
+  endorsedAt datetime(3) [null, default: null]
+  approvedAt datetime(3) [null, default: null]
+  routingState varchar(50) [null, default: null]
+  submittedById int [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+Table clearancerecord [headercolor: #B07AA1] {
+  id int [pk, increment]
+  studentId int
+  milestoneDefinitionId int [null, default: null]
+  submittedAt datetime(3) [null, default: null]
+  clearedAt datetime(3) [null, default: null]
+  status varchar(50) [null, default: null]
+  createdById int [null, default: null]
+  createdAt datetime(3) [default: `CURRENT_TIMESTAMP(3)`]
+  updatedAt datetime(3)
+}
+
+
+Ref: adviserassignment.studentId > student.id
+Ref: adviserassignment.adviserUserId > useraccount.id
+Ref: alert.studentId > student.id
+Ref: alert.taskId > task.id
+Ref: alert.closedById > useraccount.id
+Ref: alert.createdById > useraccount.id
+Ref: alertthreshold.createdById > useraccount.id
+Ref: alertthreshold.updatedById > useraccount.id
+Ref: auditlog.actorUserId > useraccount.id
+Ref: availability.scheduleRequestId > schedulerequest.id
+Ref: availability.userId > useraccount.id
+Ref: decisionlog.studentId > student.id
+Ref: decisionlog.taskId > task.id
+Ref: decisionlog.decidedById > useraccount.id
+Ref: documentrecord.milestoneDefinitionId > milestonedefinition.id
+Ref: documentrecord.studentId > student.id
+Ref: documentversion.documentRecordId > documentrecord.id
+Ref: documentversion.uploadedById > useraccount.id
+Ref: intervention.alertId > alert.id
+Ref: intervention.performedById > useraccount.id
+Ref: milestonedefinition.createdById > useraccount.id
+Ref: notificationalert.alertId > alert.id
+Ref: notificationalert.userId > useraccount.id
+Ref: panelassignment.studentId > student.id
+Ref: panelassignment.panelUserId > useraccount.id
+Ref: revisionnote.documentRecordId > documentrecord.id
+Ref: revisionnote.versionId > documentversion.id
+Ref: revisionnote.authorId > useraccount.id
+Ref: routingrule.createdById > useraccount.id
+Ref: routingrule.updatedById > useraccount.id
+Ref: scheduleevent.scheduleRequestId > schedulerequest.id
+Ref: scheduleevent.decidedById > useraccount.id
+Ref: schedulerequest.studentId > student.id
+Ref: schedulerequest.requestedById > useraccount.id
+Ref: student.programId > program.id
+Ref: student.adviserId > useraccount.id
+Ref: student.researchCoordinatorId > useraccount.id
+Ref: student.userAccountId > useraccount.id
+Ref: studentlifecycle.studentId > student.id
+Ref: studentmilestonestatus.milestoneDefinitionId > milestonedefinition.id
+Ref: studentmilestonestatus.studentId > student.id
+Ref: studentmilestonestatus.updatedById > useraccount.id
+Ref: studentpanelassignment.studentId > student.id
+Ref: studentpanelassignment.panelMemberId > useraccount.id
+Ref: task.milestoneDefinitionId > milestonedefinition.id
+Ref: task.studentId > student.id
+Ref: task.assignedToId > useraccount.id
+Ref: task.createdById > useraccount.id
+Ref: timelineevent.studentId > student.id
+Ref: timelineevent.performedById > useraccount.id
+Ref: userrole.roleId > role.id
+Ref: userrole.userId > useraccount.id
+
+// Additional relationships for merged tables
+Ref: termenrollment.studentId > student.id
+Ref: termenrollment.termId > academicterm.id
+Ref: course.programId > program.id
+Ref: curriculum.programId > program.id
+Ref: studyplanitem.curriculumId > curriculum.id
+Ref: studyplanitem.courseId > course.id
+Ref: studyplanitem.recommendedTermId > academicterm.id
+Ref: studentcurriculumtag.studentId > student.id
+Ref: studentcurriculumtag.curriculumId > curriculum.id
+Ref: courseenrollment.termEnrollmentId > termenrollment.id
+Ref: courseenrollment.courseId > course.id
+Ref: researchcase.studentId > student.id
+Ref: researchcase.currentMilestoneId > milestonedefinition.id
+Ref: milestoneevent.researchCaseId > researchcase.id
+Ref: milestoneevent.studentId > student.id
+Ref: milestoneevent.milestoneDefinitionId > milestonedefinition.id
+Ref: milestoneevent.decidedById > useraccount.id
+Ref: milestoneevent.taskId > task.id
+Ref: formsubmission.studentId > student.id
+Ref: formsubmission.milestoneEventId > milestoneevent.id
+Ref: formsubmission.submittedById > useraccount.id
+Ref: clearancerecord.studentId > student.id
+Ref: clearancerecord.milestoneDefinitionId > milestonedefinition.id
+Ref: clearancerecord.createdById > useraccount.id
