@@ -1,0 +1,136 @@
+PRIVATE UBUNTU HOSTING NOTES
+
+This file is intentionally ignored by git and should stay local.
+
+Target setup:
+- Ubuntu Server 22.04 or 24.04
+- Node.js 20 LTS
+- MySQL 8
+- Nginx
+- Express API running on 127.0.0.1:4000
+- Nginx serving the built React client and proxying /api and /health
+
+Local deployment files:
+- deploy/nginx/usls-gs-mvp.conf
+- deploy/systemd/usls-gs-mvp-api.service
+- deploy/scripts/setup-ubuntu.sh
+- deploy/scripts/setup.sh
+- deploy/scripts/startall.sh
+- deploy/scripts/deploy.sh
+- deploy/scripts/backup-db.sh
+- deploy/scripts/cron-backup.example
+
+Fresh VM quick path:
+
+1. Copy or clone the project to /opt/usls-gs-mvp.
+
+2. Run the full setup wrapper:
+
+   cd /opt/usls-gs-mvp
+   sudo DOMAIN=your-domain.example BRANCH=main DEMO_SEED=true bash deploy/scripts/setup.sh
+
+Manual bootstrap:
+
+   cd /opt/usls-gs-mvp
+   sudo bash deploy/scripts/setup-ubuntu.sh
+
+Production backend environment:
+
+   sudo nano /etc/usls-gs-mvp/server.env
+
+Minimum values:
+
+   NODE_ENV=production
+   PORT=4000
+   DATABASE_URL="mysql://usls_app:CHANGE_ME_STRONG_PASSWORD@127.0.0.1:3306/usls_gs_mvp"
+   JWT_SECRET="CHANGE_ME_WITH_AT_LEAST_32_CHARACTERS"
+   JWT_EXPIRES_IN=8h
+   CLIENT_URL=https://your-domain.example
+   CORS_ORIGINS=https://your-domain.example,https://www.your-domain.example
+   PORTAL_BASE_URL=https://your-domain.example
+   UPLOAD_DIR=/var/lib/usls-gs-mvp/uploads
+   PRISMA_CLIENT_ENGINE_TYPE=library
+   ENABLE_OPENAI_ASSIST=false
+   OPENAI_MODEL=gpt-4.1-mini
+
+Create database and app user:
+
+   sudo mysql -u root -p
+
+   CREATE DATABASE IF NOT EXISTS usls_gs_mvp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE USER IF NOT EXISTS 'usls_app'@'127.0.0.1' IDENTIFIED BY 'CHANGE_ME_STRONG_PASSWORD';
+   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON usls_gs_mvp.* TO 'usls_app'@'127.0.0.1';
+   FLUSH PRIVILEGES;
+
+Deploy/update:
+
+   cd /opt/usls-gs-mvp
+   sudo APP_ROOT=/opt/usls-gs-mvp APP_USER=uslsapp bash deploy/scripts/deploy.sh main
+
+Optional demo seed:
+
+   cd /opt/usls-gs-mvp
+   sudo DEMO_SEED=true APP_ROOT=/opt/usls-gs-mvp APP_USER=uslsapp bash deploy/scripts/deploy.sh main
+
+Start services after reboot:
+
+   cd /opt/usls-gs-mvp
+   sudo bash deploy/scripts/startall.sh
+
+Service commands:
+
+   sudo systemctl status usls-gs-mvp-api
+   sudo journalctl -u usls-gs-mvp-api -f
+   sudo systemctl restart usls-gs-mvp-api
+   sudo nginx -t
+   sudo systemctl reload nginx
+
+Cloudflare HTTPS:
+
+1. Add A record for your domain pointing to the VM public IP.
+2. Keep Cloudflare proxy enabled.
+3. Set SSL/TLS mode to Full (strict).
+4. Create a Cloudflare Origin Certificate.
+5. Save certificate:
+
+   /etc/ssl/certs/usls-origin.crt
+
+6. Save private key:
+
+   /etc/ssl/private/usls-origin.key
+
+7. Secure files:
+
+   sudo chown root:root /etc/ssl/certs/usls-origin.crt /etc/ssl/private/usls-origin.key
+   sudo chmod 644 /etc/ssl/certs/usls-origin.crt
+   sudo chmod 600 /etc/ssl/private/usls-origin.key
+
+Backups:
+
+   sudo nano /etc/usls-gs-mvp/backup.env
+   sudo bash /opt/usls-gs-mvp/deploy/scripts/backup-db.sh
+
+Cron example:
+
+   30 2 * * * /bin/bash /opt/usls-gs-mvp/deploy/scripts/backup-db.sh >> /var/log/usls-gs-mvp-backup.log 2>&1
+
+Verification:
+
+   curl -sS http://127.0.0.1:4000/health
+   curl -sS https://your-domain.example/health
+   sudo nginx -t
+   sudo systemctl status nginx usls-gs-mvp-api
+   mysql -u usls_app -p -h 127.0.0.1 -D usls_gs_mvp -e "SHOW TABLES;"
+
+Troubleshooting:
+
+   sudo ss -tulpn | grep -E ':80|:443|:4000|:3306'
+   sudo journalctl -u usls-gs-mvp-api -n 200 --no-pager
+   sudo tail -f /var/log/nginx/error.log /var/log/nginx/access.log
+
+Common checks:
+- CORS_ORIGINS must exactly match the browser origin.
+- DATABASE_URL must point to the production database user.
+- UPLOAD_DIR should be /var/lib/usls-gs-mvp/uploads and writable by the API user.
+- Do not use wildcard CORS in production.
+- Keep OpenAI disabled unless explicitly needed.
