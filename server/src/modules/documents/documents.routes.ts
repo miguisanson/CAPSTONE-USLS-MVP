@@ -5,6 +5,7 @@ import path from "node:path";
 import multer from "multer";
 import { z } from "zod";
 import {
+  canDeleteDocumentVersion,
   canDownloadDocument,
   canReadStudent,
   canUploadDocument,
@@ -325,6 +326,118 @@ documentsRouter.get(
     });
 
     res.download(absolutePath, version.fileName);
+  })
+);
+
+documentsRouter.delete(
+  "/documents/versions/:id",
+  authorize(
+    RoleName.ADMIN,
+    RoleName.GRADUATE_SCHOOL_STAFF,
+    RoleName.ACADEMIC_COORDINATOR,
+    RoleName.RESEARCH_COORDINATOR,
+    RoleName.ADVISER,
+    RoleName.PANEL_MEMBER,
+    RoleName.STUDENT
+  ),
+  asyncHandler(async (req, res) => {
+    const versionId = Number(req.params.id);
+    if (!Number.isFinite(versionId)) throw new HttpError(400, "Invalid document version ID.");
+
+    const canDelete = await canDeleteDocumentVersion(req.user!, versionId);
+    if (!canDelete) {
+      await logAccessDenied(req, "Document version delete denied by relationship checks.", {
+        versionId,
+      });
+      throw new HttpError(403, "You are not authorized to delete this document version.");
+    }
+
+    const version = await prisma.documentVersion.findUnique({
+      where: { id: versionId },
+      include: {
+        documentRecord: {
+          select: {
+            id: true,
+            studentId: true,
+            checklistItem: true,
+            outstandingRevisionCount: true,
+          },
+        },
+      },
+    });
+
+    if (!version) throw new HttpError(404, "Document version not found.");
+
+    const absolutePath = path.resolve(uploadDirectory, version.filePath);
+    if (!absolutePath.startsWith(uploadDirectory)) {
+      await logAccessDenied(req, "Document delete path traversal blocked.", {
+        versionId,
+      });
+      throw new HttpError(403, "Invalid document path.");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.documentVersion.delete({
+        where: { id: versionId },
+      });
+
+      const remainingVersions = await tx.documentVersion.findMany({
+        where: { documentRecordId: version.documentRecordId },
+        orderBy: { versionNumber: "desc" },
+      });
+
+      if (version.isCurrent && remainingVersions.length > 0) {
+        await tx.documentVersion.update({
+          where: { id: remainingVersions[0].id },
+          data: { isCurrent: true },
+        });
+      }
+
+      if (remainingVersions.length === 0) {
+        await tx.documentRecord.update({
+          where: { id: version.documentRecordId },
+          data: {
+            status:
+              version.documentRecord.outstandingRevisionCount > 0
+                ? DocumentStatus.NEEDS_REVISION
+                : DocumentStatus.PENDING,
+          },
+        });
+      }
+    });
+
+    try {
+      if (fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+      }
+    } catch {
+      // File cleanup should not fail API flow after DB transaction.
+    }
+
+    await logTimelineEvent({
+      studentId: version.documentRecord.studentId,
+      eventType: "DOCUMENT_VERSION_DELETED",
+      title: "Document version deleted",
+      details: version.fileName,
+      relatedEntityType: "DocumentVersion",
+      relatedEntityId: version.id,
+      performedById: req.user!.id,
+    });
+
+    await logAudit({
+      actorUserId: req.user!.id,
+      actionType: AuditActionType.DELETE,
+      entityType: "DocumentVersion",
+      entityId: String(version.id),
+      description: "Document version deleted.",
+      metadata: {
+        documentId: version.documentRecordId,
+        fileName: version.fileName,
+      },
+      req,
+    });
+
+    res.json({ message: "Document version deleted." });
   })
 );
 

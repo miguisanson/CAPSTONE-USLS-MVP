@@ -1,125 +1,212 @@
-import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  BarChart3,
+  CalendarClock,
+  CheckSquare,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  ScrollText,
+  Settings,
+  Users,
+  X,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
 import { useAuth } from "./AuthContext";
 import { canAccessAdmin, canAccessAnalytics, canAccessAudit, roleLabel } from "../utils/roles";
+import { roleTone } from "../utils/presentation";
 
 type NavItem = {
   to: string;
   label: string;
+  icon: typeof LayoutDashboard;
+  visible: boolean;
 };
 
-const baseNav: NavItem[] = [
-  { to: "/", label: "Dashboard" },
-  { to: "/students", label: "Students" },
-  { to: "/tasks", label: "Task Queue" },
-  { to: "/documents", label: "Documents" },
-  { to: "/scheduling", label: "Scheduling" },
-  { to: "/alerts", label: "Monitoring Alerts" },
+const sectionTitleByPath: Array<{ match: RegExp; title: string }> = [
+  { match: /^\/$/, title: "Dashboard" },
+  { match: /^\/dashboard/, title: "Dashboard" },
+  { match: /^\/students/, title: "Students" },
+  { match: /^\/tasks/, title: "Task Queue" },
+  { match: /^\/documents/, title: "Documents" },
+  { match: /^\/scheduling/, title: "Scheduling" },
+  { match: /^\/alerts/, title: "Monitoring Alerts" },
+  { match: /^\/analytics/, title: "Analytics" },
+  { match: /^\/audit/, title: "Audit Log" },
+  { match: /^\/admin/, title: "Admin Configuration" },
 ];
 
 export const AppLayout = () => {
   const { user, logout } = useAuth();
+  const roles = user?.roles ?? [];
   const navigate = useNavigate();
   const location = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const roles = user?.roles ?? [];
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const dynamicNav: NavItem[] = [
-    ...baseNav,
-    ...(canAccessAnalytics(roles) ? [{ to: "/analytics", label: "Analytics" }] : []),
-    ...(canAccessAudit(roles) ? [{ to: "/audit", label: "Audit Log" }] : []),
-    ...(canAccessAdmin(roles) ? [{ to: "/admin", label: "Admin Config" }] : []),
-  ];
+  const items = useMemo<NavItem[]>(
+    () => [
+      { to: "/", label: "Dashboard", icon: LayoutDashboard, visible: true },
+      { to: "/students", label: "Students", icon: Users, visible: true },
+      { to: "/tasks", label: "Task Queue", icon: CheckSquare, visible: true },
+      { to: "/documents", label: "Documents", icon: FileText, visible: true },
+      { to: "/scheduling", label: "Scheduling", icon: CalendarClock, visible: true },
+      { to: "/alerts", label: "Monitoring Alerts", icon: AlertTriangle, visible: true },
+      { to: "/analytics", label: "Analytics", icon: BarChart3, visible: canAccessAnalytics(roles) },
+      { to: "/audit", label: "Audit Log", icon: ScrollText, visible: canAccessAudit(roles) },
+      { to: "/admin", label: "Admin Config", icon: Settings, visible: canAccessAdmin(roles) },
+    ],
+    [roles]
+  );
+
+  const activeTitle = useMemo(() => {
+    const matched = sectionTitleByPath.find((item) => item.match.test(location.pathname));
+    return matched?.title ?? "Portal";
+  }, [location.pathname]);
 
   const onLogout = async () => {
     await logout();
     navigate("/login", { replace: true });
   };
 
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
+  const navNode = (
+    <nav className="space-y-1 p-3">
+      {items
+        .filter((item) => item.visible)
+        .map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `group flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition ${
+                  isActive
+                    ? "border-[var(--gs-primary)] bg-[var(--gs-primary)] !text-white hover:!text-white [&>svg]:!text-white [&>span]:!text-white"
+                    : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50"
+                }`
+              }
+            >
+              <Icon className="h-4 w-4" />
+              <span className="truncate">{item.label}</span>
+            </NavLink>
+          );
+        })}
+    </nav>
+  );
 
   return (
-    <div className="min-h-screen bg-[var(--gs-bg)] text-slate-800">
-      <div className="mx-auto flex min-h-screen max-w-[1600px]">
-        <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white p-6 lg:block">
-          <h1 className="text-lg font-semibold text-[var(--gs-dark)]">Graduate Lifecycle</h1>
-          <p className="mt-1 text-xs text-slate-500">Monitoring & Analytics Platform</p>
-          <nav className="mt-6 space-y-1">
-            {dynamicNav.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                className={({ isActive }) =>
-                  `block rounded-lg px-3 py-2 text-sm ${
-                    isActive
-                      ? "bg-[var(--gs-primary)]/10 text-[var(--gs-dark)]"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
-        <main className="flex-1 p-4 md:p-6">
-          <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-[var(--gs-dark)]">Graduate Lifecycle</p>
-                <p className="text-[11px] text-slate-500">Monitoring & Analytics Platform</p>
-              </div>
-              <button
-                onClick={() => setMobileMenuOpen((prev) => !prev)}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                aria-expanded={mobileMenuOpen}
-                aria-controls="mobile-nav"
-              >
-                {mobileMenuOpen ? "Close Menu" : "Open Menu"}
-              </button>
+    <div className="min-h-screen">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="flex h-16 w-full items-center justify-between gap-3 px-4 md:px-6">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((prev) => !prev)}
+              className="hidden rounded-md border border-slate-300 p-1.5 text-slate-700 hover:bg-slate-50 lg:inline-flex"
+              aria-label="Toggle sidebar"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="inline-flex rounded-md border border-slate-300 p-1.5 text-slate-700 hover:bg-slate-50 lg:hidden"
+              aria-label="Open navigation"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--gs-primary)] text-[11px] font-extrabold leading-none tracking-tight text-white">
+              USLS
             </div>
-            {mobileMenuOpen ? (
-              <nav id="mobile-nav" className="mt-3 grid gap-1">
-                {dynamicNav.map((item) => (
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Graduate School Monitoring Portal</p>
+              <p className="text-xs text-slate-500">University of St. La Salle</p>
+            </div>
+          </div>
+          <div className="hidden min-w-0 flex-1 px-2 md:block">
+            <p className="truncate text-sm text-slate-600">{activeTitle}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {roles.map((role) => (
+              <Badge key={role} tone={roleTone(role)} className="hidden sm:inline-flex">
+                {roleLabel(role)}
+              </Badge>
+            ))}
+            <Button variant="outline" size="sm" onClick={() => void onLogout()}>
+              <LogOut className="h-3.5 w-3.5" />
+              Logout
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <aside
+        className={`fixed bottom-0 left-0 top-16 z-40 hidden border-r border-slate-200 bg-white transition-all duration-200 lg:block ${
+          sidebarOpen ? "w-72" : "w-20"
+        }`}
+      >
+        {sidebarOpen ? (
+          navNode
+        ) : (
+          <nav className="space-y-1 p-3">
+            {items
+              .filter((item) => item.visible)
+              .map((item) => {
+                const Icon = item.icon;
+                return (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     end={item.to === "/"}
                     className={({ isActive }) =>
-                      `block rounded-lg px-3 py-2 text-sm ${
+                      `flex items-center justify-center rounded-lg border p-2 transition ${
                         isActive
-                          ? "bg-[var(--gs-primary)]/10 text-[var(--gs-dark)]"
-                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          ? "border-[var(--gs-primary)] bg-[var(--gs-primary)] !text-white hover:!text-white [&>svg]:!text-white"
+                          : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50"
                       }`
                     }
+                    aria-label={item.label}
+                    title={item.label}
                   >
-                    {item.label}
+                    <Icon className="h-4 w-4" />
                   </NavLink>
-                ))}
-              </nav>
-            ) : null}
-          </section>
+                );
+              })}
+          </nav>
+        )}
+      </aside>
 
-          <header className="mb-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-[var(--gs-dark)]">{user?.fullName}</p>
-                <p className="text-xs text-slate-500">{(user?.roles ?? []).map(roleLabel).join(", ")}</p>
-              </div>
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 lg:hidden">
+          <aside className="h-full w-80 max-w-[90vw] border-r border-slate-200 bg-white">
+            <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
+              <p className="text-sm font-semibold text-slate-900">Navigation</p>
               <button
-                onClick={onLogout}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-md border border-slate-300 p-1.5 text-slate-700"
+                aria-label="Close navigation"
               >
-                Logout
+                <X className="h-4 w-4" />
               </button>
             </div>
-          </header>
+            {navNode}
+          </aside>
+        </div>
+      ) : null}
+
+      <main className={`pt-16 transition-all duration-200 ${sidebarOpen ? "lg:pl-72" : "lg:pl-20"}`}>
+        <div className="mx-auto w-full max-w-[1680px] px-4 py-5 md:px-6 md:py-6">
           <Outlet />
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

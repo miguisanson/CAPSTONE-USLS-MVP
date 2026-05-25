@@ -8,9 +8,9 @@ type Props = {
 export const StatCard = ({ label, value, hint, emphasis = "neutral" }: Props) => {
   const tone =
     emphasis === "primary"
-      ? "border-[var(--gs-primary)]/30 bg-[var(--gs-primary)]/5 text-[var(--gs-dark)]"
+      ? "border-[var(--gs-primary)]/30 bg-[var(--gs-primary-soft)] text-[var(--gs-primary)]"
       : emphasis === "danger"
-        ? "border-rose-300 bg-rose-50 text-rose-700"
+        ? "border-rose-300 bg-rose-50 text-[var(--gs-danger)]"
         : "border-slate-200 bg-white text-slate-700";
 
   return (
@@ -21,4 +21,3 @@ export const StatCard = ({ label, value, hint, emphasis = "neutral" }: Props) =>
     </div>
   );
 };
-

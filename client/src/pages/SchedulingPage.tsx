@@ -1,14 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { schedulingApi, studentsApi } from "../api/endpoints";
 import { handleApiError } from "../api/client";
 import { useAuth } from "../app/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Card, CardBody } from "../components/ui/Card";
+import { PageHeader } from "../components/ui/PageHeader";
+import { QuickInsights } from "../components/ui/QuickInsights";
+import { RecommendedActions, type RecommendedActionItem } from "../components/ui/RecommendedActions";
+import { SectionTitle } from "../components/ui/SectionTitle";
 import type { Paginated, ScheduleRequestItem, StudentListItem } from "../types/domain";
-import { formatDateTime, readableEnum } from "../utils/format";
+import { diffDaysFromNow, formatDateTime, readableEnum } from "../utils/format";
+import { scheduleStatusTone } from "../utils/presentation";
 
 export const SchedulingPage = () => {
   const { user } = useAuth();
+  const roles = user?.roles ?? [];
+  const isStudent = roles.includes("STUDENT");
+  const canSetScheduleOutcome = roles.some((role) =>
+    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR"].includes(role)
+  );
+
   const [students, setStudents] = useState<StudentListItem[]>([]);
   const [requests, setRequests] = useState<Paginated<ScheduleRequestItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,16 +41,13 @@ export const SchedulingPage = () => {
   const [eventStatus, setEventStatus] = useState("CONFIRMED");
   const [eventAt, setEventAt] = useState("");
   const [eventNotes, setEventNotes] = useState("");
-  const roles = user?.roles ?? [];
-  const isStudent = roles.includes("STUDENT");
-  const canSetScheduleOutcome = roles.some((role) =>
-    ["ADMIN", "GRADUATE_SCHOOL_STAFF", "ACADEMIC_COORDINATOR", "RESEARCH_COORDINATOR"].includes(role)
-  );
 
-  const loadAll = async () => {
+  const load = async () => {
     try {
       setLoading(true);
-      const requestRes = await schedulingApi.list({ pageSize: 50 });
+      const requestRes = await schedulingApi.list({ pageSize: 60 });
+      setRequests(requestRes);
+
       if (isStudent) {
         const me = await studentsApi.me();
         setStudents([
@@ -55,18 +66,13 @@ export const SchedulingPage = () => {
         ]);
         setRequestStudentId(me.id);
       } else {
-        const studentRes = await studentsApi.list({ pageSize: 50 });
-        setStudents(studentRes.items);
-        if (studentRes.items[0] && !requestStudentId) {
-          setRequestStudentId(studentRes.items[0].id);
-        }
+        const studentsRes = await studentsApi.list({ pageSize: 100 });
+        setStudents(studentsRes.items);
+        setRequestStudentId((prev) => prev || studentsRes.items[0]?.id || 0);
       }
 
-      setRequests(requestRes);
-      if (requestRes.items[0]) {
-        setAvailabilityRequestId(requestRes.items[0].id);
-        setEventRequestId(requestRes.items[0].id);
-      }
+      setAvailabilityRequestId((prev) => prev || requestRes.items[0]?.id || 0);
+      setEventRequestId((prev) => prev || requestRes.items[0]?.id || 0);
       setError(null);
     } catch (err) {
       setError(handleApiError(err));
@@ -76,8 +82,41 @@ export const SchedulingPage = () => {
   };
 
   useEffect(() => {
-    void loadAll();
+    void load();
   }, [isStudent]);
+
+  const recommendedActions = useMemo<RecommendedActionItem[]>(() => {
+    const items = requests?.items ?? [];
+    const actions: RecommendedActionItem[] = [];
+    const pending = items.filter((item) => item.status === "REQUESTED");
+    if (pending.length > 0) {
+      actions.push({
+        id: "pending-availability",
+        title: "Collect availability for pending requests",
+        description: `${pending.length} request(s) are still in requested state. Follow up with participants to avoid scheduling delays.`,
+        priority: "high",
+      });
+    }
+    const delayed = items.filter((item) => diffDaysFromNow(item.createdAt) > 10 && item.status !== "CONFIRMED");
+    if (delayed.length > 0) {
+      actions.push({
+        id: "delayed-requests",
+        title: "Escalate delayed scheduling cases",
+        description: `${delayed.length} request(s) exceed 10 days without confirmed outcome.`,
+        priority: "high",
+      });
+    }
+    const rescheduled = items.filter((item) => item.status === "RESCHEDULED");
+    if (rescheduled.length > 0) {
+      actions.push({
+        id: "rescheduled",
+        title: "Review recurring reschedule patterns",
+        description: `${rescheduled.length} request(s) have reschedule outcomes. Validate causes and improve lead-time planning.`,
+        priority: "medium",
+      });
+    }
+    return actions;
+  }, [requests]);
 
   const createRequest = async () => {
     if (!requestStudentId) return;
@@ -87,7 +126,7 @@ export const SchedulingPage = () => {
         preferredDate: preferredDate || undefined,
         reason: requestReason || undefined,
       });
-      await loadAll();
+      await load();
     } catch (err) {
       setError(handleApiError(err));
     }
@@ -100,9 +139,10 @@ export const SchedulingPage = () => {
         scheduleRequestId: availabilityRequestId,
         availableFrom: availabilityFrom,
         availableTo: availabilityTo,
-        notes: availabilityNote,
+        notes: availabilityNote || undefined,
       });
-      await loadAll();
+      setAvailabilityNote("");
+      await load();
     } catch (err) {
       setError(handleApiError(err));
     }
@@ -115,102 +155,82 @@ export const SchedulingPage = () => {
         scheduleRequestId: eventRequestId,
         eventStatus,
         scheduledAt: eventAt || null,
-        notes: eventNotes,
+        notes: eventNotes || undefined,
       });
-      await loadAll();
+      setEventNotes("");
+      await load();
     } catch (err) {
       setError(handleApiError(err));
     }
   };
 
-  if (loading) return <LoadingBlock text="Loading scheduling module..." />;
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <PageHeader title="Scheduling" subtitle="Defense schedule requests, participant availability, and confirmed or rescheduled outcomes." />
+
       <section className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">1. Request Defense Schedule</h3>
-          <div className="mt-2 space-y-2">
-            <select
-              value={requestStudentId}
-              onChange={(event) => setRequestStudentId(Number(event.target.value))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.studentNumber} - {student.firstName} {student.lastName}
-                </option>
-              ))}
-            </select>
-            <input
-              type="datetime-local"
-              value={preferredDate}
-              onChange={(event) => setPreferredDate(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="1. Create Schedule Request"
+              subtitle="Start a defense scheduling workflow"
+              insight={
+                <QuickInsights
+                  title="Schedule Request"
+                  summary="Creates the initial request linked to a student case."
+                  recommendation="Set preferred date and clear reason to streamline participant coordination."
+                />
+              }
             />
-            <input
-              value={requestReason}
-              onChange={(event) => setRequestReason(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <button
-              onClick={() => void createRequest()}
-              className="rounded-md bg-[var(--gs-primary)] px-3 py-1.5 text-sm text-white hover:bg-[var(--gs-dark)]"
-            >
-              Submit Request
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">2. Collect Availability</h3>
-          <div className="mt-2 space-y-2">
-            <select
-              value={availabilityRequestId}
-              onChange={(event) => setAvailabilityRequestId(Number(event.target.value))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {(requests?.items ?? []).map((request) => (
-                <option key={request.id} value={request.id}>
-                  Request #{request.id}
-                </option>
-              ))}
-            </select>
-            <input
-              type="datetime-local"
-              value={availabilityFrom}
-              onChange={(event) => setAvailabilityFrom(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <input
-              type="datetime-local"
-              value={availabilityTo}
-              onChange={(event) => setAvailabilityTo(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <input
-              value={availabilityNote}
-              onChange={(event) => setAvailabilityNote(event.target.value)}
-              placeholder="Availability note"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <button
-              onClick={() => void submitAvailability()}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-            >
-              Add Availability
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">3. Confirm / Reschedule</h3>
-          {canSetScheduleOutcome ? (
-            <div className="mt-2 space-y-2">
+            <div className="space-y-2">
               <select
-                value={eventRequestId}
-                onChange={(event) => setEventRequestId(Number(event.target.value))}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={requestStudentId}
+                onChange={(event) => setRequestStudentId(Number(event.target.value))}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+              >
+                {students.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.studentNumber} - {student.firstName} {student.lastName}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="datetime-local"
+                value={preferredDate}
+                onChange={(event) => setPreferredDate(event.target.value)}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+              />
+              <input
+                value={requestReason}
+                onChange={(event) => setRequestReason(event.target.value)}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Reason"
+              />
+              <Button size="sm" onClick={() => void createRequest()}>
+                Submit Request
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="2. Collect Availability"
+              subtitle="Capture participant time slots"
+              insight={
+                <QuickInsights
+                  title="Availability Collection"
+                  summary="Participants submit available time windows per schedule request."
+                  recommendation="Collect at least two slots per participant before finalizing outcomes."
+                />
+              }
+            />
+            <div className="space-y-2">
+              <select
+                value={availabilityRequestId}
+                onChange={(event) => setAvailabilityRequestId(Number(event.target.value))}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
               >
                 {(requests?.items ?? []).map((request) => (
                   <option key={request.id} value={request.id}>
@@ -218,83 +238,169 @@ export const SchedulingPage = () => {
                   </option>
                 ))}
               </select>
-              <select
-                value={eventStatus}
-                onChange={(event) => setEventStatus(event.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="RESCHEDULED">Rescheduled</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
               <input
                 type="datetime-local"
-                value={eventAt}
-                onChange={(event) => setEventAt(event.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={availabilityFrom}
+                onChange={(event) => setAvailabilityFrom(event.target.value)}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
               />
               <input
-                value={eventNotes}
-                onChange={(event) => setEventNotes(event.target.value)}
-                placeholder="Outcome notes"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                type="datetime-local"
+                value={availabilityTo}
+                onChange={(event) => setAvailabilityTo(event.target.value)}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
               />
-              <button
-                onClick={() => void submitEvent()}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-              >
-                Submit Outcome
-              </button>
+              <input
+                value={availabilityNote}
+                onChange={(event) => setAvailabilityNote(event.target.value)}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+                placeholder="Notes"
+              />
+              <Button size="sm" variant="outline" onClick={() => void submitAvailability()}>
+                Add Availability
+              </Button>
             </div>
-          ) : (
-            <p className="mt-2 text-xs text-slate-500">Schedule outcome updates are restricted to staff/coordinators.</p>
-          )}
-        </div>
-      </section>
+          </CardBody>
+        </Card>
 
-      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-sm font-semibold text-slate-800">Scheduling Cases</h2>
-        {!requests?.items.length ? (
-          <EmptyState message="No scheduling cases available." />
-        ) : (
-          <div className="space-y-3">
-            {requests.items.map((request) => (
-              <div key={request.id} className="rounded-xl border border-slate-100 p-3">
-                <p className="text-sm font-medium text-slate-800">
-                  Request #{request.id} - {request.student ? `${request.student.firstName} ${request.student.lastName}` : "Student"}
-                </p>
-                <p className="text-xs text-slate-500">
-                  Status: {readableEnum(request.status)} | Preferred: {formatDateTime(request.preferredDate)}
-                </p>
-                <div className="mt-2 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">Availabilities</p>
-                    <ul className="mt-1 space-y-1 text-xs text-slate-700">
-                      {request.availabilities.map((slot) => (
-                        <li key={slot.id} className="rounded-md bg-slate-50 px-2 py-1">
-                          {formatDateTime(slot.availableFrom)} - {formatDateTime(slot.availableTo)}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">Events</p>
-                    <ul className="mt-1 space-y-1 text-xs text-slate-700">
-                      {request.scheduleEvents.map((event) => (
-                        <li key={event.id} className="rounded-md bg-slate-50 px-2 py-1">
-                          {readableEnum(event.eventStatus)} ({formatDateTime(event.createdAt)})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="3. Confirm / Reschedule / Cancel"
+              subtitle="Record official schedule outcome"
+              insight={
+                <QuickInsights
+                  title="Schedule Outcomes"
+                  summary="Outcome updates set request status to confirmed, rescheduled, or cancelled."
+                  recommendation="Only authorized staff should finalize outcomes after availability review."
+                />
+              }
+            />
+            {canSetScheduleOutcome ? (
+              <div className="space-y-2">
+                <select
+                  value={eventRequestId}
+                  onChange={(event) => setEventRequestId(Number(event.target.value))}
+                  className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+                >
+                  {(requests?.items ?? []).map((request) => (
+                    <option key={request.id} value={request.id}>
+                      Request #{request.id}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={eventStatus}
+                  onChange={(event) => setEventStatus(event.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+                >
+                  <option value="CONFIRMED">Confirmed</option>
+                  <option value="RESCHEDULED">Rescheduled</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+                <input
+                  type="datetime-local"
+                  value={eventAt}
+                  onChange={(event) => setEventAt(event.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+                />
+                <input
+                  value={eventNotes}
+                  onChange={(event) => setEventNotes(event.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+                  placeholder="Outcome notes"
+                />
+                <Button size="sm" variant="outline" onClick={() => void submitEvent()}>
+                  Submit Outcome
+                </Button>
               </div>
-            ))}
-          </div>
-        )}
+            ) : (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Schedule outcome updates are restricted to admin, staff, and coordinators.
+              </p>
+            )}
+          </CardBody>
+        </Card>
       </section>
+
+      {loading ? <LoadingBlock text="Loading scheduling records..." /> : null}
+      {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+
+      {!loading && !error ? (
+        <Card>
+          <CardBody className="p-4 md:p-5">
+            <SectionTitle
+              title="Scheduling Cases"
+              subtitle="Status, availability, and event history by request"
+              insight={
+                <QuickInsights
+                  title="Scheduling Case List"
+                  summary="Each case includes request status, participant availability, and decision events."
+                  recommendation="Monitor cases exceeding threshold days in requested/rescheduled states."
+                />
+              }
+            />
+            {!requests?.items.length ? (
+              <EmptyState message="No scheduling cases available." />
+            ) : (
+              <div className="space-y-3">
+                {requests.items.map((request) => (
+                  <article key={request.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          Request #{request.id} - {request.student ? `${request.student.firstName} ${request.student.lastName}` : `Student #${request.studentId}`}
+                        </p>
+                        <p className="text-xs text-slate-600">
+                          Created {formatDateTime(request.createdAt)} ({diffDaysFromNow(request.createdAt)} day(s) ago) | Preferred{" "}
+                          {formatDateTime(request.preferredDate)}
+                        </p>
+                      </div>
+                      <Badge tone={scheduleStatusTone(request.status)}>{readableEnum(request.status)}</Badge>
+                    </div>
+
+                    <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                      <div className="rounded-md border border-slate-200 bg-white p-2.5">
+                        <p className="text-xs font-semibold text-slate-700">Availabilities</p>
+                        {request.availabilities.length === 0 ? (
+                          <p className="mt-1 text-xs text-slate-500">No submitted availability yet.</p>
+                        ) : (
+                          <ul className="mt-1 space-y-1">
+                            {request.availabilities.map((slot) => (
+                              <li key={slot.id} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700">
+                                {slot.user?.fullName ?? "Participant"}: {formatDateTime(slot.availableFrom)} - {formatDateTime(slot.availableTo)}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className="rounded-md border border-slate-200 bg-white p-2.5">
+                        <p className="text-xs font-semibold text-slate-700">Outcome History</p>
+                        {request.scheduleEvents.length === 0 ? (
+                          <p className="mt-1 text-xs text-slate-500">No schedule outcomes recorded.</p>
+                        ) : (
+                          <ul className="mt-1 space-y-1">
+                            {request.scheduleEvents.map((event) => (
+                              <li key={event.id} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700">
+                                {readableEnum(event.eventStatus)} | {formatDateTime(event.scheduledAt)} | {event.decidedBy?.fullName ?? "System"}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      ) : null}
+
+      <RecommendedActions
+        actions={recommendedActions}
+        context="Page-level recommendations based on pending scheduling cases, request aging, and outcome status trends."
+      />
     </div>
   );
 };

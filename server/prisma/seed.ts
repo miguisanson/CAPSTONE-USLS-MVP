@@ -3,10 +3,6 @@ import { PrismaClient, RoleName, LifecycleStage, MilestoneStatus, TaskStatus, Ta
 import bcrypt from "bcryptjs";
 import dayjs from "dayjs";
 
-if ((process.env.PRISMA_CLIENT_ENGINE_TYPE ?? "").toLowerCase() === "client") {
-  process.env.PRISMA_CLIENT_ENGINE_TYPE = "binary";
-}
-
 const prisma = new PrismaClient();
 
 const stageOrder: LifecycleStage[] = [

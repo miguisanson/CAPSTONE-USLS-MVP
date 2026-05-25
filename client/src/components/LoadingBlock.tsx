@@ -1,4 +1,3 @@
 export const LoadingBlock = ({ text = "Loading..." }: { text?: string }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">{text}</div>
+  <div className="surface-card p-6 text-sm text-slate-500">{text}</div>
 );
-

@@ -1,9 +1,24 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
-  --gs-primary: #008f46;
-  --gs-dark: #026f38;
-  --gs-bg: #fffffe;
+  --gs-primary: #006633;
+  --gs-primary-hover: #004d26;
+  --gs-primary-soft: #e4f3eb;
+  --gs-border: #d8e0e7;
+  --gs-text: #1f2937;
+  --gs-text-soft: #5b6674;
+  --gs-bg: #f5f8f7;
+  --gs-surface: #ffffff;
+  --gs-danger: #b42318;
+  --gs-warning: #b54708;
+  --gs-success: #067647;
+  --ui-font-meta: 0.8125rem;
+  --ui-line-meta: 1.125rem;
+  --ui-font-body: 0.9375rem;
+  --ui-line-body: 1.375rem;
+  --ui-font-section: 1.0625rem;
+  --ui-line-section: 1.5rem;
 }
 
 * {
@@ -15,8 +30,73 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
-  font-family: "Segoe UI", "Source Sans Pro", "Trebuchet MS", sans-serif;
-  background: var(--gs-bg);
+  font-family: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: radial-gradient(circle at 3% 2%, rgba(0, 102, 51, 0.08), transparent 22%), var(--gs-bg);
+  color: var(--gs-text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* Typography normalization:
+   Keep UI copy on a tight 3-size scale for consistency across cards/pages. */
+.text-xs {
+  font-size: var(--ui-font-meta) !important;
+  line-height: var(--ui-line-meta) !important;
+}
+
+.text-sm,
+.text-base {
+  font-size: var(--ui-font-body) !important;
+  line-height: var(--ui-line-body) !important;
+}
+
+.text-lg,
+.text-xl,
+.text-2xl,
+.text-3xl {
+  font-size: var(--ui-font-section) !important;
+  line-height: var(--ui-line-section) !important;
+}
+
+@layer components {
+  .surface-card {
+    @apply rounded-2xl border bg-white shadow-sm;
+    border-color: var(--gs-border);
+  }
+
+  .surface-card-muted {
+    @apply rounded-2xl border bg-slate-50/80 shadow-sm;
+    border-color: var(--gs-border);
+  }
+
+  .section-heading {
+    @apply text-base font-semibold tracking-wide text-slate-800;
+  }
+
+  .section-subheading {
+    @apply mt-1 text-xs text-slate-500;
+  }
+
+  .table-cell-head {
+    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+
+  .table-cell {
+    @apply px-3 py-2 text-sm text-slate-700 align-top;
+  }
 }
 
 @media print {
@@ -24,4 +104,3 @@ body,
     display: none !important;
   }
 }
-

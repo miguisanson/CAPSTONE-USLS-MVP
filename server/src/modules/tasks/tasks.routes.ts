@@ -142,17 +142,18 @@ tasksRouter.get(
 
     const { skip, take, page, pageSize } = getPagination(req);
     const status = queueStatusSchema.parse(req.query.status);
+    const where = {
+      status: status as TaskStatus | undefined,
+      OR: [
+        { assignedRole: { in: req.user!.roles } },
+        { nextActionOwnerRole: { in: req.user!.roles } },
+        { assignedToId: null },
+      ],
+    };
 
     const [items, total] = await Promise.all([
       prisma.task.findMany({
-        where: {
-          status: status as TaskStatus | undefined,
-          OR: [
-            { assignedRole: { in: req.user!.roles } },
-            { nextActionOwnerRole: { in: req.user!.roles } },
-            { assignedToId: null },
-          ],
-        },
+        where,
         include: {
           student: { include: { program: true } },
           milestoneDefinition: true,
@@ -162,11 +163,7 @@ tasksRouter.get(
         skip,
         take,
       }),
-      prisma.task.count({
-        where: {
-          status: status as TaskStatus | undefined,
-        },
-      }),
+      prisma.task.count({ where }),
     ]);
 
     const enriched = await Promise.all(items.map((task) => enrichTask(task.id)));
