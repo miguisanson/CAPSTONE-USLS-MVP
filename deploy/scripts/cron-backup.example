@@ -1,3 +1,0 @@
-# Run as root via: crontab -e
-# Daily DB + uploads backup at 02:30
-30 2 * * * /bin/bash /opt/usls-gs-mvp/deploy/scripts/backup-db.sh >> /var/log/usls-gs-mvp-backup.log 2>&1

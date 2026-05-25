@@ -1,1 +1,40 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+References/MVP-FIGMA/node_modules/
+
+# Build output
+dist/
+client/dist/
+server/dist/
+coverage/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+client/.env
+client/.env.*
+!client/.env.example
+server/.env
+server/.env.*
+!server/.env.example
+
+# Runtime data
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Logs and OS/editor files
+*.log
+npm-debug.log*
+.DS_Store
+.vscode/
+.idea/
+
+# Private local notes and deployment files
+PRIVATE_UBUNTU_HOSTING_NOTES.txt
+deploy/
+
+# Ignore accidental nested copies of this repository
 CAPSTONE-USLS-MVP/
