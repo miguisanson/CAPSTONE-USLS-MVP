@@ -9,32 +9,44 @@ Full-stack MVP for monitoring graduate student progress, tasks, documents, sched
 - Database: MySQL 8 with Prisma migrations
 - Auth: JWT with backend-enforced role permissions
 
-## Local Setup
+## Run Locally
 
-Prerequisites:
+The app has a one-command local runner. It creates missing `.env` files, installs dependencies, prepares the MySQL database, runs Prisma migrations, seeds demo data if the database is empty, and starts both the backend and frontend.
+
+After it starts, open:
+
+- Web app: `http://localhost:5173`
+- API health check: `http://localhost:4000/health`
+
+### Requirements
 
 - Node.js 20+
 - npm 10+
 - MySQL 8 running locally
 - MySQL CLI available in your terminal as `mysql`
 
-The local runner creates env files, installs dependencies, prepares the database, seeds demo data if needed, and starts both the API and web app.
-
 ### macOS
+
+Install prerequisites with Homebrew:
 
 ```bash
 brew install node mysql
 brew services start mysql
+```
+
+Run the app from the project root:
+
+```bash
 npm run dev
 ```
 
-If your MySQL root user has a password:
+If MySQL asks for a password, run with your password:
 
 ```bash
 DATABASE_URL='mysql://root:your_password@localhost:3306/usls_gs_mvp' npm run dev
 ```
 
-If your local MySQL root user has no password:
+If your MySQL root user has no password:
 
 ```bash
 DATABASE_URL='mysql://root:@localhost:3306/usls_gs_mvp' npm run dev
@@ -42,19 +54,25 @@ DATABASE_URL='mysql://root:@localhost:3306/usls_gs_mvp' npm run dev
 
 ### Windows
 
-Install first:
+Install prerequisites:
 
 - Node.js 20+ from `https://nodejs.org/`
 - MySQL 8 from the MySQL Installer
-- Make sure `mysql` works in PowerShell. If not, add the MySQL `bin` folder to PATH.
+- Make sure `mysql` works in PowerShell
 
-Then run this from the repo root in PowerShell:
+If `mysql` is not recognized in PowerShell, add the MySQL `bin` folder to PATH. It is usually similar to:
+
+```text
+C:\Program Files\MySQL\MySQL Server 8.0\bin
+```
+
+Run the app from the project root in PowerShell:
 
 ```powershell
 npm run dev
 ```
 
-If your MySQL root user has a password:
+If MySQL asks for a password, run with your password:
 
 ```powershell
 $env:DATABASE_URL="mysql://root:your_password@localhost:3306/usls_gs_mvp"; npm run dev
@@ -72,12 +90,9 @@ If PowerShell blocks scripts, use the direct Windows runner:
 powershell -ExecutionPolicy Bypass -File .\dev-local.ps1
 ```
 
-### Local URLs
+### Direct Runner Commands
 
-- Frontend: `http://localhost:5173`
-- Backend health check: `http://localhost:4000/health`
-
-Direct platform runners are also available:
+Usually `npm run dev` is enough. These are available if you want to run the platform-specific script directly:
 
 ```bash
 # macOS / Linux
@@ -88,6 +103,17 @@ bash dev-local.sh
 # Windows
 powershell -ExecutionPolicy Bypass -File .\dev-local.ps1
 ```
+
+### What The Runner Does
+
+1. Creates `server/.env` and `client/.env` if missing.
+2. Generates a local JWT secret.
+3. Installs backend and frontend dependencies.
+4. Creates the `usls_gs_mvp` MySQL database if it does not exist.
+5. Runs Prisma migrations.
+6. Seeds demo data if the database has no users.
+7. Starts the backend at `http://localhost:4000`.
+8. Starts the frontend at `http://localhost:5173`.
 
 ## Demo Login
 
