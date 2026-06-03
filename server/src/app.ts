@@ -18,6 +18,7 @@ import { milestonesRouter } from "./modules/milestones/milestones.routes";
 import { schedulingRouter } from "./modules/scheduling/scheduling.routes";
 import { studentsRouter } from "./modules/students/students.routes";
 import { tasksRouter } from "./modules/tasks/tasks.routes";
+import { transactionsRouter } from "./modules/transactions/transactions.routes";
 import { usersRouter } from "./modules/users/users.routes";
 
 export const createApp = (): express.Express => {
@@ -59,6 +60,7 @@ export const createApp = (): express.Express => {
   app.use("/api/students", studentsRouter);
   app.use("/api/milestones", milestonesRouter);
   app.use("/api/tasks", tasksRouter);
+  app.use("/api/transactions", transactionsRouter);
   app.use("/api", documentsRouter);
   app.use("/api/scheduling", schedulingRouter);
   app.use("/api/alerts", alertsRouter);

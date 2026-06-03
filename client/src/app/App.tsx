@@ -7,6 +7,7 @@ import { DashboardPage } from "../pages/DashboardPage";
 import { StudentsPage } from "../pages/StudentsPage";
 import { StudentProfilePage } from "../pages/StudentProfilePage";
 import { TaskQueuePage } from "../pages/TaskQueuePage";
+import { TransactionsPage } from "../pages/TransactionsPage";
 import { DocumentsPage } from "../pages/DocumentsPage";
 import { SchedulingPage } from "../pages/SchedulingPage";
 import { AlertsPage } from "../pages/AlertsPage";
@@ -32,6 +33,7 @@ export const App = () => (
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/students" element={<StudentsPage />} />
             <Route path="/students/:id" element={<StudentProfilePage />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/tasks" element={<TaskQueuePage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/scheduling" element={<SchedulingPage />} />

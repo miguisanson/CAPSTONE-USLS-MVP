@@ -314,3 +314,188 @@ export type UserAccount = {
   isActive: boolean;
   roles: RoleName[];
 };
+
+export type TransactionDefinition = {
+  key: string;
+  priority: "P0" | "P1" | "P2";
+  transaction: string;
+  actors: RoleName[];
+  dataCaptured: string;
+};
+
+export type TransactionComponentDefinition = {
+  key: "lifecycle" | "coursework" | "research" | "scheduling" | "completion" | "followUp";
+  title: string;
+  transactions: TransactionDefinition[];
+};
+
+export type TransactionDefinitionsResponse = {
+  components: TransactionComponentDefinition[];
+};
+
+export type TransactionRecordPayload = {
+  transactionKey: string;
+  studentId?: number | null;
+  actorRole?: RoleName | null;
+  sourceReference?: string | null;
+  termId?: number | null;
+  milestoneDefinitionId?: number | null;
+  scheduleRequestId?: number | null;
+  adviserUserId?: number | null;
+  panelUserIds?: number[];
+  studentProfile?: {
+    studentNumber: string;
+    firstName: string;
+    lastName: string;
+    email?: string | null;
+    programCode: string;
+  } | null;
+  statusResult?: string | null;
+  missingItems?: string[];
+  decisionOutcome?: TaskDecision | null;
+  nextOwnerRole?: RoleName | null;
+  evidenceNote?: string | null;
+  notes?: string | null;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+};
+
+export type TransactionRecordResponse = {
+  message: string;
+  transactionKey: string;
+  studentId?: number | null;
+  taskId?: number | null;
+  createdEntity?: { type: string; id: number | string } | null;
+};
+
+export type TransactionStudentRef = {
+  id: number;
+  studentNumber: string;
+  firstName: string;
+  lastName: string;
+  currentStage: LifecycleStage;
+  riskFlag: boolean;
+  program: { code: string; name: string };
+};
+
+export type LifecycleTransactionModel = {
+  summary: {
+    totalInScope: number;
+    admissionRecords: number;
+    loaActive: number;
+    openLifecycleTasks: number;
+  };
+  stageCounts: Array<{ stage: LifecycleStage; count: number }>;
+  handoffCandidates: TransactionStudentRef[];
+  loaCases: Array<TransactionStudentRef & { loaStart?: string | null; loaEnd?: string | null }>;
+  standingRecords: Array<{
+    id: number;
+    statusSignal?: string | null;
+    confirmedAt?: string | null;
+    term: { academicYear: string; term: string };
+    student: TransactionStudentRef;
+  }>;
+  lifecycleTasks: TaskItem[];
+};
+
+export type CourseworkTransactionModel = {
+  summary: {
+    auditedStudents: number;
+    completeCoursework: number;
+    missingSubjectCases: number;
+    highDemandSubjects: number;
+  };
+  courseAudits: Array<{
+    student: {
+      id: number;
+      label: string;
+      currentStage: LifecycleStage;
+      program: { code: string; name: string };
+    };
+    curriculum?: { id: number; code: string; version?: string | null; effectiveAcademicYear?: string | null } | null;
+    requiredCount: number;
+    completedCount: number;
+    currentCount: number;
+    missingCount: number;
+    affectedCount: number;
+    missingSubjects: Array<{ id: number; code: string; title: string }>;
+    currentSubjects: Array<{ id: number; code: string; title: string }>;
+    affectedSubjects: Array<{ id: number; code: string; title: string }>;
+    result: string;
+  }>;
+  offeringDemand: Array<{ courseCode: string; courseTitle: string; count: number; students: string[] }>;
+};
+
+export type ResearchTransactionModel = {
+  summary: {
+    researchCases: number;
+    readyCases: number;
+    revisionCases: number;
+    missingEvidenceCases: number;
+  };
+  gateCases: Array<{
+    student: TransactionStudentRef & {
+      adviser?: { id: number; fullName: string } | null;
+      researchCoordinator?: { id: number; fullName: string } | null;
+    };
+    researchCase?: {
+      id: number;
+      caseType?: string | null;
+      topicTitle?: string | null;
+      status?: string | null;
+      currentMilestone?: MilestoneDefinition | null;
+    } | null;
+    requiredEvidence: number;
+    approvedEvidence: number;
+    openRevisionCount: number;
+    openTaskCount: number;
+    readiness: "READY" | "NEEDS_REVISION" | "MISSING_EVIDENCE";
+  }>;
+};
+
+export type SchedulingTransactionModel = {
+  summary: {
+    requests: number;
+    confirmed: number;
+    delayed: number;
+    matchFound: number;
+  };
+  scheduleCases: Array<ScheduleRequestItem & {
+    ageDays: number;
+    rescheduleCount: number;
+    participantAvailabilityCount: number;
+    bestAvailabilityDate?: string | null;
+    bestAvailabilityCount: number;
+    schedulingSignal: "CONFIRMED" | "DELAYED" | "MATCH_FOUND" | "COLLECT_AVAILABILITY";
+  }>;
+};
+
+export type CompletionTransactionModel = {
+  summary: {
+    candidates: number;
+    eligible: number;
+    pendingRequirements: number;
+  };
+  graduationCandidates: Array<{
+    student: TransactionStudentRef;
+    courseworkMissing?: number | null;
+    pendingMilestones: number;
+    missingDocuments: number;
+    openAlerts: number;
+    eligibilityResult: "ELIGIBLE_FOR_GS_ENDORSEMENT" | "PENDING_REQUIREMENTS";
+    missingRequirements: string[];
+  }>;
+};
+
+export type FollowUpTransactionModel = {
+  summary: {
+    openAlerts: number;
+    overdueTasks: number;
+    alertsWithoutIntervention: number;
+  };
+  interventionQueue: Array<AlertItem & {
+    ageDays: number;
+    latestIntervention?: AlertItem["interventions"][number] | null;
+  }>;
+  overdueTasks: TaskItem[];
+};

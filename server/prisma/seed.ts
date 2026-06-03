@@ -19,6 +19,18 @@ const stageOrder: LifecycleStage[] = [
 
 const stageIndex = (stage: LifecycleStage): number => stageOrder.indexOf(stage);
 
+const stageThresholdDefaults: Record<LifecycleStage, number> = {
+  [LifecycleStage.ADMISSION]: 14,
+  [LifecycleStage.COURSEWORK]: 45,
+  [LifecycleStage.PROPOSAL_DEVELOPMENT]: 50,
+  [LifecycleStage.PROPOSAL_DEFENSE]: 20,
+  [LifecycleStage.DATA_COLLECTION]: 75,
+  [LifecycleStage.DISSERTATION_WRITING]: 45,
+  [LifecycleStage.ORAL_DEFENSE]: 20,
+  [LifecycleStage.LOA]: 30,
+  [LifecycleStage.COMPLETED]: 999,
+};
+
 const resetDatabase = async (): Promise<void> => {
   await prisma.$transaction([
     prisma.auditLog.deleteMany(),
@@ -1064,6 +1076,447 @@ const seed = async (): Promise<void> => {
           relatedEntityId: null,
           performedById: userIds.staff,
           occurredAt: dayjs().subtract(5, "day").toDate(),
+        },
+      ],
+    });
+  }
+
+  const extraCurriculumByProgram: Record<string, number> = {
+    MSCS: curriculumByCode["MSCS-2025"],
+    MBA: curriculumByCode["MBA-2025"],
+  };
+
+  const ensureCurriculumForProgram = async (programCode: string): Promise<number> => {
+    if (extraCurriculumByProgram[programCode]) {
+      return extraCurriculumByProgram[programCode];
+    }
+
+    const curriculum = await prisma.curriculum.create({
+      data: {
+        programId: programByCode[programCode],
+        code: `${programCode}-2025`,
+        version: "v1",
+        effectiveAcademicYear: "2025-2026",
+      },
+    });
+
+    const programCourseIds = courses.filter((course) => course.programId === programByCode[programCode]).map((course) => course.id);
+    await prisma.studyPlanItem.createMany({
+      data: programCourseIds.map((courseId) => ({
+        curriculumId: curriculum.id,
+        courseId,
+        recommendedTermId: termByLabel["2025-2026-Term 1"],
+        isRequired: true,
+        notes: "Generated study plan item",
+      })),
+    });
+
+    extraCurriculumByProgram[programCode] = curriculum.id;
+    return curriculum.id;
+  };
+
+  const firstNames = [
+    "Miguel",
+    "Patricia",
+    "Ramon",
+    "Lara",
+    "Joshua",
+    "Nicole",
+    "Martin",
+    "Camille",
+    "Rafael",
+    "Bianca",
+    "Paolo",
+    "Mara",
+    "Noel",
+    "Sophia",
+    "Jerome",
+    "Andrea",
+    "Louie",
+    "Clarisse",
+    "Vincent",
+    "Elaine",
+  ];
+  const lastNames = [
+    "Alvarez",
+    "Bautista",
+    "Cabrera",
+    "Delos Reyes",
+    "Escobar",
+    "Fernandez",
+    "Garcia",
+    "Hernandez",
+    "Ilagan",
+    "Jimenez",
+    "Katigbak",
+    "Lacson",
+    "Mendoza",
+    "Navarro",
+    "Ortega",
+    "Pascual",
+    "Quintos",
+    "Rivera",
+    "Soriano",
+    "Villanueva",
+  ];
+  const programCodes = ["MSCS", "MBA", "PHDENG", "MAED"];
+  const termIds = Object.values(termByLabel);
+  const extraStudents: Array<{ id: number; stage: LifecycleStage; stageDays: number; programCode: string }> = [];
+  const lifecycleTaskTemplates = [
+    "Confirm enrollment standing from institutional signal",
+    "Compare onboarding records with missing requirements",
+    "Route LOA request for Dean decision",
+    "Send readmission request for decision",
+    "Record withdrawal request and closure reference",
+  ];
+  const researchTaskTemplates = [
+    "Compare Form 1 title defense readiness",
+    "Record title defense result and next action",
+    "Compare Form 4 defense readiness requirements",
+    "Record proposal or final defense result",
+    "Verify completion clearance documents",
+  ];
+  const ownerRotation: RoleName[] = [
+    RoleName.GRADUATE_SCHOOL_STAFF,
+    RoleName.ACADEMIC_COORDINATOR,
+    RoleName.RESEARCH_COORDINATOR,
+    RoleName.ADVISER,
+    RoleName.PANEL_MEMBER,
+  ];
+
+  for (let index = 11; index <= 200; index += 1) {
+    const programCode = programCodes[index % programCodes.length];
+    const stage = stageOrder[index % stageOrder.length];
+    const stageDays = 6 + ((index * 7) % 110);
+    const firstName = firstNames[index % firstNames.length];
+    const lastName = lastNames[(index * 3) % lastNames.length];
+    const studentNumber = `2025-${String(index).padStart(4, "0")}`;
+    const adviserId = index % 2 === 0 ? userIds.adviser1 : userIds.adviser2;
+    const isAtRisk = index % 5 === 0 || stageDays > 75 || stage === LifecycleStage.LOA;
+    const student = await prisma.student.create({
+      data: {
+        studentNumber,
+        firstName,
+        lastName,
+        email: `${studentNumber.toLowerCase()}@student.gs.local`,
+        programId: programByCode[programCode],
+        currentStage: stage,
+        riskFlag: isAtRisk,
+        adviserId,
+        researchCoordinatorId: userIds.researchCoord,
+        loaStart: stage === LifecycleStage.LOA ? dayjs().subtract(stageDays, "day").toDate() : null,
+        loaEnd: stage === LifecycleStage.LOA ? dayjs().add(30 + (index % 45), "day").toDate() : null,
+      },
+    });
+
+    extraStudents.push({ id: student.id, stage, stageDays, programCode });
+
+    await prisma.adviserAssignment.create({
+      data: {
+        adviserUserId: adviserId,
+        studentId: student.id,
+      },
+    });
+    await prisma.panelAssignment.createMany({
+      data: [
+        { studentId: student.id, panelUserId: userIds.panel1 },
+        { studentId: student.id, panelUserId: userIds.panel2 },
+      ],
+      skipDuplicates: true,
+    });
+    await prisma.studentPanelAssignment.createMany({
+      data: [
+        { studentId: student.id, panelMemberId: userIds.panel1 },
+        { studentId: student.id, panelMemberId: userIds.panel2 },
+      ],
+      skipDuplicates: true,
+    });
+
+    const curriculumId = await ensureCurriculumForProgram(programCode);
+    await prisma.studentCurriculumTag.create({
+      data: {
+        studentId: student.id,
+        curriculumId,
+        tag: index % 9 === 0 ? "revised-plan" : index % 7 === 0 ? "bridging" : "regular-plan",
+      },
+    });
+
+    await prisma.studentLifecycle.create({
+      data: {
+        studentId: student.id,
+        stage,
+        enteredAt: dayjs().subtract(stageDays, "day").toDate(),
+        notes: `Generated lifecycle record for ${stage}.`,
+        changedById: userIds.staff,
+      },
+    });
+
+    const currentStageIdx = stageIndex(stage);
+    const relatedMilestones = milestoneDefinitions.filter((definition) => stageIndex(definition.stage) <= currentStageIdx);
+    for (const [milestoneIndex, definition] of relatedMilestones.entries()) {
+      const completed = stageIndex(definition.stage) < currentStageIdx || milestoneIndex % 4 === 0;
+      await prisma.studentMilestoneStatus.upsert({
+        where: {
+          studentId_milestoneDefinitionId: {
+            studentId: student.id,
+            milestoneDefinitionId: definition.id,
+          },
+        },
+        update: {},
+        create: {
+          studentId: student.id,
+          milestoneDefinitionId: definition.id,
+          status: completed ? MilestoneStatus.COMPLETED : index % 6 === 0 ? MilestoneStatus.BLOCKED : MilestoneStatus.IN_PROGRESS,
+          dueAt: dayjs().add(10 - (index % 20), "day").toDate(),
+          completedAt: completed ? dayjs().subtract(index % 30, "day").toDate() : null,
+          updatedById: userIds.staff,
+          notes: completed ? "Generated completed milestone." : "Generated active milestone.",
+        },
+      });
+    }
+
+    const termEnrollment = await prisma.termEnrollment.create({
+      data: {
+        studentId: student.id,
+        termId: termIds[index % termIds.length],
+        statusSignal: stage === LifecycleStage.LOA ? "on-hold" : index % 13 === 0 ? "withdrawn" : "enrolled",
+        confirmedAt: dayjs().subtract(stageDays + 20, "day").toDate(),
+      },
+    });
+
+    const programCourseIds = courses.filter((course) => course.programId === programByCode[programCode]).map((course) => course.id);
+    if (programCourseIds.length > 0) {
+      await prisma.courseEnrollment.createMany({
+        data: programCourseIds.slice(0, 2).map((courseId, courseIndex) => ({
+          termEnrollmentId: termEnrollment.id,
+          courseId,
+          statusSignal:
+            stage === LifecycleStage.COURSEWORK && courseIndex === 1
+              ? "in-progress"
+              : index % 8 === 0 && courseIndex === 0
+                ? "incomplete"
+                : "completed",
+          grade: index % 8 === 0 && courseIndex === 0 ? "INC" : courseIndex === 0 ? "1.50" : "1.75",
+        })),
+      });
+    }
+
+    const assignedRole = ownerRotation[index % ownerRotation.length];
+    const taskTitle =
+      currentStageIdx >= stageIndex(LifecycleStage.PROPOSAL_DEVELOPMENT)
+        ? researchTaskTemplates[index % researchTaskTemplates.length]
+        : lifecycleTaskTemplates[index % lifecycleTaskTemplates.length];
+    const taskStatus = index % 6 === 0 ? TaskStatus.OVERDUE : index % 4 === 0 ? TaskStatus.IN_PROGRESS : TaskStatus.PENDING;
+    const relatedMilestone = relatedMilestones[relatedMilestones.length - 1] ?? milestoneDefinitions[0];
+    const task = await prisma.task.create({
+      data: {
+        title: taskTitle,
+        description: "Generated transaction-list workflow task.",
+        studentId: student.id,
+        milestoneDefinitionId: relatedMilestone.id,
+        assignedRole,
+        nextActionOwnerRole: assignedRole,
+        status: taskStatus,
+        dueAt: dayjs().add(index % 6 === 0 ? -1 * (index % 18) : 3 + (index % 12), "day").toDate(),
+        createdById: userIds.staff,
+        priorityScore: 20 + (isAtRisk ? 25 : 0) + (taskStatus === TaskStatus.OVERDUE ? 25 : 0) + (index % 30),
+        recommendedAction:
+          taskStatus === TaskStatus.OVERDUE
+            ? `Prioritize immediate follow-up with ${assignedRole}.`
+            : `Monitor and keep ${assignedRole} on schedule.`,
+      },
+    });
+
+    if (index % 9 === 0) {
+      await prisma.decisionLog.create({
+        data: {
+          taskId: task.id,
+          studentId: student.id,
+          decision: index % 18 === 0 ? TaskDecision.REVISE : TaskDecision.APPROVE,
+          rationale: "Generated decision record for transaction demo.",
+          decidedById: assignedRole === RoleName.PANEL_MEMBER ? userIds.panel1 : userIds.staff,
+          createdAt: dayjs().subtract(index % 12, "day").toDate(),
+        },
+      });
+    }
+
+    if (currentStageIdx >= stageIndex(LifecycleStage.PROPOSAL_DEVELOPMENT) && stage !== LifecycleStage.COMPLETED) {
+      const researchCase = await prisma.researchCase.create({
+        data: {
+          studentId: student.id,
+          caseType: stage === LifecycleStage.DISSERTATION_WRITING || programCode === "PHDENG" ? "dissertation" : "thesis",
+          topicTitle: `Graduate lifecycle monitoring study ${index}`,
+          status: stage.toLowerCase(),
+          currentMilestoneId: relatedMilestone.id,
+        },
+      });
+
+      const milestoneEvent = await prisma.milestoneEvent.create({
+        data: {
+          researchCaseId: researchCase.id,
+          studentId: student.id,
+          milestoneDefinitionId: relatedMilestone.id,
+          occurredAt: dayjs().subtract(Math.max(1, stageDays - 8), "day").toDate(),
+          outcome: index % 5 === 0 ? "revise" : index % 7 === 0 ? "pending" : "recorded",
+          ownerRole: assignedRole,
+          decidedById: assignedRole === RoleName.PANEL_MEMBER ? userIds.panel1 : null,
+          taskId: task.id,
+          notes: "Generated milestone event from transaction list flow.",
+        },
+      });
+
+      await prisma.formSubmission.create({
+        data: {
+          studentId: student.id,
+          milestoneEventId: milestoneEvent.id,
+          formType: stage === LifecycleStage.PROPOSAL_DEVELOPMENT ? "Form 1" : stage === LifecycleStage.PROPOSAL_DEFENSE ? "Form 4" : "Research Clearance",
+          submittedAt: dayjs().subtract(Math.max(1, stageDays - 12), "day").toDate(),
+          endorsedAt: index % 4 === 0 ? null : dayjs().subtract(Math.max(1, stageDays - 10), "day").toDate(),
+          approvedAt: index % 5 === 0 ? null : dayjs().subtract(Math.max(1, stageDays - 8), "day").toDate(),
+          routingState: index % 5 === 0 ? "for-revision" : "recorded",
+          submittedById: userIds.staff,
+        },
+      });
+    }
+
+    const checklistItems =
+      currentStageIdx >= stageIndex(LifecycleStage.PROPOSAL_DEVELOPMENT)
+        ? ["Form 1 / title defense packet", "Research manuscript", "Panel comments sheet", "Clearance evidence"]
+        : ["Admission handoff confirmation", "Enrollment confirmation", "Curriculum tag"];
+    for (const [docIndex, checklistItem] of checklistItems.entries()) {
+      const needsRevision = index % 5 === 0 && docIndex === 1;
+      await prisma.documentRecord.create({
+        data: {
+          studentId: student.id,
+          milestoneDefinitionId: relatedMilestone.id,
+          checklistItem,
+          status: needsRevision ? DocumentStatus.NEEDS_REVISION : docIndex <= index % checklistItems.length ? DocumentStatus.APPROVED : DocumentStatus.PENDING,
+          outstandingRevisionCount: needsRevision ? 1 : 0,
+          revisionNotes: needsRevision
+            ? {
+                create: {
+                  authorId: userIds.adviser1,
+                  note: "Generated revision note: clarify requirement evidence and resubmit.",
+                },
+              }
+            : undefined,
+        },
+      });
+    }
+
+    if (stage === LifecycleStage.PROPOSAL_DEFENSE || stage === LifecycleStage.ORAL_DEFENSE || index % 10 === 0) {
+      const request = await prisma.scheduleRequest.create({
+        data: {
+          studentId: student.id,
+          requestedById: userIds.staff,
+          preferredDate: dayjs().add(5 + (index % 20), "day").toDate(),
+          reason: "Generated defense scheduling coordination.",
+          status: index % 6 === 0 ? ScheduleStatus.REQUESTED : index % 4 === 0 ? ScheduleStatus.RESCHEDULED : ScheduleStatus.CONFIRMED,
+          createdAt: dayjs().subtract(index % 18, "day").toDate(),
+        },
+      });
+
+      await prisma.availability.createMany({
+        data: [
+          {
+            scheduleRequestId: request.id,
+            userId: userIds.panel1,
+            availableFrom: dayjs().add(7 + (index % 5), "day").hour(9).minute(0).toDate(),
+            availableTo: dayjs().add(7 + (index % 5), "day").hour(11).minute(0).toDate(),
+            notes: "Generated panel availability.",
+          },
+          {
+            scheduleRequestId: request.id,
+            userId: adviserId,
+            availableFrom: dayjs().add(7 + (index % 5), "day").hour(10).minute(0).toDate(),
+            availableTo: dayjs().add(7 + (index % 5), "day").hour(12).minute(0).toDate(),
+            notes: "Generated adviser availability.",
+          },
+        ],
+      });
+
+      if (request.status !== ScheduleStatus.REQUESTED) {
+        await prisma.scheduleEvent.create({
+          data: {
+            scheduleRequestId: request.id,
+            eventStatus: request.status,
+            scheduledAt: dayjs().add(7 + (index % 5), "day").hour(10).minute(0).toDate(),
+            decidedById: userIds.staff,
+            notes: request.status === ScheduleStatus.CONFIRMED ? "Generated confirmed defense schedule." : "Generated reschedule event.",
+          },
+        });
+      }
+    }
+
+    if (isAtRisk || taskStatus === TaskStatus.OVERDUE) {
+      const alert = await prisma.alert.create({
+        data: {
+          studentId: student.id,
+          taskId: task.id,
+          alertType:
+            stage === LifecycleStage.LOA
+              ? AlertType.INACTIVITY
+              : taskTitle.toLowerCase().includes("schedule")
+                ? AlertType.DELAYED_SCHEDULING
+                : taskStatus === TaskStatus.OVERDUE
+                  ? AlertType.UNRESOLVED_HANDOFF
+                  : AlertType.PROLONGED_STAGE,
+          severity: stageDays > 90 ? AlertSeverity.CRITICAL : taskStatus === TaskStatus.OVERDUE ? AlertSeverity.HIGH : AlertSeverity.MEDIUM,
+          status: index % 11 === 0 ? AlertStatus.ACKNOWLEDGED : AlertStatus.OPEN,
+          message: "Generated transaction-driven monitoring alert.",
+          thresholdDays: stageThresholdDefaults[stage],
+          triggeredAt: dayjs().subtract(index % 9, "day").toDate(),
+          createdById: userIds.staff,
+        },
+      });
+
+      if (index % 3 === 0) {
+        await prisma.intervention.create({
+          data: {
+            alertId: alert.id,
+            actionTaken: "Generated follow-up action recorded.",
+            evidenceNote: "Coordinator contacted responsible owner.",
+            performedById: userIds.staff,
+            status: index % 12 === 0 ? InterventionStatus.CLOSED : InterventionStatus.OPEN,
+            closedAt: index % 12 === 0 ? dayjs().subtract(1, "day").toDate() : null,
+            closureEvidence: index % 12 === 0 ? "Generated closure evidence." : null,
+          },
+        });
+      }
+
+      await prisma.notificationAlert.create({
+        data: {
+          alertId: alert.id,
+          userId: userIds.staff,
+          email: "staff@gs.local",
+          reason: "Generated monitoring alert notification.",
+          success: true,
+          metadata: { generated: true },
+        },
+      });
+    }
+
+    await prisma.timelineEvent.createMany({
+      data: [
+        {
+          studentId: student.id,
+          eventType: "STUDENT_HANDOFF",
+          title: "Student monitoring record created",
+          details: "Generated handoff from institutional records.",
+          relatedEntityType: "Student",
+          relatedEntityId: student.id,
+          performedById: userIds.staff,
+          occurredAt: dayjs().subtract(stageDays + 20, "day").toDate(),
+        },
+        {
+          studentId: student.id,
+          eventType: "TRANSACTION_ACTIVITY",
+          title: taskTitle,
+          details: "Generated transaction-list activity.",
+          relatedEntityType: "Task",
+          relatedEntityId: task.id,
+          performedById: userIds.staff,
+          occurredAt: dayjs().subtract(index % 14, "day").toDate(),
         },
       ],
     });

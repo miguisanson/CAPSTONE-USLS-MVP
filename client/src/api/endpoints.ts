@@ -16,6 +16,15 @@ import type {
   StudentListItem,
   TaskDecision,
   TaskItem,
+  CompletionTransactionModel,
+  CourseworkTransactionModel,
+  FollowUpTransactionModel,
+  LifecycleTransactionModel,
+  ResearchTransactionModel,
+  SchedulingTransactionModel,
+  TransactionDefinitionsResponse,
+  TransactionRecordPayload,
+  TransactionRecordResponse,
   UserAccount,
 } from "../types/domain";
 
@@ -155,4 +164,17 @@ export const adminApi = {
     api.post<RoutingRule>("/api/admin/routing-rules", payload).then((res) => res.data),
   updateRoutingRule: (id: number, payload: Record<string, unknown>) =>
     api.patch<RoutingRule>(`/api/admin/routing-rules/${id}`, payload).then((res) => res.data),
+};
+
+export const transactionsApi = {
+  definitions: () =>
+    api.get<TransactionDefinitionsResponse>("/api/transactions/definitions").then((res) => res.data),
+  lifecycle: () => api.get<LifecycleTransactionModel>("/api/transactions/lifecycle").then((res) => res.data),
+  coursework: () => api.get<CourseworkTransactionModel>("/api/transactions/coursework").then((res) => res.data),
+  research: () => api.get<ResearchTransactionModel>("/api/transactions/research").then((res) => res.data),
+  scheduling: () => api.get<SchedulingTransactionModel>("/api/transactions/scheduling").then((res) => res.data),
+  completion: () => api.get<CompletionTransactionModel>("/api/transactions/completion").then((res) => res.data),
+  followUp: () => api.get<FollowUpTransactionModel>("/api/transactions/follow-up").then((res) => res.data),
+  record: (payload: TransactionRecordPayload) =>
+    api.post<TransactionRecordResponse>("/api/transactions/record", payload).then((res) => res.data),
 };

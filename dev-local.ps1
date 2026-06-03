@@ -30,6 +30,23 @@ function Get-RequiredCommand {
   )
 
   $Command = Get-Command $Name -ErrorAction SilentlyContinue
+  if (-not $Command -and $Name -eq "mysql") {
+    $CommonMySqlBins = @(
+      "C:\Program Files\MySQL\MySQL Server 8.0\bin",
+      "C:\Program Files\MySQL\MySQL Server 8.4\bin"
+    )
+
+    foreach ($Bin in $CommonMySqlBins) {
+      $Candidate = Join-Path $Bin "mysql.exe"
+      if (Test-Path $Candidate) {
+        if (($env:Path -split ";") -notcontains $Bin) {
+          $env:Path = "$Bin;$env:Path"
+        }
+        return $Candidate
+      }
+    }
+  }
+
   if (-not $Command) {
     Stop-WithError "$Name is required but was not found. $InstallHint"
   }
@@ -223,6 +240,28 @@ function Stop-DevProcesses {
   }
 }
 
+function Stop-ExistingProjectDevProcesses {
+  $EscapedRoot = [regex]::Escape($RootDir)
+  $Processes = Get-CimInstance Win32_Process |
+    Where-Object {
+      $_.Name -eq "node.exe" -and
+      $_.CommandLine -match $EscapedRoot -and
+      (
+        $_.CommandLine -match "tsx\\dist\\cli\.mjs" -or
+        $_.CommandLine -match "tsx\\dist\\preflight" -or
+        $_.CommandLine -match "vite\\bin\\vite\.js"
+      )
+    }
+
+  if ($Processes) {
+    Write-Log "Stopping existing project dev processes"
+    foreach ($Process in $Processes) {
+      Stop-Process -Id $Process.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 1
+  }
+}
+
 try {
   $NodeCommand = Get-RequiredCommand "node" "Install Node.js 20+ from https://nodejs.org/"
   $NpmCommand = Get-NpmCommand
@@ -285,6 +324,8 @@ try {
   if ($InputDatabaseUrl) {
     Set-EnvValue $ServerEnv "DATABASE_URL" $DatabaseUrl
   }
+
+  Stop-ExistingProjectDevProcesses
 
   Write-Log "Installing backend dependencies"
   Invoke-Checked $NpmCommand @("install") $ServerDir
