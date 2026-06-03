@@ -3,6 +3,8 @@ node_modules/
 client/node_modules/
 server/node_modules/
 References/MVP-FIGMA/node_modules/
+__pycache__/
+*.py[cod]
 
 # Build output
 dist/

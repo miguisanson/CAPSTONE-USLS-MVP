@@ -1,238 +1,91 @@
-# Graduate Student Lifecycle Monitoring & Analytics Platform
+# USLS Graduate School Python Demo
 
-Full-stack MVP for monitoring graduate student progress, tasks, documents, scheduling, alerts, analytics, and audit activity.
+Small Monday-demo version of the Graduate School lifecycle monitoring system.
+The old prototype was removed; this version is Python + MySQL and focuses on six working workflows.
 
-## Tech Stack
+## What It Does
 
-- Frontend: React, TypeScript, Vite, Tailwind CSS, Chart.js
-- Backend: Node.js, Express, TypeScript
-- Database: MySQL 8 with Prisma migrations
-- Auth: JWT with backend-enforced role permissions
+The app demonstrates how Graduate School records move through workflow-based monitoring:
 
-## Run Locally
+1. Student Handoff
+2. LOA / Readmission Decision
+3. Course Audit
+4. Research Gate Readiness
+5. Panel Matching
+6. Defense Scheduling
 
-The app has a one-command local runner. It creates missing `.env` files, installs dependencies, prepares the MySQL database, runs Prisma migrations, seeds demo data if the database is empty, and starts both the backend and frontend.
+Each workflow writes to SQL-backed records such as students, enrollment standing, course evidence, document checks, panel assignments, schedule requests, tasks, and activity logs.
 
-After it starts, open:
+The workflows are not just log entries. Each one performs its action:
 
-- Web app: `http://localhost:5173`
-- API health check: `http://localhost:4000/health`
+- Student Handoff creates the monitoring record and compares received onboarding evidence.
+- LOA / Readmission checks request facts or submitted evidence before updating standing.
+- Course Audit maps course records against curriculum requirements.
+- Research Gate Readiness compares submitted Form 1/Form 4/final/completion evidence with the school protocol.
+- Panel Matching assigns the required panel roles using specialization, availability, and workload.
+- Defense Scheduling checks panel availability and protocol lead-time rules before confirming.
 
-### Requirements
+## Requirements
 
-- Node.js 20+
-- npm 10+
+- Python 3.11+
 - MySQL 8 running locally
-- MySQL CLI available in your terminal as `mysql`
+- MySQL root password set to `1234` or update `.env`
 
-### macOS
+Current database setting:
 
-Install prerequisites with Homebrew:
-
-```bash
-brew install node mysql
-brew services start mysql
+```env
+DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
 ```
 
-Run the app from the project root:
+## Run The Demo
 
-```bash
-npm run dev
+From the project folder:
+
+```powershell
+.\run_demo.ps1
 ```
 
-If MySQL asks for a password, run with your password:
-
-```bash
-DATABASE_URL='mysql://root:your_password@localhost:3306/usls_gs_mvp' npm run dev
-```
-
-If your MySQL root user has no password:
-
-```bash
-DATABASE_URL='mysql://root:@localhost:3306/usls_gs_mvp' npm run dev
-```
-
-### Windows
-
-Install prerequisites:
-
-- Node.js 20+ from `https://nodejs.org/`
-- MySQL 8 from the MySQL Installer
-- Make sure `mysql` works in PowerShell
-
-If `mysql` is not recognized in PowerShell, add the MySQL `bin` folder to PATH. It is usually similar to:
-
-```text
-C:\Program Files\MySQL\MySQL Server 8.0\bin
-```
-
-Run the app from the project root in PowerShell:
+Or, if you prefer the old command:
 
 ```powershell
 npm run dev
 ```
 
-If MySQL asks for a password, run with your password:
-
-```powershell
-$env:DATABASE_URL="mysql://root:your_password@localhost:3306/usls_gs_mvp"; npm run dev
-```
-
-If your local MySQL root user has no password:
-
-```powershell
-$env:DATABASE_URL="mysql://root:@localhost:3306/usls_gs_mvp"; npm run dev
-```
-
-If PowerShell blocks scripts, use the direct Windows runner:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\dev-local.ps1
-```
-
-### Direct Runner Commands
-
-Usually `npm run dev` is enough. These are available if you want to run the platform-specific script directly:
-
-```bash
-# macOS / Linux
-bash dev-local.sh
-```
-
-```powershell
-# Windows
-powershell -ExecutionPolicy Bypass -File .\dev-local.ps1
-```
-
-### What The Runner Does
-
-1. Creates `server/.env` and `client/.env` if missing.
-2. Generates a local JWT secret.
-3. Installs backend and frontend dependencies.
-4. Creates the `usls_gs_mvp` MySQL database if it does not exist.
-5. Runs Prisma migrations.
-6. Seeds demo data if the database has no users.
-7. Starts the backend at `http://localhost:4000`.
-8. Starts the frontend at `http://localhost:5173`.
-
-## Demo Login
-
-Password for all demo users:
+Open:
 
 ```text
-DemoPass123!
+http://localhost:5000
 ```
 
-Demo accounts:
+## Refresh Demo Data
 
-- Admin: `admin@gs.local`
-- Graduate School Staff: `staff@gs.local`
-- Academic Coordinator: `acad.coord@gs.local`
-- Research Coordinator: `research.coord@gs.local`
-- Adviser: `adviser.one@gs.local`
-- Panel Member: `panel.one@gs.local`
-- Student: `student1@gs.local`
+This resets the MySQL demo database and creates synthetic USLS Graduate School data:
+
+```powershell
+python app.py --seed
+```
+
+By default it creates 350 students plus related course records, document checks, tasks, panels, schedules, and activity logs. Change `DEMO_SEED_COUNT` in `.env` if you want 200-500 records.
 
 ## Project Structure
 
 ```text
 CAPSTONE-USLS-MVP/
-  client/          React web app
-  server/          Express API, Prisma schema, migrations, tests
-  docs/            Architecture and thesis feature mapping
-  References/      Design and research references
-  dev-local.sh     macOS/Linux local setup and dev runner
-  dev-local.ps1    Windows local setup and dev runner
-  scripts/         Cross-platform npm helpers
+  app.py              Flask app, SQL models, workflow handlers, seed data
+  templates/          HTML pages for the guide and workflows
+  static/styles.css   Demo UI styling
+  Documents/          Proposal, meeting notes, school forms, and workflow source docs
+  run_demo.ps1        Installs Python packages, seeds MySQL, starts the app
+  requirements.txt    Python dependencies
 ```
 
-## Planning Docs
+## Demo Script
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Thesis Feature Map](docs/THESIS_FEATURE_MAP.md)
-- [Database Workflow](server/prisma/README.md)
+Use the home page as the documentation guide. A simple walkthrough is:
 
-## Main Features
-
-- Role-based dashboard
-- Student lifecycle tracking
-- Student profile, stage, milestone, task, and alert views
-- Task queue and decision logging
-- Document checklist, upload versions, and review comments
-- Scheduling requests, availability, and outcomes
-- Monitoring alerts and interventions
-- Analytics charts, CSV export, and printable reports
-- Audit log viewer
-- Admin configuration for users, milestones, thresholds, and routing rules
-
-## Useful Commands
-
-Run backend only:
-
-```bash
-npm run dev:server
-```
-
-Run frontend only:
-
-```bash
-npm run dev:client
-```
-
-Run backend tests:
-
-```bash
-npm test
-```
-
-Build everything:
-
-```bash
-npm run build
-```
-
-Build only one side:
-
-```bash
-npm run build:server
-npm run build:client
-```
-
-## Database Workflow
-
-The app uses Prisma migrations as the source of truth.
-
-Apply existing migrations:
-
-```bash
-npm run prisma:deploy
-```
-
-Create a new migration after editing `server/prisma/schema.prisma`:
-
-```bash
-cd server
-npx prisma migrate dev --name describe_change
-```
-
-Regenerate the Prisma client:
-
-```bash
-npm run prisma:generate
-```
-
-Refresh demo data:
-
-```bash
-npm run seed
-```
-
-Note: `npm run seed` resets the demo database data.
-
-## Security Notes
-
-- Role permissions are enforced in backend routes and policy checks.
-- Student, adviser, and panel access is scoped server-side.
-- Access-denied attempts are recorded in the audit log.
-- Document downloads require authenticated authorization.
-- Optional OpenAI assistance is disabled by default with `ENABLE_OPENAI_ASSIST=false`.
+1. Open Student Handoff and create one new student.
+2. Open Course Audit for that student and mark one subject missing or completed.
+3. Open Research Gate Readiness and record missing Form 1/Form 4 items.
+4. Open Panel Matching and save the recommended panel.
+5. Open Defense Scheduling and try a preferred date.
+6. Return to the home page to show updated indicators, tasks, and activity events.
