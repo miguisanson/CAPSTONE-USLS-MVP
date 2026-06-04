@@ -26,6 +26,8 @@ server/.env.*
 # Runtime data
 server/uploads/*
 !server/uploads/.gitkeep
+*.sqlite3
+usls_gs_demo.sqlite3
 
 # Logs and OS/editor files
 *.log

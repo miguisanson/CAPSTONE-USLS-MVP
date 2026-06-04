@@ -1,91 +1,104 @@
-# USLS Graduate School Python Demo
+# USLS Graduate Student Lifecycle Monitoring & Analytics Platform
 
-Small Monday-demo version of the Graduate School lifecycle monitoring system.
-The old prototype was removed; this version is Python + MySQL and focuses on six working workflows.
+A web platform for the University of St. La Salle Graduate School that consolidates lifecycle
+records, milestone events, scheduling, document checks, and follow-ups into one staff-friendly
+monitoring environment.
+
+- **Backend:** Python (Flask) JSON API — owns all models, business rules, and the source of truth.
+- **Frontend:** React + Vite + Tailwind CSS single-page app (clean, light, institutional-green UI).
+- **Database:** zero-config **SQLite** by default; **MySQL** supported via `DATABASE_URL`.
+- **Charts:** Recharts. **Icons:** Lucide (SVG). **Fonts:** Poppins + Open Sans.
 
 ## What It Does
 
-The app demonstrates how Graduate School records move through workflow-based monitoring:
+Six working workflows (transactions) drive the platform. Each one performs a real action and
+writes SQL-backed records (students, enrollment, course evidence, document checks, panel
+assignments, schedule requests, tasks, and an activity trail):
 
-1. Student Handoff
-2. LOA / Readmission Decision
-3. Course Audit
-4. Research Gate Readiness
-5. Panel Matching
-6. Defense Scheduling
+1. **Student Handoff** (P0) — creates the monitoring record and compares received onboarding evidence.
+2. **LOA / Readmission Decision** (P0) — checks residency rules or return evidence, then records the decision.
+3. **Course Audit** (P1) — maps completed/current/missing subjects against curriculum requirements.
+4. **Research Gate Readiness** (P1) — compares Form 1 / Form 4 / final / completion evidence with the protocol.
+5. **Panel Matching** (P0) — scores faculty by specialization, availability, college, and workload.
+6. **Defense Scheduling** (P0) — checks panel availability and protocol lead-time before confirming.
 
-Each workflow writes to SQL-backed records such as students, enrollment standing, course evidence, document checks, panel assignments, schedule requests, tasks, and activity logs.
-
-The workflows are not just log entries. Each one performs its action:
-
-- Student Handoff creates the monitoring record and compares received onboarding evidence.
-- LOA / Readmission checks request facts or submitted evidence before updating standing.
-- Course Audit maps course records against curriculum requirements.
-- Research Gate Readiness compares submitted Form 1/Form 4/final/completion evidence with the school protocol.
-- Panel Matching assigns the required panel roles using specialization, availability, and workload.
-- Defense Scheduling checks panel availability and protocol lead-time rules before confirming.
+On top of the transactions: a **Dashboard** (transaction-derived KPIs + charts), a **Students**
+directory with a full lifecycle record view, a role-filtered **Work Queue**, and an **Activity Log**.
 
 ## Requirements
 
 - Python 3.11+
-- MySQL 8 running locally
-- MySQL root password set to `1234` or update `.env`
+- Node.js 18+ and npm (to build the React frontend)
+- MySQL 8 is **optional** — only needed if you set `DATABASE_URL`.
 
-Current database setting:
+## Run It (Windows cmd — two commands)
+
+```cmd
+setup.bat      :: first time only — installs deps, builds the UI, seeds the database
+run.bat        :: every time after that — starts the platform on http://localhost:5000
+```
+
+Then open <http://localhost:5000>. Press `Ctrl+C` in the window to stop.
+
+### Manual steps (equivalent)
+
+```cmd
+python -m pip install -r requirements.txt
+npm --prefix frontend install
+npm --prefix frontend run build
+python app.py --seed          :: creates the demo dataset
+python app.py                 :: serves the API + built UI on port 5000
+```
+
+### Frontend development (hot reload)
+
+```powershell
+python app.py                 # API on :5000
+npm --prefix frontend run dev # Vite dev server on :5173, proxies /api -> :5000
+```
+
+## Database
+
+By default the app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no setup.
+To use MySQL instead, set in `.env`:
 
 ```env
 DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
 ```
 
-## Run The Demo
-
-From the project folder:
-
-```powershell
-.\run_demo.ps1
-```
-
-Or, if you prefer the old command:
-
-```powershell
-npm run dev
-```
-
-Open:
-
-```text
-http://localhost:5000
-```
-
-## Refresh Demo Data
-
-This resets the MySQL demo database and creates synthetic USLS Graduate School data:
+Reseed anytime (resets data, creates ~350 synthetic students plus related records):
 
 ```powershell
 python app.py --seed
 ```
 
-By default it creates 350 students plus related course records, document checks, tasks, panels, schedules, and activity logs. Change `DEMO_SEED_COUNT` in `.env` if you want 200-500 records.
+Change `DEMO_SEED_COUNT` in `.env` to seed 200–500 records.
 
 ## Project Structure
 
 ```text
 CAPSTONE-USLS-MVP/
-  app.py              Flask app, SQL models, workflow handlers, seed data
-  templates/          HTML pages for the guide and workflows
-  static/styles.css   Demo UI styling
-  Documents/          Proposal, meeting notes, school forms, and workflow source docs
-  run_demo.ps1        Installs Python packages, seeds MySQL, starts the app
-  requirements.txt    Python dependencies
+  app.py                 Flask JSON API, SQL models, workflow rules, seed data
+  frontend/              React + Vite + Tailwind single-page app
+    src/
+      pages/             Dashboard, Students, StudentDetail, WorkQueue, ActivityLog, WorkflowPage
+      components/        Layout (sidebar/topbar), UI primitives, forms, StudentPicker
+      api.js, hooks.js, lib/format.js
+    dist/                Production build (served by Flask) — git-ignored
+  Documents/             Proposal, meeting notes, transaction list, school forms
+  run_demo.ps1           Installs deps, builds the UI, seeds the DB, starts the app
+  requirements.txt       Python dependencies
 ```
 
-## Demo Script
+## API Overview
 
-Use the home page as the documentation guide. A simple walkthrough is:
-
-1. Open Student Handoff and create one new student.
-2. Open Course Audit for that student and mark one subject missing or completed.
-3. Open Research Gate Readiness and record missing Form 1/Form 4 items.
-4. Open Panel Matching and save the recommended panel.
-5. Open Defense Scheduling and try a preferred date.
-6. Return to the home page to show updated indicators, tasks, and activity events.
+```text
+GET  /api/meta                         programs, terms, faculty, stages, transaction catalogue
+GET  /api/dashboard                    KPIs + chart distributions (computed from transactions)
+GET  /api/students?q=&stage=&risk=...  paginated, filterable student list
+GET  /api/students/<id>                full lifecycle record (audit, research, docs, panel, schedule, tasks, timeline)
+GET  /api/tasks?owner=                 work queue
+GET  /api/activity                     activity trail
+GET  /api/transactions/<slug>/context  data a workflow screen needs
+POST /api/transactions/<slug>          run a workflow (JSON body)
+```

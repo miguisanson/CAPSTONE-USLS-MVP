@@ -1,12 +1,16 @@
 {
-  "name": "capstone-usls-python-demo",
+  "name": "capstone-usls-platform",
   "private": true,
-  "version": "0.2.0",
-  "description": "Python demo for the USLS Graduate School lifecycle monitoring system",
+  "version": "1.0.0",
+  "description": "Graduate Student Lifecycle Monitoring and Analytics Platform — Flask JSON API + React (Vite + Tailwind) UI for the USLS Graduate School",
   "scripts": {
     "install:python": "python -m pip install -r requirements.txt",
+    "install:web": "npm --prefix frontend install",
+    "build:web": "npm --prefix frontend run build",
+    "dev:web": "npm --prefix frontend run dev",
     "seed": "python app.py --seed",
     "start": "python app.py",
-    "dev": "powershell -ExecutionPolicy Bypass -File ./run_demo.ps1"
+    "build": "npm run build:web",
+    "demo": "powershell -ExecutionPolicy Bypass -File ./run_demo.ps1"
   }
 }

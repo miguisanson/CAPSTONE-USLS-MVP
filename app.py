@@ -6,23 +6,30 @@ import sys
 from datetime import date, datetime, time, timedelta
 from urllib.parse import urlparse
 
-import pymysql
 from dotenv import load_dotenv
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, text
+from werkzeug.datastructures import MultiDict
 
 
 load_dotenv()
 
 db = SQLAlchemy()
 
+FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 
+
+# ---------------------------------------------------------------------------
+# Transaction catalogue (source of truth for the workflow screens)
+# ---------------------------------------------------------------------------
 TRANSACTIONS = [
     {
         "slug": "student-handoff",
         "priority": "P0",
         "title": "Student Handoff",
+        "icon": "user-plus",
+        "group": "Intake",
         "short": "Create the Graduate School monitoring record from an admission or enrollment signal.",
         "actor": "GS Staff",
         "data": "Student profile, admission/enrollment signal, program, term, source reference, timestamp, initial status.",
@@ -31,6 +38,8 @@ TRANSACTIONS = [
         "slug": "loa-decision",
         "priority": "P0",
         "title": "LOA / Readmission Decision",
+        "icon": "calendar-off",
+        "group": "Standing",
         "short": "Compare request details with residency rules, route a decision, and update standing.",
         "actor": "Student / GS Staff / Dean",
         "data": "Request type, effective term, eligibility result, approval/denial/return, residency pause, next owner.",
@@ -39,6 +48,8 @@ TRANSACTIONS = [
         "slug": "course-audit",
         "priority": "P1",
         "title": "Course Audit",
+        "icon": "clipboard-check",
+        "group": "Coursework",
         "short": "Map completed, current, and missing subjects to curriculum requirements.",
         "actor": "Academic Coordinator / GS Staff",
         "data": "Taken/current/missing subjects, AY/term, evidence reference, audit result, offering demand.",
@@ -47,6 +58,8 @@ TRANSACTIONS = [
         "slug": "research-gate",
         "priority": "P1",
         "title": "Research Gate Readiness",
+        "icon": "file-check",
+        "group": "Research",
         "short": "Check Form 1, Form 4, or completion evidence and set readiness or revision state.",
         "actor": "Student / Adviser / Research Coordinator",
         "data": "Form gate, required evidence, missing documents, decision result, next owner, milestone status.",
@@ -55,6 +68,8 @@ TRANSACTIONS = [
         "slug": "panel-matching",
         "priority": "P0",
         "title": "Panel Matching",
+        "icon": "users",
+        "group": "Research",
         "short": "Recommend panel members using specialization, availability, workload, and eligibility notes.",
         "actor": "Research Coordinator / Academic Coordinator",
         "data": "Specialization need, availability reference, workload count, recommended panel, eligibility notes.",
@@ -63,6 +78,8 @@ TRANSACTIONS = [
         "slug": "defense-scheduling",
         "priority": "P0",
         "title": "Defense Scheduling",
+        "icon": "calendar-check",
+        "group": "Research",
         "short": "Match available dates across student, adviser, and panel, then confirm or flag scheduling.",
         "actor": "Research Coordinator / Panel / Adviser / Student",
         "data": "Preferred date, availability responses, constraints, final schedule, mode, venue/link, status.",
@@ -102,37 +119,58 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
+def is_mysql(url: str) -> bool:
+    return url.startswith("mysql")
+
+
 def ensure_mysql_database(database_url: str) -> None:
-    parsed = urlparse(database_url)
-    if not parsed.scheme.startswith("mysql"):
+    """Create the MySQL database if it is missing. No-op for SQLite."""
+    if not is_mysql(database_url):
         return
 
+    import pymysql  # imported lazily so SQLite users do not need it
+
+    parsed = urlparse(database_url)
     database_name = parsed.path.strip("/")
     if not database_name:
         raise RuntimeError("DATABASE_URL must include a database name.")
 
-    username = parsed.username or "root"
-    password = parsed.password or ""
-    host = parsed.hostname or "localhost"
-    port = parsed.port or 3306
-
-    connection = pymysql.connect(host=host, port=port, user=username, password=password, autocommit=True)
+    connection = pymysql.connect(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 3306,
+        user=parsed.username or "root",
+        password=parsed.password or "",
+        autocommit=True,
+    )
     try:
         with connection.cursor() as cursor:
             cursor.execute(
-                f"CREATE DATABASE IF NOT EXISTS `{database_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                f"CREATE DATABASE IF NOT EXISTS `{database_name}` "
+                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
             )
     finally:
         connection.close()
 
 
+def resolve_database_url() -> str:
+    """Default to a zero-config SQLite file so `python app.py` just runs.
+
+    Set DATABASE_URL (e.g. mysql://root:1234@localhost:3306/usls_gs_demo) to use MySQL.
+    """
+    configured = os.getenv("DATABASE_URL")
+    if configured:
+        return normalize_database_url(configured)
+    sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usls_gs_demo.sqlite3")
+    return f"sqlite:///{sqlite_path}"
+
+
 def create_app() -> Flask:
-    database_url = normalize_database_url(
-        os.getenv("DATABASE_URL", "mysql+pymysql://root:1234@localhost:3306/usls_gs_demo")
-    )
+    database_url = resolve_database_url()
     ensure_mysql_database(database_url)
 
-    app = Flask(__name__)
+    # static_folder disabled: our catch-all route serves both the built assets
+    # and the SPA fallback, so Flask's greedy static route does not shadow client routes.
+    app = Flask(__name__, static_folder=None)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "demo-only-secret")
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -142,6 +180,9 @@ def create_app() -> Flask:
     return app
 
 
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
 class Program(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(30), unique=True, nullable=False)
@@ -309,154 +350,592 @@ class TransactionLog(db.Model):
     created_at = db.Column(db.DateTime, default=now_utc)
 
 
-def register_routes(app: Flask) -> None:
-    @app.route("/")
-    def index():
-        stats = dashboard_stats()
-        recent_logs = (
-            TransactionLog.query.filter(TransactionLog.actor_role != "Demo Data")
-            .order_by(TransactionLog.created_at.desc())
-            .limit(8)
-            .all()
-        )
-        overdue_tasks = Task.query.filter(Task.status.in_(["Pending", "Overdue"])).order_by(Task.priority.desc()).limit(8).all()
-        return render_template(
-            "index.html",
-            transactions=TRANSACTIONS,
-            stats=stats,
-            recent_logs=recent_logs,
-            overdue_tasks=overdue_tasks,
-        )
-
-    @app.route("/transaction/<slug>", methods=["GET", "POST"])
-    def legacy_transaction_page(slug: str):
-        return redirect(url_for("action_page", slug=slug, **request.args))
-
-    @app.route("/action/<slug>", methods=["GET", "POST"])
-    def action_page(slug: str):
-        transaction = TRANSACTION_BY_SLUG.get(slug)
-        if not transaction:
-            flash("Unknown workflow.", "error")
-            return redirect(url_for("index"))
-
-        if request.method == "POST":
-            handler = TRANSACTION_HANDLERS[slug]
-            student_id = handler()
-            db.session.commit()
-            flash("Saved. The student record, queue, and monitoring indicators were updated.", "success")
-            if slug == "student-handoff":
-                return redirect(url_for("action_page", slug=slug))
-            return redirect(url_for("action_page", slug=slug, student_id=student_id or ""))
-
-        selected_student_id = None if slug == "student-handoff" else request.args.get("student_id", type=int)
-        student_lookup = "" if slug == "student-handoff" else request.args.get("student_lookup", "").strip()
-        if not selected_student_id and student_lookup:
-            selected_student = resolve_student_lookup(student_lookup)
-            selected_student_id = selected_student.id if selected_student else None
-        context = build_transaction_context(slug, selected_student_id, student_lookup)
-        return render_template(
-            "transaction.html",
-            transaction=transaction,
-            transactions=TRANSACTIONS,
-            context=context,
-        )
+# ---------------------------------------------------------------------------
+# Serializers
+# ---------------------------------------------------------------------------
+def iso(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return str(value)
 
 
-def dashboard_stats() -> dict:
-    total_students = Student.query.count()
-    active_students = Student.query.filter(Student.standing == "Active").count()
-    at_risk = Student.query.filter(Student.risk_level.in_(["Medium", "High"])).count()
-    pending_tasks = Task.query.filter(Task.status.in_(["Pending", "Overdue"])).count()
-    confirmed_schedules = ScheduleRequest.query.filter(ScheduleRequest.status == "Confirmed").count()
-    stage_counts = (
-        db.session.query(Student.current_stage, func.count(Student.id))
-        .group_by(Student.current_stage)
-        .order_by(func.count(Student.id).desc())
-        .all()
-    )
+def program_dict(program: Program) -> dict:
     return {
-        "total_students": total_students,
-        "active_students": active_students,
-        "at_risk": at_risk,
-        "pending_tasks": pending_tasks,
-        "confirmed_schedules": confirmed_schedules,
-        "stage_counts": stage_counts,
+        "id": program.id,
+        "code": program.code,
+        "name": program.name,
+        "college": program.college,
+        "has_practicum": program.has_practicum,
     }
 
 
-def build_transaction_context(slug: str, selected_student_id: int | None, student_lookup: str = "") -> dict:
-    students = Student.query.order_by(Student.last_name.asc(), Student.first_name.asc()).limit(500).all()
-    selected_student = None if slug == "student-handoff" else (Student.query.get(selected_student_id) if selected_student_id else (students[0] if students else None))
-    programs = Program.query.order_by(Program.college, Program.name).all()
-    terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
-    faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
+def term_dict(term: AcademicTerm) -> dict:
+    return {"id": term.id, "label": term.label, "start_date": iso(term.start_date), "end_date": iso(term.end_date)}
+
+
+def faculty_dict(faculty: Faculty) -> dict:
+    return {
+        "id": faculty.id,
+        "name": faculty.name,
+        "college": faculty.college,
+        "role": faculty.role,
+        "specialization": faculty.specialization,
+        "active": faculty.active,
+    }
+
+
+def student_brief(student: Student) -> dict:
+    return {
+        "id": student.id,
+        "student_number": student.student_number,
+        "name": student.name,
+        "first_name": student.first_name,
+        "last_name": student.last_name,
+        "email": student.email,
+        "program_code": student.program.code,
+        "program_name": student.program.name,
+        "college": student.program.college,
+        "entry_year": student.entry_year,
+        "current_stage": student.current_stage,
+        "standing": student.standing,
+        "risk_level": student.risk_level,
+        "adviser_name": student.adviser_name,
+        "search_label": student_search_label(student),
+    }
+
+
+def course_audit_dict(audit: dict) -> dict:
+    def row(item):
+        return {
+            "code": item["course"].code,
+            "title": item["course"].title,
+            "units": item["course"].units,
+            "recommended_term": item["course"].recommended_term,
+            "status": item["status"],
+            "term_label": item["record"].term_label if item["record"] else None,
+            "evidence_reference": item["record"].evidence_reference if item["record"] else None,
+        }
+
+    return {
+        "required_count": audit["required_count"],
+        "completed": [row(r) for r in audit["completed"]],
+        "current": [row(r) for r in audit["current"]],
+        "incomplete": [row(r) for r in audit["incomplete"]],
+        "missing": [row(r) for r in audit["missing"]],
+        "missing_count": audit["missing_count"],
+        "completion_rate": audit["completion_rate"],
+    }
+
+
+def research_case_dict(case: ResearchCase | None) -> dict | None:
+    if not case:
+        return None
+    return {
+        "id": case.id,
+        "case_type": case.case_type,
+        "title": case.title,
+        "current_gate": case.current_gate,
+        "status": case.status,
+        "adviser_name": case.adviser_name,
+        "opened_at": iso(case.opened_at),
+    }
+
+
+def document_check_dict(doc: DocumentCheck) -> dict:
+    return {
+        "id": doc.id,
+        "gate": doc.gate,
+        "item_name": doc.item_name,
+        "status": doc.status,
+        "evidence_reference": doc.evidence_reference,
+        "updated_at": iso(doc.updated_at),
+    }
+
+
+def panel_assignment_dict(assignment: PanelAssignment) -> dict:
+    return {
+        "id": assignment.id,
+        "panel_role": assignment.panel_role,
+        "score": assignment.score,
+        "eligibility_note": assignment.eligibility_note,
+        "faculty_name": assignment.faculty.name if assignment.faculty else None,
+        "specialization": assignment.faculty.specialization if assignment.faculty else None,
+        "assigned_at": iso(assignment.assigned_at),
+    }
+
+
+def schedule_request_dict(req: ScheduleRequest) -> dict:
+    return {
+        "id": req.id,
+        "preferred_date": iso(req.preferred_date),
+        "mode": req.mode,
+        "venue": req.venue,
+        "status": req.status,
+        "matched_count": req.matched_count,
+        "notes": req.notes,
+        "created_at": iso(req.created_at),
+        "confirmed_at": iso(req.confirmed_at),
+    }
+
+
+def task_dict(task: Task) -> dict:
+    return {
+        "id": task.id,
+        "student_id": task.student_id,
+        "student_name": task.student.name if task.student else None,
+        "title": task.title,
+        "owner_role": task.owner_role,
+        "due_at": iso(task.due_at),
+        "status": task.status,
+        "priority": task.priority,
+        "overdue": task.status != "Done" and task.due_at < date.today(),
+    }
+
+
+def log_dict(log: TransactionLog) -> dict:
+    return {
+        "id": log.id,
+        "transaction_slug": log.transaction_slug,
+        "student_id": log.student_id,
+        "student_name": log.student.name if log.student else None,
+        "actor_role": log.actor_role,
+        "source_reference": log.source_reference,
+        "result": log.result,
+        "next_owner": log.next_owner,
+        "notes": log.notes,
+        "created_at": iso(log.created_at),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Routes (JSON API + SPA hosting)
+# ---------------------------------------------------------------------------
+def register_routes(app: Flask) -> None:
+    @app.route("/api/health")
+    def health():
+        return jsonify({"status": "ok", "students": Student.query.count()})
+
+    @app.route("/api/meta")
+    def meta():
+        programs = Program.query.order_by(Program.college, Program.name).all()
+        terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
+        faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
+        return jsonify(
+            {
+                "transactions": TRANSACTIONS,
+                "stages": STAGES,
+                "colleges": COLLEGES,
+                "programs": [program_dict(p) for p in programs],
+                "terms": [term_dict(t) for t in terms],
+                "faculty": [faculty_dict(f) for f in faculty],
+            }
+        )
+
+    @app.route("/api/dashboard")
+    def dashboard():
+        return jsonify(dashboard_stats())
+
+    @app.route("/api/students")
+    def students_list():
+        query = Student.query.join(Program)
+        q = request.args.get("q", "").strip()
+        if q:
+            pattern = f"%{q}%"
+            query = query.filter(
+                or_(
+                    Student.student_number.ilike(pattern),
+                    Student.first_name.ilike(pattern),
+                    Student.last_name.ilike(pattern),
+                    Student.email.ilike(pattern),
+                    Program.code.ilike(pattern),
+                    Program.name.ilike(pattern),
+                )
+            )
+        stage = request.args.get("stage", "").strip()
+        if stage:
+            query = query.filter(Student.current_stage == stage)
+        program_id = request.args.get("program_id", type=int)
+        if program_id:
+            query = query.filter(Student.program_id == program_id)
+        risk = request.args.get("risk", "").strip()
+        if risk:
+            query = query.filter(Student.risk_level == risk)
+        standing = request.args.get("standing", "").strip()
+        if standing:
+            query = query.filter(Student.standing == standing)
+
+        page = max(request.args.get("page", 1, type=int), 1)
+        page_size = min(max(request.args.get("page_size", 25, type=int), 5), 100)
+        total = query.count()
+        items = (
+            query.order_by(Student.last_name.asc(), Student.first_name.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        return jsonify(
+            {
+                "items": [student_brief(s) for s in items],
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "pages": (total + page_size - 1) // page_size,
+            }
+        )
+
+    @app.route("/api/students/<int:student_id>")
+    def student_detail(student_id: int):
+        student = Student.query.get_or_404(student_id)
+        audit = compute_course_audit(student)
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+        )
+        document_checks = (
+            DocumentCheck.query.filter_by(student_id=student.id)
+            .order_by(DocumentCheck.gate, DocumentCheck.item_name)
+            .all()
+        )
+        panel = (
+            PanelAssignment.query.filter_by(student_id=student.id).order_by(PanelAssignment.score.desc()).all()
+        )
+        schedules = (
+            ScheduleRequest.query.filter_by(student_id=student.id)
+            .order_by(ScheduleRequest.created_at.desc())
+            .limit(8)
+            .all()
+        )
+        tasks = (
+            Task.query.filter_by(student_id=student.id)
+            .order_by(Task.status.desc(), Task.due_at.asc())
+            .limit(20)
+            .all()
+        )
+        logs = (
+            TransactionLog.query.filter(TransactionLog.student_id == student.id)
+            .order_by(TransactionLog.created_at.desc())
+            .limit(25)
+            .all()
+        )
+        enrollments = (
+            TermEnrollment.query.filter_by(student_id=student.id)
+            .order_by(TermEnrollment.confirmed_at.desc())
+            .all()
+        )
+        docs_by_gate: dict[str, list] = {}
+        for doc in document_checks:
+            docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
+
+        return jsonify(
+            {
+                "student": student_brief(student),
+                "stages": STAGES,
+                "stage_index": STAGES.index(student.current_stage) if student.current_stage in STAGES else 0,
+                "course_audit": course_audit_dict(audit),
+                "research_case": research_case_dict(research_case),
+                "documents_by_gate": docs_by_gate,
+                "panel": [panel_assignment_dict(p) for p in panel],
+                "schedules": [schedule_request_dict(s) for s in schedules],
+                "tasks": [task_dict(t) for t in tasks],
+                "logs": [log_dict(l) for l in logs],
+                "enrollments": [
+                    {
+                        "id": e.id,
+                        "term_label": e.term.label if e.term else None,
+                        "status": e.status,
+                        "source_reference": e.source_reference,
+                        "confirmed_at": iso(e.confirmed_at),
+                    }
+                    for e in enrollments
+                ],
+            }
+        )
+
+    @app.route("/api/tasks")
+    def tasks_list():
+        owner = request.args.get("owner", "").strip()
+        query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
+        if owner:
+            query = query.filter(Task.owner_role == owner)
+        tasks = query.order_by(Task.priority.desc(), Task.due_at.asc()).limit(100).all()
+        return jsonify({"items": [task_dict(t) for t in tasks]})
+
+    @app.route("/api/activity")
+    def activity():
+        logs = (
+            TransactionLog.query.filter(TransactionLog.actor_role != "Demo Data")
+            .order_by(TransactionLog.created_at.desc())
+            .limit(40)
+            .all()
+        )
+        return jsonify({"items": [log_dict(l) for l in logs]})
+
+    @app.route("/api/faculty")
+    def faculty_list():
+        faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
+        return jsonify({"items": [faculty_dict(f) for f in faculty]})
+
+    @app.route("/api/transactions/<slug>/context")
+    def transaction_context(slug: str):
+        if slug not in TRANSACTION_BY_SLUG:
+            return jsonify({"error": "Unknown workflow."}), 404
+        student_id = request.args.get("student_id", type=int)
+        specialization = request.args.get("specialization", "")
+        return jsonify(serialize_transaction_context(slug, student_id, specialization))
+
+    @app.route("/api/transactions/<slug>", methods=["POST"])
+    def transaction_submit(slug: str):
+        if slug not in TRANSACTION_BY_SLUG:
+            return jsonify({"error": "Unknown workflow."}), 404
+        data = request_payload()
+        handler = TRANSACTION_HANDLERS[slug]
+        try:
+            student_id = handler(data)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify(
+            {
+                "ok": True,
+                "student_id": student_id,
+                "message": "Saved. The student record, queue, and monitoring indicators were updated.",
+            }
+        )
+
+    # ---- SPA hosting -----------------------------------------------------
+    @app.route("/")
+    def index():
+        return _serve_spa()
+
+    @app.route("/<path:path>")
+    def catch_all(path: str):
+        candidate = os.path.join(FRONTEND_DIST, path)
+        if path and os.path.isfile(candidate):
+            return send_from_directory(FRONTEND_DIST, path)
+        return _serve_spa()
+
+    def _serve_spa():
+        index_path = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.isfile(index_path):
+            return send_from_directory(FRONTEND_DIST, "index.html")
+        return (
+            "<h1>USLS GS Platform API</h1>"
+            "<p>The React frontend has not been built yet. Run "
+            "<code>cd frontend &amp;&amp; npm install &amp;&amp; npm run build</code>, "
+            "or use the Vite dev server (<code>npm run dev</code>) which proxies to this API.</p>",
+            200,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Payload helper (works for both JSON bodies and classic form posts)
+# ---------------------------------------------------------------------------
+def request_payload() -> MultiDict:
+    if request.is_json:
+        body = request.get_json(silent=True) or {}
+        md = MultiDict()
+        for key, value in body.items():
+            if isinstance(value, list):
+                for item in value:
+                    md.add(key, item)
+            else:
+                md.add(key, value)
+        return md
+    return request.form
+
+
+# ---------------------------------------------------------------------------
+# Analytics
+# ---------------------------------------------------------------------------
+def dashboard_stats() -> dict:
+    total_students = Student.query.count()
+    active_students = Student.query.filter(Student.standing == "Active").count()
+    on_leave = Student.query.filter(Student.standing == "On Leave").count()
+    completed = Student.query.filter(Student.current_stage == "Completed").count()
+    at_risk = Student.query.filter(Student.risk_level.in_(["Medium", "High"])).count()
+    high_risk = Student.query.filter(Student.risk_level == "High").count()
+    pending_tasks = Task.query.filter(Task.status.in_(["Pending", "Overdue"])).count()
+    overdue_tasks = Task.query.filter(Task.due_at < date.today(), Task.status != "Done").count()
+    confirmed_schedules = ScheduleRequest.query.filter(ScheduleRequest.status == "Confirmed").count()
+    needs_availability = ScheduleRequest.query.filter(ScheduleRequest.status == "Needs Availability").count()
+
+    stage_counts = dict(
+        db.session.query(Student.current_stage, func.count(Student.id)).group_by(Student.current_stage).all()
+    )
+    stage_distribution = [{"stage": stage, "count": stage_counts.get(stage, 0)} for stage in STAGES]
+
+    risk_counts = dict(
+        db.session.query(Student.risk_level, func.count(Student.id)).group_by(Student.risk_level).all()
+    )
+    risk_distribution = [{"risk": level, "count": risk_counts.get(level, 0)} for level in ["Low", "Medium", "High"]]
+
+    college_rows = (
+        db.session.query(Program.college, func.count(Student.id))
+        .join(Student, Student.program_id == Program.id)
+        .group_by(Program.college)
+        .order_by(func.count(Student.id).desc())
+        .all()
+    )
+    college_distribution = [{"college": c, "count": n} for c, n in college_rows]
+
+    gate_rows = (
+        db.session.query(ResearchCase.current_gate, func.count(ResearchCase.id))
+        .group_by(ResearchCase.current_gate)
+        .all()
+    )
+    gate_distribution = [{"gate": g, "count": n} for g, n in gate_rows]
+
+    owner_rows = (
+        db.session.query(Task.owner_role, func.count(Task.id))
+        .filter(Task.status.in_(["Pending", "Overdue"]))
+        .group_by(Task.owner_role)
+        .order_by(func.count(Task.id).desc())
+        .all()
+    )
+    tasks_by_owner = [{"owner": o, "count": n} for o, n in owner_rows]
+
+    schedule_rows = (
+        db.session.query(ScheduleRequest.status, func.count(ScheduleRequest.id))
+        .group_by(ScheduleRequest.status)
+        .all()
+    )
+    schedule_distribution = [{"status": s, "count": n} for s, n in schedule_rows]
+
+    recent_logs = (
+        TransactionLog.query.filter(TransactionLog.actor_role != "Demo Data")
+        .order_by(TransactionLog.created_at.desc())
+        .limit(8)
+        .all()
+    )
+    open_tasks = (
+        Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
+        .order_by(Task.priority.desc(), Task.due_at.asc())
+        .limit(8)
+        .all()
+    )
+
+    return {
+        "kpis": {
+            "total_students": total_students,
+            "active_students": active_students,
+            "on_leave": on_leave,
+            "completed": completed,
+            "at_risk": at_risk,
+            "high_risk": high_risk,
+            "pending_tasks": pending_tasks,
+            "overdue_tasks": overdue_tasks,
+            "confirmed_schedules": confirmed_schedules,
+            "needs_availability": needs_availability,
+        },
+        "stage_distribution": stage_distribution,
+        "risk_distribution": risk_distribution,
+        "college_distribution": college_distribution,
+        "gate_distribution": gate_distribution,
+        "tasks_by_owner": tasks_by_owner,
+        "schedule_distribution": schedule_distribution,
+        "recent_logs": [log_dict(l) for l in recent_logs],
+        "open_tasks": [task_dict(t) for t in open_tasks],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Transaction context (data needed by each workflow screen)
+# ---------------------------------------------------------------------------
+def serialize_transaction_context(slug: str, selected_student_id: int | None, specialization: str = "") -> dict:
+    selected_student = None
+    if slug != "student-handoff" and selected_student_id:
+        selected_student = Student.query.get(selected_student_id)
+
     recent_logs = (
         TransactionLog.query.filter(
             TransactionLog.transaction_slug == slug,
             TransactionLog.actor_role != "Demo Data",
         )
         .order_by(TransactionLog.created_at.desc())
-        .limit(10)
+        .limit(8)
         .all()
     )
 
-    context = {
-        "students": students,
-        "selected_student": selected_student,
-        "student_lookup": student_lookup or student_search_label(selected_student),
-        "student_options": [{"id": student.id, "label": student_search_label(student)} for student in students],
-        "programs": programs,
-        "terms": terms,
-        "faculty": faculty,
-        "recent_logs": recent_logs,
+    context: dict = {
+        "slug": slug,
+        "transaction": TRANSACTION_BY_SLUG[slug],
+        "selected_student": student_brief(selected_student) if selected_student else None,
+        "recent_logs": [log_dict(l) for l in recent_logs],
         "gate_requirements": {
-            "Form 1 - Title Defense": required_documents_for_gate("Form 1 - Title Defense"),
-            "Form 4 - Proposal Defense Readiness": required_documents_for_gate("Form 4 - Proposal Defense Readiness"),
-            "Final Defense": required_documents_for_gate("Final Defense"),
-            "Completion Evidence": required_documents_for_gate("Completion Evidence"),
+            gate: required_documents_for_gate(gate)
+            for gate in [
+                "Form 1 - Title Defense",
+                "Form 4 - Proposal Defense Readiness",
+                "Final Defense",
+                "Completion Evidence",
+            ]
         },
         "readmission_requirements": readmission_requirements(),
         "onboarding_requirements": onboarding_requirements(),
-        "courses": [],
-        "course_audit": None,
-        "panel_recommendations": [],
-        "assigned_panel": [],
-        "schedule_requests": [],
-        "document_checks": [],
-        "research_case": None,
-        "offering_demand": [],
-        "panel_roles": [],
     }
+
+    if slug == "student-handoff":
+        context["programs"] = [program_dict(p) for p in Program.query.order_by(Program.college, Program.name).all()]
+        context["terms"] = [term_dict(t) for t in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()]
 
     if selected_student:
         context["panel_roles"] = panel_roles_for_student(selected_student)
-        context["courses"] = Course.query.filter(Course.program_id == selected_student.program_id).order_by(Course.code).all()
-        context["course_audit"] = compute_course_audit(selected_student)
-        context["document_checks"] = (
-            DocumentCheck.query.filter(DocumentCheck.student_id == selected_student.id)
-            .order_by(DocumentCheck.gate, DocumentCheck.item_name)
-            .all()
-        )
-        context["research_case"] = (
-            ResearchCase.query.filter(ResearchCase.student_id == selected_student.id)
-            .order_by(ResearchCase.opened_at.desc())
-            .first()
-        )
-        context["assigned_panel"] = (
-            PanelAssignment.query.filter(PanelAssignment.student_id == selected_student.id)
-            .order_by(PanelAssignment.score.desc())
-            .all()
-        )
-        context["schedule_requests"] = (
-            ScheduleRequest.query.filter(ScheduleRequest.student_id == selected_student.id)
-            .order_by(ScheduleRequest.created_at.desc())
-            .limit(6)
-            .all()
-        )
-        context["panel_recommendations"] = recommend_panel(selected_student, request.args.get("specialization", ""))
-
-    if slug == "course-audit":
-        context["offering_demand"] = compute_offering_demand()
+        context["research_case_type"] = research_case_type(selected_student)
+        if slug == "course-audit":
+            context["course_audit"] = course_audit_dict(compute_course_audit(selected_student))
+            context["courses"] = [
+                {"id": c.id, "code": c.code, "title": c.title}
+                for c in Course.query.filter(Course.program_id == selected_student.program_id)
+                .order_by(Course.code)
+                .all()
+            ]
+            context["offering_demand"] = [
+                {"code": row["course"].code, "title": row["course"].title, "count": row["count"]}
+                for row in compute_offering_demand()
+            ]
+        if slug == "research-gate":
+            context["research_case"] = research_case_dict(
+                ResearchCase.query.filter_by(student_id=selected_student.id)
+                .order_by(ResearchCase.opened_at.desc())
+                .first()
+            )
+            context["documents_by_gate"] = {}
+            for doc in DocumentCheck.query.filter_by(student_id=selected_student.id).all():
+                context["documents_by_gate"].setdefault(doc.gate, []).append(document_check_dict(doc))
+        if slug == "panel-matching":
+            context["panel_recommendations"] = [
+                {
+                    "faculty_id": row["faculty"].id,
+                    "faculty_name": row["faculty"].name,
+                    "college": row["faculty"].college,
+                    "specialization": row["faculty"].specialization,
+                    "score": row["score"],
+                    "note": row["note"],
+                }
+                for row in recommend_panel(selected_student, specialization)[:12]
+            ]
+            context["assigned_panel"] = [
+                panel_assignment_dict(p)
+                for p in PanelAssignment.query.filter_by(student_id=selected_student.id)
+                .order_by(PanelAssignment.score.desc())
+                .all()
+            ]
+        if slug == "defense-scheduling":
+            context["assigned_panel"] = [
+                panel_assignment_dict(p)
+                for p in PanelAssignment.query.filter_by(student_id=selected_student.id)
+                .order_by(PanelAssignment.score.desc())
+                .all()
+            ]
+            context["schedules"] = [
+                schedule_request_dict(s)
+                for s in ScheduleRequest.query.filter_by(student_id=selected_student.id)
+                .order_by(ScheduleRequest.created_at.desc())
+                .limit(6)
+                .all()
+            ]
 
     return context
 
@@ -465,30 +944,6 @@ def student_search_label(student: Student | None) -> str:
     if not student:
         return ""
     return f"{student.student_number} - {student.last_name}, {student.first_name} - {student.program.code}"
-
-
-def resolve_student_lookup(value: str) -> Student | None:
-    value = value.strip()
-    if not value:
-        return None
-    if " - " in value:
-        value = value.split(" - ", 1)[0].strip()
-    pattern = f"%{value}%"
-    return (
-        Student.query.join(Program)
-        .filter(
-            or_(
-                Student.student_number.ilike(pattern),
-                Student.first_name.ilike(pattern),
-                Student.last_name.ilike(pattern),
-                Student.email.ilike(pattern),
-                Program.code.ilike(pattern),
-                Program.name.ilike(pattern),
-            )
-        )
-        .order_by(Student.last_name.asc(), Student.first_name.asc())
-        .first()
-    )
 
 
 def add_log(slug: str, student_id: int | None, actor: str, source: str, result: str, next_owner: str, notes: str) -> None:
@@ -518,22 +973,25 @@ def add_task(student_id: int, title: str, owner: str, days: int, priority: int =
     )
 
 
-def handle_student_handoff() -> int:
-    program = Program.query.get(int(request.form["program_id"]))
+# ---------------------------------------------------------------------------
+# Transaction handlers (now accept a MultiDict payload from JSON or form)
+# ---------------------------------------------------------------------------
+def handle_student_handoff(data: MultiDict) -> int:
+    program = Program.query.get(int(data["program_id"]))
     count = Student.query.count() + 1
-    student_number = request.form.get("student_number", "").strip() or f"2026-{count:04d}"
-    first_name = request.form["first_name"].strip()
-    last_name = request.form["last_name"].strip()
-    submitted_onboarding = set(request.form.getlist("onboarding_items"))
+    student_number = (data.get("student_number") or "").strip() or f"2026-{count:04d}"
+    first_name = data["first_name"].strip()
+    last_name = data["last_name"].strip()
+    submitted_onboarding = set(data.getlist("onboarding_items"))
     missing_items = [item for item in onboarding_requirements() if item not in submitted_onboarding]
-    missing_items.extend(split_items(request.form.get("additional_missing_items", "")))
+    missing_items.extend(split_items(data.get("additional_missing_items", "")))
     student = Student(
         student_number=student_number,
         first_name=first_name,
         last_name=last_name,
-        email=request.form.get("email", "").strip() or f"{student_number.lower()}@student.usls.edu.ph",
+        email=(data.get("email") or "").strip() or f"{student_number.lower()}@student.usls.edu.ph",
         program_id=program.id,
-        entry_year=int(request.form.get("entry_year") or date.today().year),
+        entry_year=int(data.get("entry_year") or date.today().year),
         current_stage="Admission",
         standing="Active",
         risk_level="Medium" if missing_items else "Low",
@@ -541,13 +999,13 @@ def handle_student_handoff() -> int:
     db.session.add(student)
     db.session.flush()
 
-    term = AcademicTerm.query.get(int(request.form["term_id"]))
+    term = AcademicTerm.query.get(int(data["term_id"]))
     db.session.add(
         TermEnrollment(
             student_id=student.id,
             term_id=term.id,
-            status=request.form["admission_signal"],
-            source_reference=request.form.get("source_reference", ""),
+            status=data["admission_signal"],
+            source_reference=data.get("source_reference", ""),
         )
     )
 
@@ -558,19 +1016,19 @@ def handle_student_handoff() -> int:
                 gate="Admission Handoff",
                 item_name=item,
                 status="Missing" if item in missing_items else "Complete",
-                evidence_reference=request.form.get("source_reference", ""),
+                evidence_reference=data.get("source_reference", ""),
             )
         )
 
     if missing_items:
-        for item in split_items(request.form.get("additional_missing_items", "")):
+        for item in split_items(data.get("additional_missing_items", "")):
             db.session.add(
                 DocumentCheck(
                     student_id=student.id,
                     gate="Admission Handoff",
                     item_name=item,
                     status="Missing",
-                    evidence_reference=request.form.get("source_reference", ""),
+                    evidence_reference=data.get("source_reference", ""),
                 )
             )
         add_task(student.id, "Complete admission handoff missing items", "GS Staff", 3, 40)
@@ -579,28 +1037,30 @@ def handle_student_handoff() -> int:
         "student-handoff",
         student.id,
         "GS Staff",
-        request.form.get("source_reference", ""),
-        f"Monitoring record created from {request.form['admission_signal']}; {len(missing_items)} onboarding item(s) missing",
+        data.get("source_reference", ""),
+        f"Monitoring record created from {data['admission_signal']}; {len(missing_items)} onboarding item(s) missing",
         "GS Staff",
-        f"Program: {program.code}; Compared {len(submitted_onboarding)} received item(s) against {len(onboarding_requirements())} required item(s). Missing: {', '.join(missing_items) if missing_items else 'None'}",
+        f"Program: {program.code}; Compared {len(submitted_onboarding)} received item(s) against "
+        f"{len(onboarding_requirements())} required item(s). Missing: "
+        f"{', '.join(missing_items) if missing_items else 'None'}",
     )
     return student.id
 
 
-def handle_loa_decision() -> int:
-    student = Student.query.get_or_404(int(request.form["student_id"]))
-    request_type = request.form["request_type"]
-    dean_action = request.form.get("dean_action", "Approve")
-    start = parse_date(request.form.get("effective_start"))
-    end = parse_date(request.form.get("effective_end"))
-    source = request.form.get("source_reference", "")
-    note = request.form.get("notes", "")
+def handle_loa_decision(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    request_type = data["request_type"]
+    dean_action = data.get("dean_action", "Approve")
+    start = parse_date(data.get("effective_start"))
+    end = parse_date(data.get("effective_end"))
+    source = data.get("source_reference", "")
+    note = data.get("notes", "")
 
     if request_type == "LOA":
-        completed_terms = int(request.form.get("completed_terms") or 0)
-        loa_terms_used = int(request.form.get("loa_terms_used") or 0)
-        requested_terms = int(request.form.get("requested_terms") or 1)
-        has_reason = request.form.get("reason_document") == "yes"
+        completed_terms = int(data.get("completed_terms") or 0)
+        loa_terms_used = int(data.get("loa_terms_used") or 0)
+        requested_terms = int(data.get("requested_terms") or 1)
+        has_reason = data.get("reason_document") == "yes"
         within_limit = loa_terms_used + requested_terms <= 4
         has_residency = completed_terms >= 1
         eligible = has_reason and within_limit and has_residency
@@ -629,7 +1089,7 @@ def handle_loa_decision() -> int:
             add_task(student.id, "Complete LOA request requirements", "Student", 5, 35)
         note = f"{note}\nRule check: completed terms {completed_terms}, used LOA terms {loa_terms_used}, requested {requested_terms}."
     else:
-        submitted = set(request.form.getlist("readmission_items"))
+        submitted = set(data.getlist("readmission_items"))
         missing = [item for item in readmission_requirements() if item not in submitted]
         if not missing and dean_action == "Approve":
             student.current_stage = "Coursework" if student.current_stage == "LOA" else student.current_stage
@@ -653,17 +1113,17 @@ def handle_loa_decision() -> int:
     return student.id
 
 
-def handle_course_audit() -> int:
-    student = Student.query.get_or_404(int(request.form["student_id"]))
-    course = Course.query.get_or_404(int(request.form["course_id"]))
-    status = request.form["status"]
+def handle_course_audit(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    course = Course.query.get_or_404(int(data["course_id"]))
+    status = data["status"]
     existing = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
     if not existing:
         existing = CourseRecord(student_id=student.id, course_id=course.id)
         db.session.add(existing)
     existing.status = status
-    existing.term_label = request.form.get("term_label", "")
-    existing.evidence_reference = request.form.get("evidence_reference", "")
+    existing.term_label = data.get("term_label", "")
+    existing.evidence_reference = data.get("evidence_reference", "")
     existing.updated_at = now_utc()
 
     audit = compute_course_audit(student)
@@ -677,7 +1137,7 @@ def handle_course_audit() -> int:
         "course-audit",
         student.id,
         "Academic Coordinator",
-        request.form.get("evidence_reference", ""),
+        data.get("evidence_reference", ""),
         f"{course.code} marked {status}; {audit['missing_count']} subject(s) missing",
         "Academic Coordinator",
         "Course audit updated from monitoring signal.",
@@ -685,20 +1145,18 @@ def handle_course_audit() -> int:
     return student.id
 
 
-def handle_research_gate() -> int:
-    student = Student.query.get_or_404(int(request.form["student_id"]))
-    gate = request.form["gate"]
-    source = request.form.get("source_reference", "")
+def handle_research_gate(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    gate = data["gate"]
+    source = data.get("source_reference", "")
     required_items = required_documents_for_gate(gate)
-    package_text = request.form.get("submitted_package", "")
+    package_text = data.get("submitted_package", "")
     submitted_items = {
-        item.split("||", 1)[1]
-        for item in request.form.getlist("submitted_items")
-        if item.startswith(f"{gate}||")
+        item.split("||", 1)[1] for item in data.getlist("submitted_items") if item.startswith(f"{gate}||")
     }
     submitted_items.update(infer_submitted_research_items(gate, package_text))
     missing_items = [item for item in required_items if item not in submitted_items]
-    revision_required = request.form.get("revision_required") == "yes"
+    revision_required = data.get("revision_required") == "yes"
 
     if missing_items:
         result = "Missing Requirements"
@@ -718,7 +1176,7 @@ def handle_research_gate() -> int:
         research_case = ResearchCase(
             student_id=student.id,
             case_type="Dissertation" if "PhD" in student.program.name else "Thesis",
-            title=request.form.get("research_title", "").strip() or f"{student.program.code} graduate research case",
+            title=(data.get("research_title") or "").strip() or f"{student.program.code} graduate research case",
             current_gate=gate,
             status=result,
             adviser_name=student.adviser_name,
@@ -727,8 +1185,8 @@ def handle_research_gate() -> int:
     else:
         research_case.current_gate = gate
         research_case.status = result
-        if request.form.get("research_title"):
-            research_case.title = request.form["research_title"].strip()
+        if data.get("research_title"):
+            research_case.title = data["research_title"].strip()
 
     for item in required_items:
         status = "Missing" if item in missing_items else "Complete"
@@ -757,14 +1215,16 @@ def handle_research_gate() -> int:
         source,
         f"{gate}: {result}",
         next_owner,
-        f"Compared evidence package against {len(required_items)} required item(s). Detected: {', '.join(sorted(submitted_items)) if submitted_items else 'None'}. Missing: {', '.join(missing_items) if missing_items else 'None'}",
+        f"Compared evidence package against {len(required_items)} required item(s). Detected: "
+        f"{', '.join(sorted(submitted_items)) if submitted_items else 'None'}. Missing: "
+        f"{', '.join(missing_items) if missing_items else 'None'}",
     )
     return student.id
 
 
-def handle_panel_matching() -> int:
-    student = Student.query.get_or_404(int(request.form["student_id"]))
-    specialization = request.form.get("specialization", "").strip() or student.program.name
+def handle_panel_matching(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    specialization = (data.get("specialization") or "").strip() or student.program.name
     recommendations = recommend_panel(student, specialization)
     required_roles = panel_roles_for_student(student)
 
@@ -784,7 +1244,7 @@ def handle_panel_matching() -> int:
         "panel-matching",
         student.id,
         "Research Coordinator",
-        request.form.get("source_reference", ""),
+        data.get("source_reference", ""),
         f"{len(required_roles)}-member {research_case_type(student)} panel matched for {specialization}",
         "Research Coordinator",
         "; ".join(
@@ -798,12 +1258,12 @@ def handle_panel_matching() -> int:
     return student.id
 
 
-def handle_defense_scheduling() -> int:
-    student = Student.query.get_or_404(int(request.form["student_id"]))
-    preferred_date = parse_date(request.form["preferred_date"])
-    defense_type = request.form.get("defense_type", "Title Defense")
-    mode = request.form["mode"]
-    venue = request.form.get("venue", "")
+def handle_defense_scheduling(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    preferred_date = parse_date(data["preferred_date"])
+    defense_type = data.get("defense_type", "Title Defense")
+    mode = data["mode"]
+    venue = data.get("venue", "")
     panel = PanelAssignment.query.filter_by(student_id=student.id).all()
     panel_ids = [assignment.faculty_id for assignment in panel]
     required_panel_count = len(panel_roles_for_student(student))
@@ -834,7 +1294,8 @@ def handle_defense_scheduling() -> int:
         venue=venue,
         status=status,
         matched_count=matched_count,
-        notes=f"{defense_type}; {'; '.join(status_reason) if status_reason else 'all scheduling checks passed'}; {request.form.get('constraints', '')}",
+        notes=f"{defense_type}; {'; '.join(status_reason) if status_reason else 'all scheduling checks passed'}; "
+        f"{data.get('constraints', '')}",
         confirmed_at=now_utc() if status == "Confirmed" else None,
     )
     db.session.add(schedule)
@@ -851,7 +1312,7 @@ def handle_defense_scheduling() -> int:
         "defense-scheduling",
         student.id,
         "Research Coordinator",
-        request.form.get("source_reference", ""),
+        data.get("source_reference", ""),
         f"{defense_type} schedule {status}; {matched_count}/{required_panel_count} panel availability match(es)",
         next_owner,
         f"{mode}; {venue}; {'; '.join(status_reason) if status_reason else 'lead time and availability passed'}",
@@ -869,6 +1330,9 @@ TRANSACTION_HANDLERS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Domain rules / helpers
+# ---------------------------------------------------------------------------
 def split_items(value: str) -> list[str]:
     return [item.strip() for item in value.replace(",", "\n").splitlines() if item.strip()]
 
@@ -917,17 +1381,33 @@ def research_evidence_aliases(gate: str) -> dict[str, list[str]]:
     aliases = {
         "Form 1 - Application for Title Defense": ["form 1", "application for title defense"],
         "Three concept papers": ["three concept", "3 concept", "concept papers", "concept paper"],
-        "Academic Coordinator endorsement/e-signature": ["academic coordinator", "ac endorsement", "ac e-signature", "e-signature", "endorsed by ac"],
+        "Academic Coordinator endorsement/e-signature": [
+            "academic coordinator",
+            "ac endorsement",
+            "ac e-signature",
+            "e-signature",
+            "endorsed by ac",
+        ],
         "Recommended panel set": ["recommended panel", "panel recommendation", "panel set"],
         "Form 4 - Endorsement for Proposal Defense": ["form 4", "endorsement for proposal"],
         "Proposal manuscript": ["proposal manuscript", "proposal paper", "proposal draft"],
         "Adviser e-signature/endorsement": ["adviser endorsement", "adviser e-signature", "endorsed by adviser"],
-        "Form 4.1 Statistical Consultation Form or qualitative exemption": ["form 4.1", "statistical consultation", "qualitative exemption", "statistician"],
+        "Form 4.1 Statistical Consultation Form or qualitative exemption": [
+            "form 4.1",
+            "statistical consultation",
+            "qualitative exemption",
+            "statistician",
+        ],
         "Agreed defense schedule in Form 4": ["agreed schedule", "schedule in form 4", "defense schedule"],
         "Form 4 - Endorsement for Final Defense": ["form 4", "endorsement for final"],
         "Final manuscript": ["final manuscript", "final paper", "closed-door manuscript"],
         "Ethics Clearance": ["ethics clearance", "rerc clearance"],
-        "Panel received manuscript at least 14 days before defense": ["14-day", "14 day", "two weeks", "panel received manuscript"],
+        "Panel received manuscript at least 14 days before defense": [
+            "14-day",
+            "14 day",
+            "two weeks",
+            "panel received manuscript",
+        ],
         "Agreed final defense schedule": ["final defense schedule", "agreed final schedule"],
         "Soft copy of final manuscript": ["soft copy", "final manuscript"],
         "Panel approval emails": ["panel approval", "approval emails", "email approval"],
@@ -1071,11 +1551,17 @@ def recommend_panel(student: Student, specialization: str) -> list[dict]:
     return sorted(rows, key=lambda row: row["score"], reverse=True)
 
 
+# ---------------------------------------------------------------------------
+# Database reset + seed
+# ---------------------------------------------------------------------------
 def reset_database() -> None:
-    db.session.execute(text("SET FOREIGN_KEY_CHECKS=0"))
-    db.drop_all()
-    db.session.execute(text("SET FOREIGN_KEY_CHECKS=1"))
-    db.session.commit()
+    if is_mysql(db.engine.url.render_as_string(hide_password=True)):
+        db.session.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+        db.drop_all()
+        db.session.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+        db.session.commit()
+    else:
+        db.drop_all()
     db.create_all()
 
 
@@ -1169,73 +1655,22 @@ def seed_database(count: int = 350) -> None:
                 )
 
     first_names = [
-        "Ana",
-        "Ben",
-        "Carla",
-        "Daniel",
-        "Elise",
-        "Francis",
-        "Grace",
-        "Hector",
-        "Irene",
-        "Jon",
-        "Miguel",
-        "Patricia",
-        "Ramon",
-        "Lara",
-        "Joshua",
-        "Nicole",
-        "Martin",
-        "Camille",
-        "Rafael",
-        "Bianca",
-        "Adrian",
-        "Clarisse",
-        "Diane",
-        "Enrico",
-        "Fatima",
-        "Gian",
-        "Hazel",
-        "Isabel",
-        "Jerome",
-        "Katrina",
+        "Ana", "Ben", "Carla", "Daniel", "Elise", "Francis", "Grace", "Hector", "Irene", "Jon",
+        "Miguel", "Patricia", "Ramon", "Lara", "Joshua", "Nicole", "Martin", "Camille", "Rafael", "Bianca",
+        "Adrian", "Clarisse", "Diane", "Enrico", "Fatima", "Gian", "Hazel", "Isabel", "Jerome", "Katrina",
     ]
     last_names = [
-        "Santos",
-        "Reyes",
-        "Tan",
-        "Uy",
-        "Co",
-        "Lim",
-        "Ong",
-        "Yu",
-        "Flores",
-        "Pang",
-        "Alvarez",
-        "Bautista",
-        "Cabrera",
-        "Delos Reyes",
-        "Escobar",
-        "Fernandez",
-        "Garcia",
-        "Hernandez",
-        "Mendoza",
-        "Villanueva",
-        "Abad",
-        "Bernardo",
-        "Chua",
-        "Dizon",
-        "Evangelista",
-        "Francisco",
-        "Gonzales",
-        "Jacinto",
-        "Lacson",
-        "Navarro",
+        "Santos", "Reyes", "Tan", "Uy", "Co", "Lim", "Ong", "Yu", "Flores", "Pang",
+        "Alvarez", "Bautista", "Cabrera", "Delos Reyes", "Escobar", "Fernandez", "Garcia", "Hernandez",
+        "Mendoza", "Villanueva", "Abad", "Bernardo", "Chua", "Dizon", "Evangelista", "Francisco",
+        "Gonzales", "Jacinto", "Lacson", "Navarro",
     ]
     name_pairs = [(first, last) for first in first_names for last in last_names]
     random.shuffle(name_pairs)
     if count > len(name_pairs):
-        raise ValueError(f"Seed count {count} exceeds the {len(name_pairs)} unique generated student names available.")
+        raise ValueError(
+            f"Seed count {count} exceeds the {len(name_pairs)} unique generated student names available."
+        )
     stage_weights = [
         "Admission",
         "Coursework",
@@ -1289,7 +1724,13 @@ def seed_database(count: int = 350) -> None:
         for course_index, course in enumerate(program_courses):
             if stage in ["Admission", "LOA"] and course_index > 2:
                 continue
-            status = "Completed" if course_index < complete_cutoff else "Current" if course_index == complete_cutoff else "Missing"
+            status = (
+                "Completed"
+                if course_index < complete_cutoff
+                else "Current"
+                if course_index == complete_cutoff
+                else "Missing"
+            )
             if idx % 13 == 0 and course_index == 1:
                 status = "Incomplete"
             db.session.add(
@@ -1307,7 +1748,9 @@ def seed_database(count: int = 350) -> None:
                 student_id=student.id,
                 case_type="Dissertation" if "Doctor" in program.name else "Thesis",
                 title=f"{program.code} graduate research topic {idx}",
-                current_gate=random.choice(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense"]),
+                current_gate=random.choice(
+                    ["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense"]
+                ),
                 status=random.choice(["Ready", "Missing Requirements", "Revisions Required", "Verified Complete"]),
                 adviser_name=student.adviser_name,
                 opened_at=now_utc() - timedelta(days=random.randint(10, 180)),
@@ -1326,7 +1769,14 @@ def seed_database(count: int = 350) -> None:
                     )
 
         if idx % 4 == 0:
-            add_task(student.id, random.choice(["Verify missing evidence", "Follow up adviser decision", "Confirm next owner"]), "GS Staff", random.randint(-5, 10), random.randint(15, 60), "Overdue" if idx % 12 == 0 else "Pending")
+            add_task(
+                student.id,
+                random.choice(["Verify missing evidence", "Follow up adviser decision", "Confirm next owner"]),
+                "GS Staff",
+                random.randint(-5, 10),
+                random.randint(15, 60),
+                "Overdue" if idx % 12 == 0 else "Pending",
+            )
         if idx % 6 == 0:
             top_panel = random.sample(faculty_list, 3)
             for panel_index, faculty in enumerate(top_panel):
@@ -1367,8 +1817,10 @@ def seed_database(count: int = 350) -> None:
     db.session.commit()
 
 
+app = create_app()
+
+
 if __name__ == "__main__":
-    app = create_app()
     with app.app_context():
         db.create_all()
         seed_count = int(os.getenv("DEMO_SEED_COUNT", "350"))
@@ -1381,5 +1833,5 @@ if __name__ == "__main__":
             print(f"Database was empty, so {seed_count} demo students were seeded.")
 
     port = int(os.getenv("FLASK_PORT", "5000"))
-    print(f"USLS Graduate School Python demo running at http://localhost:{port}")
+    print(f"USLS Graduate School platform running at http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
