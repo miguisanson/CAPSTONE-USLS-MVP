@@ -4,7 +4,7 @@ A web platform for the University of St. La Salle Graduate School that consolida
 records, milestone events, scheduling, document checks, and follow-ups into one staff-friendly
 monitoring environment.
 
-- **Backend:** Python (Flask) JSON API — owns all models, business rules, and the source of truth.
+- **Backend:** Python (Flask) JSON API - owns all models, business rules, and the source of truth.
 - **Frontend:** React + Vite + Tailwind CSS single-page app (clean, light, institutional-green UI).
 - **Database:** zero-config **SQLite** by default; **MySQL** supported via `DATABASE_URL`.
 - **Charts:** Recharts. **Icons:** Lucide (SVG). **Fonts:** Poppins + Open Sans.
@@ -15,17 +15,17 @@ Six working workflows (transactions) drive the platform. Each one performs a rea
 writes SQL-backed records (students, enrollment, course evidence, document checks, panel
 assignments, schedule requests, tasks, and an activity trail):
 
-1. **Student Handoff** — creates the monitoring record and compares received onboarding evidence.
-2. **LOA / Readmission Decision** — checks residency rules or return evidence, then records the decision.
-3. **Course Audit** — maps completed/current/missing subjects against curriculum requirements.
-4. **Research Gate Readiness** — compares Form 1 / Form 4 / final / completion evidence with the protocol.
-5. **Panel Matching** — scores faculty by specialization, availability, college, and workload.
-6. **Defense Scheduling** — checks panel availability and protocol lead-time before confirming.
+1. **Student Handoff** - creates the monitoring record and compares received onboarding evidence.
+2. **LOA / Readmission Decision** - checks residency rules or return evidence, then records the decision.
+3. **Course Audit** - maps completed/current/missing subjects against curriculum requirements.
+4. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
+5. **Panel Matching** - scores faculty by specialization, availability, college, and workload.
+6. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
 
 On top of the transactions: a **Dashboard** (transaction-derived KPIs + charts), a **Students**
 directory with a full lifecycle record view, a role-filtered **Work Queue**, and an **Activity Log**.
 
-## Tech Stack (current)
+## Tech Stack
 
 **Frontend**
 - React 18 (UI library, written in JSX)
@@ -41,7 +41,7 @@ directory with a full lifecycle record view, a role-filtered **Work Queue**, and
 - python-dotenv (config), PyMySQL (only when using MySQL)
 
 **Database**
-- SQLite by default (local file, zero setup) — MySQL 8 optional via `DATABASE_URL`
+- SQLite by default (local file, zero setup) - MySQL 8 optional via `DATABASE_URL`
 
 **Tooling**
 - npm + Node.js (frontend), pip (Python), Git
@@ -52,25 +52,77 @@ directory with a full lifecycle record view, a role-filtered **Work Queue**, and
 ## Requirements
 
 - Python 3.11+
-- Node.js 18+ and npm (to build the React frontend)
-- MySQL 8 is **optional** — only needed if you set `DATABASE_URL`.
+- Node.js 18+ and npm
+- Git
+- MySQL 8 is **optional** and only needed if you set `DATABASE_URL`.
 
-## Run It (two npm commands)
+## Install and Run
 
-Run these from the project root in cmd (or any terminal):
+### 1. Get the project
+
+Clone the repository, then open the project folder:
 
 ```cmd
-npm run setup     :: first time only — installs Python + frontend deps, builds the UI, seeds the DB
-npm run dev       :: every time after that — starts the platform on http://localhost:5000
+git clone <repository-url>
+cd CAPSTONE-USLS-MVP
 ```
 
-Then open <http://localhost:5000>. Press `Ctrl+C` to stop.
+If you already downloaded or extracted the project, just open a terminal in the project root.
+
+### 2. Optional: create a Python virtual environment
+
+This keeps the Python packages for this project separate from your system Python.
+
+Windows:
+
+```cmd
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+macOS / Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies, build the frontend, and seed the database
+
+Run this once from the project root:
+
+```cmd
+npm run setup
+```
+
+This command installs the Python dependencies, installs the React frontend dependencies, builds
+the frontend, and creates the demo SQLite database with seed data.
+
+### 4. Start the app
+
+```cmd
+npm run dev
+```
+
+Then open <http://localhost:5000>. Press `Ctrl+C` in the terminal to stop the server.
+
+### Development with frontend hot reload
+
+For normal demo/use, `npm run dev` is enough. If you are editing React files and want Vite hot
+reload, run both commands in two terminals:
+
+```cmd
+npm run dev
+npm run dev:web
+```
+
+Open the Vite app at <http://localhost:5173>. The Flask API still runs on <http://localhost:5000>.
 
 ### All available npm scripts
 
 | Command | What it does |
 |---|---|
-| `npm run setup` | One-time setup: pip install → npm install → build UI → seed database |
+| `npm run setup` | One-time setup: pip install -> npm install -> build UI -> seed database |
 | `npm run dev` | Start the app (Flask serves the API + built UI on port 5000) |
 | `npm start` | Same as `npm run dev` |
 | `npm run build` | Rebuild the frontend after changing UI code |
@@ -81,20 +133,20 @@ Then open <http://localhost:5000>. Press `Ctrl+C` to stop.
 
 ## Database
 
-By default the app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no setup.
-To use MySQL instead, set in `.env`:
+By default the app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no database
+server setup. To use MySQL instead, set this in `.env`:
 
 ```env
 DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
 ```
 
-Reseed anytime (resets data, creates ~350 synthetic students plus related records):
+Reseed anytime. This resets data and creates about 350 synthetic students plus related records:
 
 ```cmd
 npm run seed
 ```
 
-Change `DEMO_SEED_COUNT` in `.env` to seed 200–500 records.
+Change `DEMO_SEED_COUNT` in `.env` to seed 200-500 records.
 
 ## Project Structure
 
@@ -106,7 +158,7 @@ CAPSTONE-USLS-MVP/
       pages/             Dashboard, Students, StudentDetail, WorkQueue, ActivityLog, WorkflowPage
       components/        Layout (sidebar/topbar), UI primitives, forms, StudentPicker
       api.js, hooks.js, lib/format.js
-    dist/                Production build (served by Flask) — git-ignored
+    dist/                Production build (served by Flask) - git-ignored
   Documents/             Proposal, meeting notes, transaction list, school forms
   package.json           npm scripts (setup / dev / build / seed)
   requirements.txt       Python dependencies
