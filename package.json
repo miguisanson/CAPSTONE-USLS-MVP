@@ -1,0 +1,17 @@
+{
+  "name": "capstone-usls-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Graduate Student Lifecycle Monitoring and Analytics Platform — Flask JSON API + React (Vite + Tailwind) UI for the USLS Graduate School",
+  "scripts": {
+    "setup": "npm run install:python && npm run install:web && npm run build:web && npm run seed",
+    "install:python": "python -m pip install -r requirements.txt",
+    "install:web": "npm --prefix frontend install",
+    "build:web": "npm --prefix frontend run build",
+    "build": "npm run build:web",
+    "seed": "python app.py --seed",
+    "dev": "python app.py",
+    "start": "python app.py",
+    "dev:web": "npm --prefix frontend run dev"
+  }
+}
