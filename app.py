@@ -2246,7 +2246,13 @@ def seed_database(count: int = 350) -> None:
         if idx % 4 == 0:
             add_task(
                 student.id,
-                random.choice(["Verify missing evidence", "Follow up adviser decision", "Confirm next owner"]),
+                random.choice([
+                    "Verify submitted requirements",
+                    "Follow up on the adviser's decision",
+                    "Request the missing document",
+                    "Route the case to the next reviewer",
+                    "Check the student's readiness to advance",
+                ]),
                 "GS Staff",
                 random.randint(-5, 10),
                 random.randint(15, 60),
