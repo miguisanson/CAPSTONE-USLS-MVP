@@ -69,7 +69,31 @@ cd CAPSTONE-USLS-MVP
 
 If you already downloaded or extracted the project, just open a terminal in the project root.
 
-### 2. Install dependencies, build the frontend, and seed the database
+### 2. Set up the database
+
+The app uses **SQLite by default**, so there is no separate database server to install for the
+standard setup. Python includes SQLite support, and `npm run setup` will create the local
+`usls_gs_demo.sqlite3` database file automatically.
+
+If you want to use **MySQL** instead of SQLite:
+
+1. Install MySQL 8 and start the MySQL server.
+2. Create a database for the app:
+
+```sql
+CREATE DATABASE usls_gs_demo;
+```
+
+3. Create or update the `.env` file in the project root with your MySQL connection string:
+
+```env
+DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
+```
+
+Replace `root`, `1234`, `localhost`, and `usls_gs_demo` with your actual MySQL username,
+password, host, and database name.
+
+### 3. Install dependencies, build the frontend, and seed the database
 
 Run this once from the project root:
 
@@ -80,7 +104,7 @@ npm run setup
 This command installs the Python dependencies, installs the React frontend dependencies, builds
 the frontend, and creates the demo SQLite database with seed data.
 
-### 3. Start the app
+### 4. Start the app
 
 ```cmd
 npm run dev
@@ -113,10 +137,10 @@ Open the Vite app at <http://localhost:5173>. The Flask API still runs on <http:
 
 > If you change anything under `frontend/src`, run `npm run build` (or use `npm run dev:web`) to see it.
 
-## 4. Database
+## Database
 
 By default the app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no database
-server setup. To use MySQL instead, set this in `.env`:
+server setup. To use MySQL instead, install MySQL 8, create a database, and set this in `.env`:
 
 ```env
 DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
