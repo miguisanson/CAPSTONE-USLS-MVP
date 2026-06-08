@@ -20,10 +20,15 @@ db = SQLAlchemy()
 
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 
+# This demo keeps the Flask API, SQLAlchemy models, workflow rules, RAG prototype,
+# and seed data in one file so evaluators can trace a workflow end-to-end quickly.
+
 
 # ---------------------------------------------------------------------------
 # Transaction catalogue (source of truth for the workflow screens)
 # ---------------------------------------------------------------------------
+# Each entry here is exposed through /api/meta and drives the frontend workflow
+# navigation. The slug must match a handler in TRANSACTION_HANDLERS below.
 TRANSACTIONS = [
     {
         "slug": "student-handoff",
@@ -89,6 +94,7 @@ TRANSACTIONS = [
 
 TRANSACTION_BY_SLUG = {item["slug"]: item for item in TRANSACTIONS}
 
+# Ordered lifecycle labels used by the student detail timeline and dashboard.
 STAGES = [
     "Admission",
     "Coursework",
@@ -101,6 +107,8 @@ STAGES = [
     "Completed",
 ]
 
+# Colleges are shared by programs and faculty so panel matching can prefer
+# same-college evaluators while still allowing cross-college matches.
 COLLEGES = [
     "Arts and Sciences",
     "Business",
@@ -110,6 +118,9 @@ COLLEGES = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# App configuration helpers
+# ---------------------------------------------------------------------------
 def now_utc() -> datetime:
     return datetime.now()
 
@@ -184,6 +195,8 @@ def create_app() -> Flask:
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
+# The schema is intentionally compact for the MVP. It stores monitoring signals
+# and workflow outcomes, not official registrar/accounting records.
 class Program(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(30), unique=True, nullable=False)
@@ -195,6 +208,8 @@ class Program(db.Model):
     students = db.relationship("Student", backref="program", lazy=True)
 
 
+# Central student lifecycle record. Related tables hang off this record so the
+# detail page can reconstruct coursework, documents, tasks, schedules, and logs.
 class Student(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_number = db.Column(db.String(40), unique=True, nullable=False)
@@ -238,6 +253,7 @@ class Course(db.Model):
     recommended_term = db.Column(db.String(40), default="Year 1")
 
 
+# Term-level enrollment signal copied from an institutional source such as AIMS.
 class TermEnrollment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
@@ -249,6 +265,7 @@ class TermEnrollment(db.Model):
     term = db.relationship("AcademicTerm")
 
 
+# Monitoring copy of a student's subject status against the program curriculum.
 class CourseRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
@@ -261,6 +278,7 @@ class CourseRecord(db.Model):
     course = db.relationship("Course")
 
 
+# Research milestone container for thesis, dissertation, or project-paper cases.
 class ResearchCase(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
@@ -272,6 +290,7 @@ class ResearchCase(db.Model):
     opened_at = db.Column(db.DateTime, default=now_utc)
 
 
+# Checklist-style evidence tracking per lifecycle gate or research milestone.
 class DocumentCheck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
@@ -282,6 +301,7 @@ class DocumentCheck(db.Model):
     updated_at = db.Column(db.DateTime, default=now_utc)
 
 
+# Faculty reference data used by panel matching and scheduling availability.
 class Faculty(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -293,6 +313,7 @@ class Faculty(db.Model):
     availabilities = db.relationship("FacultyAvailability", backref="faculty", lazy=True, cascade="all, delete-orphan")
 
 
+# Date/time windows that make defense scheduling checkable in the demo.
 class FacultyAvailability(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"), nullable=False)
@@ -301,6 +322,7 @@ class FacultyAvailability(db.Model):
     end_time = db.Column(db.Time, nullable=False)
 
 
+# Result of the panel matching transaction, including the rule score shown to users.
 class PanelAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
@@ -314,6 +336,7 @@ class PanelAssignment(db.Model):
     faculty = db.relationship("Faculty")
 
 
+# Defense scheduling request and computed confirmation status.
 class ScheduleRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
@@ -329,6 +352,7 @@ class ScheduleRequest(db.Model):
     student = db.relationship("Student")
 
 
+# Work queue item. Tasks represent the next owner and next action after a transaction.
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
@@ -339,6 +363,7 @@ class Task(db.Model):
     priority = db.Column(db.Integer, default=10)
 
 
+# Append-style activity record for transactions and accountability demos.
 class TransactionLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     transaction_slug = db.Column(db.String(80), nullable=False)
@@ -354,6 +379,8 @@ class TransactionLog(db.Model):
 # ---------------------------------------------------------------------------
 # Serializers
 # ---------------------------------------------------------------------------
+# These helpers shape SQLAlchemy objects into stable JSON contracts for React.
+# Keeping them separate from routes makes the API response shape easy to review.
 def iso(value) -> str | None:
     if value is None:
         return None
@@ -527,6 +554,11 @@ def student_indicators(student: Student) -> dict:
     ).order_by(Task.due_at.asc()).all()
     overdue = [t for t in open_tasks if t.due_at < date.today()]
     max_overdue_days = max(((date.today() - t.due_at).days for t in overdue), default=0)
+    upcoming = [t for t in open_tasks if t.due_at >= date.today()]
+    next_due_days = min(((t.due_at - date.today()).days for t in upcoming), default=None)
+    next_upcoming_title = (
+        sorted(upcoming, key=lambda t: t.due_at)[0].title if upcoming else None
+    )
     case = (
         ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
     )
@@ -762,6 +794,8 @@ def portfolio_recommendations(limit: int = 150) -> dict:
 # Generation: Google AI Studio when a key is set; otherwise an offline grounded
 # responder so the feature is fully demonstrable without any external service.
 # ---------------------------------------------------------------------------
+# For the MVP, the "retrieval corpus" is a curated in-code set of policy snippets.
+# A production version would ingest approved DOCX/PDF/XLSX documents into chunks.
 POLICY_SNIPPETS = [
     {"id": "loa-residency", "title": "Leave of Absence & Residency", "source": "GS Research Protocol / Handbook",
      "tags": ["loa", "leave", "residency", "terms", "pause", "eligible", "eligibility"],
@@ -928,6 +962,8 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
     payload = student_recommendations(student) if student else None
     snippets = retrieve_policy(question, k=3)
 
+    # The assistant is advisory only: it retrieves policy snippets and explains
+    # backend-computed facts. It never changes records or approves decisions.
     api_key = os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     mode = "offline"
     if api_key:
@@ -954,10 +990,12 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
 # Routes (JSON API + SPA hosting)
 # ---------------------------------------------------------------------------
 def register_routes(app: Flask) -> None:
+    # Lightweight smoke-check endpoint for setup/demo verification.
     @app.route("/api/health")
     def health():
         return jsonify({"status": "ok", "students": Student.query.count()})
 
+    # Shared reference data used to render filters, dropdowns, and workflow cards.
     @app.route("/api/meta")
     def meta():
         programs = Program.query.order_by(Program.college, Program.name).all()
@@ -974,10 +1012,12 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
     def dashboard():
         return jsonify(dashboard_stats())
 
+    # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
     def students_list():
         query = Student.query.join(Program)
@@ -1026,6 +1066,8 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    # Full student profile: lifecycle stage, audit, research, docs, panel,
+    # schedules, tasks, activity trail, and decision-support recommendations.
     @app.route("/api/students/<int:student_id>")
     def student_detail(student_id: int):
         student = Student.query.get_or_404(student_id)
@@ -1094,6 +1136,7 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    # Role-filterable work queue.
     @app.route("/api/tasks")
     def tasks_list():
         owner = request.args.get("owner", "").strip()
@@ -1103,6 +1146,7 @@ def register_routes(app: Flask) -> None:
         tasks = query.order_by(Task.priority.desc(), Task.due_at.asc()).limit(100).all()
         return jsonify({"items": [task_dict(t) for t in tasks]})
 
+    # Human-facing audit feed; generated seed history is hidden for clarity.
     @app.route("/api/activity")
     def activity():
         logs = (
@@ -1113,15 +1157,18 @@ def register_routes(app: Flask) -> None:
         )
         return jsonify({"items": [log_dict(l) for l in logs]})
 
+    # Faculty reference endpoint for panels and scheduling.
     @app.route("/api/faculty")
     def faculty_list():
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_dict(f) for f in faculty]})
 
+    # Population-level queue of rule-based recommendations.
     @app.route("/api/decision-support")
     def decision_support():
         return jsonify(portfolio_recommendations())
 
+    # RAG-style policy/case guidance endpoint.
     @app.route("/api/assistant", methods=["POST"])
     def assistant():
         data = request_payload()
@@ -1135,6 +1182,7 @@ def register_routes(app: Flask) -> None:
             student_id = None
         return jsonify(generate_answer(question, student_id))
 
+    # Starter questions for the Assistant UI.
     @app.route("/api/assistant/suggestions")
     def assistant_suggestions():
         return jsonify({
@@ -1147,6 +1195,8 @@ def register_routes(app: Flask) -> None:
             ]
         })
 
+    # Supplies each workflow screen with student-specific context before
+    # submission, such as current audit status or panel recommendations.
     @app.route("/api/transactions/<slug>/context")
     def transaction_context(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
@@ -1155,6 +1205,8 @@ def register_routes(app: Flask) -> None:
         specialization = request.args.get("specialization", "")
         return jsonify(serialize_transaction_context(slug, student_id, specialization))
 
+    # Single transaction entry point. The slug selects the workflow handler,
+    # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
     def transaction_submit(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
@@ -1208,6 +1260,8 @@ def register_routes(app: Flask) -> None:
 # Payload helper (works for both JSON bodies and classic form posts)
 # ---------------------------------------------------------------------------
 def request_payload() -> MultiDict:
+    # Workflow forms submit JSON from React, but MultiDict keeps list-handling
+    # compatible with classic Flask form posts and getlist().
     if request.is_json:
         body = request.get_json(silent=True) or {}
         md = MultiDict()
@@ -1225,6 +1279,8 @@ def request_payload() -> MultiDict:
 # Analytics
 # ---------------------------------------------------------------------------
 def dashboard_stats() -> dict:
+    # The dashboard intentionally uses live SQL aggregates instead of cached
+    # values so every completed workflow is visible immediately during the demo.
     total_students = Student.query.count()
     active_students = Student.query.filter(Student.standing == "Active").count()
     on_leave = Student.query.filter(Student.standing == "On Leave").count()
@@ -1319,6 +1375,8 @@ def dashboard_stats() -> dict:
 # Transaction context (data needed by each workflow screen)
 # ---------------------------------------------------------------------------
 def serialize_transaction_context(slug: str, selected_student_id: int | None, specialization: str = "") -> dict:
+    # Context responses are read-only preparation data for workflow screens.
+    # The actual record changes happen only in the transaction handlers.
     selected_student = None
     if slug != "student-handoff" and selected_student_id:
         selected_student = Student.query.get(selected_student_id)
@@ -1422,6 +1480,8 @@ def student_search_label(student: Student | None) -> str:
 
 
 def add_log(slug: str, student_id: int | None, actor: str, source: str, result: str, next_owner: str, notes: str) -> None:
+    # Every workflow records what happened, who acted, where the evidence came
+    # from, and who owns the next action.
     db.session.add(
         TransactionLog(
             transaction_slug=slug,
@@ -1436,6 +1496,7 @@ def add_log(slug: str, student_id: int | None, actor: str, source: str, result: 
 
 
 def add_task(student_id: int, title: str, owner: str, days: int, priority: int = 20, status: str = "Pending") -> None:
+    # Tasks make workflow follow-ups visible in the Work Queue.
     db.session.add(
         Task(
             student_id=student_id,
@@ -1452,6 +1513,8 @@ def add_task(student_id: int, title: str, owner: str, days: int, priority: int =
 # Transaction handlers (now accept a MultiDict payload from JSON or form)
 # ---------------------------------------------------------------------------
 def handle_student_handoff(data: MultiDict) -> int:
+    # Intake transaction: create the monitoring record, mirror the enrollment
+    # signal, compare onboarding evidence, and open a follow-up if anything is missing.
     program = Program.query.get(int(data["program_id"]))
     count = Student.query.count() + 1
     student_number = (data.get("student_number") or "").strip() or f"2026-{count:04d}"
@@ -1523,6 +1586,8 @@ def handle_student_handoff(data: MultiDict) -> int:
 
 
 def handle_loa_decision(data: MultiDict) -> int:
+    # Standing transaction: one handler covers both LOA and readmission because
+    # the UI routes both requests through the same Dean decision flow.
     student = Student.query.get_or_404(int(data["student_id"]))
     request_type = data["request_type"]
     dean_action = data.get("dean_action", "Approve")
@@ -1532,6 +1597,8 @@ def handle_loa_decision(data: MultiDict) -> int:
     note = data.get("notes", "")
 
     if request_type == "LOA":
+        # Demo LOA rule: student needs a reason document, at least one completed
+        # term, and no more than four total LOA terms.
         completed_terms = int(data.get("completed_terms") or 0)
         loa_terms_used = int(data.get("loa_terms_used") or 0)
         requested_terms = int(data.get("requested_terms") or 1)
@@ -1564,6 +1631,8 @@ def handle_loa_decision(data: MultiDict) -> int:
             add_task(student.id, "Complete LOA request requirements", "Student", 5, 35)
         note = f"{note}\nRule check: completed terms {completed_terms}, used LOA terms {loa_terms_used}, requested {requested_terms}."
     else:
+        # Readmission is evidence-driven: complete checklist + Dean approval
+        # returns the student to active monitoring.
         submitted = set(data.getlist("readmission_items"))
         missing = [item for item in readmission_requirements() if item not in submitted]
         if not missing and dean_action == "Approve":
@@ -1589,6 +1658,8 @@ def handle_loa_decision(data: MultiDict) -> int:
 
 
 def handle_course_audit(data: MultiDict) -> int:
+    # Coursework transaction: upsert one subject status, then recompute the whole
+    # curriculum audit to determine risk and readiness.
     student = Student.query.get_or_404(int(data["student_id"]))
     course = Course.query.get_or_404(int(data["course_id"]))
     status = data["status"]
@@ -1621,6 +1692,8 @@ def handle_course_audit(data: MultiDict) -> int:
 
 
 def handle_research_gate(data: MultiDict) -> int:
+    # Research gate transaction: compare submitted evidence against the selected
+    # protocol checklist and route missing/revision work to the next owner.
     student = Student.query.get_or_404(int(data["student_id"]))
     gate = data["gate"]
     source = data.get("source_reference", "")
@@ -1698,6 +1771,8 @@ def handle_research_gate(data: MultiDict) -> int:
 
 
 def handle_panel_matching(data: MultiDict) -> int:
+    # Panel transaction: replace the current assignment with the highest-scoring
+    # faculty recommendations for the student's required panel roles.
     student = Student.query.get_or_404(int(data["student_id"]))
     specialization = (data.get("specialization") or "").strip() or student.program.name
     recommendations = recommend_panel(student, specialization)
@@ -1734,6 +1809,8 @@ def handle_panel_matching(data: MultiDict) -> int:
 
 
 def handle_defense_scheduling(data: MultiDict) -> int:
+    # Scheduling transaction: confirm only when the assigned panel is complete,
+    # enough members are available, and the required lead time is met.
     student = Student.query.get_or_404(int(data["student_id"]))
     preferred_date = parse_date(data["preferred_date"])
     defense_type = data.get("defense_type", "Title Defense")
@@ -1809,6 +1886,7 @@ TRANSACTION_HANDLERS = {
 # Domain rules / helpers
 # ---------------------------------------------------------------------------
 def split_items(value: str) -> list[str]:
+    # Accept either comma-separated or newline-separated checklist additions.
     return [item.strip() for item in value.replace(",", "\n").splitlines() if item.strip()]
 
 
@@ -1819,6 +1897,8 @@ def parse_date(value: str | None) -> date:
 
 
 def required_documents_for_gate(gate: str) -> list[str]:
+    # Prototype research protocol checklist. The Research Gate workflow uses
+    # these items as the source of truth for missing/complete evidence.
     if gate == "Form 1 - Title Defense":
         return [
             "Form 1 - Application for Title Defense",
@@ -1853,6 +1933,8 @@ def required_documents_for_gate(gate: str) -> list[str]:
 
 
 def research_evidence_aliases(gate: str) -> dict[str, list[str]]:
+    # Loose aliases let the demo infer checklist items from free-text package
+    # notes without requiring exact document names.
     aliases = {
         "Form 1 - Application for Title Defense": ["form 1", "application for title defense"],
         "Three concept papers": ["three concept", "3 concept", "concept papers", "concept paper"],
@@ -1903,6 +1985,7 @@ def infer_submitted_research_items(gate: str, package_text: str) -> set[str]:
 
 
 def research_case_type(student: Student) -> str:
+    # Program metadata decides which research track and panel size applies.
     name = student.program.name.lower()
     if "doctor" in name or "phd" in name:
         return "Dissertation"
@@ -1912,6 +1995,8 @@ def research_case_type(student: Student) -> str:
 
 
 def panel_roles_for_student(student: Student) -> list[str]:
+    # Required roles are derived from the case type, then used by panel matching
+    # and defense scheduling.
     case_type = research_case_type(student)
     if case_type == "Project Paper":
         return ["Panel Chair", "Content Specialist", "Method Specialist"]
@@ -1921,12 +2006,14 @@ def panel_roles_for_student(student: Student) -> list[str]:
 
 
 def defense_lead_days(defense_type: str) -> int:
+    # Lead-time rule used by scheduling confirmation.
     if defense_type == "Public Final Defense":
         return 5
     return 14
 
 
 def onboarding_requirements() -> list[str]:
+    # Intake checklist for creating a complete Graduate School monitoring record.
     return [
         "Admission approval",
         "Student profile sheet",
@@ -1937,6 +2024,7 @@ def onboarding_requirements() -> list[str]:
 
 
 def readmission_requirements() -> list[str]:
+    # Return checklist for moving a student from LOA back to active monitoring.
     return [
         "Return intent letter",
         "Updated study plan",
@@ -1946,6 +2034,8 @@ def readmission_requirements() -> list[str]:
 
 
 def compute_course_audit(student: Student) -> dict:
+    # Builds the student's curriculum picture from required program subjects and
+    # recorded subject statuses.
     required_courses = Course.query.filter_by(program_id=student.program_id).order_by(Course.code).all()
     records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
     completed = []
@@ -1978,6 +2068,8 @@ def compute_course_audit(student: Student) -> dict:
 
 
 def compute_offering_demand() -> list[dict]:
+    # Planning helper: counts which missing subjects appear most often among
+    # active students, useful for course offering discussions.
     demand: dict[int, dict] = {}
     students = Student.query.filter(Student.standing == "Active").limit(500).all()
     for student in students:
@@ -1992,6 +2084,8 @@ def compute_offering_demand() -> list[dict]:
 
 
 def recommend_panel(student: Student, specialization: str) -> list[dict]:
+    # Scoring model for the demo: same college, specialization match, upcoming
+    # availability, and lower current workload all improve the recommendation.
     specialization = specialization.lower().strip()
     faculty_members = Faculty.query.filter_by(active=True).all()
     rows = []
@@ -2030,6 +2124,7 @@ def recommend_panel(student: Student, specialization: str) -> list[dict]:
 # Database reset + seed
 # ---------------------------------------------------------------------------
 def reset_database() -> None:
+    # MySQL requires temporarily disabling FK checks before dropping related tables.
     if is_mysql(db.engine.url.render_as_string(hide_password=True)):
         db.session.execute(text("SET FOREIGN_KEY_CHECKS=0"))
         db.drop_all()
@@ -2041,6 +2136,8 @@ def reset_database() -> None:
 
 
 def seed_database(count: int = 350) -> None:
+    # Deterministic seed data keeps demos repeatable while still showing varied
+    # stages, risks, documents, panels, schedules, and activity history.
     reset_database()
     random.seed(20260603)
 
@@ -2164,6 +2261,8 @@ def seed_database(count: int = 350) -> None:
     faculty_list = Faculty.query.all()
 
     for idx in range(1, count + 1):
+        # Each generated student receives enough related records to exercise the
+        # dashboards, student detail view, work queue, and workflow context screens.
         program = programs[idx % len(programs)]
         stage = random.choice(stage_weights)
         risk = "High" if idx % 17 == 0 else "Medium" if idx % 5 == 0 or stage == "LOA" else "Low"
