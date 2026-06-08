@@ -69,25 +69,7 @@ cd CAPSTONE-USLS-MVP
 
 If you already downloaded or extracted the project, just open a terminal in the project root.
 
-### 2. Optional: create a Python virtual environment
-
-This keeps the Python packages for this project separate from your system Python.
-
-Windows:
-
-```cmd
-python -m venv .venv
-.venv\Scripts\activate
-```
-
-macOS / Linux:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 3. Install dependencies, build the frontend, and seed the database
+### 2. Install dependencies, build the frontend, and seed the database
 
 Run this once from the project root:
 
@@ -98,7 +80,7 @@ npm run setup
 This command installs the Python dependencies, installs the React frontend dependencies, builds
 the frontend, and creates the demo SQLite database with seed data.
 
-### 4. Start the app
+### 3. Start the app
 
 ```cmd
 npm run dev
@@ -131,7 +113,7 @@ Open the Vite app at <http://localhost:5173>. The Flask API still runs on <http:
 
 > If you change anything under `frontend/src`, run `npm run build` (or use `npm run dev:web`) to see it.
 
-## Database
+## 4. Database
 
 By default the app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no database
 server setup. To use MySQL instead, set this in `.env`:
