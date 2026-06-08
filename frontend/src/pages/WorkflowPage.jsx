@@ -132,6 +132,7 @@ export default function WorkflowPage() {
               <StudentPicker
                 value={studentId}
                 selectedLabel={studentLabel}
+                meta={meta}
                 onChange={(id, label) => {
                   setStudentId(id);
                   setStudentLabel(label || "");

@@ -42,3 +42,6 @@ deploy/
 
 # Ignore accidental nested copies of this repository
 CAPSTONE-USLS-MVP/
+
+# Temporary document-build scratch folder
+_handout/
