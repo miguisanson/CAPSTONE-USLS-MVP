@@ -6,6 +6,8 @@ import StudentDetail from "./pages/StudentDetail";
 import WorkQueue from "./pages/WorkQueue";
 import ActivityLog from "./pages/ActivityLog";
 import WorkflowPage from "./pages/WorkflowPage";
+import DecisionSupport from "./pages/DecisionSupport";
+import Assistant from "./pages/Assistant";
 
 export default function App() {
   return (
@@ -16,6 +18,8 @@ export default function App() {
         <Route path="/students/:id" element={<StudentDetail />} />
         <Route path="/work-queue" element={<WorkQueue />} />
         <Route path="/activity" element={<ActivityLog />} />
+        <Route path="/decision-support" element={<DecisionSupport />} />
+        <Route path="/assistant" element={<Assistant />} />
         <Route path="/workflow/:slug" element={<WorkflowPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

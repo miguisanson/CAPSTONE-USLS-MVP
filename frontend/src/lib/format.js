@@ -63,6 +63,12 @@ export function initials(name = "") {
 }
 
 // Brand-aligned chart palette.
+export const SEVERITY = {
+  high: { label: "High", badge: "bg-red-50 text-red-700 ring-red-200", bar: "bg-red-500", dot: "bg-red-500" },
+  medium: { label: "Medium", badge: "bg-amber-50 text-amber-700 ring-amber-200", bar: "bg-amber-500", dot: "bg-amber-500" },
+  low: { label: "Low", badge: "bg-brand-50 text-brand-700 ring-brand-200", bar: "bg-brand-500", dot: "bg-brand-500" },
+};
+
 export const CHART_COLORS = ["#0f7a44", "#1c9a59", "#3fb673", "#71d094", "#a6e4ba", "#138096", "#f59e0b", "#ef4444"];
 export const RISK_COLORS = { Low: "#1c9a59", Medium: "#f59e0b", High: "#ef4444" };
 export const SCHEDULE_COLORS = { Confirmed: "#0f7a44", "Needs Availability": "#f59e0b", Rescheduled: "#3b82f6" };

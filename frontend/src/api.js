@@ -39,4 +39,8 @@ export const api = {
   },
   submitTransaction: (slug, payload) =>
     request(`/transactions/${slug}`, { method: "POST", body: JSON.stringify(payload) }),
+  decisionSupport: () => request("/decision-support"),
+  assistant: (question, studentId) =>
+    request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),
+  assistantSuggestions: () => request("/assistant/suggestions"),
 };

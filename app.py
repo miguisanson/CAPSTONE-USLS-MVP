@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import random
+import re
 import sys
 from datetime import date, datetime, time, timedelta
 from urllib.parse import urlparse
@@ -510,6 +511,446 @@ def log_dict(log: TransactionLog) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Module 5 — Prescriptive decision support (rule-based, computed in the backend)
+# ---------------------------------------------------------------------------
+# These indicators + recommendations are the SOURCE OF TRUTH. They are computed
+# deterministically from recorded transactions, never by the assistant/LLM.
+STALL_WARN_DAYS = 120
+STALL_HIGH_DAYS = 210
+
+
+def student_indicators(student: Student) -> dict:
+    """Computed indicators for one student (Table 13 in the proposal)."""
+    audit = compute_course_audit(student)
+    open_tasks = Task.query.filter(
+        Task.student_id == student.id, Task.status.in_(["Pending", "Overdue"])
+    ).order_by(Task.due_at.asc()).all()
+    overdue = [t for t in open_tasks if t.due_at < date.today()]
+    max_overdue_days = max(((date.today() - t.due_at).days for t in overdue), default=0)
+    case = (
+        ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+    )
+    missing_docs = DocumentCheck.query.filter_by(student_id=student.id, status="Missing").count()
+    sched = (
+        ScheduleRequest.query.filter_by(student_id=student.id).order_by(ScheduleRequest.created_at.desc()).first()
+    )
+    last_log = (
+        TransactionLog.query.filter_by(student_id=student.id).order_by(TransactionLog.created_at.desc()).first()
+    )
+    anchor = student.updated_at or student.created_at or now_utc()
+    days_in_stage = max((now_utc() - anchor).days, 0)
+    next_owner = (last_log.next_owner if last_log else None) or (open_tasks[0].owner_role if open_tasks else None)
+    return {
+        "stage": student.current_stage,
+        "standing": student.standing,
+        "risk": student.risk_level,
+        "completion_rate": audit["completion_rate"],
+        "missing_subjects": audit["missing_count"],
+        "open_tasks": len(open_tasks),
+        "overdue_tasks": len(overdue),
+        "max_overdue_days": max_overdue_days,
+        "research_gate": case.current_gate if case else None,
+        "research_status": case.status if case else None,
+        "missing_documents": missing_docs,
+        "schedule_status": sched.status if sched else None,
+        "days_in_stage": days_in_stage,
+        "next_owner": next_owner,
+    }
+
+
+# Priority score = weighted urgency, so same-severity items can be ranked.
+# Severity is DERIVED from the score, so the badge and the score never disagree.
+SCORE_HIGH = 67
+SCORE_MEDIUM = 34
+
+
+def band_from_score(score: int) -> str:
+    if score >= SCORE_HIGH:
+        return "high"
+    if score >= SCORE_MEDIUM:
+        return "medium"
+    return "low"
+
+
+def _make_rec(code, base_score, trigger, recommendation, owner, bonus=0):
+    score = max(1, min(100, int(base_score + bonus)))
+    return {
+        "code": code,
+        "score": score,
+        "severity": band_from_score(score),
+        "trigger": trigger,
+        "recommendation": recommendation,
+        "owner": owner or "GS Staff",
+    }
+
+
+def student_recommendations(student: Student) -> dict:
+    """Turn indicators into prescriptive, scored, owner-assigned next actions."""
+    ind = student_indicators(student)
+    owner = ind["next_owner"] or "GS Staff"
+    recs: list[dict] = []
+
+    if ind["overdue_tasks"] > 0:
+        d = ind["max_overdue_days"]
+        recs.append(_make_rec(
+            "overdue", 68, f"{ind['overdue_tasks']} task(s) overdue — oldest is {d} day(s) past due",
+            f"Escalate the overdue task(s) to {owner} and confirm the next step ({d} day(s) late).",
+            owner, bonus=min(d * 2, 32)))
+    if ind["missing_documents"] > 0 and ind["research_gate"]:
+        n = ind["missing_documents"]
+        recs.append(_make_rec(
+            "evidence", 42, f"{n} required document(s) missing at {ind['research_gate']}",
+            f"Return to the student to submit the {n} missing item(s) for {ind['research_gate']}.",
+            "Student", bonus=min(n * 4, 24)))
+    if ind["missing_subjects"] > 0 and ind["stage"] not in ("Admission", "LOA", "Completed"):
+        n = ind["missing_subjects"]
+        recs.append(_make_rec(
+            "coursework", 36, f"{n} subject(s) missing or incomplete in the course audit",
+            f"Resolve the {n} outstanding subject(s) with the Academic Coordinator.",
+            "Academic Coordinator", bonus=min(n * 2, 18)))
+    if ind["schedule_status"] == "Needs Availability":
+        recs.append(_make_rec(
+            "schedule", 46, "Defense schedule has no confirmed panel availability",
+            "Collect panel and adviser availability, then re-confirm the defense date.",
+            "Research Coordinator"))
+    if ind["standing"] == "On Leave":
+        recs.append(_make_rec(
+            "residency", 40, "Student is on Leave of Absence",
+            "Check the LOA expiry and prepare the readmission follow-up.", "GS Staff"))
+    if ind["days_in_stage"] >= STALL_WARN_DAYS and ind["stage"] != "Completed":
+        d = ind["days_in_stage"]
+        recs.append(_make_rec(
+            "stalled", 48, f"No recorded update in {d} days at the {ind['stage']} stage",
+            f"Follow up — the case has been inactive for {d} days at {ind['stage']}.",
+            owner, bonus=min(d // 8, 40)))
+
+    recs.sort(key=lambda r: -r["score"])
+    return {"indicators": ind, "recommendations": recs}
+
+
+def student_priority(student: Student) -> dict:
+    """A student's overall priority = the highest-scoring recommendation. Keeps the
+    student record consistent with the Decision Support queue."""
+    recs = student_recommendations(student)["recommendations"]
+    if not recs:
+        return {"level": "Low", "score": 0, "reason": "On track — no flagged actions"}
+    top = recs[0]
+    return {
+        "level": band_from_score(top["score"]).capitalize(),
+        "score": top["score"],
+        "reason": top["trigger"],
+    }
+
+
+def recompute_risk(student: Student) -> None:
+    """Persist the derived priority into risk_level so every view agrees."""
+    student.risk_level = student_priority(student)["level"]
+
+
+def _portfolio_row(rec, student):
+    row = dict(rec)
+    row.update({
+        "student_id": student.id,
+        "student_name": student.name,
+        "student_number": student.student_number,
+        "program_code": student.program.code,
+        "stage": student.current_stage,
+    })
+    return row
+
+
+def portfolio_recommendations(limit: int = 150) -> dict:
+    """Action queue across the population, each item scored and specific (cheap queries)."""
+    today = date.today()
+    rows: list[dict] = []
+
+    for t in (
+        Task.query.filter(Task.status.in_(["Pending", "Overdue"]), Task.due_at < today)
+        .order_by(Task.due_at.asc())
+        .limit(80)
+        .all()
+    ):
+        if not t.student:
+            continue
+        d = (today - t.due_at).days
+        rows.append(_portfolio_row(_make_rec(
+            "overdue", 68, f"“{t.title}” is {d} day(s) overdue (due {t.due_at.isoformat()})",
+            f"Escalate “{t.title}” to {t.owner_role} — {d} day(s) past due.",
+            t.owner_role, bonus=min(d * 2, 32)), t.student))
+
+    cutoff = now_utc() - timedelta(days=STALL_WARN_DAYS)
+    for s in (
+        Student.query.filter(
+            Student.standing == "Active",
+            Student.current_stage != "Completed",
+            Student.updated_at < cutoff,
+        )
+        .order_by(Student.updated_at.asc())
+        .limit(50)
+        .all()
+    ):
+        d = max((now_utc() - (s.updated_at or s.created_at)).days, 0)
+        owner = "Research Coordinator" if s.current_stage in (
+            "Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense"
+        ) else "Academic Coordinator" if s.current_stage == "Coursework" else "GS Staff"
+        rows.append(_portfolio_row(_make_rec(
+            "stalled", 48, f"No recorded update in {d} days at {s.current_stage}",
+            f"Follow up — inactive for {d} days at {s.current_stage}.",
+            owner, bonus=min(d // 8, 40)), s))
+
+    for sc in (
+        ScheduleRequest.query.filter(ScheduleRequest.status == "Needs Availability")
+        .order_by(ScheduleRequest.created_at.desc())
+        .limit(40)
+        .all()
+    ):
+        if sc.student:
+            rows.append(_portfolio_row(_make_rec(
+                "schedule", 46, "Defense schedule has no confirmed panel availability",
+                "Collect panel and adviser availability, then re-confirm the defense date.",
+                "Research Coordinator"), sc.student))
+
+    for sid, n in (
+        db.session.query(DocumentCheck.student_id, func.count(DocumentCheck.id))
+        .filter(DocumentCheck.status == "Missing")
+        .group_by(DocumentCheck.student_id)
+        .limit(50)
+        .all()
+    ):
+        s = Student.query.get(sid)
+        if s and s.standing == "Active":
+            rows.append(_portfolio_row(_make_rec(
+                "evidence", 42, f"{n} required document(s) missing",
+                f"Request the {n} missing required document(s) from the student.",
+                "Student", bonus=min(n * 4, 24)), s))
+
+    seen = {(r["student_id"], r["code"]) for r in rows}
+    for s in Student.query.filter(Student.standing == "On Leave").limit(40).all():
+        if (s.id, "residency") not in seen:
+            rows.append(_portfolio_row(_make_rec(
+                "residency", 40, "Student is on Leave of Absence",
+                "Check the LOA expiry and prepare the readmission follow-up.", "GS Staff"), s))
+
+    rows.sort(key=lambda r: -r["score"])
+    rows = rows[:limit]
+
+    by_severity: dict[str, int] = {}
+    by_owner: dict[str, int] = {}
+    for r in rows:
+        by_severity[r["severity"]] = by_severity.get(r["severity"], 0) + 1
+        by_owner[r["owner"]] = by_owner.get(r["owner"], 0) + 1
+
+    return {
+        "items": rows,
+        "summary": {
+            "total": len(rows),
+            "students_flagged": len({r["student_id"] for r in rows}),
+            "by_severity": [
+                {"severity": sev, "count": by_severity.get(sev, 0)}
+                for sev in ["high", "medium", "low"]
+                if by_severity.get(sev, 0) > 0
+            ],
+            "by_owner": [{"owner": o, "count": n} for o, n in sorted(by_owner.items(), key=lambda x: -x[1])],
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Module 6 — RAG policy & case guidance
+# Source A: computed indicators above (backend = truth).
+# Source B: the curated policy corpus below (retrieved, then cited).
+# Generation: Google AI Studio when a key is set; otherwise an offline grounded
+# responder so the feature is fully demonstrable without any external service.
+# ---------------------------------------------------------------------------
+POLICY_SNIPPETS = [
+    {"id": "loa-residency", "title": "Leave of Absence & Residency", "source": "GS Research Protocol / Handbook",
+     "tags": ["loa", "leave", "residency", "terms", "pause", "eligible", "eligibility"],
+     "text": "A student may file a Leave of Absence with an approved reason. The residency clock is paused for the approved LOA period. LOA is limited (prototype rule: up to 4 terms total) and the student must have completed at least one term of residency before filing. The Dean approves the request; GS Staff records the effective dates."},
+    {"id": "readmission", "title": "Readmission of Returning Students", "source": "GS Research Protocol / Handbook",
+     "tags": ["readmission", "return", "re-enroll", "comeback"],
+     "text": "A returning student files for readmission with a return-intent letter, an updated study plan, a program/adviser endorsement, and clearance of any pending accountability. On approval the student is marked active for the return term."},
+    {"id": "onboarding", "title": "Admission Handoff & Onboarding", "source": "GS Onboarding Checklist",
+     "tags": ["onboarding", "handoff", "admission", "intake", "requirements"],
+     "text": "At admission handoff, GS verifies admission approval, the student profile sheet, program assignment, the enrollment signal, and the official transcript. Missing items are flagged and assigned to GS Staff for follow-up."},
+    {"id": "title-defense", "title": "Title Defense Readiness (Form 1)", "source": "GS Research Protocol — Title Defense",
+     "tags": ["form 1", "title", "title defense", "concept", "concept papers"],
+     "text": "Title defense readiness requires Form 1 (Application for Title Defense), three concept papers, the Academic Coordinator endorsement, and a recommended panel set."},
+    {"id": "title-result", "title": "Title Defense Result (Form 2)", "source": "GS Research Protocol — Title Defense",
+     "tags": ["form 2", "title result", "approved title", "result"],
+     "text": "The title defense outcome is recorded on Form 2 (approved / for revision / not approved). An approved title advances the student to proposal preparation."},
+    {"id": "adviser", "title": "Research Adviser Designation (Form 3 / 3.1)", "source": "GS Research Protocol — Advising",
+     "tags": ["adviser", "designation", "form 3", "appointment"],
+     "text": "Research adviser designation uses Form 3 (Application) and Form 3.1 (Appointment), routed for Dean approval. The appointed adviser is recorded with the date."},
+    {"id": "proposal", "title": "Proposal Defense Readiness (Form 4)", "source": "GS Research Protocol — Proposal Defense",
+     "tags": ["form 4", "proposal", "defense readiness", "statistical", "manuscript"],
+     "text": "Proposal defense readiness requires the Form 4 endorsement, the proposal manuscript, the adviser endorsement, Form 4.1 statistical consultation (quantitative) or a qualitative exemption, and an agreed schedule."},
+    {"id": "panel", "title": "Panel Composition & Matching", "source": "GS Research Protocol — Panel",
+     "tags": ["panel", "composition", "members", "chair", "external", "specialization"],
+     "text": "A thesis panel has a Chair, content and method specialists, and an external panel member; a dissertation panel adds a second content specialist. Panels are matched by specialization, availability, and current workload."},
+    {"id": "scheduling", "title": "Defense Scheduling & Lead Time", "source": "GS Research Protocol — Scheduling",
+     "tags": ["schedule", "scheduling", "lead time", "defense date", "availability"],
+     "text": "A defense is confirmed only when the assigned panel is available on the chosen date and the required lead time is met (prototype: 14 days for proposal/final, 5 days for the public final). Otherwise the case waits for availability."},
+    {"id": "ethics", "title": "Ethics Review & Clearance", "source": "GS Research Protocol — Ethics (RERC)",
+     "tags": ["ethics", "clearance", "rerc", "review"],
+     "text": "Studies requiring ethics review submit for RERC clearance. Ethics clearance is recorded before data-collection and writing milestones proceed."},
+    {"id": "final-defense", "title": "Final Defense Readiness", "source": "GS Research Protocol — Final Defense",
+     "tags": ["final defense", "final", "form 6", "form 7", "14 days"],
+     "text": "Final defense readiness requires the Form 4 endorsement for final defense, the final manuscript, ethics clearance, and the panel receiving the manuscript at least 14 days before the defense."},
+    {"id": "completion", "title": "Completion Evidence", "source": "GS Research Protocol — Completion",
+     "tags": ["completion", "turnitin", "editor", "approval sheet", "form 9", "form 10", "similarity"],
+     "text": "Completion requires the final manuscript, panel approval, ethics clearance, a Turnitin certificate (similarity not more than 15%), the Form 9 editor certification, and the Form 10 approval sheet."},
+    {"id": "withdrawal", "title": "Withdrawal", "source": "GS Handbook — Withdrawal",
+     "tags": ["withdrawal", "withdraw", "attrition", "drop out"],
+     "text": "A withdrawal request is routed for a Dean decision. On approval the case is closed with a recorded reason and monitoring stops."},
+    {"id": "graduation", "title": "Graduation Endorsement", "source": "GS Handbook — Graduation",
+     "tags": ["graduation", "endorsement", "candidate", "registrar"],
+     "text": "Graduation endorsement checks coursework, research, practicum (if applicable), and clearance completion, then compiles the candidate endorsement list for Dean approval and registrar hand-off."},
+    {"id": "practicum", "title": "Practicum / OJT (Program-dependent)", "source": "GS Handbook — Practicum",
+     "tags": ["practicum", "ojt", "hours", "moa", "certificate"],
+     "text": "Programs requiring practicum track the required hours, the MOA, and uploaded certificates as completion evidence."},
+    {"id": "course-audit", "title": "Course Audit & Curriculum", "source": "AC Student Monitoring",
+     "tags": ["course audit", "subjects", "curriculum", "completion", "missing"],
+     "text": "Course audit maps completed, current, and missing subjects against the curriculum. Clearing all subjects signals readiness to move to proposal development."},
+    {"id": "escalation", "title": "Delay, Time-in-Stage & Escalation", "source": "Monitoring Policy",
+     "tags": ["delay", "delayed", "time in stage", "escalation", "overdue", "follow up", "stalled"],
+     "text": "Cases that exceed the allowed time-in-stage or carry overdue tasks are escalated to the responsible coordinator; incomplete evidence is returned to the student queue."},
+    {"id": "risk", "title": "Risk Flags & Intervention", "source": "Monitoring Policy",
+     "tags": ["risk", "at risk", "monitoring", "intervention", "attention"],
+     "text": "Students are flagged for attention based on overdue tasks, missing evidence, stalled stages, or residency nearing its limit, prompting a follow-up intervention with recorded closure."},
+]
+
+_STOPWORDS = set(
+    "the a an of to and or for in on with is are be by at as your you student students case "
+    "what who which how when does do this that it should can will".split()
+)
+
+
+def _tokenize(text: str) -> list[str]:
+    return [w for w in re.findall(r"[a-z0-9]+", (text or "").lower()) if w not in _STOPWORDS and len(w) > 2]
+
+
+def retrieve_policy(query: str, k: int = 3) -> list[dict]:
+    """Lightweight lexical retriever over the policy corpus (no embeddings needed)."""
+    q_terms = set(_tokenize(query))
+    q_lower = (query or "").lower()
+    scored = []
+    for sn in POLICY_SNIPPETS:
+        tags = {t.lower() for t in sn["tags"]}
+        title_terms = set(_tokenize(sn["title"]))
+        body_terms = set(_tokenize(sn["text"]))
+        score = 0
+        for w in q_terms:
+            if w in tags:
+                score += 3
+            if w in title_terms:
+                score += 2
+            if w in body_terms:
+                score += 1
+        for tag in sn["tags"]:
+            if " " in tag and tag in q_lower:
+                score += 4
+        if score > 0:
+            scored.append((score, sn))
+    scored.sort(key=lambda x: -x[0])
+    return [sn for _, sn in scored[:k]]
+
+
+def _status_sentence(student: Student, ind: dict) -> str:
+    bits = [f"{student.name} ({student.student_number}, {student.program.code}) is at the {ind['stage']} stage"]
+    bits.append(f"standing {ind['standing']}, risk {ind['risk']}")
+    if ind["research_gate"]:
+        bits.append(f"research gate {ind['research_gate']} — {ind['research_status']}")
+    bits.append(f"coursework {ind['completion_rate']}% complete")
+    return ", ".join(bits) + "."
+
+
+def local_grounded_answer(question: str, student: Student | None, payload: dict | None, snippets: list[dict]) -> str:
+    """Offline, deterministic responder. Grounds answers in computed indicators + retrieved policy.
+    Stands in for Google AI Studio so the feature is demonstrable without an API key."""
+    q = (question or "").lower()
+    out: list[str] = []
+    ind = payload["indicators"] if payload else None
+    recs = payload["recommendations"] if payload else []
+
+    asks_status = any(w in q for w in ["status", "pending", "where", "next", "owner", "summary", "doing", "standing"])
+    asks_policy = any(w in q for w in ["loa", "leave", "residency", "readmission", "eligible", "require", "requirement",
+                                       "form", "ethics", "panel", "schedule", "completion", "graduat", "withdraw", "practicum", "policy", "rule"])
+    asks_portfolio = any(w in q for w in ["delayed", "overdue", "at risk", "risk", "stalled", "which students",
+                                          "attention", "bottleneck", "escalate", "behind"])
+
+    if student and (asks_status or (not asks_policy and not asks_portfolio)):
+        out.append(_status_sentence(student, ind))
+        if ind["overdue_tasks"]:
+            out.append(f"There {'is' if ind['overdue_tasks'] == 1 else 'are'} {ind['overdue_tasks']} overdue task(s).")
+        if ind["missing_documents"] and ind["research_gate"]:
+            out.append(f"{ind['missing_documents']} required document(s) are still missing at {ind['research_gate']}.")
+        out.append(f"The next action is owned by {ind['next_owner'] or 'GS Staff'}.")
+        if recs:
+            out.append("Recommended next steps: " + "; ".join(f"{r['recommendation']} ({r['owner']})" for r in recs[:3]))
+        else:
+            out.append("No outstanding follow-ups are flagged for this student.")
+
+    elif asks_portfolio and not student:
+        port = portfolio_recommendations()
+        s = port["summary"]
+        out.append(f"{s['students_flagged']} student(s) currently need attention "
+                   f"({s['by_severity']['high']} high, {s['by_severity']['medium']} medium).")
+        for r in port["items"][:5]:
+            out.append(f"• {r['student_name']} ({r['program_code']}, {r['stage']}): {r['trigger']} → {r['recommendation']} [{r['owner']}]")
+
+    else:
+        if snippets:
+            top = snippets[0]
+            out.append(f"{top['title']}: {top['text']}")
+        if student and ind:
+            out.append("For this student — " + _status_sentence(student, ind))
+            if recs:
+                out.append("Suggested action: " + recs[0]["recommendation"] + f" ({recs[0]['owner']}).")
+        if not snippets and not student:
+            out.append("I could not find a matching policy. Try mentioning a stage, form, or topic "
+                       "(e.g. LOA, Form 4, panel, ethics, completion).")
+
+    return " ".join(out).strip()
+
+
+def call_google_ai_studio(question: str, snippets: list[dict], payload: dict | None, api_key: str) -> str:
+    """Real provider integration point (Google AI Studio / Gemini).
+
+    Intentionally a thin stub: in the demo no key is set, so this is never called.
+    When GOOGLE_AI_STUDIO_API_KEY is provided, build the grounded prompt from
+    `snippets` + `payload` and POST to the AI Studio endpoint here, then return the text.
+    """
+    raise NotImplementedError("Google AI Studio not connected in this build.")
+
+
+def generate_answer(question: str, student_id: int | None = None) -> dict:
+    student = Student.query.get(student_id) if student_id else None
+    payload = student_recommendations(student) if student else None
+    snippets = retrieve_policy(question, k=3)
+
+    api_key = os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    mode = "offline"
+    if api_key:
+        try:
+            answer = call_google_ai_studio(question, snippets, payload, api_key)
+            mode = "google-ai-studio"
+        except Exception:
+            answer = local_grounded_answer(question, student, payload, snippets)
+            mode = "offline-fallback"
+    else:
+        answer = local_grounded_answer(question, student, payload, snippets)
+
+    return {
+        "answer": answer,
+        "mode": mode,
+        "citations": [{"id": s["id"], "title": s["title"], "source": s["source"], "text": s["text"]} for s in snippets],
+        "grounded": payload["indicators"] if payload else None,
+        "recommendations": payload["recommendations"] if payload else [],
+        "student": student_brief(student) if student else None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Routes (JSON API + SPA hosting)
 # ---------------------------------------------------------------------------
 def register_routes(app: Flask) -> None:
@@ -639,6 +1080,7 @@ def register_routes(app: Flask) -> None:
                 "schedules": [schedule_request_dict(s) for s in schedules],
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
+                "recommendations": student_recommendations(student)["recommendations"],
                 "enrollments": [
                     {
                         "id": e.id,
@@ -676,6 +1118,35 @@ def register_routes(app: Flask) -> None:
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_dict(f) for f in faculty]})
 
+    @app.route("/api/decision-support")
+    def decision_support():
+        return jsonify(portfolio_recommendations())
+
+    @app.route("/api/assistant", methods=["POST"])
+    def assistant():
+        data = request_payload()
+        question = (data.get("question") or "").strip()
+        if not question:
+            return jsonify({"error": "Ask a question to get started."}), 400
+        student_id = data.get("student_id")
+        try:
+            student_id = int(student_id) if student_id else None
+        except (TypeError, ValueError):
+            student_id = None
+        return jsonify(generate_answer(question, student_id))
+
+    @app.route("/api/assistant/suggestions")
+    def assistant_suggestions():
+        return jsonify({
+            "items": [
+                "Which students need attention right now?",
+                "What does a student need for proposal defense readiness?",
+                "Explain the LOA and residency rule.",
+                "What evidence is required for completion?",
+                "How is a defense panel composed?",
+            ]
+        })
+
     @app.route("/api/transactions/<slug>/context")
     def transaction_context(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
@@ -692,6 +1163,10 @@ def register_routes(app: Flask) -> None:
         handler = TRANSACTION_HANDLERS[slug]
         try:
             student_id = handler(data)
+            if student_id:
+                target = Student.query.get(student_id)
+                if target:
+                    recompute_risk(target)  # keep priority consistent with the new signals
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
@@ -1814,6 +2289,12 @@ def seed_database(count: int = 350) -> None:
                 "Generated background history for the demo dataset.",
             )
 
+    db.session.commit()
+
+    # Derive each student's risk/priority from the same signals the Decision Support
+    # engine uses, so the student record and the recommendation queue always agree.
+    for student in Student.query.all():
+        recompute_risk(student)
     db.session.commit()
 
 

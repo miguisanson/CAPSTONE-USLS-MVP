@@ -14,6 +14,8 @@ import {
   X,
   GraduationCap,
   ChevronRight,
+  Lightbulb,
+  Bot,
 } from "lucide-react";
 
 const ICONS = {
@@ -36,6 +38,13 @@ const NAV_GROUPS = [
       { to: "/students", label: "Students", icon: Users },
       { to: "/work-queue", label: "Work Queue", icon: ListTodo },
       { to: "/activity", label: "Activity Log", icon: Activity },
+    ],
+  },
+  {
+    label: "Decision Support",
+    items: [
+      { to: "/decision-support", label: "Recommendations", icon: Lightbulb },
+      { to: "/assistant", label: "Policy Assistant", icon: Bot },
     ],
   },
 ];

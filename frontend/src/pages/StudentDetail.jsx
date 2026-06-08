@@ -11,11 +11,12 @@ import {
   Clock,
   FileText,
   AlertTriangle,
+  Lightbulb,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ProgressBar } from "../components/ui";
-import { initials, formatDate, relativeDays } from "../lib/format";
+import { initials, formatDate, relativeDays, SEVERITY } from "../lib/format";
 
 export default function StudentDetail() {
   const { id } = useParams();
@@ -24,7 +25,7 @@ export default function StudentDetail() {
   if (loading) return <Spinner label="Loading student record…" />;
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load student" hint={error} />;
 
-  const { student, stages, stage_index, course_audit, research_case, documents_by_gate, panel, schedules, tasks, logs } = data;
+  const { student, stages, stage_index, course_audit, research_case, documents_by_gate, panel, schedules, tasks, logs, recommendations = [] } = data;
 
   return (
     <div className="space-y-5 animate-fade-up">
@@ -189,6 +190,41 @@ export default function StudentDetail() {
 
         {/* Side column */}
         <div className="space-y-5 lg:col-span-4">
+          <Card className="p-6">
+            <SectionTitle title="Recommended actions" subtitle="Computed from this record" icon={Lightbulb} />
+            {recommendations.length ? (
+              <ul className="space-y-2.5">
+                {recommendations.map((r, i) => {
+                  const sev = SEVERITY[r.severity] || SEVERITY.low;
+                  return (
+                    <li key={i} className="overflow-hidden rounded-xl border border-slate-100">
+                      <div className="flex">
+                        <span className={`w-1 shrink-0 ${sev.bar}`} aria-hidden />
+                        <div className="p-3">
+                          <div className="mb-1 flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${sev.badge}`}>
+                              {sev.label}
+                            </span>
+                            {typeof r.score === "number" && (
+                              <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white" title="Priority score (0–100)">
+                                {r.score}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm font-semibold text-ink">{r.recommendation}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Why: {r.trigger}</p>
+                          <p className="mt-1 text-xs font-semibold text-brand-700">Owner: {r.owner}</p>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyState title="On track" hint="No recommended follow-ups for this student." />
+            )}
+          </Card>
+
           <Card className="p-6">
             <SectionTitle title="Open tasks" icon={ListTodo} />
             {tasks.length ? (
