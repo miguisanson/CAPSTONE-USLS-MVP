@@ -39,6 +39,20 @@ export const api = {
   },
   submitTransaction: (slug, payload) =>
     request(`/transactions/${slug}`, { method: "POST", body: JSON.stringify(payload) }),
+  importHandoff: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    // No Content-Type header: the browser sets the multipart boundary itself.
+    const res = await fetch(`${BASE}/transactions/student-handoff/import`, { method: "POST", body: form });
+    let body = null;
+    try {
+      body = await res.json();
+    } catch (e) {
+      /* ignore */
+    }
+    if (!res.ok) throw new Error((body && body.error) || `Upload failed (${res.status})`);
+    return body;
+  },
   decisionSupport: () => request("/decision-support"),
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),

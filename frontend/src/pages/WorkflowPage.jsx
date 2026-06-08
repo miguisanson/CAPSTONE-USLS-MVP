@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
   UserPlus,
   CalendarOff,
@@ -11,6 +11,10 @@ import {
   Info,
   Sparkles,
   AlertTriangle,
+  UploadCloud,
+  FileSpreadsheet,
+  X,
+  ArrowUpRight,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -156,7 +160,7 @@ export default function WorkflowPage() {
             </Card>
           ) : (
             <Card className="p-6">
-              {slug === "student-handoff" && <HandoffForm {...formProps} />}
+              {slug === "student-handoff" && <HandoffPanel {...formProps} />}
               {slug === "course-audit" && <CourseAuditForm {...formProps} />}
               {slug === "research-gate" && <ResearchGateForm {...formProps} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
@@ -210,7 +214,195 @@ function SubmitButton({ submitting, children }) {
 }
 
 // ---------------------------------------------------------------------------
-// Student Handoff
+// Student Handoff — file upload (primary) with a manual fallback
+// ---------------------------------------------------------------------------
+function HandoffPanel(props) {
+  const [mode, setMode] = useState("upload");
+  return (
+    <div className="space-y-5">
+      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+        <button
+          type="button"
+          onClick={() => setMode("upload")}
+          className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+            mode === "upload" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Upload sheet
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("manual")}
+          className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+            mode === "manual" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Add manually
+        </button>
+      </div>
+      {mode === "upload" ? <HandoffImport /> : <HandoffForm {...props} />}
+    </div>
+  );
+}
+
+function HandoffImport() {
+  const [file, setFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+
+  function pick(f) {
+    if (!f) return;
+    if (!/\.(xlsx|xlsm)$/i.test(f.name)) {
+      setError("Please choose an Excel .xlsx file in the AC Student Monitoring format.");
+      return;
+    }
+    setError("");
+    setResult(null);
+    setFile(f);
+  }
+
+  async function runImport() {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await api.importHandoff(file);
+      setResult(res);
+      setFile(null);
+    } catch (err) {
+      setError(err.message || "Could not import the file.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <SectionTitle
+        title="Import from monitoring sheet"
+        subtitle="Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically"
+        icon={FileSpreadsheet}
+      />
+
+      {/* Dropzone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          pick(e.dataTransfer.files?.[0]);
+        }}
+        className={`rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
+          dragging ? "border-brand-500 bg-brand-50" : "border-slate-300 bg-slate-50/60"
+        }`}
+      >
+        <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-brand-100 text-brand-700">
+          <UploadCloud className="h-6 w-6" />
+        </span>
+        {file ? (
+          <div className="flex items-center justify-center gap-2 text-sm">
+            <FileSpreadsheet className="h-4 w-4 text-brand-600" />
+            <span className="font-semibold text-ink">{file.name}</span>
+            <button
+              type="button"
+              onClick={() => setFile(null)}
+              className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-white hover:text-slate-600 cursor-pointer"
+              aria-label="Remove file"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-ink">Drag &amp; drop your .xlsx here</p>
+            <p className="text-xs text-slate-500">or</p>
+          </>
+        )}
+        <label className="mt-3 inline-block">
+          <input
+            type="file"
+            accept=".xlsx,.xlsm"
+            className="hidden"
+            onChange={(e) => pick(e.target.files?.[0])}
+          />
+          <span className="btn-ghost cursor-pointer">{file ? "Choose a different file" : "Browse files"}</span>
+        </label>
+        <p className="mt-3 text-xs text-slate-400">
+          Expected format: AC Student Monitoring template — program in cell A1, one student per row.
+        </p>
+      </div>
+
+      <ErrorNote message={error} />
+
+      <button type="button" onClick={runImport} disabled={!file || busy} className="btn-primary w-full sm:w-auto">
+        {busy ? (
+          <>
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Importing…
+          </>
+        ) : (
+          <>
+            <UploadCloud className="h-4 w-4" /> Import students
+          </>
+        )}
+      </button>
+
+      {result && (
+        <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/50 p-5 animate-fade-up">
+          <div className="flex items-center gap-2 text-sm font-semibold text-brand-800">
+            <CheckCircle2 className="h-5 w-5" /> {result.message}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ResultStat label="New" value={result.created} />
+            <ResultStat label="Updated" value={result.updated} />
+            <ResultStat label="Subjects" value={result.subjects} />
+            <ResultStat label="Program" value={result.program} />
+          </div>
+          {result.sample?.length > 0 && (
+            <div className="rounded-xl border border-slate-100 bg-white p-3">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Imported students (sample)</p>
+              <ul className="divide-y divide-slate-100">
+                {result.sample.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {s.student_number} · {s.program_code} · {s.stage} · {s.completed}/{s.total_subjects} subjects
+                      </p>
+                    </div>
+                    <Link
+                      to={`/students/${s.id}`}
+                      className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50 cursor-pointer"
+                    >
+                      Open <ArrowUpRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResultStat({ label, value }) {
+  return (
+    <div className="rounded-xl bg-white p-3 text-center ring-1 ring-slate-100">
+      <p className="font-display text-xl font-semibold leading-none text-ink">{value}</p>
+      <p className="mt-1 text-xs text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Student Handoff — manual entry (fallback)
 // ---------------------------------------------------------------------------
 function HandoffForm({ meta, context, submit, submitting }) {
   const onboarding = context.onboarding_requirements || [];

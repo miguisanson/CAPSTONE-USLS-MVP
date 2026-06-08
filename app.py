@@ -1206,6 +1206,25 @@ def register_routes(app: Flask) -> None:
         return jsonify(serialize_transaction_context(slug, student_id, specialization))
 
     # Single transaction entry point. The slug selects the workflow handler,
+    # Student Handoff via file upload: ingest an AC Student Monitoring .xlsx.
+    @app.route("/api/transactions/student-handoff/import", methods=["POST"])
+    def student_handoff_import():
+        file = request.files.get("file")
+        if not file or not file.filename:
+            return jsonify({"error": "No file uploaded. Choose an AC Student Monitoring .xlsx file."}), 400
+        if not file.filename.lower().endswith((".xlsx", ".xlsm")):
+            return jsonify({"error": "Please upload an Excel .xlsx file in the AC Student Monitoring format."}), 400
+        try:
+            parsed = parse_ac_monitoring(file.stream)
+            if not parsed["rows"]:
+                return jsonify({"error": "No student rows found. Check that the sheet matches the AC Monitoring template."}), 400
+            result = import_ac_monitoring(parsed)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
+            db.session.rollback()
+            return jsonify({"error": f"Could not import the sheet: {exc}"}), 400
+        return jsonify(result)
+
     # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
     def transaction_submit(slug: str):
@@ -1507,6 +1526,225 @@ def add_task(student_id: int, title: str, owner: str, days: int, priority: int =
             status=status,
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Student Handoff via file upload — AC Student Monitoring sheet importer
+# ---------------------------------------------------------------------------
+def _norm(value) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _entry_year_from_ay(ay: str) -> int:
+    """'23-24' -> 2023, '2023-2024' -> 2023, fallback to current year."""
+    m = re.search(r"(\d{2,4})", ay or "")
+    if not m:
+        return date.today().year
+    n = int(m.group(1))
+    return n if n >= 1900 else 2000 + n
+
+
+def parse_ac_monitoring(stream) -> dict:
+    """Parse an AC Student Monitoring .xlsx into a structured payload.
+
+    Layout: A1 = 'PROGRAM: <code>'. A two-row header (row N has IDNO/COURSE/YR,
+    row N+1 has AY ENTRY/SN/FN and the subject codes), then one student per row.
+    """
+    import openpyxl  # imported lazily so the rest of the app has no hard dependency
+
+    wb = openpyxl.load_workbook(stream, data_only=True, read_only=True)
+    ws = wb.active
+    max_col = ws.max_column or 40
+
+    grid = [[_norm(c.value) for c in row] for row in ws.iter_rows(min_row=1, max_row=ws.max_row)]
+
+    def cell(r, c):  # 1-indexed helpers over the cached grid
+        if 1 <= r <= len(grid) and 1 <= c <= len(grid[r - 1]):
+            return grid[r - 1][c - 1]
+        return ""
+
+    program_code = ""
+    for r in range(1, min(5, len(grid)) + 1):
+        for c in range(1, min(6, max_col) + 1):
+            v = cell(r, c)
+            if v and "PROGRAM" in v.upper():
+                program_code = v.split(":", 1)[1].strip() if ":" in v else v.upper().replace("PROGRAM", "").strip()
+                break
+        if program_code:
+            break
+
+    # header row = the one containing IDNO and COURSE
+    hdr = None
+    for r in range(1, min(15, len(grid)) + 1):
+        rowvals = [cell(r, c).upper() for c in range(1, max_col + 1)]
+        if "IDNO" in rowvals and "COURSE" in rowvals:
+            hdr = r
+            break
+    if not hdr:
+        raise ValueError("Could not find the header row (expected an 'IDNO' and 'COURSE' header).")
+    sub = hdr + 1
+
+    def find(row, label):
+        for c in range(1, max_col + 1):
+            if cell(row, c).upper() == label:
+                return c
+        return None
+
+    idno_c = find(hdr, "IDNO")
+    course_c = find(hdr, "COURSE")
+    yr_c = find(hdr, "YR")
+    note_c = find(hdr, "NOTE")
+    sn_c = find(sub, "SN")
+    fn_c = find(sub, "FN")
+    ay_c = find(sub, "AY ENTRY") or 1
+    milestone_cols = {m: find(sub, m) for m in ("TITLE", "PROPOSAL", "ETHICS", "FINAL")}
+
+    stop_cols = [c for c in list(milestone_cols.values()) + [note_c] if c]
+    milestone_start = min(stop_cols) if stop_cols else max_col + 1
+
+    subjects = []  # (col, code)
+    if yr_c:
+        for c in range(yr_c + 1, milestone_start):
+            code = cell(sub, c)
+            group = cell(hdr, c).upper()
+            if not code or code == "-" or code.isdigit() or code.upper() in ("SN", "FN", "TOTAL"):
+                continue
+            if group == "TOTAL":
+                continue
+            subjects.append((c, code))
+
+    rows = []
+    last_ay = None
+    for r in range(sub + 1, len(grid) + 1):
+        idno = cell(r, idno_c) if idno_c else ""
+        ay_here = cell(r, ay_c) if ay_c else ""
+        if ay_here:
+            last_ay = ay_here
+        if not idno:
+            continue
+        last = cell(r, sn_c) if sn_c else ""
+        first = cell(r, fn_c) if fn_c else ""
+        if not last and not first:
+            continue
+        subj = {code: bool(cell(r, c)) for c, code in subjects}
+        milestones = {m: bool(cell(r, mc)) for m, mc in milestone_cols.items() if mc}
+        rows.append({
+            "idno": idno,
+            "last_name": last,
+            "first_name": first,
+            "course": cell(r, course_c) if course_c else "",
+            "year": cell(r, yr_c) if yr_c else "",
+            "ay_entry": ay_here or last_ay or "",
+            "subjects": subj,
+            "milestones": milestones,
+            "note": cell(r, note_c) if note_c else "",
+        })
+
+    if not program_code:
+        program_code = "IMPORT"
+    return {"program_code": program_code, "subjects": [s[1] for s in subjects], "rows": rows}
+
+
+def _stage_from_sheet(milestones: dict, completed_subjects: int) -> str:
+    if milestones.get("FINAL"):
+        return "Final Defense"
+    if milestones.get("ETHICS"):
+        return "Data Collection"
+    if milestones.get("PROPOSAL"):
+        return "Proposal Defense"
+    if milestones.get("TITLE"):
+        return "Proposal Development"
+    if completed_subjects > 0:
+        return "Coursework"
+    return "Admission"
+
+
+def import_ac_monitoring(parsed: dict) -> dict:
+    program = Program.query.filter_by(code=parsed["program_code"]).first()
+    if not program:
+        program = Program(code=parsed["program_code"], name=f"{parsed['program_code']} (imported)", college="Imported")
+        db.session.add(program)
+        db.session.flush()
+
+    # ensure a Course row exists for each subject code on the sheet (for this program)
+    course_by_code: dict[str, Course] = {}
+    for code in parsed["subjects"]:
+        existing = Course.query.filter_by(code=code).first()
+        if not existing:
+            existing = Course(program_id=program.id, code=code, title=code, units=3)
+            db.session.add(existing)
+            db.session.flush()
+        course_by_code[code] = existing
+
+    term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+
+    created, updated, sample = 0, 0, []
+    for row in parsed["rows"]:
+        student = Student.query.filter_by(student_number=row["idno"]).first()
+        is_new = student is None
+        if is_new:
+            student = Student(student_number=row["idno"], program_id=program.id, standing="Active")
+            db.session.add(student)
+        student.first_name = row["first_name"] or student.first_name or "—"
+        student.last_name = row["last_name"] or student.last_name or "—"
+        student.program_id = program.id
+        student.entry_year = _entry_year_from_ay(row["ay_entry"])
+        if is_new or not student.email:
+            student.email = f"{str(row['idno']).lower()}@student.usls.edu.ph"
+        completed = sum(1 for v in row["subjects"].values() if v)
+        student.current_stage = _stage_from_sheet(row["milestones"], completed)
+        db.session.flush()
+
+        # per-subject course records (real subjects from the sheet)
+        for code, done in row["subjects"].items():
+            course = course_by_code[code]
+            rec = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+            if not rec:
+                rec = CourseRecord(student_id=student.id, course_id=course.id)
+                db.session.add(rec)
+            rec.status = "Completed" if done else "Missing"
+            rec.term_label = row["ay_entry"]
+            rec.evidence_reference = "AC Student Monitoring import"
+            rec.updated_at = now_utc()
+
+        # onboarding evidence treated as complete (record came from the official sheet)
+        if is_new and term:
+            db.session.add(TermEnrollment(
+                student_id=student.id, term_id=term.id, status="Confirmed",
+                source_reference="AC Student Monitoring import"))
+            for item in onboarding_requirements():
+                db.session.add(DocumentCheck(
+                    student_id=student.id, gate="Admission Handoff", item_name=item,
+                    status="Complete", evidence_reference="AC Student Monitoring import"))
+
+        add_log("student-handoff", student.id, "GS Staff", "AC Student Monitoring import",
+                f"{'Created' if is_new else 'Updated'} from monitoring sheet — {completed}/{len(row['subjects'])} subjects complete",
+                "Academic Coordinator",
+                f"Program {program.code}; course track {row['course']}; AY entry {row['ay_entry']}.")
+        recompute_risk(student)
+
+        if is_new:
+            created += 1
+        else:
+            updated += 1
+        if len(sample) < 10:
+            sample.append({
+                "id": student.id, "name": student.name, "student_number": student.student_number,
+                "program_code": program.code, "stage": student.current_stage,
+                "completed": completed, "total_subjects": len(row["subjects"]),
+            })
+
+    return {
+        "ok": True,
+        "program": program.code,
+        "subjects": len(parsed["subjects"]),
+        "rows": len(parsed["rows"]),
+        "created": created,
+        "updated": updated,
+        "sample": sample,
+        "message": f"Imported {created + updated} student(s) from the {program.code} monitoring sheet "
+                   f"({created} new, {updated} updated).",
+    }
 
 
 # ---------------------------------------------------------------------------
