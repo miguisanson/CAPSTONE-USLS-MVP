@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, Pill, ErrorNote } from "../components/ui";
+import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from "../components/ui";
 import { Field, Input, Textarea, Select, CheckList, RadioRow } from "../components/forms";
 import StudentPicker from "../components/StudentPicker";
 import { formatDate } from "../lib/format";
@@ -101,10 +101,7 @@ export default function WorkflowPage() {
             <Icon className="h-6 w-6" />
           </span>
           <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-display text-2xl font-semibold text-ink">{tx.title}</h1>
-              <Pill tone={tx.priority}>{tx.priority}</Pill>
-            </div>
+            <h1 className="font-display text-2xl font-semibold text-ink">{tx.title}</h1>
             <p className="mt-1 text-sm text-slate-600">{tx.short}</p>
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
               <p>

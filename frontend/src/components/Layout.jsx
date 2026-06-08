@@ -41,12 +41,12 @@ const NAV_GROUPS = [
 ];
 
 const WORKFLOWS = [
-  { slug: "student-handoff", label: "Student Handoff", icon: "user-plus", priority: "P0" },
-  { slug: "course-audit", label: "Course Audit", icon: "clipboard-check", priority: "P1" },
-  { slug: "research-gate", label: "Research Gate", icon: "file-check", priority: "P1" },
-  { slug: "panel-matching", label: "Panel Matching", icon: "users", priority: "P0" },
-  { slug: "defense-scheduling", label: "Defense Scheduling", icon: "calendar-check", priority: "P0" },
-  { slug: "loa-decision", label: "LOA / Readmission", icon: "calendar-off", priority: "P0" },
+  { slug: "student-handoff", label: "Student Handoff", icon: "user-plus" },
+  { slug: "course-audit", label: "Course Audit", icon: "clipboard-check" },
+  { slug: "research-gate", label: "Research Gate", icon: "file-check" },
+  { slug: "panel-matching", label: "Panel Matching", icon: "users" },
+  { slug: "defense-scheduling", label: "Defense Scheduling", icon: "calendar-check" },
+  { slug: "loa-decision", label: "LOA / Readmission", icon: "calendar-off" },
 ];
 
 function NavItem({ to, label, icon: Icon, end, onClick }) {
@@ -113,14 +113,7 @@ function SidebarContent({ onNavigate }) {
                   }
                 >
                   <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-                  <span className="flex-1">{wf.label}</span>
-                  <span
-                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                      wf.priority === "P0" ? "bg-brand-100 text-brand-700" : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    {wf.priority}
-                  </span>
+                  <span>{wf.label}</span>
                 </NavLink>
               );
             })}

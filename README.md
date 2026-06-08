@@ -15,15 +15,39 @@ Six working workflows (transactions) drive the platform. Each one performs a rea
 writes SQL-backed records (students, enrollment, course evidence, document checks, panel
 assignments, schedule requests, tasks, and an activity trail):
 
-1. **Student Handoff** (P0) — creates the monitoring record and compares received onboarding evidence.
-2. **LOA / Readmission Decision** (P0) — checks residency rules or return evidence, then records the decision.
-3. **Course Audit** (P1) — maps completed/current/missing subjects against curriculum requirements.
-4. **Research Gate Readiness** (P1) — compares Form 1 / Form 4 / final / completion evidence with the protocol.
-5. **Panel Matching** (P0) — scores faculty by specialization, availability, college, and workload.
-6. **Defense Scheduling** (P0) — checks panel availability and protocol lead-time before confirming.
+1. **Student Handoff** — creates the monitoring record and compares received onboarding evidence.
+2. **LOA / Readmission Decision** — checks residency rules or return evidence, then records the decision.
+3. **Course Audit** — maps completed/current/missing subjects against curriculum requirements.
+4. **Research Gate Readiness** — compares Form 1 / Form 4 / final / completion evidence with the protocol.
+5. **Panel Matching** — scores faculty by specialization, availability, college, and workload.
+6. **Defense Scheduling** — checks panel availability and protocol lead-time before confirming.
 
 On top of the transactions: a **Dashboard** (transaction-derived KPIs + charts), a **Students**
 directory with a full lifecycle record view, a role-filtered **Work Queue**, and an **Activity Log**.
+
+## Tech Stack (current)
+
+**Frontend**
+- React 18 (UI library, written in JSX)
+- Vite 5 (build tool + dev server)
+- Tailwind CSS 3 (styling) + PostCSS + Autoprefixer
+- React Router 6 (page navigation)
+- Recharts (dashboard charts)
+- Lucide React (SVG icons)
+
+**Backend**
+- Python 3 + Flask 3 (JSON API and static hosting)
+- Flask-SQLAlchemy (ORM / data models)
+- python-dotenv (config), PyMySQL (only when using MySQL)
+
+**Database**
+- SQLite by default (local file, zero setup) — MySQL 8 optional via `DATABASE_URL`
+
+**Tooling**
+- npm + Node.js (frontend), pip (Python), Git
+
+> Note: the original proposal specified Node.js/Express + Chart.js. This build uses **Python/Flask**
+> (per the team's decision) and **Recharts** (the React equivalent of Chart.js) instead.
 
 ## Requirements
 
@@ -31,31 +55,29 @@ directory with a full lifecycle record view, a role-filtered **Work Queue**, and
 - Node.js 18+ and npm (to build the React frontend)
 - MySQL 8 is **optional** — only needed if you set `DATABASE_URL`.
 
-## Run It (Windows cmd — two commands)
+## Run It (two npm commands)
+
+Run these from the project root in cmd (or any terminal):
 
 ```cmd
-setup.bat      :: first time only — installs deps, builds the UI, seeds the database
-run.bat        :: every time after that — starts the platform on http://localhost:5000
+npm run setup     :: first time only — installs Python + frontend deps, builds the UI, seeds the DB
+npm run dev       :: every time after that — starts the platform on http://localhost:5000
 ```
 
-Then open <http://localhost:5000>. Press `Ctrl+C` in the window to stop.
+Then open <http://localhost:5000>. Press `Ctrl+C` to stop.
 
-### Manual steps (equivalent)
+### All available npm scripts
 
-```cmd
-python -m pip install -r requirements.txt
-npm --prefix frontend install
-npm --prefix frontend run build
-python app.py --seed          :: creates the demo dataset
-python app.py                 :: serves the API + built UI on port 5000
-```
+| Command | What it does |
+|---|---|
+| `npm run setup` | One-time setup: pip install → npm install → build UI → seed database |
+| `npm run dev` | Start the app (Flask serves the API + built UI on port 5000) |
+| `npm start` | Same as `npm run dev` |
+| `npm run build` | Rebuild the frontend after changing UI code |
+| `npm run seed` | Reset/reseed the demo database (~350 students) |
+| `npm run dev:web` | Vite dev server on :5173 with hot reload (run `npm run dev` in a second terminal for the API) |
 
-### Frontend development (hot reload)
-
-```powershell
-python app.py                 # API on :5000
-npm --prefix frontend run dev # Vite dev server on :5173, proxies /api -> :5000
-```
+> If you change anything under `frontend/src`, run `npm run build` (or use `npm run dev:web`) to see it.
 
 ## Database
 
@@ -68,8 +90,8 @@ DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
 
 Reseed anytime (resets data, creates ~350 synthetic students plus related records):
 
-```powershell
-python app.py --seed
+```cmd
+npm run seed
 ```
 
 Change `DEMO_SEED_COUNT` in `.env` to seed 200–500 records.
@@ -86,7 +108,7 @@ CAPSTONE-USLS-MVP/
       api.js, hooks.js, lib/format.js
     dist/                Production build (served by Flask) — git-ignored
   Documents/             Proposal, meeting notes, transaction list, school forms
-  run_demo.ps1           Installs deps, builds the UI, seeds the DB, starts the app
+  package.json           npm scripts (setup / dev / build / seed)
   requirements.txt       Python dependencies
 ```
 
