@@ -35,7 +35,7 @@ const ICONS = {
 const NEEDS_STUDENT = {
   "student-handoff": false,
   "loa-decision": true,
-  "course-audit": true,
+  "course-audit": false,
   "research-gate": true,
   "panel-matching": true,
   "defense-scheduling": true,
@@ -161,7 +161,7 @@ export default function WorkflowPage() {
           ) : (
             <Card className="p-6">
               {slug === "student-handoff" && <HandoffPanel {...formProps} />}
-              {slug === "course-audit" && <CourseAuditForm {...formProps} />}
+              {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
               {slug === "research-gate" && <ResearchGateForm {...formProps} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
               {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
@@ -217,35 +217,18 @@ function SubmitButton({ submitting, children }) {
 // Student Handoff — file upload (primary) with a manual fallback
 // ---------------------------------------------------------------------------
 function HandoffPanel(props) {
-  const [mode, setMode] = useState("upload");
   return (
-    <div className="space-y-5">
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
-        <button
-          type="button"
-          onClick={() => setMode("upload")}
-          className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-            mode === "upload" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Upload sheet
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("manual")}
-          className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-            mode === "manual" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Add manually
-        </button>
+    <div className="space-y-6">
+      <HandoffImport />
+      <div className="border-t border-slate-200 pt-6">
+        <HandoffForm {...props} />
       </div>
-      {mode === "upload" ? <HandoffImport /> : <HandoffForm {...props} />}
     </div>
   );
 }
 
-function HandoffImport() {
+function HandoffImport({ context }) {
+  const isAudit = context === "audit";
   const [file, setFile] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -281,8 +264,12 @@ function HandoffImport() {
   return (
     <div className="space-y-4">
       <SectionTitle
-        title="Import from monitoring sheet"
-        subtitle="Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically"
+        title={isAudit ? "Update audits from monitoring sheet" : "Import from monitoring sheet"}
+        subtitle={
+          isAudit
+            ? "Upload the latest AC Student Monitoring sheet — each student's completed subjects are updated from it"
+            : "Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically"
+        }
         icon={FileSpreadsheet}
       />
 
@@ -429,7 +416,7 @@ function HandoffForm({ meta, context, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Create monitoring record" subtitle="Compares received onboarding items against requirements" icon={UserPlus} />
+      <SectionTitle title="Or add a student manually" subtitle="One-off entry — compares received onboarding items against requirements" icon={UserPlus} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="First name" required>
           <Input value={form.first_name} onChange={set("first_name")} required />
@@ -484,7 +471,198 @@ function HandoffForm({ meta, context, submit, submitting }) {
 }
 
 // ---------------------------------------------------------------------------
-// Course Audit
+// Course Audit — roster (by subject) or sheet upload
+// ---------------------------------------------------------------------------
+function CourseAuditPanel({ meta }) {
+  return (
+    <div className="space-y-6">
+      <HandoffImport context="audit" />
+      <div className="border-t border-slate-200 pt-6">
+        <CourseAuditRoster meta={meta} />
+      </div>
+    </div>
+  );
+}
+
+function CourseAuditRoster({ meta }) {
+  const [programId, setProgramId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [term, setTerm] = useState("");
+  const [roster, setRoster] = useState(null);
+  const [checked, setChecked] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+
+  // load subjects (optionally filtered by program)
+  useEffect(() => {
+    setSubjects([]);
+    setCourseId("");
+    setRoster(null);
+    api
+      .courseAuditSubjects(programId || undefined)
+      .then((res) => setSubjects(res.items))
+      .catch((e) => setError(e.message));
+  }, [programId]);
+
+  // load roster when a subject is chosen
+  useEffect(() => {
+    if (!courseId) {
+      setRoster(null);
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    api
+      .courseAuditRoster(courseId)
+      .then((res) => {
+        setRoster(res);
+        setChecked(Object.fromEntries(res.students.map((s) => [s.student_id, s.completed])));
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [courseId]);
+
+  const completedCount = roster ? Object.values(checked).filter(Boolean).length : 0;
+  const allChecked = roster && roster.students.length > 0 && completedCount === roster.students.length;
+
+  function toggle(id) {
+    setChecked((c) => ({ ...c, [id]: !c[id] }));
+  }
+  function toggleAll() {
+    if (!roster) return;
+    const next = !allChecked;
+    setChecked(Object.fromEntries(roster.students.map((s) => [s.student_id, next])));
+  }
+
+  async function save() {
+    if (!roster) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await api.saveCourseAudit({ course_id: roster.course.id, term, completions: checked });
+      setResult(res);
+      // refresh roster to reflect new statuses
+      const fresh = await api.courseAuditRoster(roster.course.id);
+      setRoster(fresh);
+      setChecked(Object.fromEntries(fresh.students.map((s) => [s.student_id, s.completed])));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle
+        title="End-of-term course audit"
+        subtitle="Pick a subject, then tick the students who completed it this term"
+        icon={ClipboardCheck}
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Program">
+          <Select
+            value={programId}
+            onChange={(e) => setProgramId(e.target.value)}
+            placeholder="All programs"
+            options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
+          />
+        </Field>
+        <Field label="Subject" required>
+          <Select
+            value={courseId}
+            onChange={(e) => setCourseId(e.target.value)}
+            options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))}
+          />
+        </Field>
+        <Field label="Audit term" hint="Recorded on each updated subject">
+          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 Term 1" />
+        </Field>
+      </div>
+
+      <ErrorNote message={error} />
+
+      {result && (
+        <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
+          <CheckCircle2 className="h-5 w-5" /> {result.message}
+        </div>
+      )}
+
+      {loading ? (
+        <Spinner label="Loading class roster…" />
+      ) : !courseId ? (
+        <EmptyState icon={ClipboardCheck} title="Choose a subject to audit" hint="Pick a subject above to see its enrolled students." />
+      ) : roster && roster.students.length > 0 ? (
+        <>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+              <p className="text-sm font-semibold text-ink">
+                {roster.course.code} — {roster.course.title}
+              </p>
+              <p className="text-xs text-slate-500">
+                {completedCount} of {roster.students.length} marked completed
+              </p>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2.5">Student</th>
+                  <th className="px-3 py-2.5">Current</th>
+                  <th className="px-3 py-2.5 text-center">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5">
+                      <input type="checkbox" checked={allChecked} onChange={toggleAll} className="h-4 w-4 accent-brand-600 cursor-pointer" />
+                      <span>Completed</span>
+                    </label>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.students.map((s) => (
+                  <tr key={s.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
+                    <td className="px-4 py-2.5">
+                      <p className="font-semibold text-ink">{s.name}</p>
+                      <p className="text-xs text-slate-400">{s.student_number} · {s.program_code}</p>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <StatusBadge value={s.status} dot={false} />
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!checked[s.student_id]}
+                        onChange={() => toggle(s.student_id)}
+                        aria-label={`Mark ${s.name} completed`}
+                        className="h-5 w-5 accent-brand-600 cursor-pointer"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">
+            {saving ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Saving…
+              </>
+            ) : (
+              "Save audit"
+            )}
+          </button>
+        </>
+      ) : (
+        <EmptyState icon={ClipboardCheck} title="No students enrolled in this subject" />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Course Audit (legacy single-student form — retained but unused)
 // ---------------------------------------------------------------------------
 function CourseAuditForm({ context, studentId, submit, submitting }) {
   const audit = context.course_audit;
@@ -812,11 +990,11 @@ function MiniBox({ label, value, tone }) {
 function workflowGuidance(slug) {
   const map = {
     "student-handoff":
-      "Records a new student from an admission or enrollment signal and compares received onboarding items against the required checklist. Missing items create a GS Staff follow-up task automatically.",
+      "The registrar's data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically — no manual typing.",
     "loa-decision":
       "For LOA, the system checks residency (a completed term), the four-term LOA limit, and the reason document before routing the Dean's decision. For readmission, it checks return evidence completeness.",
     "course-audit":
-      "Marks a subject completed, current, missing, incomplete, or dropped, then recomputes the student's completion rate and missing count. Clearing all subjects advances the student to Proposal Development.",
+      "Run at the end of the term. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":
       "Compares the submitted evidence package against the protocol requirements for the selected gate (Form 1, Form 4, Final Defense, or Completion). Missing or revised items route back to the right owner.",
     "panel-matching":

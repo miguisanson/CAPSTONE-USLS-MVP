@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Lightbulb,
   Bot,
+  Table2,
 } from "lucide-react";
 
 const ICONS = {
@@ -36,6 +37,7 @@ const NAV_GROUPS = [
     label: "Monitoring",
     items: [
       { to: "/students", label: "Students", icon: Users },
+      { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
       { to: "/work-queue", label: "Work Queue", icon: ListTodo },
       { to: "/activity", label: "Activity Log", icon: Activity },
     ],

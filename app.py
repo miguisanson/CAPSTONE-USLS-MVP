@@ -251,6 +251,7 @@ class Course(db.Model):
     title = db.Column(db.String(160), nullable=False)
     units = db.Column(db.Integer, default=3)
     recommended_term = db.Column(db.String(40), default="Year 1")
+    category = db.Column(db.String(40), default="Core")  # Basic / Major / Cognate (from monitoring sheet groups)
 
 
 # Term-level enrollment signal copied from an institutional source such as AIMS.
@@ -1163,6 +1164,160 @@ def register_routes(app: Flask) -> None:
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_dict(f) for f in faculty]})
 
+    # ---- Course Audit (end-of-term, per-subject roster) ------------------
+    @app.route("/api/course-audit/subjects")
+    def course_audit_subjects():
+        program_id = request.args.get("program_id", type=int)
+        query = Course.query
+        if program_id:
+            query = query.filter(Course.program_id == program_id)
+        counts = dict(
+            db.session.query(CourseRecord.course_id, func.count(CourseRecord.id))
+            .group_by(CourseRecord.course_id)
+            .all()
+        )
+        done = dict(
+            db.session.query(CourseRecord.course_id, func.count(CourseRecord.id))
+            .filter(CourseRecord.status == "Completed")
+            .group_by(CourseRecord.course_id)
+            .all()
+        )
+        items = []
+        for c in query.order_by(Course.code).all():
+            enrolled = counts.get(c.id, 0)
+            if enrolled:
+                items.append({
+                    "id": c.id, "code": c.code, "title": c.title, "program_id": c.program_id,
+                    "enrolled": enrolled, "completed": done.get(c.id, 0),
+                })
+        return jsonify({"items": items})
+
+    @app.route("/api/course-audit/roster")
+    def course_audit_roster():
+        course_id = request.args.get("course_id", type=int)
+        course = Course.query.get_or_404(course_id)
+        rows = (
+            db.session.query(CourseRecord, Student)
+            .join(Student, Student.id == CourseRecord.student_id)
+            .filter(CourseRecord.course_id == course_id)
+            .order_by(Student.last_name.asc(), Student.first_name.asc())
+            .all()
+        )
+        students = [{
+            "student_id": s.id, "name": s.name, "student_number": s.student_number,
+            "program_code": s.program.code, "status": rec.status,
+            "completed": rec.status == "Completed", "term_label": rec.term_label,
+        } for rec, s in rows]
+        return jsonify({
+            "course": {"id": course.id, "code": course.code, "title": course.title},
+            "students": students,
+        })
+
+    @app.route("/api/course-audit/roster", methods=["POST"])
+    def course_audit_roster_save():
+        data = request.get_json(silent=True) or {}
+        course = Course.query.get_or_404(int(data.get("course_id") or 0))
+        completions = data.get("completions") or {}
+        term = (data.get("term") or "").strip()
+        changed = 0
+        for sid_str, done in completions.items():
+            try:
+                sid = int(sid_str)
+            except (TypeError, ValueError):
+                continue
+            rec = CourseRecord.query.filter_by(student_id=sid, course_id=course.id).first()
+            if not rec:
+                continue
+            new_status = "Completed" if done else "Missing"
+            if rec.status == new_status:
+                continue
+            rec.status = new_status
+            rec.updated_at = now_utc()
+            if term:
+                rec.term_label = term
+            changed += 1
+            student = Student.query.get(sid)
+            audit = compute_course_audit(student)
+            if audit["missing_count"] == 0 and student.current_stage in ("Admission", "Coursework"):
+                student.current_stage = "Proposal Development"
+            recompute_risk(student)
+            add_log("course-audit", sid, "Academic Coordinator", f"Course audit {term}".strip(),
+                    f"{course.code} marked {'Completed' if done else 'Not completed'}",
+                    "Academic Coordinator", f"End-of-term course audit for {course.code}.")
+        db.session.commit()
+        return jsonify({
+            "ok": True, "course": course.code, "updated": changed,
+            "message": f"Saved {course.code} audit — {changed} student record(s) updated.",
+        })
+
+    # ---- Monitoring grid (spreadsheet view, one program at a time) -------
+    @app.route("/api/monitoring/grid")
+    def monitoring_grid():
+        program_id = request.args.get("program_id", type=int)
+        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        if not program:
+            return jsonify({"error": "No program found."}), 404
+
+        courses = (
+            Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
+        )
+        students = (
+            Student.query.filter_by(program_id=program.id)
+            .order_by(Student.last_name.asc(), Student.first_name.asc())
+            .all()
+        )
+        sids = [s.id for s in students]
+        cids = [c.id for c in courses]
+        records: dict[tuple[int, int], str] = {}
+        if sids and cids:
+            for rec in CourseRecord.query.filter(
+                CourseRecord.student_id.in_(sids), CourseRecord.course_id.in_(cids)
+            ).all():
+                records[(rec.student_id, rec.course_id)] = rec.status
+
+        cat_order = ["Basic", "Major", "Cognate", "Core", "Comprehensive"]
+        grouped: dict[str, list] = {}
+        for c in courses:
+            grouped.setdefault(c.category or "Core", []).append({"id": c.id, "code": c.code, "title": c.title})
+        categories = [
+            {"name": name, "courses": grouped[name]}
+            for name in sorted(grouped, key=lambda n: cat_order.index(n) if n in cat_order else 99)
+        ]
+
+        def milestones(stage: str) -> dict:
+            idx = STAGES.index(stage) if stage in STAGES else 0
+            return {
+                "title": stage != "LOA" and idx >= STAGES.index("Proposal Development"),
+                "proposal": idx >= STAGES.index("Proposal Defense"),
+                "ethics": idx >= STAGES.index("Data Collection"),
+                "final": idx >= STAGES.index("Final Defense"),
+            }
+
+        rows = []
+        for s in students:
+            cells = {}
+            done = 0
+            for c in courses:
+                status = records.get((s.id, c.id), "Missing")
+                cells[c.id] = status
+                if status == "Completed":
+                    done += 1
+            rows.append({
+                "id": s.id, "name": s.name, "student_number": s.student_number,
+                "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
+                "cells": cells, "completed": done, "total": len(courses),
+                "rate": round(done / len(courses) * 100, 1) if courses else 0,
+                "milestones": milestones(s.current_stage),
+            })
+
+        return jsonify({
+            "program": program_dict(program),
+            "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+            "categories": categories,
+            "course_count": len(courses),
+            "students": rows,
+        })
+
     # Population-level queue of rule-based recommendations.
     @app.route("/api/decision-support")
     def decision_support():
@@ -1603,15 +1758,21 @@ def parse_ac_monitoring(stream) -> dict:
     milestone_start = min(stop_cols) if stop_cols else max_col + 1
 
     subjects = []  # (col, code)
+    subject_categories = {}  # code -> Basic / Major / Cognate
+    current_group = "Core"
+    group_map = {"BASIC": "Basic", "MAJOR": "Major", "COGNATE": "Cognate", "COMPRE": "Comprehensive"}
     if yr_c:
         for c in range(yr_c + 1, milestone_start):
+            group_label = cell(hdr, c).upper()
+            if group_label in group_map:
+                current_group = group_map[group_label]
             code = cell(sub, c)
-            group = cell(hdr, c).upper()
             if not code or code == "-" or code.isdigit() or code.upper() in ("SN", "FN", "TOTAL"):
                 continue
-            if group == "TOTAL":
+            if group_label == "TOTAL":
                 continue
             subjects.append((c, code))
+            subject_categories[code] = current_group
 
     rows = []
     last_ay = None
@@ -1642,7 +1803,12 @@ def parse_ac_monitoring(stream) -> dict:
 
     if not program_code:
         program_code = "IMPORT"
-    return {"program_code": program_code, "subjects": [s[1] for s in subjects], "rows": rows}
+    return {
+        "program_code": program_code,
+        "subjects": [s[1] for s in subjects],
+        "subject_categories": subject_categories,
+        "rows": rows,
+    }
 
 
 def _stage_from_sheet(milestones: dict, completed_subjects: int) -> str:
@@ -1667,13 +1833,17 @@ def import_ac_monitoring(parsed: dict) -> dict:
         db.session.flush()
 
     # ensure a Course row exists for each subject code on the sheet (for this program)
+    categories = parsed.get("subject_categories", {})
     course_by_code: dict[str, Course] = {}
     for code in parsed["subjects"]:
+        category = categories.get(code, "Core")
         existing = Course.query.filter_by(code=code).first()
         if not existing:
-            existing = Course(program_id=program.id, code=code, title=code, units=3)
+            existing = Course(program_id=program.id, code=code, title=code, units=3, category=category)
             db.session.add(existing)
             db.session.flush()
+        elif (existing.category or "Core") == "Core" and category != "Core":
+            existing.category = category
         course_by_code[code] = existing
 
     term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()

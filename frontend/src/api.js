@@ -53,6 +53,13 @@ export const api = {
     if (!res.ok) throw new Error((body && body.error) || `Upload failed (${res.status})`);
     return body;
   },
+  monitoringGrid: (programId) =>
+    request(`/monitoring/grid${programId ? `?program_id=${programId}` : ""}`),
+  courseAuditSubjects: (programId) =>
+    request(`/course-audit/subjects${programId ? `?program_id=${programId}` : ""}`),
+  courseAuditRoster: (courseId) => request(`/course-audit/roster?course_id=${courseId}`),
+  saveCourseAudit: (payload) =>
+    request("/course-audit/roster", { method: "POST", body: JSON.stringify(payload) }),
   decisionSupport: () => request("/decision-support"),
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),
