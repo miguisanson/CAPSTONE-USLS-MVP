@@ -1,14 +1,16 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// During `npm run dev` the Vite server (5173) proxies /api calls to Flask (5000).
+const flaskPort = process.env.FLASK_PORT || "5000";
+
+// During `npm run dev:web` the Vite server (5173) proxies /api calls to Flask.
 // `npm run build` emits to dist/, which Flask serves directly in production.
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:5000",
+      "/api": `http://localhost:${flaskPort}`,
     },
   },
   build: {

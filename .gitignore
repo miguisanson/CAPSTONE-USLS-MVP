@@ -5,6 +5,7 @@ server/node_modules/
 References/MVP-FIGMA/node_modules/
 __pycache__/
 *.py[cod]
+.venv/
 
 # Build output
 dist/

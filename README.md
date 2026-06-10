@@ -101,8 +101,9 @@ Run this once from the project root:
 npm run setup
 ```
 
-This command installs the Python dependencies, installs the React frontend dependencies, builds
-the frontend, and creates the demo SQLite database with seed data.
+This command creates a local `.venv`, installs the Python dependencies from `requirements.txt`,
+installs the React frontend dependencies, builds the frontend, and creates the demo SQLite
+database with seed data.
 
 ### 4. Start the app
 
@@ -111,6 +112,15 @@ npm run dev
 ```
 
 Then open <http://localhost:5000>. Press `Ctrl+C` in the terminal to stop the server.
+
+On macOS, port 5000 may already be used by Control Center / AirPlay Receiver. If that happens,
+start the app on port 5001 instead:
+
+```cmd
+FLASK_PORT=5001 npm run dev
+```
+
+Then open <http://localhost:5001>.
 
 ### Development with frontend hot reload
 
@@ -123,6 +133,13 @@ npm run dev:web
 ```
 
 Open the Vite app at <http://localhost:5173>. The Flask API still runs on <http://localhost:5000>.
+
+If you are using port 5001 because port 5000 is taken, pass the same port to both terminals:
+
+```cmd
+FLASK_PORT=5001 npm run dev
+FLASK_PORT=5001 npm run dev:web
+```
 
 ### All available npm scripts
 
