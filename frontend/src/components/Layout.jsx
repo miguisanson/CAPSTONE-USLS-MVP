@@ -17,6 +17,8 @@ import {
   Lightbulb,
   Bot,
   Table2,
+  BookOpenCheck,
+  SlidersHorizontal,
 } from "lucide-react";
 
 const ICONS = {
@@ -40,6 +42,13 @@ const NAV_GROUPS = [
       { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
       { to: "/work-queue", label: "Work Queue", icon: ListTodo },
       { to: "/activity", label: "Activity Log", icon: Activity },
+    ],
+  },
+  {
+    label: "Planning",
+    items: [
+      { to: "/curriculum-planning", label: "Curriculum Planning", icon: BookOpenCheck },
+      { to: "/course-adjustments", label: "Course Adjustments", icon: SlidersHorizontal },
     ],
   },
   {

@@ -12,6 +12,7 @@ import {
   FileText,
   AlertTriangle,
   Lightbulb,
+  Bot,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -26,6 +27,11 @@ export default function StudentDetail() {
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load student" hint={error} />;
 
   const { student, stages, stage_index, course_audit, research_case, documents_by_gate, panel, schedules, tasks, logs, recommendations = [] } = data;
+  const auditAssistantParams = new URLSearchParams({
+    student_id: String(student.id),
+    student_label: student.search_label || student.name,
+    q: `Is ${student.name} eligible to move to Proposal Development based on the course audit? Explain what is complete and what is missing.`,
+  });
 
   return (
     <div className="space-y-5 animate-fade-up">
@@ -91,7 +97,16 @@ export default function StudentDetail() {
         <div className="space-y-5 lg:col-span-8">
           {/* Course audit */}
           <Card className="p-6">
-            <SectionTitle title="Course audit" subtitle="Completed, current, and missing subjects vs curriculum" icon={ClipboardCheck} />
+            <SectionTitle
+              title="Course audit"
+              subtitle="Completed, current, and missing subjects vs curriculum"
+              icon={ClipboardCheck}
+              action={
+                <Link to={`/assistant?${auditAssistantParams.toString()}`} className="btn-ghost shrink-0">
+                  <Bot className="h-4 w-4" /> Ask eligibility
+                </Link>
+              }
+            />
             <div className="mb-4 flex items-center gap-4">
               <div className="flex-1">
                 <div className="mb-1 flex items-center justify-between text-sm">

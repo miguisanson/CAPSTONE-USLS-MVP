@@ -7,6 +7,8 @@ import WorkQueue from "./pages/WorkQueue";
 import ActivityLog from "./pages/ActivityLog";
 import WorkflowPage from "./pages/WorkflowPage";
 import MonitoringGrid from "./pages/MonitoringGrid";
+import CurriculumPlanning from "./pages/CurriculumPlanning";
+import CourseAdjustments from "./pages/CourseAdjustments";
 import DecisionSupport from "./pages/DecisionSupport";
 import Assistant from "./pages/Assistant";
 
@@ -18,6 +20,8 @@ export default function App() {
         <Route path="/students" element={<Students />} />
         <Route path="/students/:id" element={<StudentDetail />} />
         <Route path="/monitoring-sheet" element={<MonitoringGrid />} />
+        <Route path="/curriculum-planning" element={<CurriculumPlanning />} />
+        <Route path="/course-adjustments" element={<CourseAdjustments />} />
         <Route path="/work-queue" element={<WorkQueue />} />
         <Route path="/activity" element={<ActivityLog />} />
         <Route path="/decision-support" element={<DecisionSupport />} />

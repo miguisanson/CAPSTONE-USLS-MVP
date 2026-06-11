@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Table2, Download, AlertTriangle, Check } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -15,6 +15,16 @@ const CELL = {
   Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
 };
 
+const STATUS_CYCLE = ["Missing", "Completed", "Current", "Incomplete"];
+const CELL_VIEW = {
+  Completed: { cls: "bg-brand-500 text-white", mark: "C" },
+  Current: { cls: "bg-blue-100 text-blue-700", mark: "R" },
+  Enrolled: { cls: "bg-blue-100 text-blue-700", mark: "R" },
+  Incomplete: { cls: "bg-amber-200 text-amber-800", mark: "I" },
+  Dropped: { cls: "bg-slate-200 text-slate-500", mark: "D" },
+  Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
+};
+
 const MILES = [
   ["title", "Title"],
   ["proposal", "Proposal"],
@@ -24,6 +34,8 @@ const MILES = [
 
 export default function MonitoringGrid() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedProgramId = searchParams.get("program_id") || "";
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
   const [grid, setGrid] = useState(null);
@@ -45,23 +57,24 @@ export default function MonitoringGrid() {
   }
 
   useEffect(() => {
-    load();
+    load(selectedProgramId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedProgramId]);
 
   const flatCourses = useMemo(
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
     [grid]
   );
 
-  async function toggleCell(studentId, course, current) {
-    const next = current !== "Completed";
+  async function cycleCell(studentId, course, current) {
+    const index = STATUS_CYCLE.indexOf(current);
+    const nextStatus = STATUS_CYCLE[(index + 1) % STATUS_CYCLE.length];
     // optimistic update
     setGrid((g) => {
       if (!g) return g;
       const students = g.students.map((s) => {
         if (s.id !== studentId) return s;
-        const cells = { ...s.cells, [course.id]: next ? "Completed" : "Missing" };
+        const cells = { ...s.cells, [course.id]: nextStatus };
         const completed = flatCourses.reduce((n, c) => n + (cells[c.id] === "Completed" ? 1 : 0), 0);
         return { ...s, cells, completed, rate: g.course_count ? Math.round((completed / g.course_count) * 1000) / 10 : 0 };
       });
@@ -69,7 +82,7 @@ export default function MonitoringGrid() {
     });
     setSaving(true);
     try {
-      await api.saveCourseAudit({ course_id: course.id, completions: { [studentId]: next } });
+      await api.saveCourseAudit({ course_id: course.id, statuses: { [studentId]: nextStatus } });
     } catch (e) {
       setError(e.message);
       load(programId); // revert by reloading on failure
@@ -85,7 +98,7 @@ export default function MonitoringGrid() {
     grid.students.forEach((s) => {
       const row = [
         `"${s.name}"`, s.student_number, s.entry_year,
-        ...flatCourses.map((c) => (s.cells[c.id] === "Completed" ? "1" : "")),
+        ...flatCourses.map((c) => s.cells[c.id] || "Missing"),
         s.completed, s.total, s.rate,
       ];
       lines.push(row.join(","));
@@ -105,13 +118,13 @@ export default function MonitoringGrid() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
           <p className="mt-1 text-sm text-slate-500">
-            The full class view — students by row, subjects by column. Click any subject cell to mark it completed.
+            The full class view — students by row, subjects by column. Click a subject cell to cycle its status.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={programId}
-            onChange={(e) => load(e.target.value)}
+            onChange={(e) => setSearchParams({ program_id: e.target.value })}
             className="field-input cursor-pointer"
             aria-label="Program"
           >
@@ -130,8 +143,10 @@ export default function MonitoringGrid() {
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Completed</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-100 ring-1 ring-amber-200" /> Current / Incomplete</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Current</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-amber-300" /> Incomplete</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>
+        <span className="text-slate-400">Cycle: Not taken - Completed - Current - Incomplete</span>
         {saving && <span className="text-brand-600">Saving…</span>}
       </div>
 
@@ -221,13 +236,13 @@ export default function MonitoringGrid() {
                     </td>
                     {flatCourses.map((c) => {
                       const status = s.cells[c.id] || "Missing";
-                      const sty = CELL[status] || CELL.Missing;
+                      const sty = CELL_VIEW[status] || CELL_VIEW.Missing;
                       return (
                         <td key={c.id} className="border-b border-r border-slate-100 p-0 text-center">
                           <button
                             type="button"
-                            onClick={() => toggleCell(s.id, c, status)}
-                            title={`${c.code} — ${status} (click to toggle)`}
+                            onClick={() => cycleCell(s.id, c, status)}
+                            title={`${c.code} — ${status}. Click to cycle to the next status.`}
                             className={`flex h-8 w-full items-center justify-center text-[11px] font-bold transition-colors hover:opacity-80 cursor-pointer ${sty.cls}`}
                           >
                             {sty.mark}
@@ -264,3 +279,5 @@ export default function MonitoringGrid() {
     </div>
   );
 }
+
+

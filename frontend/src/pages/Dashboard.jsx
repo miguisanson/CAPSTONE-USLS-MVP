@@ -225,7 +225,7 @@ export default function Dashboard() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-ink">{log.result}</p>
                     <p className="truncate text-xs text-slate-500">
-                      {log.student_name || "—"} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
+                      {log.student_name || log.source_reference || "Workflow"} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
                     </p>
                   </div>
                 </li>
@@ -283,3 +283,4 @@ function MiniStat({ icon: Icon, label, value }) {
     </Card>
   );
 }
+

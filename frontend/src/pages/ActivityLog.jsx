@@ -7,6 +7,8 @@ import { formatDate } from "../lib/format";
 
 const SLUG_LABEL = {
   "student-handoff": "Student Handoff",
+  "curriculum-planning": "Curriculum Planning",
+  "course-adjustments": "Course Adjustments",
   "loa-decision": "LOA / Readmission",
   "course-audit": "Course Audit",
   "research-gate": "Research Gate",
@@ -55,6 +57,7 @@ export default function ActivityLog() {
                       </Link>
                     </>
                   )}
+                  {!log.student_id && log.source_reference && <>{" · "}{log.source_reference}</>}
                   {" · next owner: "}
                   {log.next_owner || "—"}
                 </p>
@@ -67,3 +70,4 @@ export default function ActivityLog() {
     </div>
   );
 }
+

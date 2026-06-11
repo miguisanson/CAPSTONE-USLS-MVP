@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Send, Sparkles, BookText, Info, Bot, User, CornerDownLeft } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -7,6 +7,9 @@ import { Card, SectionTitle } from "../components/ui";
 import StudentPicker from "../components/StudentPicker";
 
 export default function Assistant() {
+  const [searchParams] = useSearchParams();
+  const initialStudentId = searchParams.get("student_id");
+  const initialQuestion = searchParams.get("q") || "";
   const { data: meta } = useApi(() => api.meta(), []);
   const { data: suggData } = useApi(() => api.assistantSuggestions(), []);
   const [messages, setMessages] = useState([
@@ -17,11 +20,19 @@ export default function Assistant() {
       citations: [],
     },
   ]);
-  const [input, setInput] = useState("");
-  const [studentId, setStudentId] = useState(null);
-  const [studentLabel, setStudentLabel] = useState("");
+  const [input, setInput] = useState(initialQuestion);
+  const [studentId, setStudentId] = useState(initialStudentId ? Number(initialStudentId) : null);
+  const [studentLabel, setStudentLabel] = useState(searchParams.get("student_label") || "");
   const [busy, setBusy] = useState(false);
   const endRef = useRef(null);
+
+  useEffect(() => {
+    const nextStudentId = searchParams.get("student_id");
+    const nextQuestion = searchParams.get("q") || "";
+    setStudentId(nextStudentId ? Number(nextStudentId) : null);
+    setStudentLabel(searchParams.get("student_label") || "");
+    if (nextQuestion) setInput(nextQuestion);
+  }, [searchParams]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });

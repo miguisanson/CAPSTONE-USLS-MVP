@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, ChevronLeft, ChevronRight, Users, SlidersHorizontal } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, SlidersHorizontal, GitMerge, AlertTriangle } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
@@ -37,10 +37,32 @@ export default function Students() {
     setSearchParams(params, { replace: true });
   }, [debouncedQ, stage, risk, programId, page, setSearchParams]);
 
-  const { data, loading, error } = useApi(
+  const { data, loading, error, refetch } = useApi(
     () => api.students({ q: debouncedQ, stage, risk, program_id: programId, page, page_size: 25 }),
     [debouncedQ, stage, risk, programId, page]
   );
+  const { data: duplicateData, loading: duplicatesLoading, refetch: refetchDuplicates } = useApi(
+    () => api.duplicateStudents(),
+    []
+  );
+  const [mergeBusy, setMergeBusy] = useState("");
+  const [mergeMessage, setMergeMessage] = useState("");
+
+  async function mergeDuplicate(targetId, sourceId, overwriteProfile = false) {
+    const key = `${targetId}-${sourceId}-${overwriteProfile ? "overwrite" : "keep"}`;
+    setMergeBusy(key);
+    setMergeMessage("");
+    try {
+      const res = await api.mergeStudents({ target_id: targetId, source_id: sourceId, overwrite_profile: overwriteProfile });
+      setMergeMessage(res.message);
+      refetch();
+      refetchDuplicates();
+    } catch (err) {
+      setMergeMessage(err.message || "Could not merge duplicate records.");
+    } finally {
+      setMergeBusy("");
+    }
+  }
 
   const activeFilters = useMemo(
     () => [debouncedQ, stage, risk, programId].filter(Boolean).length,
@@ -93,6 +115,14 @@ export default function Students() {
           </button>
         )}
       </Card>
+
+      <DuplicateReview
+        groups={duplicateData?.groups || []}
+        loading={duplicatesLoading}
+        busy={mergeBusy}
+        message={mergeMessage}
+        onMerge={mergeDuplicate}
+      />
 
       <Card className="overflow-hidden">
         {loading ? (
@@ -184,6 +214,74 @@ export default function Students() {
         )}
       </Card>
     </div>
+  );
+}
+
+function DuplicateReview({ groups, loading, busy, message, onMerge }) {
+  if (loading) return null;
+  if (!groups.length) return null;
+
+  return (
+    <Card className="p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+          <AlertTriangle className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 className="text-lg font-semibold leading-tight text-ink">Duplicate review</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Review likely duplicate identities before they split the monitoring sheet and student directory.
+          </p>
+        </div>
+      </div>
+      {message && <p className="mb-3 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">{message}</p>}
+      <div className="space-y-3">
+        {groups.map((group, i) => {
+          const primary = group.students[0];
+          const duplicates = group.students.slice(1);
+          return (
+            <div key={`${group.reason}-${i}`} className="rounded-xl border border-slate-100 p-3">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{group.reason}</p>
+              <div className="space-y-2">
+                {group.students.map((s, index) => (
+                  <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">
+                        {index === 0 ? "Primary: " : "Duplicate: "}{s.name}
+                      </p>
+                      <p className="text-xs text-slate-500">{s.student_number} · {s.program_code} · Entry {s.entry_year}</p>
+                    </div>
+                    {index > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onMerge(primary.id, s.id, false)}
+                          disabled={!!busy}
+                          className="btn-ghost"
+                        >
+                          <GitMerge className="h-4 w-4" /> Merge
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onMerge(primary.id, s.id, true)}
+                          disabled={!!busy}
+                          className="btn-primary"
+                        >
+                          Use duplicate profile
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {duplicates.length > 1 && (
+                <p className="mt-2 text-xs text-slate-400">Merge duplicates one at a time into the primary record.</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

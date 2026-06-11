@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   UploadCloud,
   FileSpreadsheet,
+  Table2,
+  GitMerge,
   X,
   ArrowUpRight,
 } from "lucide-react";
@@ -184,8 +186,9 @@ export default function WorkflowPage() {
                   <li key={log.id} className="rounded-xl border border-slate-100 p-3">
                     <p className="text-sm font-semibold text-ink">{log.result}</p>
                     <p className="text-xs text-slate-500">
-                      {log.student_name || "—"} · {formatDate(log.created_at)}
+                      {log.student_name || log.source_reference || "Workflow"} · {formatDate(log.created_at)}
                     </p>
+                    {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
                   </li>
                 ))}
               </ul>
@@ -271,6 +274,11 @@ function HandoffImport({ context }) {
             : "Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically"
         }
         icon={FileSpreadsheet}
+        action={
+          <Link to="/monitoring-sheet" className="btn-ghost shrink-0">
+            <Table2 className="h-4 w-4" /> Full sheet
+          </Link>
+        }
       />
 
       {/* Dropzone */}
@@ -334,7 +342,7 @@ function HandoffImport({ context }) {
           </>
         ) : (
           <>
-            <UploadCloud className="h-4 w-4" /> Import students
+            <UploadCloud className="h-4 w-4" /> {isAudit ? "Update audits" : "Import students"}
           </>
         )}
       </button>
@@ -344,15 +352,49 @@ function HandoffImport({ context }) {
           <div className="flex items-center gap-2 text-sm font-semibold text-brand-800">
             <CheckCircle2 className="h-5 w-5" /> {result.message}
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
             <ResultStat label="New" value={result.created} />
-            <ResultStat label="Updated" value={result.updated} />
+            <ResultStat label="Matched" value={result.updated} />
+            <ResultStat label="Cell changes" value={result.subject_changes ?? 0} />
+            <ResultStat label="Conflicts" value={result.conflict_count ?? 0} />
             <ResultStat label="Subjects" value={result.subjects} />
             <ResultStat label="Program" value={result.program} />
           </div>
+          {result.program_id && (
+            <div className="flex flex-wrap gap-2">
+              <Link to={`/monitoring-sheet?program_id=${result.program_id}`} className="btn-primary">
+                <Table2 className="h-4 w-4" /> Open Monitoring Sheet
+              </Link>
+              <Link to="/students" className="btn-ghost">
+                <Users className="h-4 w-4" /> View Students
+              </Link>
+            </div>
+          )}
+          {result.conflicts?.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
+                <AlertTriangle className="h-4 w-4" /> Rows skipped for duplicate review
+              </p>
+              <ul className="space-y-2">
+                {result.conflicts.slice(0, 5).map((c) => (
+                  <li key={`${c.incoming_student_number}-${c.matched_student.id}`} className="rounded-lg bg-white px-3 py-2 text-sm">
+                    <p className="font-semibold text-ink">{c.incoming_name || "Unnamed student"} · {c.incoming_student_number}</p>
+                    <p className="text-xs text-slate-500">
+                      Possible match: {c.matched_student.name} · {c.matched_student.student_number}. {c.reason}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <Link to="/students" className="btn-ghost mt-3">
+                <GitMerge className="h-4 w-4" /> Open duplicate review
+              </Link>
+            </div>
+          )}
           {result.sample?.length > 0 && (
             <div className="rounded-xl border border-slate-100 bg-white p-3">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Imported students (sample)</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                {isAudit ? "Updated students (sample)" : "Imported students (sample)"}
+              </p>
               <ul className="divide-y divide-slate-100">
                 {result.sample.map((s) => (
                   <li key={s.id} className="flex items-center justify-between py-2">
@@ -1004,3 +1046,5 @@ function workflowGuidance(slug) {
   };
   return map[slug] || "";
 }
+
+

@@ -29,6 +29,9 @@ export const api = {
     return request(`/students${qs ? `?${qs}` : ""}`);
   },
   student: (id) => request(`/students/${id}`),
+  duplicateStudents: () => request("/students/duplicates"),
+  mergeStudents: (payload) =>
+    request("/students/merge", { method: "POST", body: JSON.stringify(payload) }),
   tasks: (owner) => request(`/tasks${owner ? `?owner=${encodeURIComponent(owner)}` : ""}`),
   activity: () => request("/activity"),
   transactionContext: (slug, params = {}) => {
@@ -55,6 +58,14 @@ export const api = {
   },
   monitoringGrid: (programId) =>
     request(`/monitoring/grid${programId ? `?program_id=${programId}` : ""}`),
+  curriculumPlanning: (programId) =>
+    request(`/curriculum-planning${programId ? `?program_id=${programId}` : ""}`),
+  generateCurriculum: (payload) =>
+    request("/curriculum-planning/generate", { method: "POST", body: JSON.stringify(payload) }),
+  courseAdjustments: (programId) =>
+    request(`/course-adjustments${programId ? `?program_id=${programId}` : ""}`),
+  saveCourseAdjustmentPlan: (payload) =>
+    request("/course-adjustments/plan", { method: "POST", body: JSON.stringify(payload) }),
   courseAuditSubjects: (programId) =>
     request(`/course-audit/subjects${programId ? `?program_id=${programId}` : ""}`),
   courseAuditRoster: (courseId) => request(`/course-audit/roster?course_id=${courseId}`),
