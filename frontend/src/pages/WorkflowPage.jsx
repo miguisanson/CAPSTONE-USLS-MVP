@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import {
   UserPlus,
   CalendarOff,
+  UserCheck,
   ClipboardCheck,
   FileCheck,
   Users,
@@ -25,7 +26,8 @@ import { formatDate } from "../lib/format";
 
 const ICONS = {
   "student-handoff": UserPlus,
-  "loa-decision": CalendarOff,
+  "leave-of-absence": CalendarOff,
+  readmission: UserCheck,
   "course-audit": ClipboardCheck,
   "research-gate": FileCheck,
   "panel-matching": Users,
@@ -34,7 +36,8 @@ const ICONS = {
 
 const NEEDS_STUDENT = {
   "student-handoff": false,
-  "loa-decision": true,
+  "leave-of-absence": true,
+  readmission: true,
   "course-audit": true,
   "research-gate": true,
   "panel-matching": true,
@@ -165,7 +168,8 @@ export default function WorkflowPage() {
               {slug === "research-gate" && <ResearchGateForm {...formProps} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
               {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
-              {slug === "loa-decision" && <LoaDecisionForm {...formProps} />}
+              {slug === "leave-of-absence" && <LeaveOfAbsenceForm {...formProps} />}
+              {slug === "readmission" && <ReadmissionForm {...formProps} />}
             </Card>
           )}
         </div>
@@ -717,21 +721,92 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
 }
 
 // ---------------------------------------------------------------------------
-// LOA / Readmission
+// Leave of Absence
 // ---------------------------------------------------------------------------
-function LoaDecisionForm({ context, studentId, submit, submitting }) {
-  const [requestType, setRequestType] = useState("LOA");
-  const readmission = context.readmission_requirements || [];
-  const [items, setItems] = useState(readmission);
+function LeaveOfAbsenceForm({ studentId, submit, submitting }) {
   const [form, setForm] = useState({
-    dean_action: "Approve",
-    completed_terms: 1,
-    loa_terms_used: 0,
-    requested_terms: 1,
-    reason_document: "yes",
+    request_date: new Date().toISOString().slice(0, 10),
+    application_reference: "",
     effective_start: "",
     effective_end: "",
-    notes: "",
+    reason_remarks: "",
+    prior_loa_count: 0,
+    eligibility_status: "Eligible",
+    dean_action: "Approve",
+    staff_notes: "",
+    source_reference: "",
+  });
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  function onSubmit(e) {
+    e.preventDefault();
+    submit({ student_id: studentId, ...form });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-5">
+      <SectionTitle title="Record leave of absence" subtitle="Records the request, Dean decision, status pause, and notice trail" icon={CalendarOff} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Application attachment / file reference">
+          <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
+        </Field>
+        <Field label="Request date" required>
+          <Input type="date" value={form.request_date} onChange={set("request_date")} required />
+        </Field>
+        <Field label="Effective start term/date">
+          <Input value={form.effective_start} onChange={set("effective_start")} placeholder="AY 2026-2027 Term 1 or YYYY-MM-DD" />
+        </Field>
+        <Field label="Effective end term/date">
+          <Input value={form.effective_end} onChange={set("effective_end")} placeholder="AY 2026-2027 Term 2 or YYYY-MM-DD" />
+        </Field>
+        <Field label="Prior LOA count">
+          <Input type="number" min="0" value={form.prior_loa_count} onChange={set("prior_loa_count")} />
+        </Field>
+        <Field label="Eligibility status / check result">
+          <Select
+            value={form.eligibility_status}
+            onChange={set("eligibility_status")}
+            placeholder=""
+            options={["Eligible", "Needs Review", "Not Eligible", "Pending Requirements"]}
+          />
+        </Field>
+      </div>
+
+      <Field label="Dean decision">
+        <RadioRow
+          value={form.dean_action}
+          onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))}
+          options={["Approve", "Deny", "Return for Revision"]}
+        />
+      </Field>
+      <Field label="Reason / remarks">
+        <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} />
+      </Field>
+      <Field label="Staff notes">
+        <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
+      </Field>
+      <Field label="Source / reference number">
+        <Input value={form.source_reference} onChange={set("source_reference")} />
+      </Field>
+      <SubmitButton submitting={submitting}>Record LOA Decision</SubmitButton>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Readmission
+// ---------------------------------------------------------------------------
+function ReadmissionForm({ context, studentId, submit, submitting }) {
+  const requirements = context.readmission_requirements || [];
+  const [items, setItems] = useState(requirements);
+  const [form, setForm] = useState({
+    application_reference: "",
+    target_return_term: "",
+    previous_loa_period: "",
+    eligibility_status: "Eligible to Return",
+    missing_requirements: "",
+    dean_action: "Approve",
+    staff_notes: "",
     source_reference: "",
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -741,55 +816,51 @@ function LoaDecisionForm({ context, studentId, submit, submitting }) {
 
   function onSubmit(e) {
     e.preventDefault();
-    const payload = { student_id: studentId, request_type: requestType, ...form };
-    if (requestType === "Readmission") payload.readmission_items = items;
-    submit(payload);
+    submit({ student_id: studentId, ...form, readmission_items: items });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Route LOA / Readmission" subtitle="Checks residency rules or return evidence before recording the decision" icon={CalendarOff} />
-      <Field label="Request type">
-        <RadioRow value={requestType} onChange={setRequestType} options={["LOA", "Readmission"]} />
-      </Field>
-
-      {requestType === "LOA" ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="Completed terms" hint="Residency requires ≥ 1">
-            <Input type="number" min="0" value={form.completed_terms} onChange={set("completed_terms")} />
-          </Field>
-          <Field label="LOA terms already used">
-            <Input type="number" min="0" value={form.loa_terms_used} onChange={set("loa_terms_used")} />
-          </Field>
-          <Field label="Requested LOA terms">
-            <Input type="number" min="1" value={form.requested_terms} onChange={set("requested_terms")} />
-          </Field>
-          <Field label="Reason document attached?">
-            <RadioRow value={form.reason_document} onChange={(v) => setForm((f) => ({ ...f, reason_document: v }))} options={[{ value: "yes", label: "Yes" }, { value: "no", label: "No" }]} />
-          </Field>
-          <Field label="Effective start">
-            <Input type="date" value={form.effective_start} onChange={set("effective_start")} />
-          </Field>
-          <Field label="Effective end">
-            <Input type="date" value={form.effective_end} onChange={set("effective_end")} />
-          </Field>
-        </div>
-      ) : (
-        <Field label="Return evidence received" hint="Unticked items are flagged missing and routed back to the student.">
-          <CheckList items={readmission} selected={items} onToggle={toggle} />
+      <SectionTitle title="Record readmission" subtitle="Checks return eligibility, records the Dean decision, and reactivates approved students" icon={UserCheck} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Application attachment / file reference">
+          <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
         </Field>
-      )}
-
+        <Field label="Target return term" required>
+          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 Term 1" />
+        </Field>
+        <Field label="Previous LOA period">
+          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 Term 2 to AY 2026-2027 Term 1" />
+        </Field>
+        <Field label="Eligibility to return status">
+          <Select
+            value={form.eligibility_status}
+            onChange={set("eligibility_status")}
+            placeholder=""
+            options={["Eligible to Return", "Needs Review", "Not Eligible", "Pending Requirements"]}
+          />
+        </Field>
+      </div>
+      <Field label="Eligibility to return checklist" hint="Unticked items are treated as missing requirements.">
+        <CheckList items={requirements} selected={items} onToggle={toggle} />
+      </Field>
+      <Field label="Missing requirements / remarks">
+        <Textarea value={form.missing_requirements} onChange={set("missing_requirements")} />
+      </Field>
       <Field label="Dean decision">
-        <RadioRow value={form.dean_action} onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))} options={["Approve", "Deny", "Return"]} />
+        <RadioRow
+          value={form.dean_action}
+          onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))}
+          options={["Approve", "Deny", "Return for Revision"]}
+        />
       </Field>
-      <Field label="Notes">
-        <Textarea value={form.notes} onChange={set("notes")} />
+      <Field label="Staff notes">
+        <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
       </Field>
-      <Field label="Source reference">
+      <Field label="Source / reference number">
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
-      <SubmitButton submitting={submitting}>Record decision</SubmitButton>
+      <SubmitButton submitting={submitting}>Record Readmission Decision</SubmitButton>
     </form>
   );
 }
@@ -813,8 +884,10 @@ function workflowGuidance(slug) {
   const map = {
     "student-handoff":
       "Records a new student from an admission or enrollment signal and compares received onboarding items against the required checklist. Missing items create a GS Staff follow-up task automatically.",
-    "loa-decision":
-      "For LOA, the system checks residency (a completed term), the four-term LOA limit, and the reason document before routing the Dean's decision. For readmission, it checks return evidence completeness.",
+    "leave-of-absence":
+      "Leave of Absence is a stop/pause process. Staff record the uploaded application, check prior LOA eligibility, forward the request to the Dean, record the decision, update the student's status only when approved, and send the notice.",
+    readmission:
+      "Readmission is a separate return/re-entry process after the approved leave period. Staff record the request, check eligibility for the target term, route the Dean decision, reactivate approved students, and send the notice.",
     "course-audit":
       "Marks a subject completed, current, missing, incomplete, or dropped, then recomputes the student's completion rate and missing count. Clearing all subjects advances the student to Proposal Development.",
     "research-gate":

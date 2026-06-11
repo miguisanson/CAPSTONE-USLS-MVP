@@ -133,55 +133,83 @@
             <textarea name="additional_missing_items" rows="2" placeholder="Optional. One item per line."></textarea>
           </label>
 
-        {% elif transaction.slug == "loa-decision" %}
+        {% elif transaction.slug == "leave-of-absence" %}
           <input type="hidden" name="student_id" value="{{ context.selected_student.id }}">
           <div class="field-row">
-            <label>Request type
-              <select name="request_type">
-                <option>LOA</option>
-                <option>Readmission</option>
-              </select>
-            </label>
             <label>Dean action
               <select name="dean_action">
                 <option>Approve</option>
-                <option>Return</option>
                 <option>Deny</option>
+                <option>Return for Revision</option>
               </select>
+            </label>
+            <label>Request date
+              <input name="request_date" type="date">
             </label>
           </div>
           <div class="field-row">
-            <label>Effective start
-              <input name="effective_start" type="date" value="2026-06-03">
+            <label>Effective start term/date
+              <input name="effective_start" value="AY 2026-2027 Term 1">
             </label>
-            <label>Effective end
-              <input name="effective_end" type="date" value="2026-12-15">
+            <label>Effective end term/date
+              <input name="effective_end" value="AY 2026-2027 Term 2">
+            </label>
+          </div>
+          <div class="field-row">
+            <label>Prior LOA count
+              <input name="prior_loa_count" type="number" min="0" value="0">
+            </label>
+            <label>Eligibility status/check result
+              <select name="eligibility_status">
+                <option>Eligible</option>
+                <option>Needs Review</option>
+                <option>Not Eligible</option>
+                <option>Pending Requirements</option>
+              </select>
+            </label>
+          </div>
+          <label>Application attachment / file reference
+            <input name="application_reference" value="Uploaded LOA application">
+          </label>
+          <label>Reason / remarks
+            <textarea name="reason_remarks" rows="3" placeholder="Reason for leave"></textarea>
+          </label>
+          <label>Source reference
+            <input name="source_reference" value="Dean decision memo">
+          </label>
+          <label>Staff notes
+            <textarea name="staff_notes" rows="4" placeholder="Eligibility check and notice notes"></textarea>
+          </label>
+
+        {% elif transaction.slug == "readmission" %}
+          <input type="hidden" name="student_id" value="{{ context.selected_student.id }}">
+          <div class="field-row">
+            <label>Dean action
+              <select name="dean_action">
+                <option>Approve</option>
+                <option>Deny</option>
+                <option>Return for Revision</option>
+              </select>
+            </label>
+            <label>Target return term
+              <input name="target_return_term" value="AY 2026-2027 Term 1">
+            </label>
+          </div>
+          <div class="field-row">
+            <label>Previous LOA period
+              <input name="previous_loa_period" value="AY 2025-2026 Term 2 to AY 2026-2027 Term 1">
+            </label>
+            <label>Eligibility to return status
+              <select name="eligibility_status">
+                <option>Eligible to Return</option>
+                <option>Needs Review</option>
+                <option>Not Eligible</option>
+                <option>Pending Requirements</option>
+              </select>
             </label>
           </div>
           <fieldset>
-            <legend>LOA rule facts</legend>
-            <div class="field-row">
-              <label>Completed terms
-                <input name="completed_terms" type="number" min="0" value="2">
-              </label>
-              <label>LOA terms already used
-                <input name="loa_terms_used" type="number" min="0" value="0">
-              </label>
-            </div>
-            <div class="field-row">
-              <label>Requested LOA terms
-                <input name="requested_terms" type="number" min="1" max="4" value="1">
-              </label>
-              <label>Reason document submitted
-                <select name="reason_document">
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-              </label>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Readmission evidence</legend>
+            <legend>Eligibility to return checklist</legend>
             <div class="check-grid">
               {% for item in context.readmission_requirements %}
                 <label class="check-item">
@@ -191,11 +219,17 @@
               {% endfor %}
             </div>
           </fieldset>
+          <label>Application attachment / file reference
+            <input name="application_reference" value="Uploaded readmission request">
+          </label>
+          <label>Missing requirements / remarks
+            <textarea name="missing_requirements" rows="3" placeholder="Optional missing items or return notes"></textarea>
+          </label>
           <label>Source reference
             <input name="source_reference" value="Dean decision memo">
           </label>
-          <label>Decision notes
-            <textarea name="notes" rows="4" placeholder="Residency, missing proof, or return-term note"></textarea>
+          <label>Staff notes
+            <textarea name="staff_notes" rows="4" placeholder="Eligibility and notice notes"></textarea>
           </label>
 
         {% elif transaction.slug == "course-audit" %}

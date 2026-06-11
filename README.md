@@ -11,16 +11,17 @@ monitoring environment.
 
 ## What It Does
 
-Six working workflows (transactions) drive the platform. Each one performs a real action and
+Seven working workflows (transactions) drive the platform. Each one performs a real action and
 writes SQL-backed records (students, enrollment, course evidence, document checks, panel
 assignments, schedule requests, tasks, and an activity trail):
 
 1. **Student Handoff** - creates the monitoring record and compares received onboarding evidence.
-2. **LOA / Readmission Decision** - checks residency rules or return evidence, then records the decision.
-3. **Course Audit** - maps completed/current/missing subjects against curriculum requirements.
-4. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
-5. **Panel Matching** - scores faculty by specialization, availability, college, and workload.
-6. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
+2. **Leave of Absence** - records the application, eligibility check, Dean decision, status pause, and notice.
+3. **Readmission** - records the return request, eligibility-to-return check, Dean decision, re-entry status, and notice.
+4. **Course Audit** - maps completed/current/missing subjects against curriculum requirements.
+5. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
+6. **Panel Matching** - scores faculty by specialization, availability, college, and workload.
+7. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
 
 On top of the transactions: a **Dashboard** (transaction-derived KPIs + charts), a **Students**
 directory with a full lifecycle record view, a role-filtered **Work Queue**, and an **Activity Log**.

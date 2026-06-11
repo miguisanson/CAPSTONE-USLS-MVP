@@ -7,6 +7,7 @@ import {
   Activity,
   UserPlus,
   CalendarOff,
+  UserCheck,
   ClipboardCheck,
   FileCheck,
   CalendarCheck,
@@ -21,6 +22,7 @@ import {
 const ICONS = {
   "user-plus": UserPlus,
   "calendar-off": CalendarOff,
+  "user-check": UserCheck,
   "clipboard-check": ClipboardCheck,
   "file-check": FileCheck,
   users: Users,
@@ -51,11 +53,12 @@ const NAV_GROUPS = [
 
 const WORKFLOWS = [
   { slug: "student-handoff", label: "Student Handoff", icon: "user-plus" },
+  { slug: "leave-of-absence", label: "Leave of Absence", icon: "calendar-off" },
+  { slug: "readmission", label: "Readmission", icon: "user-check" },
   { slug: "course-audit", label: "Course Audit", icon: "clipboard-check" },
   { slug: "research-gate", label: "Research Gate", icon: "file-check" },
   { slug: "panel-matching", label: "Panel Matching", icon: "users" },
   { slug: "defense-scheduling", label: "Defense Scheduling", icon: "calendar-check" },
-  { slug: "loa-decision", label: "LOA / Readmission", icon: "calendar-off" },
 ];
 
 function NavItem({ to, label, icon: Icon, end, onClick }) {

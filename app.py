@@ -41,14 +41,24 @@ TRANSACTIONS = [
         "data": "Student profile, admission/enrollment signal, program, term, source reference, timestamp, initial status.",
     },
     {
-        "slug": "loa-decision",
+        "slug": "leave-of-absence",
         "priority": "P0",
-        "title": "LOA / Readmission Decision",
+        "title": "Leave of Absence",
         "icon": "calendar-off",
         "group": "Standing",
-        "short": "Compare request details with residency rules, route a decision, and update standing.",
+        "short": "Record an LOA application, route the Dean decision, and pause the student record when approved.",
         "actor": "Student / GS Staff / Dean",
-        "data": "Request type, effective term, eligibility result, approval/denial/return, residency pause, next owner.",
+        "data": "Application reference, request date, effective period, prior LOA count, eligibility check, Dean decision, status update, notice.",
+    },
+    {
+        "slug": "readmission",
+        "priority": "P0",
+        "title": "Readmission",
+        "icon": "user-check",
+        "group": "Standing",
+        "short": "Record a return request after LOA, route the Dean decision, and reactivate approved students.",
+        "actor": "Student / GS Staff / Dean",
+        "data": "Application reference, target return term, previous LOA period, return eligibility, missing requirements, Dean decision, status update, notice.",
     },
     {
         "slug": "course-audit",
@@ -1823,75 +1833,126 @@ def handle_student_handoff(data: MultiDict) -> int:
     return student.id
 
 
-def handle_loa_decision(data: MultiDict) -> int:
-    # Standing transaction: one handler covers both LOA and readmission because
-    # the UI routes both requests through the same Dean decision flow.
+def handle_leave_of_absence(data: MultiDict) -> int:
+    # Stop/pause transaction: record the student's LOA application, document the
+    # eligibility check, and mark the student on leave only after Dean approval.
     student = Student.query.get_or_404(int(data["student_id"]))
-    request_type = data["request_type"]
     dean_action = data.get("dean_action", "Approve")
-    start = parse_date(data.get("effective_start"))
-    end = parse_date(data.get("effective_end"))
-    source = data.get("source_reference", "")
-    note = data.get("notes", "")
+    source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+    application_reference = (data.get("application_reference") or "").strip()
+    request_date = (data.get("request_date") or "").strip()
+    effective_start = (data.get("effective_start") or "").strip()
+    effective_end = (data.get("effective_end") or "").strip()
+    reason = (data.get("reason_remarks") or "").strip()
+    staff_notes = (data.get("staff_notes") or "").strip()
+    prior_loa_count = int(data.get("prior_loa_count") or 0)
+    eligibility_status = (data.get("eligibility_status") or "Checked").strip()
+    period = " to ".join([part for part in [effective_start, effective_end] if part])
+    is_return = dean_action.lower().startswith("return")
 
-    if request_type == "LOA":
-        # Demo LOA rule: student needs a reason document, at least one completed
-        # term, and no more than four total LOA terms.
-        completed_terms = int(data.get("completed_terms") or 0)
-        loa_terms_used = int(data.get("loa_terms_used") or 0)
-        requested_terms = int(data.get("requested_terms") or 1)
-        has_reason = data.get("reason_document") == "yes"
-        within_limit = loa_terms_used + requested_terms <= 4
-        has_residency = completed_terms >= 1
-        eligible = has_reason and within_limit and has_residency
-        reasons = []
-        if not has_reason:
-            reasons.append("reason document missing")
-        if not has_residency:
-            reasons.append("student has no completed term yet")
-        if not within_limit:
-            reasons.append("requested LOA exceeds four-term demo rule")
-
-        if eligible and dean_action == "Approve":
-            student.current_stage = "LOA"
-            student.standing = "On Leave"
-            student.risk_level = "Medium"
-            result = f"LOA approved from {start} to {end}; residency clock paused for {requested_terms} term(s)"
-            next_owner = "GS Staff"
-        elif dean_action == "Deny":
-            result = "LOA denied after rule check"
-            next_owner = "GS Staff"
-            student.risk_level = "Medium"
-        else:
-            result = f"LOA returned by system check: {', '.join(reasons) if reasons else 'Dean requested completion'}"
-            next_owner = "Student"
-            student.risk_level = "Medium"
-            add_task(student.id, "Complete LOA request requirements", "Student", 5, 35)
-        note = f"{note}\nRule check: completed terms {completed_terms}, used LOA terms {loa_terms_used}, requested {requested_terms}."
+    if dean_action == "Approve":
+        student.current_stage = "LOA"
+        student.standing = "On Leave"
+        student.risk_level = "Medium"
+        result = "LOA approved; student status set to On Leave"
+        if period:
+            result = f"{result} for {period}"
+        next_owner = "GS Staff"
+        status_note = "Graduate School Staff recorded student status as On Leave."
+    elif dean_action == "Deny":
+        result = "LOA denied; student status unchanged"
+        next_owner = "GS Staff"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+    elif is_return:
+        result = "LOA returned for revision; student status unchanged"
+        next_owner = "Student"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+        add_task(student.id, "Revise Leave of Absence application", "Student", 5, 35)
     else:
-        # Readmission is evidence-driven: complete checklist + Dean approval
-        # returns the student to active monitoring.
-        submitted = set(data.getlist("readmission_items"))
-        missing = [item for item in readmission_requirements() if item not in submitted]
-        if not missing and dean_action == "Approve":
-            student.current_stage = "Coursework" if student.current_stage == "LOA" else student.current_stage
-            student.standing = "Active"
-            student.risk_level = "Low"
-            result = "Readmission approved; required return evidence complete"
-            next_owner = "Academic Coordinator"
-            add_task(student.id, "Confirm return-term study plan", "Academic Coordinator", 5, 25)
-        elif dean_action == "Deny":
-            result = "Readmission denied after evidence review"
-            next_owner = "GS Staff"
-            student.risk_level = "Medium"
-        else:
-            result = f"Readmission returned; missing {', '.join(missing) if missing else 'Dean-requested clarification'}"
-            next_owner = "Student"
-            student.risk_level = "Medium"
-            add_task(student.id, "Complete readmission evidence", "Student", 5, 40)
-        note = f"{note}\nEvidence compared: {len(submitted)} submitted, {len(missing)} missing."
+        result = f"LOA decision recorded: {dean_action}"
+        next_owner = "GS Staff"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
 
-    add_log("loa-decision", student.id, "GS Staff / Dean", source, result, next_owner, note.strip())
+    notes = [
+        f"LOA request recorded from {application_reference or source or 'uploaded application/email'}"
+        f"{f' on {request_date}' if request_date else ''}.",
+        f"Prior LOA count checked: {prior_loa_count}; eligibility result: {eligibility_status}.",
+        "Graduate School Staff forwarded the LOA request to the Dean.",
+        f"Dean reviewed the LOA request and sent decision: {dean_action}.",
+        status_note,
+        "LOA notice sent to the student. This is a stop/pause process for the approved period.",
+    ]
+    if period:
+        notes.append(f"Approved/requested LOA period: {period}.")
+    if reason:
+        notes.append(f"Reason/remarks: {reason}")
+    if staff_notes:
+        notes.append(f"Staff notes: {staff_notes}")
+
+    add_log("leave-of-absence", student.id, "GS Staff / Dean", source, result, next_owner, "\n".join(notes))
+    return student.id
+
+
+def handle_readmission(data: MultiDict) -> int:
+    # Return/re-entry transaction: record the readmission request and reactivate
+    # the student only after the Dean approves the return.
+    student = Student.query.get_or_404(int(data["student_id"]))
+    dean_action = data.get("dean_action", "Approve")
+    source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+    application_reference = (data.get("application_reference") or "").strip()
+    target_return_term = (data.get("target_return_term") or "").strip()
+    previous_loa_period = (data.get("previous_loa_period") or "").strip()
+    eligibility_status = (data.get("eligibility_status") or "Checked").strip()
+    submitted = set(data.getlist("readmission_items"))
+    missing = [item for item in readmission_requirements() if item not in submitted]
+    missing.extend(split_items(data.get("missing_requirements", "")))
+    staff_notes = (data.get("staff_notes") or "").strip()
+    is_return = dean_action.lower().startswith("return")
+
+    if dean_action == "Approve":
+        if student.current_stage == "LOA":
+            student.current_stage = "Coursework"
+        student.standing = "Active"
+        student.risk_level = "Low"
+        result = "Readmission approved; student status set to Active"
+        if target_return_term:
+            result = f"{result} for {target_return_term}"
+        next_owner = "Academic Coordinator"
+        status_note = "Graduate School Staff recorded student status as Active."
+        add_task(student.id, "Confirm return-term study plan", "Academic Coordinator", 5, 25)
+    elif dean_action == "Deny":
+        result = "Readmission denied; student status unchanged"
+        next_owner = "GS Staff"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+    elif is_return:
+        result = "Readmission returned for revision; student status unchanged"
+        next_owner = "Student"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+        add_task(student.id, "Complete readmission requirements", "Student", 5, 40)
+    else:
+        result = f"Readmission decision recorded: {dean_action}"
+        next_owner = "GS Staff"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+
+    notes = [
+        f"Readmission request recorded from {application_reference or source or 'uploaded application/email'}.",
+        f"Eligibility to return checked for {target_return_term or 'the target return term'}: {eligibility_status}.",
+        "Graduate School Staff forwarded the readmission request to the Dean.",
+        f"Dean reviewed the readmission request and sent decision: {dean_action}.",
+        status_note,
+        "Readmission notice sent to the student. This is the return/re-entry process after LOA.",
+        f"Return checklist submitted: {len(submitted)} item(s); missing: {', '.join(missing) if missing else 'None'}.",
+    ]
+    if previous_loa_period:
+        notes.append(f"Previous LOA period: {previous_loa_period}.")
+    if staff_notes:
+        notes.append(f"Staff notes: {staff_notes}")
+
+    add_log("readmission", student.id, "GS Staff / Dean", source, result, next_owner, "\n".join(notes))
     return student.id
 
 
@@ -2112,7 +2173,8 @@ def handle_defense_scheduling(data: MultiDict) -> int:
 
 TRANSACTION_HANDLERS = {
     "student-handoff": handle_student_handoff,
-    "loa-decision": handle_loa_decision,
+    "leave-of-absence": handle_leave_of_absence,
+    "readmission": handle_readmission,
     "course-audit": handle_course_audit,
     "research-gate": handle_research_gate,
     "panel-matching": handle_panel_matching,
