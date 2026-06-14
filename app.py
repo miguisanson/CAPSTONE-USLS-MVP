@@ -4,14 +4,16 @@ import os
 import random
 import re
 import sys
+from functools import wraps
 from datetime import date, datetime, time, timedelta
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, text
 from werkzeug.datastructures import MultiDict
+from werkzeug.security import check_password_hash, generate_password_hash
 
 
 load_dotenv()
@@ -41,14 +43,24 @@ TRANSACTIONS = [
         "data": "Student profile, admission/enrollment signal, program, term, source reference, timestamp, initial status.",
     },
     {
-        "slug": "loa-decision",
+        "slug": "leave-of-absence",
         "priority": "P0",
-        "title": "LOA / Readmission Decision",
+        "title": "Leave of Absence",
         "icon": "calendar-off",
         "group": "Standing",
-        "short": "Compare request details with residency rules, route a decision, and update standing.",
+        "short": "Record an LOA application, route the Dean decision, and pause the student record when approved.",
         "actor": "Student / GS Staff / Dean",
-        "data": "Request type, effective term, eligibility result, approval/denial/return, residency pause, next owner.",
+        "data": "Application reference, request date, effective period, prior LOA count, eligibility check, Dean decision, status update, notice.",
+    },
+    {
+        "slug": "readmission",
+        "priority": "P0",
+        "title": "Readmission",
+        "icon": "user-check",
+        "group": "Standing",
+        "short": "Record a return request after LOA, route the Dean decision, and reactivate approved students.",
+        "actor": "Student / GS Staff / Dean",
+        "data": "Application reference, target return term, previous LOA period, return eligibility, missing requirements, Dean decision, status update, notice.",
     },
     {
         "slug": "course-audit",
@@ -235,6 +247,19 @@ class Student(db.Model):
     @property
     def name(self) -> str:
         return f"{self.first_name} {self.last_name}"
+
+
+class UserAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(160), unique=True, nullable=False)
+    full_name = db.Column(db.String(160), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(40), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"))
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=now_utc)
+
+    student = db.relationship("Student")
 
 
 class AcademicTerm(db.Model):
@@ -615,6 +640,43 @@ def human_activity_query():
             & TransactionLog.source_reference.like("Course audit%")
         )
     )
+
+
+def account_dict(account: UserAccount) -> dict:
+    return {
+        "id": account.id,
+        "email": account.email,
+        "full_name": account.full_name,
+        "role": account.role,
+        "student_id": account.student_id,
+    }
+
+
+def current_account() -> UserAccount | None:
+    account_id = session.get("account_id")
+    if not account_id:
+        return None
+    account = UserAccount.query.get(account_id)
+    if not account or not account.active:
+        session.clear()
+        return None
+    return account
+
+
+def require_api_login(role: str | None = None):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            account = current_account()
+            if not account:
+                return jsonify({"error": "Please sign in to continue."}), 401
+            if role and account.role != role:
+                return jsonify({"error": "This account cannot access that area."}), 403
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 # ---------------------------------------------------------------------------
@@ -1093,8 +1155,36 @@ def register_routes(app: Flask) -> None:
     def health():
         return jsonify({"status": "ok", "students": Student.query.count()})
 
+    @app.route("/api/auth/me")
+    def auth_me():
+        account = current_account()
+        return jsonify({"user": account_dict(account) if account else None})
+
+    @app.route("/api/auth/login", methods=["POST"])
+    def auth_login():
+        body = request.get_json(silent=True) or {}
+        role = (body.get("role") or "").strip().lower()
+        email = (body.get("email") or "").strip().lower()
+        password = body.get("password") or ""
+        if role not in ["staff", "student"]:
+            return jsonify({"error": "Choose Staff or Student to sign in."}), 400
+        account = UserAccount.query.filter_by(email=email, role=role, active=True).first()
+        if not account or not check_password_hash(account.password_hash, password):
+            return jsonify({"error": "Invalid email, password, or account type."}), 401
+        session.clear()
+        session["account_id"] = account.id
+        session["role"] = account.role
+        session["student_id"] = account.student_id
+        return jsonify({"user": account_dict(account)})
+
+    @app.route("/api/auth/logout", methods=["POST"])
+    def auth_logout():
+        session.clear()
+        return jsonify({"ok": True})
+
     # Shared reference data used to render filters, dropdowns, and workflow cards.
     @app.route("/api/meta")
+    @require_api_login()
     def meta():
         programs = Program.query.order_by(Program.college, Program.name).all()
         terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
@@ -1112,11 +1202,13 @@ def register_routes(app: Flask) -> None:
 
     # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
+    @require_api_login("staff")
     def dashboard():
         return jsonify(dashboard_stats())
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
+    @require_api_login("staff")
     def students_list():
         query = Student.query.join(Program)
         q = request.args.get("q", "").strip()
@@ -1190,6 +1282,7 @@ def register_routes(app: Flask) -> None:
     # Full student profile: lifecycle stage, audit, research, docs, panel,
     # schedules, tasks, activity trail, and decision-support recommendations.
     @app.route("/api/students/<int:student_id>")
+    @require_api_login("staff")
     def student_detail(student_id: int):
         student = Student.query.get_or_404(student_id)
         audit = compute_course_audit(student)
@@ -1257,8 +1350,236 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    # Student-facing portal context. This mirrors the staff record but keeps the
+    # response focused on what a student needs to see and act on.
+    @app.route("/api/student-portal/context")
+    @require_api_login("student")
+    def student_portal_context():
+        account = current_account()
+        student_id = account.student_id if account else None
+        if not student_id:
+            return jsonify({"error": "No students are available in the demo dataset."}), 404
+
+        student = Student.query.get_or_404(student_id)
+        audit = compute_course_audit(student)
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+        )
+        document_checks = (
+            DocumentCheck.query.filter_by(student_id=student.id)
+            .order_by(DocumentCheck.gate, DocumentCheck.item_name)
+            .all()
+        )
+        schedules = (
+            ScheduleRequest.query.filter_by(student_id=student.id)
+            .order_by(ScheduleRequest.created_at.desc())
+            .limit(5)
+            .all()
+        )
+        tasks = (
+            Task.query.filter(
+                Task.student_id == student.id,
+                Task.status.in_(["Pending", "Overdue"]),
+            )
+            .order_by(Task.priority.desc(), Task.due_at.asc())
+            .limit(12)
+            .all()
+        )
+        logs = (
+            TransactionLog.query.filter(TransactionLog.student_id == student.id)
+            .order_by(TransactionLog.created_at.desc())
+            .limit(18)
+            .all()
+        )
+        docs_by_gate: dict[str, list] = {}
+        for doc in document_checks:
+            docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
+
+        return jsonify(
+            {
+                "student": student_brief(student),
+                "stages": STAGES,
+                "stage_index": STAGES.index(student.current_stage) if student.current_stage in STAGES else 0,
+                "course_audit": course_audit_dict(audit),
+                "research_case": research_case_dict(research_case),
+                "documents_by_gate": docs_by_gate,
+                "schedules": [schedule_request_dict(s) for s in schedules],
+                "tasks": [task_dict(t) for t in tasks],
+                "logs": [log_dict(l) for l in logs],
+                "recommendations": student_recommendations(student)["recommendations"],
+                "gate_requirements": {
+                    gate: required_documents_for_gate(gate)
+                    for gate in [
+                        "Form 1 - Title Defense",
+                        "Form 4 - Proposal Defense Readiness",
+                        "Final Defense",
+                        "Completion Evidence",
+                    ]
+                },
+                "readmission_requirements": readmission_requirements(),
+            }
+        )
+
+    @app.route("/api/student-portal/requests/research-gate", methods=["POST"])
+    @require_api_login("student")
+    def student_research_gate_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        gate = data.get("gate", "Form 1 - Title Defense")
+        title = (data.get("research_title") or "").strip()
+        source = (data.get("source_reference") or data.get("submitted_package") or "").strip()
+        submitted = data.getlist("submitted_items")
+        clean_submitted = [
+            item.split("||", 1)[1] if item.startswith(f"{gate}||") else item
+            for item in submitted
+        ]
+        notes = [
+            f"Student submitted a {gate} request for staff review.",
+            f"Research title: {title or 'Not provided'}.",
+            f"Submitted items: {', '.join(clean_submitted) if clean_submitted else 'None listed'}.",
+        ]
+        if data.get("submitted_package"):
+            notes.append(f"Student notes/package reference: {data.get('submitted_package')}.")
+
+        add_task(student.id, f"Review student {gate} application", "Research Coordinator", 3, 55)
+        add_log(
+            "research-gate",
+            student.id,
+            "Student",
+            source,
+            f"{gate} application submitted",
+            "Research Coordinator",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Research staff will review your application."})
+
+    @app.route("/api/student-portal/requests/leave-of-absence", methods=["POST"])
+    @require_api_login("student")
+    def student_loa_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+        effective_start = (data.get("effective_start") or "").strip()
+        effective_end = (data.get("effective_end") or "").strip()
+        period = " to ".join([part for part in [effective_start, effective_end] if part]) or "Not specified"
+        notes = [
+            "Student submitted a Leave of Absence application for staff eligibility review.",
+            f"Requested period: {period}.",
+        ]
+        if data.get("reason_remarks"):
+            notes.append(f"Reason/remarks: {data.get('reason_remarks')}.")
+        if data.get("application_reference"):
+            notes.append(f"Attachment/reference: {data.get('application_reference')}.")
+
+        add_task(student.id, "Review student Leave of Absence application", "GS Staff", 3, 55)
+        add_log(
+            "leave-of-absence",
+            student.id,
+            "Student",
+            source,
+            "LOA application submitted",
+            "GS Staff",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your LOA application."})
+
+    @app.route("/api/student-portal/requests/readmission", methods=["POST"])
+    @require_api_login("student")
+    def student_readmission_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+        submitted = set(data.getlist("readmission_items"))
+        missing = [item for item in readmission_requirements() if item not in submitted]
+        notes = [
+            "Student submitted a readmission request for staff review.",
+            f"Target return term: {data.get('target_return_term') or 'Not specified'}.",
+            f"Checklist submitted: {len(submitted)} item(s); missing/not marked: {', '.join(missing) if missing else 'None'}.",
+        ]
+        if data.get("previous_loa_period"):
+            notes.append(f"Previous LOA period: {data.get('previous_loa_period')}.")
+        if data.get("application_reference"):
+            notes.append(f"Attachment/reference: {data.get('application_reference')}.")
+
+        add_task(student.id, "Review student readmission request", "GS Staff", 3, 55)
+        add_log(
+            "readmission",
+            student.id,
+            "Student",
+            source,
+            "Readmission request submitted",
+            "GS Staff",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your readmission request."})
+
+    @app.route("/api/student-portal/requests/defense-scheduling", methods=["POST"])
+    @require_api_login("student")
+    def student_defense_schedule_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        source = (data.get("source_reference") or data.get("venue") or "").strip()
+        preferred_date = (data.get("preferred_date") or "").strip()
+        defense_type = data.get("defense_type", "Proposal Defense")
+        notes = [
+            f"Student requested scheduling support for {defense_type}.",
+            f"Preferred date: {preferred_date or 'Not specified'}.",
+            f"Mode: {data.get('mode') or 'Not specified'}.",
+        ]
+        if data.get("venue"):
+            notes.append(f"Venue/link preference: {data.get('venue')}.")
+        if data.get("constraints"):
+            notes.append(f"Constraints: {data.get('constraints')}.")
+
+        add_task(student.id, f"Review student {defense_type} schedule request", "Research Coordinator", 4, 45)
+        add_log(
+            "defense-scheduling",
+            student.id,
+            "Student",
+            source,
+            f"{defense_type} schedule requested",
+            "Research Coordinator",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Research staff will review your preferred schedule."})
+
+    @app.route("/api/student-portal/documents/<int:document_id>/upload", methods=["POST"])
+    @require_api_login("student")
+    def student_document_upload(document_id: int):
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
+        filename = (data.get("filename") or "").strip()
+        if not filename.lower().endswith(".pdf"):
+            return jsonify({"error": "Please choose a PDF supporting document."}), 400
+        doc.status = "Submitted"
+        doc.evidence_reference = filename
+        doc.updated_at = now_utc()
+        add_task(student.id, f"Review submitted {doc.item_name}", "Research Coordinator", 3, 35)
+        add_log(
+            "research-gate",
+            student.id,
+            "Student",
+            filename,
+            f"{doc.item_name} submitted",
+            "Research Coordinator",
+            f"Student uploaded a supporting document for {doc.gate}. Staff must verify before marking it complete.",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Staff will verify the supporting document."})
+
     # Role-filterable work queue.
     @app.route("/api/tasks")
+    @require_api_login("staff")
     def tasks_list():
         owner = request.args.get("owner", "").strip()
         query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
@@ -1269,6 +1590,7 @@ def register_routes(app: Flask) -> None:
 
     # Human-facing audit feed; generated seed history is hidden for clarity.
     @app.route("/api/activity")
+    @require_api_login("staff")
     def activity():
         logs = (
             human_activity_query()
@@ -1280,6 +1602,7 @@ def register_routes(app: Flask) -> None:
 
     # Faculty reference endpoint for panels and scheduling.
     @app.route("/api/faculty")
+    @require_api_login("staff")
     def faculty_list():
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_dict(f) for f in faculty]})
@@ -1609,11 +1932,13 @@ def register_routes(app: Flask) -> None:
 
     # Population-level queue of rule-based recommendations.
     @app.route("/api/decision-support")
+    @require_api_login("staff")
     def decision_support():
         return jsonify(portfolio_recommendations())
 
     # RAG-style policy/case guidance endpoint.
     @app.route("/api/assistant", methods=["POST"])
+    @require_api_login("staff")
     def assistant():
         data = request_payload()
         question = (data.get("question") or "").strip()
@@ -1628,6 +1953,7 @@ def register_routes(app: Flask) -> None:
 
     # Starter questions for the Assistant UI.
     @app.route("/api/assistant/suggestions")
+    @require_api_login("staff")
     def assistant_suggestions():
         return jsonify({
             "items": [
@@ -1642,6 +1968,7 @@ def register_routes(app: Flask) -> None:
     # Supplies each workflow screen with student-specific context before
     # submission, such as current audit status or panel recommendations.
     @app.route("/api/transactions/<slug>/context")
+    @require_api_login("staff")
     def transaction_context(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
             return jsonify({"error": "Unknown workflow."}), 404
@@ -1652,6 +1979,7 @@ def register_routes(app: Flask) -> None:
     # Single transaction entry point. The slug selects the workflow handler,
     # Student Handoff via file upload: ingest an AC Student Monitoring .xlsx.
     @app.route("/api/transactions/student-handoff/import", methods=["POST"])
+    @require_api_login("staff")
     def student_handoff_import():
         file = request.files.get("file")
         if not file or not file.filename:
@@ -1671,6 +1999,7 @@ def register_routes(app: Flask) -> None:
 
     # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
+    @require_api_login("staff")
     def transaction_submit(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
             return jsonify({"error": "Unknown workflow."}), 404
@@ -1917,12 +2246,20 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 .all()
             ]
         if slug == "defense-scheduling":
-            context["assigned_panel"] = [
-                panel_assignment_dict(p)
-                for p in PanelAssignment.query.filter_by(student_id=selected_student.id)
+            assignments = (
+                PanelAssignment.query.filter_by(student_id=selected_student.id)
                 .order_by(PanelAssignment.score.desc())
                 .all()
-            ]
+            )
+            context["assigned_panel"] = [panel_assignment_dict(p) for p in assignments]
+            participants = defense_participants(selected_student, assignments)
+            window_start = date.today()
+            window_end = window_start + timedelta(days=60)
+            context["availability"] = defense_availability_context(
+                participants,
+                window_start,
+                window_end,
+            )
             context["schedules"] = [
                 schedule_request_dict(s)
                 for s in ScheduleRequest.query.filter_by(student_id=selected_student.id)
@@ -2456,75 +2793,126 @@ def handle_student_handoff(data: MultiDict) -> int:
     return student.id
 
 
-def handle_loa_decision(data: MultiDict) -> int:
-    # Standing transaction: one handler covers both LOA and readmission because
-    # the UI routes both requests through the same Dean decision flow.
+def handle_leave_of_absence(data: MultiDict) -> int:
+    # Stop/pause transaction: record the student's LOA application, document the
+    # eligibility check, and mark the student on leave only after Dean approval.
     student = Student.query.get_or_404(int(data["student_id"]))
-    request_type = data["request_type"]
     dean_action = data.get("dean_action", "Approve")
-    start = parse_date(data.get("effective_start"))
-    end = parse_date(data.get("effective_end"))
-    source = data.get("source_reference", "")
-    note = data.get("notes", "")
+    source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+    application_reference = (data.get("application_reference") or "").strip()
+    request_date = (data.get("request_date") or "").strip()
+    effective_start = (data.get("effective_start") or "").strip()
+    effective_end = (data.get("effective_end") or "").strip()
+    reason = (data.get("reason_remarks") or "").strip()
+    staff_notes = (data.get("staff_notes") or "").strip()
+    prior_loa_count = int(data.get("prior_loa_count") or 0)
+    eligibility_status = (data.get("eligibility_status") or "Checked").strip()
+    period = " to ".join([part for part in [effective_start, effective_end] if part])
+    is_return = dean_action.lower().startswith("return")
 
-    if request_type == "LOA":
-        # Demo LOA rule: student needs a reason document, at least one completed
-        # term, and no more than four total LOA terms.
-        completed_terms = int(data.get("completed_terms") or 0)
-        loa_terms_used = int(data.get("loa_terms_used") or 0)
-        requested_terms = int(data.get("requested_terms") or 1)
-        has_reason = data.get("reason_document") == "yes"
-        within_limit = loa_terms_used + requested_terms <= 4
-        has_residency = completed_terms >= 1
-        eligible = has_reason and within_limit and has_residency
-        reasons = []
-        if not has_reason:
-            reasons.append("reason document missing")
-        if not has_residency:
-            reasons.append("student has no completed term yet")
-        if not within_limit:
-            reasons.append("requested LOA exceeds four-term demo rule")
-
-        if eligible and dean_action == "Approve":
-            student.current_stage = "LOA"
-            student.standing = "On Leave"
-            student.risk_level = "Medium"
-            result = f"LOA approved from {start} to {end}; residency clock paused for {requested_terms} term(s)"
-            next_owner = "GS Staff"
-        elif dean_action == "Deny":
-            result = "LOA denied after rule check"
-            next_owner = "GS Staff"
-            student.risk_level = "Medium"
-        else:
-            result = f"LOA returned by system check: {', '.join(reasons) if reasons else 'Dean requested completion'}"
-            next_owner = "Student"
-            student.risk_level = "Medium"
-            add_task(student.id, "Complete LOA request requirements", "Student", 5, 35)
-        note = f"{note}\nRule check: completed terms {completed_terms}, used LOA terms {loa_terms_used}, requested {requested_terms}."
+    if dean_action == "Approve":
+        student.current_stage = "LOA"
+        student.standing = "On Leave"
+        student.risk_level = "Medium"
+        result = "LOA approved; student status set to On Leave"
+        if period:
+            result = f"{result} for {period}"
+        next_owner = "GS Staff"
+        status_note = "Graduate School Staff recorded student status as On Leave."
+    elif dean_action == "Deny":
+        result = "LOA denied; student status unchanged"
+        next_owner = "GS Staff"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+    elif is_return:
+        result = "LOA returned for revision; student status unchanged"
+        next_owner = "Student"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+        add_task(student.id, "Revise Leave of Absence application", "Student", 5, 35)
     else:
-        # Readmission is evidence-driven: complete checklist + Dean approval
-        # returns the student to active monitoring.
-        submitted = set(data.getlist("readmission_items"))
-        missing = [item for item in readmission_requirements() if item not in submitted]
-        if not missing and dean_action == "Approve":
-            student.current_stage = "Coursework" if student.current_stage == "LOA" else student.current_stage
-            student.standing = "Active"
-            student.risk_level = "Low"
-            result = "Readmission approved; required return evidence complete"
-            next_owner = "Academic Coordinator"
-            add_task(student.id, "Confirm return-term study plan", "Academic Coordinator", 5, 25)
-        elif dean_action == "Deny":
-            result = "Readmission denied after evidence review"
-            next_owner = "GS Staff"
-            student.risk_level = "Medium"
-        else:
-            result = f"Readmission returned; missing {', '.join(missing) if missing else 'Dean-requested clarification'}"
-            next_owner = "Student"
-            student.risk_level = "Medium"
-            add_task(student.id, "Complete readmission evidence", "Student", 5, 40)
-        note = f"{note}\nEvidence compared: {len(submitted)} submitted, {len(missing)} missing."
+        result = f"LOA decision recorded: {dean_action}"
+        next_owner = "GS Staff"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
 
-    add_log("loa-decision", student.id, "GS Staff / Dean", source, result, next_owner, note.strip())
+    notes = [
+        f"LOA request recorded from {application_reference or source or 'uploaded application/email'}"
+        f"{f' on {request_date}' if request_date else ''}.",
+        f"Prior LOA count checked: {prior_loa_count}; eligibility result: {eligibility_status}.",
+        "Graduate School Staff forwarded the LOA request to the Dean.",
+        f"Dean reviewed the LOA request and sent decision: {dean_action}.",
+        status_note,
+        "LOA notice sent to the student. This is a stop/pause process for the approved period.",
+    ]
+    if period:
+        notes.append(f"Approved/requested LOA period: {period}.")
+    if reason:
+        notes.append(f"Reason/remarks: {reason}")
+    if staff_notes:
+        notes.append(f"Staff notes: {staff_notes}")
+
+    add_log("leave-of-absence", student.id, "GS Staff / Dean", source, result, next_owner, "\n".join(notes))
+    return student.id
+
+
+def handle_readmission(data: MultiDict) -> int:
+    # Return/re-entry transaction: record the readmission request and reactivate
+    # the student only after the Dean approves the return.
+    student = Student.query.get_or_404(int(data["student_id"]))
+    dean_action = data.get("dean_action", "Approve")
+    source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+    application_reference = (data.get("application_reference") or "").strip()
+    target_return_term = (data.get("target_return_term") or "").strip()
+    previous_loa_period = (data.get("previous_loa_period") or "").strip()
+    eligibility_status = (data.get("eligibility_status") or "Checked").strip()
+    submitted = set(data.getlist("readmission_items"))
+    missing = [item for item in readmission_requirements() if item not in submitted]
+    missing.extend(split_items(data.get("missing_requirements", "")))
+    staff_notes = (data.get("staff_notes") or "").strip()
+    is_return = dean_action.lower().startswith("return")
+
+    if dean_action == "Approve":
+        if student.current_stage == "LOA":
+            student.current_stage = "Coursework"
+        student.standing = "Active"
+        student.risk_level = "Low"
+        result = "Readmission approved; student status set to Active"
+        if target_return_term:
+            result = f"{result} for {target_return_term}"
+        next_owner = "Academic Coordinator"
+        status_note = "Graduate School Staff recorded student status as Active."
+        add_task(student.id, "Confirm return-term study plan", "Academic Coordinator", 5, 25)
+    elif dean_action == "Deny":
+        result = "Readmission denied; student status unchanged"
+        next_owner = "GS Staff"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+    elif is_return:
+        result = "Readmission returned for revision; student status unchanged"
+        next_owner = "Student"
+        student.risk_level = "Medium"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+        add_task(student.id, "Complete readmission requirements", "Student", 5, 40)
+    else:
+        result = f"Readmission decision recorded: {dean_action}"
+        next_owner = "GS Staff"
+        status_note = f"Graduate School Staff left student status as {student.standing}."
+
+    notes = [
+        f"Readmission request recorded from {application_reference or source or 'uploaded application/email'}.",
+        f"Eligibility to return checked for {target_return_term or 'the target return term'}: {eligibility_status}.",
+        "Graduate School Staff forwarded the readmission request to the Dean.",
+        f"Dean reviewed the readmission request and sent decision: {dean_action}.",
+        status_note,
+        "Readmission notice sent to the student. This is the return/re-entry process after LOA.",
+        f"Return checklist submitted: {len(submitted)} item(s); missing: {', '.join(missing) if missing else 'None'}.",
+    ]
+    if previous_loa_period:
+        notes.append(f"Previous LOA period: {previous_loa_period}.")
+    if staff_notes:
+        notes.append(f"Staff notes: {staff_notes}")
+
+    add_log("readmission", student.id, "GS Staff / Dean", source, result, next_owner, "\n".join(notes))
     return student.id
 
 
@@ -2681,7 +3069,7 @@ def handle_panel_matching(data: MultiDict) -> int:
 
 def handle_defense_scheduling(data: MultiDict) -> int:
     # Scheduling transaction: confirm only when the assigned panel is complete,
-    # enough members are available, and the required lead time is met.
+    # every participant shares the selected time, and lead-time rules are met.
     student = Student.query.get_or_404(int(data["student_id"]))
     preferred_date = parse_date(data["preferred_date"])
     defense_type = data.get("defense_type", "Title Defense")
@@ -2689,27 +3077,47 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     venue = data.get("venue", "")
     panel = PanelAssignment.query.filter_by(student_id=student.id).all()
     panel_ids = [assignment.faculty_id for assignment in panel]
+    participants = defense_participants(student, panel)
     required_panel_count = len(panel_roles_for_student(student))
     lead_days = defense_lead_days(defense_type)
     lead_ok = preferred_date >= date.today() + timedelta(days=lead_days)
-    matching_slots = (
-        FacultyAvailability.query.filter(
-            FacultyAvailability.faculty_id.in_(panel_ids),
+    selected_start = parse_time(data.get("selected_start"))
+    selected_end = parse_time(data.get("selected_end"))
+    selected_window_ok = False
+    matched_count = 0
+    if selected_start and selected_end and participants:
+        participant_ids = [participant["faculty"].id for participant in participants]
+        matching_slots = FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id.in_(participant_ids),
             FacultyAvailability.available_date == preferred_date,
+            FacultyAvailability.start_time <= selected_start,
+            FacultyAvailability.end_time >= selected_end,
         ).all()
-        if panel_ids
-        else []
-    )
-    matched_count = len({slot.faculty_id for slot in matching_slots})
-    enough_panel = len(panel_ids) >= required_panel_count and matched_count >= required_panel_count
-    status = "Confirmed" if enough_panel and lead_ok else "Needs Availability"
+        matched_count = len({slot.faculty_id for slot in matching_slots})
+        selected_window_ok = matched_count == len(participant_ids)
+
+    enough_panel = len(panel_ids) >= required_panel_count
+    status = "Confirmed" if enough_panel and selected_window_ok and lead_ok else "Needs Availability"
     status_reason = []
     if not lead_ok:
         status_reason.append(f"{defense_type} needs at least {lead_days} days lead time")
     if len(panel_ids) < required_panel_count:
         status_reason.append(f"{research_case_type(student)} requires {required_panel_count} panel members")
-    elif matched_count < required_panel_count:
-        status_reason.append(f"only {matched_count} of {required_panel_count} panel members are available")
+    if not selected_start or not selected_end:
+        status_reason.append("select a shared start and end time")
+    elif not selected_window_ok:
+        status_reason.append(f"only {matched_count} of {len(participants)} participants share that time")
+    time_label = (
+        f"{selected_start.strftime('%I:%M %p')}-{selected_end.strftime('%I:%M %p')}"
+        if selected_start and selected_end
+        else "time not selected"
+    )
+    previous_schedule = (
+        ScheduleRequest.query.filter_by(student_id=student.id)
+        .order_by(ScheduleRequest.created_at.desc())
+        .first()
+    )
+    action_label = "Rescheduled" if previous_schedule else "Scheduled"
     schedule = ScheduleRequest(
         student_id=student.id,
         preferred_date=preferred_date,
@@ -2717,7 +3125,8 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         venue=venue,
         status=status,
         matched_count=matched_count,
-        notes=f"{defense_type}; {'; '.join(status_reason) if status_reason else 'all scheduling checks passed'}; "
+        notes=f"{action_label}; {defense_type}; {time_label}; "
+        f"{'; '.join(status_reason) if status_reason else 'all scheduling checks passed'}; "
         f"{data.get('constraints', '')}",
         confirmed_at=now_utc() if status == "Confirmed" else None,
     )
@@ -2736,16 +3145,18 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         student.id,
         "Research Coordinator",
         data.get("source_reference", ""),
-        f"{defense_type} schedule {status}; {matched_count}/{required_panel_count} panel availability match(es)",
+        f"{defense_type} schedule {status}; {matched_count}/{len(participants)} participant match(es)",
         next_owner,
-        f"{mode}; {venue}; {'; '.join(status_reason) if status_reason else 'lead time and availability passed'}",
+        f"{preferred_date.isoformat()} {time_label}; {mode}; {venue}; "
+        f"{'; '.join(status_reason) if status_reason else 'lead time and availability passed'}",
     )
     return student.id
 
 
 TRANSACTION_HANDLERS = {
     "student-handoff": handle_student_handoff,
-    "loa-decision": handle_loa_decision,
+    "leave-of-absence": handle_leave_of_absence,
+    "readmission": handle_readmission,
     "course-audit": handle_course_audit,
     "research-gate": handle_research_gate,
     "panel-matching": handle_panel_matching,
@@ -2765,6 +3176,115 @@ def parse_date(value: str | None) -> date:
     if not value:
         return date.today()
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def parse_time(value: str | None) -> time | None:
+    if not value:
+        return None
+    return datetime.strptime(value, "%H:%M").time()
+
+
+def defense_participants(student: Student, assignments: list[PanelAssignment]) -> list[dict]:
+    participants = []
+    seen = set()
+    adviser = Faculty.query.filter_by(name=student.adviser_name, active=True).first()
+    if adviser:
+        participants.append({"faculty": adviser, "role": "Research Adviser"})
+        seen.add(adviser.id)
+    for assignment in assignments:
+        if assignment.faculty and assignment.faculty.id not in seen:
+            participants.append({"faculty": assignment.faculty, "role": assignment.panel_role})
+            seen.add(assignment.faculty.id)
+    return participants
+
+
+def defense_availability_context(
+    participants: list[dict],
+    window_start: date,
+    window_end: date,
+    duration_minutes: int = 120,
+) -> dict:
+    if not participants:
+        return {
+            "window_start": iso(window_start),
+            "window_end": iso(window_end),
+            "duration_minutes": duration_minutes,
+            "participants": [],
+            "dates": [],
+            "possible_slots": [],
+        }
+
+    participant_ids = [participant["faculty"].id for participant in participants]
+    rows = (
+        FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id.in_(participant_ids),
+            FacultyAvailability.available_date >= window_start,
+            FacultyAvailability.available_date <= window_end,
+        )
+        .order_by(
+            FacultyAvailability.available_date,
+            FacultyAvailability.start_time,
+        )
+        .all()
+    )
+    slots_by_faculty: dict[int, list[FacultyAvailability]] = {faculty_id: [] for faculty_id in participant_ids}
+    dates = set()
+    for row in rows:
+        slots_by_faculty[row.faculty_id].append(row)
+        dates.add(row.available_date)
+
+    possible_slots = []
+    for day in sorted(dates):
+        day_rows = {
+            faculty_id: [slot for slot in slots_by_faculty[faculty_id] if slot.available_date == day]
+            for faculty_id in participant_ids
+        }
+        if any(not faculty_slots for faculty_slots in day_rows.values()):
+            continue
+        for start_minutes in range(8 * 60, 18 * 60 - duration_minutes + 1, 30):
+            end_minutes = start_minutes + duration_minutes
+            all_available = all(
+                any(
+                    slot.start_time.hour * 60 + slot.start_time.minute <= start_minutes
+                    and slot.end_time.hour * 60 + slot.end_time.minute >= end_minutes
+                    for slot in faculty_slots
+                )
+                for faculty_slots in day_rows.values()
+            )
+            if all_available:
+                possible_slots.append(
+                    {
+                        "date": iso(day),
+                        "start": f"{start_minutes // 60:02d}:{start_minutes % 60:02d}",
+                        "end": f"{end_minutes // 60:02d}:{end_minutes % 60:02d}",
+                        "matched_count": len(participants),
+                    }
+                )
+
+    return {
+        "window_start": iso(window_start),
+        "window_end": iso(window_end),
+        "duration_minutes": duration_minutes,
+        "participants": [
+            {
+                "faculty_id": participant["faculty"].id,
+                "name": participant["faculty"].name,
+                "role": participant["role"],
+                "college": participant["faculty"].college,
+                "slots": [
+                    {
+                        "date": iso(slot.available_date),
+                        "start": slot.start_time.strftime("%H:%M"),
+                        "end": slot.end_time.strftime("%H:%M"),
+                    }
+                    for slot in slots_by_faculty[participant["faculty"].id]
+                ],
+            }
+            for participant in participants
+        ],
+        "dates": [iso(day) for day in sorted(dates)],
+        "possible_slots": possible_slots,
+    }
 
 
 def required_documents_for_gate(gate: str) -> list[str]:
@@ -3221,6 +3741,17 @@ def seed_database(count: int = 350) -> None:
                         end_time=time(11 + (idx % 3), 0),
                     )
                 )
+        # Shared afternoon blocks make the scheduling demo reliably produce
+        # options while the varied morning blocks still show real constraints.
+        for shared_offset in [14, 21, 28, 35]:
+            db.session.add(
+                FacultyAvailability(
+                    faculty_id=faculty.id,
+                    available_date=date.today() + timedelta(days=shared_offset),
+                    start_time=time(13, 0),
+                    end_time=time(16, 0),
+                )
+            )
 
     first_names = [
         "Ana", "Ben", "Carla", "Daniel", "Elise", "Francis", "Grace", "Hector", "Irene", "Jon",
@@ -3396,7 +3927,46 @@ def seed_database(count: int = 350) -> None:
     # engine uses, so the student record and the recommendation queue always agree.
     for student in Student.query.all():
         recompute_risk(student)
+    ensure_demo_accounts()
     db.session.commit()
+
+
+def ensure_demo_accounts() -> None:
+    staff = UserAccount.query.filter_by(email="staff@gs.local").first()
+    if not staff:
+        db.session.add(
+            UserAccount(
+                email="staff@gs.local",
+                full_name="Graduate School Staff Demo",
+                password_hash=generate_password_hash("DemoPass123!"),
+                role="staff",
+                active=True,
+            )
+        )
+
+    linked_student = Student.query.order_by(Student.student_number.asc()).first()
+    if linked_student:
+        demo_missing = DocumentCheck.query.filter_by(
+            student_id=linked_student.id,
+            gate="Form 4 - Proposal Defense Readiness",
+            item_name="Proposal manuscript",
+        ).first()
+        if demo_missing and demo_missing.status == "Complete":
+            demo_missing.status = "Missing"
+            demo_missing.evidence_reference = "Demo missing requirement"
+
+        student_account = UserAccount.query.filter_by(email="student@gs.local").first()
+        if not student_account:
+            student_account = UserAccount(
+                email="student@gs.local",
+                full_name=f"{linked_student.name} Demo",
+                password_hash=generate_password_hash("DemoPass123!"),
+                role="student",
+                active=True,
+            )
+            db.session.add(student_account)
+        student_account.student_id = linked_student.id
+        student_account.full_name = f"{linked_student.name} Demo"
 
 
 app = create_app()
@@ -3413,6 +3983,11 @@ if __name__ == "__main__":
         if Student.query.count() == 0:
             seed_database(seed_count)
             print(f"Database was empty, so {seed_count} demo students were seeded.")
+        accounts_before = UserAccount.query.count()
+        ensure_demo_accounts()
+        db.session.commit()
+        if accounts_before == 0:
+            print("Demo staff and student accounts were created.")
 
     port = int(os.getenv("FLASK_PORT", "5000"))
     print(f"USLS Graduate School platform running at http://localhost:{port}")

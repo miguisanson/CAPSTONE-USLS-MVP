@@ -11,16 +11,17 @@ monitoring environment.
 
 ## What It Does
 
-Six working workflows (transactions) drive the platform. Each one performs a real action and
+Seven working workflows (transactions) drive the platform. Each one performs a real action and
 writes SQL-backed records (students, enrollment, course evidence, document checks, panel
 assignments, schedule requests, tasks, and an activity trail):
 
 1. **Student Handoff** - creates the monitoring record and compares received onboarding evidence.
-2. **LOA / Readmission Decision** - checks residency rules or return evidence, then records the decision.
-3. **Course Audit** - maps completed/current/missing subjects against curriculum requirements.
-4. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
-5. **Panel Matching** - scores faculty by specialization, availability, college, and workload.
-6. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
+2. **Leave of Absence** - records the application, eligibility check, Dean decision, status pause, and notice.
+3. **Readmission** - records the return request, eligibility-to-return check, Dean decision, re-entry status, and notice.
+4. **Course Audit** - maps completed/current/missing subjects against curriculum requirements.
+5. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
+6. **Panel Matching** - scores faculty by specialization, availability, college, and workload.
+7. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
 
 On top of the transactions: a **Dashboard** (transaction-derived KPIs + charts), a **Students**
 directory with a full lifecycle record view, a role-filtered **Work Queue**, and an **Activity Log**.
@@ -101,8 +102,9 @@ Run this once from the project root:
 npm run setup
 ```
 
-This command installs the Python dependencies, installs the React frontend dependencies, builds
-the frontend, and creates the demo SQLite database with seed data.
+This command creates a local `.venv`, installs the Python dependencies from `requirements.txt`,
+installs the React frontend dependencies, builds the frontend, and creates the demo SQLite
+database with seed data.
 
 ### 4. Start the app
 
@@ -111,6 +113,15 @@ npm run dev
 ```
 
 Then open <http://localhost:5000>. Press `Ctrl+C` in the terminal to stop the server.
+
+On macOS, port 5000 may already be used by Control Center / AirPlay Receiver. If that happens,
+start the app on port 5001 instead:
+
+```cmd
+FLASK_PORT=5001 npm run dev
+```
+
+Then open <http://localhost:5001>.
 
 ### Development with frontend hot reload
 
@@ -123,6 +134,13 @@ npm run dev:web
 ```
 
 Open the Vite app at <http://localhost:5173>. The Flask API still runs on <http://localhost:5000>.
+
+If you are using port 5001 because port 5000 is taken, pass the same port to both terminals:
+
+```cmd
+FLASK_PORT=5001 npm run dev
+FLASK_PORT=5001 npm run dev:web
+```
 
 ### All available npm scripts
 
