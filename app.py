@@ -1804,12 +1804,20 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 .all()
             ]
         if slug == "defense-scheduling":
-            context["assigned_panel"] = [
-                panel_assignment_dict(p)
-                for p in PanelAssignment.query.filter_by(student_id=selected_student.id)
+            assignments = (
+                PanelAssignment.query.filter_by(student_id=selected_student.id)
                 .order_by(PanelAssignment.score.desc())
                 .all()
-            ]
+            )
+            context["assigned_panel"] = [panel_assignment_dict(p) for p in assignments]
+            participants = defense_participants(selected_student, assignments)
+            window_start = date.today()
+            window_end = window_start + timedelta(days=60)
+            context["availability"] = defense_availability_context(
+                participants,
+                window_start,
+                window_end,
+            )
             context["schedules"] = [
                 schedule_request_dict(s)
                 for s in ScheduleRequest.query.filter_by(student_id=selected_student.id)
@@ -2428,7 +2436,7 @@ def handle_panel_matching(data: MultiDict) -> int:
 
 def handle_defense_scheduling(data: MultiDict) -> int:
     # Scheduling transaction: confirm only when the assigned panel is complete,
-    # enough members are available, and the required lead time is met.
+    # every participant shares the selected time, and lead-time rules are met.
     student = Student.query.get_or_404(int(data["student_id"]))
     preferred_date = parse_date(data["preferred_date"])
     defense_type = data.get("defense_type", "Title Defense")
@@ -2436,27 +2444,47 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     venue = data.get("venue", "")
     panel = PanelAssignment.query.filter_by(student_id=student.id).all()
     panel_ids = [assignment.faculty_id for assignment in panel]
+    participants = defense_participants(student, panel)
     required_panel_count = len(panel_roles_for_student(student))
     lead_days = defense_lead_days(defense_type)
     lead_ok = preferred_date >= date.today() + timedelta(days=lead_days)
-    matching_slots = (
-        FacultyAvailability.query.filter(
-            FacultyAvailability.faculty_id.in_(panel_ids),
+    selected_start = parse_time(data.get("selected_start"))
+    selected_end = parse_time(data.get("selected_end"))
+    selected_window_ok = False
+    matched_count = 0
+    if selected_start and selected_end and participants:
+        participant_ids = [participant["faculty"].id for participant in participants]
+        matching_slots = FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id.in_(participant_ids),
             FacultyAvailability.available_date == preferred_date,
+            FacultyAvailability.start_time <= selected_start,
+            FacultyAvailability.end_time >= selected_end,
         ).all()
-        if panel_ids
-        else []
-    )
-    matched_count = len({slot.faculty_id for slot in matching_slots})
-    enough_panel = len(panel_ids) >= required_panel_count and matched_count >= required_panel_count
-    status = "Confirmed" if enough_panel and lead_ok else "Needs Availability"
+        matched_count = len({slot.faculty_id for slot in matching_slots})
+        selected_window_ok = matched_count == len(participant_ids)
+
+    enough_panel = len(panel_ids) >= required_panel_count
+    status = "Confirmed" if enough_panel and selected_window_ok and lead_ok else "Needs Availability"
     status_reason = []
     if not lead_ok:
         status_reason.append(f"{defense_type} needs at least {lead_days} days lead time")
     if len(panel_ids) < required_panel_count:
         status_reason.append(f"{research_case_type(student)} requires {required_panel_count} panel members")
-    elif matched_count < required_panel_count:
-        status_reason.append(f"only {matched_count} of {required_panel_count} panel members are available")
+    if not selected_start or not selected_end:
+        status_reason.append("select a shared start and end time")
+    elif not selected_window_ok:
+        status_reason.append(f"only {matched_count} of {len(participants)} participants share that time")
+    time_label = (
+        f"{selected_start.strftime('%I:%M %p')}-{selected_end.strftime('%I:%M %p')}"
+        if selected_start and selected_end
+        else "time not selected"
+    )
+    previous_schedule = (
+        ScheduleRequest.query.filter_by(student_id=student.id)
+        .order_by(ScheduleRequest.created_at.desc())
+        .first()
+    )
+    action_label = "Rescheduled" if previous_schedule else "Scheduled"
     schedule = ScheduleRequest(
         student_id=student.id,
         preferred_date=preferred_date,
@@ -2464,7 +2492,8 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         venue=venue,
         status=status,
         matched_count=matched_count,
-        notes=f"{defense_type}; {'; '.join(status_reason) if status_reason else 'all scheduling checks passed'}; "
+        notes=f"{action_label}; {defense_type}; {time_label}; "
+        f"{'; '.join(status_reason) if status_reason else 'all scheduling checks passed'}; "
         f"{data.get('constraints', '')}",
         confirmed_at=now_utc() if status == "Confirmed" else None,
     )
@@ -2483,9 +2512,10 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         student.id,
         "Research Coordinator",
         data.get("source_reference", ""),
-        f"{defense_type} schedule {status}; {matched_count}/{required_panel_count} panel availability match(es)",
+        f"{defense_type} schedule {status}; {matched_count}/{len(participants)} participant match(es)",
         next_owner,
-        f"{mode}; {venue}; {'; '.join(status_reason) if status_reason else 'lead time and availability passed'}",
+        f"{preferred_date.isoformat()} {time_label}; {mode}; {venue}; "
+        f"{'; '.join(status_reason) if status_reason else 'lead time and availability passed'}",
     )
     return student.id
 
@@ -2513,6 +2543,115 @@ def parse_date(value: str | None) -> date:
     if not value:
         return date.today()
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def parse_time(value: str | None) -> time | None:
+    if not value:
+        return None
+    return datetime.strptime(value, "%H:%M").time()
+
+
+def defense_participants(student: Student, assignments: list[PanelAssignment]) -> list[dict]:
+    participants = []
+    seen = set()
+    adviser = Faculty.query.filter_by(name=student.adviser_name, active=True).first()
+    if adviser:
+        participants.append({"faculty": adviser, "role": "Research Adviser"})
+        seen.add(adviser.id)
+    for assignment in assignments:
+        if assignment.faculty and assignment.faculty.id not in seen:
+            participants.append({"faculty": assignment.faculty, "role": assignment.panel_role})
+            seen.add(assignment.faculty.id)
+    return participants
+
+
+def defense_availability_context(
+    participants: list[dict],
+    window_start: date,
+    window_end: date,
+    duration_minutes: int = 120,
+) -> dict:
+    if not participants:
+        return {
+            "window_start": iso(window_start),
+            "window_end": iso(window_end),
+            "duration_minutes": duration_minutes,
+            "participants": [],
+            "dates": [],
+            "possible_slots": [],
+        }
+
+    participant_ids = [participant["faculty"].id for participant in participants]
+    rows = (
+        FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id.in_(participant_ids),
+            FacultyAvailability.available_date >= window_start,
+            FacultyAvailability.available_date <= window_end,
+        )
+        .order_by(
+            FacultyAvailability.available_date,
+            FacultyAvailability.start_time,
+        )
+        .all()
+    )
+    slots_by_faculty: dict[int, list[FacultyAvailability]] = {faculty_id: [] for faculty_id in participant_ids}
+    dates = set()
+    for row in rows:
+        slots_by_faculty[row.faculty_id].append(row)
+        dates.add(row.available_date)
+
+    possible_slots = []
+    for day in sorted(dates):
+        day_rows = {
+            faculty_id: [slot for slot in slots_by_faculty[faculty_id] if slot.available_date == day]
+            for faculty_id in participant_ids
+        }
+        if any(not faculty_slots for faculty_slots in day_rows.values()):
+            continue
+        for start_minutes in range(8 * 60, 18 * 60 - duration_minutes + 1, 30):
+            end_minutes = start_minutes + duration_minutes
+            all_available = all(
+                any(
+                    slot.start_time.hour * 60 + slot.start_time.minute <= start_minutes
+                    and slot.end_time.hour * 60 + slot.end_time.minute >= end_minutes
+                    for slot in faculty_slots
+                )
+                for faculty_slots in day_rows.values()
+            )
+            if all_available:
+                possible_slots.append(
+                    {
+                        "date": iso(day),
+                        "start": f"{start_minutes // 60:02d}:{start_minutes % 60:02d}",
+                        "end": f"{end_minutes // 60:02d}:{end_minutes % 60:02d}",
+                        "matched_count": len(participants),
+                    }
+                )
+
+    return {
+        "window_start": iso(window_start),
+        "window_end": iso(window_end),
+        "duration_minutes": duration_minutes,
+        "participants": [
+            {
+                "faculty_id": participant["faculty"].id,
+                "name": participant["faculty"].name,
+                "role": participant["role"],
+                "college": participant["faculty"].college,
+                "slots": [
+                    {
+                        "date": iso(slot.available_date),
+                        "start": slot.start_time.strftime("%H:%M"),
+                        "end": slot.end_time.strftime("%H:%M"),
+                    }
+                    for slot in slots_by_faculty[participant["faculty"].id]
+                ],
+            }
+            for participant in participants
+        ],
+        "dates": [iso(day) for day in sorted(dates)],
+        "possible_slots": possible_slots,
+    }
 
 
 def required_documents_for_gate(gate: str) -> list[str]:
@@ -2844,6 +2983,17 @@ def seed_database(count: int = 350) -> None:
                         end_time=time(11 + (idx % 3), 0),
                     )
                 )
+        # Shared afternoon blocks make the scheduling demo reliably produce
+        # options while the varied morning blocks still show real constraints.
+        for shared_offset in [14, 21, 28, 35]:
+            db.session.add(
+                FacultyAvailability(
+                    faculty_id=faculty.id,
+                    available_date=date.today() + timedelta(days=shared_offset),
+                    start_time=time(13, 0),
+                    end_time=time(16, 0),
+                )
+            )
 
     first_names = [
         "Ana", "Ben", "Carla", "Daniel", "Elise", "Francis", "Grace", "Hector", "Irene", "Jon",

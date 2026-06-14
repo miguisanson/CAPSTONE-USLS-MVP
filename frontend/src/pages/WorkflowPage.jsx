@@ -16,6 +16,11 @@ import {
   FileSpreadsheet,
   X,
   ArrowUpRight,
+  CalendarDays,
+  Clock3,
+  MapPin,
+  RotateCcw,
+  UserRoundCheck,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -671,16 +676,75 @@ function PanelMatchingForm({ context, studentId, specialization, setSpecializati
 // Defense Scheduling
 // ---------------------------------------------------------------------------
 function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
+  const availability = context.availability || {};
+  const participants = availability.participants || [];
+  const possibleSlots = availability.possible_slots || [];
+  const schedules = context.schedules || [];
   const [form, setForm] = useState({
     preferred_date: "",
+    selected_start: "",
+    selected_end: "",
     defense_type: "Proposal Defense",
     mode: "On-site",
     venue: "",
     constraints: "",
     source_reference: "",
   });
+  const [window, setWindow] = useState({ start: "", end: "" });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const panel = context.assigned_panel || [];
+
+  useEffect(() => {
+    setWindow({
+      start: availability.window_start || "",
+      end: availability.window_end || "",
+    });
+    setForm((current) => ({
+      ...current,
+      preferred_date: "",
+      selected_start: "",
+      selected_end: "",
+    }));
+  }, [studentId, availability.window_start, availability.window_end]);
+
+  const filteredSlots = useMemo(
+    () =>
+      possibleSlots.filter(
+        (slot) =>
+          (!window.start || slot.date >= window.start) &&
+          (!window.end || slot.date <= window.end)
+      ),
+    [possibleSlots, window]
+  );
+
+  const visibleDates = useMemo(() => {
+    const dates = new Set();
+    participants.forEach((participant) => {
+      participant.slots.forEach((slot) => {
+        if (
+          (!window.start || slot.date >= window.start) &&
+          (!window.end || slot.date <= window.end)
+        ) {
+          dates.add(slot.date);
+        }
+      });
+    });
+    return [...dates].sort().slice(0, 12);
+  }, [participants, window]);
+
+  const possibleDates = useMemo(
+    () => new Set(filteredSlots.map((slot) => slot.date)),
+    [filteredSlots]
+  );
+
+  function chooseSlot(slot) {
+    setForm((current) => ({
+      ...current,
+      preferred_date: slot.date,
+      selected_start: slot.start,
+      selected_end: slot.end,
+    }));
+  }
 
   function onSubmit(e) {
     e.preventDefault();
@@ -689,15 +753,36 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Schedule a defense" subtitle="Confirms only when assigned panel availability matches the date" icon={CalendarCheck} />
+      <SectionTitle
+        title="Coordinate the defense schedule"
+        subtitle="Compare database availability, select a shared time, and send the proposed schedule"
+        icon={CalendarCheck}
+      />
       {panel.length === 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
           No panel is assigned yet. Run Panel Matching first — scheduling needs an assigned panel to check availability.
         </div>
       )}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-blue-800">
+        <FileCheck className="h-4 w-4" />
+        <span className="font-semibold">Defense readiness:</span>
+        <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-blue-100">Form 4 endorsement</span>
+        <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-blue-100">Form 4.3 for public defense, when applicable</span>
+      </div>
+      <AvailabilityWorkspace
+        availability={availability}
+        participants={participants}
+        filteredSlots={filteredSlots}
+        visibleDates={visibleDates}
+        possibleDates={possibleDates}
+        window={window}
+        setWindow={setWindow}
+        form={form}
+        chooseSlot={chooseSlot}
+      />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Preferred date" required>
-          <Input type="date" value={form.preferred_date} onChange={set("preferred_date")} required />
+        <Field label="Selected date" required>
+          <Input type="date" value={form.preferred_date} readOnly required />
         </Field>
         <Field label="Defense type" required>
           <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={["Title Defense", "Proposal Defense", "Final Defense", "Public Final Defense"]} />
@@ -706,7 +791,10 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
           <Select value={form.mode} onChange={set("mode")} placeholder="" options={["On-site", "Online", "Hybrid"]} />
         </Field>
         <Field label="Venue / meeting link">
-          <Input value={form.venue} onChange={set("venue")} placeholder="GS Conference Room / Zoom link" />
+          <div className="relative">
+            <MapPin className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <Input className="pl-9" value={form.venue} onChange={set("venue")} placeholder="GS Conference Room / Zoom link" />
+          </div>
         </Field>
       </div>
       <Field label="Scheduling constraints">
@@ -715,9 +803,237 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
       <Field label="Source reference">
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
-      <SubmitButton submitting={submitting}>Check & record schedule</SubmitButton>
+      <button type="submit" disabled={submitting || !form.preferred_date} className="btn-primary w-full sm:w-auto">
+        {submitting ? "Saving..." : schedules.length ? "Confirm revised schedule" : "Confirm proposed schedule"}
+      </button>
+      {schedules.length > 0 && <ScheduleHistory schedules={schedules} />}
     </form>
   );
+}
+
+function AvailabilityWorkspace({
+  availability,
+  participants,
+  filteredSlots,
+  visibleDates,
+  possibleDates,
+  window,
+  setWindow,
+  form,
+  chooseSlot,
+}) {
+  return (
+    <>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-ink">Preferred date window</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              The system searches for a {availability.duration_minutes || 120}-minute overlap.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:w-[360px]">
+            <Field label="From">
+              <Input
+                type="date"
+                value={window.start}
+                onChange={(e) => setWindow((current) => ({ ...current, start: e.target.value }))}
+              />
+            </Field>
+            <Field label="To">
+              <Input
+                type="date"
+                value={window.end}
+                min={window.start}
+                onChange={(e) => setWindow((current) => ({ ...current, end: e.target.value }))}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {participants.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-ink">Panel availability</p>
+              <p className="text-xs text-slate-500">Green rows contain at least one complete overlap.</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+              <UserRoundCheck className="h-3.5 w-3.5" />
+              {participants.length} participants
+            </span>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="min-w-[760px] w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left">
+                  <th className="sticky left-0 z-10 w-36 border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                    Date
+                  </th>
+                  {participants.map((participant) => (
+                    <th key={participant.faculty_id} className="min-w-44 border-b border-slate-200 px-3 py-3">
+                      <p className="font-semibold text-ink">{participant.name}</p>
+                      <p className="mt-0.5 text-xs font-normal text-slate-500">{participant.role}</p>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleDates.map((day) => {
+                  const hasOverlap = possibleDates.has(day);
+                  return (
+                    <tr key={day} className={hasOverlap ? "bg-brand-50/55" : "bg-white"}>
+                      <td className={`sticky left-0 z-10 border-r border-t border-slate-200 px-3 py-3 ${hasOverlap ? "bg-brand-50" : "bg-white"}`}>
+                        <p className="font-semibold text-ink">{shortDate(day)}</p>
+                        {hasOverlap && <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-brand-700">Overlap found</p>}
+                      </td>
+                      {participants.map((participant) => {
+                        const slots = participant.slots.filter((slot) => slot.date === day);
+                        return (
+                          <td key={participant.faculty_id} className="border-t border-slate-200 px-3 py-3 align-top">
+                            {slots.length ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {slots.map((slot) => (
+                                  <span key={`${slot.start}-${slot.end}`} className="rounded-lg bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+                                    {timeRange(slot.start, slot.end)}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs font-medium text-slate-400">Unavailable</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {visibleDates.length === 0 && (
+              <div className="p-8 text-center text-sm text-slate-500">No availability was recorded inside this date window.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Best shared options</p>
+            <p className="text-xs text-slate-500">Select one to prepare the proposed schedule.</p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+            {filteredSlots.length} found
+          </span>
+        </div>
+        {filteredSlots.length ? (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {filteredSlots.slice(0, 8).map((slot, index) => {
+              const selected =
+                form.preferred_date === slot.date &&
+                form.selected_start === slot.start &&
+                form.selected_end === slot.end;
+              return (
+                <button
+                  key={`${slot.date}-${slot.start}`}
+                  type="button"
+                  onClick={() => chooseSlot(slot)}
+                  className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors cursor-pointer ${
+                    selected
+                      ? "border-brand-500 bg-brand-50 ring-2 ring-brand-100"
+                      : "border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/30"
+                  }`}
+                >
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${selected ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                    <CalendarDays className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-ink">
+                      {index === 0 ? "Earliest option - " : ""}{shortDate(slot.date)}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                      <Clock3 className="h-3.5 w-3.5" /> {timeRange(slot.start, slot.end)} - all {slot.matched_count} available
+                    </span>
+                  </span>
+                  <span className={`h-4 w-4 rounded-full border-2 ${selected ? "border-brand-600 bg-brand-600 ring-2 ring-white" : "border-slate-300"}`} />
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+            No complete overlap appears in this window. Revise the dates or collect updated availability from the adviser and panel.
+          </div>
+        )}
+      </div>
+
+      {form.preferred_date && (
+        <div className="rounded-2xl border border-brand-200 bg-brand-50/70 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Selected proposed schedule</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-brand-900">
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <CalendarDays className="h-4 w-4" /> {shortDate(form.preferred_date)}
+            </span>
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <Clock3 className="h-4 w-4" /> {timeRange(form.selected_start, form.selected_end)}
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <UserRoundCheck className="h-4 w-4" /> All participants available
+            </span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ScheduleHistory({ schedules }) {
+  return (
+    <div className="border-t border-slate-200 pt-5">
+      <div className="mb-3 flex items-center gap-2">
+        <RotateCcw className="h-4 w-4 text-slate-500" />
+        <p className="text-sm font-semibold text-ink">Scheduling and rescheduling history</p>
+      </div>
+      <div className="space-y-2">
+        {schedules.map((schedule) => (
+          <div key={schedule.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-ink">{shortDate(schedule.preferred_date)} - {schedule.mode}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{schedule.venue || "Arrangement pending"} - {schedule.notes}</p>
+            </div>
+            <StatusBadge status={schedule.status} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function shortDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-PH", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function timeRange(start, end) {
+  const format = (value) => {
+    if (!value) return "";
+    const [hour, minute] = value.split(":").map(Number);
+    return new Intl.DateTimeFormat("en-PH", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(2026, 0, 1, hour, minute)));
+  };
+  return `${format(start)}-${format(end)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -895,7 +1211,7 @@ function workflowGuidance(slug) {
     "panel-matching":
       "Scores active faculty using specialization match, same-college fit, available dates, and current panel load, then assigns the top candidates to each required panel role.",
     "defense-scheduling":
-      "Checks lead-time rules and whether the assigned panel has availability on the chosen date. It confirms only when both pass; otherwise it logs a 'needs availability' follow-up.",
+      "Collects adviser and panel availability from the database, highlights overlapping time windows, and lets the Research Coordinator propose a shared slot. Revised preferred dates repeat the coordination loop.",
   };
   return map[slug] || "";
 }
