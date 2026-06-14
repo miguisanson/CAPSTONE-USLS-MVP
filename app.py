@@ -4,14 +4,16 @@ import os
 import random
 import re
 import sys
+from functools import wraps
 from datetime import date, datetime, time, timedelta
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, text
 from werkzeug.datastructures import MultiDict
+from werkzeug.security import check_password_hash, generate_password_hash
 
 
 load_dotenv()
@@ -245,6 +247,19 @@ class Student(db.Model):
     @property
     def name(self) -> str:
         return f"{self.first_name} {self.last_name}"
+
+
+class UserAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(160), unique=True, nullable=False)
+    full_name = db.Column(db.String(160), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(40), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"))
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=now_utc)
+
+    student = db.relationship("Student")
 
 
 class AcademicTerm(db.Model):
@@ -545,6 +560,43 @@ def log_dict(log: TransactionLog) -> dict:
         "notes": log.notes,
         "created_at": iso(log.created_at),
     }
+
+
+def account_dict(account: UserAccount) -> dict:
+    return {
+        "id": account.id,
+        "email": account.email,
+        "full_name": account.full_name,
+        "role": account.role,
+        "student_id": account.student_id,
+    }
+
+
+def current_account() -> UserAccount | None:
+    account_id = session.get("account_id")
+    if not account_id:
+        return None
+    account = UserAccount.query.get(account_id)
+    if not account or not account.active:
+        session.clear()
+        return None
+    return account
+
+
+def require_api_login(role: str | None = None):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            account = current_account()
+            if not account:
+                return jsonify({"error": "Please sign in to continue."}), 401
+            if role and account.role != role:
+                return jsonify({"error": "This account cannot access that area."}), 403
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 # ---------------------------------------------------------------------------
@@ -1005,8 +1057,36 @@ def register_routes(app: Flask) -> None:
     def health():
         return jsonify({"status": "ok", "students": Student.query.count()})
 
+    @app.route("/api/auth/me")
+    def auth_me():
+        account = current_account()
+        return jsonify({"user": account_dict(account) if account else None})
+
+    @app.route("/api/auth/login", methods=["POST"])
+    def auth_login():
+        body = request.get_json(silent=True) or {}
+        role = (body.get("role") or "").strip().lower()
+        email = (body.get("email") or "").strip().lower()
+        password = body.get("password") or ""
+        if role not in ["staff", "student"]:
+            return jsonify({"error": "Choose Staff or Student to sign in."}), 400
+        account = UserAccount.query.filter_by(email=email, role=role, active=True).first()
+        if not account or not check_password_hash(account.password_hash, password):
+            return jsonify({"error": "Invalid email, password, or account type."}), 401
+        session.clear()
+        session["account_id"] = account.id
+        session["role"] = account.role
+        session["student_id"] = account.student_id
+        return jsonify({"user": account_dict(account)})
+
+    @app.route("/api/auth/logout", methods=["POST"])
+    def auth_logout():
+        session.clear()
+        return jsonify({"ok": True})
+
     # Shared reference data used to render filters, dropdowns, and workflow cards.
     @app.route("/api/meta")
+    @require_api_login()
     def meta():
         programs = Program.query.order_by(Program.college, Program.name).all()
         terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
@@ -1024,11 +1104,13 @@ def register_routes(app: Flask) -> None:
 
     # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
+    @require_api_login("staff")
     def dashboard():
         return jsonify(dashboard_stats())
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
+    @require_api_login("staff")
     def students_list():
         query = Student.query.join(Program)
         q = request.args.get("q", "").strip()
@@ -1079,6 +1161,7 @@ def register_routes(app: Flask) -> None:
     # Full student profile: lifecycle stage, audit, research, docs, panel,
     # schedules, tasks, activity trail, and decision-support recommendations.
     @app.route("/api/students/<int:student_id>")
+    @require_api_login("staff")
     def student_detail(student_id: int):
         student = Student.query.get_or_404(student_id)
         audit = compute_course_audit(student)
@@ -1146,8 +1229,210 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    # Student-facing portal context. This mirrors the staff record but keeps the
+    # response focused on what a student needs to see and act on.
+    @app.route("/api/student-portal/context")
+    @require_api_login("student")
+    def student_portal_context():
+        account = current_account()
+        student_id = account.student_id if account else None
+        if not student_id:
+            return jsonify({"error": "No students are available in the demo dataset."}), 404
+
+        student = Student.query.get_or_404(student_id)
+        audit = compute_course_audit(student)
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+        )
+        document_checks = (
+            DocumentCheck.query.filter_by(student_id=student.id)
+            .order_by(DocumentCheck.gate, DocumentCheck.item_name)
+            .all()
+        )
+        schedules = (
+            ScheduleRequest.query.filter_by(student_id=student.id)
+            .order_by(ScheduleRequest.created_at.desc())
+            .limit(5)
+            .all()
+        )
+        tasks = (
+            Task.query.filter(
+                Task.student_id == student.id,
+                Task.status.in_(["Pending", "Overdue"]),
+            )
+            .order_by(Task.priority.desc(), Task.due_at.asc())
+            .limit(12)
+            .all()
+        )
+        logs = (
+            TransactionLog.query.filter(TransactionLog.student_id == student.id)
+            .order_by(TransactionLog.created_at.desc())
+            .limit(18)
+            .all()
+        )
+        docs_by_gate: dict[str, list] = {}
+        for doc in document_checks:
+            docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
+
+        return jsonify(
+            {
+                "student": student_brief(student),
+                "stages": STAGES,
+                "stage_index": STAGES.index(student.current_stage) if student.current_stage in STAGES else 0,
+                "course_audit": course_audit_dict(audit),
+                "research_case": research_case_dict(research_case),
+                "documents_by_gate": docs_by_gate,
+                "schedules": [schedule_request_dict(s) for s in schedules],
+                "tasks": [task_dict(t) for t in tasks],
+                "logs": [log_dict(l) for l in logs],
+                "recommendations": student_recommendations(student)["recommendations"],
+                "gate_requirements": {
+                    gate: required_documents_for_gate(gate)
+                    for gate in [
+                        "Form 1 - Title Defense",
+                        "Form 4 - Proposal Defense Readiness",
+                        "Final Defense",
+                        "Completion Evidence",
+                    ]
+                },
+                "readmission_requirements": readmission_requirements(),
+            }
+        )
+
+    @app.route("/api/student-portal/requests/research-gate", methods=["POST"])
+    @require_api_login("student")
+    def student_research_gate_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        gate = data.get("gate", "Form 1 - Title Defense")
+        title = (data.get("research_title") or "").strip()
+        source = (data.get("source_reference") or data.get("submitted_package") or "").strip()
+        submitted = data.getlist("submitted_items")
+        clean_submitted = [
+            item.split("||", 1)[1] if item.startswith(f"{gate}||") else item
+            for item in submitted
+        ]
+        notes = [
+            f"Student submitted a {gate} request for staff review.",
+            f"Research title: {title or 'Not provided'}.",
+            f"Submitted items: {', '.join(clean_submitted) if clean_submitted else 'None listed'}.",
+        ]
+        if data.get("submitted_package"):
+            notes.append(f"Student notes/package reference: {data.get('submitted_package')}.")
+
+        add_task(student.id, f"Review student {gate} application", "Research Coordinator", 3, 55)
+        add_log(
+            "research-gate",
+            student.id,
+            "Student",
+            source,
+            f"{gate} application submitted",
+            "Research Coordinator",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Research staff will review your application."})
+
+    @app.route("/api/student-portal/requests/leave-of-absence", methods=["POST"])
+    @require_api_login("student")
+    def student_loa_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+        effective_start = (data.get("effective_start") or "").strip()
+        effective_end = (data.get("effective_end") or "").strip()
+        period = " to ".join([part for part in [effective_start, effective_end] if part]) or "Not specified"
+        notes = [
+            "Student submitted a Leave of Absence application for staff eligibility review.",
+            f"Requested period: {period}.",
+        ]
+        if data.get("reason_remarks"):
+            notes.append(f"Reason/remarks: {data.get('reason_remarks')}.")
+        if data.get("application_reference"):
+            notes.append(f"Attachment/reference: {data.get('application_reference')}.")
+
+        add_task(student.id, "Review student Leave of Absence application", "GS Staff", 3, 55)
+        add_log(
+            "leave-of-absence",
+            student.id,
+            "Student",
+            source,
+            "LOA application submitted",
+            "GS Staff",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your LOA application."})
+
+    @app.route("/api/student-portal/requests/readmission", methods=["POST"])
+    @require_api_login("student")
+    def student_readmission_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+        submitted = set(data.getlist("readmission_items"))
+        missing = [item for item in readmission_requirements() if item not in submitted]
+        notes = [
+            "Student submitted a readmission request for staff review.",
+            f"Target return term: {data.get('target_return_term') or 'Not specified'}.",
+            f"Checklist submitted: {len(submitted)} item(s); missing/not marked: {', '.join(missing) if missing else 'None'}.",
+        ]
+        if data.get("previous_loa_period"):
+            notes.append(f"Previous LOA period: {data.get('previous_loa_period')}.")
+        if data.get("application_reference"):
+            notes.append(f"Attachment/reference: {data.get('application_reference')}.")
+
+        add_task(student.id, "Review student readmission request", "GS Staff", 3, 55)
+        add_log(
+            "readmission",
+            student.id,
+            "Student",
+            source,
+            "Readmission request submitted",
+            "GS Staff",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your readmission request."})
+
+    @app.route("/api/student-portal/requests/defense-scheduling", methods=["POST"])
+    @require_api_login("student")
+    def student_defense_schedule_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        source = (data.get("source_reference") or data.get("venue") or "").strip()
+        preferred_date = (data.get("preferred_date") or "").strip()
+        defense_type = data.get("defense_type", "Proposal Defense")
+        notes = [
+            f"Student requested scheduling support for {defense_type}.",
+            f"Preferred date: {preferred_date or 'Not specified'}.",
+            f"Mode: {data.get('mode') or 'Not specified'}.",
+        ]
+        if data.get("venue"):
+            notes.append(f"Venue/link preference: {data.get('venue')}.")
+        if data.get("constraints"):
+            notes.append(f"Constraints: {data.get('constraints')}.")
+
+        add_task(student.id, f"Review student {defense_type} schedule request", "Research Coordinator", 4, 45)
+        add_log(
+            "defense-scheduling",
+            student.id,
+            "Student",
+            source,
+            f"{defense_type} schedule requested",
+            "Research Coordinator",
+            "\n".join(notes),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Research staff will review your preferred schedule."})
+
     # Role-filterable work queue.
     @app.route("/api/tasks")
+    @require_api_login("staff")
     def tasks_list():
         owner = request.args.get("owner", "").strip()
         query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
@@ -1158,6 +1443,7 @@ def register_routes(app: Flask) -> None:
 
     # Human-facing audit feed; generated seed history is hidden for clarity.
     @app.route("/api/activity")
+    @require_api_login("staff")
     def activity():
         logs = (
             TransactionLog.query.filter(TransactionLog.actor_role != "Demo Data")
@@ -1169,17 +1455,20 @@ def register_routes(app: Flask) -> None:
 
     # Faculty reference endpoint for panels and scheduling.
     @app.route("/api/faculty")
+    @require_api_login("staff")
     def faculty_list():
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_dict(f) for f in faculty]})
 
     # Population-level queue of rule-based recommendations.
     @app.route("/api/decision-support")
+    @require_api_login("staff")
     def decision_support():
         return jsonify(portfolio_recommendations())
 
     # RAG-style policy/case guidance endpoint.
     @app.route("/api/assistant", methods=["POST"])
+    @require_api_login("staff")
     def assistant():
         data = request_payload()
         question = (data.get("question") or "").strip()
@@ -1194,6 +1483,7 @@ def register_routes(app: Flask) -> None:
 
     # Starter questions for the Assistant UI.
     @app.route("/api/assistant/suggestions")
+    @require_api_login("staff")
     def assistant_suggestions():
         return jsonify({
             "items": [
@@ -1208,6 +1498,7 @@ def register_routes(app: Flask) -> None:
     # Supplies each workflow screen with student-specific context before
     # submission, such as current audit status or panel recommendations.
     @app.route("/api/transactions/<slug>/context")
+    @require_api_login("staff")
     def transaction_context(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
             return jsonify({"error": "Unknown workflow."}), 404
@@ -1218,6 +1509,7 @@ def register_routes(app: Flask) -> None:
     # Single transaction entry point. The slug selects the workflow handler,
     # Student Handoff via file upload: ingest an AC Student Monitoring .xlsx.
     @app.route("/api/transactions/student-handoff/import", methods=["POST"])
+    @require_api_login("staff")
     def student_handoff_import():
         file = request.files.get("file")
         if not file or not file.filename:
@@ -1237,6 +1529,7 @@ def register_routes(app: Flask) -> None:
 
     # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
+    @require_api_login("staff")
     def transaction_submit(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
             return jsonify({"error": "Unknown workflow."}), 404
@@ -2700,7 +2993,37 @@ def seed_database(count: int = 350) -> None:
     # engine uses, so the student record and the recommendation queue always agree.
     for student in Student.query.all():
         recompute_risk(student)
+    ensure_demo_accounts()
     db.session.commit()
+
+
+def ensure_demo_accounts() -> None:
+    staff = UserAccount.query.filter_by(email="staff@gs.local").first()
+    if not staff:
+        db.session.add(
+            UserAccount(
+                email="staff@gs.local",
+                full_name="Graduate School Staff Demo",
+                password_hash=generate_password_hash("DemoPass123!"),
+                role="staff",
+                active=True,
+            )
+        )
+
+    linked_student = Student.query.order_by(Student.student_number.asc()).first()
+    if linked_student:
+        student_account = UserAccount.query.filter_by(email="student@gs.local").first()
+        if not student_account:
+            student_account = UserAccount(
+                email="student@gs.local",
+                full_name=f"{linked_student.name} Demo",
+                password_hash=generate_password_hash("DemoPass123!"),
+                role="student",
+                active=True,
+            )
+            db.session.add(student_account)
+        student_account.student_id = linked_student.id
+        student_account.full_name = f"{linked_student.name} Demo"
 
 
 app = create_app()
@@ -2717,6 +3040,10 @@ if __name__ == "__main__":
         if Student.query.count() == 0:
             seed_database(seed_count)
             print(f"Database was empty, so {seed_count} demo students were seeded.")
+        if UserAccount.query.count() == 0:
+            ensure_demo_accounts()
+            db.session.commit()
+            print("Demo staff and student accounts were created.")
 
     port = int(os.getenv("FLASK_PORT", "5000"))
     print(f"USLS Graduate School platform running at http://localhost:{port}")

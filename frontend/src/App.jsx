@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./auth";
 import Layout from "./components/Layout";
+import { Spinner } from "./components/ui";
 import Dashboard from "./pages/Dashboard";
 import Students from "./pages/Students";
 import StudentDetail from "./pages/StudentDetail";
@@ -8,21 +10,56 @@ import ActivityLog from "./pages/ActivityLog";
 import WorkflowPage from "./pages/WorkflowPage";
 import DecisionSupport from "./pages/DecisionSupport";
 import Assistant from "./pages/Assistant";
+import StudentPortal from "./pages/StudentPortal";
+import Login from "./pages/Login";
 
 export default function App() {
+  const { user, loading } = useAuth();
+  if (loading) return <Spinner label="Checking account..." />;
+
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/students" element={<Students />} />
-        <Route path="/students/:id" element={<StudentDetail />} />
-        <Route path="/work-queue" element={<WorkQueue />} />
-        <Route path="/activity" element={<ActivityLog />} />
-        <Route path="/decision-support" element={<DecisionSupport />} />
-        <Route path="/assistant" element={<Assistant />} />
-        <Route path="/workflow/:slug" element={<WorkflowPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/student"
+        element={
+          <StudentOnly user={user}>
+            <StudentPortal />
+          </StudentOnly>
+        }
+      />
+      <Route
+        path="/*"
+        element={
+          <StaffOnly user={user}>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/students" element={<Students />} />
+                <Route path="/students/:id" element={<StudentDetail />} />
+                <Route path="/work-queue" element={<WorkQueue />} />
+                <Route path="/activity" element={<ActivityLog />} />
+                <Route path="/decision-support" element={<DecisionSupport />} />
+                <Route path="/assistant" element={<Assistant />} />
+                <Route path="/workflow/:slug" element={<WorkflowPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Layout>
+          </StaffOnly>
+        }
+      />
+    </Routes>
   );
+}
+
+function StaffOnly({ user, children }) {
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "staff") return <Navigate to="/student" replace />;
+  return children;
+}
+
+function StudentOnly({ user, children }) {
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "student") return <Navigate to="/" replace />;
+  return children;
 }

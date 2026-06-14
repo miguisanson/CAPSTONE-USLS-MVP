@@ -4,6 +4,7 @@ const BASE = "/api";
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
     ...options,
   });
   if (!res.ok) {
@@ -20,6 +21,9 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  me: () => request("/auth/me"),
+  login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
+  logout: () => request("/auth/logout", { method: "POST", body: JSON.stringify({}) }),
   meta: () => request("/meta"),
   dashboard: () => request("/dashboard"),
   students: (params = {}) => {
@@ -43,7 +47,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     // No Content-Type header: the browser sets the multipart boundary itself.
-    const res = await fetch(`${BASE}/transactions/student-handoff/import`, { method: "POST", body: form });
+    const res = await fetch(`${BASE}/transactions/student-handoff/import`, { method: "POST", body: form, credentials: "same-origin" });
     let body = null;
     try {
       body = await res.json();
@@ -57,4 +61,7 @@ export const api = {
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),
   assistantSuggestions: () => request("/assistant/suggestions"),
+  studentPortalContext: () => request("/student-portal/context"),
+  submitStudentRequest: (type, payload) =>
+    request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
 };

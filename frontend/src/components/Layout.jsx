@@ -17,7 +17,9 @@ import {
   ChevronRight,
   Lightbulb,
   Bot,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "../auth";
 
 const ICONS = {
   "user-plus": UserPlus,
@@ -145,6 +147,7 @@ function SidebarContent({ onNavigate }) {
 export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen lg:flex">
@@ -187,8 +190,16 @@ export default function Layout({ children }) {
           <Breadcrumb path={location.pathname} />
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex">
-              Graduate School Staff
+              {user?.full_name || "Graduate School Staff"}
             </span>
+            <button
+              type="button"
+              onClick={logout}
+              className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
             <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">
               GS
             </span>
