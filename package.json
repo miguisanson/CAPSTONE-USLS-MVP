@@ -4,14 +4,14 @@
   "version": "1.0.0",
   "description": "Graduate Student Lifecycle Monitoring and Analytics Platform — Flask JSON API + React (Vite + Tailwind) UI for the USLS Graduate School",
   "scripts": {
-    "setup": "npm run install:py && npm run install:web && npm run build:web && npm run seed",
-    "install:python": "py -m pip install -r requirements.txt",
+    "setup": "npm run install:python && npm run install:web && npm run build:web && npm run seed",
+    "install:python": "python3 -m venv .venv && ./.venv/bin/python -m pip install --upgrade pip && ./.venv/bin/python -m pip install -r requirements.txt",
     "install:web": "npm --prefix frontend install",
     "build:web": "npm --prefix frontend run build",
     "build": "npm run build:web",
-    "seed": "py app.py --seed",
-    "dev": "py app.py",
-    "start": "py app.py",
+    "seed": "./.venv/bin/python app.py --seed",
+    "dev": "./.venv/bin/python app.py",
+    "start": "npm run dev",
     "dev:web": "npm --prefix frontend run dev"
   }
 }
