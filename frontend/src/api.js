@@ -64,4 +64,6 @@ export const api = {
   studentPortalContext: () => request("/student-portal/context"),
   submitStudentRequest: (type, payload) =>
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
+  submitStudentDocument: (documentId, filename) =>
+    request(`/student-portal/documents/${documentId}/upload`, { method: "POST", body: JSON.stringify({ filename }) }),
 };

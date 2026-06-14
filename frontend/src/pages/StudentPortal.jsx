@@ -9,8 +9,11 @@ import {
   ClipboardCheck,
   FileCheck,
   FileText,
+  FileUp,
   GraduationCap,
+  Eye,
   ListTodo,
+  Lock,
   LogOut,
   Mail,
   Send,
@@ -25,11 +28,35 @@ import { formatDate, initials, relativeDays } from "../lib/format";
 
 const GATES = ["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"];
 
-const REQUESTS = [
-  { id: "research", label: "Research Gate", icon: FileCheck },
-  { id: "loa", label: "Leave of Absence", icon: CalendarOff },
-  { id: "readmission", label: "Readmission", icon: UserCheck },
-  { id: "schedule", label: "Defense Schedule", icon: CalendarCheck },
+const REQUEST_GROUPS = [
+  {
+    title: "Research & Defense",
+    description: "Submit research requirements first, then request a defense schedule once a research case is active.",
+    items: [
+      { id: "research", label: "Research Gate", icon: FileCheck },
+      {
+        id: "schedule",
+        label: "Defense Schedule",
+        icon: CalendarCheck,
+        lockedWhen: (data) => !data.research_case,
+        lockedReason: "Available once you are enrolled in research and staff has opened your research case.",
+      },
+    ],
+  },
+  {
+    title: "Leave & Return",
+    description: "LOA pauses your studies; readmission is only for returning after an approved LOA.",
+    items: [
+      { id: "loa", label: "Leave of Absence", icon: CalendarOff },
+      {
+        id: "readmission",
+        label: "Readmission",
+        icon: UserCheck,
+        lockedWhen: (data) => data.student.standing !== "On Leave" && data.student.current_stage !== "LOA",
+        lockedReason: "Available only after an approved Leave of Absence.",
+      },
+    ],
+  },
 ];
 
 export default function StudentPortal() {
@@ -87,7 +114,7 @@ export default function StudentPortal() {
                 <div className="space-y-5 lg:col-span-8">
                   <ProgressPanel data={data} />
                   <RequestCenter data={data} onSaved={refetch} />
-                  <DocumentsPanel documentsByGate={data.documents_by_gate} />
+                  <DocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} />
                   <ActivityPanel logs={data.logs} />
                 </div>
                 <div className="space-y-5 lg:col-span-4">
@@ -147,13 +174,23 @@ function MiniStat({ label, value, badge }) {
 
 function ProgressPanel({ data }) {
   const { stages, stage_index, student, course_audit, research_case } = data;
+  const progressStages = stages
+    .filter((stage) => stage !== "LOA")
+    .map((stage) => (stage === "Completed" ? "Completion Evidence" : stage));
+  const currentStage = student.current_stage === "Completed" ? "Completion Evidence" : student.current_stage;
+  const displayIndex = progressStages.indexOf(currentStage);
   return (
     <Card className="p-6">
-      <SectionTitle title="My Progress" subtitle="Current lifecycle position and readiness signals" icon={ClipboardCheck} />
+      <SectionTitle title="My Academic Status" subtitle="Your current stage, requirements, and next step" icon={ClipboardCheck} />
+      {student.standing === "On Leave" && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          Your studies are currently paused because you are on Leave of Absence. Readmission becomes available while this status is active.
+        </div>
+      )}
       <div className="mb-5 flex flex-wrap gap-1.5">
-        {stages.map((stage, i) => {
-          const done = i < stage_index;
-          const current = i === stage_index;
+        {progressStages.map((stage, i) => {
+          const done = displayIndex >= 0 && i < displayIndex;
+          const current = i === displayIndex;
           return (
             <span
               key={stage}
@@ -195,33 +232,67 @@ function ProgressPanel({ data }) {
 
 function RequestCenter({ data, onSaved }) {
   const [active, setActive] = useState("research");
-  const ActiveIcon = REQUESTS.find((r) => r.id === active)?.icon || Send;
+  const allRequests = REQUEST_GROUPS.flatMap((group) => group.items);
+  const activeRequest = allRequests.find((r) => r.id === active) || allRequests[0];
+  const ActiveIcon = activeRequest?.icon || Send;
+  const activeLocked = activeRequest?.lockedWhen?.(data);
 
   return (
     <Card className="p-6">
-      <SectionTitle title="Request Center" subtitle="Submit applications to the staff queue for review" icon={Send} />
-      <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {REQUESTS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActive(id)}
-            className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
-              active === id ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-brand-50 hover:text-brand-700"
-            }`}
-          >
-            <Icon className="h-4 w-4" /> {label}
-          </button>
+      <SectionTitle title="Request Center" subtitle="Choose the request that matches your current status" icon={Send} />
+      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+        {REQUEST_GROUPS.map((group) => (
+          <div key={group.title} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+            <p className="text-sm font-semibold text-ink">{group.title}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{group.description}</p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const locked = item.lockedWhen?.(data);
+                const isActive = active === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    title={locked ? item.lockedReason : ""}
+                    aria-disabled={locked ? "true" : "false"}
+                    onClick={() => {
+                      if (!locked) setActive(item.id);
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      locked
+                        ? "cursor-not-allowed border border-slate-200 bg-white text-slate-400"
+                        : isActive
+                        ? "bg-brand-600 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-brand-50 hover:text-brand-700"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" /> {item.label}
+                    {locked && <Lock className="h-3.5 w-3.5" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </div>
       <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <ActiveIcon className="h-4 w-4 text-brand-700" /> {REQUESTS.find((r) => r.id === active)?.label}
+          <ActiveIcon className="h-4 w-4 text-brand-700" /> {activeRequest?.label}
         </div>
-        {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
-        {active === "loa" && <LoaRequestForm studentId={data.student.id} onSaved={onSaved} />}
-        {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
-        {active === "schedule" && <ScheduleRequestForm studentId={data.student.id} onSaved={onSaved} />}
+        {activeLocked ? (
+          <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            <Lock className="mt-0.5 h-4 w-4 text-slate-400" />
+            <p>{activeRequest.lockedReason}</p>
+          </div>
+        ) : (
+          <>
+            {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
+            {active === "loa" && <LoaRequestForm studentId={data.student.id} onSaved={onSaved} />}
+            {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
+            {active === "schedule" && <ScheduleRequestForm studentId={data.student.id} onSaved={onSaved} />}
+          </>
+        )}
       </div>
     </Card>
   );
@@ -289,9 +360,7 @@ function ResearchRequestForm({ data, onSaved }) {
       <Field label="Submission notes or package reference">
         <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
       </Field>
-      <Field label="File/link reference">
-        <Input value={form.source_reference} onChange={set("source_reference")} placeholder="Drive link, email subject, or filename" />
-      </Field>
+      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, source_reference: file?.name || "" }))} />
       <SubmitState busy={busy} error={error} message={message} label="Submit research application" />
     </form>
   );
@@ -326,12 +395,7 @@ function LoaRequestForm({ studentId, onSaved }) {
       <Field label="Reason / remarks" required>
         <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} required />
       </Field>
-      <Field label="Attachment or file reference">
-        <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Drive link, email subject, or filename" />
-      </Field>
-      <Field label="Other reference">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
-      </Field>
+      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, application_reference: file?.name || "", source_reference: file?.name || "" }))} />
       <SubmitState busy={busy} error={error} message={message} label="Submit LOA application" />
     </form>
   );
@@ -369,12 +433,7 @@ function ReadmissionRequestForm({ data, onSaved }) {
       <Field label="Requirements included">
         <CheckList items={requirements} selected={items} onToggle={(item) => setItems((x) => (x.includes(item) ? x.filter((v) => v !== item) : [...x, item]))} />
       </Field>
-      <Field label="Attachment or file reference">
-        <Input value={form.application_reference} onChange={set("application_reference")} />
-      </Field>
-      <Field label="Other reference">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
-      </Field>
+      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, application_reference: file?.name || "", source_reference: file?.name || "" }))} />
       <SubmitState busy={busy} error={error} message={message} label="Submit readmission request" />
     </form>
   );
@@ -416,11 +475,36 @@ function ScheduleRequestForm({ studentId, onSaved }) {
       <Field label="Scheduling constraints">
         <Textarea value={form.constraints} onChange={set("constraints")} />
       </Field>
-      <Field label="Other reference">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
-      </Field>
+      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, source_reference: file?.name || "" }))} />
       <SubmitState busy={busy} error={error} message={message} label="Submit schedule request" />
     </form>
+  );
+}
+
+function PdfUploadField({ label, onFile }) {
+  const [fileName, setFileName] = useState("");
+  return (
+    <Field label={label} hint="PDF only. This demo records the filename; file storage can be added next.">
+      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 hover:bg-slate-50">
+        <span className="flex min-w-0 items-center gap-2">
+          <FileUp className="h-4 w-4 shrink-0 text-brand-700" />
+          <span className="truncate">{fileName || "Choose PDF file"}</span>
+        </span>
+        <span className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+          Browse
+        </span>
+        <input
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0] || null;
+            setFileName(file?.name || "");
+            onFile(file);
+          }}
+        />
+      </label>
+    </Field>
   );
 }
 
@@ -473,7 +557,7 @@ function TasksPanel({ tasks }) {
   );
 }
 
-function DocumentsPanel({ documentsByGate }) {
+function DocumentsPanel({ documentsByGate, onSaved }) {
   const entries = Object.entries(documentsByGate || {});
   return (
     <Card className="p-6">
@@ -485,9 +569,16 @@ function DocumentsPanel({ documentsByGate }) {
               <p className="mb-2 text-sm font-semibold text-slate-700">{gate}</p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {docs.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-                    <span className="truncate text-sm text-slate-600">{doc.item_name}</span>
-                    <StatusBadge value={doc.status} dot={false} />
+                  <div key={doc.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                    <div className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm text-slate-600">{doc.item_name}</span>
+                      <StatusBadge value={doc.status} dot={false} />
+                      {doc.status === "Missing" ? (
+                        <MissingDocumentUpload doc={doc} onSaved={onSaved} />
+                      ) : (
+                        <DocumentViewButton doc={doc} />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -498,6 +589,70 @@ function DocumentsPanel({ documentsByGate }) {
         <EmptyState title="No document checks yet" hint="Your requirements will appear here after a staff review." />
       )}
     </Card>
+  );
+}
+
+function DocumentViewButton({ doc }) {
+  const reference = doc.evidence_reference || "";
+  const canView = Boolean(reference);
+
+  function viewReference() {
+    if (!canView) return;
+    if (/^https?:\/\//i.test(reference)) {
+      window.open(reference, "_blank", "noopener,noreferrer");
+      return;
+    }
+    window.alert(`Document reference: ${reference}`);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={viewReference}
+      disabled={!canView}
+      aria-label="View document"
+      title={canView ? `View document: ${reference}` : "No document reference recorded yet"}
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <Eye className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function MissingDocumentUpload({ doc, onSaved }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(file) {
+    if (!file) return;
+    setError("");
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please choose a PDF file.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.submitStudentDocument(doc.id, file.name);
+      onSaved();
+    } catch (err) {
+      setError(err.message || "Could not submit the document.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="shrink-0">
+      <label
+        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-brand-700 hover:bg-brand-50"
+        title="Upload PDF"
+        aria-label="Upload PDF"
+      >
+        <FileUp className="h-3.5 w-3.5" />
+        <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => submit(e.target.files?.[0])} />
+      </label>
+      {error && <p className="mt-1 max-w-32 text-xs font-medium text-red-600">{error}</p>}
+    </div>
   );
 }
 

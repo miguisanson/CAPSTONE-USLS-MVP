@@ -1430,6 +1430,32 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "message": "Submitted. Research staff will review your preferred schedule."})
 
+    @app.route("/api/student-portal/documents/<int:document_id>/upload", methods=["POST"])
+    @require_api_login("student")
+    def student_document_upload(document_id: int):
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
+        filename = (data.get("filename") or "").strip()
+        if not filename.lower().endswith(".pdf"):
+            return jsonify({"error": "Please choose a PDF supporting document."}), 400
+        doc.status = "Submitted"
+        doc.evidence_reference = filename
+        doc.updated_at = now_utc()
+        add_task(student.id, f"Review submitted {doc.item_name}", "Research Coordinator", 3, 35)
+        add_log(
+            "research-gate",
+            student.id,
+            "Student",
+            filename,
+            f"{doc.item_name} submitted",
+            "Research Coordinator",
+            f"Student uploaded a supporting document for {doc.gate}. Staff must verify before marking it complete.",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Staff will verify the supporting document."})
+
     # Role-filterable work queue.
     @app.route("/api/tasks")
     @require_api_login("staff")
@@ -3012,6 +3038,15 @@ def ensure_demo_accounts() -> None:
 
     linked_student = Student.query.order_by(Student.student_number.asc()).first()
     if linked_student:
+        demo_missing = DocumentCheck.query.filter_by(
+            student_id=linked_student.id,
+            gate="Form 4 - Proposal Defense Readiness",
+            item_name="Proposal manuscript",
+        ).first()
+        if demo_missing and demo_missing.status == "Complete":
+            demo_missing.status = "Missing"
+            demo_missing.evidence_reference = "Demo missing requirement"
+
         student_account = UserAccount.query.filter_by(email="student@gs.local").first()
         if not student_account:
             student_account = UserAccount(
@@ -3040,9 +3075,10 @@ if __name__ == "__main__":
         if Student.query.count() == 0:
             seed_database(seed_count)
             print(f"Database was empty, so {seed_count} demo students were seeded.")
-        if UserAccount.query.count() == 0:
-            ensure_demo_accounts()
-            db.session.commit()
+        accounts_before = UserAccount.query.count()
+        ensure_demo_accounts()
+        db.session.commit()
+        if accounts_before == 0:
             print("Demo staff and student accounts were created.")
 
     port = int(os.getenv("FLASK_PORT", "5000"))
