@@ -26,26 +26,26 @@ import { Card, EmptyState, ErrorNote, ProgressBar, SectionTitle, Spinner, Status
 import { CheckList, Field, Input, Select, Textarea } from "../components/forms";
 import { formatDate, initials, relativeDays } from "../lib/format";
 
-const GATES = ["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"];
+const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
 const REQUEST_GROUPS = [
   {
     title: "Research & Defense",
-    description: "Submit research requirements first, then request a defense schedule once a research case is active.",
+    description: "Upload your milestone files, submit them for review, then request scheduling after a panel is assigned.",
     items: [
-      { id: "research", label: "Research Gate", icon: FileCheck },
+      { id: "research", label: "Research Submission", icon: FileCheck },
       {
         id: "schedule",
         label: "Defense Schedule",
         icon: CalendarCheck,
-        lockedWhen: (data) => !data.research_case,
-        lockedReason: "Available once you are enrolled in research and staff has opened your research case.",
+        lockedWhen: (data) => !data.research_case || !data.panel?.length,
+        lockedReason: "Available after research staff opens your research case and completes panel matching.",
       },
     ],
   },
   {
     title: "Leave & Return",
-    description: "LOA pauses your studies; readmission is only for returning after an approved LOA.",
+    description: "Submit a leave application or request your return after an approved leave.",
     items: [
       { id: "loa", label: "Leave of Absence", icon: CalendarOff },
       {
@@ -92,13 +92,6 @@ export default function StudentPortal() {
 
       <main className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
         <div className="space-y-5 animate-fade-up">
-          <Card className="p-5">
-            <h1 className="font-display text-2xl font-semibold text-ink">My Graduate School Portal</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Track your progress, submit requests, and see which office owns the next step.
-            </p>
-          </Card>
-
           {loading ? (
             <Card className="p-6">
               <Spinner label="Loading student portal..." />
@@ -114,7 +107,7 @@ export default function StudentPortal() {
                 <div className="space-y-5 lg:col-span-8">
                   <ProgressPanel data={data} />
                   <RequestCenter data={data} onSaved={refetch} />
-                  <DocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} />
+                  <AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} />
                   <ActivityPanel logs={data.logs} />
                 </div>
                 <div className="space-y-5 lg:col-span-4">
@@ -221,7 +214,7 @@ function ProgressPanel({ data }) {
             Adviser: {student.adviser_name || research_case?.adviser_name || "Not assigned"}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusBadge value={research_case?.current_gate || "Research not started"} dot={false} />
+            <StatusBadge value={research_case?.current_gate_label || "Research not started"} dot={false} />
             {research_case?.status && <StatusBadge value={research_case.status} />}
           </div>
         </div>
@@ -322,13 +315,20 @@ function useSubmitRequest(type, onSaved) {
 }
 
 function ResearchRequestForm({ data, onSaved }) {
-  const [gate, setGate] = useState(GATES[0]);
-  const required = data.gate_requirements?.[gate] || [];
-  const [selected, setSelected] = useState(required);
-  const [form, setForm] = useState({ research_title: "", submitted_package: "", source_reference: "" });
+  const milestones = data.research_milestones || [];
+  const initialGate = data.research_case?.current_gate || milestones[0]?.value || "";
+  const [gate, setGate] = useState(initialGate);
+  const [form, setForm] = useState({ research_title: data.research_case?.title || "", submitted_package: "" });
   const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
+  const milestone = milestones.find((item) => item.value === gate) || milestones[0];
+  const uploadRequirements = milestone?.requirements.filter((item) => item.student_upload) || [];
+  const managedRequirements = milestone?.requirements.filter((item) => !item.student_upload) || [];
 
-  useEffect(() => setSelected(required), [gate, required]);
+  useEffect(() => {
+    const currentGate = data.research_case?.current_gate || milestones[0]?.value || "";
+    setGate(currentGate);
+    setForm((current) => ({ ...current, research_title: data.research_case?.title || "" }));
+  }, [data.student.id, data.research_case?.current_gate, data.research_case?.title, milestones]);
 
   function set(key) {
     return (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -341,38 +341,128 @@ function ResearchRequestForm({ data, onSaved }) {
       gate,
       research_title: form.research_title,
       submitted_package: form.submitted_package,
-      source_reference: form.source_reference,
-      submitted_items: selected.map((item) => `${gate}||${item}`),
     });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field label="Gate / milestone" required>
-        <Select value={gate} onChange={(e) => setGate(e.target.value)} placeholder="" options={GATES} />
+      <Field label="Research milestone" required hint={milestone?.description}>
+        <Select
+          value={gate}
+          onChange={(e) => setGate(e.target.value)}
+          placeholder=""
+          options={milestones.map((item) => ({ value: item.value, label: item.label }))}
+        />
       </Field>
       <Field label="Research title">
         <Input value={form.research_title} onChange={set("research_title")} />
       </Field>
-      <Field label="Requirements included">
-        <CheckList items={required} selected={selected} onToggle={(item) => setSelected((x) => (x.includes(item) ? x.filter((v) => v !== item) : [...x, item]))} />
-      </Field>
-      <Field label="Submission notes or package reference">
+      <div>
+        <p className="field-label">Files you upload</p>
+        <p className="mb-2 text-xs text-slate-500">Only these items require action from you for this milestone.</p>
+        <div className="space-y-2">
+          {uploadRequirements.map((requirement) => (
+            <ResearchEvidenceUpload
+              key={requirement.item_name}
+              gate={gate}
+              requirement={requirement}
+              onSaved={onSaved}
+            />
+          ))}
+        </div>
+      </div>
+      {managedRequirements.length > 0 && (
+        <div>
+          <p className="field-label">Completed by staff or the system</p>
+          <p className="mb-2 text-xs text-slate-500">These update automatically after review, panel matching, or scheduling.</p>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            {managedRequirements.map((requirement) => (
+              <div key={requirement.item_name} className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-3.5 py-3 last:border-b-0">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{requirement.label}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
+                </div>
+                <StatusBadge value={requirement.status_label} dot={false} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <Field label="Message to the Research Coordinator" hint="Optional context for this submission.">
         <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
       </Field>
-      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, source_reference: file?.name || "" }))} />
-      <SubmitState busy={busy} error={error} message={message} label="Submit research application" />
+      <SubmitState
+        busy={busy}
+        error={error}
+        message={message}
+        disabled={!milestone?.student_uploads_ready}
+        label={`Submit ${milestone?.short_label || "milestone"} for review`}
+        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
+      />
     </form>
+  );
+}
+
+function ResearchEvidenceUpload({ gate, requirement, onSaved }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const needed = requirement.required_file_count;
+  const files = requirement.files || [];
+
+  async function upload(file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please choose a PDF file.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api.uploadResearchEvidence(gate, requirement.item_name, file);
+      await onSaved();
+    } catch (err) {
+      setError(err.message || "Could not upload this evidence.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-ink">{requirement.label}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
+          <p className="mt-1 text-xs font-medium text-slate-600">{files.length} of {needed} file{needed > 1 ? "s" : ""} uploaded</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusBadge value={requirement.status_label} dot={false} />
+          <label className="btn-ghost cursor-pointer">
+          <FileUp className="h-4 w-4" /> {busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
+          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy} onChange={(e) => upload(e.target.files?.[0])} />
+          </label>
+        </div>
+      </div>
+      {files.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {files.map((file) => (
+            <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-slate-200">
+              {file.name}<Eye className="h-3.5 w-3.5" />
+            </a>
+          ))}
+        </div>
+      )}
+      {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
+    </div>
   );
 }
 
 function LoaRequestForm({ studentId, onSaved }) {
   const [form, setForm] = useState({
-    application_reference: "",
+    attachment_id: null,
     effective_start: "",
     effective_end: "",
     reason_remarks: "",
-    source_reference: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("leave-of-absence", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -395,25 +485,24 @@ function LoaRequestForm({ studentId, onSaved }) {
       <Field label="Reason / remarks" required>
         <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} required />
       </Field>
-      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, application_reference: file?.name || "", source_reference: file?.name || "" }))} />
-      <SubmitState busy={busy} error={error} message={message} label="Submit LOA application" />
+      <RequestPdfUpload requestType="leave-of-absence" label="Completed LOA application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the completed LOA application before submitting." : ""} label="Submit LOA application" />
     </form>
   );
 }
 
 function ReadmissionRequestForm({ data, onSaved }) {
   const requirements = data.readmission_requirements || [];
-  const [items, setItems] = useState(requirements);
+  const [items, setItems] = useState([]);
   const [form, setForm] = useState({
-    application_reference: "",
+    attachment_id: null,
     target_return_term: "",
     previous_loa_period: "",
-    source_reference: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("readmission", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  useEffect(() => setItems(requirements), [requirements]);
+  useEffect(() => setItems([]), [data.student.id]);
 
   function onSubmit(e) {
     e.preventDefault();
@@ -430,11 +519,11 @@ function ReadmissionRequestForm({ data, onSaved }) {
           <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 Term 2 to AY 2026-2027 Term 1" />
         </Field>
       </div>
-      <Field label="Requirements included">
+      <Field label="Requirements included in your application" hint="Select only the items actually included in the uploaded PDF.">
         <CheckList items={requirements} selected={items} onToggle={(item) => setItems((x) => (x.includes(item) ? x.filter((v) => v !== item) : [...x, item]))} />
       </Field>
-      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, application_reference: file?.name || "", source_reference: file?.name || "" }))} />
-      <SubmitState busy={busy} error={error} message={message} label="Submit readmission request" />
+      <RequestPdfUpload requestType="readmission" label="Completed readmission application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || items.length !== requirements.length} disabledHint={!form.attachment_id ? "Upload the completed readmission application before submitting." : items.length !== requirements.length ? "Confirm all required items included in the application." : ""} label="Submit readmission request" />
     </form>
   );
 }
@@ -446,7 +535,6 @@ function ScheduleRequestForm({ studentId, onSaved }) {
     mode: "On-site",
     venue: "",
     constraints: "",
-    source_reference: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("defense-scheduling", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -475,20 +563,41 @@ function ScheduleRequestForm({ studentId, onSaved }) {
       <Field label="Scheduling constraints">
         <Textarea value={form.constraints} onChange={set("constraints")} />
       </Field>
-      <PdfUploadField label="Supporting Document" onFile={(file) => setForm((f) => ({ ...f, source_reference: file?.name || "" }))} />
       <SubmitState busy={busy} error={error} message={message} label="Submit schedule request" />
     </form>
   );
 }
 
-function PdfUploadField({ label, onFile }) {
-  const [fileName, setFileName] = useState("");
+function RequestPdfUpload({ requestType, label, onUploaded }) {
+  const [attachment, setAttachment] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function upload(file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please choose a PDF file.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.uploadStudentRequestAttachment(requestType, file);
+      setAttachment(result.attachment);
+      onUploaded(result.attachment);
+    } catch (err) {
+      setError(err.message || "Could not upload the application.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <Field label={label} hint="PDF only. This demo records the filename; file storage can be added next.">
+    <Field label={label} hint="PDF only, up to 25 MB. The file is stored with your request.">
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 hover:bg-slate-50">
         <span className="flex min-w-0 items-center gap-2">
           <FileUp className="h-4 w-4 shrink-0 text-brand-700" />
-          <span className="truncate">{fileName || "Choose PDF file"}</span>
+          <span className="truncate">{attachment?.name || (busy ? "Uploading..." : "Choose PDF file")}</span>
         </span>
         <span className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
           Browse
@@ -497,18 +606,17 @@ function PdfUploadField({ label, onFile }) {
           type="file"
           accept="application/pdf,.pdf"
           className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0] || null;
-            setFileName(file?.name || "");
-            onFile(file);
-          }}
+          disabled={busy}
+          onChange={(e) => upload(e.target.files?.[0])}
         />
       </label>
+      {attachment && <a href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View uploaded application</a>}
+      {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
     </Field>
   );
 }
 
-function SubmitState({ busy, error, message, label }) {
+function SubmitState({ busy, error, message, label, disabled = false, disabledHint = "" }) {
   return (
     <div className="space-y-3">
       <ErrorNote message={error} />
@@ -517,7 +625,7 @@ function SubmitState({ busy, error, message, label }) {
           <CheckCircle2 className="h-5 w-5" /> {message}
         </div>
       )}
-      <button type="submit" disabled={busy} className="btn-primary w-full sm:w-auto">
+      <button type="submit" disabled={busy || disabled} className="btn-primary w-full sm:w-auto">
         {busy ? (
           <>
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Submitting...
@@ -528,6 +636,7 @@ function SubmitState({ busy, error, message, label }) {
           </>
         )}
       </button>
+      {disabledHint && <p className="text-xs font-medium text-slate-500">{disabledHint}</p>}
     </div>
   );
 }
@@ -557,48 +666,46 @@ function TasksPanel({ tasks }) {
   );
 }
 
-function DocumentsPanel({ documentsByGate, onSaved }) {
-  const entries = Object.entries(documentsByGate || {});
+function AdministrativeDocumentsPanel({ documentsByGate, onSaved }) {
+  const entries = Object.entries(documentsByGate || {}).filter(([gate]) => !RESEARCH_GATE_KEYS.has(gate));
+  if (!entries.length) return null;
   return (
     <Card className="p-6">
-      <SectionTitle title="Documents & Requirements" subtitle="Submitted and missing checklist items by milestone" icon={FileText} />
-      {entries.length ? (
-        <div className="space-y-4">
-          {entries.map(([gate, docs]) => (
-            <div key={gate}>
-              <p className="mb-2 text-sm font-semibold text-slate-700">{gate}</p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {docs.map((doc) => (
-                  <div key={doc.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-                    <div className="flex items-center gap-3">
-                      <span className="min-w-0 flex-1 truncate text-sm text-slate-600">{doc.item_name}</span>
-                      <StatusBadge value={doc.status} dot={false} />
-                      {doc.status === "Missing" ? (
-                        <MissingDocumentUpload doc={doc} onSaved={onSaved} />
-                      ) : (
-                        <DocumentViewButton doc={doc} />
-                      )}
-                    </div>
+      <SectionTitle title="Administrative Documents" subtitle="Admission and general records outside your research submissions" icon={FileText} />
+      <div className="space-y-4">
+        {entries.map(([gate, docs]) => (
+          <div key={gate}>
+            <p className="mb-2 text-sm font-semibold text-slate-700">{gate}</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {docs.map((doc) => (
+                <div key={doc.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 truncate text-sm text-slate-600">{doc.display_name || doc.item_name}</span>
+                    <StatusBadge value={doc.status_label || doc.status} dot={false} />
+                    {doc.status === "Missing" ? (
+                      <MissingDocumentUpload doc={doc} onSaved={onSaved} />
+                    ) : (
+                      <DocumentViewButton doc={doc} />
+                    )}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : (
-        <EmptyState title="No document checks yet" hint="Your requirements will appear here after a staff review." />
-      )}
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }
 
 function DocumentViewButton({ doc }) {
-  const reference = doc.evidence_reference || "";
+  const file = doc.files?.[0];
+  const reference = file?.url || doc.evidence_reference || "";
   const canView = Boolean(reference);
 
   function viewReference() {
     if (!canView) return;
-    if (/^https?:\/\//i.test(reference)) {
+    if (file?.url || /^https?:\/\//i.test(reference)) {
       window.open(reference, "_blank", "noopener,noreferrer");
       return;
     }
@@ -632,7 +739,7 @@ function MissingDocumentUpload({ doc, onSaved }) {
     }
     setBusy(true);
     try {
-      await api.submitStudentDocument(doc.id, file.name);
+      await api.submitStudentDocument(doc.id, file);
       onSaved();
     } catch (err) {
       setError(err.message || "Could not submit the document.");

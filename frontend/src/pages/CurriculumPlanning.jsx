@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BookOpenCheck, FileSpreadsheet, RefreshCw, AlertTriangle, Users, CheckCircle2 } from "lucide-react";
+import { BookOpenCheck, FileSpreadsheet, RefreshCw, AlertTriangle, Users, CheckCircle2, Plus, X, Save } from "lucide-react";
 import { api } from "../api";
 import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
 
@@ -13,6 +13,8 @@ export default function CurriculumPlanning() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [showSubjectForm, setShowSubjectForm] = useState(false);
+  const [subject, setSubject] = useState({ code: "", title: "", units: 3, category: "Core", recommended_term: "Year 1" });
 
   function load(pid) {
     setLoading(true);
@@ -32,15 +34,18 @@ export default function CurriculumPlanning() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProgramId]);
 
-  async function generate() {
+  async function createSubject(event) {
+    event.preventDefault();
     if (!programId) return;
     setBusy(true);
     setMessage("");
     setError("");
     try {
-      const res = await api.generateCurriculum({ program_id: programId, scope: "active" });
+      const res = await api.createCurriculumSubject({ program_id: programId, ...subject });
       setMessage(res.message);
       setData(res.data);
+      setSubject({ code: "", title: "", units: 3, category: "Core", recommended_term: "Year 1" });
+      setShowSubjectForm(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -73,6 +78,10 @@ export default function CurriculumPlanning() {
           <Link to={programId ? `/monitoring-sheet?program_id=${programId}` : "/monitoring-sheet"} className="btn-ghost">
             <FileSpreadsheet className="h-4 w-4" /> Monitoring Sheet
           </Link>
+          <button type="button" onClick={() => setShowSubjectForm((current) => !current)} className="btn-primary">
+            {showSubjectForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showSubjectForm ? "Close" : "Add subject"}
+          </button>
         </div>
       </div>
 
@@ -86,34 +95,51 @@ export default function CurriculumPlanning() {
             <Metric icon={Users} label="Students" value={data.summary.students} tone="brand" />
             <Metric icon={CheckCircle2} label="Active" value={data.summary.active} tone="blue" />
             <Metric icon={AlertTriangle} label="Delayed / LOA" value={data.summary.delayed_or_loa} tone="amber" />
-            <Metric icon={BookOpenCheck} label="Generated" value={data.summary.curriculum_generated} tone="brand" />
-            <Metric icon={RefreshCw} label="Need generation" value={data.summary.needs_generation} tone="red" />
+            <Metric icon={BookOpenCheck} label="Subjects" value={data.summary.subjects} tone="brand" />
+            <Metric icon={RefreshCw} label="Audit coverage" value={`${data.summary.coverage_rate}%`} tone={data.summary.coverage_rate === 100 ? "brand" : "red"} />
           </div>
 
-          <Card className="p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-ink">Set up student subject checklists</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Gives each active student the program's full subject list (as “not taken”) so their course audit and the
-                  Monitoring Sheet are complete and ready to mark. It only adds what's missing — nothing already recorded is changed.
-                  The Academic Coordinator stays in control; this just prepares the checklist.
-                </p>
+          {showSubjectForm && (
+            <Card className="p-5">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-ink">Add curriculum subject</h2>
+                <p className="mt-1 text-sm text-slate-500">The subject becomes part of {data.program.code} and is automatically added to every student course audit in this program.</p>
               </div>
-              <button type="button" onClick={generate} disabled={busy} className="btn-primary">
-                {busy ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Setting up...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4" /> Set up checklists
-                  </>
-                )}
-              </button>
-            </div>
-            {message && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{message}</p>}
-          </Card>
+              <form onSubmit={createSubject} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  <SubjectField label="Subject code" required>
+                    <input required value={subject.code} onChange={(e) => setSubject((current) => ({ ...current, code: e.target.value.toUpperCase() }))} className="field-input" placeholder={`${data.program.code}-509`} />
+                  </SubjectField>
+                  <SubjectField label="Subject title" required className="xl:col-span-2">
+                    <input required value={subject.title} onChange={(e) => setSubject((current) => ({ ...current, title: e.target.value }))} className="field-input" placeholder="Advanced Research Seminar" />
+                  </SubjectField>
+                  <SubjectField label="Units" required>
+                    <input required type="number" min="0" max="12" value={subject.units} onChange={(e) => setSubject((current) => ({ ...current, units: e.target.value }))} className="field-input" />
+                  </SubjectField>
+                  <SubjectField label="Category" required>
+                    <select value={subject.category} onChange={(e) => setSubject((current) => ({ ...current, category: e.target.value }))} className="field-input cursor-pointer">
+                      {["Basic", "Core", "Major", "Cognate", "Comprehensive"].map((item) => <option key={item}>{item}</option>)}
+                    </select>
+                  </SubjectField>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="w-full sm:max-w-xs">
+                    <SubjectField label="Recommended term" required>
+                      <select value={subject.recommended_term} onChange={(e) => setSubject((current) => ({ ...current, recommended_term: e.target.value }))} className="field-input cursor-pointer">
+                        {["Year 1 Term 1", "Year 1 Term 2", "Year 2 Term 1", "Year 2 Term 2", "Year 3"].map((item) => <option key={item}>{item}</option>)}
+                      </select>
+                    </SubjectField>
+                  </div>
+                  <button type="submit" disabled={busy} className="btn-primary">
+                    {busy ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Save className="h-4 w-4" />}
+                    {busy ? "Adding..." : "Add subject"}
+                  </button>
+                </div>
+              </form>
+            </Card>
+          )}
+
+          {message && <p className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{message}</p>}
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
             <Card className="p-5 lg:col-span-4">
@@ -152,7 +178,7 @@ export default function CurriculumPlanning() {
             <Card className="overflow-hidden lg:col-span-8">
               <div className="border-b border-slate-100 px-5 py-3">
                 <h2 className="text-lg font-semibold text-ink">Student curriculum coverage</h2>
-                <p className="text-sm text-slate-500">Students should show generated rows before audit and offering decisions.</p>
+                <p className="text-sm text-slate-500">Coverage updates automatically when students or curriculum subjects are added.</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-sm">
@@ -208,5 +234,14 @@ function Metric({ icon: Icon, label, value, tone }) {
         <p className="text-xs text-slate-500">{label}</p>
       </div>
     </Card>
+  );
+}
+
+function SubjectField({ label, required, children, className = "" }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="field-label">{label}{required && <span className="text-red-500"> *</span>}</span>
+      {children}
+    </label>
   );
 }

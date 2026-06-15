@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import { Spinner } from "./components/ui";
 import Dashboard from "./pages/Dashboard";
 import Students from "./pages/Students";
+import Faculty from "./pages/Faculty";
 import StudentDetail from "./pages/StudentDetail";
 import WorkQueue from "./pages/WorkQueue";
 import ActivityLog from "./pages/ActivityLog";
@@ -56,6 +57,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/students" element={<Students />} />
+                <Route path="/faculty" element={<Faculty />} />
                 <Route path="/students/:id" element={<StudentDetail />} />
                 <Route path="/monitoring-sheet" element={<MonitoringGrid />} />
                 <Route path="/curriculum-planning" element={<CurriculumPlanning />} />

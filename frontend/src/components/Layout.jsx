@@ -36,6 +36,7 @@ const NAV_GROUPS = [
     label: "Records",
     items: [
       { to: "/students", label: "Students", icon: Users },
+      { to: "/faculty", label: "Faculty", icon: UsersRound },
       { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
     ],
   },

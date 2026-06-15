@@ -4,15 +4,19 @@ import os
 import random
 import re
 import sys
+from collections import Counter
 from functools import wraps
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, text
 from werkzeug.datastructures import MultiDict
+from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -21,6 +25,8 @@ load_dotenv()
 db = SQLAlchemy()
 
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
+UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "research_evidence"
+REQUEST_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "student_requests"
 
 # This demo keeps the Flask API, SQLAlchemy models, workflow rules, RAG prototype,
 # and seed data in one file so evaluators can trace a workflow end-to-end quickly.
@@ -358,6 +364,36 @@ class DocumentCheck(db.Model):
     evidence_reference = db.Column(db.String(160))
     updated_at = db.Column(db.DateTime, default=now_utc)
 
+    evidence_files = db.relationship(
+        "ResearchEvidenceFile",
+        backref="document_check",
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+
+
+# Student-uploaded research evidence. Checklist status is derived from these
+# rows so staff cannot mark a document as received when no file exists.
+class ResearchEvidenceFile(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    document_check_id = db.Column(db.Integer, db.ForeignKey("document_check.id"), nullable=False)
+    original_name = db.Column(db.String(220), nullable=False)
+    stored_name = db.Column(db.String(220), nullable=False, unique=True)
+    mime_type = db.Column(db.String(100), nullable=False, default="application/pdf")
+    extracted_text = db.Column(db.Text)
+    uploaded_at = db.Column(db.DateTime, default=now_utc)
+
+
+class StudentRequestAttachment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    request_type = db.Column(db.String(60), nullable=False)
+    original_name = db.Column(db.String(220), nullable=False)
+    stored_name = db.Column(db.String(220), nullable=False, unique=True)
+    mime_type = db.Column(db.String(100), nullable=False, default="application/pdf")
+    uploaded_at = db.Column(db.DateTime, default=now_utc)
+
 
 # Faculty reference data used by panel matching and scheduling availability.
 class Faculty(db.Model):
@@ -369,6 +405,7 @@ class Faculty(db.Model):
     active = db.Column(db.Boolean, default=True)
 
     availabilities = db.relationship("FacultyAvailability", backref="faculty", lazy=True, cascade="all, delete-orphan")
+    working_hours = db.relationship("FacultyWorkingHour", backref="faculty", lazy=True, cascade="all, delete-orphan")
 
 
 # Date/time windows that make defense scheduling checkable in the demo.
@@ -378,6 +415,17 @@ class FacultyAvailability(db.Model):
     available_date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
+
+
+# Recurring profile hours. Monday-Friday defaults are used when a legacy
+# faculty record has no rows; weekends require an explicit dated availability.
+class FacultyWorkingHour(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"), nullable=False)
+    weekday = db.Column(db.Integer, nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    enabled = db.Column(db.Boolean, default=True)
 
 
 # Result of the panel matching transaction, including the rule score shown to users.
@@ -462,6 +510,8 @@ def term_dict(term: AcademicTerm) -> dict:
 
 
 def faculty_dict(faculty: Faculty) -> dict:
+    workload = PanelAssignment.query.filter_by(faculty_id=faculty.id).count()
+    working_hours = faculty_working_hours(faculty)
     return {
         "id": faculty.id,
         "name": faculty.name,
@@ -469,6 +519,13 @@ def faculty_dict(faculty: Faculty) -> dict:
         "role": faculty.role,
         "specialization": faculty.specialization,
         "active": faculty.active,
+        "panel_load": workload,
+        "working_hours": working_hours,
+        "calendar": {
+            "provider": "Google Calendar",
+            "connected": False,
+            "status": "Not connected",
+        },
     }
 
 
@@ -524,11 +581,13 @@ def course_audit_dict(audit: dict) -> dict:
 def research_case_dict(case: ResearchCase | None) -> dict | None:
     if not case:
         return None
+    milestone = RESEARCH_MILESTONES.get(case.current_gate, {})
     return {
         "id": case.id,
         "case_type": case.case_type,
         "title": case.title,
         "current_gate": case.current_gate,
+        "current_gate_label": milestone.get("label", case.current_gate),
         "status": case.status,
         "adviser_name": case.adviser_name,
         "opened_at": iso(case.opened_at),
@@ -536,14 +595,46 @@ def research_case_dict(case: ResearchCase | None) -> dict | None:
 
 
 def document_check_dict(doc: DocumentCheck) -> dict:
+    files = sorted(doc.evidence_files, key=lambda item: item.uploaded_at or now_utc(), reverse=True)
+    presentation = research_requirement_presentation(doc.gate, doc.item_name)
+    state = research_requirement_state(Student.query.get(doc.student_id), doc.gate, doc.item_name, doc)
     return {
         "id": doc.id,
         "gate": doc.gate,
         "item_name": doc.item_name,
-        "status": doc.status,
+        "status": state["status"] if presentation else doc.status,
+        "status_label": state["status_label"] if presentation else doc.status,
+        "display_name": presentation["label"] if presentation else doc.item_name,
+        "description": presentation["description"] if presentation else None,
+        "source_type": presentation["source_type"] if presentation else "record",
+        "student_upload": presentation["source_type"] == "student_upload" if presentation else True,
+        "required_file_count": presentation["required_file_count"] if presentation else 1,
         "evidence_reference": doc.evidence_reference,
         "updated_at": iso(doc.updated_at),
+        "file_count": len(files),
+        "files": [
+            {
+                "id": item.id,
+                "name": item.original_name,
+                "uploaded_at": iso(item.uploaded_at),
+                "url": f"/api/research-evidence/{item.id}/file",
+            }
+            for item in files
+        ],
     }
+
+
+def student_portal_stage(student: Student, case: ResearchCase | None) -> str:
+    if student.standing == "On Leave":
+        return "LOA"
+    if not case:
+        return student.current_stage
+    return {
+        "Form 1 - Title Defense": "Proposal Development",
+        "Form 4 - Proposal Defense Readiness": "Proposal Defense",
+        "Final Defense": "Final Defense",
+        "Completion Evidence": "Completed",
+    }.get(case.current_gate, student.current_stage)
 
 
 def panel_assignment_dict(assignment: PanelAssignment) -> dict:
@@ -719,7 +810,8 @@ def student_indicators(student: Student) -> dict:
     case = (
         ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
     )
-    missing_docs = DocumentCheck.query.filter_by(student_id=student.id, status="Missing").count()
+    current_milestone = research_milestone_payload(student, case.current_gate) if case and case.current_gate in RESEARCH_MILESTONES else None
+    missing_docs = current_milestone["student_missing_count"] if current_milestone else 0
     sched = (
         ScheduleRequest.query.filter_by(student_id=student.id).order_by(ScheduleRequest.created_at.desc()).first()
     )
@@ -815,6 +907,27 @@ def student_recommendations(student: Student) -> dict:
 
     recs.sort(key=lambda r: -r["score"])
     return {"indicators": ind, "recommendations": recs}
+
+
+def student_portal_recommendations(student: Student) -> list[dict]:
+    payload = student_recommendations(student)
+    indicators = payload["indicators"]
+    milestone = RESEARCH_MILESTONES.get(indicators.get("research_gate") or "", {})
+    rows = []
+    for rec in payload["recommendations"]:
+        item = dict(rec)
+        if rec["code"] == "evidence":
+            count = indicators["missing_documents"]
+            item["recommendation"] = f"Upload the {count} missing file(s) for {milestone.get('label', indicators['research_gate'])}."
+            item["owner"] = "You"
+        elif rec["code"] == "coursework":
+            item["recommendation"] = f"Contact the Academic Coordinator about your {indicators['missing_subjects']} outstanding subject(s)."
+        elif rec["code"] == "schedule":
+            item["recommendation"] = "Wait for the Research Coordinator to confirm a time shared by your adviser and panel."
+        elif rec["code"] == "stalled":
+            item["recommendation"] = "Contact the office shown below to confirm the next action on your record."
+        rows.append(item)
+    return rows
 
 
 def student_priority(student: Student) -> dict:
@@ -1391,6 +1504,11 @@ def register_routes(app: Flask) -> None:
             .limit(5)
             .all()
         )
+        panel = (
+            PanelAssignment.query.filter_by(student_id=student.id)
+            .order_by(PanelAssignment.score.desc())
+            .all()
+        )
         tasks = (
             Task.query.filter(
                 Task.student_id == student.id,
@@ -1410,27 +1528,23 @@ def register_routes(app: Flask) -> None:
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
 
+        portal_student = student_brief(student)
+        portal_student["current_stage"] = student_portal_stage(student, research_case)
+
         return jsonify(
             {
-                "student": student_brief(student),
+                "student": portal_student,
                 "stages": STAGES,
-                "stage_index": STAGES.index(student.current_stage) if student.current_stage in STAGES else 0,
+                "stage_index": STAGES.index(portal_student["current_stage"]) if portal_student["current_stage"] in STAGES else 0,
                 "course_audit": course_audit_dict(audit),
                 "research_case": research_case_dict(research_case),
                 "documents_by_gate": docs_by_gate,
+                "panel": [panel_assignment_dict(item) for item in panel],
                 "schedules": [schedule_request_dict(s) for s in schedules],
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
-                "recommendations": student_recommendations(student)["recommendations"],
-                "gate_requirements": {
-                    gate: required_documents_for_gate(gate)
-                    for gate in [
-                        "Form 1 - Title Defense",
-                        "Form 4 - Proposal Defense Readiness",
-                        "Final Defense",
-                        "Completion Evidence",
-                    ]
-                },
+                "recommendations": student_portal_recommendations(student),
+                "research_milestones": [research_milestone_payload(student, gate) for gate in RESEARCH_MILESTONES],
                 "readmission_requirements": readmission_requirements(),
             }
         )
@@ -1444,15 +1558,47 @@ def register_routes(app: Flask) -> None:
         gate = data.get("gate", "Form 1 - Title Defense")
         title = (data.get("research_title") or "").strip()
         source = (data.get("source_reference") or data.get("submitted_package") or "").strip()
-        submitted = data.getlist("submitted_items")
-        clean_submitted = [
-            item.split("||", 1)[1] if item.startswith(f"{gate}||") else item
-            for item in submitted
+        if gate not in RESEARCH_MILESTONES:
+            return jsonify({"error": "Choose a valid research milestone."}), 400
+        ensure_research_document_checks(student.id, gate)
+        milestone = research_milestone_payload(student, gate)
+        missing_items = [
+            item["label"]
+            for item in milestone["requirements"]
+            if item["student_upload"] and item["status"] == "Missing"
         ]
+        if missing_items:
+            return jsonify({"error": f"Upload the required files before submitting: {', '.join(missing_items)}."}), 400
+        submitted_items = [
+            item["label"]
+            for item in milestone["requirements"]
+            if item["student_upload"]
+        ]
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id)
+            .order_by(ResearchCase.opened_at.desc())
+            .first()
+        )
+        if not research_case:
+            research_case = ResearchCase(
+                student_id=student.id,
+                case_type=research_case_type(student),
+                title=title or f"{student.program.code} graduate research case",
+                current_gate=gate,
+                status="Awaiting Review",
+                adviser_name=student.adviser_name,
+            )
+            db.session.add(research_case)
+        else:
+            research_case.current_gate = gate
+            research_case.status = "Awaiting Review"
+            if title:
+                research_case.title = title
         notes = [
-            f"Student submitted a {gate} request for staff review.",
+            f"Student submitted {milestone['label']} for staff review.",
             f"Research title: {title or 'Not provided'}.",
-            f"Submitted items: {', '.join(clean_submitted) if clean_submitted else 'None listed'}.",
+            f"File-backed items: {', '.join(submitted_items) if submitted_items else 'None uploaded'}.",
+            "All student-upload requirements were received. Staff and system requirements remain separate.",
         ]
         if data.get("submitted_package"):
             notes.append(f"Student notes/package reference: {data.get('submitted_package')}.")
@@ -1470,13 +1616,82 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "message": "Submitted. Research staff will review your application."})
 
+    @app.route("/api/student-portal/research-evidence/upload", methods=["POST"])
+    @require_api_login("student")
+    def student_research_evidence_upload():
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        gate = (request.form.get("gate") or "").strip()
+        item_name = (request.form.get("item_name") or "").strip()
+        uploaded = request.files.get("file")
+        if gate not in [
+            "Form 1 - Title Defense",
+            "Form 4 - Proposal Defense Readiness",
+            "Final Defense",
+            "Completion Evidence",
+        ]:
+            return jsonify({"error": "Choose a valid research gate."}), 400
+        if item_name not in required_documents_for_gate(gate):
+            return jsonify({"error": "Choose a valid requirement for this gate."}), 400
+        presentation = research_requirement_presentation(gate, item_name)
+        if not presentation or presentation["source_type"] != "student_upload":
+            return jsonify({"error": "This requirement is completed by staff or by the system and does not accept a student upload."}), 400
+        if not uploaded or not uploaded.filename:
+            return jsonify({"error": "Choose a PDF file to upload."}), 400
+        try:
+            evidence = store_research_evidence(student, gate, item_name, uploaded)
+            add_task(student.id, f"Review submitted {item_name}", "Research Coordinator", 3, 35)
+            add_log(
+                "research-gate",
+                student.id,
+                "Student",
+                evidence.original_name,
+                f"{item_name} submitted",
+                "Research Coordinator",
+                f"Student uploaded file-backed evidence for {gate}. Staff evaluation is derived from stored files.",
+            )
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "document": document_check_dict(evidence.document_check)})
+
+    @app.route("/api/student-portal/request-attachments/upload", methods=["POST"])
+    @require_api_login("student")
+    def student_request_attachment_upload():
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        request_type = (request.form.get("request_type") or "").strip()
+        uploaded = request.files.get("file")
+        if request_type not in {"leave-of-absence", "readmission"}:
+            return jsonify({"error": "Choose a valid request type."}), 400
+        if not uploaded or not uploaded.filename:
+            return jsonify({"error": "Choose a PDF application file."}), 400
+        try:
+            attachment = store_student_request_attachment(student, request_type, uploaded)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "ok": True,
+            "attachment": {
+                "id": attachment.id,
+                "name": attachment.original_name,
+                "url": f"/api/student-request-attachments/{attachment.id}/file",
+            },
+        })
+
     @app.route("/api/student-portal/requests/leave-of-absence", methods=["POST"])
     @require_api_login("student")
     def student_loa_request():
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+        attachment = request_attachment_from_payload(student, "leave-of-absence", data)
+        if not attachment:
+            return jsonify({"error": "Upload the completed LOA application PDF before submitting."}), 400
+        source = attachment.original_name
         effective_start = (data.get("effective_start") or "").strip()
         effective_end = (data.get("effective_end") or "").strip()
         period = " to ".join([part for part in [effective_start, effective_end] if part]) or "Not specified"
@@ -1486,8 +1701,7 @@ def register_routes(app: Flask) -> None:
         ]
         if data.get("reason_remarks"):
             notes.append(f"Reason/remarks: {data.get('reason_remarks')}.")
-        if data.get("application_reference"):
-            notes.append(f"Attachment/reference: {data.get('application_reference')}.")
+        notes.append(f"Application PDF: {attachment.original_name}.")
 
         add_task(student.id, "Review student Leave of Absence application", "GS Staff", 3, 55)
         add_log(
@@ -1508,7 +1722,10 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        source = (data.get("source_reference") or data.get("application_reference") or "").strip()
+        attachment = request_attachment_from_payload(student, "readmission", data)
+        if not attachment:
+            return jsonify({"error": "Upload the completed readmission application PDF before submitting."}), 400
+        source = attachment.original_name
         submitted = set(data.getlist("readmission_items"))
         missing = [item for item in readmission_requirements() if item not in submitted]
         notes = [
@@ -1518,8 +1735,7 @@ def register_routes(app: Flask) -> None:
         ]
         if data.get("previous_loa_period"):
             notes.append(f"Previous LOA period: {data.get('previous_loa_period')}.")
-        if data.get("application_reference"):
-            notes.append(f"Attachment/reference: {data.get('application_reference')}.")
+        notes.append(f"Application PDF: {attachment.original_name}.")
 
         add_task(student.id, "Review student readmission request", "GS Staff", 3, 55)
         add_log(
@@ -1540,7 +1756,9 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        source = (data.get("source_reference") or data.get("venue") or "").strip()
+        if not PanelAssignment.query.filter_by(student_id=student.id).first():
+            return jsonify({"error": "Panel matching must be completed before requesting a defense schedule."}), 400
+        source = (data.get("venue") or "").strip()
         preferred_date = (data.get("preferred_date") or "").strip()
         defense_type = data.get("defense_type", "Proposal Defense")
         notes = [
@@ -1569,28 +1787,59 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/student-portal/documents/<int:document_id>/upload", methods=["POST"])
     @require_api_login("student")
     def student_document_upload(document_id: int):
-        data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
-        filename = (data.get("filename") or "").strip()
-        if not filename.lower().endswith(".pdf"):
+        uploaded = request.files.get("file")
+        if not uploaded or not uploaded.filename:
             return jsonify({"error": "Please choose a PDF supporting document."}), 400
-        doc.status = "Submitted"
-        doc.evidence_reference = filename
-        doc.updated_at = now_utc()
+        try:
+            evidence = store_research_evidence(student, doc.gate, doc.item_name, uploaded, doc)
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
         add_task(student.id, f"Review submitted {doc.item_name}", "Research Coordinator", 3, 35)
         add_log(
             "research-gate",
             student.id,
             "Student",
-            filename,
+            evidence.original_name,
             f"{doc.item_name} submitted",
             "Research Coordinator",
             f"Student uploaded a supporting document for {doc.gate}. Staff must verify before marking it complete.",
         )
         db.session.commit()
         return jsonify({"ok": True, "message": "Submitted. Staff will verify the supporting document."})
+
+    @app.route("/api/research-evidence/<int:evidence_id>/file")
+    @require_api_login()
+    def research_evidence_file(evidence_id: int):
+        evidence = ResearchEvidenceFile.query.get_or_404(evidence_id)
+        account = current_account()
+        if account.role == "student" and account.student_id != evidence.student_id:
+            return jsonify({"error": "You cannot access this file."}), 403
+        return send_from_directory(
+            UPLOAD_ROOT,
+            evidence.stored_name,
+            as_attachment=False,
+            download_name=evidence.original_name,
+            mimetype=evidence.mime_type,
+        )
+
+    @app.route("/api/student-request-attachments/<int:attachment_id>/file")
+    @require_api_login()
+    def student_request_attachment_file(attachment_id: int):
+        attachment = StudentRequestAttachment.query.get_or_404(attachment_id)
+        account = current_account()
+        if account.role == "student" and account.student_id != attachment.student_id:
+            return jsonify({"error": "You cannot access this file."}), 403
+        return send_from_directory(
+            REQUEST_UPLOAD_ROOT,
+            attachment.stored_name,
+            as_attachment=False,
+            download_name=attachment.original_name,
+            mimetype=attachment.mime_type,
+        )
 
     # Role-filterable work queue.
     @app.route("/api/tasks")
@@ -1620,9 +1869,10 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def faculty_list():
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
-        return jsonify({"items": [faculty_dict(f) for f in faculty]})
+        return jsonify({"items": [faculty_profile_dict(f) for f in faculty]})
 
     @app.route("/api/curriculum-planning")
+    @require_api_login("staff")
     def curriculum_planning():
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
@@ -1630,7 +1880,62 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "No program found."}), 404
         return jsonify(curriculum_planning_payload(program))
 
+    @app.route("/api/curriculum-planning/subjects", methods=["POST"])
+    @require_api_login("staff")
+    def curriculum_planning_create_subject():
+        data = request.get_json(silent=True) or {}
+        program = Program.query.get_or_404(int(data.get("program_id") or 0))
+        code = (data.get("code") or "").strip().upper()
+        title = (data.get("title") or "").strip()
+        category = (data.get("category") or "Core").strip()
+        recommended_term = (data.get("recommended_term") or "Year 1").strip()
+        try:
+            units = int(data.get("units") or 3)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Units must be a whole number."}), 400
+        if not code or not title:
+            return jsonify({"error": "Subject code and title are required."}), 400
+        if units < 0 or units > 12:
+            return jsonify({"error": "Units must be between 0 and 12."}), 400
+        if Course.query.filter(func.lower(Course.code) == code.lower()).first():
+            return jsonify({"error": f"Subject code {code} already exists."}), 400
+        course = Course(
+            program_id=program.id,
+            code=code,
+            title=title,
+            units=units,
+            category=category,
+            recommended_term=recommended_term,
+        )
+        db.session.add(course)
+        db.session.flush()
+        sync = sync_program_curriculum(program, courses=[course])
+        add_log(
+            "curriculum-planning",
+            None,
+            "Academic Coordinator",
+            "Curriculum Planning",
+            f"Added {code} to the {program.code} curriculum",
+            "Academic Coordinator",
+            f"{title}; {units} unit(s); {category}; {recommended_term}. Automatically added to {sync['students']} student record(s).",
+        )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": f"Added {code}. It was automatically added to {sync['students']} student course audit(s).",
+            "course": {
+                "id": course.id,
+                "code": course.code,
+                "title": course.title,
+                "units": course.units,
+                "category": course.category,
+                "recommended_term": course.recommended_term,
+            },
+            "data": curriculum_planning_payload(program),
+        })
+
     @app.route("/api/curriculum-planning/generate", methods=["POST"])
+    @require_api_login("staff")
     def curriculum_planning_generate():
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
@@ -2354,6 +2659,8 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             for doc in DocumentCheck.query.filter_by(student_id=selected_student.id).all():
                 context["documents_by_gate"].setdefault(doc.gate, []).append(document_check_dict(doc))
         if slug == "panel-matching":
+            matching_profile = research_matching_profile(selected_student, specialization)
+            context["matching_profile"] = matching_profile
             context["panel_recommendations"] = [
                 {
                     "faculty_id": row["faculty"].id,
@@ -2362,6 +2669,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     "specialization": row["faculty"].specialization,
                     "score": row["score"],
                     "note": row["note"],
+                    "matched_keywords": row["matched_keywords"],
                 }
                 for row in recommend_panel(selected_student, specialization)[:12]
             ]
@@ -2378,7 +2686,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 .all()
             )
             context["assigned_panel"] = [panel_assignment_dict(p) for p in assignments]
-            participants = defense_participants(selected_student, assignments)
+            participants = defense_participants(selected_student, assignments) if assignments else []
             window_start = date.today()
             window_end = window_start + timedelta(days=60)
             context["availability"] = defense_availability_context(
@@ -2815,6 +3123,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
                 "completed": completed, "total_subjects": len(row["subjects"]),
             })
 
+    sync_program_curriculum(program)
     add_log(
         "student-handoff",
         None,
@@ -2870,6 +3179,7 @@ def handle_student_handoff(data: MultiDict) -> int:
     )
     db.session.add(student)
     db.session.flush()
+    sync_student_curriculum(student)
 
     term = AcademicTerm.query.get(int(data["term_id"]))
     db.session.add(
@@ -3079,23 +3389,44 @@ def handle_course_audit(data: MultiDict) -> int:
 
 
 def handle_research_gate(data: MultiDict) -> int:
-    # Research gate transaction: compare submitted evidence against the selected
-    # protocol checklist and route missing/revision work to the next owner.
+    # Research gate status is derived only from stored student uploads. Staff
+    # can evaluate evidence, but cannot assert that an absent file was received.
     student = Student.query.get_or_404(int(data["student_id"]))
     gate = data["gate"]
-    source = data.get("source_reference", "")
     required_items = required_documents_for_gate(gate)
-    package_text = data.get("submitted_package", "")
-    submitted_items = {
-        item.split("||", 1)[1] for item in data.getlist("submitted_items") if item.startswith(f"{gate}||")
-    }
-    submitted_items.update(infer_submitted_research_items(gate, package_text))
-    missing_items = [item for item in required_items if item not in submitted_items]
+    checks = ensure_research_document_checks(student.id, gate)
+    submitted_items = set()
+    missing_items = []
+    states = {}
+    for doc in checks:
+        presentation = research_requirement_presentation(gate, doc.item_name)
+        state = research_requirement_state(student, gate, doc.item_name, doc)
+        states[doc.item_name] = state
+        present = (
+            presentation["source_type"] == "staff"
+            and research_student_uploads_ready(student, gate)
+            and research_milestone_submission(student, gate)
+        ) or state["status"] == "Complete" or (
+            presentation["source_type"] == "student_upload" and state["status"] == "Submitted"
+        )
+        if present:
+            submitted_items.add(doc.item_name)
+        else:
+            missing_items.append(doc.item_name)
+    evidence_names = [file.original_name for doc in checks for file in doc.evidence_files]
+    source = ", ".join(evidence_names[:4])
     revision_required = data.get("revision_required") == "yes"
 
-    if missing_items:
+    missing_sources = {
+        research_requirement_presentation(gate, item)["source_type"]
+        for item in missing_items
+    }
+    if "student_upload" in missing_sources:
         result = "Missing Requirements"
         next_owner = "Student"
+    elif missing_items:
+        result = "Pending Staff Action"
+        next_owner = "Research Coordinator"
     elif revision_required:
         result = "Revisions Required"
         next_owner = "Adviser"
@@ -3125,15 +3456,13 @@ def handle_research_gate(data: MultiDict) -> int:
 
     for item in required_items:
         status = "Missing" if item in missing_items else "Complete"
-        existing = DocumentCheck.query.filter_by(student_id=student.id, gate=gate, item_name=item).first()
-        if not existing:
-            existing = DocumentCheck(student_id=student.id, gate=gate, item_name=item)
-            db.session.add(existing)
+        existing = next(doc for doc in checks if doc.item_name == item)
         existing.status = status
-        existing.evidence_reference = source
+        if existing.evidence_files:
+            existing.evidence_reference = ", ".join(file.original_name for file in existing.evidence_files)
         existing.updated_at = now_utc()
 
-    if result in ["Missing Requirements", "Revisions Required", "Returned"]:
+    if result in ["Missing Requirements", "Revisions Required", "Returned", "Pending Staff Action"]:
         add_task(student.id, f"Resolve {gate} requirements", next_owner, 5, 45)
         student.risk_level = "High" if result == "Returned" else "Medium"
     elif gate == "Form 1 - Title Defense" and result == "Ready":
@@ -3150,7 +3479,7 @@ def handle_research_gate(data: MultiDict) -> int:
         source,
         f"{gate}: {result}",
         next_owner,
-        f"Compared evidence package against {len(required_items)} required item(s). Detected: "
+        f"Compared stored PDF evidence against {len(required_items)} required item(s). Received: "
         f"{', '.join(sorted(submitted_items)) if submitted_items else 'None'}. Missing: "
         f"{', '.join(missing_items) if missing_items else 'None'}",
     )
@@ -3161,7 +3490,10 @@ def handle_panel_matching(data: MultiDict) -> int:
     # Panel transaction: replace the current assignment with the highest-scoring
     # faculty recommendations for the student's required panel roles.
     student = Student.query.get_or_404(int(data["student_id"]))
-    specialization = (data.get("specialization") or "").strip() or student.program.name
+    specialization = (data.get("specialization") or "").strip()
+    matching_profile = research_matching_profile(student, specialization)
+    if not matching_profile["ready"]:
+        raise ValueError("Panel matching requires three uploaded concept-paper PDFs for this student.")
     recommendations = recommend_panel(student, specialization)
     required_roles = panel_roles_for_student(student)
 
@@ -3182,7 +3514,7 @@ def handle_panel_matching(data: MultiDict) -> int:
         student.id,
         "Research Coordinator",
         data.get("source_reference", ""),
-        f"{len(required_roles)}-member {research_case_type(student)} panel matched for {specialization}",
+        f"{len(required_roles)}-member {research_case_type(student)} panel matched from uploaded concept papers",
         "Research Coordinator",
         "; ".join(
             [
@@ -3204,6 +3536,8 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     mode = data["mode"]
     venue = data.get("venue", "")
     panel = PanelAssignment.query.filter_by(student_id=student.id).all()
+    if not panel:
+        raise ValueError("Complete Panel Matching before creating a defense schedule.")
     panel_ids = [assignment.faculty_id for assignment in panel]
     participants = defense_participants(student, panel)
     required_panel_count = len(panel_roles_for_student(student))
@@ -3214,15 +3548,18 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     selected_window_ok = False
     matched_count = 0
     if selected_start and selected_end and participants:
-        participant_ids = [participant["faculty"].id for participant in participants]
-        matching_slots = FacultyAvailability.query.filter(
-            FacultyAvailability.faculty_id.in_(participant_ids),
-            FacultyAvailability.available_date == preferred_date,
-            FacultyAvailability.start_time <= selected_start,
-            FacultyAvailability.end_time >= selected_end,
-        ).all()
-        matched_count = len({slot.faculty_id for slot in matching_slots})
-        selected_window_ok = matched_count == len(participant_ids)
+        day_context = defense_availability_context(participants, preferred_date, preferred_date)
+        matched_count = sum(
+            1
+            for participant in day_context["participants"]
+            if any(
+                slot["date"] == preferred_date.isoformat()
+                and parse_time(slot["start"]) <= selected_start
+                and parse_time(slot["end"]) >= selected_end
+                for slot in participant["slots"]
+            )
+        )
+        selected_window_ok = matched_count == len(participants)
 
     enough_panel = len(panel_ids) >= required_panel_count
     status = "Confirmed" if enough_panel and selected_window_ok and lead_ok else "Needs Availability"
@@ -3295,6 +3632,231 @@ TRANSACTION_HANDLERS = {
 # ---------------------------------------------------------------------------
 # Domain rules / helpers
 # ---------------------------------------------------------------------------
+WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+MATCH_STOPWORDS = {
+    "about", "after", "against", "also", "among", "based", "between", "could", "from", "have",
+    "into", "more", "most", "paper", "papers", "research", "study", "that", "their", "these",
+    "this", "through", "using", "were", "what", "when", "where", "which", "with", "would",
+}
+
+
+def faculty_working_hours(faculty: Faculty) -> list[dict]:
+    rows = sorted(faculty.working_hours, key=lambda row: (row.weekday, row.start_time))
+    if not rows:
+        return [
+            {
+                "weekday": weekday,
+                "day": WEEKDAY_NAMES[weekday],
+                "start": "08:00",
+                "end": "17:00",
+                "enabled": True,
+            }
+            for weekday in range(5)
+        ] + [
+            {
+                "weekday": weekday,
+                "day": WEEKDAY_NAMES[weekday],
+                "start": None,
+                "end": None,
+                "enabled": False,
+            }
+            for weekday in range(5, 7)
+        ]
+    by_day = {row.weekday: row for row in rows}
+    return [
+        {
+            "weekday": weekday,
+            "day": WEEKDAY_NAMES[weekday],
+            "start": by_day[weekday].start_time.strftime("%H:%M") if weekday in by_day else None,
+            "end": by_day[weekday].end_time.strftime("%H:%M") if weekday in by_day else None,
+            "enabled": bool(by_day[weekday].enabled) if weekday in by_day else False,
+        }
+        for weekday in range(7)
+    ]
+
+
+def faculty_profile_dict(faculty: Faculty) -> dict:
+    payload = faculty_dict(faculty)
+    upcoming = (
+        FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id == faculty.id,
+            FacultyAvailability.available_date >= date.today(),
+        )
+        .order_by(FacultyAvailability.available_date, FacultyAvailability.start_time)
+        .limit(12)
+        .all()
+    )
+    payload["upcoming_availability"] = [
+        {
+            "date": iso(slot.available_date),
+            "start": slot.start_time.strftime("%H:%M"),
+            "end": slot.end_time.strftime("%H:%M"),
+            "weekend_override": slot.available_date.weekday() >= 5,
+        }
+        for slot in upcoming
+    ]
+    return payload
+
+
+def ensure_research_document_checks(student_id: int, gate: str) -> list[DocumentCheck]:
+    checks = []
+    for item_name in required_documents_for_gate(gate):
+        doc = DocumentCheck.query.filter_by(student_id=student_id, gate=gate, item_name=item_name).first()
+        if not doc:
+            doc = DocumentCheck(
+                student_id=student_id,
+                gate=gate,
+                item_name=item_name,
+                status="Missing",
+            )
+            db.session.add(doc)
+            db.session.flush()
+        checks.append(doc)
+    return checks
+
+
+def extract_pdf_text(path: Path) -> str:
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path))
+        return "\n".join((page.extract_text() or "") for page in reader.pages)[:120000]
+    except Exception:
+        return ""
+
+
+def store_research_evidence(
+    student: Student,
+    gate: str,
+    item_name: str,
+    uploaded,
+    doc: DocumentCheck | None = None,
+) -> ResearchEvidenceFile:
+    original_name = secure_filename(uploaded.filename or "")
+    if not original_name.lower().endswith(".pdf"):
+        raise ValueError("Research evidence must be uploaded as a PDF file.")
+    if uploaded.mimetype and uploaded.mimetype not in {"application/pdf", "application/octet-stream"}:
+        raise ValueError("Research evidence must be a valid PDF file.")
+    doc = doc or next(
+        item for item in ensure_research_document_checks(student.id, gate) if item.item_name == item_name
+    )
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{student.id}-{uuid4().hex}.pdf"
+    target = UPLOAD_ROOT / stored_name
+    uploaded.save(target)
+    if target.stat().st_size == 0:
+        target.unlink(missing_ok=True)
+        raise ValueError("The uploaded PDF is empty.")
+    if target.stat().st_size > 25 * 1024 * 1024:
+        target.unlink(missing_ok=True)
+        raise ValueError("Research evidence PDFs must be 25 MB or smaller.")
+    with target.open("rb") as stream:
+        if stream.read(5) != b"%PDF-":
+            target.unlink(missing_ok=True)
+            raise ValueError("The selected file is not a valid PDF.")
+    evidence = ResearchEvidenceFile(
+        student_id=student.id,
+        document_check_id=doc.id,
+        original_name=original_name,
+        stored_name=stored_name,
+        mime_type="application/pdf",
+        extracted_text=extract_pdf_text(target),
+    )
+    db.session.add(evidence)
+    doc.status = "Submitted"
+    doc.evidence_reference = original_name
+    doc.updated_at = now_utc()
+    db.session.flush()
+    return evidence
+
+
+def store_student_request_attachment(student: Student, request_type: str, uploaded) -> StudentRequestAttachment:
+    original_name = secure_filename(uploaded.filename or "")
+    if not original_name.lower().endswith(".pdf"):
+        raise ValueError("The application must be uploaded as a PDF file.")
+    REQUEST_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{student.id}-{request_type}-{uuid4().hex}.pdf"
+    target = REQUEST_UPLOAD_ROOT / stored_name
+    uploaded.save(target)
+    if target.stat().st_size == 0 or target.stat().st_size > 25 * 1024 * 1024:
+        target.unlink(missing_ok=True)
+        raise ValueError("The application PDF must be between 1 byte and 25 MB.")
+    with target.open("rb") as stream:
+        if stream.read(5) != b"%PDF-":
+            target.unlink(missing_ok=True)
+            raise ValueError("The selected file is not a valid PDF.")
+    attachment = StudentRequestAttachment(
+        student_id=student.id,
+        request_type=request_type,
+        original_name=original_name,
+        stored_name=stored_name,
+        mime_type="application/pdf",
+    )
+    db.session.add(attachment)
+    db.session.flush()
+    return attachment
+
+
+def request_attachment_from_payload(
+    student: Student,
+    request_type: str,
+    data: MultiDict,
+) -> StudentRequestAttachment | None:
+    try:
+        attachment_id = int(data.get("attachment_id") or 0)
+    except (TypeError, ValueError):
+        return None
+    if not attachment_id:
+        return None
+    return StudentRequestAttachment.query.filter_by(
+        id=attachment_id,
+        student_id=student.id,
+        request_type=request_type,
+    ).first()
+
+
+def matching_tokens(value: str) -> list[str]:
+    return [
+        token
+        for token in re.findall(r"[a-z][a-z0-9-]{3,}", (value or "").lower())
+        if token not in MATCH_STOPWORDS
+    ]
+
+
+def research_matching_profile(student: Student, extra_text: str = "") -> dict:
+    research_case = (
+        ResearchCase.query.filter_by(student_id=student.id)
+        .order_by(ResearchCase.opened_at.desc())
+        .first()
+    )
+    concept_files = (
+        ResearchEvidenceFile.query.join(DocumentCheck)
+        .filter(
+            ResearchEvidenceFile.student_id == student.id,
+            DocumentCheck.item_name == "Three concept papers",
+        )
+        .order_by(ResearchEvidenceFile.uploaded_at.desc())
+        .all()
+    )
+    title = research_case.title if research_case else ""
+    paper_text = "\n".join(item.extracted_text or item.original_name for item in concept_files)
+    combined = " ".join([title, paper_text, extra_text, student.program.name])
+    counts = Counter(matching_tokens(combined))
+    keywords = [token for token, _count in counts.most_common(12)]
+    return {
+        "research_title": title,
+        "concept_paper_count": len(concept_files),
+        "concept_papers": [
+            {"id": item.id, "name": item.original_name, "url": f"/api/research-evidence/{item.id}/file"}
+            for item in concept_files
+        ],
+        "keywords": keywords,
+        "query_text": combined,
+        "ready": len(concept_files) >= 3,
+        "source": "Uploaded concept papers and research title" if concept_files else "Research title and program fallback",
+    }
+
+
 def split_items(value: str) -> list[str]:
     # Accept either comma-separated or newline-separated checklist additions.
     return [item.strip() for item in value.replace(",", "\n").splitlines() if item.strip()]
@@ -3358,6 +3920,21 @@ def defense_availability_context(
     slots_by_faculty: dict[int, list[FacultyAvailability]] = {faculty_id: [] for faculty_id in participant_ids}
     dates = set()
     for row in rows:
+        if row.available_date.weekday() < 5:
+            profile = next(
+                (
+                    item
+                    for item in faculty_working_hours(row.faculty)
+                    if item["weekday"] == row.available_date.weekday()
+                ),
+                None,
+            )
+            if not profile or not profile["enabled"]:
+                continue
+            profile_start = parse_time(profile["start"])
+            profile_end = parse_time(profile["end"])
+            if row.start_time < profile_start or row.end_time > profile_end:
+                continue
         slots_by_faculty[row.faculty_id].append(row)
         dates.add(row.available_date)
 
@@ -3399,11 +3976,14 @@ def defense_availability_context(
                 "name": participant["faculty"].name,
                 "role": participant["role"],
                 "college": participant["faculty"].college,
+                "working_hours": faculty_working_hours(participant["faculty"]),
+                "calendar_connected": False,
                 "slots": [
                     {
                         "date": iso(slot.available_date),
                         "start": slot.start_time.strftime("%H:%M"),
                         "end": slot.end_time.strftime("%H:%M"),
+                        "weekend_override": slot.available_date.weekday() >= 5,
                     }
                     for slot in slots_by_faculty[participant["faculty"].id]
                 ],
@@ -3412,6 +3992,283 @@ def defense_availability_context(
         ],
         "dates": [iso(day) for day in sorted(dates)],
         "possible_slots": possible_slots,
+    }
+
+
+RESEARCH_MILESTONES = {
+    "Form 1 - Title Defense": {
+        "label": "Title Defense Application",
+        "short_label": "Title Defense",
+        "description": "Submit the signed Form 1 and three concept papers. Staff endorsement and panel assignment follow after review.",
+    },
+    "Form 4 - Proposal Defense Readiness": {
+        "label": "Proposal Defense Readiness",
+        "short_label": "Proposal Defense",
+        "description": "Submit the proposal manuscript and consultation evidence. Adviser endorsement and the confirmed schedule are recorded separately.",
+    },
+    "Final Defense": {
+        "label": "Final Defense Readiness",
+        "short_label": "Final Defense",
+        "description": "Submit the final manuscript and required clearance. Staff verifies distribution and the confirmed defense schedule.",
+    },
+    "Completion Evidence": {
+        "label": "Final Submission and Completion",
+        "short_label": "Completion",
+        "description": "Submit the final manuscript, approvals, similarity certificate, and completion forms for final verification.",
+    },
+}
+
+RESEARCH_REQUIREMENTS = {
+    "Form 1 - Application for Title Defense": {
+        "label": "Signed Form 1 application",
+        "description": "The completed application for title defense.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Three concept papers": {
+        "label": "Concept papers",
+        "description": "Upload each of the three concept papers as a separate PDF. These files are used for panel matching.",
+        "source_type": "student_upload",
+        "required_file_count": 3,
+    },
+    "Academic Coordinator endorsement/e-signature": {
+        "label": "Academic Coordinator endorsement",
+        "description": "Recorded by the Academic Coordinator after reviewing the submission.",
+        "source_type": "staff",
+        "required_file_count": 0,
+    },
+    "Recommended panel set": {
+        "label": "Panel assignment",
+        "description": "Generated after the Research Coordinator completes Panel Matching.",
+        "source_type": "system_panel",
+        "required_file_count": 0,
+    },
+    "Form 4 - Endorsement for Proposal Defense": {
+        "label": "Signed Form 4 endorsement",
+        "description": "The endorsed application for proposal defense.",
+        "source_type": "staff",
+        "required_file_count": 0,
+    },
+    "Proposal manuscript": {
+        "label": "Proposal manuscript",
+        "description": "The proposal manuscript that will be reviewed by the panel.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Adviser e-signature/endorsement": {
+        "label": "Adviser endorsement",
+        "description": "Recorded by the adviser after manuscript review.",
+        "source_type": "staff",
+        "required_file_count": 0,
+    },
+    "Form 4.1 Statistical Consultation Form or qualitative exemption": {
+        "label": "Statistical consultation form or qualitative exemption",
+        "description": "Upload Form 4.1 or the approved qualitative-research exemption.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Agreed defense schedule in Form 4": {
+        "label": "Confirmed proposal defense schedule",
+        "description": "Added automatically after staff confirms a shared panel schedule.",
+        "source_type": "system_proposal_schedule",
+        "required_file_count": 0,
+    },
+    "Form 4 - Endorsement for Final Defense": {
+        "label": "Final defense endorsement",
+        "description": "Recorded by the adviser or Research Coordinator after final-manuscript review.",
+        "source_type": "staff",
+        "required_file_count": 0,
+    },
+    "Final manuscript": {
+        "label": "Final defense manuscript",
+        "description": "The manuscript that will be distributed to the final defense panel.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Ethics Clearance": {
+        "label": "Ethics clearance",
+        "description": "Upload the approved ethics clearance issued for the research.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Panel received manuscript at least 14 days before defense": {
+        "label": "Panel manuscript distribution verified",
+        "description": "Staff verifies that the panel received the manuscript at least 14 days before defense.",
+        "source_type": "staff",
+        "required_file_count": 0,
+    },
+    "Agreed final defense schedule": {
+        "label": "Confirmed final defense schedule",
+        "description": "Added automatically after staff confirms a shared final defense schedule.",
+        "source_type": "system_final_schedule",
+        "required_file_count": 0,
+    },
+    "Soft copy of final manuscript": {
+        "label": "Final manuscript for archiving",
+        "description": "The final corrected manuscript for the Graduate School archive.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Panel approval emails": {
+        "label": "Panel approval confirmations",
+        "description": "Combine the panel approval emails or confirmations into one PDF.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Turnitin Certificate with SIR not more than 15%": {
+        "label": "Turnitin certificate (SIR 15% or below)",
+        "description": "Upload the final Turnitin certificate showing the required similarity result.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Form 9 - Editor Certification": {
+        "label": "Form 9 editor certification",
+        "description": "The signed editor certification.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Form 10 - Approval Sheet": {
+        "label": "Form 10 approval sheet",
+        "description": "The completed and signed approval sheet.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+}
+
+
+def research_requirement_presentation(gate: str, item_name: str) -> dict | None:
+    if gate not in RESEARCH_MILESTONES:
+        return None
+    return RESEARCH_REQUIREMENTS.get(item_name, {
+        "label": item_name,
+        "description": "Research milestone requirement.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    })
+
+
+def research_student_uploads_ready(student: Student, gate: str) -> bool:
+    docs = {
+        doc.item_name: doc
+        for doc in DocumentCheck.query.filter_by(student_id=student.id, gate=gate).all()
+    }
+    for item_name in required_documents_for_gate(gate):
+        presentation = research_requirement_presentation(gate, item_name)
+        if presentation["source_type"] != "student_upload":
+            continue
+        doc = docs.get(item_name)
+        if not doc or len(doc.evidence_files) < presentation["required_file_count"]:
+            return False
+    return True
+
+
+def research_milestone_submission(student: Student, gate: str) -> TransactionLog | None:
+    return (
+        TransactionLog.query.filter(
+            TransactionLog.student_id == student.id,
+            TransactionLog.transaction_slug == "research-gate",
+            TransactionLog.actor_role == "Student",
+            TransactionLog.result == f"{gate} application submitted",
+        )
+        .order_by(TransactionLog.created_at.desc())
+        .first()
+    )
+
+
+def research_milestone_reviewed_after_submission(student: Student, gate: str) -> bool:
+    submission = research_milestone_submission(student, gate)
+    if not submission:
+        return False
+    review = (
+        TransactionLog.query.filter(
+            TransactionLog.student_id == student.id,
+            TransactionLog.transaction_slug == "research-gate",
+            TransactionLog.actor_role == "Research Coordinator",
+            TransactionLog.result.like(f"{gate}:%"),
+        )
+        .order_by(TransactionLog.created_at.desc())
+        .first()
+    )
+    return bool(
+        review
+        and review.created_at
+        and submission.created_at
+        and review.created_at >= submission.created_at
+    )
+
+
+def research_requirement_state(
+    student: Student | None,
+    gate: str,
+    item_name: str,
+    doc: DocumentCheck | None = None,
+) -> dict:
+    presentation = research_requirement_presentation(gate, item_name)
+    if not presentation:
+        return {"status": doc.status if doc else "Missing", "status_label": doc.status if doc else "Missing"}
+    source_type = presentation["source_type"]
+    files = doc.evidence_files if doc else []
+    if source_type == "student_upload":
+        enough_files = len(files) >= presentation["required_file_count"]
+        if not enough_files:
+            return {"status": "Missing", "status_label": "Upload required"}
+        if doc and doc.status == "Complete":
+            return {"status": "Complete", "status_label": "Verified"}
+        return {"status": "Submitted", "status_label": "Submitted for review"}
+    if source_type == "system_panel":
+        complete = bool(student) and PanelAssignment.query.filter_by(student_id=student.id).count() >= len(panel_roles_for_student(student))
+        return {"status": "Complete" if complete else "Pending", "status_label": "Completed" if complete else "Pending panel matching"}
+    if source_type in {"system_proposal_schedule", "system_final_schedule"}:
+        schedule_query = ScheduleRequest.query.filter_by(student_id=student.id, status="Confirmed") if student else None
+        schedules = schedule_query.order_by(ScheduleRequest.created_at.desc()).all() if schedule_query else []
+        expected = "Proposal Defense" if source_type == "system_proposal_schedule" else "Final Defense"
+        complete = any(expected in (schedule.notes or "") for schedule in schedules)
+        return {"status": "Complete" if complete else "Pending", "status_label": "Completed" if complete else "Pending confirmed schedule"}
+    if not student or not research_student_uploads_ready(student, gate):
+        return {"status": "Pending", "status_label": "Waiting for student files"}
+    if not research_milestone_submission(student, gate):
+        return {"status": "Pending", "status_label": "Waiting for student submission"}
+    if not research_milestone_reviewed_after_submission(student, gate):
+        return {"status": "Pending", "status_label": "Pending staff verification"}
+    complete = bool(doc and doc.status in {"Complete", "Verified Complete"})
+    return {"status": "Complete" if complete else "Pending", "status_label": "Verified by staff" if complete else "Pending staff verification"}
+
+
+def research_milestone_payload(student: Student, gate: str) -> dict:
+    docs = {
+        doc.item_name: doc
+        for doc in DocumentCheck.query.filter_by(student_id=student.id, gate=gate).all()
+    }
+    requirements = []
+    for item_name in required_documents_for_gate(gate):
+        doc = docs.get(item_name)
+        presentation = research_requirement_presentation(gate, item_name)
+        state = research_requirement_state(student, gate, item_name, doc)
+        files = sorted(doc.evidence_files, key=lambda item: item.uploaded_at or now_utc(), reverse=True) if doc else []
+        requirements.append({
+            "id": doc.id if doc else None,
+            "item_name": item_name,
+            "label": presentation["label"],
+            "description": presentation["description"],
+            "source_type": presentation["source_type"],
+            "student_upload": presentation["source_type"] == "student_upload",
+            "required_file_count": presentation["required_file_count"],
+            "file_count": len(files),
+            "status": state["status"],
+            "status_label": state["status_label"],
+            "files": [
+                {"id": item.id, "name": item.original_name, "uploaded_at": iso(item.uploaded_at), "url": f"/api/research-evidence/{item.id}/file"}
+                for item in files
+            ],
+        })
+    upload_requirements = [item for item in requirements if item["student_upload"]]
+    return {
+        "value": gate,
+        **RESEARCH_MILESTONES[gate],
+        "requirements": requirements,
+        "student_uploads_ready": all(item["status"] != "Missing" for item in upload_requirements),
+        "student_missing_count": sum(item["status"] == "Missing" for item in upload_requirements),
+        "overall_complete": all(item["status"] == "Complete" for item in requirements),
     }
 
 
@@ -3616,6 +4473,47 @@ def compute_course_audit(student: Student) -> dict:
     }
 
 
+def sync_student_curriculum(student: Student, courses: list[Course] | None = None) -> int:
+    curriculum = courses if courses is not None else Course.query.filter_by(program_id=student.program_id).all()
+    existing = {record.course_id for record in CourseRecord.query.filter_by(student_id=student.id).all()}
+    created = 0
+    for course in curriculum:
+        if course.id in existing:
+            continue
+        db.session.add(
+            CourseRecord(
+                student_id=student.id,
+                course_id=course.id,
+                status="Missing",
+                evidence_reference="Automatic curriculum sync",
+            )
+        )
+        created += 1
+    return created
+
+
+def sync_program_curriculum(program: Program, courses: list[Course] | None = None) -> dict:
+    students = Student.query.filter_by(program_id=program.id).all()
+    created = 0
+    touched = 0
+    for student in students:
+        added = sync_student_curriculum(student, courses=courses)
+        if added:
+            created += added
+            touched += 1
+    return {"created": created, "students": touched}
+
+
+def sync_all_curricula() -> dict:
+    created = 0
+    touched = 0
+    for program in Program.query.all():
+        result = sync_program_curriculum(program)
+        created += result["created"]
+        touched += result["students"]
+    return {"created": created, "students": touched}
+
+
 def curriculum_planning_payload(program: Program) -> dict:
     courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
     students = Student.query.filter_by(program_id=program.id).order_by(Student.last_name, Student.first_name).all()
@@ -3640,7 +4538,7 @@ def curriculum_planning_payload(program: Program) -> dict:
             "curriculum_rows": record_count,
             "required_subjects": len(courses),
             "missing_curriculum_rows": missing_rows,
-            "curriculum_status": "Generated" if missing_rows == 0 and courses else "Needs generation",
+            "curriculum_status": "Synced" if missing_rows == 0 and courses else "Sync pending",
         })
 
     grouped: dict[str, list] = {}
@@ -3663,6 +4561,7 @@ def curriculum_planning_payload(program: Program) -> dict:
             "curriculum_generated": generated_count,
             "needs_generation": max(len(students) - generated_count, 0),
             "subjects": len(courses),
+            "coverage_rate": round((generated_count / len(students)) * 100, 1) if students else 100,
         },
         "categories": [{"name": name, "courses": grouped[name]} for name in sorted(grouped)],
         "students": rows[:150],
@@ -3763,10 +4662,12 @@ def compute_offering_demand() -> list[dict]:
     return sorted(demand.values(), key=lambda item: item["count"], reverse=True)[:12]
 
 
-def recommend_panel(student: Student, specialization: str) -> list[dict]:
-    # Scoring model for the demo: same college, specialization match, upcoming
-    # availability, and lower current workload all improve the recommendation.
-    specialization = specialization.lower().strip()
+def recommend_panel(student: Student, specialization: str = "") -> list[dict]:
+    # Local retrieval ranks faculty profiles against text extracted from the
+    # student's concept papers and research title. Operational constraints are
+    # added after semantic/token overlap so the result remains explainable.
+    profile = research_matching_profile(student, specialization)
+    query_counts = Counter(matching_tokens(profile["query_text"]))
     faculty_members = Faculty.query.filter_by(active=True).all()
     rows = []
     for faculty in faculty_members:
@@ -3775,28 +4676,30 @@ def recommend_panel(student: Student, specialization: str) -> list[dict]:
             FacultyAvailability.faculty_id == faculty.id,
             FacultyAvailability.available_date >= date.today(),
         ).count()
-        score = 40
+        faculty_tokens = set(matching_tokens(f"{faculty.specialization} {faculty.role} {faculty.college}"))
+        matched_keywords = [token for token, _count in query_counts.most_common() if token in faculty_tokens][:6]
+        semantic_score = min(45, sum(query_counts[token] for token in matched_keywords) * 7)
+        score = 25 + semantic_score
         if student.program.college == faculty.college:
-            score += 20
-        if specialization and specialization in faculty.specialization.lower():
-            score += 35
-        elif any(word in faculty.specialization.lower() for word in specialization.split() if len(word) > 3):
             score += 15
         score += min(20, availability_count * 4)
         score -= workload * 3
         reasons = []
+        if matched_keywords:
+            reasons.append(f"matches {', '.join(matched_keywords[:3])}")
         if student.program.college == faculty.college:
             reasons.append("same college")
-        if specialization and specialization in faculty.specialization.lower():
-            reasons.append("matching expertise")
-        elif any(word in faculty.specialization.lower() for word in specialization.split() if len(word) > 3):
-            reasons.append("related expertise")
         if availability_count:
             reasons.append(f"{availability_count} available dates")
         if workload <= 1:
             reasons.append("low current panel load")
         note = ", ".join(reasons) if reasons else "available for review"
-        rows.append({"faculty": faculty, "score": max(score, 1), "note": note})
+        rows.append({
+            "faculty": faculty,
+            "score": max(score, 1),
+            "note": note,
+            "matched_keywords": matched_keywords,
+        })
     return sorted(rows, key=lambda row: row["score"], reverse=True)
 
 
@@ -3895,6 +4798,16 @@ def seed_database(count: int = 350) -> None:
         )
         db.session.add(faculty)
         db.session.flush()
+        for weekday in range(5):
+            db.session.add(
+                FacultyWorkingHour(
+                    faculty_id=faculty.id,
+                    weekday=weekday,
+                    start_time=time(8, 0),
+                    end_time=time(17, 0),
+                    enabled=True,
+                )
+            )
         for offset in range(1, 8):
             if (idx + offset) % 3 != 0:
                 db.session.add(
@@ -4097,6 +5010,8 @@ def seed_database(count: int = 350) -> None:
 
     db.session.commit()
 
+    sync_all_curricula()
+
     # Derive each student's risk/priority from the same signals the Decision Support
     # engine uses, so the student record and the recommendation queue always agree.
     for student in Student.query.all():
@@ -4175,7 +5090,10 @@ if __name__ == "__main__":
             print(f"Database was empty, so {seed_count} demo students were seeded.")
         accounts_before = UserAccount.query.count()
         ensure_demo_accounts()
+        sync_result = sync_all_curricula()
         db.session.commit()
+        if sync_result["created"]:
+            print(f"Automatically added {sync_result['created']} missing curriculum row(s) for {sync_result['students']} student(s).")
         if accounts_before == 0:
             print("Demo staff and student accounts were created.")
 

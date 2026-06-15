@@ -32,6 +32,7 @@ export const api = {
     ).toString();
     return request(`/students${qs ? `?${qs}` : ""}`);
   },
+  faculty: () => request("/faculty"),
   student: (id) => request(`/students/${id}`),
   duplicateStudents: () => request("/students/duplicates"),
   mergeStudents: (payload) =>
@@ -66,6 +67,8 @@ export const api = {
     request(`/curriculum-planning${programId ? `?program_id=${programId}` : ""}`),
   generateCurriculum: (payload) =>
     request("/curriculum-planning/generate", { method: "POST", body: JSON.stringify(payload) }),
+  createCurriculumSubject: (payload) =>
+    request("/curriculum-planning/subjects", { method: "POST", body: JSON.stringify(payload) }),
   courseAdjustments: (programId) =>
     request(`/course-adjustments${programId ? `?program_id=${programId}` : ""}`),
   resetUploadedData: () => request("/admin/reset-uploaded-data", { method: "POST", body: JSON.stringify({}) }),
@@ -86,6 +89,43 @@ export const api = {
   studentPortalContext: () => request("/student-portal/context"),
   submitStudentRequest: (type, payload) =>
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
-  submitStudentDocument: (documentId, filename) =>
-    request(`/student-portal/documents/${documentId}/upload`, { method: "POST", body: JSON.stringify({ filename }) }),
+  uploadResearchEvidence: async (gate, itemName, file) => {
+    const form = new FormData();
+    form.append("gate", gate);
+    form.append("item_name", itemName);
+    form.append("file", file);
+    const res = await fetch(`${BASE}/student-portal/research-evidence/upload`, {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
+    return body;
+  },
+  uploadStudentRequestAttachment: async (requestType, file) => {
+    const form = new FormData();
+    form.append("request_type", requestType);
+    form.append("file", file);
+    const res = await fetch(`${BASE}/student-portal/request-attachments/upload`, {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
+    return body;
+  },
+  submitStudentDocument: async (documentId, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/student-portal/documents/${documentId}/upload`, {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
+    return body;
+  },
 };

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   UserPlus,
   CalendarOff,
@@ -54,22 +54,36 @@ const NEEDS_STUDENT = {
 
 export default function WorkflowPage() {
   const { slug } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: meta } = useApi(() => api.meta(), []);
-  const [studentId, setStudentId] = useState(null);
+  const [studentId, setStudentId] = useState(() => {
+    const value = searchParams.get("student_id") || window.localStorage.getItem("workflowStudentId");
+    return value ? Number(value) : null;
+  });
   const [studentLabel, setStudentLabel] = useState("");
   const [specialization, setSpecialization] = useState("");
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  // reset selection when switching workflow
+  // Keep the same student while staff move through research gate, panel
+  // matching, and scheduling. The query string also makes the view shareable.
   useEffect(() => {
-    setStudentId(null);
-    setStudentLabel("");
     setSpecialization("");
     setResult(null);
     setSubmitError("");
   }, [slug]);
+
+  useEffect(() => {
+    if (studentId) {
+      window.localStorage.setItem("workflowStudentId", String(studentId));
+      if (searchParams.get("student_id") !== String(studentId)) {
+        const next = new URLSearchParams(searchParams);
+        next.set("student_id", String(studentId));
+        setSearchParams(next, { replace: true });
+      }
+    }
+  }, [studentId, searchParams, setSearchParams]);
 
   const { data: context, loading, error, refetch } = useApi(
     () => api.transactionContext(slug, { student_id: studentId, specialization }),
@@ -79,6 +93,12 @@ export default function WorkflowPage() {
   const tx = context?.transaction || meta?.transactions?.find((t) => t.slug === slug);
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
+
+  useEffect(() => {
+    if (!studentLabel && context?.selected_student?.search_label) {
+      setStudentLabel(context.selected_student.search_label);
+    }
+  }, [context, studentLabel]);
 
   async function submit(payload) {
     setSubmitting(true);
@@ -152,6 +172,12 @@ export default function WorkflowPage() {
                   setStudentId(id);
                   setStudentLabel(label || "");
                   setResult(null);
+                  if (!id) {
+                    window.localStorage.removeItem("workflowStudentId");
+                    const next = new URLSearchParams(searchParams);
+                    next.delete("student_id");
+                    setSearchParams(next, { replace: true });
+                  }
                 }}
               />
             </Card>
@@ -755,6 +781,19 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
     submit({ student_id: studentId, ...form });
   }
 
+  if (panel.length === 0) {
+    return (
+      <div className="py-6">
+        <EmptyState icon={CalendarCheck} title="Panel matching is required" hint="The calendar stays empty until this student has an assigned panel. This prevents schedules from being created against the wrong or incomplete participant list." />
+        <div className="mt-4 flex justify-center">
+          <Link to={`/workflow/panel-matching?student_id=${studentId}`} className="btn-primary">
+            Open Panel Matching <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle title="Update course audit" subtitle="Map a subject's status against curriculum requirements" icon={ClipboardCheck} />
@@ -814,50 +853,70 @@ const GATES = ["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", 
 function ResearchGateForm({ context, studentId, submit, submitting }) {
   const [gate, setGate] = useState(GATES[0]);
   const required = context.gate_requirements?.[gate] || [];
-  const [received, setReceived] = useState(required);
-  const [form, setForm] = useState({ research_title: "", revision_required: "no", submitted_package: "", source_reference: "" });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const [form, setForm] = useState({ research_title: "", revision_required: "no" });
+  const set = (key) => (e) => setForm((current) => ({ ...current, [key]: e.target.value }));
+  const evidenceByItem = new Map(
+    (context.documents_by_gate?.[gate] || []).map((doc) => [doc.item_name, doc])
+  );
 
-  // when gate changes, default to all items received
   useEffect(() => {
-    setReceived(context.gate_requirements?.[gate] || []);
-  }, [gate, context.gate_requirements]);
-
-  const toggle = (item) => setReceived((r) => (r.includes(item) ? r.filter((x) => x !== item) : [...r, item]));
+    setForm((current) => ({
+      ...current,
+      research_title: context.research_case?.title || "",
+    }));
+  }, [studentId, context.research_case?.title]);
 
   function onSubmit(e) {
     e.preventDefault();
     submit({
       student_id: studentId,
       gate,
-      submitted_items: received.map((item) => `${gate}||${item}`),
       revision_required: form.revision_required,
-      submitted_package: form.submitted_package,
       research_title: form.research_title,
-      source_reference: form.source_reference,
     });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Check research readiness" subtitle="Compares submitted evidence against the gate requirements" icon={FileCheck} />
+      <SectionTitle title="Check research readiness" subtitle="Evidence status comes from PDFs uploaded by the student" icon={FileCheck} />
       <Field label="Gate / milestone" required>
         <Select value={gate} onChange={(e) => setGate(e.target.value)} placeholder="" options={GATES} />
       </Field>
-      <Field label="Research title" hint="Optional — sets or updates the research case title">
+      <Field label="Research title" hint="Sets or updates the research case title">
         <Input value={form.research_title} onChange={set("research_title")} />
       </Field>
-      <Field label="Evidence received for this gate" hint="Tick what was submitted. Unticked items are flagged missing and routed back to the student.">
-        <CheckList items={required} selected={received} onToggle={toggle} />
-      </Field>
-      <Field label="Submission notes / package text" hint="Free text — the system also auto-detects mentioned items here">
-        <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
+      <Field label="Student-uploaded evidence" hint="Read-only for staff. Missing evidence must be uploaded through the student portal.">
+        <div className="overflow-hidden rounded-xl border border-slate-200">
+          {required.map((item) => {
+            const doc = evidenceByItem.get(item);
+            const needed = item === "Three concept papers" ? 3 : 1;
+            const count = doc?.file_count || 0;
+            const received = count >= needed;
+            return (
+              <div key={item} className="border-b border-slate-100 px-4 py-3 last:border-b-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-ink">{item}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{count} of {needed} required file{needed > 1 ? "s" : ""} uploaded</p>
+                  </div>
+                  <StatusBadge value={received ? "Submitted" : "Missing"} dot={false} />
+                </div>
+                {doc?.files?.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {doc.files.map((file) => (
+                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-slate-200 hover:bg-brand-50">
+                        {file.name}<ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </Field>
       <Field label="Adviser flagged revisions?">
         <RadioRow value={form.revision_required} onChange={(v) => setForm((f) => ({ ...f, revision_required: v }))} options={[{ value: "no", label: "No revisions" }, { value: "yes", label: "Revisions required" }]} />
-      </Field>
-      <Field label="Source reference">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
       <SubmitButton submitting={submitting}>Evaluate gate</SubmitButton>
     </form>
@@ -869,24 +928,47 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
 // ---------------------------------------------------------------------------
 function PanelMatchingForm({ context, studentId, specialization, setSpecialization, submit, submitting }) {
   const [text, setText] = useState(specialization);
-  const recs = context.panel_recommendations || [];
   const roles = context.panel_roles || [];
+  const profile = context.matching_profile || {};
+  const recs = profile.ready ? context.panel_recommendations || [] : [];
+
+  useEffect(() => setText(""), [studentId]);
 
   function onSubmit(e) {
     e.preventDefault();
+    if (!profile.ready) return;
     submit({ student_id: studentId, specialization: text });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Match a panel" subtitle="Scores faculty by specialization, availability, college, and workload" icon={Users} />
+      <SectionTitle title="Match a panel" subtitle="Retrieves faculty expertise against the student's uploaded concept papers" icon={Users} action={<Link to="/faculty" className="btn-ghost"><Users className="h-4 w-4" /> Faculty profiles</Link>} />
+      <div className={`rounded-xl border px-4 py-3 ${profile.ready ? "border-brand-200 bg-brand-50" : "border-amber-200 bg-amber-50"}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className={`text-sm font-semibold ${profile.ready ? "text-brand-800" : "text-amber-900"}`}>
+              {profile.ready ? "Concept-paper retrieval ready" : "Three concept papers are required"}
+            </p>
+            <p className={`mt-1 text-xs ${profile.ready ? "text-brand-700" : "text-amber-800"}`}>
+              {profile.concept_paper_count || 0} of 3 concept-paper PDFs uploaded. Source: {profile.source || "No research evidence yet"}.
+            </p>
+          </div>
+          <StatusBadge value={profile.ready ? "Ready" : "Blocked"} dot={false} />
+        </div>
+        {profile.research_title && <p className="mt-3 text-sm font-medium text-slate-700">{profile.research_title}</p>}
+        {profile.keywords?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {profile.keywords.map((keyword) => <span key={keyword} className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">{keyword}</span>)}
+          </div>
+        )}
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <Field label="Specialization needed" hint={`${context.research_case_type || "Thesis"} panel needs ${roles.length} members: ${roles.join(", ")}`}>
-            <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. analytics and information systems" />
+          <Field label="Additional specialization terms" hint={`${context.research_case_type || "Thesis"} panel needs ${roles.length} members: ${roles.join(", ")}`}>
+            <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Optional terms to refine the paper-derived query" />
           </Field>
         </div>
-        <button type="button" onClick={() => setSpecialization(text)} className="btn-ghost mb-0.5">
+        <button type="button" disabled={!profile.ready} onClick={() => setSpecialization(text)} className="btn-ghost mb-0.5">
           Preview matches
         </button>
       </div>
@@ -897,6 +979,7 @@ function PanelMatchingForm({ context, studentId, specialization, setSpecializati
             <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
               <th className="px-4 py-2.5">Faculty</th>
               <th className="px-3 py-2.5">Specialization</th>
+              <th className="px-3 py-2.5">Paper match</th>
               <th className="px-3 py-2.5 text-right">Score</th>
             </tr>
           </thead>
@@ -908,6 +991,7 @@ function PanelMatchingForm({ context, studentId, specialization, setSpecializati
                   <p className="text-xs text-slate-400">{r.note}</p>
                 </td>
                 <td className="px-3 py-2.5 text-slate-600">{r.specialization}</td>
+                <td className="px-3 py-2.5 text-slate-600">{r.matched_keywords?.length ? r.matched_keywords.slice(0, 3).join(", ") : "Profile fit"}</td>
                 <td className="px-3 py-2.5 text-right">
                   <span className="rounded-lg bg-brand-100 px-2 py-1 text-xs font-bold text-brand-700">{r.score}</span>
                 </td>
@@ -917,7 +1001,9 @@ function PanelMatchingForm({ context, studentId, specialization, setSpecializati
         </table>
       </div>
       <p className="text-xs text-slate-400">Highlighted rows are the recommended assignment for each required panel role.</p>
-      <SubmitButton submitting={submitting}>Assign recommended panel</SubmitButton>
+      <button type="submit" disabled={submitting || !profile.ready} className="btn-primary w-full sm:w-auto">
+        {submitting ? "Saving..." : "Assign recommended panel"}
+      </button>
     </form>
   );
 }
@@ -968,18 +1054,23 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
   );
 
   const visibleDates = useMemo(() => {
-    const dates = new Set();
+    const recordedDates = new Set();
     participants.forEach((participant) => {
       participant.slots.forEach((slot) => {
-        if (
-          (!window.start || slot.date >= window.start) &&
-          (!window.end || slot.date <= window.end)
-        ) {
-          dates.add(slot.date);
-        }
+        recordedDates.add(slot.date);
       });
     });
-    return [...dates].sort().slice(0, 12);
+    if (!window.start || !window.end) return [...recordedDates].sort().slice(0, 14);
+    const dates = [];
+    const cursor = new Date(`${window.start}T00:00:00`);
+    const end = new Date(`${window.end}T00:00:00`);
+    while (cursor <= end && dates.length < 14) {
+      const isoDate = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+      const weekend = cursor.getDay() === 0 || cursor.getDay() === 6;
+      if (!weekend || recordedDates.has(isoDate)) dates.push(isoDate);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return dates;
   }, [participants, window]);
 
   const possibleDates = useMemo(
@@ -1005,14 +1096,13 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle
         title="Coordinate the defense schedule"
-        subtitle="Compare database availability, select a shared time, and send the proposed schedule"
+        subtitle="Compare faculty availability in a date spread, then select a shared time"
         icon={CalendarCheck}
       />
-      {panel.length === 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          No panel is assigned yet. Run Panel Matching first — scheduling needs an assigned panel to check availability.
-        </div>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+        <span>Monday-Friday use faculty working hours. Weekend dates appear only when a faculty member records an explicit availability override.</span>
+        <Link to="/faculty" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+      </div>
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-blue-800">
         <FileCheck className="h-4 w-4" />
         <span className="font-semibold">Defense readiness:</span>
@@ -1457,11 +1547,11 @@ function workflowGuidance(slug) {
     "course-audit":
       "Run at the end of the term. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":
-      "Compares the submitted evidence package against the protocol requirements for the selected gate (Form 1, Form 4, Final Defense, or Completion). Missing or revised items route back to the right owner.",
+      "Reads the student's stored PDF evidence for the selected gate. Staff can evaluate existing files and adviser revisions, but cannot manually mark an absent document as received.",
     "panel-matching":
-      "Scores active faculty using specialization match, same-college fit, available dates, and current panel load, then assigns the top candidates to each required panel role.",
+      "Retrieves keywords from the student's research title and three uploaded concept papers, then ranks faculty expertise with availability, college fit, and current panel load.",
     "defense-scheduling":
-      "Collects adviser and panel availability from the database, highlights overlapping time windows, and lets the Research Coordinator propose a shared slot. Revised preferred dates repeat the coordination loop.",
+      "Opens only after panel matching. The date spread compares adviser and panel availability, respects weekday work hours, and shows weekends only when faculty recorded an explicit override.",
   };
   return map[slug] || "";
 }
