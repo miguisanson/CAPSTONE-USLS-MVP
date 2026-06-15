@@ -10,9 +10,6 @@ const STATUS_STYLES = {
   Active: "bg-brand-50 text-brand-700 ring-brand-200",
   "On Leave": "bg-amber-50 text-amber-700 ring-amber-200",
   Completed: "bg-blue-50 text-blue-700 ring-blue-200",
-  // enrollment tag
-  LOA: "bg-amber-50 text-amber-700 ring-amber-200",
-  AWOL: "bg-red-50 text-red-700 ring-red-200",
   // scheduling
   Confirmed: "bg-brand-50 text-brand-700 ring-brand-200",
   "Needs Availability": "bg-amber-50 text-amber-700 ring-amber-200",
@@ -35,15 +32,6 @@ const STATUS_STYLES = {
   Pending: "bg-amber-50 text-amber-700 ring-amber-200",
   Overdue: "bg-red-50 text-red-700 ring-red-200",
   Done: "bg-brand-50 text-brand-700 ring-brand-200",
-  // planning
-  Generated: "bg-brand-50 text-brand-700 ring-brand-200",
-  "Needs generation": "bg-amber-50 text-amber-700 ring-amber-200",
-  Draft: "bg-slate-100 text-slate-700 ring-slate-200",
-  "For Dean Review": "bg-amber-50 text-amber-700 ring-amber-200",
-  Approved: "bg-blue-50 text-blue-700 ring-blue-200",
-  Published: "bg-brand-50 text-brand-700 ring-brand-200",
-  Suggested: "bg-blue-50 text-blue-700 ring-blue-200",
-  "Not Offered": "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
 export function statusClass(value) {

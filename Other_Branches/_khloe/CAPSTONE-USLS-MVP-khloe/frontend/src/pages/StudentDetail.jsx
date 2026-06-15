@@ -12,7 +12,6 @@ import {
   FileText,
   AlertTriangle,
   Lightbulb,
-  Bot,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -27,11 +26,6 @@ export default function StudentDetail() {
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load student" hint={error} />;
 
   const { student, stages, stage_index, course_audit, research_case, documents_by_gate, panel, schedules, tasks, logs, recommendations = [] } = data;
-  const auditAssistantParams = new URLSearchParams({
-    student_id: String(student.id),
-    student_label: student.search_label || student.name,
-    q: `Is ${student.name} eligible to move to Proposal Development based on the course audit? Explain what is complete and what is missing.`,
-  });
 
   return (
     <div className="space-y-5 animate-fade-up">
@@ -57,7 +51,6 @@ export default function StudentDetail() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {student.enrollment_tag && <StatusBadge value={student.enrollment_tag} dot={false} />}
             <StatusBadge value={student.standing} dot={false} />
             <StatusBadge value={student.risk_level} />
             <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -98,16 +91,7 @@ export default function StudentDetail() {
         <div className="space-y-5 lg:col-span-8">
           {/* Course audit */}
           <Card className="p-6">
-            <SectionTitle
-              title="Course audit"
-              subtitle="Completed, current, and missing subjects vs curriculum"
-              icon={ClipboardCheck}
-              action={
-                <Link to={`/assistant?${auditAssistantParams.toString()}`} className="btn-ghost shrink-0">
-                  <Bot className="h-4 w-4" /> Ask eligibility
-                </Link>
-              }
-            />
+            <SectionTitle title="Course audit" subtitle="Completed, current, and missing subjects vs curriculum" icon={ClipboardCheck} />
             <div className="mb-4 flex items-center gap-4">
               <div className="flex-1">
                 <div className="mb-1 flex items-center justify-between text-sm">
@@ -123,53 +107,6 @@ export default function StudentDetail() {
               <AuditStat label="Incomplete" value={course_audit.incomplete.length} tone="amber" />
               <AuditStat label="Missing" value={course_audit.missing.length} tone="red" />
             </div>
-
-            {/* Units + per-category subtotals */}
-            <div className="mt-4">
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-semibold text-slate-700">Units completed</span>
-                <span className="font-bold text-brand-700">
-                  {course_audit.completed_units} / {course_audit.total_units} units ({course_audit.units_rate}%)
-                </span>
-              </div>
-              <ProgressBar value={course_audit.units_rate} />
-              {course_audit.by_category?.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {course_audit.by_category.map((cat) => (
-                    <span key={cat.category} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                      {cat.category}
-                      <span className="text-slate-400">{cat.completed_units}/{cat.total_units}u</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Eligibility (unit-driven) */}
-            {course_audit.eligibility && (
-              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Eligibility (requires all {course_audit.total_units} units)
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    ["Comprehensive Exam", course_audit.eligibility.comprehensive],
-                    ["Final Proposal", course_audit.eligibility.final_proposal],
-                    ["Thesis / Title Defense", course_audit.eligibility.thesis],
-                  ].map(([label, ok]) => (
-                    <span
-                      key={label}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${
-                        ok ? "bg-brand-50 text-brand-700 ring-brand-200" : "bg-slate-100 text-slate-500 ring-slate-200"
-                      }`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-brand-500" : "bg-slate-300"}`} />
-                      {label} {ok ? "· Eligible" : "· Not yet"}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
             {(course_audit.missing.length > 0 || course_audit.incomplete.length > 0) && (
               <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Outstanding subjects</p>

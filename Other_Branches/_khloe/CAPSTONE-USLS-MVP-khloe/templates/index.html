@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}USLS Graduate School Demo Guide{% endblock %}
+{% block section_title %}Demo Guide{% endblock %}
+
+{% block content %}
+  <section class="guide-hero">
+    <div>
+      <p class="eyebrow">Python + MySQL demo</p>
+      <h1>Graduate student monitoring through six working workflows</h1>
+      <p class="lead">
+        Every action creates or updates a student record, task, document check, panel assignment,
+        schedule request, or monitoring event in SQL.
+      </p>
+    </div>
+    <div class="stat-grid">
+      <article class="stat-tile">
+        <span>Total students</span>
+        <strong>{{ stats.total_students }}</strong>
+      </article>
+      <article class="stat-tile">
+        <span>Active</span>
+        <strong>{{ stats.active_students }}</strong>
+      </article>
+      <article class="stat-tile">
+        <span>Medium/high risk</span>
+        <strong>{{ stats.at_risk }}</strong>
+      </article>
+      <article class="stat-tile">
+        <span>Open tasks</span>
+        <strong>{{ stats.pending_tasks }}</strong>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-grid two-col">
+    <article class="panel">
+      <h2>Demo Flow For Monday</h2>
+      <ol class="steps">
+        <li><strong>Create a student handoff.</strong> Simulate an AIMS/admission handoff.</li>
+        <li><strong>Run a course audit.</strong> Pick the same student, mark one subject completed/current/missing, and watch the missing count update.</li>
+        <li><strong>Check research readiness.</strong> Use Form 1 or Form 4 and mark missing items to create a next-owner task.</li>
+        <li><strong>Match a panel.</strong> Enter a specialization and let the system score faculty by specialization, availability, and workload.</li>
+        <li><strong>Schedule a defense.</strong> Pick a date; the app confirms only when assigned panel availability matches.</li>
+        <li><strong>Show the activity trail.</strong> Each completed action leaves an audit-style event for the student.</li>
+      </ol>
+    </article>
+
+    <article class="panel">
+      <h2>What The System Is Doing</h2>
+      <p>
+        The user is not entering dashboard numbers manually. The indicators are derived from live student data:
+        student standing, course evidence, document checks, faculty availability, panel assignments,
+        schedule results, and pending owner tasks.
+      </p>
+      <div class="stage-list">
+        {% for stage, count in stats.stage_counts %}
+          <div>
+            <span>{{ stage }}</span>
+            <strong>{{ count }}</strong>
+          </div>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+
+  <section class="module-grid">
+    {% for item in transactions %}
+      <a class="module-card" href="{{ url_for('action_page', slug=item.slug) }}">
+        <h2>{{ item.title }}</h2>
+        <p>{{ item.short }}</p>
+        <dl>
+          <dt>Main actors</dt>
+          <dd>{{ item.actor }}</dd>
+          <dt>Data captured/output</dt>
+          <dd>{{ item.data }}</dd>
+        </dl>
+      </a>
+    {% endfor %}
+  </section>
+
+  <section class="content-grid two-col">
+    <article class="panel">
+      <h2>Recent Activity</h2>
+      {% if recent_logs %}
+        <div class="compact-table">
+          {% for log in recent_logs %}
+            <div class="table-row">
+              <span>{{ log.created_at.strftime("%b %d, %Y") }}</span>
+              <strong>{{ log.result }}</strong>
+              <small>{{ log.next_owner or "No owner" }}</small>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No activity yet. Seed or complete a workflow to populate this feed.</p>
+      {% endif %}
+    </article>
+
+    <article class="panel">
+      <h2>Open Work Queue</h2>
+      {% if overdue_tasks %}
+        <div class="compact-table">
+          {% for task in overdue_tasks %}
+            <div class="table-row">
+              <span>{{ task.owner_role }}</span>
+              <strong>{{ task.title }}</strong>
+              <small>Due {{ task.due_at.strftime("%b %d") }} - {{ task.status }}</small>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No pending tasks.</p>
+      {% endif %}
+    </article>
+  </section>
+{% endblock %}

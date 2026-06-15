@@ -232,8 +232,6 @@ class Student(db.Model):
     entry_year = db.Column(db.Integer, nullable=False)
     current_stage = db.Column(db.String(60), nullable=False, default="Admission")
     standing = db.Column(db.String(60), nullable=False, default="Active")
-    # Current-term enrollment tag (per AC notes): Enrolled / LOA / AWOL / Completed.
-    enrollment_tag = db.Column(db.String(20), nullable=False, default="Enrolled")
     risk_level = db.Column(db.String(20), nullable=False, default="Low")
     adviser_name = db.Column(db.String(120))
     created_at = db.Column(db.DateTime, default=now_utc)
@@ -278,35 +276,6 @@ class Course(db.Model):
     title = db.Column(db.String(160), nullable=False)
     units = db.Column(db.Integer, default=3)
     recommended_term = db.Column(db.String(40), default="Year 1")
-    category = db.Column(db.String(40), default="Core")  # Basic / Major / Cognate (from monitoring sheet groups)
-
-
-class CourseOfferingPlan(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    program_id = db.Column(db.Integer, db.ForeignKey("program.id"), nullable=False)
-    term_label = db.Column(db.String(60), nullable=False)
-    status = db.Column(db.String(40), nullable=False, default="Draft")
-    notes = db.Column(db.String(260))
-    created_at = db.Column(db.DateTime, default=now_utc)
-    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
-    approved_at = db.Column(db.DateTime)
-    published_at = db.Column(db.DateTime)
-
-    program = db.relationship("Program")
-    offerings = db.relationship("CourseOffering", backref="plan", lazy=True, cascade="all, delete-orphan")
-
-
-class CourseOffering(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    plan_id = db.Column(db.Integer, db.ForeignKey("course_offering_plan.id"), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
-    demand_count = db.Column(db.Integer, default=0)
-    section_count = db.Column(db.Integer, default=0)
-    availability_count = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(40), nullable=False, default="Suggested")
-    notes = db.Column(db.String(220))
-
-    course = db.relationship("Course")
 
 
 # Term-level enrollment signal copied from an institutional source such as AIMS.
@@ -484,7 +453,6 @@ def student_brief(student: Student) -> dict:
         "entry_year": student.entry_year,
         "current_stage": student.current_stage,
         "standing": student.standing,
-        "enrollment_tag": student.enrollment_tag,
         "risk_level": student.risk_level,
         "adviser_name": student.adviser_name,
         "search_label": student_search_label(student),
@@ -511,11 +479,6 @@ def course_audit_dict(audit: dict) -> dict:
         "missing": [row(r) for r in audit["missing"]],
         "missing_count": audit["missing_count"],
         "completion_rate": audit["completion_rate"],
-        "total_units": audit.get("total_units", 0),
-        "completed_units": audit.get("completed_units", 0),
-        "units_rate": audit.get("units_rate", 0),
-        "by_category": audit.get("by_category", []),
-        "eligibility": audit.get("eligibility", {}),
     }
 
 
@@ -584,38 +547,6 @@ def task_dict(task: Task) -> dict:
     }
 
 
-def course_offering_dict(offering: CourseOffering) -> dict:
-    return {
-        "id": offering.id,
-        "course_id": offering.course_id,
-        "code": offering.course.code if offering.course else None,
-        "title": offering.course.title if offering.course else None,
-        "demand_count": offering.demand_count,
-        "section_count": offering.section_count,
-        "availability_count": offering.availability_count,
-        "status": offering.status,
-        "notes": offering.notes,
-    }
-
-
-def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
-    if not plan:
-        return None
-    return {
-        "id": plan.id,
-        "program_id": plan.program_id,
-        "program_code": plan.program.code if plan.program else None,
-        "term_label": plan.term_label,
-        "status": plan.status,
-        "notes": plan.notes,
-        "created_at": iso(plan.created_at),
-        "updated_at": iso(plan.updated_at),
-        "approved_at": iso(plan.approved_at),
-        "published_at": iso(plan.published_at),
-        "offerings": [course_offering_dict(o) for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
-    }
-
-
 def log_dict(log: TransactionLog) -> dict:
     return {
         "id": log.id,
@@ -629,25 +560,6 @@ def log_dict(log: TransactionLog) -> dict:
         "notes": log.notes,
         "created_at": iso(log.created_at),
     }
-
-
-def human_activity_query():
-    # Global activity feeds should show meaningful workflow events, not every
-    # per-student row touched by a bulk monitoring-sheet upload or course audit.
-    query = TransactionLog.query.filter(TransactionLog.actor_role != "Demo Data").filter(
-        or_(
-            TransactionLog.source_reference.is_(None),
-            TransactionLog.source_reference != "AC Student Monitoring import",
-            TransactionLog.student_id.is_(None),
-        )
-    )
-    return query.filter(
-        ~(
-            (TransactionLog.transaction_slug == "course-audit")
-            & TransactionLog.student_id.isnot(None)
-            & TransactionLog.source_reference.like("Course audit%")
-        )
-    )
 
 
 def account_dict(account: UserAccount) -> dict:
@@ -1059,28 +971,10 @@ def local_grounded_answer(question: str, student: Student | None, payload: dict 
     asks_status = any(w in q for w in ["status", "pending", "where", "next", "owner", "summary", "doing", "standing"])
     asks_policy = any(w in q for w in ["loa", "leave", "residency", "readmission", "eligible", "require", "requirement",
                                        "form", "ethics", "panel", "schedule", "completion", "graduat", "withdraw", "practicum", "policy", "rule"])
-    asks_coursework_eligibility = student and any(
-        w in q for w in ["course audit", "coursework", "subject", "subjects", "proposal development"]
-    ) and any(w in q for w in ["eligible", "clear", "cleared", "move", "ready", "proposal development"])
     asks_portfolio = any(w in q for w in ["delayed", "overdue", "at risk", "risk", "stalled", "which students",
                                           "attention", "bottleneck", "escalate", "behind"])
 
-    if asks_coursework_eligibility:
-        out.append(_status_sentence(student, ind))
-        if ind["missing_subjects"] == 0:
-            out.append(
-                "Course-audit eligibility: cleared. All required subjects are marked completed, so the backend rule "
-                "can advance an Admission or Coursework student to Proposal Development."
-            )
-        else:
-            out.append(
-                f"Course-audit eligibility: not cleared yet. {ind['missing_subjects']} required subject(s) are "
-                "missing or incomplete, so the Academic Coordinator should resolve the audit before proposal development."
-            )
-        if recs:
-            out.append("Recommended next step: " + recs[0]["recommendation"] + f" ({recs[0]['owner']}).")
-
-    elif student and (asks_status or (not asks_policy and not asks_portfolio)):
+    if student and (asks_status or (not asks_policy and not asks_portfolio)):
         out.append(_status_sentence(student, ind))
         if ind["overdue_tasks"]:
             out.append(f"There {'is' if ind['overdue_tasks'] == 1 else 'are'} {ind['overdue_tasks']} overdue task(s).")
@@ -1263,29 +1157,6 @@ def register_routes(app: Flask) -> None:
                 "pages": (total + page_size - 1) // page_size,
             }
         )
-
-    @app.route("/api/students/duplicates")
-    def students_duplicates():
-        return jsonify({"groups": duplicate_student_groups()})
-
-    @app.route("/api/students/merge", methods=["POST"])
-    def students_merge():
-        data = request.get_json(silent=True) or {}
-        target = Student.query.get_or_404(int(data.get("target_id") or 0))
-        source = Student.query.get_or_404(int(data.get("source_id") or 0))
-        overwrite_profile = bool(data.get("overwrite_profile"))
-        try:
-            moved = merge_student_records(target, source, overwrite_profile=overwrite_profile)
-            db.session.commit()
-        except Exception as exc:  # noqa: BLE001
-            db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
-        return jsonify({
-            "ok": True,
-            "student": student_brief(target),
-            "moved": moved,
-            "message": f"Merged duplicate into {target.name} ({target.student_number}).",
-        })
 
     # Full student profile: lifecycle stage, audit, research, docs, panel,
     # schedules, tasks, activity trail, and decision-support recommendations.
@@ -1601,7 +1472,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def activity():
         logs = (
-            human_activity_query()
+            TransactionLog.query.filter(TransactionLog.actor_role != "Demo Data")
             .order_by(TransactionLog.created_at.desc())
             .limit(40)
             .all()
@@ -1614,366 +1485,6 @@ def register_routes(app: Flask) -> None:
     def faculty_list():
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_dict(f) for f in faculty]})
-
-    @app.route("/api/curriculum-planning")
-    def curriculum_planning():
-        program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
-        if not program:
-            return jsonify({"error": "No program found."}), 404
-        return jsonify(curriculum_planning_payload(program))
-
-    @app.route("/api/curriculum-planning/generate", methods=["POST"])
-    def curriculum_planning_generate():
-        data = request.get_json(silent=True) or {}
-        program = Program.query.get_or_404(int(data.get("program_id") or 0))
-        scope = data.get("scope") or "active"
-        query = Student.query.filter_by(program_id=program.id)
-        if scope == "active":
-            query = query.filter(Student.standing == "Active")
-        students = query.order_by(Student.last_name, Student.first_name).all()
-        courses = Course.query.filter_by(program_id=program.id).order_by(Course.code).all()
-        created = 0
-        touched_students = 0
-        for student in students:
-            existing = {rec.course_id for rec in CourseRecord.query.filter_by(student_id=student.id).all()}
-            added_for_student = 0
-            for course in courses:
-                if course.id in existing:
-                    continue
-                db.session.add(
-                    CourseRecord(
-                        student_id=student.id,
-                        course_id=course.id,
-                        status="Missing",
-                        evidence_reference="Curriculum planning generation",
-                    )
-                )
-                created += 1
-                added_for_student += 1
-            if added_for_student:
-                touched_students += 1
-                recompute_risk(student)
-        add_log(
-            "curriculum-planning",
-            None,
-            "Academic Coordinator",
-            "Curriculum Planning",
-            f"Generated curriculum plan rows for {touched_students} student(s)",
-            "Academic Coordinator",
-            f"Program {program.code}; {created} missing subject row(s) created from {len(courses)} curriculum subject(s).",
-        )
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "message": f"Generated {created} curriculum subject row(s) for {touched_students} student(s).",
-            "created": created,
-            "students": touched_students,
-            "data": curriculum_planning_payload(program),
-        })
-
-    @app.route("/api/course-adjustments")
-    def course_adjustments():
-        program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
-        if not program:
-            return jsonify({"error": "No program found."}), 404
-        return jsonify(course_adjustments_payload(program))
-
-    @app.route("/api/course-adjustments/plan", methods=["POST"])
-    def course_adjustments_plan():
-        data = request.get_json(silent=True) or {}
-        program = Program.query.get_or_404(int(data.get("program_id") or 0))
-        action = data.get("action") or "draft"
-        latest_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
-        term_label = (data.get("term_label") or "").strip() or (latest_term.label if latest_term else "Current Term")
-        plan = (
-            CourseOfferingPlan.query.filter_by(program_id=program.id, term_label=term_label)
-            .order_by(CourseOfferingPlan.created_at.desc())
-            .first()
-        )
-        if action == "draft":
-            if not plan:
-                plan = CourseOfferingPlan(program_id=program.id, term_label=term_label, status="Draft")
-                db.session.add(plan)
-                db.session.flush()
-            plan.status = "Draft"
-            CourseOffering.query.filter_by(plan_id=plan.id).delete()
-            demand_by_course = {row["course"]["id"]: row for row in course_demand_rows(program)}
-            # If the Academic Coordinator edited the offer list, honour their choices;
-            # otherwise fall back to the demand-suggested offerings.
-            selections = data.get("selections")
-            if selections:
-                plan.notes = data.get("notes") or "Draft set by the Academic Coordinator from the suggested demand."
-                for sel in selections:
-                    cid = int(sel.get("course_id"))
-                    row = demand_by_course.get(cid, {})
-                    db.session.add(
-                        CourseOffering(
-                            plan_id=plan.id,
-                            course_id=cid,
-                            demand_count=row.get("demand_count", 0),
-                            section_count=int(sel.get("section_count") or row.get("suggested_sections", 1)),
-                            availability_count=row.get("availability_count", 0),
-                            status="Offered" if sel.get("offer", True) else "Not Offered",
-                            notes=row.get("recommendation", "Selected by Academic Coordinator"),
-                        )
-                    )
-                result = "Draft offering plan saved from the coordinator's selections"
-            else:
-                plan.notes = data.get("notes") or "Draft generated from current missing-subject demand."
-                for row in course_demand_rows(program):
-                    db.session.add(
-                        CourseOffering(
-                            plan_id=plan.id,
-                            course_id=row["course"]["id"],
-                            demand_count=row["demand_count"],
-                            section_count=row["suggested_sections"],
-                            availability_count=row["availability_count"],
-                            status="Suggested" if row["demand_count"] > 0 else "Not Offered",
-                            notes=row["recommendation"],
-                        )
-                    )
-                result = "Draft offering plan generated from demand"
-        elif action == "review":
-            if not plan:
-                return jsonify({"error": "Create a draft offering plan first."}), 400
-            plan.status = "For Dean Review"
-            plan.notes = data.get("notes") or plan.notes
-            result = "Offering plan sent for Dean review"
-        elif action == "approve":
-            if not plan:
-                return jsonify({"error": "Create a draft offering plan first."}), 400
-            plan.status = "Approved"
-            plan.approved_at = now_utc()
-            plan.notes = data.get("notes") or plan.notes
-            result = "Offering plan approved"
-        elif action == "publish":
-            if not plan:
-                return jsonify({"error": "Create a draft offering plan first."}), 400
-            plan.status = "Published"
-            plan.published_at = now_utc()
-            plan.notes = data.get("notes") or plan.notes
-            result = "Final course offerings published"
-        else:
-            return jsonify({"error": "Unknown course adjustment action."}), 400
-        plan.updated_at = now_utc()
-        add_log(
-            "course-adjustments",
-            None,
-            "Academic Coordinator",
-            "Course Adjustments",
-            f"{result}: {program.code} {term_label}",
-            "Graduate School Staff" if action == "publish" else "Dean",
-            plan.notes or "",
-        )
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "message": f"{result} for {program.code} ({term_label}).",
-            "data": course_adjustments_payload(program),
-        })
-
-    # ---- Course Audit (end-of-term, per-subject roster) ------------------
-    @app.route("/api/course-audit/subjects")
-    def course_audit_subjects():
-        program_id = request.args.get("program_id", type=int)
-        query = Course.query
-        if program_id:
-            query = query.filter(Course.program_id == program_id)
-        counts = dict(
-            db.session.query(CourseRecord.course_id, func.count(CourseRecord.id))
-            .group_by(CourseRecord.course_id)
-            .all()
-        )
-        done = dict(
-            db.session.query(CourseRecord.course_id, func.count(CourseRecord.id))
-            .filter(CourseRecord.status == "Completed")
-            .group_by(CourseRecord.course_id)
-            .all()
-        )
-        items = []
-        for c in query.order_by(Course.code).all():
-            enrolled = counts.get(c.id, 0)
-            if enrolled:
-                items.append({
-                    "id": c.id, "code": c.code, "title": c.title, "program_id": c.program_id,
-                    "enrolled": enrolled, "completed": done.get(c.id, 0),
-                })
-        return jsonify({"items": items})
-
-    @app.route("/api/course-audit/roster")
-    def course_audit_roster():
-        course_id = request.args.get("course_id", type=int)
-        course = Course.query.get_or_404(course_id)
-        rows = (
-            db.session.query(CourseRecord, Student)
-            .join(Student, Student.id == CourseRecord.student_id)
-            .filter(CourseRecord.course_id == course_id)
-            .order_by(Student.last_name.asc(), Student.first_name.asc())
-            .all()
-        )
-        students = [{
-            "student_id": s.id, "name": s.name, "student_number": s.student_number,
-            "program_code": s.program.code, "status": rec.status,
-            "completed": rec.status == "Completed", "term_label": rec.term_label,
-        } for rec, s in rows]
-        return jsonify({
-            "course": {"id": course.id, "code": course.code, "title": course.title},
-            "students": students,
-        })
-
-    @app.route("/api/course-audit/roster", methods=["POST"])
-    def course_audit_roster_save():
-        data = request.get_json(silent=True) or {}
-        course = Course.query.get_or_404(int(data.get("course_id") or 0))
-        completions = data.get("completions") or {}
-        status_updates = data.get("statuses") or data.get("status_updates") or {}
-        term = (data.get("term") or "").strip()
-        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Dropped", "Missing"}
-        changed = 0
-        changed_students: set[int] = set()
-        status_counts: dict[str, int] = {}
-
-        if status_updates:
-            updates = status_updates.items()
-        else:
-            updates = ((sid, "Completed" if done else "Missing") for sid, done in completions.items())
-
-        for sid_str, new_status in updates:
-            try:
-                sid = int(sid_str)
-            except (TypeError, ValueError):
-                continue
-            if new_status not in allowed_statuses:
-                continue
-            rec = CourseRecord.query.filter_by(student_id=sid, course_id=course.id).first()
-            if not rec:
-                student = Student.query.get(sid)
-                if not student:
-                    continue
-                rec = CourseRecord(student_id=sid, course_id=course.id)
-                db.session.add(rec)
-            else:
-                student = Student.query.get(sid)
-                if not student:
-                    continue
-            if rec.status == new_status:
-                continue
-            rec.status = new_status
-            rec.updated_at = now_utc()
-            rec.evidence_reference = "Course audit update"
-            if term:
-                rec.term_label = term
-            changed += 1
-            changed_students.add(student.id)
-            status_counts[new_status] = status_counts.get(new_status, 0) + 1
-            audit = compute_course_audit(student)
-            if audit["missing_count"] == 0 and student.current_stage in ("Admission", "Coursework"):
-                student.current_stage = "Proposal Development"
-            recompute_risk(student)
-            add_log("course-audit", sid, "Academic Coordinator", f"Course audit {term}".strip(),
-                    f"{course.code} marked {new_status}",
-                    "Academic Coordinator", f"End-of-term course audit for {course.code}.")
-        if changed:
-            status_summary = ", ".join(f"{status}: {count}" for status, count in sorted(status_counts.items()))
-            add_log(
-                "course-audit",
-                None,
-                "Academic Coordinator",
-                "Course audit summary",
-                f"{course.code} audit saved: {changed} record(s) updated",
-                "Academic Coordinator",
-                f"{len(changed_students)} student(s) affected. Status changes: {status_summary}.",
-            )
-        db.session.commit()
-        return jsonify({
-            "ok": True, "course": course.code, "updated": changed,
-            "message": f"Saved {course.code} audit — {changed} student record(s) updated.",
-        })
-
-    # ---- Monitoring grid (spreadsheet view, one program at a time) -------
-    @app.route("/api/monitoring/grid")
-    def monitoring_grid():
-        program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
-        if not program:
-            return jsonify({"error": "No program found."}), 404
-
-        courses = (
-            Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
-        )
-        students = (
-            Student.query.filter_by(program_id=program.id)
-            .order_by(Student.last_name.asc(), Student.first_name.asc())
-            .all()
-        )
-        sids = [s.id for s in students]
-        cids = [c.id for c in courses]
-        records: dict[tuple[int, int], str] = {}
-        if sids and cids:
-            for rec in CourseRecord.query.filter(
-                CourseRecord.student_id.in_(sids), CourseRecord.course_id.in_(cids)
-            ).all():
-                records[(rec.student_id, rec.course_id)] = rec.status
-
-        cat_order = ["Basic", "Major", "Cognate", "Core", "Comprehensive"]
-        grouped: dict[str, list] = {}
-        for c in courses:
-            grouped.setdefault(c.category or "Core", []).append(
-                {"id": c.id, "code": c.code, "title": c.title, "units": c.units or 3}
-            )
-        categories = [
-            {
-                "name": name,
-                "courses": grouped[name],
-                "total_units": sum(c["units"] for c in grouped[name]),
-            }
-            for name in sorted(grouped, key=lambda n: cat_order.index(n) if n in cat_order else 99)
-        ]
-        course_units = {c.id: (c.units or 3) for c in courses}
-        total_units_all = sum(course_units.values())
-
-        def milestones(stage: str) -> dict:
-            idx = STAGES.index(stage) if stage in STAGES else 0
-            return {
-                "title": stage != "LOA" and idx >= STAGES.index("Proposal Development"),
-                "proposal": idx >= STAGES.index("Proposal Defense"),
-                "ethics": idx >= STAGES.index("Data Collection"),
-                "final": idx >= STAGES.index("Final Defense"),
-            }
-
-        rows = []
-        for s in students:
-            cells = {}
-            done = 0
-            done_units = 0
-            for c in courses:
-                status = records.get((s.id, c.id), "Missing")
-                cells[c.id] = status
-                if status == "Completed":
-                    done += 1
-                    done_units += course_units[c.id]
-            units_complete = total_units_all > 0 and done_units >= total_units_all
-            rows.append({
-                "id": s.id, "name": s.name, "student_number": s.student_number,
-                "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
-                "enrollment_tag": s.enrollment_tag,
-                "cells": cells, "completed": done, "total": len(courses),
-                "rate": round(done / len(courses) * 100, 1) if courses else 0,
-                "completed_units": done_units, "total_units": total_units_all,
-                "eligible": units_complete,
-                "milestones": milestones(s.current_stage),
-            })
-
-        return jsonify({
-            "program": program_dict(program),
-            "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
-            "categories": categories,
-            "course_count": len(courses),
-            "total_units": total_units_all,
-            "students": rows,
-        })
 
     # Population-level queue of rule-based recommendations.
     @app.route("/api/decision-support")
@@ -2172,7 +1683,7 @@ def dashboard_stats() -> dict:
     schedule_distribution = [{"status": s, "count": n} for s, n in schedule_rows]
 
     recent_logs = (
-        human_activity_query()
+        TransactionLog.query.filter(TransactionLog.actor_role != "Demo Data")
         .order_by(TransactionLog.created_at.desc())
         .limit(8)
         .all()
@@ -2219,8 +1730,10 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         selected_student = Student.query.get(selected_student_id)
 
     recent_logs = (
-        human_activity_query()
-        .filter(TransactionLog.transaction_slug == slug)
+        TransactionLog.query.filter(
+            TransactionLog.transaction_slug == slug,
+            TransactionLog.actor_role != "Demo Data",
+        )
         .order_by(TransactionLog.created_at.desc())
         .limit(8)
         .all()
@@ -2320,151 +1833,6 @@ def student_search_label(student: Student | None) -> str:
     if not student:
         return ""
     return f"{student.student_number} - {student.last_name}, {student.first_name} - {student.program.code}"
-
-
-def identity_text(value: str | None) -> str:
-    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
-
-
-def student_identity_key(first_name: str, last_name: str, program_id: int | None, entry_year: int | None) -> tuple:
-    return (identity_text(last_name), identity_text(first_name), program_id, entry_year)
-
-
-def possible_student_identity_match(first_name: str, last_name: str, program_id: int, entry_year: int) -> Student | None:
-    first_key = identity_text(first_name)
-    last_key = identity_text(last_name)
-    if not first_key or not last_key:
-        return None
-    candidates = Student.query.filter_by(program_id=program_id, entry_year=entry_year).all()
-    for student in candidates:
-        if identity_text(student.first_name) == first_key and identity_text(student.last_name) == last_key:
-            return student
-    return None
-
-
-def duplicate_student_groups(limit: int = 12) -> list[dict]:
-    groups: list[dict] = []
-    seen: set[tuple[int, ...]] = set()
-
-    def add_group(reason: str, students: list[Student]) -> None:
-        ids = tuple(sorted(s.id for s in students))
-        if len(ids) < 2 or ids in seen:
-            return
-        seen.add(ids)
-        groups.append({
-            "reason": reason,
-            "students": [student_brief(s) for s in sorted(students, key=lambda st: st.id)],
-        })
-
-    by_email: dict[str, list[Student]] = {}
-    by_identity: dict[tuple, list[Student]] = {}
-    for student in Student.query.order_by(Student.last_name, Student.first_name).all():
-        email_key = (student.email or "").strip().lower()
-        if email_key:
-            by_email.setdefault(email_key, []).append(student)
-        key = student_identity_key(student.first_name, student.last_name, student.program_id, student.entry_year)
-        if all(key):
-            by_identity.setdefault(key, []).append(student)
-
-    for email, students in by_email.items():
-        if len(students) > 1:
-            add_group(f"Same email: {email}", students)
-    for students in by_identity.values():
-        if len(students) > 1:
-            sample = students[0]
-            add_group(f"Same name, program, and entry year: {sample.program.code} / {sample.entry_year}", students)
-
-    return groups[:limit]
-
-
-def status_rank(status: str | None) -> int:
-    ranks = {"Completed": 5, "Current": 4, "Enrolled": 4, "Incomplete": 3, "Dropped": 2, "Missing": 1}
-    return ranks.get(status or "", 0)
-
-
-def merge_student_records(target: Student, source: Student, overwrite_profile: bool = False) -> dict:
-    if target.id == source.id:
-        raise ValueError("Choose two different student records to merge.")
-
-    if overwrite_profile:
-        target.first_name = source.first_name
-        target.last_name = source.last_name
-        target.email = source.email
-        target.program_id = source.program_id
-        target.entry_year = source.entry_year
-        target.current_stage = source.current_stage
-        target.standing = source.standing
-        target.risk_level = source.risk_level
-        target.adviser_name = source.adviser_name
-    else:
-        target.adviser_name = target.adviser_name or source.adviser_name
-
-    moved = {"course_records": 0, "related_records": 0}
-
-    target_courses = {rec.course_id: rec for rec in CourseRecord.query.filter_by(student_id=target.id).all()}
-    for rec in CourseRecord.query.filter_by(student_id=source.id).all():
-        existing = target_courses.get(rec.course_id)
-        if existing:
-            if status_rank(rec.status) > status_rank(existing.status):
-                existing.status = rec.status
-                existing.term_label = rec.term_label or existing.term_label
-                existing.evidence_reference = rec.evidence_reference or existing.evidence_reference
-                existing.updated_at = now_utc()
-            db.session.delete(rec)
-        else:
-            rec.student_id = target.id
-            moved["course_records"] += 1
-
-    target_terms = {e.term_id: e for e in TermEnrollment.query.filter_by(student_id=target.id).all()}
-    for enrollment in TermEnrollment.query.filter_by(student_id=source.id).all():
-        if enrollment.term_id in target_terms:
-            db.session.delete(enrollment)
-        else:
-            enrollment.student_id = target.id
-            moved["related_records"] += 1
-
-    target_docs = {(d.gate, d.item_name): d for d in DocumentCheck.query.filter_by(student_id=target.id).all()}
-    for doc in DocumentCheck.query.filter_by(student_id=source.id).all():
-        existing = target_docs.get((doc.gate, doc.item_name))
-        if existing:
-            if status_rank(doc.status) > status_rank(existing.status):
-                existing.status = doc.status
-                existing.evidence_reference = doc.evidence_reference or existing.evidence_reference
-                existing.updated_at = now_utc()
-            db.session.delete(doc)
-        else:
-            doc.student_id = target.id
-            moved["related_records"] += 1
-
-    for model in (ResearchCase, ScheduleRequest, Task, TransactionLog):
-        for row in model.query.filter_by(student_id=source.id).all():
-            row.student_id = target.id
-            moved["related_records"] += 1
-
-    target_panel_keys = {(p.faculty_id, p.panel_role): p for p in PanelAssignment.query.filter_by(student_id=target.id).all()}
-    for panel in PanelAssignment.query.filter_by(student_id=source.id).all():
-        existing = target_panel_keys.get((panel.faculty_id, panel.panel_role))
-        if existing:
-            existing.score = max(existing.score or 0, panel.score or 0)
-            db.session.delete(panel)
-        else:
-            panel.student_id = target.id
-            moved["related_records"] += 1
-
-    source_label = f"{source.name} ({source.student_number})"
-    db.session.delete(source)
-    target.updated_at = now_utc()
-    recompute_risk(target)
-    add_log(
-        "student-handoff",
-        target.id,
-        "GS Staff",
-        "Duplicate review",
-        f"Merged duplicate record into {target.student_number}",
-        "GS Staff",
-        f"Source record: {source_label}. Moved {moved['course_records']} course audit row(s) and {moved['related_records']} related record(s).",
-    )
-    return moved
 
 
 def add_log(slug: str, student_id: int | None, actor: str, source: str, result: str, next_owner: str, notes: str) -> None:
@@ -2572,21 +1940,15 @@ def parse_ac_monitoring(stream) -> dict:
     milestone_start = min(stop_cols) if stop_cols else max_col + 1
 
     subjects = []  # (col, code)
-    subject_categories = {}  # code -> Basic / Major / Cognate
-    current_group = "Core"
-    group_map = {"BASIC": "Basic", "MAJOR": "Major", "COGNATE": "Cognate", "COMPRE": "Comprehensive"}
     if yr_c:
         for c in range(yr_c + 1, milestone_start):
-            group_label = cell(hdr, c).upper()
-            if group_label in group_map:
-                current_group = group_map[group_label]
             code = cell(sub, c)
+            group = cell(hdr, c).upper()
             if not code or code == "-" or code.isdigit() or code.upper() in ("SN", "FN", "TOTAL"):
                 continue
-            if group_label == "TOTAL":
+            if group == "TOTAL":
                 continue
             subjects.append((c, code))
-            subject_categories[code] = current_group
 
     rows = []
     last_ay = None
@@ -2617,12 +1979,7 @@ def parse_ac_monitoring(stream) -> dict:
 
     if not program_code:
         program_code = "IMPORT"
-    return {
-        "program_code": program_code,
-        "subjects": [s[1] for s in subjects],
-        "subject_categories": subject_categories,
-        "rows": rows,
-    }
+    return {"program_code": program_code, "subjects": [s[1] for s in subjects], "rows": rows}
 
 
 def _stage_from_sheet(milestones: dict, completed_subjects: int) -> str:
@@ -2647,45 +2004,28 @@ def import_ac_monitoring(parsed: dict) -> dict:
         db.session.flush()
 
     # ensure a Course row exists for each subject code on the sheet (for this program)
-    categories = parsed.get("subject_categories", {})
     course_by_code: dict[str, Course] = {}
     for code in parsed["subjects"]:
-        category = categories.get(code, "Core")
         existing = Course.query.filter_by(code=code).first()
         if not existing:
-            existing = Course(program_id=program.id, code=code, title=code, units=3, category=category)
+            existing = Course(program_id=program.id, code=code, title=code, units=3)
             db.session.add(existing)
             db.session.flush()
-        elif (existing.category or "Core") == "Core" and category != "Core":
-            existing.category = category
         course_by_code[code] = existing
 
     term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
 
-    created, updated, sample, conflicts = 0, 0, [], []
-    subject_changes = 0
-    students_changed = 0
+    created, updated, sample = 0, 0, []
     for row in parsed["rows"]:
         student = Student.query.filter_by(student_number=row["idno"]).first()
         is_new = student is None
-        entry_year = _entry_year_from_ay(row["ay_entry"])
-        if is_new:
-            possible_match = possible_student_identity_match(row["first_name"], row["last_name"], program.id, entry_year)
-            if possible_match:
-                conflicts.append({
-                    "incoming_student_number": row["idno"],
-                    "incoming_name": f"{row['first_name']} {row['last_name']}".strip(),
-                    "matched_student": student_brief(possible_match),
-                    "reason": "Same name, program, and entry year. Review before merge or overwrite.",
-                })
-                continue
         if is_new:
             student = Student(student_number=row["idno"], program_id=program.id, standing="Active")
             db.session.add(student)
         student.first_name = row["first_name"] or student.first_name or "—"
         student.last_name = row["last_name"] or student.last_name or "—"
         student.program_id = program.id
-        student.entry_year = entry_year
+        student.entry_year = _entry_year_from_ay(row["ay_entry"])
         if is_new or not student.email:
             student.email = f"{str(row['idno']).lower()}@student.usls.edu.ph"
         completed = sum(1 for v in row["subjects"].values() if v)
@@ -2693,23 +2033,16 @@ def import_ac_monitoring(parsed: dict) -> dict:
         db.session.flush()
 
         # per-subject course records (real subjects from the sheet)
-        row_subject_changes = 0
         for code, done in row["subjects"].items():
             course = course_by_code[code]
             rec = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
-            new_status = "Completed" if done else "Missing"
             if not rec:
                 rec = CourseRecord(student_id=student.id, course_id=course.id)
                 db.session.add(rec)
-            if rec.status != new_status:
-                row_subject_changes += 1
-            rec.status = new_status
+            rec.status = "Completed" if done else "Missing"
             rec.term_label = row["ay_entry"]
             rec.evidence_reference = "AC Student Monitoring import"
             rec.updated_at = now_utc()
-        subject_changes += row_subject_changes
-        if row_subject_changes:
-            students_changed += 1
 
         # onboarding evidence treated as complete (record came from the official sheet)
         if is_new and term:
@@ -2721,6 +2054,10 @@ def import_ac_monitoring(parsed: dict) -> dict:
                     student_id=student.id, gate="Admission Handoff", item_name=item,
                     status="Complete", evidence_reference="AC Student Monitoring import"))
 
+        add_log("student-handoff", student.id, "GS Staff", "AC Student Monitoring import",
+                f"{'Created' if is_new else 'Updated'} from monitoring sheet — {completed}/{len(row['subjects'])} subjects complete",
+                "Academic Coordinator",
+                f"Program {program.code}; course track {row['course']}; AY entry {row['ay_entry']}.")
         recompute_risk(student)
 
         if is_new:
@@ -2734,31 +2071,16 @@ def import_ac_monitoring(parsed: dict) -> dict:
                 "completed": completed, "total_subjects": len(row["subjects"]),
             })
 
-    add_log(
-        "student-handoff",
-        None,
-        "GS Staff",
-        "AC Student Monitoring import",
-        f"Monitoring sheet imported: {len(parsed['rows'])} rows, {created} new, {updated} matched, {len(conflicts)} conflict(s)",
-        "Academic Coordinator",
-        f"Program {program.code}; {len(parsed['subjects'])} subjects; {subject_changes} subject status change(s) across {students_changed} student(s).",
-    )
-
     return {
         "ok": True,
-        "program_id": program.id,
         "program": program.code,
         "subjects": len(parsed["subjects"]),
         "rows": len(parsed["rows"]),
         "created": created,
         "updated": updated,
-        "subject_changes": subject_changes,
-        "students_changed": students_changed,
-        "conflicts": conflicts,
-        "conflict_count": len(conflicts),
         "sample": sample,
         "message": f"Imported {created + updated} student(s) from the {program.code} monitoring sheet "
-                   f"({created} new, {updated} matched, {subject_changes} subject change(s), {len(conflicts)} conflict(s)).",
+                   f"({created} new, {updated} updated).",
     }
 
 
@@ -2858,7 +2180,6 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     if dean_action == "Approve":
         student.current_stage = "LOA"
         student.standing = "On Leave"
-        student.enrollment_tag = "LOA"
         student.risk_level = "Medium"
         result = "LOA approved; student status set to On Leave"
         if period:
@@ -2921,7 +2242,6 @@ def handle_readmission(data: MultiDict) -> int:
         if student.current_stage == "LOA":
             student.current_stage = "Coursework"
         student.standing = "Active"
-        student.enrollment_tag = "Enrolled"
         student.risk_level = "Low"
         result = "Readmission approved; student status set to Active"
         if target_return_term:
@@ -3481,36 +2801,18 @@ def compute_course_audit(student: Student) -> dict:
     missing = []
     incomplete = []
 
-    total_units = 0
-    completed_units = 0
-    by_category: dict[str, dict] = {}
-
     for course in required_courses:
         record = records.get(course.id)
         status = record.status if record else "Missing"
         row = {"course": course, "record": record, "status": status}
-        units = course.units or 3
-        category = course.category or "Core"
-        cat = by_category.setdefault(category, {"category": category, "total_count": 0, "completed_count": 0, "total_units": 0, "completed_units": 0})
-        cat["total_count"] += 1
-        cat["total_units"] += units
-        total_units += units
         if status == "Completed":
             completed.append(row)
-            completed_units += units
-            cat["completed_count"] += 1
-            cat["completed_units"] += units
         elif status in ["Current", "Enrolled"]:
             current.append(row)
         elif status in ["Incomplete", "Dropped"]:
             incomplete.append(row)
         else:
             missing.append(row)
-
-    # Eligibility is unit-driven (per AC notes): comprehensive, final proposal, and
-    # the thesis milestones all require the curriculum's total units to be completed.
-    units_complete = total_units > 0 and completed_units >= total_units
-    cat_order = ["Basic", "Major", "Cognate", "Core", "Comprehensive"]
 
     return {
         "required_count": len(required_courses),
@@ -3520,149 +2822,6 @@ def compute_course_audit(student: Student) -> dict:
         "incomplete": incomplete,
         "missing_count": len(missing) + len(incomplete),
         "completion_rate": round((len(completed) / len(required_courses)) * 100, 1) if required_courses else 0,
-        "total_units": total_units,
-        "completed_units": completed_units,
-        "units_rate": round((completed_units / total_units) * 100, 1) if total_units else 0,
-        "by_category": sorted(by_category.values(), key=lambda c: cat_order.index(c["category"]) if c["category"] in cat_order else 99),
-        "eligibility": {
-            "units_complete": units_complete,
-            "completed_units": completed_units,
-            "total_units": total_units,
-            "comprehensive": units_complete,
-            "final_proposal": units_complete,
-            "thesis": units_complete,
-        },
-    }
-
-
-def curriculum_planning_payload(program: Program) -> dict:
-    courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
-    students = Student.query.filter_by(program_id=program.id).order_by(Student.last_name, Student.first_name).all()
-    rows = []
-    active_count = 0
-    delayed_count = 0
-    loa_count = 0
-    generated_count = 0
-    for student in students:
-        if student.standing == "Active":
-            active_count += 1
-        if student.standing == "On Leave":
-            loa_count += 1
-        if student.risk_level in ("Medium", "High") or student.current_stage == "LOA":
-            delayed_count += 1
-        record_count = CourseRecord.query.filter_by(student_id=student.id).count()
-        missing_rows = max(len(courses) - record_count, 0)
-        if missing_rows == 0 and courses:
-            generated_count += 1
-        rows.append({
-            **student_brief(student),
-            "curriculum_rows": record_count,
-            "required_subjects": len(courses),
-            "missing_curriculum_rows": missing_rows,
-            "curriculum_status": "Generated" if missing_rows == 0 and courses else "Needs generation",
-        })
-
-    grouped: dict[str, list] = {}
-    for course in courses:
-        grouped.setdefault(course.category or "Core", []).append({
-            "id": course.id,
-            "code": course.code,
-            "title": course.title,
-            "units": course.units,
-            "recommended_term": course.recommended_term,
-        })
-
-    return {
-        "program": program_dict(program),
-        "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
-        "summary": {
-            "students": len(students),
-            "active": active_count,
-            "delayed_or_loa": delayed_count + loa_count,
-            "curriculum_generated": generated_count,
-            "needs_generation": max(len(students) - generated_count, 0),
-            "subjects": len(courses),
-        },
-        "categories": [{"name": name, "courses": grouped[name]} for name in sorted(grouped)],
-        "students": rows[:150],
-    }
-
-
-def course_demand_rows(program: Program) -> list[dict]:
-    # Subject demand counts only currently ENROLLED students who have not yet taken
-    # the subject (LOA / AWOL / Completed are excluded), per the AC's process.
-    demand: dict[int, dict] = {}
-    students = (
-        Student.query.filter_by(program_id=program.id, enrollment_tag="Enrolled")
-        .order_by(Student.last_name)
-        .all()
-    )
-    available_faculty = Faculty.query.filter_by(college=program.college, active=True).count()
-    future_slots = (
-        db.session.query(FacultyAvailability.faculty_id)
-        .join(Faculty, Faculty.id == FacultyAvailability.faculty_id)
-        .filter(Faculty.college == program.college, FacultyAvailability.available_date >= date.today())
-        .distinct()
-        .count()
-    )
-    availability_count = max(available_faculty, future_slots)
-    for student in students:
-        audit = compute_course_audit(student)
-        for item in audit["missing"] + audit["incomplete"]:
-            course = item["course"]
-            if course.id not in demand:
-                demand[course.id] = {"course": course, "students": []}
-            demand[course.id]["students"].append(student)
-
-    rows = []
-    for item in demand.values():
-        count = len(item["students"])
-        suggested_sections = max(1, (count + 24) // 25)
-        if count >= 15:
-            recommendation = "Offer this term"
-            priority = "High"
-        elif count >= 5:
-            recommendation = "Review section feasibility"
-            priority = "Medium"
-        else:
-            recommendation = "Monitor demand"
-            priority = "Low"
-        rows.append({
-            "course": {
-                "id": item["course"].id,
-                "code": item["course"].code,
-                "title": item["course"].title,
-                "category": item["course"].category,
-            },
-            "demand_count": count,
-            "student_sample": [student_brief(s) for s in item["students"][:5]],
-            "suggested_sections": suggested_sections,
-            "availability_count": availability_count,
-            "priority": priority,
-            "recommendation": recommendation,
-        })
-    rows.sort(key=lambda row: (-row["demand_count"], row["course"]["code"]))
-    return rows[:20]
-
-
-def course_adjustments_payload(program: Program) -> dict:
-    demand = course_demand_rows(program)
-    latest_plan = (
-        CourseOfferingPlan.query.filter_by(program_id=program.id)
-        .order_by(CourseOfferingPlan.updated_at.desc())
-        .first()
-    )
-    return {
-        "program": program_dict(program),
-        "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
-        "summary": {
-            "demand_subjects": len(demand),
-            "total_demand": sum(row["demand_count"] for row in demand),
-            "high_priority": sum(1 for row in demand if row["priority"] == "High"),
-            "suggested_sections": sum(row["suggested_sections"] for row in demand),
-        },
-        "demand": demand,
-        "latest_plan": course_offering_plan_dict(latest_plan),
     }
 
 
@@ -3670,7 +2829,7 @@ def compute_offering_demand() -> list[dict]:
     # Planning helper: counts which missing subjects appear most often among
     # active students, useful for course offering discussions.
     demand: dict[int, dict] = {}
-    students = Student.query.filter(Student.enrollment_tag == "Enrolled").limit(500).all()
+    students = Student.query.filter(Student.standing == "Active").limit(500).all()
     for student in students:
         audit = compute_course_audit(student)
         for row in audit["missing"][:4]:
@@ -3877,15 +3036,6 @@ def seed_database(count: int = 350) -> None:
         stage = random.choice(stage_weights)
         risk = "High" if idx % 17 == 0 else "Medium" if idx % 5 == 0 or stage == "LOA" else "Low"
         standing = "On Leave" if stage == "LOA" else "Completed" if stage == "Completed" else "Active"
-        # Current-term enrollment tag: LOA on leave, a few AWOL, graduated = Completed, else Enrolled.
-        if stage == "LOA":
-            enrollment_tag = "LOA"
-        elif stage == "Completed":
-            enrollment_tag = "Completed"
-        elif idx % 23 == 0:
-            enrollment_tag = "AWOL"
-        else:
-            enrollment_tag = "Enrolled"
         first_name, last_name = name_pairs[idx - 1]
         student = Student(
             student_number=f"GS-2026-{idx:04d}",
@@ -3896,7 +3046,6 @@ def seed_database(count: int = 350) -> None:
             entry_year=2022 + (idx % 5),
             current_stage=stage,
             standing=standing,
-            enrollment_tag=enrollment_tag,
             risk_level=risk,
             adviser_name=random.choice(faculty_list).name,
         )
@@ -4085,4 +3234,3 @@ if __name__ == "__main__":
     port = int(os.getenv("FLASK_PORT", "5000"))
     print(f"USLS Graduate School platform running at http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
-

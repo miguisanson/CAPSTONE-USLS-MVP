@@ -229,7 +229,12 @@ export default function MonitoringGrid() {
                       >
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold text-ink">{s.name}</span>
-                          <span className="block text-[10px] text-slate-400">{s.student_number} · Y{s.entry_year}</span>
+                          <span className="mt-0.5 flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-400">{s.student_number} · Y{s.entry_year}</span>
+                            {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
+                              <StatusBadge value={s.enrollment_tag} dot={false} />
+                            )}
+                          </span>
                         </span>
                         <StatusBadge value={s.risk} dot={false} />
                       </button>
@@ -264,9 +269,14 @@ export default function MonitoringGrid() {
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                           <div className="h-full rounded-full bg-brand-500" style={{ width: `${s.rate}%` }} />
                         </div>
-                        <span className="w-12 shrink-0 text-right text-[11px] font-semibold text-slate-500">
-                          {s.completed}/{s.total}
+                        <span className="w-20 shrink-0 text-right text-[11px] font-semibold text-slate-500">
+                          {s.completed}/{s.total} · {s.completed_units}/{s.total_units}u
                         </span>
+                        {s.eligible && (
+                          <span title="All units complete — eligible for comprehensive/final" className="shrink-0 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">
+                            ✓ units
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

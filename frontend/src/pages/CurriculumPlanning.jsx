@@ -93,19 +93,21 @@ export default function CurriculumPlanning() {
           <Card className="p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-ink">Generate curriculum plan</h2>
+                <h2 className="text-lg font-semibold text-ink">Set up student subject checklists</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Creates missing subject rows from the selected program curriculum for active students. Existing audit rows are kept.
+                  Gives each active student the program's full subject list (as “not taken”) so their course audit and the
+                  Monitoring Sheet are complete and ready to mark. It only adds what's missing — nothing already recorded is changed.
+                  The Academic Coordinator stays in control; this just prepares the checklist.
                 </p>
               </div>
               <button type="button" onClick={generate} disabled={busy} className="btn-primary">
                 {busy ? (
                   <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Generating...
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Setting up...
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="h-4 w-4" /> Generate missing rows
+                    <RefreshCw className="h-4 w-4" /> Set up checklists
                   </>
                 )}
               </button>
@@ -115,21 +117,35 @@ export default function CurriculumPlanning() {
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
             <Card className="p-5 lg:col-span-4">
-              <h2 className="mb-3 text-lg font-semibold text-ink">Curriculum subjects</h2>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-ink">Curriculum subjects</h2>
+                <span className="rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
+                  {data.categories.reduce((t, c) => t + c.courses.reduce((u, x) => u + (x.units || 0), 0), 0)} total units
+                </span>
+              </div>
               <div className="space-y-4">
-                {data.categories.map((cat) => (
-                  <div key={cat.name}>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{cat.name}</p>
-                    <ul className="space-y-1.5">
-                      {cat.courses.map((course) => (
-                        <li key={course.id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm">
-                          <span className="font-semibold text-ink">{course.code}</span>
-                          <span className="ml-1 text-slate-500">{course.title}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                {data.categories.map((cat) => {
+                  const catUnits = cat.courses.reduce((u, x) => u + (x.units || 0), 0);
+                  return (
+                    <div key={cat.name}>
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{cat.name}</p>
+                        <span className="text-xs font-semibold text-slate-500">{cat.courses.length} subj · {catUnits}u</span>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {cat.courses.map((course) => (
+                          <li key={course.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                            <span className="min-w-0">
+                              <span className="font-semibold text-ink">{course.code}</span>
+                              <span className="ml-1 text-slate-500">{course.title}</span>
+                            </span>
+                            <span className="ml-2 shrink-0 text-xs font-semibold text-slate-400">{course.units}u</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
 
