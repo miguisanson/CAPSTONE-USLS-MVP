@@ -23,6 +23,7 @@ import {
   MapPin,
   RotateCcw,
   UserRoundCheck,
+  Trash2,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -246,6 +247,22 @@ function HandoffImport({ context }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const [resetting, setResetting] = useState(false);
+
+  async function resetUploaded() {
+    if (!window.confirm("Remove all students/subjects that were brought in by sheet uploads? Seeded demo students are kept.")) return;
+    setResetting(true);
+    setError("");
+    setResult(null);
+    try {
+      const res = await api.resetUploadedData();
+      setResult({ ...res, sample: [] });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setResetting(false);
+    }
+  }
 
   function pick(f) {
     if (!f) return;
@@ -344,17 +361,30 @@ function HandoffImport({ context }) {
 
       <ErrorNote message={error} />
 
-      <button type="button" onClick={runImport} disabled={!file || busy} className="btn-primary w-full sm:w-auto">
-        {busy ? (
-          <>
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Importing…
-          </>
-        ) : (
-          <>
-            <UploadCloud className="h-4 w-4" /> {isAudit ? "Update audits" : "Import students"}
-          </>
-        )}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={runImport} disabled={!file || busy} className="btn-primary w-full sm:w-auto">
+          {busy ? (
+            <>
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Importing…
+            </>
+          ) : (
+            <>
+              <UploadCloud className="h-4 w-4" /> {isAudit ? "Update audits" : "Import students"}
+            </>
+          )}
+        </button>
+        <button type="button" onClick={resetUploaded} disabled={resetting || busy} className="btn-ghost text-red-600">
+          {resetting ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-red-500" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+          Reset uploaded data
+        </button>
+      </div>
+      <p className="text-xs text-slate-400">
+        “Reset uploaded data” removes students/subjects added by sheet uploads so you can re-test the import. Seeded demo students are kept.
+      </p>
 
       {result && (
         <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/50 p-5 animate-fade-up">

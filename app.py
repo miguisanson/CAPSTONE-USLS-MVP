@@ -289,7 +289,9 @@ class CourseOfferingPlan(db.Model):
     notes = db.Column(db.String(260))
     created_at = db.Column(db.DateTime, default=now_utc)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+    submitted_at = db.Column(db.DateTime)
     approved_at = db.Column(db.DateTime)
+    approved_by = db.Column(db.String(120))  # the account that approved (by role, not hardcoded)
     published_at = db.Column(db.DateTime)
 
     program = db.relationship("Program")
@@ -610,7 +612,9 @@ def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
         "notes": plan.notes,
         "created_at": iso(plan.created_at),
         "updated_at": iso(plan.updated_at),
+        "submitted_at": iso(plan.submitted_at),
         "approved_at": iso(plan.approved_at),
+        "approved_by": plan.approved_by,
         "published_at": iso(plan.published_at),
         "offerings": [course_offering_dict(o) for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
     }
@@ -671,14 +675,17 @@ def current_account() -> UserAccount | None:
     return account
 
 
-def require_api_login(role: str | None = None):
+def require_api_login(*roles):
+    # Pass one or more roles; empty means "any signed-in account".
+    allowed = {r for r in roles if r}
+
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             account = current_account()
             if not account:
                 return jsonify({"error": "Please sign in to continue."}), 401
-            if role and account.role != role:
+            if allowed and account.role not in allowed:
                 return jsonify({"error": "This account cannot access that area."}), 403
             return fn(*args, **kwargs)
 
@@ -1174,8 +1181,8 @@ def register_routes(app: Flask) -> None:
         role = (body.get("role") or "").strip().lower()
         email = (body.get("email") or "").strip().lower()
         password = body.get("password") or ""
-        if role not in ["staff", "student"]:
-            return jsonify({"error": "Choose Staff or Student to sign in."}), 400
+        if role not in ["staff", "student", "dean"]:
+            return jsonify({"error": "Choose an account type to sign in."}), 400
         account = UserAccount.query.filter_by(email=email, role=role, active=True).first()
         if not account or not check_password_hash(account.password_hash, password):
             return jsonify({"error": "Invalid email, password, or account type."}), 401
@@ -1735,22 +1742,20 @@ def register_routes(app: Flask) -> None:
                         )
                     )
                 result = "Draft offering plan generated from demand"
-        elif action == "review":
+        elif action == "submit":
             if not plan:
-                return jsonify({"error": "Create a draft offering plan first."}), 400
-            plan.status = "For Dean Review"
+                return jsonify({"error": "Save a draft offering plan first."}), 400
+            if plan.status not in ("Draft", "Returned"):
+                return jsonify({"error": "Only a draft can be submitted for approval."}), 400
+            plan.status = "Submitted"
+            plan.submitted_at = now_utc()
             plan.notes = data.get("notes") or plan.notes
-            result = "Offering plan sent for Dean review"
-        elif action == "approve":
-            if not plan:
-                return jsonify({"error": "Create a draft offering plan first."}), 400
-            plan.status = "Approved"
-            plan.approved_at = now_utc()
-            plan.notes = data.get("notes") or plan.notes
-            result = "Offering plan approved"
+            result = "Offering plan submitted for Dean approval"
         elif action == "publish":
             if not plan:
-                return jsonify({"error": "Create a draft offering plan first."}), 400
+                return jsonify({"error": "Save a draft offering plan first."}), 400
+            if plan.status != "Approved":
+                return jsonify({"error": "Only a Dean-approved plan can be published."}), 400
             plan.status = "Published"
             plan.published_at = now_utc()
             plan.notes = data.get("notes") or plan.notes
@@ -1773,6 +1778,56 @@ def register_routes(app: Flask) -> None:
             "message": f"{result} for {program.code} ({term_label}).",
             "data": course_adjustments_payload(program),
         })
+
+    # ---- Approvals inbox (Dean acts here from their own account) ----------
+    @app.route("/api/approvals")
+    @require_api_login("dean")
+    def approvals_list():
+        pending = (
+            CourseOfferingPlan.query.filter_by(status="Submitted")
+            .order_by(CourseOfferingPlan.submitted_at.asc())
+            .all()
+        )
+        recent = (
+            CourseOfferingPlan.query.filter(CourseOfferingPlan.status.in_(["Approved", "Published", "Returned"]))
+            .order_by(CourseOfferingPlan.updated_at.desc())
+            .limit(10)
+            .all()
+        )
+        return jsonify({
+            "pending": [course_offering_plan_dict(p) for p in pending],
+            "recent": [course_offering_plan_dict(p) for p in recent],
+        })
+
+    @app.route("/api/approvals/<int:plan_id>/decide", methods=["POST"])
+    @require_api_login("dean")
+    def approvals_decide(plan_id: int):
+        account = current_account()
+        plan = CourseOfferingPlan.query.get_or_404(plan_id)
+        if plan.status != "Submitted":
+            return jsonify({"error": "This plan is not awaiting approval."}), 400
+        data = request.get_json(silent=True) or {}
+        decision = (data.get("decision") or "").lower()
+        note = (data.get("note") or "").strip()
+        if decision == "approve":
+            plan.status = "Approved"
+            plan.approved_at = now_utc()
+            plan.approved_by = account.full_name
+            result = "Offering plan approved by Dean"
+            next_owner = "Graduate School Staff"
+        elif decision in ("return", "reject"):
+            plan.status = "Returned"
+            result = "Offering plan returned by Dean for revision"
+            next_owner = "Academic Coordinator"
+        else:
+            return jsonify({"error": "Decision must be 'approve' or 'return'."}), 400
+        if note:
+            plan.notes = note
+        plan.updated_at = now_utc()
+        add_log("course-adjustments", None, f"Dean · {account.full_name}", "Approvals",
+                f"{result}: {plan.program.code} {plan.term_label}", next_owner, note or plan.notes or "")
+        db.session.commit()
+        return jsonify({"ok": True, "message": result})
 
     # ---- Course Audit (end-of-term, per-subject roster) ------------------
     @app.route("/api/course-audit/subjects")
@@ -1890,6 +1945,32 @@ def register_routes(app: Flask) -> None:
         return jsonify({
             "ok": True, "course": course.code, "updated": changed,
             "message": f"Saved {course.code} audit — {changed} student record(s) updated.",
+        })
+
+    # ---- Reset uploaded monitoring data (so the Excel upload can be re-tested) ----
+    @app.route("/api/admin/reset-uploaded-data", methods=["POST"])
+    @require_api_login("staff")
+    def reset_uploaded_data():
+        # Remove students brought in via a monitoring-sheet upload (and the subjects
+        # those uploads created). Seeded demo students (GS-2026-*) are kept.
+        imported = Student.query.filter(~Student.student_number.like("GS-2026-%")).all()
+        ids = [s.id for s in imported]
+        if ids:
+            PanelAssignment.query.filter(PanelAssignment.student_id.in_(ids)).delete(synchronize_session=False)
+            ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(ids)).delete(synchronize_session=False)
+            for student in imported:
+                db.session.delete(student)  # cascades course records, docs, tasks, logs
+        removed_courses = 0
+        for course in Course.query.filter(Course.category.in_(["Basic", "Major", "Cognate", "Comprehensive"])).all():
+            if CourseRecord.query.filter_by(course_id=course.id).count() == 0:
+                db.session.delete(course)
+                removed_courses += 1
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "students_removed": len(ids),
+            "courses_removed": removed_courses,
+            "message": f"Removed {len(ids)} uploaded student(s) and {removed_courses} imported subject(s). Seeded demo data was kept.",
         })
 
     # ---- Monitoring grid (spreadsheet view, one program at a time) -------
@@ -4037,6 +4118,20 @@ def ensure_demo_accounts() -> None:
             )
         )
 
+    # Dean account — the approver role. Approval authority follows whoever holds
+    # this role, so changing the Dean is an account change, not a code change.
+    dean = UserAccount.query.filter_by(email="dean@gs.local").first()
+    if not dean:
+        db.session.add(
+            UserAccount(
+                email="dean@gs.local",
+                full_name="Graduate School Dean Demo",
+                password_hash=generate_password_hash("DemoPass123!"),
+                role="dean",
+                active=True,
+            )
+        )
+
     linked_student = Student.query.order_by(Student.student_number.asc()).first()
     if linked_student:
         demo_missing = DocumentCheck.query.filter_by(
@@ -4071,7 +4166,9 @@ if __name__ == "__main__":
         seed_count = int(os.getenv("DEMO_SEED_COUNT", "350"))
         if "--seed" in sys.argv:
             seed_database(seed_count)
-            print(f"Seeded {seed_count} students plus supporting workflow data.")
+            ensure_demo_accounts()
+            db.session.commit()
+            print(f"Seeded {seed_count} students plus supporting workflow data and demo accounts.")
             raise SystemExit(0)
         if Student.query.count() == 0:
             seed_database(seed_count)

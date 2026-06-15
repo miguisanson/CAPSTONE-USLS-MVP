@@ -40,6 +40,8 @@ const STATUS_STYLES = {
   "Needs generation": "bg-amber-50 text-amber-700 ring-amber-200",
   Draft: "bg-slate-100 text-slate-700 ring-slate-200",
   "For Dean Review": "bg-amber-50 text-amber-700 ring-amber-200",
+  Submitted: "bg-amber-50 text-amber-700 ring-amber-200",
+  Returned: "bg-red-50 text-red-700 ring-red-200",
   Approved: "bg-blue-50 text-blue-700 ring-blue-200",
   Published: "bg-brand-50 text-brand-700 ring-brand-200",
   Suggested: "bg-blue-50 text-blue-700 ring-blue-200",

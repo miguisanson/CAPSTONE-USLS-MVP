@@ -68,6 +68,10 @@ export const api = {
     request("/curriculum-planning/generate", { method: "POST", body: JSON.stringify(payload) }),
   courseAdjustments: (programId) =>
     request(`/course-adjustments${programId ? `?program_id=${programId}` : ""}`),
+  resetUploadedData: () => request("/admin/reset-uploaded-data", { method: "POST", body: JSON.stringify({}) }),
+  approvals: () => request("/approvals"),
+  decideApproval: (planId, payload) =>
+    request(`/approvals/${planId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
   saveCourseAdjustmentPlan: (payload) =>
     request("/course-adjustments/plan", { method: "POST", body: JSON.stringify(payload) }),
   courseAuditSubjects: (programId) =>

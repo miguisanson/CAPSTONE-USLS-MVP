@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, GraduationCap, LockKeyhole, UserCog, UserRound } from "lucide-react";
+import { Eye, EyeOff, GraduationCap, LockKeyhole, UserCog, UserRound, Gavel } from "lucide-react";
 import { useAuth } from "../auth";
 import { ErrorNote } from "../components/ui";
 
 const DEMO = {
   staff: { email: "staff@gs.local", password: "DemoPass123!" },
+  dean: { email: "dean@gs.local", password: "DemoPass123!" },
   student: { email: "student@gs.local", password: "DemoPass123!" },
 };
+
+const HOME = { staff: "/", dean: "/approvals", student: "/student" };
+const LABEL = { staff: "Staff", dean: "Dean", student: "Student" };
 
 export default function Login() {
   const { user, login, loading, error } = useAuth();
@@ -22,15 +26,14 @@ export default function Login() {
     setLocalError("");
   }, [role]);
 
-  if (user?.role === "staff") return <Navigate to="/" replace />;
-  if (user?.role === "student") return <Navigate to="/student" replace />;
+  if (user?.role) return <Navigate to={HOME[user.role] || "/"} replace />;
 
   async function onSubmit(e) {
     e.preventDefault();
     setLocalError("");
     try {
       const signedIn = await login({ role, ...form });
-      navigate(signedIn.role === "student" ? "/student" : "/", { replace: true });
+      navigate(HOME[signedIn.role] || "/", { replace: true });
     } catch {
       setLocalError("Login failed. Check the account type, email, and password.");
     }
@@ -60,8 +63,9 @@ export default function Login() {
             <p className="mt-1 text-sm text-slate-500">Accounts are created by the Graduate School office.</p>
           </div>
 
-          <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+          <div className="mb-5 grid grid-cols-3 gap-2 rounded-xl bg-slate-100 p-1">
             <ModeButton active={role === "staff"} icon={UserCog} label="Staff" onClick={() => setRole("staff")} />
+            <ModeButton active={role === "dean"} icon={Gavel} label="Dean" onClick={() => setRole("dean")} />
             <ModeButton active={role === "student"} icon={UserRound} label="Student" onClick={() => setRole("student")} />
           </div>
 
@@ -106,7 +110,7 @@ export default function Login() {
                 </>
               ) : (
                 <>
-                  <LockKeyhole className="h-4 w-4" /> Sign in as {role === "staff" ? "Staff" : "Student"}
+                  <LockKeyhole className="h-4 w-4" /> Sign in as {LABEL[role] || "Staff"}
                 </>
               )}
             </button>

@@ -20,58 +20,53 @@ import {
   Table2,
   BookOpenCheck,
   SlidersHorizontal,
+  UsersRound,
   LogOut,
 } from "lucide-react";
 import { useAuth } from "../auth";
 
-const ICONS = {
-  "user-plus": UserPlus,
-  "calendar-off": CalendarOff,
-  "user-check": UserCheck,
-  "clipboard-check": ClipboardCheck,
-  "file-check": FileCheck,
-  users: Users,
-  "calendar-check": CalendarCheck,
-};
-
+// Ordered top-to-bottom to follow the graduate lifecycle, so a new staff user
+// moves down the list step by step instead of hunting between pages.
 const NAV_GROUPS = [
   {
     label: "Overview",
     items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }],
   },
   {
-    label: "Monitoring",
+    label: "Records",
     items: [
       { to: "/students", label: "Students", icon: Users },
       { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
+    ],
+  },
+  {
+    label: "Lifecycle workflows",
+    items: [
+      { to: "/workflow/student-handoff", label: "1 · Student Handoff", icon: UserPlus },
+      { to: "/curriculum-planning", label: "2 · Curriculum Planning", icon: BookOpenCheck },
+      { to: "/course-adjustments", label: "3 · Course Adjustments", icon: SlidersHorizontal },
+      { to: "/workflow/course-audit", label: "4 · Course Audit", icon: ClipboardCheck },
+      { to: "/workflow/research-gate", label: "5 · Research Gate", icon: FileCheck },
+      { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
+      { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
+    ],
+  },
+  {
+    label: "Standing changes",
+    items: [
+      { to: "/workflow/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
+      { to: "/workflow/readmission", label: "Readmission", icon: UserCheck },
+    ],
+  },
+  {
+    label: "Monitoring & support",
+    items: [
       { to: "/work-queue", label: "Work Queue", icon: ListTodo },
       { to: "/activity", label: "Activity Log", icon: Activity },
-    ],
-  },
-  {
-    label: "Planning",
-    items: [
-      { to: "/curriculum-planning", label: "Curriculum Planning", icon: BookOpenCheck },
-      { to: "/course-adjustments", label: "Course Adjustments", icon: SlidersHorizontal },
-    ],
-  },
-  {
-    label: "Decision Support",
-    items: [
       { to: "/decision-support", label: "Recommendations", icon: Lightbulb },
       { to: "/assistant", label: "Policy Assistant", icon: Bot },
     ],
   },
-];
-
-const WORKFLOWS = [
-  { slug: "student-handoff", label: "Student Handoff", icon: "user-plus" },
-  { slug: "leave-of-absence", label: "Leave of Absence", icon: "calendar-off" },
-  { slug: "readmission", label: "Readmission", icon: "user-check" },
-  { slug: "course-audit", label: "Course Audit", icon: "clipboard-check" },
-  { slug: "research-gate", label: "Research Gate", icon: "file-check" },
-  { slug: "panel-matching", label: "Panel Matching", icon: "users" },
-  { slug: "defense-scheduling", label: "Defense Scheduling", icon: "calendar-check" },
 ];
 
 function NavItem({ to, label, icon: Icon, end, onClick }) {
@@ -118,32 +113,6 @@ function SidebarContent({ onNavigate }) {
             </div>
           </div>
         ))}
-
-        <div>
-          <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Workflows</p>
-          <div className="space-y-1">
-            {WORKFLOWS.map((wf) => {
-              const Icon = ICONS[wf.icon] || FileCheck;
-              return (
-                <NavLink
-                  key={wf.slug}
-                  to={`/workflow/${wf.slug}`}
-                  onClick={onNavigate}
-                  className={({ isActive }) =>
-                    `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors duration-200 cursor-pointer ${
-                      isActive
-                        ? "bg-brand-600 text-white shadow-sm"
-                        : "text-slate-600 hover:bg-brand-50 hover:text-brand-700"
-                    }`
-                  }
-                >
-                  <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-                  <span>{wf.label}</span>
-                </NavLink>
-              );
-            })}
-          </div>
-        </div>
       </nav>
 
       <div className="border-t border-slate-200 px-5 py-4">

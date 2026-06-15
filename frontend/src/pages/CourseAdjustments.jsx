@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, ClipboardList, FileCheck2, Send, Settings2
 import { api } from "../api";
 import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
 
-const STEPS = ["Draft", "For Dean Review", "Approved", "Published"];
+const STEPS = ["Draft", "Submitted", "Approved", "Published"];
 
 export default function CourseAdjustments() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,23 +139,21 @@ export default function CourseAdjustments() {
             <div className="flex flex-col gap-3 rounded-xl bg-slate-50/70 p-4 lg:flex-row lg:items-center lg:justify-between">
               <p className="text-sm text-slate-600">
                 {status === null && "No plan yet. Choose the subjects to offer below, then save the draft."}
-                {status === "Draft" && "Draft saved. Review the offer list, then send it to the Dean."}
-                {status === "For Dean Review" && "Waiting for the Dean. Record the Dean's approval when received."}
+                {status === "Draft" && "Draft saved. Review the offer list, then submit it for the Dean's approval."}
+                {status === "Returned" && "The Dean returned this for revision. Adjust the offer list and re-submit."}
+                {status === "Submitted" && "Submitted — waiting for the Dean to approve it from their own account. You can't approve your own plan."}
                 {status === "Approved" && "Approved by the Dean. Publish to finalise the offerings for the term."}
                 {status === "Published" && "Published. These are the final offerings for the term."}
               </p>
               <div className="flex flex-wrap gap-2">
                 <ActionButton busy={busy === "draft"} onClick={() => planAction("draft")} icon={Settings2}
-                  disabled={!(status === null || status === "Draft")} primary={status === null || status === "Draft"}>
-                  {status === "Draft" ? "Update draft" : "Save draft"} ({offeredCount} offered)
+                  disabled={!(status === null || status === "Draft" || status === "Returned")}
+                  primary={status === null || status === "Draft" || status === "Returned"}>
+                  {status === "Draft" || status === "Returned" ? "Update draft" : "Save draft"} ({offeredCount} offered)
                 </ActionButton>
-                <ActionButton busy={busy === "review"} onClick={() => planAction("review")} icon={Send}
-                  disabled={status !== "Draft"} primary={status === "Draft"}>
-                  Send to Dean
-                </ActionButton>
-                <ActionButton busy={busy === "approve"} onClick={() => planAction("approve")} icon={FileCheck2}
-                  disabled={status !== "For Dean Review"} primary={status === "For Dean Review"}>
-                  Record Dean approval
+                <ActionButton busy={busy === "submit"} onClick={() => planAction("submit")} icon={Send}
+                  disabled={!(status === "Draft" || status === "Returned")} primary={status === "Draft" || status === "Returned"}>
+                  Submit for approval
                 </ActionButton>
                 <ActionButton busy={busy === "publish"} onClick={() => planAction("publish")} icon={CheckCircle2}
                   disabled={status !== "Approved"} primary={status === "Approved"}>

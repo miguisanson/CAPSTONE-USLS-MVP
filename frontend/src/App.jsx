@@ -14,7 +14,16 @@ import CourseAdjustments from "./pages/CourseAdjustments";
 import DecisionSupport from "./pages/DecisionSupport";
 import Assistant from "./pages/Assistant";
 import StudentPortal from "./pages/StudentPortal";
+import DeanApprovals from "./pages/DeanApprovals";
 import Login from "./pages/Login";
+
+// Where each role lands by default.
+function homeFor(user) {
+  if (!user) return "/login";
+  if (user.role === "student") return "/student";
+  if (user.role === "dean") return "/approvals";
+  return "/";
+}
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -26,9 +35,17 @@ export default function App() {
       <Route
         path="/student"
         element={
-          <StudentOnly user={user}>
+          <RoleOnly user={user} role="student">
             <StudentPortal />
-          </StudentOnly>
+          </RoleOnly>
+        }
+      />
+      <Route
+        path="/approvals"
+        element={
+          <RoleOnly user={user} role="dean">
+            <DeanApprovals />
+          </RoleOnly>
         }
       />
       <Route
@@ -60,12 +77,13 @@ export default function App() {
 
 function StaffOnly({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== "staff") return <Navigate to="/student" replace />;
+  if (user.role !== "staff") return <Navigate to={homeFor(user)} replace />;
   return children;
 }
 
-function StudentOnly({ user, children }) {
+// Generic single-role guard; sends anyone else to their own home.
+function RoleOnly({ user, role, children }) {
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== "student") return <Navigate to="/" replace />;
+  if (user.role !== role) return <Navigate to={homeFor(user)} replace />;
   return children;
 }
