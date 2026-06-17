@@ -29,6 +29,22 @@ export default function DeanApprovals() {
     }
   }
 
+  async function decideWorkflow(item, decision) {
+    const key = `${item.type}-${item.id}`;
+    setBusy(key);
+    setMsg("");
+    setActErr("");
+    try {
+      const res = await api.decideWorkflowApproval(item.type, item.id, { decision, note: note[key] || "" });
+      setMsg(res.message);
+      refetch();
+    } catch (e) {
+      setActErr(e.message);
+    } finally {
+      setBusy(0);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-canvas">
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
@@ -67,9 +83,9 @@ export default function DeanApprovals() {
           <EmptyState icon={AlertTriangle} title="Could not load approvals" hint={error} />
         ) : (
           <>
-            {data.pending.length === 0 ? (
+            {data.pending.length === 0 && (data.workflow_pending || []).length === 0 ? (
               <Card className="p-6">
-                <EmptyState icon={Inbox} title="Nothing to approve right now" hint="Submitted course-offering plans will appear here." />
+                <EmptyState icon={Inbox} title="Nothing to approve right now" hint="Submitted course plans, withdrawals, practicum reports, and graduation endorsements will appear here." />
               </Card>
             ) : (
               <div className="space-y-4">
@@ -132,6 +148,16 @@ export default function DeanApprovals() {
                     </Card>
                   );
                 })}
+                {(data.workflow_pending || []).map((item) => (
+                  <WorkflowApprovalCard
+                    key={`${item.type}-${item.id}`}
+                    item={item}
+                    note={note}
+                    setNote={setNote}
+                    busy={busy}
+                    onDecide={decideWorkflow}
+                  />
+                ))}
               </div>
             )}
 
@@ -153,9 +179,64 @@ export default function DeanApprovals() {
                 </ul>
               </Card>
             )}
+            {(data.workflow_recent || []).length > 0 && (
+              <Card className="mt-6 p-5">
+                <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <Clock className="h-3.5 w-3.5" /> Recent workflow decisions
+                </p>
+                <ul className="divide-y divide-slate-100">
+                  {data.workflow_recent.map((item) => (
+                    <li key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-3 py-2 text-sm">
+                      <span className="min-w-0 truncate text-slate-700">{item.title}</span>
+                      <StatusBadge value={item.status} dot={false} />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function WorkflowApprovalCard({ item, note, setNote, busy, onDecide }) {
+  const key = `${item.type}-${item.id}`;
+  const isBusy = busy === key;
+  const approveLabel = item.type === "practicum" ? "Mark reviewed" : item.type === "withdrawal" ? "Approve" : "Approve & send";
+  const returnLabel = item.type === "withdrawal" ? "Return" : "Return for revision";
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink">{item.title}</h2>
+          <p className="text-sm text-slate-500">{item.subtitle} · submitted {formatDate(item.submitted_at)}</p>
+        </div>
+        <StatusBadge value={item.status} dot={false} />
+      </div>
+      <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-600">
+        {item.details}
+      </p>
+      <input
+        value={note[key] || ""}
+        onChange={(e) => setNote((n) => ({ ...n, [key]: e.target.value }))}
+        placeholder="Optional note to Graduate School staff..."
+        className="field-input mt-3"
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" disabled={isBusy} onClick={() => onDecide(item, item.type === "practicum" ? "review" : "approve")} className="btn-primary">
+          <CheckCircle2 className="h-4 w-4" /> {approveLabel}
+        </button>
+        {item.type === "withdrawal" && (
+          <button type="button" disabled={isBusy} onClick={() => onDecide(item, "deny")} className="btn-ghost text-red-600">
+            <AlertTriangle className="h-4 w-4" /> Deny
+          </button>
+        )}
+        <button type="button" disabled={isBusy} onClick={() => onDecide(item, "return")} className="btn-ghost">
+          <RotateCcw className="h-4 w-4" /> {returnLabel}
+        </button>
+      </div>
+    </Card>
   );
 }

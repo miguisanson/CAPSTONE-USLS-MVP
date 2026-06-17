@@ -15,6 +15,7 @@ export default function Students() {
   const [debouncedQ, setDebouncedQ] = useState(q);
   const [stage, setStage] = useState(searchParams.get("stage") || "");
   const [risk, setRisk] = useState(searchParams.get("risk") || "");
+  const [standing, setStanding] = useState(searchParams.get("standing") || "");
   const [programId, setProgramId] = useState(searchParams.get("program_id") || "");
   const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
 
@@ -25,21 +26,22 @@ export default function Students() {
   }, [q]);
 
   // reset to page 1 when a filter changes
-  useEffect(() => setPage(1), [debouncedQ, stage, risk, programId]);
+  useEffect(() => setPage(1), [debouncedQ, stage, risk, standing, programId]);
 
   useEffect(() => {
     const params = {};
     if (debouncedQ) params.q = debouncedQ;
     if (stage) params.stage = stage;
     if (risk) params.risk = risk;
+    if (standing) params.standing = standing;
     if (programId) params.program_id = programId;
     if (page > 1) params.page = page;
     setSearchParams(params, { replace: true });
-  }, [debouncedQ, stage, risk, programId, page, setSearchParams]);
+  }, [debouncedQ, stage, risk, standing, programId, page, setSearchParams]);
 
   const { data, loading, error, refetch } = useApi(
-    () => api.students({ q: debouncedQ, stage, risk, program_id: programId, page, page_size: 25 }),
-    [debouncedQ, stage, risk, programId, page]
+    () => api.students({ q: debouncedQ, stage, risk, standing, program_id: programId, page, page_size: 25 }),
+    [debouncedQ, stage, risk, standing, programId, page]
   );
   const { data: duplicateData, loading: duplicatesLoading, refetch: refetchDuplicates } = useApi(
     () => api.duplicateStudents(),
@@ -65,8 +67,8 @@ export default function Students() {
   }
 
   const activeFilters = useMemo(
-    () => [debouncedQ, stage, risk, programId].filter(Boolean).length,
-    [debouncedQ, stage, risk, programId]
+    () => [debouncedQ, stage, risk, standing, programId].filter(Boolean).length,
+    [debouncedQ, stage, risk, standing, programId]
   );
 
   return (
@@ -89,9 +91,10 @@ export default function Students() {
               className="field-input pl-10"
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <Select label="Stage" value={stage} onChange={setStage} options={meta?.stages || []} />
-            <Select label="Risk" value={risk} onChange={setRisk} options={["Low", "Medium", "High"]} />
+            <Select label="Risk" value={risk} onChange={setRisk} options={["Low", "Medium", "High", "Medium/High"]} />
+            <Select label="Standing" value={standing} onChange={setStanding} options={["Active", "On Leave", "Withdrawn", "Completed"]} />
             <Select
               label="Program"
               value={programId}
@@ -107,6 +110,7 @@ export default function Students() {
               setQ("");
               setStage("");
               setRisk("");
+              setStanding("");
               setProgramId("");
             }}
             className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 cursor-pointer"
@@ -234,7 +238,7 @@ function DuplicateReview({ groups, loading, busy, message, onMerge }) {
         <div>
           <h2 className="text-lg font-semibold leading-tight text-ink">Duplicate review</h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            Review likely duplicate identities before they split the monitoring sheet and student directory.
+            Verify likely duplicate identities first. Existing verified profile values are kept unless overwrite is selected.
           </p>
         </div>
       </div>
@@ -263,7 +267,7 @@ function DuplicateReview({ groups, loading, busy, message, onMerge }) {
                           disabled={!!busy}
                           className="btn-ghost"
                         >
-                          <GitMerge className="h-4 w-4" /> Merge
+                          <GitMerge className="h-4 w-4" /> Merge · keep existing
                         </button>
                         <button
                           type="button"
@@ -271,7 +275,7 @@ function DuplicateReview({ groups, loading, busy, message, onMerge }) {
                           disabled={!!busy}
                           className="btn-primary"
                         >
-                          Use duplicate profile
+                          Overwrite after verification
                         </button>
                       </div>
                     )}
@@ -279,7 +283,7 @@ function DuplicateReview({ groups, loading, busy, message, onMerge }) {
                 ))}
               </div>
               {duplicates.length > 1 && (
-                <p className="mt-2 text-xs text-slate-400">Merge duplicates one at a time into the primary record.</p>
+                <p className="mt-2 text-xs text-slate-400">Merge duplicates one at a time into the primary record; verify first and keep existing values unless overwrite is intentional.</p>
               )}
             </div>
           );

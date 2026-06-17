@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -22,20 +23,21 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
+  FileText,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState } from "../components/ui";
 import { CHART_COLORS, RISK_COLORS, SCHEDULE_COLORS, formatDate, relativeDays } from "../lib/format";
 
-function Kpi({ icon: Icon, label, value, sub, tone = "brand" }) {
+function Kpi({ icon: Icon, label, value, sub, tone = "brand", to }) {
   const tones = {
     brand: "bg-brand-50 text-brand-700",
     amber: "bg-amber-50 text-amber-700",
     blue: "bg-blue-50 text-blue-700",
     red: "bg-red-50 text-red-700",
   };
-  return (
+  const content = (
     <Card className="p-5">
       <div className="flex items-start justify-between">
         <span className={`grid h-11 w-11 place-items-center rounded-xl ${tones[tone]}`}>
@@ -46,6 +48,12 @@ function Kpi({ icon: Icon, label, value, sub, tone = "brand" }) {
       <p className="mt-2 text-sm font-semibold text-slate-700">{label}</p>
       {sub && <p className="text-xs text-slate-500">{sub}</p>}
     </Card>
+  );
+  if (!to) return content;
+  return (
+    <Link to={to} className="block transition-colors hover:brightness-[0.99] cursor-pointer">
+      {content}
+    </Link>
   );
 }
 
@@ -68,8 +76,76 @@ const tooltipStyle = {
   fontSize: 13,
 };
 
+const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar", "Student"];
+
+function DashboardFilters({ filters, meta, onChange, onClear }) {
+  const active = Object.values(filters).filter(Boolean).length;
+  return (
+    <Card className="p-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+        <FilterSelect label="Program" value={filters.program_id} onChange={(value) => onChange("program_id", value)}>
+          <option value="">All programs</option>
+          {(meta?.programs || []).map((program) => (
+            <option key={program.id} value={program.id}>{program.code}</option>
+          ))}
+        </FilterSelect>
+        <FilterSelect label="Progress" value={filters.stage} onChange={(value) => onChange("stage", value)}>
+          <option value="">All stages</option>
+          {(meta?.stages || []).map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+        </FilterSelect>
+        <FilterSelect label="Risk" value={filters.risk} onChange={(value) => onChange("risk", value)}>
+          <option value="">All risk levels</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Medium/High">Medium/High</option>
+        </FilterSelect>
+        <FilterSelect label="Standing" value={filters.standing} onChange={(value) => onChange("standing", value)}>
+          <option value="">All standings</option>
+          {["Active", "On Leave", "Withdrawn", "Completed"].map((standing) => <option key={standing} value={standing}>{standing}</option>)}
+        </FilterSelect>
+        <FilterSelect label="Owner" value={filters.owner} onChange={(value) => onChange("owner", value)}>
+          <option value="">All owners</option>
+          {OWNERS.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+        </FilterSelect>
+      </div>
+      {active > 0 && (
+        <button type="button" onClick={onClear} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800">
+          Clear dashboard filters
+        </button>
+      )}
+    </Card>
+  );
+}
+
+function FilterSelect({ label, value, onChange, children }) {
+  return (
+    <label className="block">
+      <span className="field-label">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="field-input cursor-pointer">
+        {children}
+      </select>
+    </label>
+  );
+}
+
 export default function Dashboard() {
-  const { data, loading, error } = useApi(() => api.dashboard(), []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { data: meta } = useApi(() => api.meta(), []);
+  const filters = useMemo(
+    () => ({
+      program_id: searchParams.get("program_id") || "",
+      stage: searchParams.get("stage") || "",
+      risk: searchParams.get("risk") || "",
+      standing: searchParams.get("standing") || "",
+      owner: searchParams.get("owner") || "",
+    }),
+    [searchParams]
+  );
+  const { data, loading, error } = useApi(
+    () => api.dashboard(filters),
+    [filters.program_id, filters.stage, filters.risk, filters.standing, filters.owner]
+  );
 
   if (loading) return <Spinner label="Loading dashboard…" />;
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load dashboard" hint={error} />;
@@ -79,26 +155,45 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-fade-up">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Graduate School Overview</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Every figure below is computed live from recorded transactions — student handoffs, audits, gates, panels, and schedules.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-ink">Graduate School Overview</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Every figure below is computed live from recorded transactions — student handoffs, audits, gates, panels, schedules, and completion workflows.
+            </p>
+          </div>
+          <Link to="/reports" className="btn-ghost">
+            <FileText className="h-4 w-4" /> Reports
+          </Link>
+        </div>
       </div>
+
+      <DashboardFilters
+        filters={filters}
+        meta={meta}
+        onChange={(key, value) => {
+          const next = new URLSearchParams(searchParams);
+          if (value) next.set(key, value);
+          else next.delete(key);
+          setSearchParams(next, { replace: true });
+        }}
+        onClear={() => setSearchParams({}, { replace: true })}
+      />
 
       {/* Primary KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={Users} label="Students monitored" value={k.total_students} sub={`${k.active_students} active`} tone="brand" />
-        <Kpi icon={AlertTriangle} label="Needing attention" value={k.at_risk} sub={`${k.high_risk} high risk`} tone="amber" />
-        <Kpi icon={ListTodo} label="Open tasks" value={k.pending_tasks} sub={`${k.overdue_tasks} overdue`} tone="red" />
-        <Kpi icon={CalendarCheck} label="Confirmed defenses" value={k.confirmed_schedules} sub={`${k.needs_availability} awaiting availability`} tone="blue" />
+        <Kpi icon={Users} label="Students monitored" value={k.total_students} sub={`${k.active_students} active`} tone="brand" to="/students" />
+        <Kpi icon={AlertTriangle} label="Needing attention" value={k.at_risk} sub={`${k.high_risk} high risk`} tone="amber" to="/students?risk=Medium/High" />
+        <Kpi icon={ListTodo} label="Open tasks" value={k.pending_tasks} sub={`${k.overdue_tasks} overdue`} tone="red" to="/work-queue" />
+        <Kpi icon={CalendarCheck} label="Confirmed defenses" value={k.confirmed_schedules} sub={`${k.needs_availability} awaiting availability`} tone="blue" to="/reports" />
       </div>
 
       {/* Secondary strip */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <MiniStat icon={UserCheck} label="Active" value={k.active_students} />
-        <MiniStat icon={CalendarOff} label="On leave" value={k.on_leave} />
-        <MiniStat icon={CheckCircle2} label="Completed" value={k.completed} />
-        <MiniStat icon={Clock} label="Overdue tasks" value={k.overdue_tasks} />
+        <MiniStat icon={UserCheck} label="Active" value={k.active_students} to="/students?standing=Active" />
+        <MiniStat icon={CalendarOff} label="On leave" value={k.on_leave} to="/students?standing=On+Leave" />
+        <MiniStat icon={CheckCircle2} label="Completed" value={k.completed} to="/reports?workflow_type=graduation_candidates" />
+        <MiniStat icon={Clock} label="Overdue tasks" value={k.overdue_tasks} to="/work-queue?status=Overdue" />
       </div>
 
       {/* Charts */}
@@ -270,8 +365,8 @@ export default function Dashboard() {
   );
 }
 
-function MiniStat({ icon: Icon, label, value }) {
-  return (
+function MiniStat({ icon: Icon, label, value, to }) {
+  const content = (
     <Card className="flex items-center gap-3 p-4">
       <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500">
         <Icon className="h-5 w-5" />
@@ -282,5 +377,6 @@ function MiniStat({ icon: Icon, label, value }) {
       </div>
     </Card>
   );
+  if (!to) return content;
+  return <Link to={to} className="block cursor-pointer">{content}</Link>;
 }
-

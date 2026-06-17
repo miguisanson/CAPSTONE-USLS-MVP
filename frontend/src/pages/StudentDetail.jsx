@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  Briefcase,
   Mail,
   GraduationCap,
   ClipboardCheck,
@@ -13,6 +14,7 @@ import {
   AlertTriangle,
   Lightbulb,
   Bot,
+  LogOut,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -26,7 +28,23 @@ export default function StudentDetail() {
   if (loading) return <Spinner label="Loading student record…" />;
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load student" hint={error} />;
 
-  const { student, stages, stage_index, course_audit, research_case, documents_by_gate, panel, schedules, tasks, logs, recommendations = [] } = data;
+  const {
+    student,
+    stages,
+    stage_index,
+    course_audit,
+    research_case,
+    documents_by_gate,
+    panel,
+    schedules,
+    tasks,
+    logs,
+    recommendations = [],
+    practicum_record,
+    withdrawal_application,
+    graduation_endorsement,
+    graduation_eligibility,
+  } = data;
   const auditAssistantParams = new URLSearchParams({
     student_id: String(student.id),
     student_label: student.search_label || student.name,
@@ -253,6 +271,14 @@ export default function StudentDetail() {
 
         {/* Side column */}
         <div className="space-y-5 lg:col-span-4">
+          <WorkflowRecordsCard
+            practicum={practicum_record}
+            withdrawal={withdrawal_application}
+            graduation={graduation_endorsement}
+            eligibility={graduation_eligibility}
+            hasPracticum={student.program_has_practicum}
+          />
+
           <Card className="p-6">
             <SectionTitle title="Recommended actions" subtitle="Computed from this record" icon={Lightbulb} />
             {recommendations.length ? (
@@ -350,6 +376,54 @@ export default function StudentDetail() {
         </div>
       </div>
     </div>
+  );
+}
+
+function WorkflowRecordsCard({ practicum, withdrawal, graduation, eligibility, hasPracticum }) {
+  const rows = [];
+  if (hasPracticum) {
+    rows.push({
+      key: "practicum",
+      icon: Briefcase,
+      label: "Practicum",
+      status: practicum?.status || "Missing",
+      detail: practicum ? `${practicum.completed_hours}/${practicum.required_hours} hours · ${practicum.document_status}` : "No practicum record",
+    });
+  }
+  rows.push({
+    key: "withdrawal",
+    icon: LogOut,
+    label: "Withdrawal",
+    status: withdrawal?.status || "No request",
+    detail: withdrawal ? `Dean: ${withdrawal.dean_decision} · fees: ${withdrawal.fee_status}` : "No active withdrawal request",
+  });
+  rows.push({
+    key: "graduation",
+    icon: GraduationCap,
+    label: "Graduation",
+    status: graduation?.endorsement_status || (eligibility?.eligible ? "For Review" : "Not Eligible"),
+    detail: graduation ? `${graduation.review_window} · registrar: ${graduation.registrar_status}` : eligibility?.next_action || "No endorsement record",
+  });
+  return (
+    <Card className="p-6">
+      <SectionTitle title="Workflow status" icon={FileText} />
+      <ul className="space-y-2.5">
+        {rows.map((row) => {
+          const Icon = row.icon;
+          return (
+            <li key={row.key} className="rounded-xl border border-slate-100 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+                  <Icon className="h-4 w-4 text-brand-700" /> {row.label}
+                </span>
+                <StatusBadge value={row.status} dot={false} />
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">{row.detail}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 

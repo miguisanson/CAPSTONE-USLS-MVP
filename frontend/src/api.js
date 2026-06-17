@@ -20,16 +20,23 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+function queryString(params = {}) {
+  return new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== "" && v != null)
+  ).toString();
+}
+
 export const api = {
   me: () => request("/auth/me"),
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request("/auth/logout", { method: "POST", body: JSON.stringify({}) }),
   meta: () => request("/meta"),
-  dashboard: () => request("/dashboard"),
+  dashboard: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/dashboard${qs ? `?${qs}` : ""}`);
+  },
   students: (params = {}) => {
-    const qs = new URLSearchParams(
-      Object.entries(params).filter(([, v]) => v !== "" && v != null)
-    ).toString();
+    const qs = queryString(params);
     return request(`/students${qs ? `?${qs}` : ""}`);
   },
   faculty: () => request("/faculty"),
@@ -37,12 +44,18 @@ export const api = {
   duplicateStudents: () => request("/students/duplicates"),
   mergeStudents: (payload) =>
     request("/students/merge", { method: "POST", body: JSON.stringify(payload) }),
-  tasks: (owner) => request(`/tasks${owner ? `?owner=${encodeURIComponent(owner)}` : ""}`),
+  tasks: (params = {}) => {
+    const actual = typeof params === "string" ? { owner: params } : params;
+    const qs = queryString(actual);
+    return request(`/tasks${qs ? `?${qs}` : ""}`);
+  },
   activity: () => request("/activity"),
+  reports: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/reports${qs ? `?${qs}` : ""}`);
+  },
   transactionContext: (slug, params = {}) => {
-    const qs = new URLSearchParams(
-      Object.entries(params).filter(([, v]) => v !== "" && v != null)
-    ).toString();
+    const qs = queryString(params);
     return request(`/transactions/${slug}/context${qs ? `?${qs}` : ""}`);
   },
   submitTransaction: (slug, payload) =>
@@ -61,8 +74,11 @@ export const api = {
     if (!res.ok) throw new Error((body && body.error) || `Upload failed (${res.status})`);
     return body;
   },
-  monitoringGrid: (programId) =>
-    request(`/monitoring/grid${programId ? `?program_id=${programId}` : ""}`),
+  monitoringGrid: (params = {}) => {
+    const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
+    const qs = queryString(actual);
+    return request(`/monitoring/grid${qs ? `?${qs}` : ""}`);
+  },
   curriculumPlanning: (programId) =>
     request(`/curriculum-planning${programId ? `?program_id=${programId}` : ""}`),
   generateCurriculum: (payload) =>
@@ -75,6 +91,8 @@ export const api = {
   approvals: () => request("/approvals"),
   decideApproval: (planId, payload) =>
     request(`/approvals/${planId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
+  decideWorkflowApproval: (type, id, payload) =>
+    request(`/approvals/workflow/${type}/${id}/decide`, { method: "POST", body: JSON.stringify(payload) }),
   saveCourseAdjustmentPlan: (payload) =>
     request("/course-adjustments/plan", { method: "POST", body: JSON.stringify(payload) }),
   courseAuditSubjects: (programId) =>

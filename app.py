@@ -108,6 +108,36 @@ TRANSACTIONS = [
         "actor": "Research Coordinator / Panel / Adviser / Student",
         "data": "Preferred date, availability responses, constraints, final schedule, mode, venue/link, status.",
     },
+    {
+        "slug": "practicum",
+        "priority": "P1",
+        "title": "Practicum",
+        "icon": "briefcase-business",
+        "group": "Completion",
+        "short": "Track practicum MOA receipt, hours, certificates, completion report, and Dean review for practicum programs.",
+        "actor": "Student / GS Staff / Academic Coordinator / Dean",
+        "data": "MOA status, practicum site, required/completed hours, certificates, document status, remarks, status report.",
+    },
+    {
+        "slug": "withdrawal",
+        "priority": "P0",
+        "title": "Withdrawal Application",
+        "icon": "log-out",
+        "group": "Standing",
+        "short": "Record withdrawal requests, route Dean decisions, verify requirements and fees, then close approved withdrawals.",
+        "actor": "Student / GS Staff / Dean / Academic Coordinator / Registrar",
+        "data": "Reason, effective term, forms and proof, fee/requirement status, Dean decision, coordinator and registrar remarks.",
+    },
+    {
+        "slug": "graduation",
+        "priority": "P0",
+        "title": "Graduation Endorsement",
+        "icon": "graduation-cap",
+        "group": "Completion",
+        "short": "Review candidate eligibility across coursework, research, practicum, Dean endorsement, and Registrar handoff.",
+        "actor": "GS Staff / Academic Coordinator / Research Coordinator / Dean / Registrar",
+        "data": "Review term, candidate, coursework/research/practicum status, missing items, endorsement status, Dean and Registrar notes.",
+    },
 ]
 
 TRANSACTION_BY_SLUG = {item["slug"]: item for item in TRANSACTIONS}
@@ -122,6 +152,8 @@ STAGES = [
     "Writing",
     "Final Defense",
     "LOA",
+    "Withdrawal",
+    "Withdrawn",
     "Completed",
 ]
 
@@ -251,6 +283,9 @@ class Student(db.Model):
     document_checks = db.relationship("DocumentCheck", backref="student", lazy=True, cascade="all, delete-orphan")
     tasks = db.relationship("Task", backref="student", lazy=True, cascade="all, delete-orphan")
     logs = db.relationship("TransactionLog", backref="student", lazy=True, cascade="all, delete-orphan")
+    practicum_records = db.relationship("PracticumRecord", backref="student", lazy=True, cascade="all, delete-orphan")
+    withdrawal_applications = db.relationship("WithdrawalApplication", backref="student", lazy=True, cascade="all, delete-orphan")
+    graduation_endorsements = db.relationship("GraduationEndorsement", backref="student", lazy=True, cascade="all, delete-orphan")
 
     @property
     def name(self) -> str:
@@ -395,6 +430,75 @@ class StudentRequestAttachment(db.Model):
     uploaded_at = db.Column(db.DateTime, default=now_utc)
 
 
+class PracticumRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    moa_status = db.Column(db.String(60), nullable=False, default="Pending Review")
+    moa_uploaded = db.Column(db.Boolean, default=False)
+    practicum_site = db.Column(db.String(180))
+    required_hours = db.Column(db.Integer, default=0)
+    completed_hours = db.Column(db.Integer, default=0)
+    document_status = db.Column(db.String(60), nullable=False, default="Missing")
+    certificate_count = db.Column(db.Integer, default=0)
+    remarks = db.Column(db.Text)
+    status = db.Column(db.String(80), nullable=False, default="MOA Received")
+    moa_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    certificate_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    report_sent_at = db.Column(db.DateTime)
+    dean_reviewed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    moa_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[moa_attachment_id])
+    certificate_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[certificate_attachment_id])
+
+
+class WithdrawalApplication(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    reason = db.Column(db.Text)
+    effective_term = db.Column(db.String(80))
+    request_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    proof_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    fee_status = db.Column(db.String(40), nullable=False, default="Pending")
+    requirement_status = db.Column(db.String(40), nullable=False, default="Pending")
+    dean_decision = db.Column(db.String(40), nullable=False, default="Pending")
+    staff_remarks = db.Column(db.Text)
+    academic_coordinator_remarks = db.Column(db.Text)
+    registrar_status = db.Column(db.String(80), nullable=False, default="Pending")
+    status = db.Column(db.String(80), nullable=False, default="Dean Review")
+    decided_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    request_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[request_attachment_id])
+    proof_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[proof_attachment_id])
+
+
+class GraduationEndorsement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    review_window = db.Column(db.String(80), nullable=False, default="Current review window")
+    coursework_status = db.Column(db.String(60), nullable=False, default="Pending")
+    research_status = db.Column(db.String(60), nullable=False, default="Pending")
+    practicum_status = db.Column(db.String(60), nullable=False, default="Not Required")
+    missing_coursework = db.Column(db.Text)
+    missing_research_requirements = db.Column(db.Text)
+    missing_practicum_requirement = db.Column(db.Text)
+    endorsement_status = db.Column(db.String(80), nullable=False, default="For Review")
+    dean_remarks = db.Column(db.Text)
+    registrar_status = db.Column(db.String(80), nullable=False, default="Pending")
+    request_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    submitted_at = db.Column(db.DateTime)
+    dean_decision_at = db.Column(db.DateTime)
+    registrar_received_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    request_attachment = db.relationship("StudentRequestAttachment")
+
+
 # Faculty reference data used by panel matching and scheduling availability.
 class Faculty(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -537,8 +641,10 @@ def student_brief(student: Student) -> dict:
         "first_name": student.first_name,
         "last_name": student.last_name,
         "email": student.email,
+        "program_id": student.program_id,
         "program_code": student.program.code,
         "program_name": student.program.name,
+        "program_has_practicum": bool(student.program.has_practicum),
         "college": student.program.college,
         "entry_year": student.entry_year,
         "current_stage": student.current_stage,
@@ -661,6 +767,125 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
         "created_at": iso(req.created_at),
         "confirmed_at": iso(req.confirmed_at),
     }
+
+
+def attachment_dict(attachment: StudentRequestAttachment | None) -> dict | None:
+    if not attachment:
+        return None
+    return {
+        "id": attachment.id,
+        "name": attachment.original_name,
+        "uploaded_at": iso(attachment.uploaded_at),
+        "url": f"/api/student-request-attachments/{attachment.id}/file",
+        "status": "Uploaded",
+        "status_label": "Pending Review",
+    }
+
+
+def latest_practicum_record(student_id: int) -> PracticumRecord | None:
+    return (
+        PracticumRecord.query.filter_by(student_id=student_id)
+        .order_by(PracticumRecord.updated_at.desc(), PracticumRecord.id.desc())
+        .first()
+    )
+
+
+def latest_withdrawal_application(student_id: int) -> WithdrawalApplication | None:
+    return (
+        WithdrawalApplication.query.filter_by(student_id=student_id)
+        .order_by(WithdrawalApplication.updated_at.desc(), WithdrawalApplication.id.desc())
+        .first()
+    )
+
+
+def latest_graduation_endorsement(student_id: int) -> GraduationEndorsement | None:
+    return (
+        GraduationEndorsement.query.filter_by(student_id=student_id)
+        .order_by(GraduationEndorsement.updated_at.desc(), GraduationEndorsement.id.desc())
+        .first()
+    )
+
+
+def practicum_record_dict(record: PracticumRecord | None, include_student: bool = True) -> dict | None:
+    if not record:
+        return None
+    payload = {
+        "id": record.id,
+        "student_id": record.student_id,
+        "moa_status": record.moa_status,
+        "moa_uploaded": bool(record.moa_uploaded),
+        "practicum_site": record.practicum_site,
+        "required_hours": record.required_hours or 0,
+        "completed_hours": record.completed_hours or 0,
+        "document_status": record.document_status,
+        "certificate_count": record.certificate_count or 0,
+        "remarks": record.remarks,
+        "status": record.status,
+        "moa_attachment": attachment_dict(record.moa_attachment),
+        "certificate_attachment": attachment_dict(record.certificate_attachment),
+        "report_sent_at": iso(record.report_sent_at),
+        "dean_reviewed_at": iso(record.dean_reviewed_at),
+        "created_at": iso(record.created_at),
+        "updated_at": iso(record.updated_at),
+    }
+    if include_student and record.student:
+        payload["student"] = student_brief(record.student)
+    return payload
+
+
+def withdrawal_application_dict(application: WithdrawalApplication | None, include_student: bool = True) -> dict | None:
+    if not application:
+        return None
+    payload = {
+        "id": application.id,
+        "student_id": application.student_id,
+        "reason": application.reason,
+        "effective_term": application.effective_term,
+        "fee_status": application.fee_status,
+        "requirement_status": application.requirement_status,
+        "dean_decision": application.dean_decision,
+        "staff_remarks": application.staff_remarks,
+        "academic_coordinator_remarks": application.academic_coordinator_remarks,
+        "registrar_status": application.registrar_status,
+        "status": application.status,
+        "request_attachment": attachment_dict(application.request_attachment),
+        "proof_attachment": attachment_dict(application.proof_attachment),
+        "decided_at": iso(application.decided_at),
+        "completed_at": iso(application.completed_at),
+        "created_at": iso(application.created_at),
+        "updated_at": iso(application.updated_at),
+    }
+    if include_student and application.student:
+        payload["student"] = student_brief(application.student)
+    return payload
+
+
+def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, include_student: bool = True) -> dict | None:
+    if not endorsement:
+        return None
+    payload = {
+        "id": endorsement.id,
+        "student_id": endorsement.student_id,
+        "review_window": endorsement.review_window,
+        "coursework_status": endorsement.coursework_status,
+        "research_status": endorsement.research_status,
+        "practicum_status": endorsement.practicum_status,
+        "missing_coursework": split_items(endorsement.missing_coursework or ""),
+        "missing_research_requirements": split_items(endorsement.missing_research_requirements or ""),
+        "missing_practicum_requirement": endorsement.missing_practicum_requirement,
+        "endorsement_status": endorsement.endorsement_status,
+        "dean_remarks": endorsement.dean_remarks,
+        "registrar_status": endorsement.registrar_status,
+        "request_attachment": attachment_dict(endorsement.request_attachment),
+        "submitted_at": iso(endorsement.submitted_at),
+        "dean_decision_at": iso(endorsement.dean_decision_at),
+        "registrar_received_at": iso(endorsement.registrar_received_at),
+        "created_at": iso(endorsement.created_at),
+        "updated_at": iso(endorsement.updated_at),
+    }
+    if include_student and endorsement.student:
+        payload["student"] = student_brief(endorsement.student)
+    return payload
 
 
 def task_dict(task: Task) -> dict:
@@ -1332,7 +1557,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/dashboard")
     @require_api_login("staff")
     def dashboard():
-        return jsonify(dashboard_stats())
+        return jsonify(dashboard_stats(request.args))
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
@@ -1360,7 +1585,8 @@ def register_routes(app: Flask) -> None:
             query = query.filter(Student.program_id == program_id)
         risk = request.args.get("risk", "").strip()
         if risk:
-            query = query.filter(Student.risk_level == risk)
+            risk_values = [item.strip() for item in re.split(r"[,/]", risk) if item.strip()]
+            query = query.filter(Student.risk_level.in_(risk_values or [risk]))
         standing = request.args.get("standing", "").strip()
         if standing:
             query = query.filter(Student.standing == standing)
@@ -1448,6 +1674,9 @@ def register_routes(app: Flask) -> None:
             .order_by(TermEnrollment.confirmed_at.desc())
             .all()
         )
+        practicum_record = latest_practicum_record(student.id)
+        withdrawal_application = latest_withdrawal_application(student.id)
+        graduation_endorsement = latest_graduation_endorsement(student.id)
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
@@ -1462,6 +1691,10 @@ def register_routes(app: Flask) -> None:
                 "documents_by_gate": docs_by_gate,
                 "panel": [panel_assignment_dict(p) for p in panel],
                 "schedules": [schedule_request_dict(s) for s in schedules],
+                "practicum_record": practicum_record_dict(practicum_record, include_student=False),
+                "withdrawal_application": withdrawal_application_dict(withdrawal_application, include_student=False),
+                "graduation_endorsement": graduation_endorsement_dict(graduation_endorsement, include_student=False),
+                "graduation_eligibility": graduation_eligibility(student),
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
                 "recommendations": student_recommendations(student)["recommendations"],
@@ -1524,6 +1757,9 @@ def register_routes(app: Flask) -> None:
             .limit(18)
             .all()
         )
+        practicum_record = latest_practicum_record(student.id)
+        withdrawal_application = latest_withdrawal_application(student.id)
+        graduation_endorsement = latest_graduation_endorsement(student.id)
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
@@ -1541,6 +1777,10 @@ def register_routes(app: Flask) -> None:
                 "documents_by_gate": docs_by_gate,
                 "panel": [panel_assignment_dict(item) for item in panel],
                 "schedules": [schedule_request_dict(s) for s in schedules],
+                "practicum_record": practicum_record_dict(practicum_record, include_student=False),
+                "withdrawal_application": withdrawal_application_dict(withdrawal_application, include_student=False),
+                "graduation_endorsement": graduation_endorsement_dict(graduation_endorsement, include_student=False),
+                "graduation_eligibility": graduation_eligibility(student),
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
                 "recommendations": student_portal_recommendations(student),
@@ -1663,7 +1903,7 @@ def register_routes(app: Flask) -> None:
         student = Student.query.get_or_404(account.student_id)
         request_type = (request.form.get("request_type") or "").strip()
         uploaded = request.files.get("file")
-        if request_type not in {"leave-of-absence", "readmission"}:
+        if request_type not in {"leave-of-absence", "readmission", "practicum", "withdrawal", "graduation", "graduation-endorsement"}:
             return jsonify({"error": "Choose a valid request type."}), 400
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a PDF application file."}), 400
@@ -1749,6 +1989,123 @@ def register_routes(app: Flask) -> None:
         )
         db.session.commit()
         return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your readmission request."})
+
+    @app.route("/api/student-portal/requests/practicum", methods=["POST"])
+    @require_api_login("student")
+    def student_practicum_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        if not student.program.has_practicum:
+            return jsonify({"error": "Practicum is available only for programs with practicum requirements."}), 400
+
+        record = latest_practicum_record(student.id)
+        if not record:
+            record = PracticumRecord(student_id=student.id)
+            db.session.add(record)
+        apply_practicum_payload(record, data, student)
+
+        if record.completed_hours < record.required_hours:
+            record.status = "Hours Incomplete" if record.certificate_count else "MOA Received"
+            add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
+            next_owner = "Student" if record.certificate_count else "Graduate School Staff"
+            message = "Submitted. Your practicum record is pending review and additional certificates are still needed."
+        else:
+            record.status = "Report Sent to Dean"
+            record.report_sent_at = now_utc()
+            add_task(student.id, "Review practicum status report", "Dean", 5, 35)
+            next_owner = "Dean"
+            message = "Submitted. Your practicum hours meet the requirement and the status report is queued for Dean review."
+
+        add_log(
+            "practicum",
+            student.id,
+            "Student",
+            record.moa_attachment.original_name if record.moa_attachment else "Student portal",
+            f"Practicum submission recorded: {record.status}",
+            next_owner,
+            practicum_notes(record),
+        )
+        recompute_risk(student)
+        db.session.commit()
+        return jsonify({"ok": True, "message": message})
+
+    @app.route("/api/student-portal/requests/withdrawal", methods=["POST"])
+    @require_api_login("student")
+    def student_withdrawal_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        attachment = request_attachment_from_payload(student, "withdrawal", data)
+        if not attachment:
+            return jsonify({"error": "Upload the completed withdrawal request PDF before submitting."}), 400
+
+        application = WithdrawalApplication(
+            student_id=student.id,
+            reason=(data.get("reason") or "").strip(),
+            effective_term=(data.get("effective_term") or "").strip(),
+            request_attachment_id=attachment.id,
+            proof_attachment_id=int(data.get("proof_attachment_id") or 0) or None,
+            fee_status="Pending",
+            requirement_status="Pending",
+            dean_decision="Pending",
+            registrar_status="Pending",
+            status="Dean Review",
+        )
+        db.session.add(application)
+        db.session.flush()
+        add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+        add_log(
+            "withdrawal",
+            student.id,
+            "Student",
+            attachment.original_name,
+            "Withdrawal request submitted",
+            "Dean",
+            f"Effective term: {application.effective_term or 'Not specified'}. Reason: {application.reason or 'Not provided'}. File is uploaded and pending review.",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. The Dean will review your withdrawal request before any status change is recorded."})
+
+    @app.route("/api/student-portal/requests/graduation", methods=["POST"])
+    @require_api_login("student")
+    def student_graduation_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        attachment = request_attachment_from_payload(student, "graduation", data)
+        eligibility = graduation_eligibility(student)
+        endorsement = latest_graduation_endorsement(student.id)
+        if not endorsement:
+            endorsement = GraduationEndorsement(student_id=student.id)
+            db.session.add(endorsement)
+        apply_graduation_eligibility(endorsement, eligibility)
+        endorsement.review_window = (data.get("review_window") or data.get("term") or "Current review window").strip()
+        endorsement.request_attachment_id = attachment.id if attachment else endorsement.request_attachment_id
+        endorsement.endorsement_status = "For Review" if eligibility["eligible"] else "Not Eligible"
+        endorsement.submitted_at = now_utc()
+        next_owner = "Graduate School Staff" if eligibility["eligible"] else eligibility["next_owner"]
+        add_task(
+            student.id,
+            "Prepare graduation endorsement review" if eligibility["eligible"] else eligibility["next_action"],
+            next_owner,
+            5,
+            45 if eligibility["eligible"] else 35,
+        )
+        add_log(
+            "graduation",
+            student.id,
+            "Student",
+            attachment.original_name if attachment else "Student portal",
+            f"Graduation endorsement request submitted: {endorsement.endorsement_status}",
+            next_owner,
+            graduation_notes(endorsement),
+        )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": "Submitted. Graduate School staff will review your graduation endorsement readiness.",
+        })
 
     @app.route("/api/student-portal/requests/defense-scheduling", methods=["POST"])
     @require_api_login("student")
@@ -1846,9 +2203,12 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def tasks_list():
         owner = request.args.get("owner", "").strip()
+        status = request.args.get("status", "").strip()
         query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
         if owner:
             query = query.filter(Task.owner_role == owner)
+        if status == "Overdue":
+            query = query.filter(Task.due_at < date.today(), Task.status != "Done")
         tasks = query.order_by(Task.priority.desc(), Task.due_at.asc()).limit(100).all()
         return jsonify({"items": [task_dict(t) for t in tasks]})
 
@@ -1863,6 +2223,11 @@ def register_routes(app: Flask) -> None:
             .all()
         )
         return jsonify({"items": [log_dict(l) for l in logs]})
+
+    @app.route("/api/reports")
+    @require_api_login("staff")
+    def reports():
+        return jsonify(reports_payload(request.args))
 
     # Faculty reference endpoint for panels and scheduling.
     @app.route("/api/faculty")
@@ -2099,9 +2464,12 @@ def register_routes(app: Flask) -> None:
             .limit(10)
             .all()
         )
+        workflow_payload = workflow_approvals_payload()
         return jsonify({
             "pending": [course_offering_plan_dict(p) for p in pending],
             "recent": [course_offering_plan_dict(p) for p in recent],
+            "workflow_pending": workflow_payload["pending"],
+            "workflow_recent": workflow_payload["recent"],
         })
 
     @app.route("/api/approvals/<int:plan_id>/decide", methods=["POST"])
@@ -2131,6 +2499,87 @@ def register_routes(app: Flask) -> None:
         plan.updated_at = now_utc()
         add_log("course-adjustments", None, f"Dean · {account.full_name}", "Approvals",
                 f"{result}: {plan.program.code} {plan.term_label}", next_owner, note or plan.notes or "")
+        db.session.commit()
+        return jsonify({"ok": True, "message": result})
+
+    @app.route("/api/approvals/workflow/<case_type>/<int:item_id>/decide", methods=["POST"])
+    @require_api_login("dean")
+    def workflow_approval_decide(case_type: str, item_id: int):
+        account = current_account()
+        data = request.get_json(silent=True) or {}
+        decision = (data.get("decision") or "").lower()
+        note = (data.get("note") or "").strip()
+        if decision not in {"approve", "return", "deny", "review"}:
+            return jsonify({"error": "Decision must be approve, return, deny, or review."}), 400
+
+        if case_type == "practicum":
+            record = PracticumRecord.query.get_or_404(item_id)
+            if decision in {"approve", "review"}:
+                record.status = "Dean Reviewed"
+                record.dean_reviewed_at = now_utc()
+                result = "Practicum status reviewed by Dean"
+                next_owner = "Graduate School Staff"
+            else:
+                record.status = "Additional Certificates Requested"
+                result = "Practicum status returned by Dean"
+                next_owner = "Academic Coordinator"
+                add_task(record.student_id, "Revise practicum status report", "Academic Coordinator", 5, 35)
+            if note:
+                record.remarks = "\n".join([part for part in [record.remarks, f"Dean: {note}"] if part])
+            add_log("practicum", record.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or practicum_notes(record))
+
+        elif case_type == "withdrawal":
+            application = WithdrawalApplication.query.get_or_404(item_id)
+            if application.dean_decision != "Pending":
+                return jsonify({"error": "This withdrawal request already has a Dean decision."}), 400
+            if decision == "approve":
+                application.dean_decision = "Approved"
+                application.status = "Approved - Follow-through"
+                result = "Withdrawal approved by Dean"
+                next_owner = "Academic Coordinator"
+                add_task(application.student_id, "Perform withdrawal follow-through actions", "Academic Coordinator", 5, 45)
+                add_task(application.student_id, "Complete withdrawal requirements", "Student", 7, 40)
+            elif decision == "deny":
+                application.dean_decision = "Denied"
+                application.status = "Denied"
+                result = "Withdrawal denied by Dean; student informed and remains Active"
+                next_owner = "Graduate School Staff"
+                application.student.standing = "Active"
+            else:
+                application.dean_decision = "Returned"
+                application.status = "Returned"
+                result = "Withdrawal request returned by Dean"
+                next_owner = "Student"
+                add_task(application.student_id, "Revise withdrawal request", "Student", 5, 35)
+            application.decided_at = now_utc()
+            if note:
+                application.staff_remarks = "\n".join([part for part in [application.staff_remarks, f"Dean: {note}"] if part])
+            add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application))
+
+        elif case_type == "graduation":
+            endorsement = GraduationEndorsement.query.get_or_404(item_id)
+            if decision == "approve":
+                endorsement.endorsement_status = "Sent to Registrar"
+                endorsement.registrar_status = "Received"
+                endorsement.registrar_received_at = now_utc()
+                endorsement.dean_decision_at = now_utc()
+                result = "Graduation endorsement approved and sent to Registrar"
+                next_owner = "Registrar"
+                add_task(endorsement.student_id, "Confirm endorsed list receipt", "Registrar", 5, 30)
+            elif decision == "return":
+                endorsement.endorsement_status = "Returned for Revision"
+                endorsement.dean_decision_at = now_utc()
+                result = "Graduation endorsement returned by Dean for revision"
+                next_owner = "Graduate School Staff"
+                add_task(endorsement.student_id, "Revise graduation endorsement list", "Graduate School Staff", 4, 35)
+            else:
+                return jsonify({"error": "Graduation endorsement decisions must be approve or return."}), 400
+            if note:
+                endorsement.dean_remarks = note
+            add_log("graduation", endorsement.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or graduation_notes(endorsement))
+        else:
+            return jsonify({"error": "Unknown workflow approval type."}), 404
+
         db.session.commit()
         return jsonify({"ok": True, "message": result})
 
@@ -2291,9 +2740,15 @@ def register_routes(app: Flask) -> None:
         )
         students = (
             Student.query.filter_by(program_id=program.id)
-            .order_by(Student.last_name.asc(), Student.first_name.asc())
-            .all()
         )
+        stage = request.args.get("stage", "").strip()
+        if stage:
+            students = students.filter(Student.current_stage == stage)
+        risk = request.args.get("risk", "").strip()
+        if risk:
+            risk_values = [item.strip() for item in re.split(r"[,/]", risk) if item.strip()]
+            students = students.filter(Student.risk_level.in_(risk_values or [risk]))
+        students = students.order_by(Student.last_name.asc(), Student.first_name.asc()).all()
         sids = [s.id for s in students]
         cids = [c.id for c in courses]
         records: dict[tuple[int, int], str] = {}
@@ -2501,33 +2956,103 @@ def request_payload() -> MultiDict:
 # ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------
-def dashboard_stats() -> dict:
+def _filter_value(filters, key: str, default: str = "") -> str:
+    value = filters.get(key, default) if hasattr(filters, "get") else default
+    return (value or "").strip() if isinstance(value, str) else str(value or "").strip()
+
+
+def normalize_filters(filters) -> dict:
+    return {
+        "program_id": _filter_value(filters, "program_id"),
+        "stage": _filter_value(filters, "stage") or _filter_value(filters, "progress"),
+        "risk": _filter_value(filters, "risk"),
+        "standing": _filter_value(filters, "standing"),
+        "owner": _filter_value(filters, "owner"),
+        "workflow_type": _filter_value(filters, "workflow_type"),
+    }
+
+
+def filtered_students_query(filters):
+    values = normalize_filters(filters)
+    query = Student.query.join(Program)
+    if values["program_id"]:
+        try:
+            query = query.filter(Student.program_id == int(values["program_id"]))
+        except (TypeError, ValueError):
+            pass
+    if values["stage"]:
+        query = query.filter(Student.current_stage == values["stage"])
+    if values["risk"]:
+        risk_values = [item.strip() for item in re.split(r"[,/]", values["risk"]) if item.strip()]
+        query = query.filter(Student.risk_level.in_(risk_values or [values["risk"]]))
+    if values["standing"]:
+        query = query.filter(Student.standing == values["standing"])
+    if values["owner"]:
+        owner_student_ids = (
+            db.session.query(Task.student_id)
+            .filter(Task.owner_role == values["owner"], Task.status.in_(["Pending", "Overdue"]))
+            .distinct()
+        )
+        query = query.filter(Student.id.in_(owner_student_ids))
+    return query
+
+
+def dashboard_stats(filters=None) -> dict:
     # The dashboard intentionally uses live SQL aggregates instead of cached
     # values so every completed workflow is visible immediately during the demo.
-    total_students = Student.query.count()
-    active_students = Student.query.filter(Student.standing == "Active").count()
-    on_leave = Student.query.filter(Student.standing == "On Leave").count()
-    completed = Student.query.filter(Student.current_stage == "Completed").count()
-    at_risk = Student.query.filter(Student.risk_level.in_(["Medium", "High"])).count()
-    high_risk = Student.query.filter(Student.risk_level == "High").count()
-    pending_tasks = Task.query.filter(Task.status.in_(["Pending", "Overdue"])).count()
-    overdue_tasks = Task.query.filter(Task.due_at < date.today(), Task.status != "Done").count()
-    confirmed_schedules = ScheduleRequest.query.filter(ScheduleRequest.status == "Confirmed").count()
-    needs_availability = ScheduleRequest.query.filter(ScheduleRequest.status == "Needs Availability").count()
+    filters = filters or {}
+    student_query = filtered_students_query(filters)
+    student_ids = [sid for (sid,) in student_query.with_entities(Student.id).all()]
+    empty = len(student_ids) == 0
+
+    def students_scope():
+        query = Student.query
+        return query.filter(Student.id.in_(student_ids)) if not empty else query.filter(False)
+
+    def scoped(model, attr="student_id"):
+        query = model.query
+        return query.filter(getattr(model, attr).in_(student_ids)) if not empty else query.filter(False)
+
+    task_query = scoped(Task).filter(Task.status.in_(["Pending", "Overdue"]))
+    owner = (filters.get("owner") or "").strip() if hasattr(filters, "get") else ""
+    if owner:
+        task_query = task_query.filter(Task.owner_role == owner)
+
+    total_students = len(student_ids)
+    active_students = students_scope().filter(Student.standing == "Active").count()
+    on_leave = students_scope().filter(Student.standing == "On Leave").count()
+    completed = students_scope().filter(Student.current_stage == "Completed").count()
+    at_risk = students_scope().filter(Student.risk_level.in_(["Medium", "High"])).count()
+    high_risk = students_scope().filter(Student.risk_level == "High").count()
+    withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
+    pending_tasks = task_query.count()
+    overdue_tasks = task_query.filter(Task.due_at < date.today(), Task.status != "Done").count()
+    confirmed_schedules = scoped(ScheduleRequest).filter(ScheduleRequest.status == "Confirmed").count()
+    needs_availability = scoped(ScheduleRequest).filter(ScheduleRequest.status == "Needs Availability").count()
+    practicum_records = scoped(PracticumRecord).count()
+    withdrawal_requests = scoped(WithdrawalApplication).count()
+    graduation_candidates = scoped(GraduationEndorsement).count()
 
     stage_counts = dict(
-        db.session.query(Student.current_stage, func.count(Student.id)).group_by(Student.current_stage).all()
+        db.session.query(Student.current_stage, func.count(Student.id))
+        .filter(Student.id.in_(student_ids) if not empty else False)
+        .group_by(Student.current_stage)
+        .all()
     )
     stage_distribution = [{"stage": stage, "count": stage_counts.get(stage, 0)} for stage in STAGES]
 
     risk_counts = dict(
-        db.session.query(Student.risk_level, func.count(Student.id)).group_by(Student.risk_level).all()
+        db.session.query(Student.risk_level, func.count(Student.id))
+        .filter(Student.id.in_(student_ids) if not empty else False)
+        .group_by(Student.risk_level)
+        .all()
     )
     risk_distribution = [{"risk": level, "count": risk_counts.get(level, 0)} for level in ["Low", "Medium", "High"]]
 
     college_rows = (
         db.session.query(Program.college, func.count(Student.id))
         .join(Student, Student.program_id == Program.id)
+        .filter(Student.id.in_(student_ids) if not empty else False)
         .group_by(Program.college)
         .order_by(func.count(Student.id).desc())
         .all()
@@ -2536,6 +3061,7 @@ def dashboard_stats() -> dict:
 
     gate_rows = (
         db.session.query(ResearchCase.current_gate, func.count(ResearchCase.id))
+        .filter(ResearchCase.student_id.in_(student_ids) if not empty else False)
         .group_by(ResearchCase.current_gate)
         .all()
     )
@@ -2543,6 +3069,7 @@ def dashboard_stats() -> dict:
 
     owner_rows = (
         db.session.query(Task.owner_role, func.count(Task.id))
+        .filter(Task.student_id.in_(student_ids) if not empty else False)
         .filter(Task.status.in_(["Pending", "Overdue"]))
         .group_by(Task.owner_role)
         .order_by(func.count(Task.id).desc())
@@ -2552,25 +3079,33 @@ def dashboard_stats() -> dict:
 
     schedule_rows = (
         db.session.query(ScheduleRequest.status, func.count(ScheduleRequest.id))
+        .filter(ScheduleRequest.student_id.in_(student_ids) if not empty else False)
         .group_by(ScheduleRequest.status)
         .all()
     )
     schedule_distribution = [{"status": s, "count": n} for s, n in schedule_rows]
 
+    workflow_rows = [
+        {"workflow": "Practicum", "count": practicum_records},
+        {"workflow": "Withdrawal", "count": withdrawal_requests},
+        {"workflow": "Graduation", "count": graduation_candidates},
+    ]
+
     recent_logs = (
         human_activity_query()
+        .filter(TransactionLog.student_id.in_(student_ids) if not empty else False)
         .order_by(TransactionLog.created_at.desc())
         .limit(8)
         .all()
     )
     open_tasks = (
-        Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
-        .order_by(Task.priority.desc(), Task.due_at.asc())
+        task_query.order_by(Task.priority.desc(), Task.due_at.asc())
         .limit(8)
         .all()
     )
 
     return {
+        "filters": normalize_filters(filters),
         "kpis": {
             "total_students": total_students,
             "active_students": active_students,
@@ -2578,10 +3113,14 @@ def dashboard_stats() -> dict:
             "completed": completed,
             "at_risk": at_risk,
             "high_risk": high_risk,
+            "withdrawn": withdrawn,
             "pending_tasks": pending_tasks,
             "overdue_tasks": overdue_tasks,
             "confirmed_schedules": confirmed_schedules,
             "needs_availability": needs_availability,
+            "practicum_records": practicum_records,
+            "withdrawal_requests": withdrawal_requests,
+            "graduation_candidates": graduation_candidates,
         },
         "stage_distribution": stage_distribution,
         "risk_distribution": risk_distribution,
@@ -2589,8 +3128,369 @@ def dashboard_stats() -> dict:
         "gate_distribution": gate_distribution,
         "tasks_by_owner": tasks_by_owner,
         "schedule_distribution": schedule_distribution,
+        "workflow_distribution": workflow_rows,
         "recent_logs": [log_dict(l) for l in recent_logs],
         "open_tasks": [task_dict(t) for t in open_tasks],
+    }
+
+
+def safe_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: Student) -> None:
+    record.moa_status = (data.get("moa_status") or record.moa_status or "Pending Review").strip()
+    record.practicum_site = (data.get("practicum_site") or data.get("site") or record.practicum_site or "").strip()
+    record.required_hours = max(safe_int(data.get("required_hours"), record.required_hours or 0), 0)
+    record.completed_hours = max(safe_int(data.get("completed_hours"), record.completed_hours or 0), 0)
+    record.certificate_count = max(safe_int(data.get("certificate_count"), record.certificate_count or 0), 0)
+    record.document_status = (data.get("document_status") or record.document_status or "Pending Review").strip()
+    record.remarks = (data.get("remarks") or record.remarks or "").strip()
+    moa_attachment = request_attachment_from_payload(student, "practicum", data)
+    if moa_attachment:
+        record.moa_attachment_id = moa_attachment.id
+        record.moa_uploaded = True
+        record.moa_status = "Uploaded"
+    record.moa_uploaded = bool(record.moa_uploaded or data.get("moa_uploaded") in {"true", "1", "yes", "on"})
+    cert_attachment_id = safe_int(data.get("certificate_attachment_id"), 0)
+    if cert_attachment_id:
+        cert = StudentRequestAttachment.query.filter_by(
+            id=cert_attachment_id,
+            student_id=student.id,
+            request_type="practicum",
+        ).first()
+        if cert:
+            record.certificate_attachment_id = cert.id
+            record.document_status = "Pending Review"
+    if record.required_hours == 0:
+        record.required_hours = 200
+    record.updated_at = now_utc()
+
+
+def practicum_notes(record: PracticumRecord) -> str:
+    return (
+        f"MOA: {record.moa_status}; site: {record.practicum_site or 'Not specified'}; "
+        f"hours: {record.completed_hours or 0}/{record.required_hours or 0}; "
+        f"documents: {record.document_status}; certificates: {record.certificate_count or 0}; "
+        f"remarks: {record.remarks or 'None'}."
+    )
+
+
+def apply_withdrawal_payload(application: WithdrawalApplication, data: MultiDict) -> None:
+    application.reason = (data.get("reason") or application.reason or "").strip()
+    application.effective_term = (data.get("effective_term") or application.effective_term or "").strip()
+    application.fee_status = (data.get("fee_status") or application.fee_status or "Pending").strip()
+    application.requirement_status = (data.get("requirement_status") or application.requirement_status or "Pending").strip()
+    application.dean_decision = (data.get("dean_decision") or application.dean_decision or "Pending").strip()
+    application.staff_remarks = (data.get("staff_remarks") or application.staff_remarks or "").strip()
+    application.academic_coordinator_remarks = (
+        data.get("academic_coordinator_remarks") or application.academic_coordinator_remarks or ""
+    ).strip()
+    application.registrar_status = (data.get("registrar_status") or application.registrar_status or "Pending").strip()
+    request_attachment_id = safe_int(data.get("request_attachment_id") or data.get("attachment_id"), 0)
+    if request_attachment_id:
+        application.request_attachment_id = request_attachment_id
+    proof_attachment_id = safe_int(data.get("proof_attachment_id"), 0)
+    if proof_attachment_id:
+        application.proof_attachment_id = proof_attachment_id
+    if application.dean_decision in {"Approved", "Denied", "Returned"} and not application.decided_at:
+        application.decided_at = now_utc()
+    application.updated_at = now_utc()
+
+
+def withdrawal_notes(application: WithdrawalApplication) -> str:
+    return (
+        f"Reason: {application.reason or 'Not provided'}; effective term: {application.effective_term or 'Not specified'}; "
+        f"Dean: {application.dean_decision}; requirements: {application.requirement_status}; "
+        f"fees: {application.fee_status}; registrar: {application.registrar_status}; "
+        f"AC remarks: {application.academic_coordinator_remarks or 'None'}; staff remarks: {application.staff_remarks or 'None'}."
+    )
+
+
+def graduation_eligibility(student: Student) -> dict:
+    audit = compute_course_audit(student)
+    missing_coursework = [
+        f"{row['course'].code} - {row['course'].title}"
+        for row in audit["missing"] + audit["incomplete"]
+    ]
+    coursework_complete = audit["missing_count"] == 0 and audit["eligibility"].get("units_complete")
+
+    research_case = (
+        ResearchCase.query.filter_by(student_id=student.id)
+        .order_by(ResearchCase.opened_at.desc())
+        .first()
+    )
+    research_missing = []
+    research_complete = False
+    if research_case:
+        completion_payload = research_milestone_payload(student, "Completion Evidence")
+        research_missing = [
+            f"{item['label']} ({item['status_label']})"
+            for item in completion_payload["requirements"]
+            if item["status"] != "Complete"
+        ]
+        research_complete = research_case.status == "Verified Complete" or completion_payload["overall_complete"]
+    else:
+        research_missing = required_documents_for_gate("Completion Evidence")
+
+    practicum_required = bool(student.program.has_practicum)
+    practicum_record = latest_practicum_record(student.id)
+    practicum_complete = not practicum_required
+    missing_practicum = ""
+    practicum_status = "Not Required"
+    if practicum_required:
+        if practicum_record:
+            enough_hours = (practicum_record.completed_hours or 0) >= (practicum_record.required_hours or 0)
+            practicum_complete = enough_hours and practicum_record.status in {"Completed", "Report Sent to Dean", "Dean Reviewed"}
+            practicum_status = practicum_record.status
+            if not practicum_complete:
+                missing_practicum = (
+                    f"Practicum incomplete: {practicum_record.completed_hours or 0}/"
+                    f"{practicum_record.required_hours or 0} hours, status {practicum_record.status}."
+                )
+        else:
+            practicum_status = "Missing"
+            missing_practicum = "No practicum record on file for a practicum-required program."
+
+    open_tasks = Task.query.filter(
+        Task.student_id == student.id,
+        Task.status.in_(["Pending", "Overdue"]),
+    ).order_by(Task.due_at.asc()).all()
+    blocking_tasks = [task.title for task in open_tasks if task.owner_role in {"Student", "Academic Coordinator", "Research Coordinator"}]
+    eligible = coursework_complete and research_complete and practicum_complete and not blocking_tasks
+    if missing_coursework:
+        next_owner = "Academic Coordinator"
+        next_action = "Resolve graduation missing coursework"
+    elif research_missing:
+        next_owner = "Research Coordinator"
+        next_action = "Resolve graduation missing research requirements"
+    elif missing_practicum:
+        next_owner = "Student"
+        next_action = "Complete practicum requirements"
+    elif blocking_tasks:
+        next_owner = open_tasks[0].owner_role
+        next_action = "Clear pending graduation-blocking tasks"
+    else:
+        next_owner = "Graduate School Staff"
+        next_action = "Prepare graduation endorsement list"
+
+    return {
+        "eligible": bool(eligible),
+        "coursework_status": "Complete" if coursework_complete else "Incomplete",
+        "research_status": "Complete" if research_complete else "Incomplete",
+        "practicum_status": practicum_status if practicum_required else "Not Required",
+        "missing_coursework": missing_coursework,
+        "missing_research_requirements": research_missing,
+        "missing_practicum_requirement": missing_practicum,
+        "pending_tasks": [task_dict(task) for task in open_tasks],
+        "next_owner": next_owner,
+        "next_action": next_action,
+    }
+
+
+def apply_graduation_eligibility(endorsement: GraduationEndorsement, eligibility: dict) -> None:
+    endorsement.coursework_status = eligibility["coursework_status"]
+    endorsement.research_status = eligibility["research_status"]
+    endorsement.practicum_status = eligibility["practicum_status"]
+    endorsement.missing_coursework = "\n".join(eligibility["missing_coursework"])
+    endorsement.missing_research_requirements = "\n".join(eligibility["missing_research_requirements"])
+    endorsement.missing_practicum_requirement = eligibility["missing_practicum_requirement"]
+    endorsement.updated_at = now_utc()
+
+
+def graduation_notes(endorsement: GraduationEndorsement) -> str:
+    coursework = endorsement.missing_coursework or "None"
+    research = endorsement.missing_research_requirements or "None"
+    practicum = endorsement.missing_practicum_requirement or "None"
+    return (
+        f"Review window: {endorsement.review_window}; status: {endorsement.endorsement_status}; "
+        f"coursework: {endorsement.coursework_status}; research: {endorsement.research_status}; "
+        f"practicum: {endorsement.practicum_status}; missing coursework: {coursework}; "
+        f"missing research: {research}; missing practicum: {practicum}; registrar: {endorsement.registrar_status}."
+    )
+
+
+def workflow_approval_item(kind: str, item) -> dict:
+    student = item.student
+    if kind == "practicum":
+        return {
+            "id": item.id,
+            "type": kind,
+            "title": f"Practicum status report · {student.name}",
+            "subtitle": f"{student.program.code} · {item.completed_hours}/{item.required_hours} hours · {item.status}",
+            "status": item.status,
+            "student": student_brief(student),
+            "submitted_at": iso(item.report_sent_at or item.updated_at),
+            "details": practicum_notes(item),
+        }
+    if kind == "withdrawal":
+        return {
+            "id": item.id,
+            "type": kind,
+            "title": f"Withdrawal request · {student.name}",
+            "subtitle": f"{student.program.code} · effective {item.effective_term or 'term pending'}",
+            "status": item.dean_decision,
+            "student": student_brief(student),
+            "submitted_at": iso(item.created_at),
+            "details": withdrawal_notes(item),
+        }
+    return {
+        "id": item.id,
+        "type": kind,
+        "title": f"Graduation endorsement · {student.name}",
+        "subtitle": f"{student.program.code} · {item.review_window}",
+        "status": item.endorsement_status,
+        "student": student_brief(student),
+        "submitted_at": iso(item.submitted_at or item.updated_at),
+        "details": graduation_notes(item),
+    }
+
+
+def workflow_approvals_payload() -> dict:
+    pending = []
+    pending.extend(
+        workflow_approval_item("practicum", item)
+        for item in PracticumRecord.query.filter(PracticumRecord.status == "Report Sent to Dean")
+        .order_by(PracticumRecord.updated_at.asc())
+        .all()
+    )
+    pending.extend(
+        workflow_approval_item("withdrawal", item)
+        for item in WithdrawalApplication.query.filter(WithdrawalApplication.dean_decision == "Pending")
+        .order_by(WithdrawalApplication.created_at.asc())
+        .all()
+    )
+    pending.extend(
+        workflow_approval_item("graduation", item)
+        for item in GraduationEndorsement.query.filter(GraduationEndorsement.endorsement_status == "Ready for Dean Review")
+        .order_by(GraduationEndorsement.submitted_at.asc())
+        .all()
+    )
+    recent = []
+    recent.extend(
+        workflow_approval_item("withdrawal", item)
+        for item in WithdrawalApplication.query.filter(WithdrawalApplication.dean_decision.in_(["Approved", "Denied", "Returned"]))
+        .order_by(WithdrawalApplication.updated_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent.extend(
+        workflow_approval_item("graduation", item)
+        for item in GraduationEndorsement.query.filter(GraduationEndorsement.endorsement_status.in_(["Sent to Registrar", "Returned for Revision"]))
+        .order_by(GraduationEndorsement.updated_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent.extend(
+        workflow_approval_item("practicum", item)
+        for item in PracticumRecord.query.filter(PracticumRecord.status == "Dean Reviewed")
+        .order_by(PracticumRecord.updated_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent.sort(key=lambda item: item.get("submitted_at") or "", reverse=True)
+    pending.sort(key=lambda item: item.get("submitted_at") or "")
+    return {"pending": pending, "recent": recent[:12]}
+
+
+def report_student_ids(filters) -> list[int]:
+    return [sid for (sid,) in filtered_students_query(filters).with_entities(Student.id).all()]
+
+
+def reports_payload(filters=None) -> dict:
+    filters = filters or {}
+    student_ids = report_student_ids(filters)
+    empty = len(student_ids) == 0
+
+    def by_students(model):
+        query = model.query
+        return query.filter(model.student_id.in_(student_ids)) if not empty else query.filter(False)
+
+    dashboard = dashboard_stats(filters)
+    practicum_rows = [
+        practicum_record_dict(item)
+        for item in by_students(PracticumRecord).order_by(PracticumRecord.updated_at.desc()).limit(150).all()
+    ]
+    withdrawal_rows = [
+        withdrawal_application_dict(item)
+        for item in by_students(WithdrawalApplication).order_by(WithdrawalApplication.updated_at.desc()).limit(150).all()
+    ]
+    graduation_rows = [
+        graduation_endorsement_dict(item)
+        for item in by_students(GraduationEndorsement).order_by(GraduationEndorsement.updated_at.desc()).limit(150).all()
+    ]
+    missing_rows = []
+    for student in filtered_students_query(filters).order_by(Student.last_name, Student.first_name).limit(120).all():
+        eligibility = graduation_eligibility(student)
+        if eligibility["missing_coursework"] or eligibility["missing_research_requirements"] or eligibility["missing_practicum_requirement"]:
+            missing_rows.append({
+                "student": student_brief(student),
+                "coursework": eligibility["missing_coursework"][:6],
+                "research": eligibility["missing_research_requirements"][:6],
+                "practicum": eligibility["missing_practicum_requirement"],
+                "next_owner": eligibility["next_owner"],
+            })
+
+    loa_readmission_rows = [
+        {
+            "student": student_brief(student),
+            "standing": student.standing,
+            "stage": student.current_stage,
+            "latest_readmission": log_dict(
+                TransactionLog.query.filter_by(student_id=student.id, transaction_slug="readmission")
+                .order_by(TransactionLog.created_at.desc())
+                .first()
+            ) if TransactionLog.query.filter_by(student_id=student.id, transaction_slug="readmission").first() else None,
+        }
+        for student in filtered_students_query(filters)
+        .filter(or_(Student.standing == "On Leave", Student.current_stage == "LOA"))
+        .order_by(Student.last_name, Student.first_name)
+        .limit(120)
+        .all()
+    ]
+    at_risk_rows = []
+    for student in filtered_students_query(filters).filter(Student.risk_level.in_(["Medium", "High"])).limit(120).all():
+        recs = student_recommendations(student)["recommendations"]
+        at_risk_rows.append({
+            "student": student_brief(student),
+            "top_recommendation": recs[0] if recs else None,
+        })
+    task_rows = [
+        task_dict(task)
+        for task in by_students(Task)
+        .filter(Task.status.in_(["Pending", "Overdue"]))
+        .order_by(Task.due_at.asc())
+        .limit(160)
+        .all()
+    ]
+    research_rows = [
+        {
+            "student": student_brief(case.student),
+            "case": research_case_dict(case),
+        }
+        for case in by_students(ResearchCase)
+        .order_by(ResearchCase.opened_at.desc())
+        .limit(160)
+        .all()
+    ]
+
+    return {
+        "filters": normalize_filters(filters),
+        "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+        "stages": STAGES,
+        "summary": dashboard["kpis"],
+        "dashboard": dashboard,
+        "graduation_candidates": {"count": len(graduation_rows), "rows": graduation_rows},
+        "missing_requirements": {"count": len(missing_rows), "rows": missing_rows},
+        "practicum_monitoring": {"count": len(practicum_rows), "rows": practicum_rows},
+        "withdrawal_requests": {"count": len(withdrawal_rows), "rows": withdrawal_rows},
+        "loa_readmission": {"count": len(loa_readmission_rows), "rows": loa_readmission_rows},
+        "at_risk": {"count": len(at_risk_rows), "rows": at_risk_rows},
+        "open_overdue_tasks": {"count": len(task_rows), "rows": task_rows},
+        "research_completion": {"count": len(research_rows), "rows": research_rows},
     }
 
 
@@ -2701,6 +3601,20 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 .limit(6)
                 .all()
             ]
+        if slug == "practicum":
+            context["practicum_record"] = practicum_record_dict(
+                latest_practicum_record(selected_student.id),
+                include_student=False,
+            )
+        if slug == "withdrawal":
+            context["withdrawal_application"] = withdrawal_application_dict(
+                latest_withdrawal_application(selected_student.id),
+                include_student=False,
+            )
+        if slug == "graduation":
+            endorsement = latest_graduation_endorsement(selected_student.id)
+            context["graduation_endorsement"] = graduation_endorsement_dict(endorsement, include_student=False)
+            context["graduation_eligibility"] = graduation_eligibility(selected_student)
 
     return context
 
@@ -2825,7 +3739,16 @@ def merge_student_records(target: Student, source: Student, overwrite_profile: b
             doc.student_id = target.id
             moved["related_records"] += 1
 
-    for model in (ResearchCase, ScheduleRequest, Task, TransactionLog):
+    for model in (
+        ResearchCase,
+        ScheduleRequest,
+        Task,
+        TransactionLog,
+        StudentRequestAttachment,
+        PracticumRecord,
+        WithdrawalApplication,
+        GraduationEndorsement,
+    ):
         for row in model.query.filter_by(student_id=source.id).all():
             row.student_id = target.id
             moved["related_records"] += 1
@@ -3618,6 +4541,160 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     return student.id
 
 
+def handle_practicum(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    if not student.program.has_practicum:
+        raise ValueError("Practicum is available only for programs with practicum requirements.")
+    record = latest_practicum_record(student.id)
+    if not record:
+        record = PracticumRecord(student_id=student.id)
+        db.session.add(record)
+    apply_practicum_payload(record, data, student)
+    requested_status = (data.get("status") or "").strip()
+
+    if record.completed_hours < record.required_hours:
+        record.status = "Additional Certificates Requested" if record.certificate_count else "Hours Incomplete"
+        add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
+        student.risk_level = "Medium"
+        next_owner = "Student"
+    elif requested_status == "Dean Reviewed":
+        record.status = "Dean Reviewed"
+        record.dean_reviewed_at = now_utc()
+        next_owner = "Graduate School Staff"
+    elif requested_status in {"Report Sent to Dean", "Completed"}:
+        record.status = requested_status
+        record.report_sent_at = record.report_sent_at or now_utc()
+        add_task(student.id, "Review practicum status report", "Dean", 5, 35)
+        next_owner = "Dean"
+    else:
+        record.status = requested_status or "Under Review"
+        next_owner = "Academic Coordinator"
+        add_task(student.id, "Review practicum MOA and certificates", "Academic Coordinator", 5, 30)
+
+    add_log(
+        "practicum",
+        student.id,
+        "Graduate School Staff / Academic Coordinator",
+        data.get("source_reference", "") or (record.moa_attachment.original_name if record.moa_attachment else "Practicum workflow"),
+        f"Practicum status updated: {record.status}",
+        next_owner,
+        practicum_notes(record),
+    )
+    return student.id
+
+
+def handle_withdrawal(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    application = latest_withdrawal_application(student.id)
+    if not application:
+        application = WithdrawalApplication(student_id=student.id)
+        db.session.add(application)
+    apply_withdrawal_payload(application, data)
+
+    if application.dean_decision == "Denied":
+        application.status = "Denied"
+        student.standing = "Active"
+        if student.current_stage == "Withdrawal":
+            student.current_stage = "Coursework"
+        next_owner = "Graduate School Staff"
+        result = "Withdrawal denied; student informed and remains Active"
+    elif application.dean_decision == "Returned":
+        application.status = "Returned"
+        next_owner = "Student"
+        result = "Withdrawal returned for revision"
+        add_task(student.id, "Revise withdrawal request", "Student", 5, 35)
+    elif application.dean_decision == "Approved":
+        student.current_stage = "Withdrawal"
+        if application.requirement_status != "Complete":
+            application.status = "Requirements Pending"
+            next_owner = "Student"
+            result = "Withdrawal approved; waiting for student requirements"
+            add_task(student.id, "Complete withdrawal requirements", "Student", 7, 40)
+        elif application.fee_status != "Cleared" or application.registrar_status not in {"Confirmed", "Record Updated"}:
+            application.status = "Registrar Review"
+            next_owner = "Registrar"
+            result = "Withdrawal requirements complete; registrar confirmation needed"
+            add_task(student.id, "Confirm fee status / update withdrawal record", "Registrar", 5, 45)
+        else:
+            application.status = "Withdrawn Confirmed"
+            application.completed_at = application.completed_at or now_utc()
+            student.standing = "Withdrawn"
+            student.current_stage = "Withdrawn"
+            student.enrollment_tag = "Withdrawn"
+            next_owner = "Graduate School Staff"
+            result = "Confirmed withdrawal recorded; student is now withdrawn"
+            add_task(student.id, "Record confirmed withdrawal notice", "Graduate School Staff", 2, 30)
+    else:
+        application.status = "Dean Review"
+        next_owner = "Dean"
+        result = "Withdrawal request recorded for Dean review"
+        add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+
+    add_log(
+        "withdrawal",
+        student.id,
+        "Graduate School Staff",
+        data.get("source_reference", "") or "Withdrawal workflow",
+        result,
+        next_owner,
+        withdrawal_notes(application),
+    )
+    return student.id
+
+
+def handle_graduation(data: MultiDict) -> int:
+    student = Student.query.get_or_404(int(data["student_id"]))
+    endorsement = latest_graduation_endorsement(student.id)
+    if not endorsement:
+        endorsement = GraduationEndorsement(student_id=student.id)
+        db.session.add(endorsement)
+    eligibility = graduation_eligibility(student)
+    apply_graduation_eligibility(endorsement, eligibility)
+    endorsement.review_window = (data.get("review_window") or endorsement.review_window or "Current review window").strip()
+    requested_status = (data.get("endorsement_status") or "").strip()
+    if data.get("dean_remarks"):
+        endorsement.dean_remarks = data.get("dean_remarks")
+    if data.get("registrar_status"):
+        endorsement.registrar_status = data.get("registrar_status")
+
+    if not eligibility["eligible"]:
+        endorsement.endorsement_status = "Not Eligible"
+        next_owner = eligibility["next_owner"]
+        result = "Graduation candidate marked not eligible; missing requirements listed"
+        add_task(student.id, eligibility["next_action"], next_owner, 7, 35)
+    elif requested_status in {"Ready for Dean Review", "For Review"}:
+        endorsement.endorsement_status = "Ready for Dean Review"
+        endorsement.submitted_at = now_utc()
+        next_owner = "Dean"
+        result = "Graduation endorsement list prepared for Dean review"
+        add_task(student.id, "Review graduation endorsement list", "Dean", 5, 55)
+    elif requested_status == "Sent to Registrar":
+        endorsement.endorsement_status = "Sent to Registrar"
+        endorsement.registrar_status = endorsement.registrar_status or "Received"
+        endorsement.registrar_received_at = endorsement.registrar_received_at or now_utc()
+        next_owner = "Registrar"
+        result = "Graduation endorsement list sent to Registrar"
+    elif requested_status == "Returned for Revision":
+        endorsement.endorsement_status = "Returned for Revision"
+        next_owner = "Graduate School Staff"
+        result = "Graduation endorsement list revised after return"
+    else:
+        endorsement.endorsement_status = "For Review"
+        next_owner = "Graduate School Staff"
+        result = "Graduation endorsement candidate reviewed"
+
+    add_log(
+        "graduation",
+        student.id,
+        "Graduate School Staff",
+        data.get("source_reference", "") or "Graduation endorsement workflow",
+        result,
+        next_owner,
+        graduation_notes(endorsement),
+    )
+    return student.id
+
+
 TRANSACTION_HANDLERS = {
     "student-handoff": handle_student_handoff,
     "leave-of-absence": handle_leave_of_absence,
@@ -3626,6 +4703,9 @@ TRANSACTION_HANDLERS = {
     "research-gate": handle_research_gate,
     "panel-matching": handle_panel_matching,
     "defense-scheduling": handle_defense_scheduling,
+    "practicum": handle_practicum,
+    "withdrawal": handle_withdrawal,
+    "graduation": handle_graduation,
 }
 
 
@@ -4733,7 +5813,8 @@ def seed_database(count: int = 350) -> None:
         ("EDD", "Doctor of Education", "Education", True),
         ("MSN", "Master of Science in Nursing", "Nursing", True),
         ("MAN", "Master of Arts in Nursing", "Nursing", True),
-        ("MAPSY", "Master of Arts in Psychology", "Arts and Sciences", False),
+        ("MAPSY", "Master of Arts in Psychology", "Arts and Sciences", True),
+        ("MAGC", "Master of Arts in Guidance and Counseling", "Education", True),
         ("MASS", "Master of Arts in Social Sciences", "Arts and Sciences", False),
     ]
     programs = []
@@ -5011,6 +6092,7 @@ def seed_database(count: int = 350) -> None:
     db.session.commit()
 
     sync_all_curricula()
+    seed_workflow_cases()
 
     # Derive each student's risk/priority from the same signals the Decision Support
     # engine uses, so the student record and the recommendation queue always agree.
@@ -5018,6 +6100,147 @@ def seed_database(count: int = 350) -> None:
         recompute_risk(student)
     ensure_demo_accounts()
     db.session.commit()
+
+
+def seed_workflow_cases() -> None:
+    practicum_students = (
+        Student.query.join(Program)
+        .filter(Program.has_practicum.is_(True))
+        .order_by(Student.student_number.asc())
+        .limit(8)
+        .all()
+    )
+    practicum_statuses = [
+        ("Hours Incomplete", 200, 144, "Pending Review", 1),
+        ("Report Sent to Dean", 200, 220, "Verified", 3),
+        ("Dean Reviewed", 200, 214, "Verified", 3),
+        ("Completed", 200, 205, "Verified", 2),
+    ]
+    for idx, student in enumerate(practicum_students[:4]):
+        status, required, completed, document_status, cert_count = practicum_statuses[idx]
+        record = PracticumRecord(
+            student_id=student.id,
+            moa_status="Uploaded",
+            moa_uploaded=True,
+            practicum_site=random.choice(["USLS Center for Psychological Services", "Guidance Center", "Partner Community Clinic"]),
+            required_hours=required,
+            completed_hours=completed,
+            document_status=document_status,
+            certificate_count=cert_count,
+            remarks="Seeded practicum monitoring case.",
+            status=status,
+            report_sent_at=now_utc() - timedelta(days=2) if status in {"Report Sent to Dean", "Dean Reviewed"} else None,
+            dean_reviewed_at=now_utc() - timedelta(days=1) if status == "Dean Reviewed" else None,
+        )
+        db.session.add(record)
+        if status == "Hours Incomplete":
+            add_task(student.id, "Submit additional practicum certificates", "Student", 5, 45)
+        if status == "Report Sent to Dean":
+            add_task(student.id, "Review practicum status report", "Dean", 4, 35)
+        add_log("practicum", student.id, "Demo Data", "Seeded practicum", f"Practicum status: {status}", "Dean" if status == "Report Sent to Dean" else "Academic Coordinator", practicum_notes(record))
+
+    withdrawal_students = (
+        Student.query.filter(Student.standing == "Active")
+        .order_by(Student.student_number.asc())
+        .offset(10)
+        .limit(4)
+        .all()
+    )
+    withdrawal_cases = [
+        ("Pending", "Pending", "Pending", "Pending", "Dean Review"),
+        ("Approved", "Pending", "Pending", "Pending", "Requirements Pending"),
+        ("Denied", "Pending", "Pending", "Pending", "Denied"),
+        ("Approved", "Complete", "Cleared", "Record Updated", "Withdrawn Confirmed"),
+    ]
+    for student, (dean, reqs, fees, registrar, status) in zip(withdrawal_students, withdrawal_cases):
+        application = WithdrawalApplication(
+            student_id=student.id,
+            reason="Personal or employment-related withdrawal request.",
+            effective_term="AY 2026-2027 Term 1",
+            fee_status=fees,
+            requirement_status=reqs,
+            dean_decision=dean,
+            registrar_status=registrar,
+            status=status,
+            decided_at=now_utc() - timedelta(days=2) if dean != "Pending" else None,
+            completed_at=now_utc() - timedelta(days=1) if status == "Withdrawn Confirmed" else None,
+            staff_remarks="Seeded withdrawal monitoring case.",
+        )
+        db.session.add(application)
+        if status == "Dean Review":
+            add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+        elif status == "Requirements Pending":
+            add_task(student.id, "Complete withdrawal requirements", "Student", 7, 40)
+            add_task(student.id, "Perform withdrawal follow-through actions", "Academic Coordinator", 5, 45)
+        elif status == "Withdrawn Confirmed":
+            student.standing = "Withdrawn"
+            student.current_stage = "Withdrawn"
+            student.enrollment_tag = "Withdrawn"
+        add_log("withdrawal", student.id, "Demo Data", "Seeded withdrawal", f"Withdrawal status: {status}", "Dean" if dean == "Pending" else "Graduate School Staff", withdrawal_notes(application))
+
+    candidate_students = (
+        Student.query.filter(Student.current_stage.in_(["Final Defense", "Completed", "Writing"]))
+        .order_by(Student.student_number.asc())
+        .limit(8)
+        .all()
+    )
+    if candidate_students:
+        ready_student = candidate_students[0]
+        for rec in CourseRecord.query.filter_by(student_id=ready_student.id).all():
+            rec.status = "Completed"
+            rec.updated_at = now_utc()
+        case = ResearchCase.query.filter_by(student_id=ready_student.id).first()
+        if not case:
+            case = ResearchCase(
+                student_id=ready_student.id,
+                case_type=research_case_type(ready_student),
+                title=f"{ready_student.program.code} completion research case",
+                current_gate="Completion Evidence",
+                status="Verified Complete",
+                adviser_name=ready_student.adviser_name,
+            )
+            db.session.add(case)
+        case.current_gate = "Completion Evidence"
+        case.status = "Verified Complete"
+        for item in required_documents_for_gate("Completion Evidence"):
+            doc = DocumentCheck.query.filter_by(student_id=ready_student.id, gate="Completion Evidence", item_name=item).first()
+            if not doc:
+                doc = DocumentCheck(student_id=ready_student.id, gate="Completion Evidence", item_name=item)
+                db.session.add(doc)
+            doc.status = "Complete"
+            doc.evidence_reference = "Seeded completion evidence"
+            doc.updated_at = now_utc()
+        if ready_student.program.has_practicum and not latest_practicum_record(ready_student.id):
+            db.session.add(PracticumRecord(
+                student_id=ready_student.id,
+                moa_status="Uploaded",
+                moa_uploaded=True,
+                practicum_site="Partner practicum site",
+                required_hours=200,
+                completed_hours=220,
+                document_status="Verified",
+                certificate_count=3,
+                status="Dean Reviewed",
+                report_sent_at=now_utc() - timedelta(days=4),
+                dean_reviewed_at=now_utc() - timedelta(days=2),
+            ))
+
+    for idx, student in enumerate(candidate_students[:6]):
+        eligibility = graduation_eligibility(student)
+        endorsement = GraduationEndorsement(
+            student_id=student.id,
+            review_window="AY 2026-2027 Graduation Review",
+            endorsement_status="Ready for Dean Review" if eligibility["eligible"] and idx % 2 == 0 else "For Review" if eligibility["eligible"] else "Not Eligible",
+            registrar_status="Pending",
+            submitted_at=now_utc() - timedelta(days=idx + 1),
+        )
+        apply_graduation_eligibility(endorsement, eligibility)
+        db.session.add(endorsement)
+        if endorsement.endorsement_status == "Ready for Dean Review":
+            add_task(student.id, "Review graduation endorsement list", "Dean", 4, 55)
+        elif endorsement.endorsement_status == "Not Eligible":
+            add_task(student.id, eligibility["next_action"], eligibility["next_owner"], 7, 35)
+        add_log("graduation", student.id, "Demo Data", "Seeded graduation endorsement", f"Graduation endorsement: {endorsement.endorsement_status}", "Dean" if endorsement.endorsement_status == "Ready for Dean Review" else eligibility["next_owner"], graduation_notes(endorsement))
 
 
 def ensure_demo_accounts() -> None:
@@ -5047,7 +6270,13 @@ def ensure_demo_accounts() -> None:
             )
         )
 
-    linked_student = Student.query.order_by(Student.student_number.asc()).first()
+    linked_student = (
+        Student.query.join(Program)
+        .filter(Program.has_practicum.is_(True), Student.standing == "Active")
+        .order_by(Student.student_number.asc())
+        .first()
+        or Student.query.order_by(Student.student_number.asc()).first()
+    )
     if linked_student:
         demo_missing = DocumentCheck.query.filter_by(
             student_id=linked_student.id,
@@ -5100,4 +6329,3 @@ if __name__ == "__main__":
     port = int(os.getenv("FLASK_PORT", "5000"))
     print(f"USLS Graduate School platform running at http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
-

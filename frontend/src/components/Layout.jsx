@@ -14,10 +14,12 @@ import {
   Menu,
   X,
   GraduationCap,
+  Briefcase,
   ChevronRight,
   Lightbulb,
   Bot,
   Table2,
+  FileText,
   BookOpenCheck,
   SlidersHorizontal,
   UsersRound,
@@ -30,7 +32,10 @@ import { useAuth } from "../auth";
 const NAV_GROUPS = [
   {
     label: "Overview",
-    items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }],
+    items: [
+      { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+      { to: "/reports", label: "Reports", icon: FileText },
+    ],
   },
   {
     label: "Records",
@@ -50,6 +55,8 @@ const NAV_GROUPS = [
       { to: "/workflow/research-gate", label: "5 · Research Gate", icon: FileCheck },
       { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
       { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
+      { to: "/workflow/practicum", label: "8 · Practicum", icon: Briefcase },
+      { to: "/workflow/graduation", label: "9 · Graduation", icon: GraduationCap },
     ],
   },
   {
@@ -57,6 +64,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/workflow/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
       { to: "/workflow/readmission", label: "Readmission", icon: UserCheck },
+      { to: "/workflow/withdrawal", label: "Withdrawal", icon: LogOut },
     ],
   },
   {

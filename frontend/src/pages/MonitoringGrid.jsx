@@ -36,18 +36,22 @@ export default function MonitoringGrid() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
+  const selectedStage = searchParams.get("stage") || "";
+  const selectedRisk = searchParams.get("risk") || "";
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
+  const [stage, setStage] = useState(selectedStage);
+  const [risk, setRisk] = useState(selectedRisk);
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function load(pid) {
+  function load(pid, nextStage = stage, nextRisk = risk) {
     setLoading(true);
     setError("");
     api
-      .monitoringGrid(pid || undefined)
+      .monitoringGrid({ program_id: pid || undefined, stage: nextStage, risk: nextRisk })
       .then((g) => {
         setGrid(g);
         setProgramId(String(g.program.id));
@@ -57,9 +61,11 @@ export default function MonitoringGrid() {
   }
 
   useEffect(() => {
-    load(selectedProgramId);
+    setStage(selectedStage);
+    setRisk(selectedRisk);
+    load(selectedProgramId, selectedStage, selectedRisk);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProgramId]);
+  }, [selectedProgramId, selectedStage, selectedRisk]);
 
   const flatCourses = useMemo(
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
@@ -112,6 +118,19 @@ export default function MonitoringGrid() {
     URL.revokeObjectURL(url);
   }
 
+  function updateFilters(next) {
+    const merged = {
+      program_id: next.program_id ?? programId,
+      stage: next.stage ?? stage,
+      risk: next.risk ?? risk,
+    };
+    const params = {};
+    if (merged.program_id) params.program_id = merged.program_id;
+    if (merged.stage) params.stage = merged.stage;
+    if (merged.risk) params.risk = merged.risk;
+    setSearchParams(params, { replace: true });
+  }
+
   return (
     <div className="space-y-5 animate-fade-up">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -121,10 +140,10 @@ export default function MonitoringGrid() {
             The full class view — students by row, subjects by column. Click a subject cell to cycle its status.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
           <select
             value={programId}
-            onChange={(e) => setSearchParams({ program_id: e.target.value })}
+            onChange={(e) => updateFilters({ program_id: e.target.value })}
             className="field-input cursor-pointer"
             aria-label="Program"
           >
@@ -132,6 +151,28 @@ export default function MonitoringGrid() {
               <option key={p.id} value={p.id}>
                 {p.code} — {p.name}
               </option>
+            ))}
+          </select>
+          <select
+            value={stage}
+            onChange={(e) => updateFilters({ stage: e.target.value })}
+            className="field-input cursor-pointer"
+            aria-label="Progress"
+          >
+            <option value="">All progress</option>
+            {(meta?.stages || []).map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+          <select
+            value={risk}
+            onChange={(e) => updateFilters({ risk: e.target.value })}
+            className="field-input cursor-pointer"
+            aria-label="Risk"
+          >
+            <option value="">All risk</option>
+            {["Low", "Medium", "High", "Medium/High"].map((item) => (
+              <option key={item} value={item}>{item}</option>
             ))}
           </select>
           <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}>
@@ -289,5 +330,3 @@ export default function MonitoringGrid() {
     </div>
   );
 }
-
-

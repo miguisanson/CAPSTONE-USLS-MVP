@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
+  Briefcase,
   CalendarCheck,
   CalendarClock,
   CalendarOff,
@@ -55,6 +56,21 @@ const REQUEST_GROUPS = [
         lockedWhen: (data) => data.student.standing !== "On Leave" && data.student.current_stage !== "LOA",
         lockedReason: "Available only after an approved Leave of Absence.",
       },
+      { id: "withdrawal", label: "Withdrawal", icon: LogOut },
+    ],
+  },
+  {
+    title: "Completion",
+    description: "Submit practicum evidence when required and request Graduate School graduation endorsement review.",
+    items: [
+      {
+        id: "practicum",
+        label: "Practicum",
+        icon: Briefcase,
+        lockedWhen: (data) => !data.student.program_has_practicum,
+        lockedReason: "Available only for programs with practicum requirements.",
+      },
+      { id: "graduation", label: "Graduation Endorsement", icon: GraduationCap },
     ],
   },
 ];
@@ -106,6 +122,7 @@ export default function StudentPortal() {
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
                 <div className="space-y-5 lg:col-span-8">
                   <ProgressPanel data={data} />
+                  <WorkflowStatusPanel data={data} />
                   <RequestCenter data={data} onSaved={refetch} />
                   <AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} />
                   <ActivityPanel logs={data.logs} />
@@ -223,6 +240,58 @@ function ProgressPanel({ data }) {
   );
 }
 
+function WorkflowStatusPanel({ data }) {
+  const rows = [];
+  if (data.student.program_has_practicum) {
+    rows.push({
+      label: "Practicum",
+      icon: Briefcase,
+      status: data.practicum_record?.status || "Missing",
+      detail: data.practicum_record
+        ? `${data.practicum_record.completed_hours}/${data.practicum_record.required_hours} hours · ${data.practicum_record.document_status}`
+        : "No practicum MOA or certificates submitted yet.",
+    });
+  }
+  rows.push({
+    label: "Withdrawal",
+    icon: LogOut,
+    status: data.withdrawal_application?.status || "No request",
+    detail: data.withdrawal_application
+      ? `Dean: ${data.withdrawal_application.dean_decision} · requirements: ${data.withdrawal_application.requirement_status}`
+      : "No withdrawal request is active.",
+  });
+  rows.push({
+    label: "Graduation Endorsement",
+    icon: GraduationCap,
+    status: data.graduation_endorsement?.endorsement_status || (data.graduation_eligibility?.eligible ? "For Review" : "Not Eligible"),
+    detail: data.graduation_endorsement
+      ? `Coursework: ${data.graduation_endorsement.coursework_status} · research: ${data.graduation_endorsement.research_status}`
+      : data.graduation_eligibility?.next_action || "No graduation endorsement request submitted yet.",
+  });
+
+  return (
+    <Card className="p-6">
+      <SectionTitle title="Workflow Status" subtitle="Administrative and completion requests currently visible to you" icon={FileText} />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {rows.map((row) => {
+          const Icon = row.icon;
+          return (
+            <div key={row.label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+                  <Icon className="h-4 w-4 text-brand-700" /> {row.label}
+                </span>
+                <StatusBadge value={row.status} dot={false} />
+              </div>
+              <p className="text-xs leading-relaxed text-slate-500">{row.detail}</p>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function RequestCenter({ data, onSaved }) {
   const [active, setActive] = useState("research");
   const allRequests = REQUEST_GROUPS.flatMap((group) => group.items);
@@ -283,6 +352,9 @@ function RequestCenter({ data, onSaved }) {
             {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
             {active === "loa" && <LoaRequestForm studentId={data.student.id} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
+            {active === "withdrawal" && <WithdrawalRequestForm studentId={data.student.id} onSaved={onSaved} />}
+            {active === "practicum" && <PracticumRequestForm data={data} onSaved={onSaved} />}
+            {active === "graduation" && <GraduationRequestForm data={data} onSaved={onSaved} />}
             {active === "schedule" && <ScheduleRequestForm studentId={data.student.id} onSaved={onSaved} />}
           </>
         )}
@@ -524,6 +596,151 @@ function ReadmissionRequestForm({ data, onSaved }) {
       </Field>
       <RequestPdfUpload requestType="readmission" label="Completed readmission application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
       <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || items.length !== requirements.length} disabledHint={!form.attachment_id ? "Upload the completed readmission application before submitting." : items.length !== requirements.length ? "Confirm all required items included in the application." : ""} label="Submit readmission request" />
+    </form>
+  );
+}
+
+function WithdrawalRequestForm({ studentId, onSaved }) {
+  const [form, setForm] = useState({
+    attachment_id: null,
+    proof_attachment_id: null,
+    reason: "",
+    effective_term: "",
+  });
+  const { busy, error, message, submit } = useSubmitRequest("withdrawal", onSaved);
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  function onSubmit(e) {
+    e.preventDefault();
+    submit({ student_id: studentId, ...form });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <Field label="Effective term" required>
+        <Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 Term 1" />
+      </Field>
+      <Field label="Reason for withdrawal" required>
+        <Textarea value={form.reason} onChange={set("reason")} required />
+      </Field>
+      <RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+      <RequestPdfUpload requestType="withdrawal" label="Proof or clearance PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, proof_attachment_id: attachment?.id || null }))} />
+      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label="Submit withdrawal request" />
+    </form>
+  );
+}
+
+function PracticumRequestForm({ data, onSaved }) {
+  const existing = data.practicum_record;
+  const [form, setForm] = useState({
+    attachment_id: existing?.moa_attachment?.id || null,
+    certificate_attachment_id: existing?.certificate_attachment?.id || null,
+    practicum_site: existing?.practicum_site || "",
+    required_hours: existing?.required_hours || 200,
+    completed_hours: existing?.completed_hours || 0,
+    certificate_count: existing?.certificate_count || 0,
+    remarks: existing?.remarks || "",
+  });
+  const { busy, error, message, submit } = useSubmitRequest("practicum", onSaved);
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  useEffect(() => {
+    setForm({
+      attachment_id: existing?.moa_attachment?.id || null,
+      certificate_attachment_id: existing?.certificate_attachment?.id || null,
+      practicum_site: existing?.practicum_site || "",
+      required_hours: existing?.required_hours || 200,
+      completed_hours: existing?.completed_hours || 0,
+      certificate_count: existing?.certificate_count || 0,
+      remarks: existing?.remarks || "",
+    });
+  }, [data.student.id, existing?.id, existing?.updated_at]);
+
+  function onSubmit(e) {
+    e.preventDefault();
+    submit({
+      student_id: data.student.id,
+      ...form,
+      moa_uploaded: Boolean(form.attachment_id),
+      moa_status: form.attachment_id ? "Uploaded" : "Missing",
+      document_status: form.certificate_attachment_id ? "Pending Review" : "Missing",
+    });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      {existing && (
+        <div className="rounded-xl border border-slate-100 bg-white px-3.5 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-ink">{existing.practicum_site || "Practicum site pending"}</p>
+            <StatusBadge value={existing.status} dot={false} />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">{existing.completed_hours}/{existing.required_hours} hours · certificates: {existing.certificate_count}</p>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Practicum site / company" required>
+          <Input value={form.practicum_site} onChange={set("practicum_site")} required />
+        </Field>
+        <Field label="Required hours" required>
+          <Input type="number" min="1" value={form.required_hours} onChange={set("required_hours")} required />
+        </Field>
+        <Field label="Completed hours" required>
+          <Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required />
+        </Field>
+        <Field label="Number of certificates">
+          <Input type="number" min="0" value={form.certificate_count} onChange={set("certificate_count")} />
+        </Field>
+      </div>
+      <RequestPdfUpload requestType="practicum" label="Practicum MOA PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+      <RequestPdfUpload requestType="practicum" label="Certificate/document PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />
+      <Field label="Remarks">
+        <Textarea value={form.remarks} onChange={set("remarks")} />
+      </Field>
+      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label="Submit practicum record" />
+    </form>
+  );
+}
+
+function GraduationRequestForm({ data, onSaved }) {
+  const [form, setForm] = useState({
+    attachment_id: data.graduation_endorsement?.request_attachment?.id || null,
+    review_window: data.graduation_endorsement?.review_window || "AY 2026-2027 Graduation Review",
+  });
+  const { busy, error, message, submit } = useSubmitRequest("graduation", onSaved);
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const eligibility = data.graduation_eligibility || {};
+  const missing = [
+    ...(eligibility.missing_coursework || []).map((item) => `Coursework: ${item}`),
+    ...(eligibility.missing_research_requirements || []).map((item) => `Research: ${item}`),
+    ...(eligibility.missing_practicum_requirement ? [`Practicum: ${eligibility.missing_practicum_requirement}`] : []),
+  ];
+
+  function onSubmit(e) {
+    e.preventDefault();
+    submit({ student_id: data.student.id, ...form });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <Field label="Review window / term" required>
+        <Input value={form.review_window} onChange={set("review_window")} required />
+      </Field>
+      <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-ink">Monitoring eligibility recommendation</p>
+          <StatusBadge value={eligibility.eligible ? "Ready for Dean Review" : "Not Eligible"} dot={false} />
+        </div>
+        {missing.length ? (
+          <ul className="mt-2 space-y-1 text-xs text-slate-500">
+            {missing.slice(0, 8).map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">No missing requirements are currently flagged by the monitoring layer.</p>
+        )}
+      </div>
+      <RequestPdfUpload requestType="graduation" label="Optional graduation endorsement/supporting PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+      <SubmitState busy={busy} error={error} message={message} label="Submit graduation endorsement request" />
     </form>
   );
 }

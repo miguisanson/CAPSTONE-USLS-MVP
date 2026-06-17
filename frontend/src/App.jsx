@@ -3,6 +3,7 @@ import { useAuth } from "./auth";
 import Layout from "./components/Layout";
 import { Spinner } from "./components/ui";
 import Dashboard from "./pages/Dashboard";
+import Reports from "./pages/Reports";
 import Students from "./pages/Students";
 import Faculty from "./pages/Faculty";
 import StudentDetail from "./pages/StudentDetail";
@@ -56,6 +57,7 @@ export default function App() {
             <Layout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/reports" element={<Reports />} />
                 <Route path="/students" element={<Students />} />
                 <Route path="/faculty" element={<Faculty />} />
                 <Route path="/students/:id" element={<StudentDetail />} />

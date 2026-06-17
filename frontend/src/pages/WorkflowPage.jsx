@@ -8,6 +8,9 @@ import {
   FileCheck,
   Users,
   CalendarCheck,
+  Briefcase,
+  GraduationCap,
+  LogOut,
   CheckCircle2,
   Info,
   Sparkles,
@@ -40,6 +43,9 @@ const ICONS = {
   "research-gate": FileCheck,
   "panel-matching": Users,
   "defense-scheduling": CalendarCheck,
+  practicum: Briefcase,
+  withdrawal: LogOut,
+  graduation: GraduationCap,
 };
 
 const NEEDS_STUDENT = {
@@ -50,6 +56,9 @@ const NEEDS_STUDENT = {
   "research-gate": true,
   "panel-matching": true,
   "defense-scheduling": true,
+  practicum: true,
+  withdrawal: true,
+  graduation: true,
 };
 
 export default function WorkflowPage() {
@@ -202,6 +211,9 @@ export default function WorkflowPage() {
               {slug === "research-gate" && <ResearchGateForm {...formProps} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
               {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
+              {slug === "practicum" && <PracticumForm {...formProps} />}
+              {slug === "withdrawal" && <WithdrawalForm {...formProps} />}
+              {slug === "graduation" && <GraduationForm {...formProps} />}
               {slug === "leave-of-absence" && <LeaveOfAbsenceForm {...formProps} />}
               {slug === "readmission" && <ReadmissionForm {...formProps} />}
             </Card>
@@ -435,17 +447,20 @@ function HandoffImport({ context }) {
               </Link>
             </div>
           )}
-          {result.conflicts?.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
-                <AlertTriangle className="h-4 w-4" /> Rows skipped for duplicate review
-              </p>
-              <ul className="space-y-2">
+              {result.conflicts?.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
+                    <AlertTriangle className="h-4 w-4" /> Rows skipped for duplicate review
+                  </p>
+                  <p className="mb-2 text-sm font-medium text-amber-800">
+                    Some students were not added because they are already in the system or require duplicate review.
+                  </p>
+                  <ul className="space-y-2">
                 {result.conflicts.slice(0, 5).map((c) => (
                   <li key={`${c.incoming_student_number}-${c.matched_student.id}`} className="rounded-lg bg-white px-3 py-2 text-sm">
                     <p className="font-semibold text-ink">{c.incoming_name || "Unnamed student"} · {c.incoming_student_number}</p>
                     <p className="text-xs text-slate-500">
-                      Possible match: {c.matched_student.name} · {c.matched_student.student_number}. {c.reason}
+                      Possible match: {c.matched_student.name} · {c.matched_student.student_number}. Verify first; existing profile values are kept unless overwrite is selected.
                     </p>
                   </li>
                 ))}
@@ -1343,11 +1358,296 @@ function ScheduleHistory({ schedules }) {
               <p className="text-sm font-semibold text-ink">{shortDate(schedule.preferred_date)} - {schedule.mode}</p>
               <p className="mt-0.5 text-xs text-slate-500">{schedule.venue || "Arrangement pending"} - {schedule.notes}</p>
             </div>
-            <StatusBadge status={schedule.status} />
+            <StatusBadge value={schedule.status} />
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Practicum
+// ---------------------------------------------------------------------------
+function PracticumForm({ context, studentId, submit, submitting }) {
+  const selected = context.selected_student;
+  const current = context.practicum_record;
+  const [form, setForm] = useState({
+    moa_status: "Uploaded",
+    moa_uploaded: "true",
+    practicum_site: "",
+    required_hours: 200,
+    completed_hours: 0,
+    document_status: "Pending Review",
+    certificate_count: 0,
+    status: "Under Review",
+    remarks: "",
+    source_reference: "",
+  });
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => {
+    setForm({
+      moa_status: current?.moa_status || "Uploaded",
+      moa_uploaded: current?.moa_uploaded ? "true" : "true",
+      practicum_site: current?.practicum_site || "",
+      required_hours: current?.required_hours || 200,
+      completed_hours: current?.completed_hours || 0,
+      document_status: current?.document_status || "Pending Review",
+      certificate_count: current?.certificate_count || 0,
+      status: current?.status || "Under Review",
+      remarks: current?.remarks || "",
+      source_reference: "",
+    });
+  }, [studentId, current?.id, current?.updated_at]);
+
+  function onSubmit(e) {
+    e.preventDefault();
+    submit({ student_id: studentId, ...form });
+  }
+
+  if (selected && !selected.program_has_practicum) {
+    return (
+      <EmptyState
+        icon={Briefcase}
+        title="Practicum not required"
+        hint={`${selected.program_code} is not marked as a practicum-required program.`}
+      />
+    );
+  }
+
+  const completeEnough = Number(form.completed_hours || 0) >= Number(form.required_hours || 0);
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-5">
+      <SectionTitle title="Process practicum submission" subtitle="Record MOA receipt, certificate review, hours, and Dean report status" icon={Briefcase} />
+      {current && (
+        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-ink">{current.practicum_site || "Practicum site not set"}</p>
+              <p className="text-xs text-slate-500">{current.completed_hours}/{current.required_hours} hours · {current.certificate_count} certificate(s)</p>
+            </div>
+            <StatusBadge value={current.status} dot={false} />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="MOA status">
+          <Select value={form.moa_status} onChange={set("moa_status")} placeholder="" options={["Uploaded", "Pending Review", "Verified", "Returned", "Missing"]} />
+        </Field>
+        <Field label="Practicum site / company" required>
+          <Input value={form.practicum_site} onChange={set("practicum_site")} required />
+        </Field>
+        <Field label="Required hours" required>
+          <Input type="number" min="1" value={form.required_hours} onChange={set("required_hours")} required />
+        </Field>
+        <Field label="Completed hours" required>
+          <Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required />
+        </Field>
+        <Field label="Certificate/document status">
+          <Select value={form.document_status} onChange={set("document_status")} placeholder="" options={["Missing", "Uploaded", "Pending Review", "Verified", "Returned"]} />
+        </Field>
+        <Field label="Number of certificates">
+          <Input type="number" min="0" value={form.certificate_count} onChange={set("certificate_count")} />
+        </Field>
+        <Field label="Workflow status">
+          <Select
+            value={form.status}
+            onChange={set("status")}
+            placeholder=""
+            options={["MOA Received", "Under Review", "Hours Incomplete", "Additional Certificates Requested", "Completed", "Report Sent to Dean", "Dean Reviewed"]}
+          />
+        </Field>
+        <Field label="Source reference">
+          <Input value={form.source_reference} onChange={set("source_reference")} placeholder="Email, drive link, or staff note" />
+        </Field>
+      </div>
+      <Field label="Remarks">
+        <Textarea value={form.remarks} onChange={set("remarks")} />
+      </Field>
+      {!completeEnough && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          Completed hours are below the requirement. Saving will keep this case incomplete and queue the student for additional certificates.
+        </div>
+      )}
+      <SubmitButton submitting={submitting}>Save practicum status</SubmitButton>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Withdrawal
+// ---------------------------------------------------------------------------
+function WithdrawalForm({ context, studentId, submit, submitting }) {
+  const current = context.withdrawal_application;
+  const [form, setForm] = useState({
+    reason: "",
+    effective_term: "",
+    fee_status: "Pending",
+    requirement_status: "Pending",
+    dean_decision: "Pending",
+    staff_remarks: "",
+    academic_coordinator_remarks: "",
+    registrar_status: "Pending",
+    source_reference: "",
+  });
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => {
+    setForm({
+      reason: current?.reason || "",
+      effective_term: current?.effective_term || "",
+      fee_status: current?.fee_status || "Pending",
+      requirement_status: current?.requirement_status || "Pending",
+      dean_decision: current?.dean_decision || "Pending",
+      staff_remarks: current?.staff_remarks || "",
+      academic_coordinator_remarks: current?.academic_coordinator_remarks || "",
+      registrar_status: current?.registrar_status || "Pending",
+      source_reference: "",
+    });
+  }, [studentId, current?.id, current?.updated_at]);
+
+  function onSubmit(e) {
+    e.preventDefault();
+    submit({ student_id: studentId, ...form });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-5">
+      <SectionTitle title="Process withdrawal application" subtitle="Record Dean decision, coordinator follow-through, requirements, fee status, and registrar confirmation" icon={LogOut} />
+      {current && (
+        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-ink">Effective {current.effective_term || "term pending"}</p>
+              <p className="text-xs text-slate-500">Dean: {current.dean_decision} · requirements: {current.requirement_status} · fees: {current.fee_status}</p>
+            </div>
+            <StatusBadge value={current.status} dot={false} />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Effective term" required>
+          <Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 Term 1" />
+        </Field>
+        <Field label="Dean decision">
+          <Select value={form.dean_decision} onChange={set("dean_decision")} placeholder="" options={["Pending", "Approved", "Denied", "Returned"]} />
+        </Field>
+        <Field label="Requirement status">
+          <Select value={form.requirement_status} onChange={set("requirement_status")} placeholder="" options={["Pending", "Complete", "Incomplete"]} />
+        </Field>
+        <Field label="Fee status">
+          <Select value={form.fee_status} onChange={set("fee_status")} placeholder="" options={["Pending", "Cleared", "Not Cleared"]} />
+        </Field>
+        <Field label="Registrar confirmation/status">
+          <Select value={form.registrar_status} onChange={set("registrar_status")} placeholder="" options={["Pending", "Confirmed", "Not Cleared", "Record Updated"]} />
+        </Field>
+        <Field label="Source reference">
+          <Input value={form.source_reference} onChange={set("source_reference")} />
+        </Field>
+      </div>
+      <Field label="Reason for withdrawal">
+        <Textarea value={form.reason} onChange={set("reason")} />
+      </Field>
+      <Field label="Academic Coordinator remarks">
+        <Textarea value={form.academic_coordinator_remarks} onChange={set("academic_coordinator_remarks")} />
+      </Field>
+      <Field label="Staff remarks">
+        <Textarea value={form.staff_remarks} onChange={set("staff_remarks")} />
+      </Field>
+      <SubmitButton submitting={submitting}>Save withdrawal action</SubmitButton>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Graduation Endorsement
+// ---------------------------------------------------------------------------
+function GraduationForm({ context, studentId, submit, submitting }) {
+  const eligibility = context.graduation_eligibility || {};
+  const current = context.graduation_endorsement;
+  const [form, setForm] = useState({
+    review_window: "AY 2026-2027 Graduation Review",
+    endorsement_status: "For Review",
+    dean_remarks: "",
+    registrar_status: "Pending",
+    source_reference: "",
+  });
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => {
+    setForm({
+      review_window: current?.review_window || "AY 2026-2027 Graduation Review",
+      endorsement_status: current?.endorsement_status || (eligibility.eligible ? "Ready for Dean Review" : "For Review"),
+      dean_remarks: current?.dean_remarks || "",
+      registrar_status: current?.registrar_status || "Pending",
+      source_reference: "",
+    });
+  }, [studentId, current?.id, current?.updated_at, eligibility.eligible]);
+
+  function onSubmit(e) {
+    e.preventDefault();
+    submit({ student_id: studentId, ...form });
+  }
+
+  const missing = [
+    ...(eligibility.missing_coursework || []).map((item) => ({ type: "Coursework", item })),
+    ...(eligibility.missing_research_requirements || []).map((item) => ({ type: "Research", item })),
+    ...(eligibility.missing_practicum_requirement ? [{ type: "Practicum", item: eligibility.missing_practicum_requirement }] : []),
+  ];
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-5">
+      <SectionTitle title="Review graduation endorsement" subtitle="Monitor endorsement readiness before the official Registrar process" icon={GraduationCap} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <MiniBox label="Coursework" value={eligibility.coursework_status || "Pending"} tone={eligibility.coursework_status === "Complete" ? "brand" : "amber"} />
+        <MiniBox label="Research" value={eligibility.research_status || "Pending"} tone={eligibility.research_status === "Complete" ? "brand" : "amber"} />
+        <MiniBox label="Practicum" value={eligibility.practicum_status || "Not Required"} tone={eligibility.practicum_status === "Not Required" || eligibility.practicum_status === "Dean Reviewed" ? "brand" : "amber"} />
+        <MiniBox label="Eligible" value={eligibility.eligible ? "Yes" : "No"} tone={eligibility.eligible ? "brand" : "red"} />
+      </div>
+      {missing.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-amber-900">Missing requirements</p>
+          <ul className="space-y-1.5">
+            {missing.slice(0, 10).map((row, index) => (
+              <li key={`${row.type}-${index}`} className="flex items-start gap-2 text-sm text-amber-800">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span><span className="font-semibold">{row.type}:</span> {row.item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Review window / term" required>
+          <Input value={form.review_window} onChange={set("review_window")} required />
+        </Field>
+        <Field label="Endorsement status">
+          <Select
+            value={form.endorsement_status}
+            onChange={set("endorsement_status")}
+            placeholder=""
+            options={["For Review", "Ready for Dean Review", "Not Eligible", "Returned for Revision", "Sent to Registrar"]}
+          />
+        </Field>
+        <Field label="Registrar handoff/status">
+          <Select value={form.registrar_status} onChange={set("registrar_status")} placeholder="" options={["Pending", "Sent", "Received"]} />
+        </Field>
+        <Field label="Source reference">
+          <Input value={form.source_reference} onChange={set("source_reference")} />
+        </Field>
+      </div>
+      <Field label="Dean remarks">
+        <Textarea value={form.dean_remarks} onChange={set("dean_remarks")} />
+      </Field>
+      {!eligibility.eligible && form.endorsement_status === "Ready for Dean Review" && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          This candidate still has missing requirements. Saving will keep the backend status as Not Eligible and queue the listed owner.
+        </div>
+      )}
+      <SubmitButton submitting={submitting}>Save endorsement review</SubmitButton>
+    </form>
   );
 }
 
@@ -1552,8 +1852,12 @@ function workflowGuidance(slug) {
       "Retrieves keywords from the student's research title and three uploaded concept papers, then ranks faculty expertise with availability, college fit, and current panel load.",
     "defense-scheduling":
       "Opens only after panel matching. The date spread compares adviser and panel availability, respects weekday work hours, and shows weekends only when faculty recorded an explicit override.",
+    practicum:
+      "Available only for programs marked with practicum requirements. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
+    withdrawal:
+      "Withdrawal is a lifecycle-exit process. A Dean denial keeps the student Active. An approval moves through coordinator follow-through, student requirements, fee/registrar confirmation, and only then marks the student Withdrawn.",
+    graduation:
+      "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and Registrar handoff.",
   };
   return map[slug] || "";
 }
-
-

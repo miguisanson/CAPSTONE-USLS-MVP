@@ -1,16 +1,28 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ListTodo, AlertTriangle } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
 import { formatDate, relativeDays } from "../lib/format";
 
-const OWNERS = ["GS Staff", "Academic Coordinator", "Research Coordinator", "Student", "Panel Chair", "Adviser"];
+const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar", "Student", "Panel Chair", "Adviser"];
 
 export default function WorkQueue() {
-  const [owner, setOwner] = useState("");
-  const { data, loading, error } = useApi(() => api.tasks(owner), [owner]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [owner, setOwner] = useState(searchParams.get("owner") || "");
+  const [status, setStatus] = useState(searchParams.get("status") || "");
+  const { data, loading, error } = useApi(() => api.tasks({ owner, status }), [owner, status]);
+
+  function updateFilter(next) {
+    const merged = { owner, status, ...next };
+    setOwner(merged.owner || "");
+    setStatus(merged.status || "");
+    const params = {};
+    if (merged.owner) params.owner = merged.owner;
+    if (merged.status) params.status = merged.status;
+    setSearchParams(params, { replace: true });
+  }
 
   return (
     <div className="space-y-5 animate-fade-up">
@@ -22,14 +34,17 @@ export default function WorkQueue() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <FilterChip active={owner === ""} onClick={() => setOwner("")}>
+        <FilterChip active={owner === ""} onClick={() => updateFilter({ owner: "" })}>
           All owners
         </FilterChip>
         {OWNERS.map((o) => (
-          <FilterChip key={o} active={owner === o} onClick={() => setOwner(o)}>
+          <FilterChip key={o} active={owner === o} onClick={() => updateFilter({ owner: o })}>
             {o}
           </FilterChip>
         ))}
+        <FilterChip active={status === "Overdue"} onClick={() => updateFilter({ status: status === "Overdue" ? "" : "Overdue" })}>
+          Overdue only
+        </FilterChip>
       </div>
 
       <Card className="overflow-hidden">
