@@ -172,6 +172,18 @@ npm run seed
 
 Change `DEMO_SEED_COUNT` in `.env` to seed 200-500 records.
 
+## Google Calendar availability
+
+Defense Scheduling can subtract each panelist's Google Calendar busy blocks from their recorded faculty availability before confirming a shared slot. Configure these values in `.env`:
+
+```env
+GOOGLE_CALENDAR_ACCESS_TOKEN=ya29...
+GOOGLE_CALENDAR_TIMEZONE=Asia/Manila
+GOOGLE_CALENDAR_IDS_JSON={"1":"faculty.one@group.calendar.google.com","2":"faculty.two@group.calendar.google.com"}
+```
+
+Calendar IDs can be mapped by faculty ID, exact faculty name, or an uppercase underscore slug such as `DR_ADRIANA_SANTOS`. Without these values, the workflow remains usable but labels that participant as using profile availability only.
+
 ## Project Structure
 
 ```text

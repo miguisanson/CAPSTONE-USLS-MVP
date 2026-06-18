@@ -4,15 +4,18 @@ import os
 import random
 import re
 import sys
+import json
 from collections import Counter
 from functools import wraps
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from urllib.parse import urlparse
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory, session
+from flask import Flask, Response, jsonify, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, text
 from werkzeug.datastructures import MultiDict
@@ -616,6 +619,8 @@ def term_dict(term: AcademicTerm) -> dict:
 def faculty_dict(faculty: Faculty) -> dict:
     workload = PanelAssignment.query.filter_by(faculty_id=faculty.id).count()
     working_hours = faculty_working_hours(faculty)
+    calendar_id = faculty_calendar_id(faculty)
+    calendar_ready = google_calendar_configured(faculty)
     return {
         "id": faculty.id,
         "name": faculty.name,
@@ -627,8 +632,12 @@ def faculty_dict(faculty: Faculty) -> dict:
         "working_hours": working_hours,
         "calendar": {
             "provider": "Google Calendar",
-            "connected": False,
-            "status": "Not connected",
+            "connected": calendar_ready,
+            "status": "Connected" if calendar_ready else "Not connected",
+            "sync_status": "FreeBusy checks enabled" if calendar_ready else "Ready to connect",
+            "connect_url": "https://calendar.google.com/calendar/u/0/r/settings",
+            "feed_url": f"/api/faculty/{faculty.id}/calendar.ics",
+            "calendar_id": calendar_id,
         },
     }
 
@@ -2236,6 +2245,15 @@ def register_routes(app: Flask) -> None:
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_profile_dict(f) for f in faculty]})
 
+    @app.route("/api/faculty/<int:faculty_id>/calendar.ics")
+    def faculty_calendar_feed(faculty_id: int):
+        faculty = Faculty.query.get_or_404(faculty_id)
+        return Response(
+            faculty_calendar_ics(faculty),
+            mimetype="text/calendar",
+            headers={"Content-Disposition": f'inline; filename="faculty-{faculty_id}-availability.ics"'},
+        )
+
     @app.route("/api/curriculum-planning")
     @require_api_login("staff")
     def curriculum_planning():
@@ -3571,7 +3589,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     "note": row["note"],
                     "matched_keywords": row["matched_keywords"],
                 }
-                for row in recommend_panel(selected_student, specialization)[:12]
+                for row in recommend_panel(selected_student, specialization)[: max(12, len(panel_roles_for_student(selected_student)), 4)]
             ]
             context["assigned_panel"] = [
                 panel_assignment_dict(p)
@@ -4481,6 +4499,12 @@ def handle_defense_scheduling(data: MultiDict) -> int:
                 and parse_time(slot["end"]) >= selected_end
                 for slot in participant["slots"]
             )
+            and not any(
+                busy["date"] == preferred_date.isoformat()
+                and parse_time(busy["start"]) < selected_end
+                and parse_time(busy["end"]) > selected_start
+                for busy in participant.get("google_busy", [])
+            )
         )
         selected_window_ok = matched_count == len(participants)
 
@@ -4718,6 +4742,63 @@ MATCH_STOPWORDS = {
     "into", "more", "most", "paper", "papers", "research", "study", "that", "their", "these",
     "this", "through", "using", "were", "what", "when", "where", "which", "with", "would",
 }
+FACULTY_DEMO_NAMES = [
+    "Dr. Adriana Santos",
+    "Dr. Benjamin Reyes",
+    "Dr. Celeste Tan",
+    "Dr. Daniel Uy",
+    "Dr. Elise Co",
+    "Dr. Francisco Lim",
+    "Dr. Gabriela Ong",
+    "Dr. Hector Yu",
+    "Dr. Irene Flores",
+    "Dr. Jonathan Pang",
+    "Dr. Miguel Alvarez",
+    "Dr. Patricia Bautista",
+    "Dr. Ramon Cabrera",
+    "Dr. Lara Delos Reyes",
+    "Dr. Joshua Escobar",
+    "Dr. Nicole Fernandez",
+    "Dr. Martin Garcia",
+    "Dr. Camille Hernandez",
+    "Dr. Rafael Mendoza",
+    "Dr. Bianca Villanueva",
+    "Dr. Adrian Abad",
+    "Dr. Clarisse Bernardo",
+    "Dr. Diane Chua",
+    "Dr. Enrico Dizon",
+    "Dr. Fatima Evangelista",
+    "Dr. Gian Francisco",
+    "Dr. Hazel Gonzales",
+    "Dr. Isabel Jacinto",
+    "Dr. Jerome Lacson",
+    "Dr. Katrina Navarro",
+    "Dr. Lorenzo Aquino",
+    "Dr. Marielle Castillo",
+    "Dr. Noel Dimaculangan",
+    "Dr. Olivia Estrella",
+    "Dr. Paolo Fajardo",
+    "Dr. Reina Gamboa",
+    "Dr. Samuel Hidalgo",
+    "Dr. Teresa Ignacio",
+    "Dr. Victor Jimenez",
+    "Dr. Yasmin Karaan",
+    "Dr. Andres Laurel",
+    "Dr. Beatrice Mercado",
+    "Dr. Carlo Natividad",
+    "Dr. Denise Ocampo",
+    "Dr. Emmanuel Padilla",
+    "Dr. Francesca Quiambao",
+    "Dr. Gabriel Ramos",
+    "Dr. Helena Salazar",
+    "Dr. Ivan Trinidad",
+    "Dr. Julia Valdez",
+    "Dr. Kenneth Yulo",
+    "Dr. Lourdes Zamora",
+    "Dr. Mateo Araneta",
+    "Dr. Natalia Borja",
+    "Dr. Oscar Cardenas",
+]
 
 
 def faculty_working_hours(faculty: Faculty) -> list[dict]:
@@ -4776,6 +4857,52 @@ def faculty_profile_dict(faculty: Faculty) -> dict:
         for slot in upcoming
     ]
     return payload
+
+
+def calendar_text(value: str | None) -> str:
+    return (value or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def faculty_calendar_ics(faculty: Faculty) -> str:
+    slots = (
+        FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id == faculty.id,
+            FacultyAvailability.available_date >= date.today(),
+        )
+        .order_by(FacultyAvailability.available_date, FacultyAvailability.start_time)
+        .limit(60)
+        .all()
+    )
+    now_stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//USLS Graduate School//Faculty Availability//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{calendar_text(f'{faculty.name} Availability')}",
+        f"X-WR-CALDESC:{calendar_text('Faculty availability windows used for defense scheduling.')}",
+    ]
+    for slot in slots:
+        start_dt = datetime.combine(slot.available_date, slot.start_time)
+        end_dt = datetime.combine(slot.available_date, slot.end_time)
+        stamp = f"{slot.id}-{faculty.id}@usls-gs-demo"
+        lines.extend(
+            [
+                "BEGIN:VEVENT",
+                f"UID:{stamp}",
+                f"DTSTAMP:{now_stamp}",
+                f"DTSTART:{start_dt.strftime('%Y%m%dT%H%M%S')}",
+                f"DTEND:{end_dt.strftime('%Y%m%dT%H%M%S')}",
+                f"SUMMARY:{calendar_text(f'{faculty.name} availability')}",
+                f"DESCRIPTION:{calendar_text(f'Specialization: {faculty.specialization}')}",
+                "STATUS:CONFIRMED",
+                "TRANSP:TRANSPARENT",
+                "END:VEVENT",
+            ]
+        )
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines) + "\r\n"
 
 
 def ensure_research_document_checks(student_id: int, gate: str) -> list[DocumentCheck]:
@@ -4903,6 +5030,25 @@ def matching_tokens(value: str) -> list[str]:
     ]
 
 
+def extract_research_phrases(text: str, limit: int = 14) -> list[str]:
+    tokens = matching_tokens(text)
+    counts: Counter[str] = Counter(tokens)
+    for size, weight in [(2, 3), (3, 4)]:
+        for index in range(0, max(len(tokens) - size + 1, 0)):
+            phrase_tokens = tokens[index : index + size]
+            if len(set(phrase_tokens)) < size:
+                continue
+            counts[" ".join(phrase_tokens)] += weight
+    return [phrase for phrase, _count in counts.most_common(limit)]
+
+
+def paper_excerpt(text: str, limit: int = 220) -> str:
+    cleaned = re.sub(r"\s+", " ", text or "").strip()
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[:limit].rsplit(" ", 1)[0] + "..."
+
+
 def research_matching_profile(student: Student, extra_text: str = "") -> dict:
     research_case = (
         ResearchCase.query.filter_by(student_id=student.id)
@@ -4921,13 +5067,19 @@ def research_matching_profile(student: Student, extra_text: str = "") -> dict:
     title = research_case.title if research_case else ""
     paper_text = "\n".join(item.extracted_text or item.original_name for item in concept_files)
     combined = " ".join([title, paper_text, extra_text, student.program.name])
-    counts = Counter(matching_tokens(combined))
-    keywords = [token for token, _count in counts.most_common(12)]
+    keywords = extract_research_phrases(combined, 16)
     return {
         "research_title": title,
         "concept_paper_count": len(concept_files),
         "concept_papers": [
-            {"id": item.id, "name": item.original_name, "url": f"/api/research-evidence/{item.id}/file"}
+            {
+                "id": item.id,
+                "name": item.original_name,
+                "url": f"/api/research-evidence/{item.id}/file",
+                "extracted": bool((item.extracted_text or "").strip()),
+                "keywords": extract_research_phrases(item.extracted_text or item.original_name, 6),
+                "excerpt": paper_excerpt(item.extracted_text or ""),
+            }
             for item in concept_files
         ],
         "keywords": keywords,
@@ -4968,6 +5120,119 @@ def defense_participants(student: Student, assignments: list[PanelAssignment]) -
     return participants
 
 
+def faculty_calendar_id(faculty: Faculty) -> str | None:
+    raw = os.getenv("GOOGLE_CALENDAR_IDS_JSON", "").strip()
+    mapping = {}
+    if raw:
+        try:
+            mapping = json.loads(raw)
+        except json.JSONDecodeError:
+            mapping = {}
+    slug = re.sub(r"[^A-Z0-9]+", "_", faculty.name.upper()).strip("_")
+    return (
+        mapping.get(str(faculty.id))
+        or mapping.get(faculty.name)
+        or mapping.get(slug)
+        or os.getenv(f"GOOGLE_CALENDAR_ID_{faculty.id}")
+        or os.getenv(f"GOOGLE_CALENDAR_ID_{slug}")
+    )
+
+
+def google_calendar_configured(faculty: Faculty) -> bool:
+    return bool(os.getenv("GOOGLE_CALENDAR_ACCESS_TOKEN") and faculty_calendar_id(faculty))
+
+
+def local_calendar_bounds(start_day: date, end_day: date) -> tuple[datetime, datetime]:
+    local_tz = timezone(timedelta(hours=8))
+    start_dt = datetime.combine(start_day, time.min).replace(tzinfo=local_tz)
+    end_dt = datetime.combine(end_day + timedelta(days=1), time.min).replace(tzinfo=local_tz)
+    return start_dt, end_dt
+
+
+def google_freebusy_lookup(faculty: Faculty, start_day: date, end_day: date) -> dict:
+    calendar_id = faculty_calendar_id(faculty)
+    token = os.getenv("GOOGLE_CALENDAR_ACCESS_TOKEN", "").strip()
+    if not calendar_id:
+        return {"configured": False, "calendar_id": None, "busy": [], "error": None}
+    if not token:
+        return {"configured": False, "calendar_id": calendar_id, "busy": [], "error": "Missing GOOGLE_CALENDAR_ACCESS_TOKEN"}
+
+    start_dt, end_dt = local_calendar_bounds(start_day, end_day)
+    body = json.dumps(
+        {
+            "timeMin": start_dt.isoformat(),
+            "timeMax": end_dt.isoformat(),
+            "timeZone": os.getenv("GOOGLE_CALENDAR_TIMEZONE", "Asia/Manila"),
+            "items": [{"id": calendar_id}],
+        }
+    ).encode("utf-8")
+    req = Request(
+        "https://www.googleapis.com/calendar/v3/freeBusy",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": f"Google Calendar HTTP {exc.code}"}
+    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": f"Google Calendar unavailable: {exc}"}
+
+    calendar = (payload.get("calendars") or {}).get(calendar_id) or {}
+    if calendar.get("errors"):
+        reason = calendar["errors"][0].get("reason") or "calendar error"
+        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": f"Google Calendar {reason}"}
+    busy = []
+    local_tz = timezone(timedelta(hours=8))
+    for item in calendar.get("busy", []):
+        try:
+            start = datetime.fromisoformat(item["start"].replace("Z", "+00:00")).astimezone(local_tz)
+            end = datetime.fromisoformat(item["end"].replace("Z", "+00:00")).astimezone(local_tz)
+        except (KeyError, ValueError):
+            continue
+        busy.append({"start": start, "end": end})
+    return {"configured": True, "calendar_id": calendar_id, "busy": busy, "error": None}
+
+
+def google_busy_by_faculty(participants: list[dict], start_day: date, end_day: date) -> dict[int, dict]:
+    return {
+        participant["faculty"].id: google_freebusy_lookup(participant["faculty"], start_day, end_day)
+        for participant in participants
+    }
+
+
+def slot_conflicts_google_busy(slot: FacultyAvailability, busy_items: list[dict]) -> bool:
+    slot_start = datetime.combine(slot.available_date, slot.start_time).replace(tzinfo=timezone(timedelta(hours=8)))
+    slot_end = datetime.combine(slot.available_date, slot.end_time).replace(tzinfo=timezone(timedelta(hours=8)))
+    return any(slot_start < item["end"] and slot_end > item["start"] for item in busy_items)
+
+
+def google_busy_payload_for_day(busy_items: list[dict], day: date) -> list[dict]:
+    result = []
+    for item in busy_items:
+        if item["start"].date() <= day <= item["end"].date():
+            result.append(
+                {
+                    "date": iso(day),
+                    "start": item["start"].strftime("%H:%M"),
+                    "end": item["end"].strftime("%H:%M"),
+                }
+            )
+    return result
+
+
+def candidate_conflicts_google_busy(day: date, start_minutes: int, end_minutes: int, busy_items: list[dict]) -> bool:
+    local_tz = timezone(timedelta(hours=8))
+    start_dt = datetime.combine(day, time(start_minutes // 60, start_minutes % 60)).replace(tzinfo=local_tz)
+    end_dt = datetime.combine(day, time(end_minutes // 60, end_minutes % 60)).replace(tzinfo=local_tz)
+    return any(start_dt < item["end"] and end_dt > item["start"] for item in busy_items)
+
+
 def defense_availability_context(
     participants: list[dict],
     window_start: date,
@@ -4985,6 +5250,7 @@ def defense_availability_context(
         }
 
     participant_ids = [participant["faculty"].id for participant in participants]
+    google_busy = google_busy_by_faculty(participants, window_start, window_end)
     rows = (
         FacultyAvailability.query.filter(
             FacultyAvailability.faculty_id.in_(participant_ids),
@@ -5032,9 +5298,15 @@ def defense_availability_context(
                 any(
                     slot.start_time.hour * 60 + slot.start_time.minute <= start_minutes
                     and slot.end_time.hour * 60 + slot.end_time.minute >= end_minutes
+                    and not candidate_conflicts_google_busy(
+                        day,
+                        start_minutes,
+                        end_minutes,
+                        google_busy.get(faculty_id, {}).get("busy", []),
+                    )
                     for slot in faculty_slots
                 )
-                for faculty_slots in day_rows.values()
+                for faculty_id, faculty_slots in day_rows.items()
             )
             if all_available:
                 possible_slots.append(
@@ -5057,13 +5329,29 @@ def defense_availability_context(
                 "role": participant["role"],
                 "college": participant["faculty"].college,
                 "working_hours": faculty_working_hours(participant["faculty"]),
-                "calendar_connected": False,
+                "calendar_connected": google_busy.get(participant["faculty"].id, {}).get("configured", False),
+                "calendar_status": (
+                    google_busy.get(participant["faculty"].id, {}).get("error")
+                    or ("Google Calendar checked" if google_busy.get(participant["faculty"].id, {}).get("configured") else "Profile availability only")
+                ),
+                "google_busy": [
+                    busy
+                    for day in sorted(dates)
+                    for busy in google_busy_payload_for_day(
+                        google_busy.get(participant["faculty"].id, {}).get("busy", []),
+                        day,
+                    )
+                ],
                 "slots": [
                     {
                         "date": iso(slot.available_date),
                         "start": slot.start_time.strftime("%H:%M"),
                         "end": slot.end_time.strftime("%H:%M"),
                         "weekend_override": slot.available_date.weekday() >= 5,
+                        "blocked_by_google": slot_conflicts_google_busy(
+                            slot,
+                            google_busy.get(participant["faculty"].id, {}).get("busy", []),
+                        ),
                     }
                     for slot in slots_by_faculty[participant["faculty"].id]
                 ],
@@ -5455,7 +5743,7 @@ def panel_roles_for_student(student: Student) -> list[str]:
     # and defense scheduling.
     case_type = research_case_type(student)
     if case_type == "Project Paper":
-        return ["Panel Chair", "Content Specialist", "Method Specialist"]
+        return ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
     if case_type == "Dissertation":
         return ["Panel Chair", "Content Specialist 1", "Content Specialist 2", "Method Specialist", "External Panel"]
     return ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
@@ -5748,6 +6036,7 @@ def recommend_panel(student: Student, specialization: str = "") -> list[dict]:
     # added after semantic/token overlap so the result remains explainable.
     profile = research_matching_profile(student, specialization)
     query_counts = Counter(matching_tokens(profile["query_text"]))
+    analyzed_phrases = profile.get("keywords", [])
     faculty_members = Faculty.query.filter_by(active=True).all()
     rows = []
     for faculty in faculty_members:
@@ -5756,16 +6045,30 @@ def recommend_panel(student: Student, specialization: str = "") -> list[dict]:
             FacultyAvailability.faculty_id == faculty.id,
             FacultyAvailability.available_date >= date.today(),
         ).count()
-        faculty_tokens = set(matching_tokens(f"{faculty.specialization} {faculty.role} {faculty.college}"))
+        faculty_profile_text = f"{faculty.specialization} {faculty.role} {faculty.college}"
+        faculty_tokens = set(matching_tokens(faculty_profile_text))
+        faculty_phrase_text = faculty_profile_text.lower()
         matched_keywords = [token for token, _count in query_counts.most_common() if token in faculty_tokens][:6]
-        semantic_score = min(45, sum(query_counts[token] for token in matched_keywords) * 7)
+        matched_phrases = [
+            phrase
+            for phrase in analyzed_phrases
+            if any(token in faculty_tokens for token in matching_tokens(phrase))
+            or phrase.lower() in faculty_phrase_text
+        ][:6]
+        semantic_score = min(
+            50,
+            sum(query_counts[token] for token in matched_keywords) * 6
+            + len(matched_phrases) * 5,
+        )
         score = 25 + semantic_score
         if student.program.college == faculty.college:
             score += 15
         score += min(20, availability_count * 4)
         score -= workload * 3
         reasons = []
-        if matched_keywords:
+        if matched_phrases:
+            reasons.append(f"matches {', '.join(matched_phrases[:2])}")
+        elif matched_keywords:
             reasons.append(f"matches {', '.join(matched_keywords[:3])}")
         if student.program.college == faculty.college:
             reasons.append("same college")
@@ -5778,7 +6081,7 @@ def recommend_panel(student: Student, specialization: str = "") -> list[dict]:
             "faculty": faculty,
             "score": max(score, 1),
             "note": note,
-            "matched_keywords": matched_keywords,
+            "matched_keywords": matched_phrases or matched_keywords,
         })
     return sorted(rows, key=lambda row: row["score"], reverse=True)
 
@@ -5871,7 +6174,7 @@ def seed_database(count: int = 350) -> None:
     for idx in range(1, 56):
         college = COLLEGES[idx % len(COLLEGES)]
         faculty = Faculty(
-            name=f"Dr. Faculty {idx:02d}",
+            name=FACULTY_DEMO_NAMES[idx - 1],
             college=college,
             role="Adviser / Panel",
             specialization=specializations[idx % len(specializations)],
@@ -6098,6 +6401,7 @@ def seed_database(count: int = 350) -> None:
     # engine uses, so the student record and the recommendation queue always agree.
     for student in Student.query.all():
         recompute_risk(student)
+    ensure_faculty_demo_names()
     ensure_demo_accounts()
     db.session.commit()
 
@@ -6243,6 +6547,16 @@ def seed_workflow_cases() -> None:
         add_log("graduation", student.id, "Demo Data", "Seeded graduation endorsement", f"Graduation endorsement: {endorsement.endorsement_status}", "Dean" if endorsement.endorsement_status == "Ready for Dean Review" else eligibility["next_owner"], graduation_notes(endorsement))
 
 
+def ensure_faculty_demo_names() -> int:
+    renamed = 0
+    faculty = Faculty.query.order_by(Faculty.id.asc()).limit(len(FACULTY_DEMO_NAMES)).all()
+    for idx, member in enumerate(faculty):
+        if re.fullmatch(r"Dr\. Faculty \d{2}", member.name or ""):
+            member.name = FACULTY_DEMO_NAMES[idx]
+            renamed += 1
+    return renamed
+
+
 def ensure_demo_accounts() -> None:
     staff = UserAccount.query.filter_by(email="staff@gs.local").first()
     if not staff:
@@ -6310,6 +6624,7 @@ if __name__ == "__main__":
         seed_count = int(os.getenv("DEMO_SEED_COUNT", "350"))
         if "--seed" in sys.argv:
             seed_database(seed_count)
+            ensure_faculty_demo_names()
             ensure_demo_accounts()
             db.session.commit()
             print(f"Seeded {seed_count} students plus supporting workflow data and demo accounts.")
@@ -6318,9 +6633,12 @@ if __name__ == "__main__":
             seed_database(seed_count)
             print(f"Database was empty, so {seed_count} demo students were seeded.")
         accounts_before = UserAccount.query.count()
+        renamed_faculty = ensure_faculty_demo_names()
         ensure_demo_accounts()
         sync_result = sync_all_curricula()
         db.session.commit()
+        if renamed_faculty:
+            print(f"Updated {renamed_faculty} demo faculty placeholder name(s).")
         if sync_result["created"]:
             print(f"Automatically added {sync_result['created']} missing curriculum row(s) for {sync_result['students']} student(s).")
         if accounts_before == 0:
