@@ -2825,6 +2825,17 @@ def register_routes(app: Flask) -> None:
                 "milestones": milestones(s.current_stage),
             })
 
+        progress = request.args.get("progress", "").strip()
+        if progress:
+            if progress == "not-started":
+                rows = [row for row in rows if row["completed"] == 0]
+            elif progress == "in-progress":
+                rows = [row for row in rows if 0 < row["completed"] < row["total"]]
+            elif progress == "complete":
+                rows = [row for row in rows if row["total"] > 0 and row["completed"] >= row["total"]]
+            elif progress == "units-complete":
+                rows = [row for row in rows if row["eligible"]]
+
         return jsonify({
             "program": program_dict(program),
             "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
@@ -3969,6 +3980,48 @@ def _stage_from_sheet(milestones: dict, completed_subjects: int) -> str:
     return "Admission"
 
 
+def _sheet_student_comparison(student: Student, row: dict, course_by_code: dict[str, Course]) -> dict:
+    entry_year = _entry_year_from_ay(row["ay_entry"])
+    differences = []
+    if (student.first_name or "").strip().lower() != (row["first_name"] or "").strip().lower():
+        differences.append("first name")
+    if (student.last_name or "").strip().lower() != (row["last_name"] or "").strip().lower():
+        differences.append("last name")
+    if student.entry_year != entry_year:
+        differences.append("entry year")
+
+    existing_records = {
+        rec.course_id: rec.status
+        for rec in CourseRecord.query.filter_by(student_id=student.id).all()
+    }
+    subject_differences = 0
+    incoming_completed = 0
+    existing_completed = 0
+    for code, done in row["subjects"].items():
+        course = course_by_code.get(code)
+        if not course:
+            continue
+        incoming_status = "Completed" if done else "Missing"
+        existing_status = existing_records.get(course.id, "Missing")
+        if incoming_status == "Completed":
+            incoming_completed += 1
+        if existing_status == "Completed":
+            existing_completed += 1
+        if existing_status != incoming_status:
+            subject_differences += 1
+
+    if subject_differences:
+        differences.append(f"{subject_differences} subject/unit status difference(s)")
+
+    return {
+        "conflicting": bool(differences),
+        "differences": differences,
+        "incoming_completed": incoming_completed,
+        "existing_completed": existing_completed,
+        "incoming_total": len(row["subjects"]),
+    }
+
+
 def import_ac_monitoring(parsed: dict) -> dict:
     program = Program.query.filter_by(code=parsed["program_code"]).first()
     if not program:
@@ -3981,7 +4034,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
     course_by_code: dict[str, Course] = {}
     for code in parsed["subjects"]:
         category = categories.get(code, "Core")
-        existing = Course.query.filter_by(code=code).first()
+        existing = Course.query.filter_by(program_id=program.id, code=code).first()
         if not existing:
             existing = Course(program_id=program.id, code=code, title=code, units=3, category=category)
             db.session.add(existing)
@@ -3992,13 +4045,36 @@ def import_ac_monitoring(parsed: dict) -> dict:
 
     term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
 
-    created, updated, sample, conflicts = 0, 0, [], []
+    created, skipped, sample, conflicts, duplicates = 0, 0, [], [], []
     subject_changes = 0
     students_changed = 0
     for row in parsed["rows"]:
         student = Student.query.filter_by(student_number=row["idno"]).first()
         is_new = student is None
         entry_year = _entry_year_from_ay(row["ay_entry"])
+        if student:
+            comparison = _sheet_student_comparison(student, row, course_by_code)
+            item = {
+                "incoming_student_number": row["idno"],
+                "incoming_name": f"{row['first_name']} {row['last_name']}".strip(),
+                "matched_student": student_brief(student),
+                "incoming_completed": comparison["incoming_completed"],
+                "existing_completed": comparison["existing_completed"],
+                "total_subjects": comparison["incoming_total"],
+            }
+            if comparison["conflicting"]:
+                conflicts.append({
+                    **item,
+                    "reason": "Conflicting monitoring sheet data. Please verify before changing this student.",
+                    "differences": comparison["differences"],
+                })
+            else:
+                duplicates.append({
+                    **item,
+                    "reason": "Student is already in the system with the same monitoring data.",
+                })
+            skipped += 1
+            continue
         if is_new:
             possible_match = possible_student_identity_match(row["first_name"], row["last_name"], program.id, entry_year)
             if possible_match:
@@ -4006,8 +4082,10 @@ def import_ac_monitoring(parsed: dict) -> dict:
                     "incoming_student_number": row["idno"],
                     "incoming_name": f"{row['first_name']} {row['last_name']}".strip(),
                     "matched_student": student_brief(possible_match),
-                    "reason": "Same name, program, and entry year. Review before merge or overwrite.",
+                    "reason": "Possible duplicate student with a different ID number. Please verify before importing.",
+                    "differences": ["student number"],
                 })
+                skipped += 1
                 continue
         if is_new:
             student = Student(student_number=row["idno"], program_id=program.id, standing="Active")
@@ -4055,8 +4133,6 @@ def import_ac_monitoring(parsed: dict) -> dict:
 
         if is_new:
             created += 1
-        else:
-            updated += 1
         if len(sample) < 10:
             sample.append({
                 "id": student.id, "name": student.name, "student_number": student.student_number,
@@ -4070,7 +4146,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
         None,
         "GS Staff",
         "AC Student Monitoring import",
-        f"Monitoring sheet imported: {len(parsed['rows'])} rows, {created} new, {updated} matched, {len(conflicts)} conflict(s)",
+        f"Monitoring sheet imported: {len(parsed['rows'])} rows, {created} new, {skipped} skipped, {len(conflicts)} conflict(s)",
         "Academic Coordinator",
         f"Program {program.code}; {len(parsed['subjects'])} subjects; {subject_changes} subject status change(s) across {students_changed} student(s).",
     )
@@ -4082,14 +4158,17 @@ def import_ac_monitoring(parsed: dict) -> dict:
         "subjects": len(parsed["subjects"]),
         "rows": len(parsed["rows"]),
         "created": created,
-        "updated": updated,
+        "updated": 0,
+        "skipped": skipped,
+        "duplicates": duplicates,
+        "duplicate_count": len(duplicates),
         "subject_changes": subject_changes,
         "students_changed": students_changed,
         "conflicts": conflicts,
         "conflict_count": len(conflicts),
         "sample": sample,
-        "message": f"Imported {created + updated} student(s) from the {program.code} monitoring sheet "
-                   f"({created} new, {updated} matched, {subject_changes} subject change(s), {len(conflicts)} conflict(s)).",
+        "message": f"Imported {created} new student(s) from the {program.code} monitoring sheet "
+                   f"({skipped} already in system or needing verification, {len(conflicts)} conflict(s)).",
     }
 
 

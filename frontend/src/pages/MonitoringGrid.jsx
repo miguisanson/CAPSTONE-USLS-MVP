@@ -36,22 +36,22 @@ export default function MonitoringGrid() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
-  const selectedStage = searchParams.get("stage") || "";
+  const selectedProgress = searchParams.get("progress") || "";
   const selectedRisk = searchParams.get("risk") || "";
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
-  const [stage, setStage] = useState(selectedStage);
+  const [progress, setProgress] = useState(selectedProgress);
   const [risk, setRisk] = useState(selectedRisk);
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function load(pid, nextStage = stage, nextRisk = risk) {
+  function load(pid, nextProgress = progress, nextRisk = risk) {
     setLoading(true);
     setError("");
     api
-      .monitoringGrid({ program_id: pid || undefined, stage: nextStage, risk: nextRisk })
+      .monitoringGrid({ program_id: pid || undefined, progress: nextProgress, risk: nextRisk })
       .then((g) => {
         setGrid(g);
         setProgramId(String(g.program.id));
@@ -61,11 +61,11 @@ export default function MonitoringGrid() {
   }
 
   useEffect(() => {
-    setStage(selectedStage);
+    setProgress(selectedProgress);
     setRisk(selectedRisk);
-    load(selectedProgramId, selectedStage, selectedRisk);
+    load(selectedProgramId, selectedProgress, selectedRisk);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProgramId, selectedStage, selectedRisk]);
+  }, [selectedProgramId, selectedProgress, selectedRisk]);
 
   const flatCourses = useMemo(
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
@@ -121,12 +121,12 @@ export default function MonitoringGrid() {
   function updateFilters(next) {
     const merged = {
       program_id: next.program_id ?? programId,
-      stage: next.stage ?? stage,
+      progress: next.progress ?? progress,
       risk: next.risk ?? risk,
     };
     const params = {};
     if (merged.program_id) params.program_id = merged.program_id;
-    if (merged.stage) params.stage = merged.stage;
+    if (merged.progress) params.progress = merged.progress;
     if (merged.risk) params.risk = merged.risk;
     setSearchParams(params, { replace: true });
   }
@@ -154,15 +154,16 @@ export default function MonitoringGrid() {
             ))}
           </select>
           <select
-            value={stage}
-            onChange={(e) => updateFilters({ stage: e.target.value })}
+            value={progress}
+            onChange={(e) => updateFilters({ progress: e.target.value })}
             className="field-input cursor-pointer"
             aria-label="Progress"
           >
             <option value="">All progress</option>
-            {(meta?.stages || []).map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
+            <option value="not-started">Not started</option>
+            <option value="in-progress">In progress</option>
+            <option value="complete">All subjects complete</option>
+            <option value="units-complete">Units complete</option>
           </select>
           <select
             value={risk}

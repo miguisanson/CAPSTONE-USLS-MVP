@@ -431,7 +431,7 @@ function HandoffImport({ context }) {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
             <ResultStat label="New" value={result.created} />
-            <ResultStat label="Matched" value={result.updated} />
+            <ResultStat label="Skipped" value={result.skipped ?? result.updated ?? 0} />
             <ResultStat label="Cell changes" value={result.subject_changes ?? 0} />
             <ResultStat label="Conflicts" value={result.conflict_count ?? 0} />
             <ResultStat label="Subjects" value={result.subjects} />
@@ -447,13 +447,33 @@ function HandoffImport({ context }) {
               </Link>
             </div>
           )}
+          {result.duplicates?.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                Already in the system
+              </p>
+              <p className="mb-2 text-sm font-medium text-slate-600">
+                These students were already added, so they were not imported again.
+              </p>
+              <ul className="space-y-2">
+                {result.duplicates.slice(0, 8).map((d) => (
+                  <li key={`${d.incoming_student_number}-${d.matched_student.id}`} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                    <p className="font-semibold text-ink">{d.incoming_name || d.matched_student.name} · {d.incoming_student_number}</p>
+                    <p className="text-xs text-slate-500">
+                      Student is in the system as {d.matched_student.name} · {d.matched_student.student_number}.
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
               {result.conflicts?.length > 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                   <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
-                    <AlertTriangle className="h-4 w-4" /> Rows skipped for duplicate review
+                    <AlertTriangle className="h-4 w-4" /> Conflicting duplicate data
                   </p>
                   <p className="mb-2 text-sm font-medium text-amber-800">
-                    Some students were not added because they are already in the system or require duplicate review.
+                    These students appear to already be in the system, but the uploaded sheet has conflicting data. Please verify before changing their records.
                   </p>
                   <ul className="space-y-2">
                 {result.conflicts.slice(0, 5).map((c) => (
