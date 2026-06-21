@@ -3526,6 +3526,39 @@ def reports_payload(filters=None) -> dict:
 # ---------------------------------------------------------------------------
 # Transaction context (data needed by each workflow screen)
 # ---------------------------------------------------------------------------
+def submitted_request_students(request_type: str) -> list[dict]:
+    # Students who actually submitted this request from the student portal — newest
+    # first, deduplicated, with their uploaded application and any prior staff decision.
+    attachments = (
+        StudentRequestAttachment.query.filter_by(request_type=request_type)
+        .order_by(StudentRequestAttachment.uploaded_at.desc())
+        .all()
+    )
+    seen = set()
+    rows = []
+    for att in attachments:
+        if att.student_id in seen:
+            continue
+        seen.add(att.student_id)
+        student = Student.query.get(att.student_id)
+        if not student:
+            continue
+        last = (
+            TransactionLog.query.filter_by(transaction_slug=request_type, student_id=student.id)
+            .filter(TransactionLog.actor_role != "Demo Data")
+            .order_by(TransactionLog.created_at.desc())
+            .first()
+        )
+        rows.append({
+            **student_brief(student),
+            "submitted_at": iso(att.uploaded_at),
+            "attachment": att.original_name,
+            "last_result": last.result if last else None,
+            "last_decision_at": iso(last.created_at) if last else None,
+        })
+    return rows
+
+
 def serialize_transaction_context(slug: str, selected_student_id: int | None, specialization: str = "") -> dict:
     # Context responses are read-only preparation data for workflow screens.
     # The actual record changes happen only in the transaction handlers.
@@ -3562,6 +3595,10 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
     if slug == "student-handoff":
         context["programs"] = [program_dict(p) for p in Program.query.order_by(Program.college, Program.name).all()]
         context["terms"] = [term_dict(t) for t in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()]
+
+    # LOA/Readmission are student-initiated: staff only see students who submitted.
+    if slug in ("leave-of-absence", "readmission"):
+        context["submitted_requests"] = submitted_request_students(slug)
 
     if selected_student:
         context["panel_roles"] = panel_roles_for_student(selected_student)
@@ -6475,6 +6512,21 @@ def seed_database(count: int = 350) -> None:
 
     sync_all_curricula()
     seed_workflow_cases()
+
+    # A few demo submitted LOA / Readmission requests so the staff queues are populated
+    # (these normally arrive when a student files them from the Student Portal).
+    for i, s in enumerate(Student.query.filter(Student.enrollment_tag == "Enrolled").order_by(Student.id).limit(4).all()):
+        db.session.add(StudentRequestAttachment(
+            student_id=s.id, request_type="leave-of-absence",
+            original_name=f"LOA_Application_{s.student_number}.pdf",
+            stored_name=f"seed-loa-{s.id}.pdf", mime_type="application/pdf",
+            uploaded_at=now_utc() - timedelta(days=i + 1)))
+    for i, s in enumerate(Student.query.filter(Student.enrollment_tag == "LOA").order_by(Student.id).limit(3).all()):
+        db.session.add(StudentRequestAttachment(
+            student_id=s.id, request_type="readmission",
+            original_name=f"Readmission_Request_{s.student_number}.pdf",
+            stored_name=f"seed-readmit-{s.id}.pdf", mime_type="application/pdf",
+            uploaded_at=now_utc() - timedelta(days=i + 1)))
 
     # Derive each student's risk/priority from the same signals the Decision Support
     # engine uses, so the student record and the recommendation queue always agree.

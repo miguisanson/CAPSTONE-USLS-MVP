@@ -27,6 +27,7 @@ import {
   RotateCcw,
   UserRoundCheck,
   Trash2,
+  Inbox,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -46,6 +47,13 @@ const ICONS = {
   practicum: Briefcase,
   withdrawal: LogOut,
   graduation: GraduationCap,
+};
+
+// Student-initiated workflows: staff pick from the submitted-request queue,
+// not the full student list (students file these from their own portal).
+const USES_REQUEST_QUEUE = {
+  "leave-of-absence": true,
+  readmission: true,
 };
 
 const NEEDS_STUDENT = {
@@ -102,6 +110,7 @@ export default function WorkflowPage() {
   const tx = context?.transaction || meta?.transactions?.find((t) => t.slug === slug);
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
+  const usesQueue = USES_REQUEST_QUEUE[slug];
 
   useEffect(() => {
     if (!studentLabel && context?.selected_student?.search_label) {
@@ -170,7 +179,7 @@ export default function WorkflowPage() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          {needsStudent && (
+          {needsStudent && !usesQueue && (
             <Card className="p-6">
               <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
               <StudentPicker
@@ -192,10 +201,29 @@ export default function WorkflowPage() {
             </Card>
           )}
 
+          {usesQueue && (
+            <RequestQueue
+              requests={context?.submitted_requests}
+              selectedId={studentId}
+              onPick={(r) => {
+                setStudentId(r.id);
+                setStudentLabel(r.search_label || r.name);
+                setResult(null);
+              }}
+              onClear={() => {
+                setStudentId(null);
+                setStudentLabel("");
+                setResult(null);
+              }}
+            />
+          )}
+
           {needsStudent && !studentId ? (
-            <Card className="p-6">
-              <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
-            </Card>
+            usesQueue ? null : (
+              <Card className="p-6">
+                <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
+              </Card>
+            )
           ) : loading ? (
             <Card className="p-6">
               <Spinner label="Loading workflow data…" />
@@ -247,6 +275,61 @@ export default function WorkflowPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Submitted-request queue for student-initiated workflows (LOA / Readmission).
+function RequestQueue({ requests, selectedId, onPick, onClear }) {
+  const list = requests || [];
+  const selected = list.find((r) => r.id === selectedId);
+  return (
+    <Card className="p-6">
+      <SectionTitle
+        title="Submitted requests"
+        subtitle="Only students who filed this request from their portal appear here"
+        icon={Inbox}
+      />
+      {selected ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">{selected.name}</p>
+            <p className="text-xs text-slate-500">
+              {selected.student_number} · {selected.program_code} · submitted {formatDate(selected.submitted_at)}
+            </p>
+          </div>
+          <button type="button" onClick={onClear} className="btn-ghost shrink-0">
+            <ArrowUpRight className="h-4 w-4 rotate-180" /> Back to list
+          </button>
+        </div>
+      ) : list.length ? (
+        <ul className="divide-y divide-slate-100">
+          {list.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => onPick(r)}
+                className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-brand-50/50 cursor-pointer"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{r.name}</p>
+                  <p className="truncate text-xs text-slate-400">
+                    {r.student_number} · {r.program_code} · submitted {formatDate(r.submitted_at)}
+                    {r.attachment ? ` · ${r.attachment}` : ""}
+                  </p>
+                </div>
+                <StatusBadge value={r.last_result ? "Decided" : "Pending"} dot={false} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          icon={Inbox}
+          title="No submitted requests yet"
+          hint="When a student files this from their portal, they'll appear here for you to act on."
+        />
+      )}
+    </Card>
   );
 }
 
