@@ -18,6 +18,7 @@ import {
   LogOut,
   Mail,
   Send,
+  Trash2,
   UserCheck,
   LayoutDashboard,
 } from "lucide-react";
@@ -29,7 +30,7 @@ import { CheckList, Field, Input, Select, Textarea } from "../components/forms";
 import { formatDate, initials, relativeDays } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
 
-const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
+const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Ethics Review", "Final Defense", "Completion Evidence"]);
 
 const STUDENT_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
@@ -400,20 +401,17 @@ function useSubmitRequest(type, onSaved) {
 }
 
 function ResearchRequestForm({ data, onSaved }) {
-  const milestones = data.research_milestones || [];
-  const initialGate = data.research_case?.current_gate || milestones[0]?.value || "";
-  const [gate, setGate] = useState(initialGate);
+  const progress = data.research_progress || {};
+  const milestone = progress.milestone || {};
+  const gate = progress.gate || milestone.value || "";
   const [form, setForm] = useState({ research_title: data.research_case?.title || "", submitted_package: "" });
   const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
-  const milestone = milestones.find((item) => item.value === gate) || milestones[0];
-  const uploadRequirements = milestone?.requirements.filter((item) => item.student_upload) || [];
-  const managedRequirements = milestone?.requirements.filter((item) => !item.student_upload) || [];
+  const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
+  const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
 
   useEffect(() => {
-    const currentGate = data.research_case?.current_gate || milestones[0]?.value || "";
-    setGate(currentGate);
     setForm((current) => ({ ...current, research_title: data.research_case?.title || "" }));
-  }, [data.student.id, data.research_case?.current_gate, data.research_case?.title, milestones]);
+  }, [data.student.id, data.research_case?.title]);
 
   function set(key) {
     return (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -423,7 +421,6 @@ function ResearchRequestForm({ data, onSaved }) {
     e.preventDefault();
     submit({
       student_id: data.student.id,
-      gate,
       research_title: form.research_title,
       submitted_package: form.submitted_package,
     });
@@ -431,17 +428,18 @@ function ResearchRequestForm({ data, onSaved }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field label="Research milestone" required hint={milestone?.description}>
-        <Select
-          value={gate}
-          onChange={(e) => setGate(e.target.value)}
-          placeholder=""
-          options={milestones.map((item) => ({ value: item.value, label: item.label }))}
-        />
-      </Field>
-      <Field label="Research title">
-        <Input value={form.research_title} onChange={set("research_title")} />
-      </Field>
+      <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-wide text-brand-600">Automatically detected stage</p><p className="mt-1 font-display text-xl font-semibold text-ink">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusBadge value={progress.status || "Pending"} dot={false} /></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-4">
+        {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-300 bg-brand-50 text-brand-700" : stage.complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-400"}`}>{stage.name}</div>)}
+      </div>
+      {progress.stage === "Title Defense" && (
+        <Field label="Research title from Form 1" hint="This student-submitted form value becomes the displayed title. Staff cannot edit it.">
+          <Input value={form.research_title} onChange={set("research_title")} required />
+        </Field>
+      )}
       <div>
         <p className="field-label">Files you upload</p>
         <p className="mb-2 text-xs text-slate-500">Only these items require action from you for this milestone.</p>
@@ -451,6 +449,7 @@ function ResearchRequestForm({ data, onSaved }) {
               key={requirement.item_name}
               gate={gate}
               requirement={requirement}
+              panelLocked={Boolean(data.panel?.length)}
               onSaved={onSaved}
             />
           ))}
@@ -480,21 +479,27 @@ function ResearchRequestForm({ data, onSaved }) {
         busy={busy}
         error={error}
         message={message}
-        disabled={!milestone?.student_uploads_ready}
+        disabled={!milestone?.student_uploads_ready || (progress.stage === "Title Defense" && !form.research_title.trim())}
         label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
+        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Enter the research title shown on Form 1." : ""}
       />
     </form>
   );
 }
 
-function ResearchEvidenceUpload({ gate, requirement, onSaved }) {
+function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
   const [busy, setBusy] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState("");
   const needed = requirement.required_file_count;
   const files = requirement.files || [];
+  const conceptPapersLocked = panelLocked && requirement.item_name === "Three concept papers";
 
   async function upload(file) {
+    if (conceptPapersLocked) {
+      setError("Concept papers are locked because a panel has already been matched.");
+      return;
+    }
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       setError("Please choose a PDF file.");
@@ -512,6 +517,22 @@ function ResearchEvidenceUpload({ gate, requirement, onSaved }) {
     }
   }
 
+  async function removeConceptPaper(file) {
+    if (conceptPapersLocked) return;
+    const confirmed = window.confirm(`Remove "${file.name}"? This will revoke the Academic Coordinator endorsement and clear the current Panel Matching result.`);
+    if (!confirmed) return;
+    setRemovingId(file.id);
+    setError("");
+    try {
+      await api.deleteResearchEvidence(file.id);
+      await onSaved();
+    } catch (err) {
+      setError(err.message || "Could not remove this concept paper.");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -522,21 +543,29 @@ function ResearchEvidenceUpload({ gate, requirement, onSaved }) {
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={requirement.status_label} dot={false} />
-          <label className="btn-ghost cursor-pointer">
-          <FileUp className="h-4 w-4" /> {busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
-          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy} onChange={(e) => upload(e.target.files?.[0])} />
+          <label className={`btn-ghost ${conceptPapersLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+          {conceptPapersLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {conceptPapersLocked ? "Locked after panel match" : busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
+          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || conceptPapersLocked} onChange={(e) => upload(e.target.files?.[0])} />
           </label>
         </div>
       </div>
       {files.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {files.map((file) => (
-            <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-slate-200">
-              {file.name}<Eye className="h-3.5 w-3.5" />
-            </a>
+            <span key={file.id} className="inline-flex overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-200">
+              <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
+                {file.name}<Eye className="h-3.5 w-3.5" />
+              </a>
+              {requirement.item_name === "Three concept papers" && (
+                <button type="button" onClick={() => removeConceptPaper(file)} disabled={conceptPapersLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={conceptPapersLocked ? "Locked after panel matching" : "Remove concept paper"}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </span>
           ))}
         </div>
       )}
+      {requirement.item_name === "Three concept papers" && files.length > 0 && <p className={`mt-2 text-xs ${conceptPapersLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{conceptPapersLocked ? "This concept-paper set is read-only because a panel has already been matched." : "Removing any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete three-paper set must be endorsed again."}</p>}
       {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
     </div>
   );

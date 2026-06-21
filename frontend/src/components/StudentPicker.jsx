@@ -169,7 +169,10 @@ export default function StudentPicker({ value, onChange, selectedLabel, meta }) 
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
                   <p className="truncate text-xs text-slate-400">
-                    {s.student_number} · {s.program_code} · {s.current_stage}
+                    {s.student_number} · {s.program_code} · {s.research_stage || s.current_stage}
+                  </p>
+                  <p className={`mt-0.5 truncate text-[11px] font-semibold ${/complete|ready/i.test(s.readiness_status || "") ? "text-emerald-600" : "text-amber-600"}`}>
+                    {s.readiness_status || "Readiness not recorded"}
                   </p>
                 </div>
                 <Check className="h-4 w-4 text-transparent" />

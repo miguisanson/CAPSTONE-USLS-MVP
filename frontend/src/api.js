@@ -147,6 +147,14 @@ export const api = {
     if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
     return body;
   },
+  deleteResearchEvidence: (evidenceId) =>
+    request(`/student-portal/research-evidence/${evidenceId}`, { method: "DELETE" }),
+  form1Endorsements: () => request("/research-gate/form1-endorsements"),
+  endorseForm1: (studentId, payload) =>
+    request(`/research-gate/form1-endorsements/${studentId}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   uploadStudentRequestAttachment: async (requestType, file) => {
     const form = new FormData();
     form.append("request_type", requestType);

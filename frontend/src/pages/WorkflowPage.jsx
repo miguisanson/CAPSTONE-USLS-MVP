@@ -137,6 +137,7 @@ export default function WorkflowPage() {
     setSpecialization,
     submit,
     submitting,
+    refetch,
   };
 
   return (
@@ -886,77 +887,102 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
 // ---------------------------------------------------------------------------
 // Research Gate
 // ---------------------------------------------------------------------------
-const GATES = ["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"];
-
 function ResearchGateForm({ context, studentId, submit, submitting }) {
-  const [gate, setGate] = useState(GATES[0]);
-  const required = context.gate_requirements?.[gate] || [];
-  const [form, setForm] = useState({ research_title: "", revision_required: "no" });
-  const set = (key) => (e) => setForm((current) => ({ ...current, [key]: e.target.value }));
-  const evidenceByItem = new Map(
-    (context.documents_by_gate?.[gate] || []).map((doc) => [doc.item_name, doc])
-  );
-
-  useEffect(() => {
-    setForm((current) => ({
-      ...current,
-      research_title: context.research_case?.title || "",
-    }));
-  }, [studentId, context.research_case?.title]);
+  const student = context.selected_student || {};
+  const researchCase = context.research_case || {};
+  const progress = context.research_progress || {};
+  const milestone = context.current_milestone || progress.milestone || {};
+  const requirements = milestone.requirements || [];
+  const completed = requirements.filter((item) => item.status === "Complete");
+  const pending = requirements.filter((item) => item.status !== "Complete");
+  const panel = context.panel_status || {};
 
   function onSubmit(e) {
     e.preventDefault();
-    submit({
-      student_id: studentId,
-      gate,
-      revision_required: form.revision_required,
-      research_title: form.research_title,
-    });
+    submit({ student_id: studentId });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Check research readiness" subtitle="Evidence status comes from PDFs uploaded by the student" icon={FileCheck} />
-      <Field label="Gate / milestone" required>
-        <Select value={gate} onChange={(e) => setGate(e.target.value)} placeholder="" options={GATES} />
-      </Field>
-      <Field label="Research title" hint="Sets or updates the research case title">
-        <Input value={form.research_title} onChange={set("research_title")} />
-      </Field>
-      <Field label="Student-uploaded evidence" hint="Read-only for staff. Missing evidence must be uploaded through the student portal.">
-        <div className="overflow-hidden rounded-xl border border-slate-200">
-          {required.map((item) => {
-            const doc = evidenceByItem.get(item);
-            const needed = item === "Three concept papers" ? 3 : 1;
-            const count = doc?.file_count || 0;
-            const received = count >= needed;
-            return (
-              <div key={item} className="border-b border-slate-100 px-4 py-3 last:border-b-0">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-ink">{item}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{count} of {needed} required file{needed > 1 ? "s" : ""} uploaded</p>
-                  </div>
-                  <StatusBadge value={received ? "Submitted" : "Missing"} dot={false} />
-                </div>
-                {doc?.files?.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {doc.files.map((file) => (
-                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-slate-200 hover:bg-brand-50">
-                        {file.name}<ArrowUpRight className="h-3.5 w-3.5" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      <SectionTitle
+        title="Research Gate record"
+        subtitle="The stage and checklist are calculated from uploads, endorsements, and workflow results"
+        icon={FileCheck}
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {[
+          ["Student", student.name], ["Student ID", student.student_number], ["Program", student.program_name],
+          ["Adviser", student.adviser_name || "Not assigned"], ["Research title", researchCase.title || "Pending Form 1"], ["Current stage", progress.stage || "Title Defense"],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <p className="field-label">Automatic research progress</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-4">
+          {(progress.stages || []).map((stage, index) => (
+            <div key={stage.name} className={`rounded-xl border px-3 py-3 ${index === progress.stage_index ? "border-brand-300 bg-brand-50" : stage.complete ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+              <p className={`text-xs font-bold ${index === progress.stage_index ? "text-brand-700" : stage.complete ? "text-emerald-700" : "text-slate-500"}`}>{stage.name}</p>
+              <p className="mt-1 text-[11px] text-slate-500">{stage.status}</p>
+            </div>
+          ))}
         </div>
-      </Field>
-      <Field label="Adviser flagged revisions?">
-        <RadioRow value={form.revision_required} onChange={(v) => setForm((f) => ({ ...f, revision_required: v }))} options={[{ value: "no", label: "No revisions" }, { value: "yes", label: "Revisions required" }]} />
-      </Field>
-      <SubmitButton submitting={submitting}>Evaluate gate</SubmitButton>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <MiniBox label="Completed requirements" value={completed.length} tone="brand" />
+        <MiniBox label="Pending requirements" value={pending.length} tone={pending.length ? "amber" : "brand"} />
+      </div>
+
+      <div>
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+          <div><p className="field-label">{progress.stage || "Current"} requirements</p><p className="text-xs text-slate-500">Uploaded and pending documents appear together. Open any file to preview it.</p></div>
+          <StatusBadge value={progress.status || "Pending"} dot={false} />
+        </div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {requirements.map((requirement) => (
+            <div key={requirement.item_name} className="border-b border-slate-100 px-4 py-3 last:border-b-0">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{requirement.label}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{requirement.student_upload ? `Student upload · ${requirement.file_count}/${requirement.required_file_count} files` : "Staff / system managed"}</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                  <StatusBadge value={requirement.status_label} dot={false} />
+                  {requirement.source_type === "coordinator_endorsement" && (
+                    <Link to="/form1-endorsements" className="btn-primary cursor-pointer justify-center whitespace-nowrap">
+                      <UserRoundCheck className="h-4 w-4" /> Form 1 endorsements
+                    </Link>
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(requirement.files || []).map((file) => (
+                  <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 transition-colors hover:bg-brand-100">
+                    {file.name} · PDF · {formatDate(file.uploaded_at)} <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><p className="text-sm font-semibold text-ink">Panel Matching</p><p className="text-xs text-slate-500">System-generated from the three concept papers.</p></div>
+          <div className="flex items-center gap-2"><StatusBadge value={panel.status || "Not yet generated"} dot={false} /><Link to={`/workflow/panel-matching?student_id=${studentId}`} className="btn-ghost cursor-pointer">Open matching <ArrowUpRight className="h-4 w-4" /></Link></div>
+        </div>
+        {panel.recommendations?.length > 0 && <p className="mt-2 text-xs text-slate-600">{panel.recommendations.map((item) => item.faculty_name).filter(Boolean).join(" · ")}</p>}
+      </div>
+
+      <SubmitButton submitting={submitting}>Verify submitted requirements</SubmitButton>
     </form>
   );
 }
@@ -964,37 +990,55 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
 // ---------------------------------------------------------------------------
 // Panel Matching
 // ---------------------------------------------------------------------------
-function PanelMatchingForm({ context, studentId, specialization, setSpecialization, submit, submitting }) {
-  const [text, setText] = useState(specialization);
+function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) {
+  const [selectedIds, setSelectedIds] = useState([]);
   const roles = context.panel_roles || [];
   const profile = context.matching_profile || {};
   const recs = profile.ready ? context.panel_recommendations || [] : [];
-  const visibleRecommendations = recs.slice(0, Math.max(4, roles.length || 0));
+  const visibleRecommendations = recs.slice(0, Math.max(8, roles.length || 0));
+  const finalizedPanel = context.assigned_panel || [];
+  const selectionComplete = selectedIds.length === roles.length && new Set(selectedIds).size === roles.length;
 
-  useEffect(() => setText(""), [studentId]);
+  useEffect(() => {
+    const finalizedIds = finalizedPanel.map((item) => item.faculty_id).filter(Boolean);
+    const recommendedIds = recs.slice(0, roles.length).map((item) => item.faculty_id);
+    setSelectedIds(finalizedIds.length === roles.length ? finalizedIds : recommendedIds);
+  }, [studentId, roles.length, recs.map((item) => item.faculty_id).join(","), finalizedPanel.map((item) => item.faculty_id).join(",")]);
 
   function onSubmit(e) {
     e.preventDefault();
-    if (!profile.ready) return;
-    submit({ student_id: studentId, specialization: text });
+    if (!profile.ready || !selectionComplete) return;
+    submit({ student_id: studentId, faculty_ids: selectedIds });
+  }
+
+  function runMatching() {
+    refetch();
+  }
+
+  function selectFaculty(index, value) {
+    setSelectedIds((current) => {
+      const next = [...current];
+      next[index] = Number(value);
+      return next;
+    });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Match a panel" subtitle="Analyzes the uploaded concept papers, extracts research keywords, then suggests the best-fit panelists" icon={Users} action={<Link to="/faculty" className="btn-ghost"><Users className="h-4 w-4" /> Faculty profiles</Link>} />
+      <SectionTitle title="Panel recommendation workspace" subtitle="Review the research evidence, run the scoring model, adjust the shortlist, then finalize the panel" icon={Users} action={<Link to="/faculty" className="btn-ghost cursor-pointer"><Users className="h-4 w-4" /> Faculty profiles</Link>} />
       <div className={`rounded-xl border px-4 py-3 ${profile.ready ? "border-brand-200 bg-brand-50" : "border-amber-200 bg-amber-50"}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className={`text-sm font-semibold ${profile.ready ? "text-brand-800" : "text-amber-900"}`}>
-              {profile.ready ? "Concept-paper retrieval ready" : "Three concept papers are required"}
+              {profile.ready ? "Concept-paper content ready" : (profile.concept_paper_count || 0) < 3 ? "Three concept papers are required" : "Readable PDF text is required"}
             </p>
             <p className={`mt-1 text-xs ${profile.ready ? "text-brand-700" : "text-amber-800"}`}>
-              {profile.concept_paper_count || 0} of 3 concept-paper PDFs uploaded. Source: {profile.source || "No research evidence yet"}.
+              {profile.concept_paper_count || 0} of 3 PDFs uploaded · {profile.readable_paper_count || 0} of 3 successfully read. Source: {profile.source || "No research evidence yet"}.
             </p>
           </div>
           <StatusBadge value={profile.ready ? "Ready" : "Blocked"} dot={false} />
         </div>
-        {profile.research_title && <p className="mt-3 text-sm font-medium text-slate-700">{profile.research_title}</p>}
+        {profile.research_title && <p className="mt-3 text-sm font-medium text-slate-700">Research title <span className="font-normal text-slate-500">(display only; excluded from matching)</span>: {profile.research_title}</p>}
         {profile.keywords?.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {profile.keywords.map((keyword) => <span key={keyword} className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">{keyword}</span>)}
@@ -1006,7 +1050,7 @@ function PanelMatchingForm({ context, studentId, specialization, setSpecializati
               <div key={paper.id} className="rounded-lg bg-white p-3 text-xs ring-1 ring-slate-200">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <a href={paper.url} target="_blank" rel="noreferrer" className="font-semibold text-ink hover:text-brand-700">{paper.name}</a>
-                  <StatusBadge value={paper.extracted ? "Text extracted" : "Filename fallback"} dot={false} />
+                  <StatusBadge value={paper.extracted ? "Text extracted" : "No readable text"} dot={false} />
                 </div>
                 {paper.keywords?.length > 0 && (
                   <p className="mt-2 text-slate-500">Analyzed terms: {paper.keywords.slice(0, 5).join(", ")}</p>
@@ -1017,47 +1061,81 @@ function PanelMatchingForm({ context, studentId, specialization, setSpecializati
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <Field label="Additional specialization terms" hint={`${context.research_case_type || "Thesis"} panel needs ${roles.length} members: ${roles.join(", ")}`}>
-            <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Optional terms to refine the paper-derived query" />
-          </Field>
-        </div>
-        <button type="button" disabled={!profile.ready} onClick={() => setSpecialization(text)} className="btn-ghost mb-0.5">
-          Preview matches
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MiniBox label="Specialization / keywords" value="50%" tone="brand" />
+        <MiniBox label="Availability" value="30%" tone="blue" />
+        <MiniBox label="Workload / suitability" value="20%" tone="amber" />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm text-slate-600">{context.research_case_type || "Thesis"} panel needs {roles.length} members: {roles.join(", ")}.</p>
+        <button type="button" disabled={!profile.ready} onClick={runMatching} className="btn-primary cursor-pointer">
+          <Sparkles className="h-4 w-4" /> Analyze PDF content and match panel
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-100">
-        <table className="w-full text-sm">
+      {profile.ready && visibleRecommendations.length === 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          No eligible faculty profiles were found. Add an active faculty profile with specialization and availability data, then run matching again.
+        </div>
+      )}
+
+      {visibleRecommendations.length > 0 && <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <table className="min-w-[920px] w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-              <th className="px-4 py-2.5">Faculty</th>
-              <th className="px-3 py-2.5">Specialization</th>
-              <th className="px-3 py-2.5">Paper match</th>
-              <th className="px-3 py-2.5 text-right">Score</th>
+              <th className="px-4 py-3">Rank / faculty</th>
+              <th className="px-3 py-3">Expertise match</th>
+              <th className="px-3 py-3">Availability</th>
+              <th className="px-3 py-3">Workload</th>
+              <th className="px-3 py-3 text-right">Match score</th>
             </tr>
           </thead>
           <tbody>
             {visibleRecommendations.map((r, i) => (
-              <tr key={r.faculty_id} className={i < roles.length ? "bg-brand-50/40" : ""}>
+              <tr key={r.faculty_id} className={`border-b border-slate-100 last:border-0 ${selectedIds.includes(r.faculty_id) ? "bg-brand-50/50" : "bg-white"}`}>
                 <td className="px-4 py-2.5">
-                  <p className="font-semibold text-ink">{r.faculty_name}</p>
-                  <p className="text-xs text-slate-400">{r.note}</p>
+                  <div className="flex items-start gap-2.5">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{i + 1}</span>
+                    <div><Link to={`/faculty?faculty=${r.faculty_id}`} className="font-semibold text-ink transition-colors hover:text-brand-700 hover:underline">{r.faculty_name}</Link><p className="text-xs text-slate-500">{r.college}</p></div>
+                  </div>
                 </td>
-                <td className="px-3 py-2.5 text-slate-600">{r.specialization}</td>
-                <td className="px-3 py-2.5 text-slate-600">{r.matched_keywords?.length ? r.matched_keywords.slice(0, 3).join(", ") : "Profile fit"}</td>
+                <td className="max-w-[300px] px-3 py-2.5 text-slate-600">
+                  <p>{r.specialization}</p>
+                  <p className="mt-1 text-xs text-brand-700">{r.matched_keywords?.length ? `Matched: ${r.matched_keywords.slice(0, 4).join(", ")}` : "No direct keyword overlap"}</p>
+                </td>
+                <td className="px-3 py-2.5"><p className="font-medium text-slate-700">{r.availability_status}</p><p className="text-xs text-slate-400">{r.availability_windows} conflict-free windows</p></td>
+                <td className="px-3 py-2.5"><p className="font-medium text-slate-700">{r.workload} active</p><p className="text-xs text-slate-400">panel assignments</p></td>
                 <td className="px-3 py-2.5 text-right">
-                  <span className="rounded-lg bg-brand-100 px-2 py-1 text-xs font-bold text-brand-700">{r.score}</span>
+                  <span className="rounded-lg bg-brand-100 px-2 py-1 text-xs font-bold text-brand-700">{r.score}/100</span>
+                  <p className="mt-1 whitespace-nowrap text-[10px] text-slate-400">{r.score_breakdown?.specialization}/50 · {r.score_breakdown?.availability}/30 · {r.score_breakdown?.suitability}/20</p>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-      <p className="text-xs text-slate-400">The first 4 rows are the strongest concept-paper specialization fits. Highlighted rows are assigned to the required panel roles.</p>
-      <button type="submit" disabled={submitting || !profile.ready} className="btn-primary w-full sm:w-auto">
-        {submitting ? "Saving..." : "Assign recommended panel"}
+      </div>}
+
+      {visibleRecommendations.length > 0 && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div><p className="text-sm font-semibold text-ink">Review and adjust the panel set</p><p className="mt-0.5 text-xs text-slate-500">The top-ranked faculty are preselected. Staff may change any role before finalizing.</p></div>
+          <StatusBadge value={finalizedPanel.length === roles.length ? "Final panel selected" : "Staff review"} dot={false} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {roles.map((role, index) => (
+            <label key={role} className="block text-xs font-semibold text-slate-600">
+              {role}
+              <select value={selectedIds[index] || ""} onChange={(event) => selectFaculty(index, event.target.value)} className="mt-1.5 w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
+                <option value="">Select faculty</option>
+                {recs.map((item) => <option key={item.faculty_id} value={item.faculty_id}>{item.faculty_name} — {item.score}/100</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+        {!selectionComplete && <p className="mt-3 text-xs font-medium text-amber-700">Choose a different eligible faculty member for every required role.</p>}
+      </div>}
+
+      <button type="submit" disabled={submitting || !profile.ready || !selectionComplete} className="btn-primary w-full cursor-pointer sm:w-auto">
+        <CheckCircle2 className="h-4 w-4" /> {submitting ? "Finalizing..." : finalizedPanel.length === roles.length ? "Update final panel" : "Finalize selected panel"}
       </button>
     </form>
   );
@@ -1068,11 +1146,13 @@ function PanelMatchingForm({ context, studentId, specialization, setSpecializati
 // ---------------------------------------------------------------------------
 function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
   const availability = context.availability || {};
+  const readiness = context.schedule_readiness || {};
   const participants = availability.participants || [];
   const possibleSlots = availability.possible_slots || [];
   const schedules = context.schedules || [];
   const [form, setForm] = useState({
     preferred_date: "",
+    preferred_end_date: "",
     selected_start: "",
     selected_end: "",
     defense_type: "Proposal Defense",
@@ -1080,10 +1160,14 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
     venue: "",
     constraints: "",
     source_reference: "",
+    override_requirements: false,
+    override_conflicts: false,
   });
   const [window, setWindow] = useState({ start: "", end: "" });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const panel = context.assigned_panel || [];
+  const requiredPanelCount = context.panel_roles?.length || 4;
+  const panelComplete = panel.length >= requiredPanelCount;
 
   useEffect(() => {
     setWindow({
@@ -1093,18 +1177,24 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
     setForm((current) => ({
       ...current,
       preferred_date: "",
+      preferred_end_date: availability.window_end || "",
       selected_start: "",
       selected_end: "",
+      defense_type: readiness.stage === "Ethics Review" ? "Proposal Defense" : (readiness.stage || "Proposal Defense"),
+      override_requirements: false,
+      override_conflicts: false,
     }));
-  }, [studentId, availability.window_start, availability.window_end]);
+  }, [studentId, availability.window_start, availability.window_end, readiness.stage]);
 
   const filteredSlots = useMemo(
     () =>
-      possibleSlots.filter(
-        (slot) =>
-          (!window.start || slot.date >= window.start) &&
-          (!window.end || slot.date <= window.end)
-      ),
+      possibleSlots
+        .filter(
+          (slot) =>
+            (!window.start || slot.date >= window.start) &&
+            (!window.end || slot.date <= window.end)
+        )
+        .sort((left, right) => Number(right.conflict_free !== false) - Number(left.conflict_free !== false) || `${left.date}${left.start}`.localeCompare(`${right.date}${right.start}`)),
     [possibleSlots, window]
   );
 
@@ -1144,25 +1234,61 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
 
   function onSubmit(e) {
     e.preventDefault();
-    submit({ student_id: studentId, ...form });
+    submit({ student_id: studentId, ...form, preferred_end_date: window.end || form.preferred_date });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle
         title="Coordinate the defense schedule"
-        subtitle="Compare faculty availability in a date spread, then select a shared time"
+        subtitle="Review readiness and the matched panel, compare overlap, then make the final staff decision"
         icon={CalendarCheck}
       />
+      <section aria-labelledby="student-readiness-heading" className={`rounded-2xl border p-5 ${readiness.ready ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p id="student-readiness-heading" className="text-xs font-bold uppercase tracking-wide text-slate-500">Student readiness</p>
+            <h3 className="mt-1 font-display text-lg font-semibold text-ink">{readiness.stage || "Research stage unavailable"}</h3>
+            <p className="mt-1 text-sm text-slate-600">{readiness.research_title || "Research title not recorded"}</p>
+            <p className="mt-1 text-xs text-slate-500">Adviser: {readiness.adviser_name || "Not assigned"}</p>
+          </div>
+          <StatusBadge value={readiness.ready ? "Requirements complete" : readiness.status || "Pending requirements"} />
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {(readiness.requirements || []).map((item) => (
+            <div key={item.item_name} className="flex items-start gap-2 rounded-xl bg-white/90 px-3 py-2.5 ring-1 ring-black/5">
+              {item.status === "Complete" ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}
+              <div><p className="text-sm font-semibold text-slate-700">{item.label || item.item_name}</p><p className="text-xs text-slate-500">{item.status_label || item.status}</p></div>
+            </div>
+          ))}
+        </div>
+        {!readiness.ready && (
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-amber-300 bg-white px-3.5 py-3 text-sm text-amber-900">
+            <input type="checkbox" checked={form.override_requirements} onChange={(e) => setForm((current) => ({ ...current, override_requirements: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-amber-400" />
+            <span><strong>Staff override:</strong> I reviewed the pending Research Gate requirements and still want to schedule this defense.</span>
+          </label>
+        )}
+      </section>
+
+      <section aria-labelledby="panel-members-heading" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><p id="panel-members-heading" className="text-sm font-semibold text-ink">Panel members</p><p className="text-xs text-slate-500">Final selections from Panel Matching</p></div>
+          <StatusBadge value={panelComplete ? `${panel.length} selected` : `${panel.length}/${requiredPanelCount} selected`} />
+        </div>
+        {panel.length ? <div className="grid gap-3 sm:grid-cols-2">
+          {panel.map((member) => {
+            const participant = participants.find((item) => item.faculty_id === member.faculty_id);
+            return <div key={member.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{member.faculty_name}</p><p className="text-xs font-semibold text-brand-700">{member.panel_role}</p></div><StatusBadge value={participant?.calendar_status || "Profile only"} /></div>
+              <p className="mt-3 text-xs text-slate-500">{member.college || "Department not recorded"}</p>
+              <p className="mt-1 text-sm text-slate-700">{member.specialization || "Specialization not recorded"}</p>
+            </div>;
+          })}
+        </div> : <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">No final panel is available. Complete Panel Matching before scheduling.</div>}
+      </section>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
         <span>Monday-Friday use faculty working hours, then Google Calendar busy times are removed for connected panelists.</span>
         <Link to="/faculty" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" /></Link>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-blue-800">
-        <FileCheck className="h-4 w-4" />
-        <span className="font-semibold">Defense readiness:</span>
-        <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-blue-100">Form 4 endorsement</span>
-        <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-blue-100">Form 4.3 for public defense, when applicable</span>
       </div>
       <AvailabilityWorkspace
         availability={availability}
@@ -1175,9 +1301,16 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
         form={form}
         chooseSlot={chooseSlot}
       />
+      <div className="border-t border-slate-200 pt-5"><p className="text-sm font-semibold text-ink">Final schedule</p><p className="text-xs text-slate-500">Only staff can finalize or reschedule this record.</p></div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Selected date" required>
-          <Input type="date" value={form.preferred_date} readOnly required />
+          <Input type="date" value={form.preferred_date} min={window.start} max={window.end} onChange={set("preferred_date")} required />
+        </Field>
+        <Field label="Start time" required>
+          <Input type="time" value={form.selected_start} onChange={set("selected_start")} required />
+        </Field>
+        <Field label="End time" required>
+          <Input type="time" value={form.selected_end} min={form.selected_start} onChange={set("selected_end")} required />
         </Field>
         <Field label="Defense type" required>
           <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={["Title Defense", "Proposal Defense", "Final Defense", "Public Final Defense"]} />
@@ -1195,11 +1328,15 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
       <Field label="Scheduling constraints">
         <Textarea value={form.constraints} onChange={set("constraints")} placeholder="e.g. external panel only available afternoons" />
       </Field>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-700">
+        <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-slate-400" />
+        <span><strong>Calendar/conflict override:</strong> finalize even if lead time, recorded availability, or another defense produces a warning. The reason will be saved.</span>
+      </label>
       <Field label="Source reference">
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
-      <button type="submit" disabled={submitting || !form.preferred_date} className="btn-primary w-full sm:w-auto">
-        {submitting ? "Saving..." : schedules.length ? "Confirm revised schedule" : "Confirm proposed schedule"}
+      <button type="submit" disabled={submitting || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements)} className="btn-primary w-full sm:w-auto">
+        {submitting ? "Saving..." : schedules.length ? "Finalize reschedule" : "Set defense schedule"}
       </button>
       {schedules.length > 0 && <ScheduleHistory schedules={schedules} />}
     </form>
@@ -1247,12 +1384,46 @@ function AvailabilityWorkspace({
         </div>
       </div>
 
+      {participants.length > 0 && visibleDates.length > 0 && (
+        <section aria-labelledby="availability-overlap-heading" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p id="availability-overlap-heading" className="text-sm font-semibold text-ink">Availability overlap</p>
+              <p className="text-xs text-slate-500">Darker green means more participants are free. Select a full-overlap cell to choose its two-hour slot.</p>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+              <span>0/{participants.length}</span><span className="h-4 w-5 rounded bg-slate-100 ring-1 ring-slate-200" /><span className="h-4 w-5 rounded bg-emerald-200" /><span className="h-4 w-5 rounded bg-emerald-600" /><span>{participants.length}/{participants.length}</span>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+            <table className="min-w-[720px] w-full border-collapse text-center text-xs">
+              <thead><tr className="bg-slate-50"><th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-slate-50 px-2 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">Time</th>{visibleDates.map((day) => <th key={day} className="border-b border-slate-200 px-2 py-3 font-semibold text-slate-700">{shortDate(day)}</th>)}</tr></thead>
+              <tbody>
+                {Array.from({ length: 20 }, (_, index) => 8 * 60 + index * 30).map((minutes) => {
+                  const start = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+                  return <tr key={start}>
+                    <th className="sticky left-0 z-10 border-r border-t border-slate-200 bg-white px-2 py-2 text-left font-medium text-slate-500">{formatTime(start)}</th>
+                    {visibleDates.map((day) => {
+                      const count = participants.filter((participant) => participant.slots.some((slot) => slot.date === day && !slot.blocked_by_google && slot.start <= start && slot.end > start) && !(participant.google_busy || []).some((busy) => busy.date === day && busy.start <= start && busy.end > start)).length;
+                      const option = filteredSlots.find((slot) => slot.date === day && slot.start === start);
+                      const selected = form.preferred_date === day && form.selected_start === start;
+                      const tone = count === participants.length ? "bg-emerald-600 text-white hover:bg-emerald-700" : count >= Math.ceil(participants.length * 0.66) ? "bg-emerald-300 text-emerald-950" : count ? "bg-emerald-100 text-emerald-900" : "bg-slate-50 text-slate-400";
+                      return <td key={day} className="border-t border-slate-200 p-1"><button type="button" disabled={!option} onClick={() => option && chooseSlot(option)} aria-label={`${shortDate(day)} ${start}: ${count} of ${participants.length} available${option ? ", selectable" : ""}`} className={`min-h-8 w-full rounded-md px-1 py-1.5 font-bold transition-colors ${tone} ${option ? "cursor-pointer focus:ring-2 focus:ring-brand-500 focus:ring-offset-1" : "cursor-default"} ${selected ? "ring-2 ring-slate-900 ring-offset-1" : ""}`}>{count}/{participants.length}</button></td>;
+                    })}
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {participants.length > 0 && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold text-ink">Panel availability</p>
-              <p className="text-xs text-slate-500">Green rows contain at least one complete overlap.</p>
+              <p className="text-xs text-slate-500">Detailed source availability for each adviser and panelist.</p>
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
               <UserRoundCheck className="h-3.5 w-3.5" />
@@ -1269,7 +1440,7 @@ function AvailabilityWorkspace({
                   {participants.map((participant) => (
                     <th key={participant.faculty_id} className="min-w-44 border-b border-slate-200 px-3 py-3">
                       <p className="font-semibold text-ink">{participant.name}</p>
-                      <p className="mt-0.5 text-xs font-normal text-slate-500">{participant.role}</p>
+                      <p className="mt-0.5 text-xs font-normal text-slate-500">{participant.role} · {participant.college}</p>
                       <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                         participant.calendar_connected
                           ? "bg-green-50 text-green-700 ring-1 ring-green-100"
@@ -1372,6 +1543,7 @@ function AvailabilityWorkspace({
                     <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                       <Clock3 className="h-3.5 w-3.5" /> {timeRange(slot.start, slot.end)} - all {slot.matched_count} available
                     </span>
+                    {slot.conflicts?.length > 0 && <span className="mt-1 block text-xs font-semibold text-amber-700">Conflict: {slot.conflicts.join(" ")}</span>}
                   </span>
                   <span className={`h-4 w-4 rounded-full border-2 ${selected ? "border-brand-600 bg-brand-600 ring-2 ring-white" : "border-slate-300"}`} />
                 </button>
@@ -1416,8 +1588,10 @@ function ScheduleHistory({ schedules }) {
         {schedules.map((schedule) => (
           <div key={schedule.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-ink">{shortDate(schedule.preferred_date)} - {schedule.mode}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{schedule.venue || "Arrangement pending"} - {schedule.notes}</p>
+              <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
+              {schedule.conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.conflict_reason}</p>}
+              {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
             </div>
             <StatusBadge value={schedule.status} />
           </div>
@@ -1953,18 +2127,19 @@ function shortDate(value) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
+function formatTime(value) {
+  if (!value) return "";
+  const [hour, minute] = value.split(":").map(Number);
+  return new Intl.DateTimeFormat("en-PH", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(2026, 0, 1, hour, minute)));
+}
+
 function timeRange(start, end) {
-  const format = (value) => {
-    if (!value) return "";
-    const [hour, minute] = value.split(":").map(Number);
-    return new Intl.DateTimeFormat("en-PH", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: "UTC",
-    }).format(new Date(Date.UTC(2026, 0, 1, hour, minute)));
-  };
-  return `${format(start)}-${format(end)}`;
+  return `${formatTime(start)}-${formatTime(end)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -2140,7 +2315,7 @@ function workflowGuidance(slug) {
     "research-gate":
       "Reads the student's stored PDF evidence for the selected gate. Staff can evaluate existing files and adviser revisions, but cannot manually mark an absent document as received.",
     "panel-matching":
-      "Retrieves keywords from the student's research title and three uploaded concept papers, then ranks faculty expertise with availability, college fit, and current panel load.",
+      "Reads the body text of all three uploaded concept papers, extracts significant keywords, then ranks faculty expertise with availability, college fit, and current panel load. Research titles and filenames are excluded.",
     "defense-scheduling":
       "Opens only after panel matching. The date spread compares adviser and panel availability, respects weekday work hours, and shows weekends only when faculty recorded an explicit override.",
     practicum:
