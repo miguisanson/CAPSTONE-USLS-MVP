@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   BarChart,
@@ -24,6 +24,7 @@ import {
   Clock,
   ArrowRight,
   FileText,
+  X,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -98,7 +99,8 @@ function DashboardFilters({ filters, meta, onChange, onClear }) {
           <option value="Low">Low</option>
           <option value="Medium">Medium</option>
           <option value="High">High</option>
-          <option value="Medium/High">Medium/High</option>
+          <option value="Critical">Critical</option>
+          <option value="Medium/High/Critical">Medium/High/Critical</option>
         </FilterSelect>
         <FilterSelect label="Standing" value={filters.standing} onChange={(value) => onChange("standing", value)}>
           <option value="">All standings</option>
@@ -146,6 +148,23 @@ export default function Dashboard() {
     () => api.dashboard(filters),
     [filters.program_id, filters.stage, filters.risk, filters.standing, filters.owner]
   );
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  async function openDetail(type, value) {
+    if (!value) return;
+    setDetail({ type, value, title: `${value}`, rows: [] });
+    setDetailLoading(true);
+    setDetailError("");
+    try {
+      setDetail(await api.dashboardDrilldown({ type, value, ...filters }));
+    } catch (err) {
+      setDetailError(err.message || "Could not load dashboard details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   if (loading) return <Spinner label="Loading dashboard…" />;
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load dashboard" hint={error} />;
@@ -183,7 +202,7 @@ export default function Dashboard() {
       {/* Primary KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Users} label="Students monitored" value={k.total_students} sub={`${k.active_students} active`} tone="brand" to="/students" />
-        <Kpi icon={AlertTriangle} label="Needing attention" value={k.at_risk} sub={`${k.high_risk} high risk`} tone="amber" to="/students?risk=Medium/High" />
+        <Kpi icon={AlertTriangle} label="Needing attention" value={k.at_risk} sub={`${k.high_risk} high or critical risk`} tone="amber" to="/students?risk=Medium/High/Critical" />
         <Kpi icon={ListTodo} label="Open tasks" value={k.pending_tasks} sub={`${k.overdue_tasks} overdue`} tone="red" to="/work-queue" />
         <Kpi icon={CalendarCheck} label="Confirmed defenses" value={k.confirmed_schedules} sub={`${k.needs_availability} awaiting availability`} tone="blue" to="/reports" />
       </div>
@@ -216,9 +235,10 @@ export default function Dashboard() {
                 axisLine={false}
               />
               <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
-              <Bar dataKey="count" radius={[0, 6, 6, 0]} fill="#0f7a44" barSize={18} />
+              <Bar dataKey="count" radius={[0, 6, 6, 0]} fill="#0f7a44" barSize={18} cursor="pointer" onClick={(entry) => openDetail("stage", entry?.stage)} />
             </BarChart>
           </ResponsiveContainer>
+          <ChartDrilldownButtons items={data.stage_distribution.map((item) => ({ label: item.stage, count: item.count }))} onClick={(value) => openDetail("stage", value)} />
         </ChartCard>
 
         <ChartCard title="Risk level" subtitle="Computed from monitoring signals">
@@ -231,6 +251,8 @@ export default function Dashboard() {
                 innerRadius={62}
                 outerRadius={96}
                 paddingAngle={2}
+                cursor="pointer"
+                onClick={(entry) => openDetail("risk", entry?.risk)}
               >
                 {data.risk_distribution.map((entry) => (
                   <Cell key={entry.risk} fill={RISK_COLORS[entry.risk] || "#94a3b8"} />
@@ -240,6 +262,7 @@ export default function Dashboard() {
               <Legend iconType="circle" wrapperStyle={{ fontSize: 13 }} />
             </PieChart>
           </ResponsiveContainer>
+          <ChartDrilldownButtons items={data.risk_distribution.map((item) => ({ label: item.risk, count: item.count }))} onClick={(value) => openDetail("risk", value)} />
         </ChartCard>
 
         <ChartCard title="Students by college" subtitle="Program clusters under monitoring">
@@ -249,16 +272,17 @@ export default function Dashboard() {
               <XAxis dataKey="college" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} angle={-12} textAnchor="end" height={56} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#64748b" }} />
               <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#1c9a59" barSize={34} />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#1c9a59" barSize={34} cursor="pointer" onClick={(entry) => openDetail("college", entry?.college)} />
             </BarChart>
           </ResponsiveContainer>
+          <ChartDrilldownButtons items={data.college_distribution.map((item) => ({ label: item.college, count: item.count }))} onClick={(value) => openDetail("college", value)} />
         </ChartCard>
 
         <ChartCard title="Research gate position" subtitle="Active research cases by gate">
           {data.gate_distribution.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={data.gate_distribution} dataKey="count" nameKey="gate" outerRadius={92} paddingAngle={2}>
+                <Pie data={data.gate_distribution} dataKey="count" nameKey="gate" outerRadius={92} paddingAngle={2} cursor="pointer" onClick={(entry) => openDetail("gate", entry?.gate)}>
                   {data.gate_distribution.map((entry, i) => (
                     <Cell key={entry.gate} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
@@ -270,13 +294,14 @@ export default function Dashboard() {
           ) : (
             <EmptyState title="No research cases yet" />
           )}
+          <ChartDrilldownButtons items={data.gate_distribution.map((item) => ({ label: item.gate, count: item.count }))} onClick={(value) => openDetail("gate", value)} />
         </ChartCard>
 
         <ChartCard title="Defense scheduling" subtitle="Outcome of scheduling requests">
           {data.schedule_distribution.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={data.schedule_distribution} dataKey="count" nameKey="status" innerRadius={50} outerRadius={92} paddingAngle={2}>
+                <Pie data={data.schedule_distribution} dataKey="count" nameKey="status" innerRadius={50} outerRadius={92} paddingAngle={2} cursor="pointer" onClick={(entry) => openDetail("schedule", entry?.status)}>
                   {data.schedule_distribution.map((entry) => (
                     <Cell key={entry.status} fill={SCHEDULE_COLORS[entry.status] || "#94a3b8"} />
                   ))}
@@ -288,6 +313,7 @@ export default function Dashboard() {
           ) : (
             <EmptyState title="No schedule requests yet" />
           )}
+          <ChartDrilldownButtons items={["Needs Availability", "Rescheduled", "Confirmed"].map((label) => ({ label, count: data.schedule_distribution.find((item) => item.status === label)?.count || 0 }))} onClick={(value) => openDetail("schedule", value)} />
         </ChartCard>
       </div>
 
@@ -300,12 +326,13 @@ export default function Dashboard() {
               <XAxis dataKey="owner" tick={{ fontSize: 11, fill: "#64748b" }} interval={0} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#64748b" }} />
               <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#0f7a44" barSize={48} />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#0f7a44" barSize={48} cursor="pointer" onClick={(entry) => openDetail("owner", entry?.owner)} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
           <EmptyState title="No open tasks" />
         )}
+        <ChartDrilldownButtons items={data.tasks_by_owner.map((item) => ({ label: item.owner, count: item.count }))} onClick={(value) => openDetail("owner", value)} />
       </ChartCard>
 
       {/* Activity + tasks */}
@@ -361,8 +388,41 @@ export default function Dashboard() {
           </Link>
         </Card>
       </div>
+      {detail && <DashboardDetailModal detail={detail} loading={detailLoading} error={detailError} onClose={() => setDetail(null)} />}
     </div>
   );
+}
+
+function DashboardDetailModal({ detail, loading, error, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="dashboard-detail-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <Card className="max-h-[88vh] w-full max-w-5xl overflow-hidden">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div><h2 id="dashboard-detail-title" className="text-lg font-semibold text-ink">{detail.title}</h2>{detail.definition && <p className="mt-1 max-w-3xl text-sm text-slate-600">{detail.definition}</p>}</div>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close dashboard details"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="max-h-[70vh] overflow-auto p-5">
+          {loading ? <Spinner label="Loading filtered details…" /> : error ? <EmptyState icon={AlertTriangle} title="Could not load details" hint={error} /> : !detail.rows?.length ? <EmptyState title="No records in this category" hint="The dashboard category is valid, but no matching records are available under the current data." /> : detail.type === "schedule" ? <ScheduleDetailTable rows={detail.rows} /> : detail.type === "owner" ? <TaskDetailTable rows={detail.rows} /> : <StudentDetailTable rows={detail.rows} />}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function ChartDrilldownButtons({ items, onClick }) {
+  return <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Chart categories">{items.map((item) => <button key={item.label} type="button" onClick={() => onClick(item.label)} aria-label={`Show ${item.label}: ${item.count} records`} className="cursor-pointer rounded-lg bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-brand-50 hover:text-brand-700">{item.label} · {item.count}</button>)}</div>;
+}
+
+function StudentDetailTable({ rows }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm"><thead><tr className="border-b border-slate-200 text-left text-xs font-bold uppercase tracking-wide text-slate-400"><th className="px-3 py-2">Student</th><th className="px-3 py-2">Program</th><th className="px-3 py-2">Stage / status</th><th className="px-3 py-2">Risk</th><th className="px-3 py-2">Relevant date</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-b border-slate-100"><td className="px-3 py-3"><Link to={`/students/${row.id}`} className="font-semibold text-brand-700 hover:underline">{row.name}</Link><p className="text-xs text-slate-400">{row.student_number}</p></td><td className="px-3 py-3 text-slate-600">{row.program_code}</td><td className="px-3 py-3"><p className="font-medium text-slate-700">{row.stage}</p><p className="text-xs text-slate-400">{row.status}</p></td><td className="px-3 py-3"><StatusBadge value={row.risk} dot={false} /></td><td className="px-3 py-3 text-slate-500">{formatDate(row.relevant_date)}</td></tr>)}</tbody></table></div>;
+}
+
+function ScheduleDetailTable({ rows }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-sm"><thead><tr className="border-b border-slate-200 text-left text-xs font-bold uppercase tracking-wide text-slate-400"><th className="px-3 py-2">Student</th><th className="px-3 py-2">Defense</th><th className="px-3 py-2">Adviser / panel</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Date / venue</th><th className="px-3 py-2">Action needed</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-b border-slate-100"><td className="px-3 py-3"><Link to={`/students/${row.student.id}`} className="font-semibold text-brand-700 hover:underline">{row.student.name}</Link><p className="text-xs text-slate-400">{row.student.student_number}</p></td><td className="px-3 py-3 text-slate-600">{row.defense_type}</td><td className="px-3 py-3 text-slate-600">{row.adviser || "—"}<p className="text-xs text-slate-400">{row.panel?.join(", ") || "Panel pending"}</p></td><td className="px-3 py-3"><StatusBadge value={row.status} dot={false} /></td><td className="px-3 py-3 text-slate-600">{formatDate(row.date)}<p className="text-xs text-slate-400">{row.venue || "Venue pending"}</p></td><td className="px-3 py-3 text-slate-600">{row.missing_action}</td></tr>)}</tbody></table></div>;
+}
+
+function TaskDetailTable({ rows }) {
+  return <div className="space-y-2">{rows.map((row) => <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"><div><p className="font-semibold text-ink">{row.title}</p><p className="text-xs text-slate-500">{row.student_name} · {row.owner_role}</p></div><div className="text-right"><StatusBadge value={row.overdue ? "Overdue" : row.status} /><p className="mt-1 text-xs text-slate-400">{formatDate(row.due_at)}</p></div></div>)}</div>;
 }
 
 function MiniStat({ icon: Icon, label, value, to }) {

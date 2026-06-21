@@ -1,5 +1,6 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle } from "lucide-react";
+import { Activity, AlertTriangle, Search, SlidersHorizontal } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
@@ -16,6 +17,9 @@ const SLUG_LABEL = {
   "research-gate": "Research Gate",
   "panel-matching": "Panel Matching",
   "defense-scheduling": "Defense Scheduling",
+  practicum: "Practicum",
+  withdrawal: "Withdrawal Requests",
+  graduation: "Graduation Endorsement",
 };
 
 function workflowLabel(slug) {
@@ -25,6 +29,16 @@ function workflowLabel(slug) {
 
 export default function ActivityLog() {
   const { data, loading, error } = useApi(() => api.activity(), []);
+  const [filters, setFilters] = useState({ query: "", workflow: "", owner: "" });
+  const items = data?.items || [];
+  const workflows = useMemo(() => [...new Set(items.map((item) => item.transaction_slug).filter(Boolean))].sort(), [items]);
+  const owners = useMemo(() => [...new Set(items.map((item) => item.next_owner).filter(Boolean))].sort(), [items]);
+  const filtered = useMemo(() => items.filter((log) => {
+    const text = `${log.result || ""} ${log.student_name || ""} ${log.actor_role || ""} ${log.notes || ""}`.toLowerCase();
+    return (!filters.query || text.includes(filters.query.toLowerCase()))
+      && (!filters.workflow || log.transaction_slug === filters.workflow)
+      && (!filters.owner || log.next_owner === filters.owner);
+  }), [items, filters]);
 
   return (
     <div className="space-y-5 animate-fade-up">
@@ -35,16 +49,25 @@ export default function ActivityLog() {
         </p>
       </div>
 
+      <Card className="p-3">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="relative block"><span className="sr-only">Search activity</span><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} className="field-input pl-10" placeholder="Search activity or student…" aria-label="Search activity" /></label>
+          <select value={filters.workflow} onChange={(event) => setFilters((current) => ({ ...current, workflow: event.target.value }))} className="field-input cursor-pointer" aria-label="Filter activity by workflow"><option value="">All workflows</option>{workflows.map((workflow) => <option key={workflow} value={workflow}>{workflowLabel(workflow)}</option>)}</select>
+          <select value={filters.owner} onChange={(event) => setFilters((current) => ({ ...current, owner: event.target.value }))} className="field-input cursor-pointer" aria-label="Filter activity by next owner"><option value="">All next owners</option>{owners.map((owner) => <option key={owner}>{owner}</option>)}</select>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>Showing {filtered.length} of {items.length} activities</span>{Object.values(filters).some(Boolean) && <button type="button" onClick={() => setFilters({ query: "", workflow: "", owner: "" })} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear filters</button>}</div>
+      </Card>
+
       <Card className="p-6">
         {loading ? (
           <Spinner label="Loading activity…" />
         ) : error ? (
           <EmptyState icon={AlertTriangle} title="Could not load activity" hint={error} />
-        ) : data.items.length === 0 ? (
-          <EmptyState icon={Activity} title="No recorded activity yet" hint="Complete a workflow to populate this feed." />
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={Activity} title="No activity matches the selected filters" hint="Clear a filter or use a broader search." />
         ) : (
           <ol className="relative space-y-5 border-l-2 border-slate-100 pl-6">
-            {data.items.map((log) => (
+            {filtered.map((log) => (
               <li key={log.id} className="relative">
                 <span className="absolute -left-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-white bg-brand-500" />
                 <div className="flex flex-wrap items-center gap-2">
@@ -77,4 +100,3 @@ export default function ActivityLog() {
     </div>
   );
 }
-

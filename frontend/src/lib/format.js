@@ -6,10 +6,11 @@ const STATUS_STYLES = {
   Low: "bg-brand-50 text-brand-700 ring-brand-200",
   Medium: "bg-amber-50 text-amber-700 ring-amber-200",
   High: "bg-red-50 text-red-700 ring-red-200",
+  Critical: "bg-red-100 text-red-800 ring-red-300",
   // standing
   Active: "bg-brand-50 text-brand-700 ring-brand-200",
   "On Leave": "bg-amber-50 text-amber-700 ring-amber-200",
-  Withdrawal: "bg-amber-50 text-amber-700 ring-amber-200",
+  "Withdrawal In Progress": "bg-amber-50 text-amber-700 ring-amber-200",
   Withdrawn: "bg-slate-100 text-slate-700 ring-slate-200",
   Completed: "bg-blue-50 text-blue-700 ring-blue-200",
   // enrollment tag
@@ -30,6 +31,10 @@ const STATUS_STYLES = {
   Uploaded: "bg-blue-50 text-blue-700 ring-blue-200",
   "Pending Review": "bg-amber-50 text-amber-700 ring-amber-200",
   "MOA Received": "bg-blue-50 text-blue-700 ring-blue-200",
+  "MOA Submitted": "bg-blue-50 text-blue-700 ring-blue-200",
+  "MOA Under Review": "bg-amber-50 text-amber-700 ring-amber-200",
+  "Practicum In Progress": "bg-blue-50 text-blue-700 ring-blue-200",
+  "Documents Submitted": "bg-blue-50 text-blue-700 ring-blue-200",
   "Under Review": "bg-amber-50 text-amber-700 ring-amber-200",
   "Hours Incomplete": "bg-red-50 text-red-700 ring-red-200",
   "Additional Certificates Requested": "bg-red-50 text-red-700 ring-red-200",
@@ -50,6 +55,9 @@ const STATUS_STYLES = {
   "Ready for Dean Review": "bg-amber-50 text-amber-700 ring-amber-200",
   "Returned for Revision": "bg-red-50 text-red-700 ring-red-200",
   "Sent to Registrar": "bg-brand-50 text-brand-700 ring-brand-200",
+  "Dean Approved": "bg-brand-50 text-brand-700 ring-brand-200",
+  "Pending Handoff": "bg-amber-50 text-amber-700 ring-amber-200",
+  Eligible: "bg-brand-50 text-brand-700 ring-brand-200",
   // document / course statuses
   Complete: "bg-brand-50 text-brand-700 ring-brand-200",
   Verified: "bg-brand-50 text-brand-700 ring-brand-200",
@@ -123,5 +131,5 @@ export const SEVERITY = {
 };
 
 export const CHART_COLORS = ["#0f7a44", "#1c9a59", "#3fb673", "#71d094", "#a6e4ba", "#138096", "#f59e0b", "#ef4444"];
-export const RISK_COLORS = { Low: "#1c9a59", Medium: "#f59e0b", High: "#ef4444" };
+export const RISK_COLORS = { Low: "#1c9a59", Medium: "#f59e0b", High: "#ef4444", Critical: "#991b1b" };
 export const SCHEDULE_COLORS = { Confirmed: "#0f7a44", "Needs Availability": "#f59e0b", Rescheduled: "#3b82f6" };

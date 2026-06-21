@@ -64,7 +64,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/workflow/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
       { to: "/workflow/readmission", label: "Readmission", icon: UserCheck },
-      { to: "/workflow/withdrawal", label: "Withdrawal", icon: LogOut },
+      { to: "/workflow/withdrawal", label: "Withdrawal Requests", icon: LogOut },
     ],
   },
   {

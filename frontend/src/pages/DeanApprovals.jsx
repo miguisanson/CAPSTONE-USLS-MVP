@@ -1,10 +1,20 @@
-import { useState } from "react";
-import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
 import { formatDate } from "../lib/format";
+import RoleSidebar from "../components/RoleSidebar";
+
+const DEAN_NAV = [
+  { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
+  { id: "practicum", label: "Practicum Reports", icon: Briefcase },
+  { id: "graduation", label: "Graduation Review", icon: GraduationCap },
+  { id: "withdrawal", label: "Withdrawal Requests", icon: LogOut },
+  { id: "leave", label: "LOA / Readmission", icon: CalendarOff },
+  { id: "reports", label: "Reports / Analytics", icon: BarChart3 },
+];
 
 export default function DeanApprovals() {
   const { user, logout } = useAuth();
@@ -13,6 +23,37 @@ export default function DeanApprovals() {
   const [note, setNote] = useState({});
   const [msg, setMsg] = useState("");
   const [actErr, setActErr] = useState("");
+  const [view, setView] = useState("overview");
+  const [filters, setFilters] = useState({ query: "", program: "", status: "" });
+  const workflowPending = data?.workflow_pending || [];
+  const workflowRecent = data?.workflow_recent || [];
+  const workflowOverview = data?.workflow_overview || [];
+  const baseWorkflowPending = view === "overview" ? workflowPending : workflowPending.filter((item) => item.type === view);
+  const baseWorkflowRecent = view === "overview" ? workflowRecent : workflowOverview.filter((item) => item.type === view);
+  const matchesFilters = (item) => {
+    const program = item.student?.program_code || item.program_code || "";
+    const text = `${item.title || ""} ${item.subtitle || ""} ${item.student?.name || ""} ${item.student?.student_number || ""} ${program}`.toLowerCase();
+    return (!filters.query || text.includes(filters.query.toLowerCase()))
+      && (!filters.program || program === filters.program)
+      && (!filters.status || item.status === filters.status);
+  };
+  const visibleWorkflowPending = baseWorkflowPending.filter(matchesFilters);
+  const visibleWorkflowRecent = baseWorkflowRecent.filter(matchesFilters);
+  const pendingPlans = (data?.pending || []).filter(matchesFilters);
+  const recentPlans = (data?.recent || []).filter(matchesFilters);
+  const programs = useMemo(() => [...new Set([
+    ...(data?.pending || []).map((item) => item.program_code),
+    ...(data?.recent || []).map((item) => item.program_code),
+    ...workflowOverview.map((item) => item.student?.program_code),
+  ].filter(Boolean))].sort(), [data, workflowOverview]);
+  const statuses = useMemo(() => [...new Set([
+    ...(view === "overview" ? [...(data?.pending || []), ...workflowOverview] : workflowOverview.filter((item) => item.type === view)).map((item) => item.status),
+  ].filter(Boolean))].sort(), [data, workflowOverview, view]);
+  const approvedGraduation = workflowOverview.filter((item) => item.type === "graduation" && item.status === "Dean Approved" && matchesFilters(item));
+
+  useEffect(() => {
+    setFilters((current) => ({ ...current, status: "" }));
+  }, [view]);
 
   async function decide(plan, decision) {
     setBusy(plan.id);
@@ -45,8 +86,26 @@ export default function DeanApprovals() {
     }
   }
 
+  async function exportApproved(reviewWindow = "", endorsementIds = []) {
+    const key = `export-${reviewWindow || "all"}`;
+    setBusy(key);
+    setMsg("");
+    setActErr("");
+    try {
+      const result = await api.exportGraduationCsv(reviewWindow, endorsementIds);
+      setMsg(`${result.count} Dean-approved candidate${result.count === 1 ? "" : "s"} exported and marked sent to the Registrar.`);
+      refetch();
+    } catch (error) {
+      setActErr(error.message || "Could not export the endorsed list.");
+    } finally {
+      setBusy(0);
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas lg:flex">
+      <RoleSidebar roleLabel="Dean Portal" items={DEAN_NAV} active={view} onChange={setView} />
+      <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white">
           <Gavel className="h-5 w-5" />
@@ -68,6 +127,14 @@ export default function DeanApprovals() {
           </p>
         </div>
 
+        <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
+        {approvedGraduation.length > 0 && (view === "overview" || view === "graduation") && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+            <p className="text-sm font-medium text-brand-800">{approvedGraduation.length} approved candidate{approvedGraduation.length === 1 ? " is" : "s are"} ready for Dean export and Registrar handoff.</p>
+            <button type="button" disabled={String(busy).startsWith("export-")} onClick={() => exportApproved("", approvedGraduation.map((item) => item.id))} className="btn-primary"><Download className="h-4 w-4" /> Export filtered approved list</button>
+          </div>
+        )}
+
         {msg && (
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
             <CheckCircle2 className="h-5 w-5" /> {msg}
@@ -83,13 +150,13 @@ export default function DeanApprovals() {
           <EmptyState icon={AlertTriangle} title="Could not load approvals" hint={error} />
         ) : (
           <>
-            {data.pending.length === 0 && (data.workflow_pending || []).length === 0 ? (
+            {(view !== "overview" || pendingPlans.length === 0) && visibleWorkflowPending.length === 0 ? (
               <Card className="p-6">
-                <EmptyState icon={Inbox} title="Nothing to approve right now" hint="Submitted course plans, withdrawals, practicum reports, and graduation endorsements will appear here." />
+                <EmptyState icon={Inbox} title="Nothing to review in this section" hint={view === "leave" ? "LOA and readmission reviews will appear here when routed to the Dean." : view === "reports" ? "No report items are awaiting a Dean decision." : "Submitted items for this role will appear here."} />
               </Card>
             ) : (
               <div className="space-y-4">
-                {data.pending.map((plan) => {
+                {view === "overview" && pendingPlans.map((plan) => {
                   const offered = plan.offerings.filter((o) => o.status === "Offered" || o.status === "Suggested");
                   return (
                     <Card key={plan.id} className="p-5">
@@ -148,7 +215,7 @@ export default function DeanApprovals() {
                     </Card>
                   );
                 })}
-                {(data.workflow_pending || []).map((item) => (
+                {visibleWorkflowPending.map((item) => (
                   <WorkflowApprovalCard
                     key={`${item.type}-${item.id}`}
                     item={item}
@@ -161,13 +228,13 @@ export default function DeanApprovals() {
               </div>
             )}
 
-            {data.recent?.length > 0 && (
+            {view === "overview" && recentPlans.length > 0 && (
               <Card className="mt-6 p-5">
                 <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
                   <Clock className="h-3.5 w-3.5" /> Recent decisions
                 </p>
                 <ul className="divide-y divide-slate-100">
-                  {data.recent.map((p) => (
+                  {recentPlans.map((p) => (
                     <li key={p.id} className="flex items-center justify-between py-2 text-sm">
                       <span className="text-slate-700">
                         {p.program_code} · {p.term_label}
@@ -179,16 +246,16 @@ export default function DeanApprovals() {
                 </ul>
               </Card>
             )}
-            {(data.workflow_recent || []).length > 0 && (
+            {visibleWorkflowRecent.length > 0 && (
               <Card className="mt-6 p-5">
                 <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
                   <Clock className="h-3.5 w-3.5" /> Recent workflow decisions
                 </p>
                 <ul className="divide-y divide-slate-100">
-                  {data.workflow_recent.map((item) => (
+                  {visibleWorkflowRecent.map((item) => (
                     <li key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-3 py-2 text-sm">
                       <span className="min-w-0 truncate text-slate-700">{item.title}</span>
-                      <StatusBadge value={item.status} dot={false} />
+                      <span className="flex items-center gap-2"><StatusBadge value={item.status} dot={false} />{item.type === "graduation" && item.status === "Dean Approved" && <button type="button" disabled={busy === `export-${item.review_window}`} onClick={() => exportApproved(item.review_window, [item.id])} className="btn-ghost px-3 py-1.5"><Download className="h-3.5 w-3.5" /> Export</button>}</span>
                     </li>
                   ))}
                 </ul>
@@ -197,7 +264,27 @@ export default function DeanApprovals() {
           </>
         )}
       </main>
+      </div>
     </div>
+  );
+}
+
+function DeanListFilters({ filters, setFilters, programs, statuses }) {
+  const active = Object.values(filters).filter(Boolean).length;
+  const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  return (
+    <Card className="mb-4 p-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="relative block">
+          <span className="sr-only">Search Dean review lists</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input value={filters.query} onChange={update("query")} className="field-input pl-10" placeholder="Search student, ID, or item…" aria-label="Search Dean review lists" />
+        </label>
+        <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter Dean list by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
+        <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter Dean list by status"><option value="">All statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
+      </div>
+      {active > 0 && <div className="mt-2 flex justify-end"><button type="button" onClick={() => setFilters({ query: "", program: "", status: "" })} className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button></div>}
+    </Card>
   );
 }
 

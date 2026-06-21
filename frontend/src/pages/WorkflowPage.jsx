@@ -27,6 +27,9 @@ import {
   RotateCcw,
   UserRoundCheck,
   Trash2,
+  Eye,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -56,9 +59,9 @@ const NEEDS_STUDENT = {
   "research-gate": true,
   "panel-matching": true,
   "defense-scheduling": true,
-  practicum: true,
-  withdrawal: true,
-  graduation: true,
+  practicum: false,
+  withdrawal: false,
+  graduation: false,
 };
 
 export default function WorkflowPage() {
@@ -211,9 +214,9 @@ export default function WorkflowPage() {
               {slug === "research-gate" && <ResearchGateForm {...formProps} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
               {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
-              {slug === "practicum" && <PracticumForm {...formProps} />}
-              {slug === "withdrawal" && <WithdrawalForm {...formProps} />}
-              {slug === "graduation" && <GraduationForm {...formProps} />}
+              {slug === "practicum" && <PracticumRoster {...formProps} />}
+              {slug === "withdrawal" && <WithdrawalRoster {...formProps} />}
+              {slug === "graduation" && <GraduationRoster {...formProps} />}
               {slug === "leave-of-absence" && <LeaveOfAbsenceForm {...formProps} />}
               {slug === "readmission" && <ReadmissionForm {...formProps} />}
             </Card>
@@ -1427,6 +1430,236 @@ function ScheduleHistory({ schedules }) {
 // ---------------------------------------------------------------------------
 // Practicum
 // ---------------------------------------------------------------------------
+function PracticumRoster({ context, submit, submitting }) {
+  const [expanded, setExpanded] = useState(null);
+  const rows = context.roster || [];
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
+  const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
+  const statuses = useMemo(() => uniqueValues(rows.map((row) => row.record?.status || "Not Submitted")), [rows]);
+  const filteredRows = useMemo(() => rows.filter((row) => {
+    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.record?.practicum_site || ""}`.toLowerCase();
+    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
+      && (!filters.program || row.student.program_code === filters.program)
+      && (!filters.status || (row.record?.status || "Not Submitted") === filters.status)
+      && (!filters.secondary || row.eligibility.status === filters.secondary);
+  }), [rows, filters]);
+
+  function actionFor(row) {
+    const record = row.record;
+    if (!record) return null;
+    const base = { student_id: row.student.id };
+    if (["MOA Submitted", "MOA Received"].includes(record.status)) {
+      return { label: "Forward to Academic Coordinator", payload: { ...base, status: "MOA Under Review", moa_status: "Under Review" } };
+    }
+    if (record.status === "MOA Under Review") {
+      return { label: "Mark practicum in progress", payload: { ...base, status: "Practicum In Progress", moa_status: "Verified" } };
+    }
+    if (["Hours Incomplete", "Documents Submitted"].includes(record.status) && row.hours_status !== "Complete") {
+      return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" } };
+    }
+    if (["Documents Submitted", "Practicum In Progress", "Hours Incomplete"].includes(record.status) && row.hours_status === "Complete") {
+      return { label: "Verify completion", payload: { ...base, status: "Completed", document_status: "Verified" } };
+    }
+    if (record.status === "Completed") {
+      return { label: "Send status report to Dean", payload: { ...base, status: "Report Sent to Dean", document_status: "Verified" } };
+    }
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      <SectionTitle title="Practicum student submissions" subtitle="Eligibility is computed from progress data; student-entered MOA, documents, and hours are read-only here" icon={Briefcase} />
+      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible for Practicum", "Not Eligible"]} count={filteredRows.length} total={rows.length} />
+      <WorkflowTable
+        headers={["Student", "Eligibility", "MOA", "Documents", "Hours", "Coordinator", "Dean report", "Action"]}
+        empty="No practicum-program students found."
+        rows={filteredRows}
+        render={(row) => {
+          const action = actionFor(row);
+          return (
+            <>
+              <tr key={row.student.id} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+                <StudentCell student={row.student} />
+                <td className="px-3 py-3"><StatusBadge value={row.eligibility.status} dot={false} /></td>
+                <td className="px-3 py-3"><StatusBadge value={row.moa_status} dot={false} /></td>
+                <td className="px-3 py-3"><StatusBadge value={row.documents_status} dot={false} /></td>
+                <td className="px-3 py-3 text-sm text-slate-600">{row.record ? `${row.record.completed_hours}/${row.record.required_hours}` : "—"}<div className="mt-1"><StatusBadge value={row.hours_status} dot={false} /></div></td>
+                <td className="px-3 py-3"><StatusBadge value={row.coordinator_review_status} dot={false} /></td>
+                <td className="px-3 py-3"><StatusBadge value={row.dean_report_status} dot={false} /></td>
+                <td className="px-3 py-3">
+                  <div className="flex min-w-[180px] flex-col gap-2">
+                    <button type="button" onClick={() => setExpanded(expanded === row.student.id ? null : row.student.id)} className="btn-ghost px-3 py-2"><Eye className="h-4 w-4" /> View details</button>
+                    {action ? <button type="button" disabled={submitting} onClick={() => submit(action.payload)} className="btn-primary px-3 py-2">{action.label}</button> : <span className="text-xs text-slate-400">{row.record ? "No staff action due" : "Awaiting student submission"}</span>}
+                  </div>
+                </td>
+              </tr>
+              {expanded === row.student.id && <PracticumDetailRow row={row} colSpan={8} />}
+            </>
+          );
+        }}
+      />
+    </div>
+  );
+}
+
+function PracticumDetailRow({ row, colSpan }) {
+  const record = row.record;
+  return (
+    <tr className="border-b border-brand-100 bg-brand-50/40">
+      <td colSpan={colSpan} className="px-4 py-4">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Automatic eligibility</p>
+            <ul className="mt-2 grid gap-1.5 text-xs text-slate-600 sm:grid-cols-2">
+              {row.eligibility.checklist.map((item) => <li key={item.key} className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${item.complete ? "bg-brand-500" : "bg-red-400"}`} />{item.label}{item.required ? `: ${item.actual}/${item.required}` : ""}</li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Student submission</p>
+            <p className="mt-2 text-sm font-semibold text-ink">{record?.practicum_site || "No site submitted"}</p>
+            <p className="mt-1 text-xs text-slate-500">Certificates: {record?.certificate_count || 0} · {record?.remarks || "No student remarks"}</p>
+            <div className="mt-2 flex flex-wrap gap-2">{record?.moa_attachment && <a className="btn-ghost px-3 py-1.5" href={record.moa_attachment.url} target="_blank" rel="noreferrer">MOA <ArrowUpRight className="h-3.5 w-3.5" /></a>}{record?.certificate_attachment && <a className="btn-ghost px-3 py-1.5" href={record.certificate_attachment.url} target="_blank" rel="noreferrer">Documents <ArrowUpRight className="h-3.5 w-3.5" /></a>}</div>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Workflow timeline</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">{(record?.timeline || []).map((step) => <span key={step.label} className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${step.state === "current" ? "bg-brand-600 text-white" : step.state === "complete" ? "bg-brand-100 text-brand-700" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>{step.label}</span>)}</div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function WithdrawalRoster({ context, submit, submitting }) {
+  const [expanded, setExpanded] = useState(null);
+  const rows = context.roster || [];
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
+  const programs = useMemo(() => uniqueValues(rows.map((item) => item.student.program_code)), [rows]);
+  const statuses = useMemo(() => uniqueValues(rows.map((item) => item.status)), [rows]);
+  const filteredRows = useMemo(() => rows.filter((item) => {
+    const haystack = `${item.student.name} ${item.student.student_number} ${item.student.program_code} ${item.reason || ""} ${item.effective_term || ""}`.toLowerCase();
+    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
+      && (!filters.program || item.student.program_code === filters.program)
+      && (!filters.status || item.status === filters.status)
+      && (!filters.secondary || item.dean_decision === filters.secondary);
+  }), [rows, filters]);
+  function actionFor(item) {
+    const base = { student_id: item.student_id };
+    if (item.dean_decision === "Pending") return { label: "Forward to Dean", payload: { ...base, dean_decision: "Pending" } };
+    if (item.dean_decision === "Approved" && item.requirement_status !== "Complete") return { label: "Confirm form & proof", payload: { ...base, requirement_status: "Complete" } };
+    if (item.dean_decision === "Approved" && item.fee_status !== "Cleared") return { label: "Record fee clearance", payload: { ...base, requirement_status: "Complete", fee_status: "Cleared" } };
+    if (item.dean_decision === "Approved" && item.registrar_status !== "Record Updated") return { label: "Confirm Registrar update", payload: { ...base, requirement_status: "Complete", fee_status: "Cleared", registrar_status: "Record Updated" } };
+    return null;
+  }
+  return (
+    <div className="space-y-4">
+      <SectionTitle title="Submitted withdrawal requests" subtitle="Withdrawal is the in-progress request; Withdrawn is applied only after requirements, fees, and Registrar update are confirmed" icon={LogOut} />
+      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
+      <WorkflowTable headers={["Student", "Request date", "Effective term", "Reason", "Status", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
+        const action = actionFor(item);
+        return <>
+          <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+            <StudentCell student={item.student} />
+            <td className="px-3 py-3 text-sm text-slate-600">{formatDate(item.created_at)}</td>
+            <td className="px-3 py-3 text-sm text-slate-600">{item.effective_term || "—"}</td>
+            <td className="max-w-[240px] px-3 py-3 text-sm text-slate-600"><span className="line-clamp-2">{item.reason || "No reason provided"}</span></td>
+            <td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td>
+            <td className="px-3 py-3"><div className="flex min-w-[170px] flex-col gap-2"><button type="button" onClick={() => setExpanded(expanded === item.id ? null : item.id)} className="btn-ghost px-3 py-2"><Eye className="h-4 w-4" /> View details</button>{action && <button type="button" disabled={submitting} onClick={() => submit(action.payload)} className="btn-primary px-3 py-2">{action.label}</button>}</div></td>
+          </tr>
+          {expanded === item.id && <tr className="border-b border-brand-100 bg-brand-50/40"><td colSpan={6} className="px-4 py-4"><div className="grid gap-3 text-sm sm:grid-cols-4"><Detail label="Dean" value={item.dean_decision} /><Detail label="Requirements" value={item.requirement_status} /><Detail label="Fee status" value={item.fee_status} /><Detail label="Registrar" value={item.registrar_status} /></div><div className="mt-3 flex flex-wrap gap-2">{item.request_attachment && <a href={item.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}{item.proof_attachment && <a href={item.proof_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost px-3 py-1.5">Proof <ArrowUpRight className="h-3.5 w-3.5" /></a>}</div></td></tr>}
+        </>;
+      }} />
+    </div>
+  );
+}
+
+function GraduationRoster({ context, submit, submitting }) {
+  const [expanded, setExpanded] = useState(null);
+  const rows = context.roster || [];
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
+  const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
+  const statuses = useMemo(() => uniqueValues(rows.map((row) => row.endorsement?.endorsement_status || "Not Prepared")), [rows]);
+  const filteredRows = useMemo(() => rows.filter((row) => {
+    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name}`.toLowerCase();
+    const eligibility = row.eligibility.eligible ? "Eligible" : "Not Eligible";
+    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
+      && (!filters.program || row.student.program_code === filters.program)
+      && (!filters.status || (row.endorsement?.endorsement_status || "Not Prepared") === filters.status)
+      && (!filters.secondary || eligibility === filters.secondary);
+  }), [rows, filters]);
+  function actionFor(row) {
+    const status = row.endorsement?.endorsement_status;
+    const base = { student_id: row.student.id, review_window: row.endorsement?.review_window || "AY 2026-2027 Graduation Review" };
+    if (!row.eligibility.eligible) return { label: "Record eligibility review", payload: { ...base, endorsement_status: "For Review" } };
+    if (!status || status === "Not Eligible") return { label: "Prepare endorsement list", payload: { ...base, endorsement_status: "For Review" } };
+    if (["For Review", "Returned for Revision"].includes(status)) return { label: status === "Returned for Revision" ? "Resend revised list to Dean" : "Send endorsement list to Dean", payload: { ...base, endorsement_status: "Ready for Dean Review" } };
+    return null;
+  }
+  return (
+    <div className="space-y-4">
+      <SectionTitle title="Graduation endorsement candidates" subtitle="Staff compiles and revises the list; only the Dean can export and hand the approved list to the Registrar" icon={GraduationCap} />
+      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not Eligible"]} count={filteredRows.length} total={rows.length} />
+      <WorkflowTable headers={["Student", "Coursework", "Missing coursework", "Research", "Missing research", "Eligibility", "Endorsement", "Action"]} empty="No graduation candidates match the selected filters." rows={filteredRows} render={(row) => {
+        const endorsement = row.endorsement;
+        const action = actionFor(row);
+        return <>
+          <tr key={row.student.id} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+            <StudentCell student={row.student} />
+            <td className="px-3 py-3"><StatusBadge value={row.eligibility.coursework_status} dot={false} /></td>
+            <td className="max-w-[220px] px-3 py-3 text-xs text-slate-500">{row.eligibility.missing_coursework?.slice(0, 2).join("; ") || "None"}</td>
+            <td className="px-3 py-3"><StatusBadge value={row.eligibility.research_status} dot={false} /></td>
+            <td className="max-w-[220px] px-3 py-3 text-xs text-slate-500">{row.eligibility.missing_research_requirements?.slice(0, 2).join("; ") || "None"}</td>
+            <td className="px-3 py-3"><StatusBadge value={row.eligibility.eligible ? "Eligible" : "Not Eligible"} dot={false} /></td>
+            <td className="px-3 py-3"><StatusBadge value={endorsement?.endorsement_status || "Not Prepared"} dot={false} /></td>
+            <td className="px-3 py-3"><div className="flex min-w-[175px] flex-col gap-2"><button type="button" onClick={() => setExpanded(expanded === row.student.id ? null : row.student.id)} className="btn-ghost px-3 py-2"><Eye className="h-4 w-4" /> Candidate details</button>{action && <button type="button" disabled={submitting} onClick={() => submit(action.payload)} className="btn-primary px-3 py-2">{action.label}</button>}{endorsement?.endorsement_status === "Dean Approved" && <span className="rounded-lg bg-brand-50 px-3 py-2 text-center text-xs font-semibold text-brand-700 ring-1 ring-brand-200">Awaiting Dean export</span>}</div></td>
+          </tr>
+          {expanded === row.student.id && <tr className="border-b border-brand-100 bg-brand-50/40"><td colSpan={8} className="px-4 py-4"><div className="grid gap-3 text-sm sm:grid-cols-4"><Detail label="Program" value={row.student.program_name} /><Detail label="Academic Coordinator" value={row.eligibility.coursework_status} /><Detail label="Research Coordinator" value={row.eligibility.research_status} /><Detail label="Dean remarks" value={endorsement?.dean_remarks || "None"} /></div></td></tr>}
+        </>;
+      }} />
+    </div>
+  );
+}
+
+function WorkflowTable({ headers, rows, render, empty }) {
+  if (!rows.length) return <EmptyState title={empty} />;
+  return <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[980px] text-left"><thead><tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-400">{headers.map((header) => <th key={header} className="px-3 py-2.5">{header}</th>)}</tr></thead><tbody>{rows.map(render)}</tbody></table></div>;
+}
+
+function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions, count, total }) {
+  const active = Object.values(filters).filter(Boolean).length;
+  const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <label className="relative block">
+          <span className="sr-only">Search list</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input value={filters.query} onChange={update("query")} className="field-input pl-10" placeholder="Search name, ID, program…" aria-label="Search list" />
+        </label>
+        <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
+        <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter by workflow status"><option value="">All workflow statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
+        <select value={filters.secondary} onChange={update("secondary")} className="field-input cursor-pointer" aria-label={`Filter by ${secondaryLabel}`}><option value="">All {secondaryLabel.toLowerCase()}</option>{secondaryOptions.map((option) => <option key={option}>{option}</option>)}</select>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+        <span>Showing {count} of {total} records</span>
+        {active > 0 && <button type="button" onClick={() => setFilters({ query: "", program: "", status: "", secondary: "" })} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button>}
+      </div>
+    </div>
+  );
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
+}
+
+function StudentCell({ student }) {
+  return <td className="px-3 py-3"><p className="text-sm font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p></td>;
+}
+
+function Detail({ label, value }) {
+  return <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 font-semibold text-slate-700">{value || "—"}</p></div>;
+}
+
 function PracticumForm({ context, studentId, submit, submitting }) {
   const selected = context.selected_student;
   const current = context.practicum_record;

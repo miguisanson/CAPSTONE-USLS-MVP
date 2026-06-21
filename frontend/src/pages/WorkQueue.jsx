@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ListTodo, AlertTriangle } from "lucide-react";
+import { ListTodo, AlertTriangle, Search } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
@@ -12,7 +12,9 @@ export default function WorkQueue() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [owner, setOwner] = useState(searchParams.get("owner") || "");
   const [status, setStatus] = useState(searchParams.get("status") || "");
+  const [query, setQuery] = useState("");
   const { data, loading, error } = useApi(() => api.tasks({ owner, status }), [owner, status]);
+  const filtered = (data?.items || []).filter((task) => `${task.title} ${task.student_name || ""} ${task.owner_role}`.toLowerCase().includes(query.toLowerCase()));
 
   function updateFilter(next) {
     const merged = { owner, status, ...next };
@@ -33,6 +35,8 @@ export default function WorkQueue() {
         </p>
       </div>
 
+      <div className="relative max-w-xl"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="field-input pl-10" placeholder="Search task, student, or owner…" aria-label="Search work queue" /></div>
+
       <div className="flex flex-wrap gap-2">
         <FilterChip active={owner === ""} onClick={() => updateFilter({ owner: "" })}>
           All owners
@@ -52,8 +56,8 @@ export default function WorkQueue() {
           <Spinner label="Loading tasks…" />
         ) : error ? (
           <EmptyState icon={AlertTriangle} title="Could not load tasks" hint={error} />
-        ) : data.items.length === 0 ? (
-          <EmptyState icon={ListTodo} title="No open tasks" hint="This queue is clear. Nice." />
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={ListTodo} title="No tasks match the selected filters" hint="Clear a filter or broaden the search." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-sm">
@@ -67,7 +71,7 @@ export default function WorkQueue() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((task) => (
+                {filtered.map((task) => (
                   <tr key={task.id} className="border-b border-slate-50 hover:bg-slate-50/60">
                     <td className="px-5 py-3 font-semibold text-ink">{task.title}</td>
                     <td className="px-3 py-3 text-slate-600">{task.owner_role}</td>
