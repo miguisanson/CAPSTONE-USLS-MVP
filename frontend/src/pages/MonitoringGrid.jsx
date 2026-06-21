@@ -172,7 +172,7 @@ export default function MonitoringGrid() {
             aria-label="Risk"
           >
             <option value="">All risk</option>
-            {["Low", "Medium", "High", "Medium/High"].map((item) => (
+            {["Low", "Medium", "High", "Critical", "Medium/High/Critical"].map((item) => (
               <option key={item} value={item}>{item}</option>
             ))}
           </select>

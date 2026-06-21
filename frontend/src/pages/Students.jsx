@@ -93,7 +93,7 @@ export default function Students() {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <Select label="Stage" value={stage} onChange={setStage} options={meta?.stages || []} />
-            <Select label="Risk" value={risk} onChange={setRisk} options={["Low", "Medium", "High", "Medium/High"]} />
+            <Select label="Risk" value={risk} onChange={setRisk} options={["Low", "Medium", "High", "Critical", "Medium/High/Critical"]} />
             <Select label="Standing" value={standing} onChange={setStanding} options={["Active", "On Leave", "Withdrawn", "Completed"]} />
             <Select
               label="Program"

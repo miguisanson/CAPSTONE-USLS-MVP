@@ -114,7 +114,7 @@ function ReportFilters({ data, filters, updateFilter, clear }) {
         </Select>
         <Select label="Risk" value={filters.risk} onChange={(value) => updateFilter("risk", value)}>
           <option value="">All risk</option>
-          {["Low", "Medium", "High", "Medium/High"].map((risk) => <option key={risk} value={risk}>{risk}</option>)}
+          {["Low", "Medium", "High", "Critical", "Medium/High/Critical"].map((risk) => <option key={risk} value={risk}>{risk}</option>)}
         </Select>
         <Select label="Standing" value={filters.standing} onChange={(value) => updateFilter("standing", value)}>
           <option value="">All standings</option>

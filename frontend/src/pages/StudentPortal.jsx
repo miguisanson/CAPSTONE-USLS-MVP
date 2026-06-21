@@ -18,7 +18,9 @@ import {
   LogOut,
   Mail,
   Send,
+  Trash2,
   UserCheck,
+  LayoutDashboard,
 } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -26,8 +28,22 @@ import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, ProgressBar, SectionTitle, Spinner, StatusBadge } from "../components/ui";
 import { CheckList, Field, Input, Select, Textarea } from "../components/forms";
 import { formatDate, initials, relativeDays } from "../lib/format";
+import RoleSidebar from "../components/RoleSidebar";
 
-const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
+const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Ethics Review", "Final Defense", "Completion Evidence"]);
+
+const STUDENT_NAV = [
+  { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
+  { id: "lifecycle", label: "Lifecycle Status", icon: Activity },
+  { id: "research", label: "Research Submission", icon: FileCheck },
+  { id: "schedule", label: "Defense Schedule", icon: CalendarCheck },
+  { id: "loa", label: "Leave of Absence", icon: CalendarOff },
+  { id: "readmission", label: "Readmission", icon: UserCheck },
+  { id: "practicum", label: "Practicum", icon: Briefcase },
+  { id: "withdrawal", label: "Withdrawal Request", icon: LogOut },
+  { id: "graduation", label: "Graduation Status", icon: GraduationCap },
+  { id: "documents", label: "Documents / Submissions", icon: FileUp },
+];
 
 const REQUEST_GROUPS = [
   {
@@ -80,9 +96,12 @@ export default function StudentPortal() {
   const { data, loading, error, refetch } = useApi(() => api.studentPortalContext(), []);
 
   const student = data?.student;
+  const [view, setView] = useState("overview");
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas lg:flex">
+      <RoleSidebar roleLabel="Student Portal" items={STUDENT_NAV} active={view} onChange={setView} />
+      <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 lg:px-8">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white shadow-sm">
@@ -119,24 +138,15 @@ export default function StudentPortal() {
           ) : student ? (
             <>
               <StudentHero data={data} />
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-                <div className="space-y-5 lg:col-span-8">
-                  <ProgressPanel data={data} />
-                  <WorkflowStatusPanel data={data} />
-                  <RequestCenter data={data} onSaved={refetch} />
-                  <AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} />
-                  <ActivityPanel logs={data.logs} />
-                </div>
-                <div className="space-y-5 lg:col-span-4">
-                  <TasksPanel tasks={data.tasks} />
-                  <SchedulePanel schedules={data.schedules} />
-                  <RecommendationsPanel recommendations={data.recommendations} />
-                </div>
-              </div>
+              {view === "overview" && <div className="grid grid-cols-1 gap-5 lg:grid-cols-12"><div className="space-y-5 lg:col-span-8"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /><ActivityPanel logs={data.logs} /></div><div className="space-y-5 lg:col-span-4"><TasksPanel tasks={data.tasks} /><SchedulePanel schedules={data.schedules} /><RecommendationsPanel recommendations={data.recommendations} /></div></div>}
+              {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
+              {["research", "schedule", "loa", "readmission", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
+              {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
             </>
           ) : null}
         </div>
       </main>
+      </div>
     </div>
   );
 }
@@ -292,17 +302,21 @@ function WorkflowStatusPanel({ data }) {
   );
 }
 
-function RequestCenter({ data, onSaved }) {
-  const [active, setActive] = useState("research");
+function RequestCenter({ data, onSaved, focusedRequest }) {
+  const [active, setActive] = useState(focusedRequest || "research");
   const allRequests = REQUEST_GROUPS.flatMap((group) => group.items);
   const activeRequest = allRequests.find((r) => r.id === active) || allRequests[0];
   const ActiveIcon = activeRequest?.icon || Send;
   const activeLocked = activeRequest?.lockedWhen?.(data);
 
+  useEffect(() => {
+    if (focusedRequest) setActive(focusedRequest);
+  }, [focusedRequest]);
+
   return (
     <Card className="p-6">
       <SectionTitle title="Request Center" subtitle="Choose the request that matches your current status" icon={Send} />
-      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+      {!focusedRequest && <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2">
         {REQUEST_GROUPS.map((group) => (
           <div key={group.title} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
             <p className="text-sm font-semibold text-ink">{group.title}</p>
@@ -337,7 +351,7 @@ function RequestCenter({ data, onSaved }) {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
       <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
           <ActiveIcon className="h-4 w-4 text-brand-700" /> {activeRequest?.label}
@@ -352,7 +366,7 @@ function RequestCenter({ data, onSaved }) {
             {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
             {active === "loa" && <LoaRequestForm studentId={data.student.id} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
-            {active === "withdrawal" && <WithdrawalRequestForm studentId={data.student.id} onSaved={onSaved} />}
+            {active === "withdrawal" && <WithdrawalRequestForm data={data} onSaved={onSaved} />}
             {active === "practicum" && <PracticumRequestForm data={data} onSaved={onSaved} />}
             {active === "graduation" && <GraduationRequestForm data={data} onSaved={onSaved} />}
             {active === "schedule" && <ScheduleRequestForm studentId={data.student.id} onSaved={onSaved} />}
@@ -387,20 +401,17 @@ function useSubmitRequest(type, onSaved) {
 }
 
 function ResearchRequestForm({ data, onSaved }) {
-  const milestones = data.research_milestones || [];
-  const initialGate = data.research_case?.current_gate || milestones[0]?.value || "";
-  const [gate, setGate] = useState(initialGate);
+  const progress = data.research_progress || {};
+  const milestone = progress.milestone || {};
+  const gate = progress.gate || milestone.value || "";
   const [form, setForm] = useState({ research_title: data.research_case?.title || "", submitted_package: "" });
   const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
-  const milestone = milestones.find((item) => item.value === gate) || milestones[0];
-  const uploadRequirements = milestone?.requirements.filter((item) => item.student_upload) || [];
-  const managedRequirements = milestone?.requirements.filter((item) => !item.student_upload) || [];
+  const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
+  const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
 
   useEffect(() => {
-    const currentGate = data.research_case?.current_gate || milestones[0]?.value || "";
-    setGate(currentGate);
     setForm((current) => ({ ...current, research_title: data.research_case?.title || "" }));
-  }, [data.student.id, data.research_case?.current_gate, data.research_case?.title, milestones]);
+  }, [data.student.id, data.research_case?.title]);
 
   function set(key) {
     return (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -410,7 +421,6 @@ function ResearchRequestForm({ data, onSaved }) {
     e.preventDefault();
     submit({
       student_id: data.student.id,
-      gate,
       research_title: form.research_title,
       submitted_package: form.submitted_package,
     });
@@ -418,17 +428,18 @@ function ResearchRequestForm({ data, onSaved }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field label="Research milestone" required hint={milestone?.description}>
-        <Select
-          value={gate}
-          onChange={(e) => setGate(e.target.value)}
-          placeholder=""
-          options={milestones.map((item) => ({ value: item.value, label: item.label }))}
-        />
-      </Field>
-      <Field label="Research title">
-        <Input value={form.research_title} onChange={set("research_title")} />
-      </Field>
+      <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-wide text-brand-600">Automatically detected stage</p><p className="mt-1 font-display text-xl font-semibold text-ink">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusBadge value={progress.status || "Pending"} dot={false} /></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-4">
+        {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-300 bg-brand-50 text-brand-700" : stage.complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-400"}`}>{stage.name}</div>)}
+      </div>
+      {progress.stage === "Title Defense" && (
+        <Field label="Research title from Form 1" hint="This student-submitted form value becomes the displayed title. Staff cannot edit it.">
+          <Input value={form.research_title} onChange={set("research_title")} required />
+        </Field>
+      )}
       <div>
         <p className="field-label">Files you upload</p>
         <p className="mb-2 text-xs text-slate-500">Only these items require action from you for this milestone.</p>
@@ -438,6 +449,7 @@ function ResearchRequestForm({ data, onSaved }) {
               key={requirement.item_name}
               gate={gate}
               requirement={requirement}
+              panelLocked={Boolean(data.panel?.length)}
               onSaved={onSaved}
             />
           ))}
@@ -467,21 +479,27 @@ function ResearchRequestForm({ data, onSaved }) {
         busy={busy}
         error={error}
         message={message}
-        disabled={!milestone?.student_uploads_ready}
+        disabled={!milestone?.student_uploads_ready || (progress.stage === "Title Defense" && !form.research_title.trim())}
         label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
+        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Enter the research title shown on Form 1." : ""}
       />
     </form>
   );
 }
 
-function ResearchEvidenceUpload({ gate, requirement, onSaved }) {
+function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
   const [busy, setBusy] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState("");
   const needed = requirement.required_file_count;
   const files = requirement.files || [];
+  const conceptPapersLocked = panelLocked && requirement.item_name === "Three concept papers";
 
   async function upload(file) {
+    if (conceptPapersLocked) {
+      setError("Concept papers are locked because a panel has already been matched.");
+      return;
+    }
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       setError("Please choose a PDF file.");
@@ -499,6 +517,22 @@ function ResearchEvidenceUpload({ gate, requirement, onSaved }) {
     }
   }
 
+  async function removeConceptPaper(file) {
+    if (conceptPapersLocked) return;
+    const confirmed = window.confirm(`Remove "${file.name}"? This will revoke the Academic Coordinator endorsement and clear the current Panel Matching result.`);
+    if (!confirmed) return;
+    setRemovingId(file.id);
+    setError("");
+    try {
+      await api.deleteResearchEvidence(file.id);
+      await onSaved();
+    } catch (err) {
+      setError(err.message || "Could not remove this concept paper.");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -509,21 +543,29 @@ function ResearchEvidenceUpload({ gate, requirement, onSaved }) {
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={requirement.status_label} dot={false} />
-          <label className="btn-ghost cursor-pointer">
-          <FileUp className="h-4 w-4" /> {busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
-          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy} onChange={(e) => upload(e.target.files?.[0])} />
+          <label className={`btn-ghost ${conceptPapersLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+          {conceptPapersLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {conceptPapersLocked ? "Locked after panel match" : busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
+          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || conceptPapersLocked} onChange={(e) => upload(e.target.files?.[0])} />
           </label>
         </div>
       </div>
       {files.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {files.map((file) => (
-            <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-slate-200">
-              {file.name}<Eye className="h-3.5 w-3.5" />
-            </a>
+            <span key={file.id} className="inline-flex overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-200">
+              <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
+                {file.name}<Eye className="h-3.5 w-3.5" />
+              </a>
+              {requirement.item_name === "Three concept papers" && (
+                <button type="button" onClick={() => removeConceptPaper(file)} disabled={conceptPapersLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={conceptPapersLocked ? "Locked after panel matching" : "Remove concept paper"}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </span>
           ))}
         </div>
       )}
+      {requirement.item_name === "Three concept papers" && files.length > 0 && <p className={`mt-2 text-xs ${conceptPapersLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{conceptPapersLocked ? "This concept-paper set is read-only because a panel has already been matched." : "Removing any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete three-paper set must be endorsed again."}</p>}
       {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
     </div>
   );
@@ -600,7 +642,8 @@ function ReadmissionRequestForm({ data, onSaved }) {
   );
 }
 
-function WithdrawalRequestForm({ studentId, onSaved }) {
+function WithdrawalRequestForm({ data, onSaved }) {
+  const existing = data.withdrawal_application;
   const [form, setForm] = useState({
     attachment_id: null,
     proof_attachment_id: null,
@@ -612,11 +655,17 @@ function WithdrawalRequestForm({ studentId, onSaved }) {
 
   function onSubmit(e) {
     e.preventDefault();
-    submit({ student_id: studentId, ...form });
+    submit({ student_id: data.student.id, ...form });
   }
+
+  const steps = ["Request Submitted", "Dean Review", "Approved Follow-through", "Requirements Submitted", "Staff / Fee Check", "Registrar Update", "Withdrawn"];
+  const activeIndex = existing?.status === "Withdrawn Confirmed" ? 6 : existing?.status === "Requirements Submitted" ? 3 : existing?.dean_decision === "Approved" ? 2 : existing ? 1 : 0;
+  const followThrough = existing?.dean_decision === "Approved" && existing?.status !== "Withdrawn Confirmed";
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {existing && <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Submitted withdrawal request</p><p className="text-xs text-slate-500">Request date {formatDate(existing.created_at)} · effective {existing.effective_term || "term pending"}</p></div><StatusBadge value={existing.status} dot={false} /></div><div className="mt-3 flex flex-wrap gap-1.5">{steps.map((step, index) => <span key={step} className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${index === activeIndex ? "bg-brand-600 text-white" : index < activeIndex ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-400"}`}>{step}</span>)}</div>{existing.dean_decision === "Denied" && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">The Dean denied this request. Your lifecycle standing remains Active.</p>}</div>}
+      {!followThrough && !existing && <>
       <Field label="Effective term" required>
         <Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 Term 1" />
       </Field>
@@ -624,14 +673,17 @@ function WithdrawalRequestForm({ studentId, onSaved }) {
         <Textarea value={form.reason} onChange={set("reason")} required />
       </Field>
       <RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-      <RequestPdfUpload requestType="withdrawal" label="Proof or clearance PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, proof_attachment_id: attachment?.id || null }))} />
       <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label="Submit withdrawal request" />
+      </>}
+      {followThrough && <><p className="text-sm text-slate-600">The Dean approved your request. Complete the required withdrawal form/clearance steps, then upload the form and proof for staff verification.</p><RequestPdfUpload requestType="withdrawal" label="Completed withdrawal form and proof PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, proof_attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.proof_attachment_id} disabledHint={!form.proof_attachment_id ? "Upload the completed form and proof first." : ""} label="Submit withdrawal requirements" /></>}
     </form>
   );
 }
 
 function PracticumRequestForm({ data, onSaved }) {
   const existing = data.practicum_record;
+  const eligibility = data.practicum_eligibility || {};
+  const timeline = data.practicum_timeline || existing?.timeline || [];
   const [form, setForm] = useState({
     attachment_id: existing?.moa_attachment?.id || null,
     certificate_attachment_id: existing?.certificate_attachment?.id || null,
@@ -669,6 +721,20 @@ function PracticumRequestForm({ data, onSaved }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><p className="text-sm font-semibold text-ink">Practicum eligibility</p><p className="mt-0.5 text-xs text-slate-500">Automatically checked from your monitoring sheet and research milestones.</p></div>
+          <StatusBadge value={eligibility.status || "Not Eligible"} dot={false} />
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {(eligibility.checklist || []).map((item) => (
+            <div key={item.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+              <span className="font-medium text-slate-600">{item.label}</span>
+              <span className={`font-bold ${item.complete ? "text-brand-700" : "text-red-600"}`}>{item.required ? `${item.actual}/${item.required}` : item.complete ? "Complete" : "Incomplete"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
       {existing && (
         <div className="rounded-xl border border-slate-100 bg-white px-3.5 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -678,12 +744,18 @@ function PracticumRequestForm({ data, onSaved }) {
           <p className="mt-1 text-xs text-slate-500">{existing.completed_hours}/{existing.required_hours} hours · certificates: {existing.certificate_count}</p>
         </div>
       )}
+      <div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Status timeline</p>
+        <div className="flex flex-wrap gap-1.5">
+          {timeline.map((step) => <span key={step.label} className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold ${step.state === "current" ? "bg-brand-600 text-white" : step.state === "complete" ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-400"}`}>{step.label}</span>)}
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Practicum site / company" required>
           <Input value={form.practicum_site} onChange={set("practicum_site")} required />
         </Field>
         <Field label="Required hours" required>
-          <Input type="number" min="1" value={form.required_hours} onChange={set("required_hours")} required />
+          <Input type="number" min="1" value={form.required_hours} readOnly aria-readonly="true" title="Set by the Graduate School requirement" />
         </Field>
         <Field label="Completed hours" required>
           <Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required />
@@ -692,12 +764,12 @@ function PracticumRequestForm({ data, onSaved }) {
           <Input type="number" min="0" value={form.certificate_count} onChange={set("certificate_count")} />
         </Field>
       </div>
-      <RequestPdfUpload requestType="practicum" label="Practicum MOA PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-      <RequestPdfUpload requestType="practicum" label="Certificate/document PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />
+      <RequestPdfUpload requestType="practicum" label="1 · Practicum MOA PDF (separate upload)" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+      <RequestPdfUpload requestType="practicum" label="2 · Completion certificates/forms/hours proof PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />
       <Field label="Remarks">
         <Textarea value={form.remarks} onChange={set("remarks")} />
       </Field>
-      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label="Submit practicum record" />
+      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || !eligibility.eligible} disabledHint={!eligibility.eligible ? "Complete all 6/9/6/21-unit and research-stage eligibility requirements first." : !form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label="Submit practicum record" />
     </form>
   );
 }

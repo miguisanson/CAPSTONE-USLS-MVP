@@ -35,6 +35,10 @@ export const api = {
     const qs = queryString(params);
     return request(`/dashboard${qs ? `?${qs}` : ""}`);
   },
+  dashboardDrilldown: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/dashboard/drilldown${qs ? `?${qs}` : ""}`);
+  },
   students: (params = {}) => {
     const qs = queryString(params);
     return request(`/students${qs ? `?${qs}` : ""}`);
@@ -53,6 +57,28 @@ export const api = {
   reports: (params = {}) => {
     const qs = queryString(params);
     return request(`/reports${qs ? `?${qs}` : ""}`);
+  },
+  exportGraduationCsv: async (reviewWindow = "", endorsementIds = []) => {
+    const res = await fetch(`${BASE}/graduation/endorsed.csv`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ review_window: reviewWindow, endorsement_ids: endorsementIds }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] || "graduate-school-endorsed-list.csv";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    return { count: Number(res.headers.get("X-Exported-Count") || 0) };
   },
   transactionContext: (slug, params = {}) => {
     const qs = queryString(params);
@@ -121,6 +147,14 @@ export const api = {
     if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
     return body;
   },
+  deleteResearchEvidence: (evidenceId) =>
+    request(`/student-portal/research-evidence/${evidenceId}`, { method: "DELETE" }),
+  form1Endorsements: () => request("/research-gate/form1-endorsements"),
+  endorseForm1: (studentId, payload) =>
+    request(`/research-gate/form1-endorsements/${studentId}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   uploadStudentRequestAttachment: async (requestType, file) => {
     const form = new FormData();
     form.append("request_type", requestType);
