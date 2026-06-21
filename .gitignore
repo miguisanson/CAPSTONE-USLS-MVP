@@ -46,3 +46,6 @@ CAPSTONE-USLS-MVP/
 
 # Temporary document-build scratch folder
 _handout/
+
+# Local reference copies of teammates branches (not part of the app)
+Other_Branches/
