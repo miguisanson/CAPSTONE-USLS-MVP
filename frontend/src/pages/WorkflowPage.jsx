@@ -92,18 +92,29 @@ export default function WorkflowPage() {
     setSpecialization("");
     setResult(null);
     setSubmitError("");
+    if (USES_REQUEST_QUEUE[slug]) {
+      window.localStorage.removeItem("workflowStudentId");
+      if (!searchParams.get("student_id")) {
+        setStudentId(null);
+        setStudentLabel("");
+      }
+    }
   }, [slug]);
 
   useEffect(() => {
     if (studentId) {
-      window.localStorage.setItem("workflowStudentId", String(studentId));
+      if (USES_REQUEST_QUEUE[slug]) {
+        window.localStorage.removeItem("workflowStudentId");
+      } else {
+        window.localStorage.setItem("workflowStudentId", String(studentId));
+      }
       if (searchParams.get("student_id") !== String(studentId)) {
         const next = new URLSearchParams(searchParams);
         next.set("student_id", String(studentId));
         setSearchParams(next, { replace: true });
       }
     }
-  }, [studentId, searchParams, setSearchParams]);
+  }, [slug, studentId, searchParams, setSearchParams]);
 
   const { data: context, loading, error, refetch } = useApi(
     () => api.transactionContext(slug, { student_id: studentId, specialization }),
@@ -114,6 +125,16 @@ export default function WorkflowPage() {
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
   const usesQueue = USES_REQUEST_QUEUE[slug];
+
+  useEffect(() => {
+    if (!usesQueue || loading || !studentId || !context?.submitted_requests) return;
+    if (context.submitted_requests.some((request) => request.id === studentId)) return;
+    setStudentId(null);
+    setStudentLabel("");
+    const next = new URLSearchParams(searchParams);
+    next.delete("student_id");
+    setSearchParams(next, { replace: true });
+  }, [usesQueue, loading, studentId, context?.submitted_requests, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!studentLabel && context?.selected_student?.search_label) {
@@ -218,6 +239,9 @@ export default function WorkflowPage() {
                 setStudentId(null);
                 setStudentLabel("");
                 setResult(null);
+                const next = new URLSearchParams(searchParams);
+                next.delete("student_id");
+                setSearchParams(next, { replace: true });
               }}
             />
           )}
@@ -236,6 +260,8 @@ export default function WorkflowPage() {
             <Card className="p-6">
               <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
             </Card>
+          ) : usesQueue && !context?.selected_request ? (
+            null
           ) : (
             <Card className="p-6">
               {slug === "student-handoff" && <HandoffPanel {...formProps} />}
@@ -288,44 +314,61 @@ function RequestQueue({ requests, selectedId, onPick, onClear }) {
   const selected = list.find((r) => r.id === selectedId);
   return (
     <Card className="p-6">
-      <SectionTitle
-        title="Submitted requests"
-        subtitle="Only students who filed this request from their portal appear here"
-        icon={Inbox}
-      />
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <SectionTitle
+          title="Submitted requests"
+          subtitle="Student-submitted applications waiting for staff review"
+          icon={Inbox}
+        />
+        <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
+          <Users className="h-4 w-4" /> {list.length} pending
+        </div>
+      </div>
       {selected ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">{selected.name}</p>
-            <p className="text-xs text-slate-500">
-              {selected.student_number} · {selected.program_code} · submitted {formatDate(selected.submitted_at)}
-            </p>
+        <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">{selected.name}</p>
+              <p className="text-xs text-slate-500">
+                {selected.student_number} · {selected.program_code} · submitted {formatDate(selected.submitted_at)}
+              </p>
+            </div>
+            <button type="button" onClick={onClear} className="btn-ghost shrink-0">
+              <ArrowUpRight className="h-4 w-4 rotate-180" /> Back to requests
+            </button>
           </div>
-          <button type="button" onClick={onClear} className="btn-ghost shrink-0">
-            <ArrowUpRight className="h-4 w-4 rotate-180" /> Back to list
-          </button>
+          <RequestSummary request={selected} compact />
         </div>
       ) : list.length ? (
-        <ul className="divide-y divide-slate-100">
+        <div className="overflow-hidden rounded-xl border border-slate-200">
+          <div className="grid grid-cols-12 gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <div className="col-span-12 sm:col-span-5">Student</div>
+            <div className="col-span-12 sm:col-span-5">Request</div>
+            <div className="col-span-12 text-right sm:col-span-2">Action</div>
+          </div>
           {list.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => onPick(r)}
-                className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-brand-50/50 cursor-pointer"
-              >
-                <div className="min-w-0">
+            <div key={r.request_log_id || r.id} className="grid grid-cols-12 items-center gap-3 border-t border-slate-100 px-4 py-3">
+              <div className="col-span-12 min-w-0 sm:col-span-5">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-sm font-semibold text-ink">{r.name}</p>
-                  <p className="truncate text-xs text-slate-400">
-                    {r.student_number} · {r.program_code} · submitted {formatDate(r.submitted_at)}
-                    {r.attachment ? ` · ${r.attachment}` : ""}
-                  </p>
+                  <StatusBadge value="Pending Review" dot={false} />
                 </div>
-                <StatusBadge value={r.last_result ? "Decided" : "Pending"} dot={false} />
-              </button>
-            </li>
+                <p className="truncate text-xs text-slate-500">
+                  {r.student_number} · {r.program_code} · submitted {formatDate(r.submitted_at)}
+                </p>
+              </div>
+              <div className="col-span-12 min-w-0 text-sm text-slate-600 sm:col-span-5">
+                <p className="truncate font-semibold text-ink">{r.request_label || "Student request"}</p>
+                <p className="truncate text-xs text-slate-500">{r.attachment || "Application PDF uploaded"}</p>
+              </div>
+              <div className="col-span-12 flex justify-start sm:col-span-2 sm:justify-end">
+                <button type="button" onClick={() => onPick(r)} className="btn-primary px-3 py-2">
+                  <Eye className="h-4 w-4" /> Review
+                </button>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       ) : (
         <EmptyState
           icon={Inbox}
@@ -334,6 +377,22 @@ function RequestQueue({ requests, selectedId, onPick, onClear }) {
         />
       )}
     </Card>
+  );
+}
+
+function RequestSummary({ request, compact = false }) {
+  if (!request) return null;
+  return (
+    <div className={`grid gap-3 text-sm ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+      <Detail label="Request" value={request.request_label || "Submitted application"} />
+      <Detail label="Application file" value={request.attachment || "Uploaded PDF"} />
+      <Detail label="Submitted" value={formatDate(request.submitted_at)} />
+      {request.attachment_detail?.file_exists && request.attachment_detail?.url && (
+        <a href={request.attachment_detail.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit px-3 py-2">
+          View PDF <ArrowUpRight className="h-3.5 w-3.5" />
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -2228,7 +2287,8 @@ function timeRange(start, end) {
 // ---------------------------------------------------------------------------
 // Leave of Absence
 // ---------------------------------------------------------------------------
-function LeaveOfAbsenceForm({ studentId, submit, submitting }) {
+function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
+  const selectedRequest = context?.selected_request;
   const [form, setForm] = useState({
     request_date: new Date().toISOString().slice(0, 10),
     application_reference: "",
@@ -2243,6 +2303,19 @@ function LeaveOfAbsenceForm({ studentId, submit, submitting }) {
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  useEffect(() => {
+    if (!selectedRequest) return;
+    setForm((current) => ({
+      ...current,
+      request_date: (selectedRequest.submitted_at || "").slice(0, 10) || current.request_date,
+      application_reference: selectedRequest.attachment || selectedRequest.source_reference || "",
+      effective_start: selectedRequest.effective_start || "",
+      effective_end: selectedRequest.effective_end || "",
+      reason_remarks: selectedRequest.reason_remarks || "",
+      source_reference: selectedRequest.source_reference || selectedRequest.attachment || "",
+    }));
+  }, [selectedRequest?.request_log_id]);
+
   function onSubmit(e) {
     e.preventDefault();
     submit({ student_id: studentId, ...form });
@@ -2251,6 +2324,7 @@ function LeaveOfAbsenceForm({ studentId, submit, submitting }) {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle title="Record leave of absence" subtitle="Records the request, Dean decision, status pause, and notice trail" icon={CalendarOff} />
+      <RequestSummary request={selectedRequest} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Application attachment / file reference">
           <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
@@ -2303,6 +2377,7 @@ function LeaveOfAbsenceForm({ studentId, submit, submitting }) {
 // ---------------------------------------------------------------------------
 function ReadmissionForm({ context, studentId, submit, submitting }) {
   const requirements = context.readmission_requirements || [];
+  const selectedRequest = context?.selected_request;
   const [items, setItems] = useState(requirements);
   const [form, setForm] = useState({
     application_reference: "",
@@ -2319,6 +2394,17 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
 
   useEffect(() => setItems(context.readmission_requirements || []), [context.readmission_requirements]);
 
+  useEffect(() => {
+    if (!selectedRequest) return;
+    setForm((current) => ({
+      ...current,
+      application_reference: selectedRequest.attachment || selectedRequest.source_reference || "",
+      target_return_term: selectedRequest.target_return_term || "",
+      previous_loa_period: selectedRequest.previous_loa_period || "",
+      source_reference: selectedRequest.source_reference || selectedRequest.attachment || "",
+    }));
+  }, [selectedRequest?.request_log_id]);
+
   function onSubmit(e) {
     e.preventDefault();
     submit({ student_id: studentId, ...form, readmission_items: items });
@@ -2327,6 +2413,7 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle title="Record readmission" subtitle="Checks return eligibility, records the Dean decision, and reactivates approved students" icon={UserCheck} />
+      <RequestSummary request={selectedRequest} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Application attachment / file reference">
           <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />

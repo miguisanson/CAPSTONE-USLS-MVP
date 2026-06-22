@@ -114,6 +114,7 @@ export const api = {
   courseAdjustments: (programId) =>
     request(`/course-adjustments${programId ? `?program_id=${programId}` : ""}`),
   resetUploadedData: () => request("/admin/reset-uploaded-data", { method: "POST", body: JSON.stringify({}) }),
+  resetDemoData: () => request("/admin/reset-demo", { method: "POST", body: JSON.stringify({}) }),
   approvals: () => request("/approvals"),
   decideApproval: (planId, payload) =>
     request(`/approvals/${planId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
@@ -145,6 +146,18 @@ export const api = {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
+    return body;
+  },
+  parseTitleDefense: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/student-portal/title-defense/parse`, {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Could not read the file (${res.status})`);
     return body;
   },
   deleteResearchEvidence: (evidenceId) =>

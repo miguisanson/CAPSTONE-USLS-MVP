@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import random
 import re
+import shutil
 import sys
 import json
 import csv
@@ -850,11 +851,13 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
 def attachment_dict(attachment: StudentRequestAttachment | None) -> dict | None:
     if not attachment:
         return None
+    file_exists = (REQUEST_UPLOAD_ROOT / attachment.stored_name).exists()
     return {
         "id": attachment.id,
         "name": attachment.original_name,
         "uploaded_at": iso(attachment.uploaded_at),
         "url": f"/api/student-request-attachments/{attachment.id}/file",
+        "file_exists": file_exists,
         "status": "Uploaded",
         "status_label": "Pending Review",
     }
@@ -1907,8 +1910,9 @@ def register_routes(app: Flask) -> None:
         source = (data.get("source_reference") or data.get("submitted_package") or "").strip()
         research_case, progress = sync_research_progress(student, title)
         gate = progress["gate"]
+        effective_title = (title or (research_case.title if research_case else "")).strip()
         if gate == "Form 1 - Title Defense" and (
-            not title or research_case.title == "Research title pending Form 1 submission"
+            not effective_title or effective_title == "Research title pending Form 1 submission"
         ):
             return jsonify({"error": "Enter the research title shown on Form 1 before submitting."}), 400
         ensure_research_document_checks(student.id, gate)
@@ -1928,7 +1932,7 @@ def register_routes(app: Flask) -> None:
         research_case.status = "Awaiting Review"
         notes = [
             f"Student submitted {milestone['label']} for staff review.",
-            f"Research title: {title or 'Not provided'}.",
+            f"Research title: {effective_title or 'Not provided'}.",
             f"File-backed items: {', '.join(submitted_items) if submitted_items else 'None uploaded'}.",
             "All student-upload requirements were received. Staff and system requirements remain separate.",
         ]
@@ -1947,6 +1951,35 @@ def register_routes(app: Flask) -> None:
         )
         db.session.commit()
         return jsonify({"ok": True, "message": "Submitted. Research staff will review your application."})
+
+    @app.route("/api/student-portal/title-defense/parse", methods=["POST"])
+    @require_api_login("student")
+    def student_title_defense_parse():
+        # Read a Form 1 (Application for Title Defense) PDF and return the fields it
+        # contains so the student portal can pre-fill the research-gate form. The
+        # file is only scanned for text — it is not stored as evidence here.
+        uploaded = request.files.get("file")
+        if not uploaded or not uploaded.filename:
+            return jsonify({"error": "Choose the Form 1 / Title Defense PDF to read."}), 400
+        if not (uploaded.filename or "").lower().endswith(".pdf"):
+            return jsonify({"error": "Upload the Form 1 as a PDF file."}), 400
+        data = uploaded.read()
+        if data[:5] != b"%PDF-":
+            return jsonify({"error": "The selected file is not a valid PDF."}), 400
+        UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+        tmp = UPLOAD_ROOT / f"_titlescan-{uuid4().hex}.pdf"
+        tmp.write_bytes(data)
+        try:
+            text = extract_pdf_text(tmp)
+        finally:
+            tmp.unlink(missing_ok=True)
+        parsed = parse_title_defense_text(text)
+        if not parsed.get("research_title"):
+            return jsonify({
+                "error": "Could not read a research title from that PDF. Make sure it is a Form 1 "
+                         "with a 'Research Title:' line.",
+            }), 422
+        return jsonify({"ok": True, **parsed})
 
     @app.route("/api/student-portal/research-evidence/upload", methods=["POST"])
     @require_api_login("student")
@@ -1972,7 +2005,19 @@ def register_routes(app: Flask) -> None:
             if item_name == "Three concept papers":
                 revoke_form1_endorsement(student.id)
             evidence = store_research_evidence(student, gate, item_name, uploaded)
-            sync_research_progress(student)
+            parsed_title = ""
+            if gate == "Form 1 - Title Defense" and item_name == "Form 1 - Application for Title Defense":
+                parsed = parse_title_defense_text(evidence.extracted_text or "")
+                parsed_title = (parsed.get("research_title") or "").strip()
+                if not parsed_title:
+                    (UPLOAD_ROOT / evidence.stored_name).unlink(missing_ok=True)
+                    raise ValueError(
+                        "Could not read a research title from that Form 1 PDF. "
+                        "Make sure it includes a 'Research Title:' line."
+                    )
+                if parsed_title:
+                    sync_research_progress(student, parsed_title)
+            research_case, _progress = sync_research_progress(student)
             add_task(student.id, f"Review submitted {item_name}", "Research Coordinator", 3, 35)
             add_log(
                 "research-gate",
@@ -1987,7 +2032,11 @@ def register_routes(app: Flask) -> None:
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
             return jsonify({"error": str(exc)}), 400
-        return jsonify({"ok": True, "document": document_check_dict(evidence.document_check)})
+        return jsonify({
+            "ok": True,
+            "document": document_check_dict(evidence.document_check),
+            "research_title": parsed_title or (research_case.title if research_case else ""),
+        })
 
     @app.route("/api/student-portal/research-evidence/<int:evidence_id>", methods=["DELETE"])
     @require_api_login("student")
@@ -3080,6 +3129,34 @@ def register_routes(app: Flask) -> None:
             "message": f"Removed {len(ids)} uploaded student(s) and {removed_courses} imported subject(s). Seeded demo data was kept.",
         })
 
+    @app.route("/api/admin/reset-demo", methods=["POST"])
+    @require_api_login("staff")
+    def reset_demo_data():
+        # Temporary demo control: rebuild the seeded database and clear generated
+        # upload storage so the walkthrough can be repeated from the same baseline.
+        seed_count = int(os.getenv("DEMO_SEED_COUNT", "350"))
+        try:
+            db.session.rollback()
+            for folder in (UPLOAD_ROOT, REQUEST_UPLOAD_ROOT):
+                if folder.exists():
+                    shutil.rmtree(folder)
+                folder.mkdir(parents=True, exist_ok=True)
+            seed_database(seed_count)
+            ensure_faculty_demo_names()
+            ensure_faculty_demo_profiles()
+            ensure_demo_accounts()
+            seed_simulation_demo()
+            ensure_demo_request_submission_logs()
+            sync_all_curricula()
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": f"Could not reset demo data: {exc}"}), 500
+        return jsonify({
+            "ok": True,
+            "message": f"Demo reset complete. Rebuilt {seed_count} seeded students and cleared generated uploads.",
+        })
+
     # ---- Monitoring grid (spreadsheet view, one program at a time) -------
     @app.route("/api/monitoring/grid")
     def monitoring_grid():
@@ -4044,36 +4121,85 @@ def reports_payload(filters=None) -> dict:
 # ---------------------------------------------------------------------------
 # Transaction context (data needed by each workflow screen)
 # ---------------------------------------------------------------------------
+def request_notes_value(notes: str | None, label: str) -> str:
+    match = re.search(rf"{re.escape(label)}:\s*(.+?)(?:\n|$)", notes or "", re.IGNORECASE)
+    return match.group(1).strip().rstrip(".") if match else ""
+
+
+def latest_request_attachment(student_id: int, request_type: str) -> StudentRequestAttachment | None:
+    return (
+        StudentRequestAttachment.query.filter_by(student_id=student_id, request_type=request_type)
+        .order_by(StudentRequestAttachment.uploaded_at.desc(), StudentRequestAttachment.id.desc())
+        .first()
+    )
+
+
 def submitted_request_students(request_type: str) -> list[dict]:
-    # Students who actually submitted this request from the student portal — newest
-    # first, deduplicated, with their uploaded application and any prior staff decision.
-    attachments = (
-        StudentRequestAttachment.query.filter_by(request_type=request_type)
-        .order_by(StudentRequestAttachment.uploaded_at.desc())
+    # Queue rows are pending student submissions, not every uploaded PDF. Once staff
+    # records a Dean decision or returns the case, the latest workflow log is no
+    # longer the student's submission and the row drops out of the queue.
+    submitted_results = {
+        "leave-of-absence": {"LOA application submitted"},
+        "readmission": {"Readmission request submitted"},
+    }[request_type]
+    submission_logs = (
+        TransactionLog.query.filter(
+            TransactionLog.transaction_slug == request_type,
+            TransactionLog.actor_role == "Student",
+            TransactionLog.result.in_(submitted_results),
+        )
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
         .all()
     )
-    seen = set()
-    rows = []
-    for att in attachments:
-        if att.student_id in seen:
+    seen: set[int] = set()
+    rows: list[dict] = []
+    for log in submission_logs:
+        if not log.student_id or log.student_id in seen:
             continue
-        seen.add(att.student_id)
-        student = Student.query.get(att.student_id)
-        if not student:
-            continue
-        last = (
-            TransactionLog.query.filter_by(transaction_slug=request_type, student_id=student.id)
+        seen.add(log.student_id)
+        latest_log = (
+            TransactionLog.query.filter_by(transaction_slug=request_type, student_id=log.student_id)
             .filter(TransactionLog.actor_role != "Demo Data")
-            .order_by(TransactionLog.created_at.desc())
+            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
             .first()
         )
-        rows.append({
+        if not latest_log or latest_log.id != log.id:
+            continue
+        student = Student.query.get(log.student_id)
+        if not student:
+            continue
+        attachment = latest_request_attachment(student.id, request_type)
+        row = {
             **student_brief(student),
-            "submitted_at": iso(att.uploaded_at),
-            "attachment": att.original_name,
-            "last_result": last.result if last else None,
-            "last_decision_at": iso(last.created_at) if last else None,
-        })
+            "request_log_id": log.id,
+            "submitted_at": iso(log.created_at),
+            "source_reference": log.source_reference,
+            "notes": log.notes,
+            "last_result": None,
+            "attachment": attachment.original_name if attachment else log.source_reference,
+            "attachment_detail": attachment_dict(attachment),
+            "status": "Pending Review",
+        }
+        if request_type == "leave-of-absence":
+            period = request_notes_value(log.notes, "Requested period")
+            start, end = "", ""
+            if " to " in period:
+                start, end = [part.strip() for part in period.split(" to ", 1)]
+            elif period and period.lower() != "not specified":
+                start = period
+            row.update({
+                "request_label": period if period else "Leave of Absence application",
+                "effective_start": start,
+                "effective_end": end,
+                "reason_remarks": request_notes_value(log.notes, "Reason/remarks"),
+            })
+        else:
+            row.update({
+                "request_label": request_notes_value(log.notes, "Target return term") or "Readmission request",
+                "target_return_term": request_notes_value(log.notes, "Target return term"),
+                "previous_loa_period": request_notes_value(log.notes, "Previous LOA period"),
+            })
+        rows.append(row)
     return rows
 
 
@@ -4184,6 +4310,10 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
     # LOA/Readmission are student-initiated: staff only see students who submitted.
     if slug in ("leave-of-absence", "readmission"):
         context["submitted_requests"] = submitted_request_students(slug)
+        context["selected_request"] = next(
+            (row for row in context["submitted_requests"] if row["id"] == selected_student_id),
+            None,
+        )
 
     if selected_student:
         context["panel_roles"] = panel_roles_for_student(selected_student)
@@ -4738,6 +4868,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
     term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
 
     created, skipped, sample, conflicts, duplicates = 0, 0, [], [], []
+    created_accounts = []
     subject_changes = 0
     students_changed = 0
     for row in parsed["rows"]:
@@ -4821,6 +4952,12 @@ def import_ac_monitoring(parsed: dict) -> dict:
                     student_id=student.id, gate="Admission Handoff", item_name=item,
                     status="Complete", evidence_reference="AC Student Monitoring import"))
 
+        if is_new:
+            # Provision a student-portal account so the handed-off student can sign in
+            # (upload concept papers, file LOA / withdrawal) — realistic and demo-ready.
+            ensure_student_account(student, student.email)
+            created_accounts.append({"name": student.name, "email": student.email, "password": SIM_STUDENT_PASSWORD})
+
         recompute_risk(student)
 
         if is_new:
@@ -4859,8 +4996,16 @@ def import_ac_monitoring(parsed: dict) -> dict:
         "conflicts": conflicts,
         "conflict_count": len(conflicts),
         "sample": sample,
+        "accounts": created_accounts,
         "message": f"Imported {created} new student(s) from the {program.code} monitoring sheet "
-                   f"({skipped} already in system or needing verification, {len(conflicts)} conflict(s)).",
+                   f"({skipped} already in system or needing verification, {len(conflicts)} conflict(s))."
+                   + (
+                       f" Portal login for {created_accounts[0]['name']}: {created_accounts[0]['email']} / {SIM_STUDENT_PASSWORD}."
+                       if len(created_accounts) == 1
+                       else f" {len(created_accounts)} new student portal account(s) created (password: {SIM_STUDENT_PASSWORD})."
+                       if created_accounts
+                       else ""
+                   ),
     }
 
 
@@ -5885,9 +6030,42 @@ def extract_pdf_text(path: Path) -> str:
         from pypdf import PdfReader
 
         reader = PdfReader(str(path))
-        return "\n".join((page.extract_text() or "") for page in reader.pages)[:120000]
+        text = "\n".join((page.extract_text() or "") for page in reader.pages)
     except Exception:
         return ""
+    # PDF extraction can yield lone surrogate code points that the DB driver cannot
+    # encode, and the stored column is a MySQL TEXT (max 65,535 bytes). Drop invalid
+    # characters and cap to a UTF-8 byte budget so storage is safe on both backends.
+    # The first ~60 KB (title, abstract, introduction, methods) is more than enough
+    # for keyword matching.
+    text = text.encode("utf-8", "ignore").decode("utf-8", "ignore")
+    encoded = text.encode("utf-8")
+    if len(encoded) > 60000:
+        text = encoded[:60000].decode("utf-8", "ignore")
+    return text
+
+
+def parse_title_defense_text(text: str) -> dict:
+    # Pull the labelled fields out of a Form 1 (Application for Title Defense) so the
+    # student portal can pre-fill the research-gate form. Tuned to the prepared sample
+    # ("Research Title:", "Objectives:", "Research Keywords:", "Proposed Panel
+    # Specialization:") but tolerant of spacing and ordering.
+    flat = re.sub(r"\s+", " ", text or "").strip()
+
+    def grab(label: str, stop: str) -> str:
+        match = re.search(rf"{label}\s*:?\s*(.+?)\s*(?:{stop})", flat, re.IGNORECASE)
+        return re.sub(r"\s+", " ", match.group(1)).strip() if match else ""
+
+    title = grab(r"RESEARCH TITLE", r"OBJECTIVES|RESEARCH KEYWORDS|KEYWORDS|PROPOSED PANEL|PREPARED BY|$")
+    objectives = grab(r"OBJECTIVES", r"RESEARCH KEYWORDS|KEYWORDS|PROPOSED PANEL|PREPARED BY|$")
+    keywords = grab(r"(?:RESEARCH )?KEYWORDS", r"PROPOSED PANEL|PREPARED BY|$")
+    panel = grab(r"PROPOSED PANEL SPECIALIZATION", r"PREPARED BY|$")
+    return {
+        "research_title": title,
+        "objectives": objectives,
+        "keywords": keywords,
+        "panel_specialization": panel,
+    }
 
 
 def store_research_evidence(
@@ -6757,7 +6935,7 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
         .order_by(ResearchCase.opened_at.desc())
         .first()
     )
-    clean_title = (submitted_title or "").strip()
+    clean_title = re.sub(r"\s+", " ", submitted_title or "").strip()[:220]
     if not research_case:
         research_case = ResearchCase(
             student_id=student.id,
@@ -7605,17 +7783,48 @@ def seed_database(count: int = 350) -> None:
     # A few demo submitted LOA / Readmission requests so the staff queues are populated
     # (these normally arrive when a student files them from the Student Portal).
     for i, s in enumerate(Student.query.filter(Student.enrollment_tag == "Enrolled").order_by(Student.id).limit(4).all()):
+        original_name = f"LOA_Application_{s.student_number}.pdf"
         db.session.add(StudentRequestAttachment(
             student_id=s.id, request_type="leave-of-absence",
-            original_name=f"LOA_Application_{s.student_number}.pdf",
+            original_name=original_name,
             stored_name=f"seed-loa-{s.id}.pdf", mime_type="application/pdf",
             uploaded_at=now_utc() - timedelta(days=i + 1)))
+        add_log(
+            "leave-of-absence",
+            s.id,
+            "Student",
+            original_name,
+            "LOA application submitted",
+            "GS Staff",
+            "Student submitted a Leave of Absence application for staff eligibility review.\n"
+            f"Requested period: AY 2026-2027 Term {1 + (i % 2)} to AY 2026-2027 Term {2 + (i % 2)}.\n"
+            "Reason/remarks: Demo queue case.\n"
+            f"Application PDF: {original_name}.",
+        )
     for i, s in enumerate(Student.query.filter(Student.enrollment_tag == "LOA").order_by(Student.id).limit(3).all()):
+        original_name = f"Readmission_Request_{s.student_number}.pdf"
         db.session.add(StudentRequestAttachment(
             student_id=s.id, request_type="readmission",
-            original_name=f"Readmission_Request_{s.student_number}.pdf",
+            original_name=original_name,
             stored_name=f"seed-readmit-{s.id}.pdf", mime_type="application/pdf",
             uploaded_at=now_utc() - timedelta(days=i + 1)))
+        add_log(
+            "readmission",
+            s.id,
+            "Student",
+            original_name,
+            "Readmission request submitted",
+            "GS Staff",
+            "Student submitted a readmission request for staff review.\n"
+            f"Target return term: AY 2026-2027 Term {1 + (i % 2)}.\n"
+            "Checklist submitted: 4 item(s); missing/not marked: None.\n"
+            f"Previous LOA period: AY 2025-2026 Term {2 + (i % 2)}.\n"
+            f"Application PDF: {original_name}.",
+        )
+
+    # End-to-end simulation fixtures (Student A's empty program + matched faculty,
+    # Students B & C with portal accounts and submitted requests).
+    seed_simulation_demo()
 
     # Derive each student's risk/priority from the same signals the Decision Support
     # engine uses, so the student record and the recommendation queue always agree.
@@ -7822,6 +8031,207 @@ def ensure_faculty_demo_profiles() -> int:
     return updated
 
 
+SIM_PROGRAM_CODE = "MAEDS"
+SIM_STUDENT_PASSWORD = "DemoPass123!"
+
+
+def ensure_student_account(student: Student, email: str, password: str = SIM_STUDENT_PASSWORD) -> UserAccount:
+    # Idempotently link (or create) a student-portal account so a handed-off student
+    # can sign in to upload concept papers and file LOA / withdrawal requests.
+    account = UserAccount.query.filter_by(email=email).first()
+    if not account:
+        account = UserAccount(
+            email=email,
+            full_name=f"{student.name} (Student)",
+            password_hash=generate_password_hash(password),
+            role="student",
+            active=True,
+        )
+        db.session.add(account)
+    account.student_id = student.id
+    account.full_name = f"{student.name} (Student)"
+    account.active = True
+    return account
+
+
+def seed_simulation_demo() -> None:
+    # Idempotent end-to-end demo fixtures (safe to re-run on every startup):
+    #  - MAEDS: a dedicated empty program so the uploaded Student A sheet's subjects
+    #    become A's entire curriculum (A can reach units-complete); practicum enabled.
+    #  - Three faculty whose specialization matches Student A's concept-paper keywords
+    #    so panel matching ranks them at the top.
+    #  - Student B (LOA -> Readmission) and Student C (Withdrawal), each with a portal
+    #    account and a submitted request so they appear in the staff queues.
+    program = Program.query.filter_by(code=SIM_PROGRAM_CODE).first()
+    if not program:
+        program = Program(
+            code=SIM_PROGRAM_CODE,
+            name="Master of Arts in Education (Simulation Cohort)",
+            college="Education",
+            has_practicum=True,
+        )
+        db.session.add(program)
+        db.session.flush()
+
+    sim_faculty = [
+        ("Dr. Liwayway Bautista", "Learning analytics, online learning, and student engagement in graduate education"),
+        ("Dr. Marlon Geronimo", "Machine learning, educational data analytics, and predicting student performance"),
+        ("Dr. Patricia Salvador", "Online learning, learning management systems, education technology, and curriculum development"),
+    ]
+    for name, spec in sim_faculty:
+        faculty = Faculty.query.filter_by(name=name).first()
+        if not faculty:
+            faculty = Faculty(name=name, college="Education", role="Adviser / Panel", specialization=spec, active=True)
+            db.session.add(faculty)
+            db.session.flush()
+        else:
+            faculty.specialization = spec
+            faculty.active = True
+        if not FacultyWorkingHour.query.filter_by(faculty_id=faculty.id).count():
+            for weekday in range(5):
+                db.session.add(
+                    FacultyWorkingHour(faculty_id=faculty.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0))
+                )
+        if not FacultyAvailability.query.filter_by(faculty_id=faculty.id).count():
+            # 08:00-10:00 sits before the first recurring profile busy block (class at
+            # 10:00), so it never conflicts for any faculty id -> these rows always count
+            # toward the availability score (keeping the advisers at the top of the panel
+            # ranking) and are valid 120-minute defense windows.
+            for offset in (4, 8, 11, 18, 25, 32):
+                db.session.add(FacultyAvailability(
+                    faculty_id=faculty.id, available_date=date.today() + timedelta(days=offset),
+                    start_time=time(8, 0), end_time=time(10, 0)))
+            # Also mirror the seeded faculty's shared 13:00-16:00 afternoon blocks so a
+            # panel mixing these advisers with seeded faculty can still share a slot.
+            for offset in (14, 21, 28, 35):
+                db.session.add(FacultyAvailability(
+                    faculty_id=faculty.id, available_date=date.today() + timedelta(days=offset),
+                    start_time=time(13, 0), end_time=time(16, 0)))
+
+    term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+    home_program = Program.query.filter_by(code="MAED").first() or program
+
+    # Student B — Leave of Absence -> Readmission
+    student_b = Student.query.filter_by(student_number="2099101").first()
+    if not student_b:
+        student_b = Student(
+            student_number="2099101", first_name="Bianca", last_name="Robles",
+            email="2099101@student.usls.edu.ph", program_id=home_program.id, entry_year=2024,
+            current_stage="Coursework", standing="Active", enrollment_tag="Enrolled", risk_level="Low",
+        )
+        db.session.add(student_b)
+        db.session.flush()
+    original_name = "LOA_Application_Robles.pdf"
+    if not StudentRequestAttachment.query.filter_by(student_id=student_b.id, request_type="leave-of-absence").first():
+        db.session.add(StudentRequestAttachment(
+            student_id=student_b.id, request_type="leave-of-absence",
+            original_name=original_name, stored_name=f"sim-loa-{student_b.id}.pdf",
+            mime_type="application/pdf", uploaded_at=now_utc() - timedelta(days=2)))
+    if not TransactionLog.query.filter_by(
+        transaction_slug="leave-of-absence",
+        student_id=student_b.id,
+        actor_role="Student",
+        result="LOA application submitted",
+    ).first():
+        add_task(student_b.id, "Review student Leave of Absence application", "GS Staff", 3, 55)
+        add_log(
+            "leave-of-absence",
+            student_b.id,
+            "Student",
+            original_name,
+            "LOA application submitted",
+            "GS Staff",
+            "Student submitted a Leave of Absence application for staff eligibility review.\n"
+            "Requested period: AY 2026-2027 Term 1 to AY 2026-2027 Term 2.\n"
+            "Reason/remarks: Family health leave request for the demo simulation.\n"
+            f"Application PDF: {original_name}.",
+        )
+    ensure_student_account(student_b, "student-b@gs.local")
+
+    # Student C — Withdrawal request
+    student_c = Student.query.filter_by(student_number="2099102").first()
+    if not student_c:
+        student_c = Student(
+            student_number="2099102", first_name="Carlo", last_name="Mendoza",
+            email="2099102@student.usls.edu.ph", program_id=home_program.id, entry_year=2024,
+            current_stage="Coursework", standing="Active", enrollment_tag="Enrolled", risk_level="Low",
+        )
+        db.session.add(student_c)
+        db.session.flush()
+    if not WithdrawalApplication.query.filter_by(student_id=student_c.id).first():
+        attachment = StudentRequestAttachment(
+            student_id=student_c.id, request_type="withdrawal",
+            original_name="Withdrawal_Request_Mendoza.pdf", stored_name=f"sim-wd-{student_c.id}.pdf",
+            mime_type="application/pdf", uploaded_at=now_utc() - timedelta(days=1))
+        db.session.add(attachment)
+        db.session.flush()
+        db.session.add(WithdrawalApplication(
+            student_id=student_c.id,
+            reason="Accepted full-time employment abroad; requesting withdrawal.",
+            effective_term=(term.label if term else "AY 2026-2027 Term 1"),
+            request_attachment_id=attachment.id, status="Dean Review", dean_decision="Pending"))
+        add_task(student_c.id, "Review withdrawal request", "Dean", 3, 60)
+        add_log("withdrawal", student_c.id, "Student", attachment.original_name,
+                "Withdrawal request submitted", "Dean",
+                "Student filed a withdrawal request from the portal for the demo simulation.")
+    ensure_student_account(student_c, "student-c@gs.local")
+
+
+def ensure_demo_request_submission_logs() -> int:
+    created = 0
+    demo_attachments = StudentRequestAttachment.query.filter(
+        StudentRequestAttachment.request_type.in_(["leave-of-absence", "readmission"]),
+        or_(
+            StudentRequestAttachment.stored_name.like("seed-loa-%"),
+            StudentRequestAttachment.stored_name.like("seed-readmit-%"),
+            StudentRequestAttachment.stored_name.like("sim-loa-%"),
+        ),
+    ).all()
+    for attachment in demo_attachments:
+        latest = (
+            TransactionLog.query.filter_by(
+                transaction_slug=attachment.request_type,
+                student_id=attachment.student_id,
+            )
+            .filter(TransactionLog.actor_role != "Demo Data")
+            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+            .first()
+        )
+        if latest:
+            continue
+        if attachment.request_type == "leave-of-absence":
+            add_task(attachment.student_id, "Review student Leave of Absence application", "GS Staff", 3, 55)
+            add_log(
+                "leave-of-absence",
+                attachment.student_id,
+                "Student",
+                attachment.original_name,
+                "LOA application submitted",
+                "GS Staff",
+                "Student submitted a Leave of Absence application for staff eligibility review.\n"
+                "Requested period: AY 2026-2027 Term 1 to AY 2026-2027 Term 2.\n"
+                "Reason/remarks: Demo queue case.\n"
+                f"Application PDF: {attachment.original_name}.",
+            )
+        else:
+            add_task(attachment.student_id, "Review student readmission request", "GS Staff", 3, 55)
+            add_log(
+                "readmission",
+                attachment.student_id,
+                "Student",
+                attachment.original_name,
+                "Readmission request submitted",
+                "GS Staff",
+                "Student submitted a readmission request for staff review.\n"
+                "Target return term: AY 2026-2027 Term 1.\n"
+                "Checklist submitted: 4 item(s); missing/not marked: None.\n"
+                "Previous LOA period: AY 2025-2026 Term 2.\n"
+                f"Application PDF: {attachment.original_name}.",
+            )
+        created += 1
+    return created
+
+
 def ensure_demo_accounts() -> None:
     staff = UserAccount.query.filter_by(email="staff@gs.local").first()
     if not staff:
@@ -7895,6 +8305,8 @@ if __name__ == "__main__":
             ensure_faculty_demo_names()
             ensure_faculty_demo_profiles()
             ensure_demo_accounts()
+            seed_simulation_demo()
+            ensure_demo_request_submission_logs()
             db.session.commit()
             print(f"Seeded {seed_count} students plus supporting workflow data and demo accounts.")
             raise SystemExit(0)
@@ -7905,12 +8317,16 @@ if __name__ == "__main__":
         renamed_faculty = ensure_faculty_demo_names()
         updated_faculty_profiles = ensure_faculty_demo_profiles()
         ensure_demo_accounts()
+        seed_simulation_demo()  # self-heal demo fixtures on an already-seeded database
+        healed_request_logs = ensure_demo_request_submission_logs()
         sync_result = sync_all_curricula()
         db.session.commit()
         if renamed_faculty:
             print(f"Updated {renamed_faculty} demo faculty placeholder name(s).")
         if updated_faculty_profiles:
             print(f"Expanded {updated_faculty_profiles} demo faculty specialization profile(s).")
+        if healed_request_logs:
+            print(f"Added {healed_request_logs} missing demo request submission log(s).")
         if sync_result["created"]:
             print(f"Automatically added {sync_result['created']} missing curriculum row(s) for {sync_result['students']} student(s).")
         if accounts_before == 0:

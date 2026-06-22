@@ -406,6 +406,7 @@ function ResearchRequestForm({ data, onSaved }) {
   const gate = progress.gate || milestone.value || "";
   const [form, setForm] = useState({ research_title: data.research_case?.title || "", submitted_package: "" });
   const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
+  const [prefillNote, setPrefillNote] = useState("");
   const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
   const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
 
@@ -426,6 +427,14 @@ function ResearchRequestForm({ data, onSaved }) {
     });
   }
 
+  async function handleEvidenceSaved(result, requirement) {
+    if (requirement?.item_name === "Form 1 - Application for Title Defense" && result?.research_title) {
+      setForm((current) => ({ ...current, research_title: result.research_title }));
+      setPrefillNote(`Auto-filled from ${result.document?.evidence_reference || "the uploaded Form 1"}.`);
+    }
+    await onSaved();
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
@@ -436,8 +445,9 @@ function ResearchRequestForm({ data, onSaved }) {
         {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-300 bg-brand-50 text-brand-700" : stage.complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-400"}`}>{stage.name}</div>)}
       </div>
       {progress.stage === "Title Defense" && (
-        <Field label="Research title from Form 1" hint="This student-submitted form value becomes the displayed title. Staff cannot edit it.">
-          <Input value={form.research_title} onChange={set("research_title")} required />
+        <Field label="Research title from uploaded Form 1" hint="This fills automatically after the Form 1 application PDF is uploaded below.">
+          <Input value={form.research_title} onChange={set("research_title")} required placeholder="Upload Form 1 below to auto-fill" />
+          {prefillNote && <p className="mt-1 text-xs font-medium text-brand-700">{prefillNote}</p>}
         </Field>
       )}
       <div>
@@ -450,7 +460,7 @@ function ResearchRequestForm({ data, onSaved }) {
               gate={gate}
               requirement={requirement}
               panelLocked={Boolean(data.panel?.length)}
-              onSaved={onSaved}
+              onSaved={(result) => handleEvidenceSaved(result, requirement)}
             />
           ))}
         </div>
@@ -481,7 +491,7 @@ function ResearchRequestForm({ data, onSaved }) {
         message={message}
         disabled={!milestone?.student_uploads_ready || (progress.stage === "Title Defense" && !form.research_title.trim())}
         label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Enter the research title shown on Form 1." : ""}
+        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Upload Form 1 so the research title can be read automatically." : ""}
       />
     </form>
   );
@@ -508,8 +518,8 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
     setBusy(true);
     setError("");
     try {
-      await api.uploadResearchEvidence(gate, requirement.item_name, file);
-      await onSaved();
+      const result = await api.uploadResearchEvidence(gate, requirement.item_name, file);
+      await onSaved(result);
     } catch (err) {
       setError(err.message || "Could not upload this evidence.");
     } finally {
