@@ -34,6 +34,7 @@ db = SQLAlchemy()
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "research_evidence"
 REQUEST_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "student_requests"
+MONITORING_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "monitoring_sheets"
 
 # This demo keeps the Flask API, SQLAlchemy models, workflow rules, RAG prototype,
 # and seed data in one file so evaluators can trace a workflow end-to-end quickly.
@@ -153,6 +154,7 @@ TRANSACTION_BY_SLUG = {item["slug"]: item for item in TRANSACTIONS}
 STAGES = [
     "Admission",
     "Coursework",
+    "Comprehensive Exam",
     "Proposal Development",
     "Proposal Defense",
     "Data Collection",
@@ -279,6 +281,7 @@ class Student(db.Model):
     standing = db.Column(db.String(60), nullable=False, default="Active")
     # Current-term enrollment tag (per AC notes): Enrolled / LOA / AWOL / Completed.
     enrollment_tag = db.Column(db.String(20), nullable=False, default="Enrolled")
+    comprehensive_exam_status = db.Column(db.String(30), nullable=False, default="Not Taken")
     risk_level = db.Column(db.String(20), nullable=False, default="Low")
     adviser_name = db.Column(db.String(120))
     created_at = db.Column(db.DateTime, default=now_utc)
@@ -382,6 +385,19 @@ class CourseRecord(db.Model):
     updated_at = db.Column(db.DateTime, default=now_utc)
 
     course = db.relationship("Course")
+
+
+class MonitoringSheetUpload(db.Model):
+    """Immutable backup and comparison result for every monitoring-sheet upload."""
+    id = db.Column(db.Integer, primary_key=True)
+    original_name = db.Column(db.String(220), nullable=False)
+    stored_name = db.Column(db.String(220), nullable=False, unique=True)
+    program_code = db.Column(db.String(30), nullable=False)
+    row_count = db.Column(db.Integer, default=0)
+    subject_count = db.Column(db.Integer, default=0)
+    snapshot_json = db.Column(db.Text, nullable=False)
+    result_json = db.Column(db.Text, nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=now_utc, nullable=False)
 
 
 # Research milestone container for thesis, dissertation, or project-paper cases.
@@ -688,10 +704,51 @@ def student_brief(student: Student) -> dict:
         "current_stage": student.current_stage,
         "standing": student.standing,
         "enrollment_tag": student.enrollment_tag,
+        "comprehensive_exam_status": student.comprehensive_exam_status,
         "risk_level": student.risk_level,
         "adviser_name": student.adviser_name,
         "search_label": student_search_label(student),
     }
+
+
+COMPRE_UNIT_REQUIREMENTS = {"Basic": 6, "Major": 9, "Cognate": 6}
+COMPRE_TOTAL_UNITS_REQUIRED = 21
+
+
+def comprehensive_exam_eligibility(student: Student) -> dict:
+    """Apply the AC monitoring template's 6 + 9 + 6 = 21 coursework rule."""
+    audit = compute_course_audit(student)
+    completed = {row["category"]: row["completed_units"] for row in audit.get("by_category", [])}
+    categories = [
+        {
+            "category": category,
+            "completed": completed.get(category, 0),
+            "required": required,
+            "complete": completed.get(category, 0) >= required,
+        }
+        for category, required in COMPRE_UNIT_REQUIREMENTS.items()
+    ]
+    qualifying_total = sum(item["completed"] for item in categories)
+    eligible = all(item["complete"] for item in categories) and qualifying_total >= COMPRE_TOTAL_UNITS_REQUIRED
+    return {
+        "eligible": eligible,
+        "status": "Eligible for Comprehensive Exam" if eligible else "Not Yet Eligible",
+        "exam_status": student.comprehensive_exam_status or "Not Taken",
+        "passed": (student.comprehensive_exam_status or "").lower() == "passed",
+        "research_allowed": eligible and (student.comprehensive_exam_status or "").lower() == "passed",
+        "categories": categories,
+        "completed_units": qualifying_total,
+        "required_units": COMPRE_TOTAL_UNITS_REQUIRED,
+    }
+
+
+def require_research_prerequisite(student: Student) -> dict:
+    prerequisite = comprehensive_exam_eligibility(student)
+    if not prerequisite["eligible"]:
+        raise ValueError("Complete the Basic 6, Major 9, and Cognate 6 unit requirements before taking the comprehensive exam.")
+    if not prerequisite["passed"]:
+        raise ValueError("The comprehensive exam must be marked Passed before starting Title, Proposal, Ethics, or Final research activities.")
+    return prerequisite
 
 
 def course_audit_dict(audit: dict) -> dict:
@@ -1695,6 +1752,14 @@ def register_routes(app: Flask) -> None:
         standing = request.args.get("standing", "").strip()
         if standing:
             query = query.filter(Student.standing == standing)
+        student_status = request.args.get("student_status", "").strip().lower()
+        if student_status == "awol":
+            query = query.filter(Student.enrollment_tag == "AWOL")
+        elif student_status == "loa":
+            query = query.filter(or_(Student.enrollment_tag == "LOA", Student.standing == "On Leave"))
+        elif student_status == "compre-eligible":
+            eligible_ids = [student.id for student in query.all() if comprehensive_exam_eligibility(student)["eligible"]]
+            query = query.filter(Student.id.in_(eligible_ids or [-1]))
 
         page = max(request.args.get("page", 1, type=int), 1)
         page_size = min(max(request.args.get("page_size", 25, type=int), 5), 100)
@@ -1707,7 +1772,7 @@ def register_routes(app: Flask) -> None:
         )
         return jsonify(
             {
-                "items": [student_directory_brief(s) for s in items],
+                "items": [{**student_directory_brief(s), "compre_eligibility": comprehensive_exam_eligibility(s)} for s in items],
                 "total": total,
                 "page": page,
                 "page_size": page_size,
@@ -1906,6 +1971,10 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
+        try:
+            require_research_prerequisite(student)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         title = (data.get("research_title") or "").strip()
         source = (data.get("source_reference") or data.get("submitted_package") or "").strip()
         research_case, progress = sync_research_progress(student, title)
@@ -1958,6 +2027,12 @@ def register_routes(app: Flask) -> None:
         # Read a Form 1 (Application for Title Defense) PDF and return the fields it
         # contains so the student portal can pre-fill the research-gate form. The
         # file is only scanned for text — it is not stored as evidence here.
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        try:
+            require_research_prerequisite(student)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose the Form 1 / Title Defense PDF to read."}), 400
@@ -1986,6 +2061,10 @@ def register_routes(app: Flask) -> None:
     def student_research_evidence_upload():
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
+        try:
+            require_research_prerequisite(student)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         gate = (request.form.get("gate") or "").strip()
         item_name = (request.form.get("item_name") or "").strip()
         uploaded = request.files.get("file")
@@ -2478,6 +2557,10 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def endorse_form1(student_id: int):
         student = Student.query.get_or_404(student_id)
+        try:
+            require_research_prerequisite(student)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         data = request_payload()
         doc = DocumentCheck.query.filter_by(
             student_id=student.id,
@@ -2642,7 +2725,9 @@ def register_routes(app: Flask) -> None:
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
         if not program:
             return jsonify({"error": "No program found."}), 404
-        return jsonify(curriculum_planning_payload(program))
+        term_id = request.args.get("term_id", type=int)
+        term = AcademicTerm.query.get(term_id) if term_id else AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        return jsonify(curriculum_planning_payload(program, term))
 
     @app.route("/api/curriculum-planning/subjects", methods=["POST"])
     @require_api_login("staff")
@@ -2754,7 +2839,9 @@ def register_routes(app: Flask) -> None:
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
         if not program:
             return jsonify({"error": "No program found."}), 404
-        return jsonify(course_adjustments_payload(program))
+        term_id = request.args.get("term_id", type=int)
+        term = AcademicTerm.query.get(term_id) if term_id else AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        return jsonify(course_adjustments_payload(program, term))
 
     @app.route("/api/course-adjustments/plan", methods=["POST"])
     def course_adjustments_plan():
@@ -3080,8 +3167,9 @@ def register_routes(app: Flask) -> None:
             changed_students.add(student.id)
             status_counts[new_status] = status_counts.get(new_status, 0) + 1
             audit = compute_course_audit(student)
-            if audit["missing_count"] == 0 and student.current_stage in ("Admission", "Coursework"):
-                student.current_stage = "Proposal Development"
+            compre = comprehensive_exam_eligibility(student)
+            if compre["eligible"] and student.current_stage in ("Admission", "Coursework"):
+                student.current_stage = "Comprehensive Exam"
             recompute_risk(student)
             add_log("course-audit", sid, "Academic Coordinator", f"Course audit {term}".strip(),
                     f"{course.code} marked {new_status}",
@@ -3213,13 +3301,15 @@ def register_routes(app: Flask) -> None:
         course_units = {c.id: (c.units or 3) for c in courses}
         total_units_all = sum(course_units.values())
 
-        def milestones(stage: str) -> dict:
+        def milestones(student: Student) -> dict:
+            stage = student.current_stage
             idx = STAGES.index(stage) if stage in STAGES else 0
+            research_allowed = comprehensive_exam_eligibility(student)["research_allowed"]
             return {
-                "title": stage != "LOA" and idx >= STAGES.index("Proposal Development"),
-                "proposal": idx >= STAGES.index("Proposal Defense"),
-                "ethics": idx >= STAGES.index("Data Collection"),
-                "final": idx >= STAGES.index("Final Defense"),
+                "title": research_allowed and stage != "LOA" and idx >= STAGES.index("Proposal Development"),
+                "proposal": research_allowed and idx >= STAGES.index("Proposal Defense"),
+                "ethics": research_allowed and idx >= STAGES.index("Data Collection"),
+                "final": research_allowed and idx >= STAGES.index("Final Defense"),
             }
 
         rows = []
@@ -3233,7 +3323,7 @@ def register_routes(app: Flask) -> None:
                 if status == "Completed":
                     done += 1
                     done_units += course_units[c.id]
-            units_complete = total_units_all > 0 and done_units >= total_units_all
+            compre = comprehensive_exam_eligibility(s)
             rows.append({
                 "id": s.id, "name": s.name, "student_number": s.student_number,
                 "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
@@ -3241,8 +3331,9 @@ def register_routes(app: Flask) -> None:
                 "cells": cells, "completed": done, "total": len(courses),
                 "rate": round(done / len(courses) * 100, 1) if courses else 0,
                 "completed_units": done_units, "total_units": total_units_all,
-                "eligible": units_complete,
-                "milestones": milestones(s.current_stage),
+                "eligible": compre["eligible"],
+                "compre_eligibility": compre,
+                "milestones": milestones(s),
             })
 
         progress = request.args.get("progress", "").strip()
@@ -3322,15 +3413,44 @@ def register_routes(app: Flask) -> None:
         if not file.filename.lower().endswith((".xlsx", ".xlsm")):
             return jsonify({"error": "Please upload an Excel .xlsx file in the AC Student Monitoring format."}), 400
         try:
-            parsed = parse_ac_monitoring(file.stream)
+            file_bytes = file.read()
+            parsed = parse_ac_monitoring(io.BytesIO(file_bytes))
             if not parsed["rows"]:
                 return jsonify({"error": "No student rows found. Check that the sheet matches the AC Monitoring template."}), 400
             result = import_ac_monitoring(parsed)
+            MONITORING_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+            safe_name = secure_filename(file.filename) or "monitoring-sheet.xlsx"
+            stored_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:10]}-{safe_name}"
+            (MONITORING_UPLOAD_ROOT / stored_name).write_bytes(file_bytes)
+            upload = MonitoringSheetUpload(
+                original_name=file.filename,
+                stored_name=stored_name,
+                program_code=parsed["program_code"],
+                row_count=len(parsed["rows"]),
+                subject_count=len(parsed["subjects"]),
+                snapshot_json=json.dumps(parsed, ensure_ascii=False),
+                result_json=json.dumps(result, ensure_ascii=False),
+            )
+            db.session.add(upload)
+            db.session.flush()
+            result["upload_id"] = upload.id
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
             return jsonify({"error": f"Could not import the sheet: {exc}"}), 400
         return jsonify(result)
+
+    @app.route("/api/monitoring/uploads")
+    @require_api_login("staff")
+    def monitoring_uploads():
+        uploads = MonitoringSheetUpload.query.order_by(MonitoringSheetUpload.uploaded_at.desc()).limit(30).all()
+        return jsonify({"items": [monitoring_upload_dict(item) for item in uploads]})
+
+    @app.route("/api/monitoring/uploads/<int:upload_id>/download")
+    @require_api_login("staff")
+    def monitoring_upload_download(upload_id: int):
+        upload = MonitoringSheetUpload.query.get_or_404(upload_id)
+        return send_from_directory(MONITORING_UPLOAD_ROOT, upload.stored_name, as_attachment=True, download_name=upload.original_name)
 
     # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
@@ -4331,6 +4451,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 for row in compute_offering_demand()
             ]
         if slug == "research-gate":
+            context["research_prerequisite"] = comprehensive_exam_eligibility(selected_student)
             research_case, progress = sync_research_progress(selected_student)
             context["research_case"] = research_case_dict(research_case)
             context["research_progress"] = progress
@@ -4361,6 +4482,8 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             for doc in DocumentCheck.query.filter_by(student_id=selected_student.id).all():
                 context["documents_by_gate"].setdefault(doc.gate, []).append(document_check_dict(doc))
         if slug == "panel-matching":
+            prerequisite = comprehensive_exam_eligibility(selected_student)
+            context["research_prerequisite"] = prerequisite
             matching_profile = research_matching_profile(selected_student)
             context["matching_profile"] = matching_profile
             context["panel_recommendations"] = [
@@ -4377,7 +4500,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     "workload": row["workload"],
                     "score_breakdown": row["score_breakdown"],
                 }
-                for row in recommend_panel(selected_student)[: max(12, len(panel_roles_for_student(selected_student)), 4)]
+                for row in (recommend_panel(selected_student) if prerequisite["research_allowed"] else [])[: max(12, len(panel_roles_for_student(selected_student)), 4)]
             ]
             context["assigned_panel"] = [
                 panel_assignment_dict(p)
@@ -4386,6 +4509,8 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 .all()
             ]
         if slug == "defense-scheduling":
+            prerequisite = comprehensive_exam_eligibility(selected_student)
+            context["research_prerequisite"] = prerequisite
             research_case, progress = sync_research_progress(selected_student)
             assignments = (
                 PanelAssignment.query.filter_by(student_id=selected_student.id)
@@ -4402,8 +4527,8 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 "requirements": requirements,
                 "completed_count": sum(item["status"] == "Complete" for item in requirements),
                 "pending_count": sum(item["status"] != "Complete" for item in requirements),
-                "research_title": research_case.title,
-                "adviser_name": research_case.adviser_name or selected_student.adviser_name,
+                "research_title": research_case.title if research_case else "Locked until comprehensive exam is passed",
+                "adviser_name": (research_case.adviser_name if research_case else None) or selected_student.adviser_name,
             }
             participants = defense_participants(selected_student, assignments) if assignments else []
             window_start = date.today()
@@ -4730,6 +4855,7 @@ def parse_ac_monitoring(stream) -> dict:
     fn_c = find(sub, "FN")
     ay_c = find(sub, "AY ENTRY") or 1
     milestone_cols = {m: find(sub, m) for m in ("TITLE", "PROPOSAL", "ETHICS", "FINAL")}
+    compre_c = find(hdr, "COMPRE") or find(sub, "COMPRE")
 
     stop_cols = [c for c in list(milestone_cols.values()) + [note_c] if c]
     milestone_start = min(stop_cols) if stop_cols else max_col + 1
@@ -4775,6 +4901,7 @@ def parse_ac_monitoring(stream) -> dict:
             "ay_entry": ay_here or last_ay or "",
             "subjects": subj,
             "milestones": milestones,
+            "comprehensive_exam_passed": bool(cell(r, compre_c)) if compre_c else False,
             "note": cell(r, note_c) if note_c else "",
         })
 
@@ -4788,7 +4915,9 @@ def parse_ac_monitoring(stream) -> dict:
     }
 
 
-def _stage_from_sheet(milestones: dict, completed_subjects: int) -> str:
+def _stage_from_sheet(milestones: dict, completed_subjects: int, comprehensive_exam_passed: bool = False) -> str:
+    if not comprehensive_exam_passed:
+        return "Coursework" if completed_subjects > 0 else "Admission"
     if milestones.get("FINAL"):
         return "Final Defense"
     if milestones.get("ETHICS"):
@@ -4835,12 +4964,20 @@ def _sheet_student_comparison(student: Student, row: dict, course_by_code: dict[
     if subject_differences:
         differences.append(f"{subject_differences} subject/unit status difference(s)")
 
+    category_comparison = []
+    for category in ("Basic", "Major", "Cognate"):
+        matching = [course for course in course_by_code.values() if course.category == category]
+        existing_units = sum((course.units or 3) for course in matching if existing_records.get(course.id) == "Completed")
+        incoming_units = sum((course.units or 3) for code, done in row["subjects"].items() if done and (course := course_by_code.get(code)) and course.category == category)
+        category_comparison.append({"category": category, "current": existing_units, "uploaded": incoming_units})
+
     return {
         "conflicting": bool(differences),
         "differences": differences,
         "incoming_completed": incoming_completed,
         "existing_completed": existing_completed,
         "incoming_total": len(row["subjects"]),
+        "category_comparison": category_comparison,
     }
 
 
@@ -4884,6 +5021,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
                 "incoming_completed": comparison["incoming_completed"],
                 "existing_completed": comparison["existing_completed"],
                 "total_subjects": comparison["incoming_total"],
+                "category_comparison": comparison["category_comparison"],
             }
             if comparison["conflicting"]:
                 conflicts.append({
@@ -4917,10 +5055,14 @@ def import_ac_monitoring(parsed: dict) -> dict:
         student.last_name = row["last_name"] or student.last_name or "—"
         student.program_id = program.id
         student.entry_year = entry_year
+        if row.get("comprehensive_exam_passed"):
+            student.comprehensive_exam_status = "Passed"
         if is_new or not student.email:
             student.email = f"{str(row['idno']).lower()}@student.usls.edu.ph"
         completed = sum(1 for v in row["subjects"].values() if v)
-        student.current_stage = _stage_from_sheet(row["milestones"], completed)
+        student.current_stage = _stage_from_sheet(
+            row["milestones"], completed, row.get("comprehensive_exam_passed", False)
+        )
         db.session.flush()
 
         # per-subject course records (real subjects from the sheet)
@@ -5006,6 +5148,23 @@ def import_ac_monitoring(parsed: dict) -> dict:
                        if created_accounts
                        else ""
                    ),
+    }
+
+
+def monitoring_upload_dict(upload: MonitoringSheetUpload) -> dict:
+    result = json.loads(upload.result_json or "{}")
+    return {
+        "id": upload.id,
+        "original_name": upload.original_name,
+        "program": upload.program_code,
+        "rows": upload.row_count,
+        "subjects": upload.subject_count,
+        "uploaded_at": iso(upload.uploaded_at),
+        "created": result.get("created", 0),
+        "skipped": result.get("skipped", 0),
+        "conflict_count": result.get("conflict_count", 0),
+        "conflicts": result.get("conflicts", []),
+        "download_url": f"/api/monitoring/uploads/{upload.id}/download",
     }
 
 
@@ -5230,8 +5389,8 @@ def handle_course_audit(data: MultiDict) -> int:
     if audit["missing_count"] > 0:
         add_task(student.id, "Resolve missing curriculum subjects", "Academic Coordinator", 7, 25)
         student.risk_level = "Medium" if audit["missing_count"] >= 3 else student.risk_level
-    if audit["missing_count"] == 0:
-        student.current_stage = "Proposal Development"
+    if comprehensive_exam_eligibility(student)["eligible"] and student.current_stage in ("Admission", "Coursework"):
+        student.current_stage = "Comprehensive Exam"
 
     add_log(
         "course-audit",
@@ -5249,6 +5408,7 @@ def handle_research_gate(data: MultiDict) -> int:
     # Research gate status is derived only from stored student uploads. Staff
     # can evaluate evidence, but cannot assert that an absent file was received.
     student = Student.query.get_or_404(int(data["student_id"]))
+    require_research_prerequisite(student)
     research_case, progress = sync_research_progress(student)
     gate = progress["gate"]
     required_items = required_documents_for_gate(gate)
@@ -5331,6 +5491,7 @@ def handle_panel_matching(data: MultiDict) -> int:
     # Finalization is a staff decision. The system supplies the ranked shortlist,
     # while the submitted faculty ids preserve any staff adjustments.
     student = Student.query.get_or_404(int(data["student_id"]))
+    require_research_prerequisite(student)
     matching_profile = research_matching_profile(student)
     if not matching_profile["ready"]:
         raise ValueError("Panel matching requires readable text extracted from all three concept-paper PDFs. Replace scanned or image-only files with searchable PDFs.")
@@ -5392,6 +5553,7 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     # Staff makes the final decision; the system requires an explicit override
     # when Research Gate, calendar, lead-time, or defense-record checks warn.
     student = Student.query.get_or_404(int(data["student_id"]))
+    require_research_prerequisite(student)
     preferred_date = parse_date(data["preferred_date"])
     preferred_end_date = parse_date(data.get("preferred_end_date") or data["preferred_date"])
     defense_type = data.get("defense_type", "Title Defense")
@@ -6807,6 +6969,8 @@ def research_requirement_state(
     presentation = research_requirement_presentation(gate, item_name)
     if not presentation:
         return {"status": doc.status if doc else "Missing", "status_label": doc.status if doc else "Missing"}
+    if student and not comprehensive_exam_eligibility(student)["research_allowed"]:
+        return {"status": "Locked", "status_label": "Locked until comprehensive exam is passed"}
     source_type = presentation["source_type"]
     files = doc.evidence_files if doc else []
     if source_type == "student_upload":
@@ -6929,6 +7093,33 @@ def detected_research_progress(student: Student) -> dict:
 
 
 def sync_research_progress(student: Student, submitted_title: str = "") -> tuple[ResearchCase, dict]:
+    prerequisite = comprehensive_exam_eligibility(student)
+    if not prerequisite["research_allowed"]:
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id)
+            .order_by(ResearchCase.opened_at.desc())
+            .first()
+        )
+        locked_milestone = {
+            "value": "Form 1 - Title Defense",
+            **RESEARCH_MILESTONES["Form 1 - Title Defense"],
+            "requirements": [],
+            "student_uploads_ready": False,
+            "student_missing_count": 0,
+            "overall_complete": False,
+        }
+        return research_case, {
+            "stage": "Title Defense",
+            "gate": "Form 1 - Title Defense",
+            "status": "Locked - comprehensive exam not passed",
+            "stage_index": 0,
+            "stages": [
+                {"name": name, "gate": gate, "complete": False, "status": "Locked"}
+                for name, gate in RESEARCH_STAGE_SEQUENCE
+            ],
+            "milestone": locked_milestone,
+            "prerequisite": prerequisite,
+        }
     progress = detected_research_progress(student)
     research_case = (
         ResearchCase.query.filter_by(student_id=student.id)
@@ -7208,9 +7399,68 @@ def sync_all_curricula() -> dict:
     return {"created": created, "students": touched}
 
 
-def curriculum_planning_payload(program: Program) -> dict:
+def recommended_term_rank(value: str | None) -> tuple[int, int, str]:
+    text_value = (value or "").strip()
+    year_match = re.search(r"year\s*(\d+)", text_value, re.IGNORECASE)
+    term_match = re.search(r"term\s*(\d+)", text_value, re.IGNORECASE)
+    return (
+        int(year_match.group(1)) if year_match else 99,
+        int(term_match.group(1)) if term_match else 99,
+        text_value.lower(),
+    )
+
+
+def student_semester_subjects(student: Student, term: AcademicTerm | None) -> dict:
+    """One source of truth for current enrollment and the student's next subject group."""
+    audit = compute_course_audit(student)
+    current_rows = [
+        row for row in audit["current"]
+        if not term or not row["record"] or not row["record"].term_label or row["record"].term_label == term.label
+    ]
+    current_subjects = [
+        {
+            "id": row["course"].id,
+            "code": row["course"].code,
+            "title": row["course"].title,
+            "units": row["course"].units or 3,
+            "category": row["course"].category,
+            "term_label": row["record"].term_label if row["record"] else (term.label if term else None),
+        }
+        for row in current_rows
+    ]
+    remaining = sorted(
+        audit["missing"] + audit["incomplete"],
+        key=lambda row: (recommended_term_rank(row["course"].recommended_term), row["course"].code),
+    )
+    next_rows = []
+    if remaining:
+        next_rank = recommended_term_rank(remaining[0]["course"].recommended_term)
+        next_rows = [row for row in remaining if recommended_term_rank(row["course"].recommended_term) == next_rank][:6]
+    next_subjects = [
+        {
+            "id": row["course"].id,
+            "code": row["course"].code,
+            "title": row["course"].title,
+            "units": row["course"].units or 3,
+            "category": row["course"].category,
+            "recommended_term": row["course"].recommended_term,
+            "status": row["status"],
+        }
+        for row in next_rows
+    ]
+    return {"audit": audit, "current_subjects": current_subjects, "next_subjects": next_subjects}
+
+
+def curriculum_planning_payload(program: Program, term: AcademicTerm | None = None) -> dict:
+    term = term or AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
     courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
-    students = Student.query.filter_by(program_id=program.id).order_by(Student.last_name, Student.first_name).all()
+    student_query = Student.query.filter_by(program_id=program.id)
+    if term:
+        student_query = student_query.join(TermEnrollment).filter(
+            TermEnrollment.term_id == term.id,
+            TermEnrollment.status.in_(["Confirmed", "Enrolled", "Active"]),
+        )
+    students = student_query.filter(Student.enrollment_tag == "Enrolled").distinct().order_by(Student.last_name, Student.first_name).all()
     rows = []
     active_count = 0
     delayed_count = 0
@@ -7225,14 +7475,32 @@ def curriculum_planning_payload(program: Program) -> dict:
             delayed_count += 1
         record_count = CourseRecord.query.filter_by(student_id=student.id).count()
         missing_rows = max(len(courses) - record_count, 0)
+        semester = student_semester_subjects(student, term)
+        audit = semester["audit"]
+        compre = comprehensive_exam_eligibility(student)
         if missing_rows == 0 and courses:
             generated_count += 1
+        exceptions = []
+        if missing_rows:
+            exceptions.append(f"{missing_rows} curriculum row(s) missing")
+        if student.enrollment_tag in {"AWOL", "LOA"}:
+            exceptions.append(student.enrollment_tag)
         rows.append({
             **student_brief(student),
             "curriculum_rows": record_count,
             "required_subjects": len(courses),
             "missing_curriculum_rows": missing_rows,
             "curriculum_status": "Synced" if missing_rows == 0 and courses else "Sync pending",
+            "completed_subjects": len(audit["completed"]),
+            "completed_units": audit["completed_units"],
+            "total_units": audit["total_units"],
+            "completion_rate": audit["units_rate"],
+            "category_progress": audit["by_category"],
+            "compre_eligibility": compre,
+            "research_access": "Unlocked" if compre["research_allowed"] else "Locked",
+            "exceptions": exceptions,
+            "current_subjects": semester["current_subjects"],
+            "next_subjects": semester["next_subjects"],
         })
 
     grouped: dict[str, list] = {}
@@ -7248,8 +7516,14 @@ def curriculum_planning_payload(program: Program) -> dict:
     return {
         "program": program_dict(program),
         "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+        "term": term_dict(term) if term else None,
+        "terms": [term_dict(item) for item in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
         "summary": {
             "students": len(students),
+            "total_enrolled": len(students),
+            "with_current_subjects": sum(bool(row["current_subjects"]) for row in rows),
+            "with_next_subjects": sum(bool(row["next_subjects"]) for row in rows),
+            "needs_review": sum(bool(row["exceptions"]) or not row["current_subjects"] for row in rows),
             "active": active_count,
             "delayed_or_loa": delayed_count + loa_count,
             "curriculum_generated": generated_count,
@@ -7257,20 +7531,31 @@ def curriculum_planning_payload(program: Program) -> dict:
             "subjects": len(courses),
             "coverage_rate": round((generated_count / len(students)) * 100, 1) if students else 100,
         },
-        "categories": [{"name": name, "courses": grouped[name]} for name in sorted(grouped)],
+        "version": {
+            "id": f"{program.code}-current",
+            "name": f"{program.code} Current Curriculum",
+            "status": "Active",
+            "assigned_students": len(students),
+        },
+        "categories": [
+            {"name": name, "courses": grouped[name]}
+            for name in sorted(grouped, key=lambda item: ["Basic", "Major", "Cognate", "Core", "Comprehensive"].index(item) if item in ["Basic", "Major", "Cognate", "Core", "Comprehensive"] else 99)
+        ],
         "students": rows[:150],
     }
 
 
-def course_demand_rows(program: Program) -> list[dict]:
+def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> list[dict]:
     # Subject demand counts only currently ENROLLED students who have not yet taken
     # the subject (LOA / AWOL / Completed are excluded), per the AC's process.
     demand: dict[int, dict] = {}
-    students = (
-        Student.query.filter_by(program_id=program.id, enrollment_tag="Enrolled")
-        .order_by(Student.last_name)
-        .all()
-    )
+    student_query = Student.query.filter_by(program_id=program.id, enrollment_tag="Enrolled")
+    if term:
+        student_query = student_query.join(TermEnrollment).filter(
+            TermEnrollment.term_id == term.id,
+            TermEnrollment.status.in_(["Confirmed", "Enrolled", "Active"]),
+        )
+    students = student_query.distinct().order_by(Student.last_name).all()
     available_faculty = Faculty.query.filter_by(college=program.college, active=True).count()
     future_slots = (
         db.session.query(FacultyAvailability.faculty_id)
@@ -7281,9 +7566,9 @@ def course_demand_rows(program: Program) -> list[dict]:
     )
     availability_count = max(available_faculty, future_slots)
     for student in students:
-        audit = compute_course_audit(student)
-        for item in audit["missing"] + audit["incomplete"]:
-            course = item["course"]
+        semester = student_semester_subjects(student, term)
+        for next_subject in semester["next_subjects"]:
+            course = Course.query.get(next_subject["id"])
             if course.id not in demand:
                 demand[course.id] = {"course": course, "students": []}
             demand[course.id]["students"].append(student)
@@ -7319,8 +7604,9 @@ def course_demand_rows(program: Program) -> list[dict]:
     return rows[:20]
 
 
-def course_adjustments_payload(program: Program) -> dict:
-    demand = course_demand_rows(program)
+def course_adjustments_payload(program: Program, term: AcademicTerm | None = None) -> dict:
+    term = term or AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+    demand = course_demand_rows(program, term)
     latest_plan = (
         CourseOfferingPlan.query.filter_by(program_id=program.id)
         .order_by(CourseOfferingPlan.updated_at.desc())
@@ -7329,6 +7615,8 @@ def course_adjustments_payload(program: Program) -> dict:
     return {
         "program": program_dict(program),
         "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+        "term": term_dict(term) if term else None,
+        "terms": [term_dict(item) for item in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
         "summary": {
             "demand_subjects": len(demand),
             "total_demand": sum(row["demand_count"] for row in demand),
@@ -7482,6 +7770,92 @@ def ensure_schedule_request_schema() -> None:
     db.session.commit()
 
 
+def ensure_monitoring_upload_schema() -> None:
+    """Create the additive upload-history table for existing MVP databases."""
+    MonitoringSheetUpload.__table__.create(bind=db.engine, checkfirst=True)
+
+
+def ensure_student_comprehensive_exam_schema() -> None:
+    """Add explicit comprehensive-exam state without dropping existing student data."""
+    inspector = inspect(db.engine)
+    if "student" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("student")}
+    if "comprehensive_exam_status" not in existing:
+        db.session.execute(text("ALTER TABLE student ADD COLUMN comprehensive_exam_status VARCHAR(30) NOT NULL DEFAULT 'Not Taken'"))
+        db.session.commit()
+
+
+def ensure_demo_comprehensive_exam_consistency() -> int:
+    """Repair legacy generated rows so research never precedes a passed exam."""
+    inspector = inspect(db.engine)
+    if "student" not in inspector.get_table_names():
+        return 0
+    existing = {column["name"] for column in inspector.get_columns("student")}
+    if "comprehensive_exam_status" not in existing:
+        return 0
+    research_stages = {"Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense", "Completed"}
+    generated = Student.query.filter(Student.student_number.like("GS-2026-%")).all()
+    generated_ids = {student.id for student in generated}
+    case_ids = {
+        student_id for (student_id,) in db.session.query(ResearchCase.student_id)
+        .filter(ResearchCase.student_id.in_(generated_ids or {-1}))
+        .distinct()
+        .all()
+    }
+    research_ids = {
+        student.id for student in generated
+        if student.current_stage in research_stages or student.id in case_ids
+    }
+    nonresearch_ids = generated_ids - research_ids
+    changed = 0
+    if research_ids:
+        changed += Student.query.filter(
+            Student.id.in_(research_ids),
+            Student.comprehensive_exam_status != "Passed",
+        ).update({Student.comprehensive_exam_status: "Passed"}, synchronize_session=False)
+        records = (
+            CourseRecord.query.join(Course)
+            .filter(
+                CourseRecord.student_id.in_(research_ids),
+                Course.category.in_(COMPRE_UNIT_REQUIREMENTS),
+                CourseRecord.status != "Completed",
+            )
+            .all()
+        )
+        for record in records:
+            record.status = "Completed"
+            record.updated_at = now_utc()
+        changed += len(records)
+    if nonresearch_ids:
+        changed += PanelAssignment.query.filter(PanelAssignment.student_id.in_(nonresearch_ids)).delete(synchronize_session=False)
+        changed += ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(nonresearch_ids)).delete(synchronize_session=False)
+    current_records = (
+        CourseRecord.query.join(Student)
+        .filter(
+            Student.id.in_(generated_ids or {-1}),
+            CourseRecord.status.in_(["Current", "Enrolled"]),
+        )
+        .all()
+    )
+    enrollments = (
+        TermEnrollment.query.filter(TermEnrollment.student_id.in_(generated_ids or {-1}))
+        .order_by(TermEnrollment.confirmed_at.desc())
+        .all()
+    )
+    enrollment_term = {}
+    for enrollment in enrollments:
+        enrollment_term.setdefault(enrollment.student_id, enrollment.term.label)
+    for record in current_records:
+        expected_term = enrollment_term.get(record.student_id)
+        if expected_term and record.term_label != expected_term:
+            record.term_label = expected_term
+            changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+
 def seed_database(count: int = 350) -> None:
     # Deterministic seed data keeps demos repeatable while still showing varied
     # stages, risks, documents, panels, schedules, and activity history.
@@ -7618,6 +7992,7 @@ def seed_database(count: int = 350) -> None:
         "Admission",
         "Coursework",
         "Coursework",
+        "Comprehensive Exam",
         "Proposal Development",
         "Proposal Defense",
         "Data Collection",
@@ -7636,6 +8011,7 @@ def seed_database(count: int = 350) -> None:
         # dashboards, student detail view, work queue, and workflow context screens.
         program = programs[idx % len(programs)]
         stage = random.choice(stage_weights)
+        research_stage = stage in {"Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense", "Completed"}
         risk = "High" if idx % 17 == 0 else "Medium" if idx % 5 == 0 or stage == "LOA" else "Low"
         standing = "On Leave" if stage == "LOA" else "Completed" if stage == "Completed" else "Active"
         # Current-term enrollment tag: LOA on leave, a few AWOL, graduated = Completed, else Enrolled.
@@ -7658,16 +8034,18 @@ def seed_database(count: int = 350) -> None:
             current_stage=stage,
             standing=standing,
             enrollment_tag=enrollment_tag,
+            comprehensive_exam_status="Passed" if research_stage else "Not Taken",
             risk_level=risk,
             adviser_name=random.choice(faculty_list).name,
         )
         db.session.add(student)
         db.session.flush()
 
+        selected_term = random.choice(terms)
         db.session.add(
             TermEnrollment(
                 student_id=student.id,
-                term_id=random.choice(terms).id,
+                term_id=selected_term.id,
                 status="Confirmed" if standing != "On Leave" else "On Hold",
                 source_reference=f"AIMS batch {idx % 12}",
                 confirmed_at=now_utc() - timedelta(days=random.randint(5, 240)),
@@ -7681,24 +8059,26 @@ def seed_database(count: int = 350) -> None:
                 continue
             status = (
                 "Completed"
+                if research_stage and course.category in COMPRE_UNIT_REQUIREMENTS
+                else "Completed"
                 if course_index < complete_cutoff
                 else "Current"
                 if course_index == complete_cutoff
                 else "Missing"
             )
-            if idx % 13 == 0 and course_index == 1:
+            if not research_stage and idx % 13 == 0 and course_index == 1:
                 status = "Incomplete"
             db.session.add(
                 CourseRecord(
                     student_id=student.id,
                     course_id=course.id,
                     status=status,
-                    term_label=random.choice(terms).label,
+                    term_label=selected_term.label if status in {"Current", "Enrolled"} else random.choice(terms).label,
                     evidence_reference=f"Monitoring sheet row {idx}",
                 )
             )
 
-        if stage not in ["Admission", "Coursework", "LOA"]:
+        if research_stage:
             case = ResearchCase(
                 student_id=student.id,
                 case_type="Dissertation" if "Doctor" in program.name else "Thesis",
@@ -7738,7 +8118,7 @@ def seed_database(count: int = 350) -> None:
                 random.randint(15, 60),
                 "Overdue" if idx % 12 == 0 else "Pending",
             )
-        if idx % 6 == 0:
+        if idx % 6 == 0 and research_stage:
             top_panel = random.sample(faculty_list, 3)
             for panel_index, faculty in enumerate(top_panel):
                 db.session.add(
@@ -7750,7 +8130,7 @@ def seed_database(count: int = 350) -> None:
                         eligibility_note=f"{faculty.specialization}; generated assignment",
                     )
                 )
-        if idx % 8 == 0:
+        if idx % 8 == 0 and research_stage:
             db.session.add(
                 ScheduleRequest(
                     student_id=student.id,
@@ -7852,6 +8232,7 @@ def seed_workflow_cases() -> None:
     if practicum_students:
         demo_practicum_student = practicum_students[0]
         demo_practicum_student.current_stage = "Final Defense"
+        demo_practicum_student.comprehensive_exam_status = "Passed"
         for course_record in CourseRecord.query.filter_by(student_id=demo_practicum_student.id).all():
             course_record.status = "Completed"
         demo_case = ResearchCase.query.filter_by(student_id=demo_practicum_student.id).order_by(ResearchCase.opened_at.desc()).first()
@@ -7937,6 +8318,7 @@ def seed_workflow_cases() -> None:
     )
     if candidate_students:
         ready_student = candidate_students[0]
+        ready_student.comprehensive_exam_status = "Passed"
         for rec in CourseRecord.query.filter_by(student_id=ready_student.id).all():
             rec.status = "Completed"
             rec.updated_at = now_utc()
@@ -8294,6 +8676,9 @@ app = create_app()
 
 with app.app_context():
     ensure_schedule_request_schema()
+    ensure_monitoring_upload_schema()
+    ensure_student_comprehensive_exam_schema()
+    ensure_demo_comprehensive_exam_consistency()
 
 
 if __name__ == "__main__":

@@ -105,14 +105,21 @@ export const api = {
     const qs = queryString(actual);
     return request(`/monitoring/grid${qs ? `?${qs}` : ""}`);
   },
-  curriculumPlanning: (programId) =>
-    request(`/curriculum-planning${programId ? `?program_id=${programId}` : ""}`),
+  monitoringUploads: () => request("/monitoring/uploads"),
+  curriculumPlanning: (params = {}) => {
+    const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
+    const qs = queryString(actual);
+    return request(`/curriculum-planning${qs ? `?${qs}` : ""}`);
+  },
   generateCurriculum: (payload) =>
     request("/curriculum-planning/generate", { method: "POST", body: JSON.stringify(payload) }),
   createCurriculumSubject: (payload) =>
     request("/curriculum-planning/subjects", { method: "POST", body: JSON.stringify(payload) }),
-  courseAdjustments: (programId) =>
-    request(`/course-adjustments${programId ? `?program_id=${programId}` : ""}`),
+  courseAdjustments: (params = {}) => {
+    const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
+    const qs = queryString(actual);
+    return request(`/course-adjustments${qs ? `?${qs}` : ""}`);
+  },
   resetUploadedData: () => request("/admin/reset-uploaded-data", { method: "POST", body: JSON.stringify({}) }),
   resetDemoData: () => request("/admin/reset-demo", { method: "POST", body: JSON.stringify({}) }),
   approvals: () => request("/approvals"),

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, ChevronLeft, ChevronRight, Users, SlidersHorizontal, GitMerge, AlertTriangle } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, SlidersHorizontal, GitMerge, AlertTriangle, GraduationCap } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
@@ -17,6 +17,7 @@ export default function Students() {
   const [risk, setRisk] = useState(searchParams.get("risk") || "");
   const [standing, setStanding] = useState(searchParams.get("standing") || "");
   const [programId, setProgramId] = useState(searchParams.get("program_id") || "");
+  const [studentStatus, setStudentStatus] = useState(searchParams.get("student_status") || "");
   const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
 
   // debounce search input
@@ -26,7 +27,7 @@ export default function Students() {
   }, [q]);
 
   // reset to page 1 when a filter changes
-  useEffect(() => setPage(1), [debouncedQ, stage, risk, standing, programId]);
+  useEffect(() => setPage(1), [debouncedQ, stage, risk, standing, programId, studentStatus]);
 
   useEffect(() => {
     const params = {};
@@ -35,13 +36,14 @@ export default function Students() {
     if (risk) params.risk = risk;
     if (standing) params.standing = standing;
     if (programId) params.program_id = programId;
+    if (studentStatus) params.student_status = studentStatus;
     if (page > 1) params.page = page;
     setSearchParams(params, { replace: true });
-  }, [debouncedQ, stage, risk, standing, programId, page, setSearchParams]);
+  }, [debouncedQ, stage, risk, standing, programId, studentStatus, page, setSearchParams]);
 
   const { data, loading, error, refetch } = useApi(
-    () => api.students({ q: debouncedQ, stage, risk, standing, program_id: programId, page, page_size: 25 }),
-    [debouncedQ, stage, risk, standing, programId, page]
+    () => api.students({ q: debouncedQ, stage, risk, standing, program_id: programId, student_status: studentStatus, page, page_size: 25 }),
+    [debouncedQ, stage, risk, standing, programId, studentStatus, page]
   );
   const { data: duplicateData, loading: duplicatesLoading, refetch: refetchDuplicates } = useApi(
     () => api.duplicateStudents(),
@@ -67,8 +69,8 @@ export default function Students() {
   }
 
   const activeFilters = useMemo(
-    () => [debouncedQ, stage, risk, standing, programId].filter(Boolean).length,
-    [debouncedQ, stage, risk, standing, programId]
+    () => [debouncedQ, stage, risk, standing, programId, studentStatus].filter(Boolean).length,
+    [debouncedQ, stage, risk, standing, programId, studentStatus]
   );
 
   return (
@@ -91,7 +93,12 @@ export default function Students() {
               className="field-input pl-10"
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+            <Select label="Student status" value={studentStatus} onChange={setStudentStatus} options={[
+              { value: "compre-eligible", label: "Compre exam eligible" },
+              { value: "awol", label: "AWOL" },
+              { value: "loa", label: "LOA" },
+            ]} />
             <Select label="Stage" value={stage} onChange={setStage} options={meta?.stages || []} />
             <Select label="Risk" value={risk} onChange={setRisk} options={["Low", "Medium", "High", "Critical", "Medium/High/Critical"]} />
             <Select label="Standing" value={standing} onChange={setStanding} options={["Active", "On Leave", "Withdrawn", "Completed"]} />
@@ -112,6 +119,7 @@ export default function Students() {
               setRisk("");
               setStanding("");
               setProgramId("");
+              setStudentStatus("");
             }}
             className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 cursor-pointer"
           >
@@ -156,6 +164,7 @@ export default function Students() {
                     <th className="px-3 py-3">Enrollment</th>
                     <th className="px-3 py-3">Standing</th>
                     <th className="px-3 py-3">Risk</th>
+                    <th className="px-3 py-3">Compre exam</th>
                     <th className="px-3 py-3">Adviser</th>
                   </tr>
                 </thead>
@@ -190,6 +199,17 @@ export default function Students() {
                       </td>
                       <td className="px-3 py-3">
                         <StatusBadge value={s.risk_level} />
+                      </td>
+                      <td className="px-3 py-3">
+                        {s.compre_eligibility?.passed ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
+                            <GraduationCap className="h-3.5 w-3.5" /> Passed
+                          </span>
+                        ) : s.compre_eligibility?.eligible ? (
+                          <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">Eligible to take</span>
+                        ) : (
+                          <span className="text-xs text-slate-400">{s.compre_eligibility?.completed_units || 0}/21 units</span>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-slate-500">{s.adviser_name || "—"}</td>
                     </tr>

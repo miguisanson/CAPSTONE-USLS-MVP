@@ -9,7 +9,9 @@ const STEPS = ["Draft", "Submitted", "Approved", "Published"];
 export default function CourseAdjustments() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
+  const selectedTermId = searchParams.get("term_id") || "";
   const [programId, setProgramId] = useState(selectedProgramId);
+  const [termId, setTermId] = useState(selectedTermId);
   const [termLabel, setTermLabel] = useState("Current Term");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,14 +20,15 @@ export default function CourseAdjustments() {
   const [message, setMessage] = useState("");
   const [sel, setSel] = useState({}); // course_id -> {offer, sections}
 
-  function load(pid) {
+  function load(pid, tid) {
     setLoading(true);
     setError("");
     api
-      .courseAdjustments(pid || undefined)
+      .courseAdjustments({ program_id: pid || undefined, term_id: tid || undefined })
       .then((res) => {
         setData(res);
         setProgramId(String(res.program.id));
+        setTermId(res.term ? String(res.term.id) : "");
         if (res.latest_plan?.term_label) setTermLabel(res.latest_plan.term_label);
         // seed editable selections from demand suggestions
         const next = {};
@@ -39,9 +42,15 @@ export default function CourseAdjustments() {
   }
 
   useEffect(() => {
-    load(selectedProgramId);
+    load(selectedProgramId, selectedTermId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProgramId]);
+  }, [selectedProgramId, selectedTermId]);
+
+  function updateFilters(next) {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(next).forEach(([key, value]) => value ? params.set(key, value) : params.delete(key));
+    setSearchParams(params, { replace: true });
+  }
 
   const status = data?.latest_plan?.status || null;
   const stepIndex = status ? STEPS.indexOf(status) : -1;
@@ -88,7 +97,7 @@ export default function CourseAdjustments() {
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={programId}
-            onChange={(e) => setSearchParams({ program_id: e.target.value })}
+            onChange={(e) => updateFilters({ program_id: e.target.value })}
             className="field-input cursor-pointer"
             aria-label="Program"
           >
@@ -97,6 +106,14 @@ export default function CourseAdjustments() {
                 {p.code} - {p.name}
               </option>
             ))}
+          </select>
+          <select
+            value={termId}
+            onChange={(e) => updateFilters({ term_id: e.target.value })}
+            className="field-input cursor-pointer"
+            aria-label="Demand source term"
+          >
+            {(data?.terms || []).map((term) => <option key={term.id} value={term.id}>{term.label}</option>)}
           </select>
           <input
             value={termLabel}
@@ -107,6 +124,11 @@ export default function CourseAdjustments() {
           />
         </div>
       </div>
+
+      <Card className="border-l-4 border-l-amber-500 bg-amber-50/50 p-4">
+        <p className="font-semibold text-amber-900">Course Adjustments = decide what to offer next term</p>
+        <p className="mt-1 text-sm text-amber-800">Use student demand, section counts, and faculty availability to create a term offering plan for approval. The curriculum is an input, not the decision made here.</p>
+      </Card>
 
       {loading ? (
         <Spinner label="Loading course adjustments..." />
@@ -181,12 +203,12 @@ export default function CourseAdjustments() {
             <div className="border-b border-slate-100 px-5 py-3">
               <h2 className="text-lg font-semibold text-ink">Choose subjects to offer</h2>
               <p className="text-sm text-slate-500">
-                Demand counts only <span className="font-semibold">enrolled</span> students who haven't taken the subject. Tick what
+                Demand comes from each enrolled student's <span className="font-semibold">next recommended subjects</span> in {data.term?.label || "the selected term"}. Tick what
                 to offer and set sections — these feed the draft. (Suggestions assist; the choice is yours.)
               </p>
             </div>
             {data.demand.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="No subject demand found" hint="Enrolled students in this program have no outstanding subjects." />
+              <EmptyState icon={CheckCircle2} title="No next-subject demand found" hint="Enrolled students in this term have no next recommended subjects." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[920px] text-sm">

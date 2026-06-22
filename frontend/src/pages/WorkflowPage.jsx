@@ -31,6 +31,8 @@ import {
   Eye,
   Search,
   SlidersHorizontal,
+  History,
+  Download,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -432,6 +434,7 @@ function HandoffImport({ context }) {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [resetting, setResetting] = useState(false);
+  const { data: uploadHistory, refetch: refetchUploadHistory } = useApi(() => api.monitoringUploads(), []);
 
   async function resetUploaded() {
     if (!window.confirm("Remove all students/subjects that were brought in by sheet uploads? Seeded demo students are kept.")) return;
@@ -467,6 +470,7 @@ function HandoffImport({ context }) {
       const res = await api.importHandoff(file);
       setResult(res);
       setFile(null);
+      refetchUploadHistory();
     } catch (err) {
       setError(err.message || "Could not import the file.");
     } finally {
@@ -663,6 +667,62 @@ function HandoffImport({ context }) {
           )}
         </div>
       )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 font-semibold text-ink"><History className="h-4 w-4 text-brand-600" /> Upload history</h3>
+            <p className="mt-1 text-xs text-slate-500">Every uploaded workbook is preserved. Open a version to review conflicts between its values and the current record.</p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{uploadHistory?.items?.length || 0} backups</span>
+        </div>
+        {uploadHistory?.items?.length ? (
+          <div className="space-y-2">
+            {uploadHistory.items.map((upload) => (
+              <details key={upload.id} className="group rounded-xl border border-slate-200 p-3">
+                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{upload.original_name}</p>
+                    <p className="text-xs text-slate-500">{upload.program} · {upload.rows} students · {formatDate(upload.uploaded_at)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge value={upload.conflict_count ? `${upload.conflict_count} conflicts` : "No conflicts"} dot={false} />
+                    <a href={upload.download_url} onClick={(event) => event.stopPropagation()} className="btn-ghost px-2.5 py-1.5" aria-label={`Download ${upload.original_name}`}>
+                      <Download className="h-3.5 w-3.5" /> Backup
+                    </a>
+                  </div>
+                </summary>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  {upload.conflicts?.length ? (
+                    <div className="space-y-2">
+                      {upload.conflicts.map((conflict) => (
+                        <div key={`${upload.id}-${conflict.incoming_student_number}`} className="rounded-lg bg-amber-50 p-3">
+                          <p className="text-sm font-semibold text-amber-900">{conflict.incoming_name} · {conflict.incoming_student_number}</p>
+                          <p className="mt-0.5 text-xs text-amber-800">Changed: {(conflict.differences || []).join(", ")}</p>
+                          {conflict.category_comparison?.length > 0 && (
+                            <div className="mt-2 grid grid-cols-3 gap-2">
+                              {conflict.category_comparison.map((item) => (
+                                <div key={item.category} className="rounded-md bg-white px-2 py-1.5 text-center text-xs ring-1 ring-amber-100">
+                                  <p className="font-bold text-slate-700">{item.category}</p>
+                                  <p className="text-slate-500">Current {item.current}u → Uploaded {item.uploaded}u</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">This version matches existing records or added new students without conflicts.</p>
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No monitoring-sheet backups yet.</p>
+        )}
+      </div>
     </div>
   );
 }

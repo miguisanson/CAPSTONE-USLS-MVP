@@ -218,7 +218,12 @@ export default function MonitoringGrid() {
                       colSpan={cat.courses.length}
                       className="sticky top-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500"
                     >
-                      {cat.name}
+                      <span>{cat.name}</span>
+                      {(["Basic", "Major", "Cognate"].includes(cat.name)) && (
+                        <span className="ml-1 font-semibold normal-case text-slate-400">
+                          ({cat.name === "Basic" ? 6 : cat.name === "Major" ? 9 : 6}u required)
+                        </span>
+                      )}
                     </th>
                   ))}
                   <th
@@ -314,11 +319,12 @@ export default function MonitoringGrid() {
                         <span className="w-20 shrink-0 text-right text-[11px] font-semibold text-slate-500">
                           {s.completed}/{s.total} · {s.completed_units}/{s.total_units}u
                         </span>
-                        {s.eligible && (
-                          <span title="All units complete — eligible for comprehensive/final" className="shrink-0 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">
-                            ✓ units
-                          </span>
-                        )}
+                        <span
+                          title={s.eligible ? "Basic 6 + Major 9 + Cognate 6 = 21 units completed" : "Requires Basic 6 + Major 9 + Cognate 6 = 21 units"}
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${s.eligible ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500"}`}
+                        >
+                          {s.compre_eligibility?.passed ? "Compre passed" : s.eligible ? "Compre eligible" : `${s.compre_eligibility?.completed_units || 0}/21u`}
+                        </span>
                       </div>
                     </td>
                   </tr>
