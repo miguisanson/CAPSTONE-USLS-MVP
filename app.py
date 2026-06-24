@@ -292,6 +292,7 @@ class Student(db.Model):
     practicum_records = db.relationship("PracticumRecord", backref="student", lazy=True, cascade="all, delete-orphan")
     withdrawal_applications = db.relationship("WithdrawalApplication", backref="student", lazy=True, cascade="all, delete-orphan")
     graduation_endorsements = db.relationship("GraduationEndorsement", backref="student", lazy=True, cascade="all, delete-orphan")
+    workflow_messages = db.relationship("WorkflowMessage", backref="student", lazy=True, cascade="all, delete-orphan")
 
     @property
     def name(self) -> str:
@@ -454,11 +455,13 @@ class PracticumRecord(db.Model):
     moa_status = db.Column(db.String(60), nullable=False, default="Pending Review")
     moa_uploaded = db.Column(db.Boolean, default=False)
     practicum_site = db.Column(db.String(180))
+    supervisor_name = db.Column(db.String(160))
     required_hours = db.Column(db.Integer, default=0)
     completed_hours = db.Column(db.Integer, default=0)
     document_status = db.Column(db.String(60), nullable=False, default="Missing")
     certificate_count = db.Column(db.Integer, default=0)
     remarks = db.Column(db.Text)
+    completion_status = db.Column(db.String(80), nullable=False, default="Pending")
     status = db.Column(db.String(80), nullable=False, default="MOA Received")
     moa_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
     certificate_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
@@ -515,6 +518,30 @@ class GraduationEndorsement(db.Model):
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
 
     request_attachment = db.relationship("StudentRequestAttachment")
+
+
+class WorkflowMessage(db.Model):
+    """Clarification note tied to one monitored student workflow.
+
+    The MVP has one active case per workflow/student, so a separate polymorphic
+    case table would add complexity without improving traceability. This table
+    can later gain a case identifier if the GS office decides to retain several
+    concurrent applications of the same type.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    transaction_slug = db.Column(db.String(80), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    sender_role = db.Column(db.String(80), nullable=False)
+    sender_name = db.Column(db.String(160), nullable=False)
+    recipient_role = db.Column(db.String(80), nullable=False)
+    template = db.Column(db.String(180), nullable=False)
+    comment = db.Column(db.Text)
+    action_type = db.Column(db.String(40), nullable=False, default="note")
+    previous_status = db.Column(db.String(100))
+    new_status = db.Column(db.String(100))
+    status = db.Column(db.String(40), nullable=False, default="Open")
+    created_at = db.Column(db.DateTime, default=now_utc)
+    resolved_at = db.Column(db.DateTime)
 
 
 # Faculty reference data used by panel matching and scheduling availability.
@@ -608,6 +635,8 @@ class TransactionLog(db.Model):
     result = db.Column(db.String(160), nullable=False)
     next_owner = db.Column(db.String(80))
     notes = db.Column(db.Text)
+    previous_status = db.Column(db.String(100))
+    new_status = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=now_utc)
 
 
@@ -855,9 +884,24 @@ def attachment_dict(attachment: StudentRequestAttachment | None) -> dict | None:
         "name": attachment.original_name,
         "uploaded_at": iso(attachment.uploaded_at),
         "url": f"/api/student-request-attachments/{attachment.id}/file",
+        "uploaded_by": "Student",
+        "uploaded_by_role": "Student",
         "status": "Uploaded",
         "status_label": "Pending Review",
     }
+
+
+def workflow_attachments(student_id: int, *request_types: str) -> list[dict]:
+    """Return every saved upload for a case, including superseded revisions."""
+    rows = (
+        StudentRequestAttachment.query.filter(
+            StudentRequestAttachment.student_id == student_id,
+            StudentRequestAttachment.request_type.in_(request_types),
+        )
+        .order_by(StudentRequestAttachment.uploaded_at.asc(), StudentRequestAttachment.id.asc())
+        .all()
+    )
+    return [attachment_dict(item) for item in rows]
 
 
 def latest_practicum_record(student_id: int) -> PracticumRecord | None:
@@ -889,7 +933,7 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
         return None
     eligibility = practicum_eligibility(record.student)
     coordinator_status = "Pending"
-    if record.status in {"MOA Under Review", "Practicum In Progress", "Documents Submitted", "Hours Incomplete", "Additional Certificates Requested"}:
+    if record.status in {"MOA Under Review", "Practicum In Progress", "Documents Submitted", "Documents Under Review", "Hours Incomplete", "Additional Certificates Requested"}:
         coordinator_status = "Under Review"
     elif record.status in {"Completed", "Report Sent to Dean", "Dean Reviewed"}:
         coordinator_status = "Completed"
@@ -900,11 +944,13 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
         "moa_status": record.moa_status,
         "moa_uploaded": bool(record.moa_uploaded),
         "practicum_site": record.practicum_site,
+        "supervisor_name": record.supervisor_name,
         "required_hours": record.required_hours or 0,
         "completed_hours": record.completed_hours or 0,
         "document_status": record.document_status,
         "certificate_count": record.certificate_count or 0,
         "remarks": record.remarks,
+        "completion_status": record.completion_status,
         "status": record.status,
         "practicum_eligibility_status": eligibility["status"],
         "moa_upload_status": "Submitted" if record.moa_uploaded else "Missing",
@@ -917,6 +963,7 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
         "timeline": practicum_timeline(record, eligibility),
         "moa_attachment": attachment_dict(record.moa_attachment),
         "certificate_attachment": attachment_dict(record.certificate_attachment),
+        "attachments": workflow_attachments(record.student_id, "practicum"),
         "report_sent_at": iso(record.report_sent_at),
         "dean_reviewed_at": iso(record.dean_reviewed_at),
         "created_at": iso(record.created_at),
@@ -944,6 +991,7 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
         "status": application.status,
         "request_attachment": attachment_dict(application.request_attachment),
         "proof_attachment": attachment_dict(application.proof_attachment),
+        "attachments": workflow_attachments(application.student_id, "withdrawal"),
         "decided_at": iso(application.decided_at),
         "completed_at": iso(application.completed_at),
         "created_at": iso(application.created_at),
@@ -971,6 +1019,7 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
         "dean_remarks": endorsement.dean_remarks,
         "registrar_status": endorsement.registrar_status,
         "request_attachment": attachment_dict(endorsement.request_attachment),
+        "attachments": workflow_attachments(endorsement.student_id, "graduation", "graduation-endorsement"),
         "submitted_at": iso(endorsement.submitted_at),
         "dean_decision_at": iso(endorsement.dean_decision_at),
         "registrar_received_at": iso(endorsement.registrar_received_at),
@@ -980,6 +1029,62 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
     if include_student and endorsement.student:
         payload["student"] = student_brief(endorsement.student)
     return payload
+
+
+def workflow_message_dict(message: WorkflowMessage) -> dict:
+    return {
+        "id": message.id,
+        "transaction_slug": message.transaction_slug,
+        "student_id": message.student_id,
+        "student_name": message.student.name if message.student else None,
+        "sender_role": message.sender_role,
+        "sender_name": message.sender_name,
+        "recipient_role": message.recipient_role,
+        "template": message.template,
+        "comment": message.comment,
+        "action_type": message.action_type,
+        "previous_status": message.previous_status,
+        "new_status": message.new_status,
+        "status": message.status,
+        "created_at": iso(message.created_at),
+        "resolved_at": iso(message.resolved_at),
+    }
+
+
+def workflow_messages_for(slug: str, student_id: int, limit: int = 20) -> list[dict]:
+    messages = (
+        WorkflowMessage.query.filter_by(transaction_slug=slug, student_id=student_id)
+        .order_by(WorkflowMessage.created_at.desc(), WorkflowMessage.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [workflow_message_dict(item) for item in messages]
+
+
+def workflow_case_meta(slug: str, student_id: int) -> dict:
+    latest_log = (
+        TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+        .first()
+    )
+    open_messages = WorkflowMessage.query.filter_by(
+        transaction_slug=slug,
+        student_id=student_id,
+        status="Open",
+    ).count()
+    return {
+        "next_action_owner": latest_log.next_owner if latest_log else None,
+        "last_activity_at": iso(latest_log.created_at) if latest_log else None,
+        "unresolved_messages": open_messages,
+        "messages": workflow_messages_for(slug, student_id),
+        "history": [
+            log_dict(item)
+            for item in TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
+            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+            .limit(30)
+            .all()
+        ],
+    }
 
 
 def task_dict(task: Task) -> dict:
@@ -1041,6 +1146,8 @@ def log_dict(log: TransactionLog) -> dict:
         "result": log.result,
         "next_owner": log.next_owner,
         "notes": log.notes,
+        "previous_status": log.previous_status,
+        "new_status": log.new_status,
         "created_at": iso(log.created_at),
     }
 
@@ -1074,6 +1181,61 @@ def account_dict(account: UserAccount) -> dict:
     }
 
 
+BACKOFFICE_ROLES = {
+    "staff",
+    "academic_coordinator",
+    "research_coordinator",
+    "registrar",
+}
+
+ROLE_TRANSACTION_ACCESS = {
+    "academic_coordinator": {"practicum", "graduation", "withdrawal"},
+    "research_coordinator": {"graduation"},
+    "registrar": {"graduation", "withdrawal"},
+}
+
+ROLE_LABELS = {
+    "staff": "Graduate School Staff",
+    "academic_coordinator": "Academic Coordinator",
+    "research_coordinator": "Research Coordinator",
+    "registrar": "Registrar",
+    "dean": "Dean",
+    "student": "Student",
+}
+
+WORKFLOW_MESSAGE_TEMPLATES = [
+    "Please upload the correct document.",
+    "The submitted file is unreadable. Please re-upload a clearer copy.",
+    "Please complete the missing required fields.",
+    "The document needs the proper signature before approval.",
+    "Please clarify the information entered in this section.",
+    "Returned for revision. Please review the comments and resubmit.",
+    "Forwarding this request for dean review.",
+    "Sending this back to the previous stage for correction.",
+    # Retain existing saved/demo values for backwards compatibility.
+    "Missing required document",
+    "Document is unclear or unreadable",
+    "Eligibility information needs verification",
+    "Units completed do not match records",
+    "Thesis/practicum status needs confirmation",
+    "Please upload an updated file",
+    "Please clarify request details",
+    "This request requires additional review",
+    "Practicum completion was not accepted; another organization may be required",
+    "Other / Custom comment",
+    "Other",
+]
+
+WORKFLOW_RECIPIENTS = {
+    "Student": "student",
+    "Graduate School Staff": "staff",
+    "Academic Coordinator": "academic_coordinator",
+    "Research Coordinator": "research_coordinator",
+    "Dean": "dean",
+    "Registrar": "registrar",
+}
+
+
 def current_account() -> UserAccount | None:
     account_id = session.get("account_id")
     if not account_id:
@@ -1102,6 +1264,19 @@ def require_api_login(*roles):
         return wrapper
 
     return decorator
+
+
+def require_workflow_actor(*roles) -> UserAccount:
+    """Enforce the BPM swimlane for a workflow transition."""
+    account = current_account()
+    if not account or account.role not in roles:
+        expected = " or ".join(ROLE_LABELS[role] for role in roles)
+        raise ValueError(f"This step must be completed by {expected}.")
+    return account
+
+
+def workflow_actor_label(account: UserAccount) -> str:
+    return f"{ROLE_LABELS.get(account.role, account.role)} · {account.full_name}"
 
 
 # ---------------------------------------------------------------------------
@@ -1618,8 +1793,15 @@ def register_routes(app: Flask) -> None:
         password = body.get("password") or ""
         if role not in ["staff", "student", "dean"]:
             return jsonify({"error": "Choose an account type to sign in."}), 400
-        account = UserAccount.query.filter_by(email=email, role=role, active=True).first()
-        if not account or not check_password_hash(account.password_hash, password):
+        account = UserAccount.query.filter_by(email=email, active=True).first()
+        role_matches = bool(
+            account
+            and (
+                (role == "staff" and account.role in BACKOFFICE_ROLES)
+                or account.role == role
+            )
+        )
+        if not role_matches or not check_password_hash(account.password_hash, password):
             return jsonify({"error": "Invalid email, password, or account type."}), 401
         session.clear()
         session["account_id"] = account.id
@@ -1802,6 +1984,13 @@ def register_routes(app: Flask) -> None:
                 "graduation_eligibility": graduation_eligibility(student),
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
+                "workflow_messages": [
+                    workflow_message_dict(item)
+                    for item in WorkflowMessage.query.filter_by(student_id=student.id)
+                    .order_by(WorkflowMessage.created_at.desc())
+                    .limit(30)
+                    .all()
+                ],
                 "recommendations": student_recommendations(student)["recommendations"],
                 "enrollments": [
                     {
@@ -1891,6 +2080,14 @@ def register_routes(app: Flask) -> None:
                 "graduation_eligibility": graduation_eligibility(student),
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
+                "workflow_messages": [
+                    workflow_message_dict(item)
+                    for item in WorkflowMessage.query.filter_by(student_id=student.id)
+                    .order_by(WorkflowMessage.created_at.desc())
+                    .limit(30)
+                    .all()
+                ],
+                "message_templates": WORKFLOW_MESSAGE_TEMPLATES,
                 "recommendations": student_portal_recommendations(student),
                 "research_milestones": [research_milestone_payload(student, gate) for gate in RESEARCH_MILESTONES],
                 "readmission_requirements": readmission_requirements(),
@@ -2160,26 +2357,58 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Practicum is available only for programs with practicum requirements."}), 400
 
         record = latest_practicum_record(student.id)
-        if not record:
-            record = PracticumRecord(student_id=student.id)
-            db.session.add(record)
-        apply_practicum_payload(record, data, student)
+        stage = practicum_student_submission_stage(record)
+        if stage == "locked":
+            return jsonify({"error": "This practicum stage is awaiting reviewer action. Your submitted information remains saved and read-only."}), 400
 
-        if not record.certificate_attachment_id:
+        previous_status = record.status if record else "Not Submitted"
+        if stage == "moa":
+            moa_attachment = request_attachment_from_payload(student, "practicum", data)
+            if not moa_attachment:
+                return jsonify({"error": "Upload the practicum MOA PDF before submitting this stage."}), 400
+            practicum_site = (data.get("practicum_site") or "").strip()
+            if not practicum_site:
+                return jsonify({"error": "Enter the practicum site or company for the MOA stage."}), 400
+            if not record:
+                record = PracticumRecord(student_id=student.id)
+                db.session.add(record)
+            record.practicum_site = practicum_site
+            record.supervisor_name = (data.get("supervisor_name") or record.supervisor_name or "").strip()
+            record.required_hours = record.required_hours or 200
+            record.moa_attachment_id = moa_attachment.id
+            record.moa_uploaded = True
+            record.moa_status = "Uploaded"
+            record.remarks = (data.get("remarks") or record.remarks or "").strip()
             record.status = "MOA Submitted"
+            record.updated_at = now_utc()
             add_task(student.id, "Record and forward practicum MOA", "Graduate School Staff", 3, 45)
             next_owner = "Graduate School Staff"
             message = "MOA submitted. Graduate School staff will record and forward it to the Academic Coordinator."
-        elif record.completed_hours < record.required_hours:
-            record.status = "Hours Incomplete"
-            add_task(student.id, "Review practicum certificates and hours", "Academic Coordinator", 5, 45)
-            next_owner = "Academic Coordinator"
-            message = "Documents submitted. The Academic Coordinator will review your certificates and completed hours."
         else:
-            record.status = "Documents Submitted"
-            add_task(student.id, "Verify practicum certificates and completion", "Academic Coordinator", 5, 50)
-            next_owner = "Academic Coordinator"
-            message = "Documents and hours submitted. Completion remains pending Academic Coordinator verification."
+            certificate_id = safe_int(data.get("certificate_attachment_id"), 0)
+            certificate = StudentRequestAttachment.query.filter_by(
+                id=certificate_id,
+                student_id=student.id,
+                request_type="practicum",
+            ).first()
+            if not certificate:
+                return jsonify({"error": "Upload the practicum completion documents PDF before submitting this stage."}), 400
+            record.certificate_attachment_id = certificate.id
+            record.completed_hours = max(safe_int(data.get("completed_hours"), record.completed_hours or 0), 0)
+            record.certificate_count = max(safe_int(data.get("certificate_count"), record.certificate_count or 0), 0)
+            record.document_status = "Pending Review"
+            record.remarks = (data.get("remarks") or record.remarks or "").strip()
+            record.updated_at = now_utc()
+            if record.completed_hours < record.required_hours:
+                record.status = "Hours Incomplete"
+                message = "Documents submitted. Graduate School staff will record and forward them to the Academic Coordinator."
+            else:
+                record.status = "Documents Submitted"
+                message = "Documents and hours submitted. Graduate School staff will record and forward them to the Academic Coordinator."
+            add_task(student.id, "Record and forward practicum documents", "Graduate School Staff", 3, 45)
+            next_owner = "Graduate School Staff"
+
+        resolve_student_returns("practicum", student.id)
 
         add_log(
             "practicum",
@@ -2189,6 +2418,8 @@ def register_routes(app: Flask) -> None:
             f"Practicum submission recorded: {record.status}",
             next_owner,
             practicum_notes(record),
+            previous_status=previous_status,
+            new_status=record.status,
         )
         recompute_risk(student)
         db.session.commit()
@@ -2203,6 +2434,8 @@ def register_routes(app: Flask) -> None:
         current = latest_withdrawal_application(student.id)
         proof_attachment_id = safe_int(data.get("proof_attachment_id"), 0)
         if current and current.dean_decision == "Approved" and proof_attachment_id:
+            if current.status != "Requirements Pending":
+                return jsonify({"error": "Wait for the Academic Coordinator and Graduate School staff to complete the approved-request follow-through before submitting requirements."}), 400
             proof = StudentRequestAttachment.query.filter_by(
                 id=proof_attachment_id, student_id=student.id, request_type="withdrawal"
             ).first()
@@ -2215,38 +2448,48 @@ def register_routes(app: Flask) -> None:
             add_log("withdrawal", student.id, "Student", proof.original_name, "Withdrawal requirements submitted", "Graduate School Staff", "Approved request follow-through proof is ready for staff verification.")
             db.session.commit()
             return jsonify({"ok": True, "message": "Requirements submitted. Graduate School staff will verify your form and proof."})
-        if current and current.status not in {"Denied", "Returned", "Withdrawn Confirmed"}:
+        if current and current.status not in {"Denied", "Returned", "Returned for Clarification", "Withdrawn Confirmed"}:
             return jsonify({"error": "You already have an active withdrawal request. Follow its current status instead of creating another request."}), 400
         attachment = request_attachment_from_payload(student, "withdrawal", data)
         if not attachment:
             return jsonify({"error": "Upload the completed withdrawal request PDF before submitting."}), 400
+        if not (data.get("reason") or (current.reason if current else "")):
+            return jsonify({"error": "Enter the reason for withdrawal before submitting."}), 400
+        if not (data.get("effective_term") or (current.effective_term if current else "")):
+            return jsonify({"error": "Enter the effective term before submitting."}), 400
 
-        application = WithdrawalApplication(
-            student_id=student.id,
-            reason=(data.get("reason") or "").strip(),
-            effective_term=(data.get("effective_term") or "").strip(),
-            request_attachment_id=attachment.id,
-            proof_attachment_id=proof_attachment_id or None,
-            fee_status="Pending",
-            requirement_status="Pending",
-            dean_decision="Pending",
-            registrar_status="Pending",
-            status="Dean Review",
-        )
-        db.session.add(application)
+        previous_status = current.status if current else "Not Submitted"
+        application = current if current and current.status in {"Returned", "Returned for Clarification"} else WithdrawalApplication(student_id=student.id)
+        if not application.id:
+            db.session.add(application)
+        application.reason = (data.get("reason") or application.reason or "").strip()
+        application.effective_term = (data.get("effective_term") or application.effective_term or "").strip()
+        application.request_attachment_id = attachment.id
+        application.proof_attachment_id = proof_attachment_id or application.proof_attachment_id
+        application.fee_status = "Pending"
+        application.requirement_status = "Pending"
+        application.dean_decision = "Pending"
+        application.registrar_status = "Pending"
+        application.status = "Submitted to GS Staff"
+        application.decided_at = None
+        application.completed_at = None
+        application.updated_at = now_utc()
         db.session.flush()
-        add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+        resolve_student_returns("withdrawal", student.id)
+        add_task(student.id, "Record and forward withdrawal request", "Graduate School Staff", 3, 60)
         add_log(
             "withdrawal",
             student.id,
             "Student",
             attachment.original_name,
             "Withdrawal request submitted",
-            "Dean",
-            f"Effective term: {application.effective_term or 'Not specified'}. Reason: {application.reason or 'Not provided'}. File is uploaded and pending review.",
+            "Graduate School Staff",
+            f"Effective term: {application.effective_term or 'Not specified'}. Reason: {application.reason or 'Not provided'}. File is uploaded for staff recording and forwarding.",
+            previous_status=previous_status,
+            new_status=application.status,
         )
         db.session.commit()
-        return jsonify({"ok": True, "message": "Submitted. The Dean will review your withdrawal request before any status change is recorded."})
+        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will record and forward your request to the Dean."})
 
     @app.route("/api/student-portal/requests/graduation", methods=["POST"])
     @require_api_login("student")
@@ -2257,21 +2500,28 @@ def register_routes(app: Flask) -> None:
         attachment = request_attachment_from_payload(student, "graduation", data)
         eligibility = graduation_eligibility(student)
         endorsement = latest_graduation_endorsement(student.id)
+        if endorsement and endorsement.endorsement_status not in {"Not Eligible", "Returned for Clarification"}:
+            return jsonify({"error": "Your graduation request is already in review. Submitted details remain saved while the current reviewer completes the next stage."}), 400
+        previous_status = endorsement.endorsement_status if endorsement else "Not Submitted"
         if not endorsement:
             endorsement = GraduationEndorsement(student_id=student.id)
             db.session.add(endorsement)
         apply_graduation_eligibility(endorsement, eligibility)
         endorsement.review_window = (data.get("review_window") or data.get("term") or "Current review window").strip()
         endorsement.request_attachment_id = attachment.id if attachment else endorsement.request_attachment_id
-        endorsement.endorsement_status = "For Review" if eligibility["eligible"] else "Not Eligible"
+        # Eligibility is displayed as monitoring context, but the BPM decision
+        # is recorded only after the AC and Research Coordinator reviews.
+        endorsement.endorsement_status = "For Review"
         endorsement.submitted_at = now_utc()
-        next_owner = "Graduate School Staff" if eligibility["eligible"] else eligibility["next_owner"]
+        endorsement.updated_at = now_utc()
+        resolve_student_returns("graduation", student.id)
+        next_owner = "Graduate School Staff"
         add_task(
             student.id,
-            "Prepare graduation endorsement review" if eligibility["eligible"] else eligibility["next_action"],
+            "Compile graduation candidate for role-based review",
             next_owner,
             5,
-            45 if eligibility["eligible"] else 35,
+            45,
         )
         add_log(
             "graduation",
@@ -2281,6 +2531,8 @@ def register_routes(app: Flask) -> None:
             f"Graduation endorsement request submitted: {endorsement.endorsement_status}",
             next_owner,
             graduation_notes(endorsement),
+            previous_status=previous_status,
+            new_status=endorsement.endorsement_status,
         )
         db.session.commit()
         return jsonify({
@@ -2481,7 +2733,7 @@ def register_routes(app: Flask) -> None:
 
     # Role-filterable work queue.
     @app.route("/api/tasks")
-    @require_api_login("staff")
+    @require_api_login(*BACKOFFICE_ROLES)
     def tasks_list():
         owner = request.args.get("owner", "").strip()
         status = request.args.get("status", "").strip()
@@ -2548,6 +2800,7 @@ def register_routes(app: Flask) -> None:
                 "Registrar",
                 item.dean_remarks or "Dean-approved Registrar handoff.",
             )
+            add_task(item.student_id, "Record receipt of endorsed graduation list", "Registrar", 3, 40)
             writer.writerow([
                 item.student.student_number,
                 item.student.name,
@@ -2865,6 +3118,7 @@ def register_routes(app: Flask) -> None:
 
         if case_type == "practicum":
             record = PracticumRecord.query.get_or_404(item_id)
+            previous_status = record.status
             if decision in {"approve", "review"}:
                 record.status = "Dean Reviewed"
                 record.dean_reviewed_at = now_utc()
@@ -2877,10 +3131,13 @@ def register_routes(app: Flask) -> None:
                 add_task(record.student_id, "Revise practicum status report", "Academic Coordinator", 5, 35)
             if note:
                 record.remarks = "\n".join([part for part in [record.remarks, f"Dean: {note}"] if part])
-            add_log("practicum", record.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or practicum_notes(record))
+            if decision == "return":
+                db.session.add(WorkflowMessage(transaction_slug="practicum", student_id=record.student_id, sender_role="Dean", sender_name=account.full_name, recipient_role="Academic Coordinator", template=note or "This request requires additional review", comment=note, action_type="return", previous_status=previous_status, new_status=record.status))
+            add_log("practicum", record.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or practicum_notes(record), previous_status=previous_status, new_status=record.status)
 
         elif case_type == "withdrawal":
             application = WithdrawalApplication.query.get_or_404(item_id)
+            previous_status = application.status
             if application.dean_decision != "Pending":
                 return jsonify({"error": "This withdrawal request already has a Dean decision."}), 400
             if decision == "approve":
@@ -2890,7 +3147,6 @@ def register_routes(app: Flask) -> None:
                 result = "Withdrawal approved by Dean"
                 next_owner = "Academic Coordinator"
                 add_task(application.student_id, "Perform withdrawal follow-through actions", "Academic Coordinator", 5, 45)
-                add_task(application.student_id, "Complete withdrawal requirements", "Student", 7, 40)
             elif decision == "deny":
                 application.dean_decision = "Denied"
                 application.status = "Denied"
@@ -2908,17 +3164,20 @@ def register_routes(app: Flask) -> None:
             application.decided_at = now_utc()
             if note:
                 application.staff_remarks = "\n".join([part for part in [application.staff_remarks, f"Dean: {note}"] if part])
-            add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application))
+            if decision == "return":
+                db.session.add(WorkflowMessage(transaction_slug="withdrawal", student_id=application.student_id, sender_role="Dean", sender_name=account.full_name, recipient_role="Student", template=note or "Please clarify request details", comment=note, action_type="return", previous_status=previous_status, new_status=application.status))
+            add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application), previous_status=previous_status, new_status=application.status)
 
         elif case_type == "graduation":
             endorsement = GraduationEndorsement.query.get_or_404(item_id)
+            previous_status = endorsement.endorsement_status
             if decision == "approve":
                 endorsement.endorsement_status = "Dean Approved"
                 endorsement.registrar_status = "Pending Handoff"
                 endorsement.dean_decision_at = now_utc()
                 result = "Graduation endorsement approved by Dean; Registrar handoff is ready for export"
-                next_owner = "Graduate School Staff"
-                add_task(endorsement.student_id, "Export and hand off endorsed list to Registrar", "Graduate School Staff", 3, 40)
+                next_owner = "Dean"
+                add_task(endorsement.student_id, "Export and hand off endorsed list to Registrar", "Dean", 3, 40)
             elif decision == "return":
                 endorsement.endorsement_status = "Returned for Revision"
                 endorsement.dean_decision_at = now_utc()
@@ -2929,7 +3188,9 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "Graduation endorsement decisions must be approve or return."}), 400
             if note:
                 endorsement.dean_remarks = note
-            add_log("graduation", endorsement.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or graduation_notes(endorsement))
+            if decision == "return":
+                db.session.add(WorkflowMessage(transaction_slug="graduation", student_id=endorsement.student_id, sender_role="Dean", sender_name=account.full_name, recipient_role="Graduate School Staff", template=note or "This request requires additional review", comment=note, action_type="return", previous_status=previous_status, new_status=endorsement.endorsement_status))
+            add_log("graduation", endorsement.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or graduation_notes(endorsement), previous_status=previous_status, new_status=endorsement.endorsement_status)
         else:
             return jsonify({"error": "Unknown workflow approval type."}), 404
 
@@ -3226,10 +3487,14 @@ def register_routes(app: Flask) -> None:
     # Supplies each workflow screen with student-specific context before
     # submission, such as current audit status or panel recommendations.
     @app.route("/api/transactions/<slug>/context")
-    @require_api_login("staff")
+    @require_api_login(*BACKOFFICE_ROLES)
     def transaction_context(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
             return jsonify({"error": "Unknown workflow."}), 404
+        account = current_account()
+        allowed = ROLE_TRANSACTION_ACCESS.get(account.role)
+        if allowed is not None and slug not in allowed:
+            return jsonify({"error": "This workflow is not assigned to your role."}), 403
         student_id = request.args.get("student_id", type=int)
         specialization = request.args.get("specialization", "")
         return jsonify(serialize_transaction_context(slug, student_id, specialization))
@@ -3257,10 +3522,14 @@ def register_routes(app: Flask) -> None:
 
     # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
-    @require_api_login("staff")
+    @require_api_login(*BACKOFFICE_ROLES)
     def transaction_submit(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
             return jsonify({"error": "Unknown workflow."}), 404
+        account = current_account()
+        allowed = ROLE_TRANSACTION_ACCESS.get(account.role)
+        if allowed is not None and slug not in allowed:
+            return jsonify({"error": "This workflow is not assigned to your role."}), 403
         data = request_payload()
         handler = TRANSACTION_HANDLERS[slug]
         try:
@@ -3280,6 +3549,156 @@ def register_routes(app: Flask) -> None:
                 "message": "Saved. The student record, queue, and monitoring indicators were updated.",
             }
         )
+
+    @app.route("/api/transactions/<slug>/messages", methods=["POST"])
+    @require_api_login(*BACKOFFICE_ROLES, "dean", "student")
+    def transaction_message(slug: str):
+        if slug not in {"practicum", "withdrawal", "graduation"}:
+            return jsonify({"error": "Messaging is available only for Practicum, Withdrawal, and Graduation."}), 404
+        account = current_account()
+        data = request_payload()
+        student_id = account.student_id if account.role == "student" else safe_int(data.get("student_id"))
+        student = Student.query.get_or_404(student_id)
+        if account.role in ROLE_TRANSACTION_ACCESS and slug not in ROLE_TRANSACTION_ACCESS[account.role]:
+            return jsonify({"error": "This workflow is not assigned to your role."}), 403
+        recipient_role = (data.get("recipient_role") or "Graduate School Staff").strip()
+        action_type = (data.get("action_type") or "note").strip()
+        if account.role == "student":
+            if action_type not in {"note", "response"}:
+                return jsonify({"error": "Students may send a question or respond to a reviewer, but cannot move or return a request."}), 403
+            latest_owner = workflow_case_meta(slug, student.id).get("next_action_owner")
+            allowed_recipients = {"Graduate School Staff"}
+            if latest_owner in WORKFLOW_RECIPIENTS and latest_owner != "Student":
+                allowed_recipients.add(latest_owner)
+            if action_type == "response":
+                returned = latest_open_student_return(slug, student.id)
+                if returned:
+                    allowed_recipients.add(returned.sender_role)
+            if recipient_role not in allowed_recipients:
+                return jsonify({"error": "Send this message to the staff member or reviewer currently handling your request."}), 403
+        try:
+            message = create_workflow_message(
+                slug,
+                student,
+                account,
+                recipient_role,
+                (data.get("template") or "Please clarify request details").strip(),
+                data.get("comment") or "",
+                action_type,
+            )
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "ok": True,
+            "message": "Clarification response saved." if message.action_type == "response" else "Message saved and the next owner was notified.",
+            "item": workflow_message_dict(message),
+        })
+
+    @app.route("/api/graduation/batch-actions", methods=["POST"])
+    @require_api_login("staff", "dean")
+    def graduation_batch_actions():
+        account = current_account()
+        data = request_payload()
+        student_ids = sorted({safe_int(value) for value in data.getlist("student_ids") if safe_int(value)})
+        action = (data.get("action") or "").strip()
+        if not student_ids:
+            return jsonify({"error": "Select at least one graduation candidate."}), 400
+        if action not in {"send_to_dean", "approve", "return", "assign", "note"}:
+            return jsonify({"error": "Choose a valid graduation group action."}), 400
+        if action == "approve" and account.role != "dean":
+            return jsonify({"error": "Only the Dean may approve an endorsement batch."}), 403
+        if action in {"send_to_dean", "assign"} and account.role != "staff":
+            return jsonify({"error": "Only Graduate School staff may prepare or assign a candidate batch."}), 403
+
+        updated = []
+        skipped = []
+        recipient = (data.get("recipient_role") or "Graduate School Staff").strip()
+        template = (data.get("template") or "This request requires additional review").strip()
+        comment = data.get("comment") or ""
+        review_window = (data.get("review_window") or "Current review window").strip()
+
+        for student_id in student_ids:
+            student = db.session.get(Student, student_id)
+            if not student:
+                skipped.append({"student_id": student_id, "reason": "Student record not found"})
+                continue
+            endorsement = latest_graduation_endorsement(student.id)
+            eligibility = graduation_eligibility(student)
+            try:
+                if action == "send_to_dean":
+                    if eligibility["status"] != "Eligible":
+                        raise ValueError(f"Eligibility is {eligibility['status'].lower()}")
+                    if not endorsement:
+                        endorsement = GraduationEndorsement(student_id=student.id, review_window=review_window)
+                        db.session.add(endorsement)
+                    previous = endorsement.endorsement_status
+                    apply_graduation_eligibility(endorsement, eligibility)
+                    endorsement.review_window = review_window
+                    endorsement.endorsement_status = "Ready for Dean Review"
+                    endorsement.submitted_at = now_utc()
+                    add_task(student.id, "Review graduation endorsement list", "Dean", 5, 55)
+                    add_log(
+                        "graduation", student.id, workflow_actor_label(account), "Graduation batch",
+                        "Candidate included in batch sent for Dean review", "Dean", comment or "Batch preparation",
+                        previous_status=previous, new_status=endorsement.endorsement_status,
+                    )
+                elif action == "approve":
+                    if not endorsement or endorsement.endorsement_status != "Ready for Dean Review":
+                        raise ValueError("Candidate is not ready for Dean review")
+                    previous = endorsement.endorsement_status
+                    endorsement.endorsement_status = "Dean Approved"
+                    endorsement.dean_remarks = comment or endorsement.dean_remarks
+                    endorsement.dean_decision_at = now_utc()
+                    endorsement.registrar_status = "Pending Handoff"
+                    add_task(student.id, "Export and hand off endorsed list to Registrar", "Dean", 3, 40)
+                    add_log(
+                        "graduation", student.id, workflow_actor_label(account), "Graduation batch",
+                        "Graduation candidate approved in Dean batch", "Dean", comment or "Approved for Registrar handoff",
+                        previous_status=previous, new_status=endorsement.endorsement_status,
+                    )
+                elif action == "return":
+                    create_workflow_message("graduation", student, account, recipient, template, comment, "return")
+                elif action == "assign":
+                    add_task(student.id, "Review assigned graduation candidate", recipient, 5, 40)
+                    add_log("graduation", student.id, workflow_actor_label(account), "Graduation batch", "Reviewer assigned", recipient, comment or "Batch reviewer assignment")
+                else:
+                    create_workflow_message("graduation", student, account, recipient, template, comment, "note")
+                updated.append({"student_id": student.id, "student_name": student.name})
+            except ValueError as exc:
+                skipped.append({"student_id": student.id, "student_name": student.name, "reason": str(exc)})
+
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "updated": updated,
+            "skipped": skipped,
+            "message": f"Applied the group action to {len(updated)} candidate(s); {len(skipped)} skipped.",
+        })
+
+    @app.route("/api/transactions/<slug>/demo-reset", methods=["POST"])
+    @require_api_login("staff")
+    def transaction_demo_reset(slug: str):
+        if slug not in {"practicum", "withdrawal", "graduation"}:
+            return jsonify({"error": "Demo reset is available only for Practicum, Withdrawal, and Graduation."}), 404
+        data = request_payload()
+        student = Student.query.get_or_404(safe_int(data.get("student_id")))
+        if not student.student_number.startswith("GS-2026-"):
+            return jsonify({"error": "Only seeded GS-2026 demo students can be reset from this control."}), 400
+        try:
+            result = reset_workflow_demo_case(slug, student)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        for stored_name in result.pop("stored_names"):
+            (REQUEST_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
+        return jsonify({
+            "ok": True,
+            **result,
+            "message": f"Reset {student.name}'s {TRANSACTION_BY_SLUG[slug]['title']} demo case. The student can start that workflow again.",
+        })
 
     # ---- SPA hosting -----------------------------------------------------
     @app.route("/")
@@ -3594,89 +4013,165 @@ def safe_int(value, default: int = 0) -> int:
         return default
 
 
-PRACTICUM_UNIT_REQUIREMENTS = {"Basic": 6, "Major": 9, "Cognate": 6}
-PRACTICUM_TOTAL_UNITS_REQUIRED = 21
+PRACTICUM_ELIGIBILITY_CONFIG = {
+    "unit_requirements": {"Basic": 6, "Major": 9, "Cognate": 6},
+    "total_units_required": 21,
+    "stage_requirements": [
+        {"key": "title", "label": "Title stage", "minimum_stage": "Proposal Development"},
+        {"key": "proposal", "label": "Proposal stage", "minimum_stage": "Data Collection"},
+        {"key": "ethics", "label": "Ethics stage", "minimum_stage": "Data Collection"},
+        {"key": "final", "label": "Final stage", "minimum_stage": "Final Defense"},
+    ],
+}
+
+DEPLOYMENT_POLICY_QUESTIONS = [
+    "What exact student data source will verify completed units?",
+    "Will units come from Registrar records, uploaded forms, encoded curriculum records, or imported spreadsheets?",
+    "How will title, proposal, ethics, and final-stage completion be verified?",
+    "Which certificates or documents are required for practicum, withdrawal, and graduation?",
+    "Can the GS office provide sample data so the production fields match the real source records?",
+    "May staff manually override eligibility when source data is incomplete?",
+    "Which role has authority to approve an eligibility override?",
+]
+
+
+def eligibility_item(
+    key: str,
+    label: str,
+    required_value,
+    actual_value,
+    passed: bool | None,
+    source_field: str,
+    note: str = "",
+) -> dict:
+    return {
+        "key": key,
+        "label": label,
+        "required": required_value,
+        "required_value": required_value,
+        "actual": actual_value,
+        "actual_value": actual_value,
+        "passed": passed,
+        # `complete` is retained for existing UI clients while `passed=None`
+        # distinguishes missing source data from a confirmed failed criterion.
+        "complete": passed is True,
+        "status": "Passed" if passed is True else "Not met" if passed is False else "Needs verification",
+        "source_field": source_field,
+        "note": note,
+    }
 
 
 def practicum_eligibility(student: Student) -> dict:
-    """Compute practicum eligibility from monitoring data; staff never keys this manually."""
+    """Compute practicum eligibility from centralized, replaceable source rules."""
     audit = compute_course_audit(student)
-    completed_by_category = {
-        row["category"]: row["completed_units"] for row in audit.get("by_category", [])
-    }
-    stage_index = STAGES.index(student.current_stage) if student.current_stage in STAGES else 0
+    category_rows = {row["category"]: row for row in audit.get("by_category", [])}
+    stage_known = student.current_stage in STAGES
+    stage_index = STAGES.index(student.current_stage) if stage_known else None
     case = (
         ResearchCase.query.filter_by(student_id=student.id)
         .order_by(ResearchCase.opened_at.desc())
         .first()
     )
-    title_completed = stage_index >= STAGES.index("Proposal Development")
-    proposal_completed = stage_index >= STAGES.index("Data Collection")
-    ethics_completed = stage_index >= STAGES.index("Data Collection")
-    final_completed = stage_index >= STAGES.index("Final Defense")
-    if case:
-        title_completed = title_completed or case.current_gate in {
-            "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"
-        }
-        proposal_completed = proposal_completed or case.current_gate in {"Final Defense", "Completion Evidence"}
-        ethics_completed = ethics_completed or case.current_gate in {"Final Defense", "Completion Evidence"}
-        final_completed = final_completed or case.current_gate == "Completion Evidence" or case.status == "Verified Complete"
+    stage_evidence = {
+        "title": bool(case and case.current_gate in {"Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"}),
+        "proposal": bool(case and case.current_gate in {"Final Defense", "Completion Evidence"}),
+        "ethics": bool(case and case.current_gate in {"Final Defense", "Completion Evidence"}),
+        "final": bool(case and (case.current_gate == "Completion Evidence" or case.status == "Verified Complete")),
+    }
 
-    basic = completed_by_category.get("Basic", 0)
-    major = completed_by_category.get("Major", 0)
-    cognate = completed_by_category.get("Cognate", 0)
+    unit_values = {
+        category: category_rows.get(category, {}).get("completed_units")
+        for category in PRACTICUM_ELIGIBILITY_CONFIG["unit_requirements"]
+    }
     total = audit.get("completed_units", 0)
-    checklist = [
-        {"key": "basic", "label": "Basic units completed", "actual": basic, "required": 6, "complete": basic >= 6},
-        {"key": "major", "label": "Major units completed", "actual": major, "required": 9, "complete": major >= 9},
-        {"key": "cognate", "label": "Cognate units completed", "actual": cognate, "required": 6, "complete": cognate >= 6},
-        {"key": "total", "label": "Total units completed", "actual": total, "required": 21, "complete": total >= 21},
-        {"key": "title", "label": "Title stage completed", "complete": title_completed},
-        {"key": "proposal", "label": "Proposal stage completed", "complete": proposal_completed},
-        {"key": "ethics", "label": "Ethics stage completed", "complete": ethics_completed},
-        {"key": "final", "label": "Final stage completed", "complete": final_completed},
-    ]
-    eligible = bool(student.program.has_practicum and student.standing == "Active" and all(item["complete"] for item in checklist))
+    checklist = []
+    for category, required in PRACTICUM_ELIGIBILITY_CONFIG["unit_requirements"].items():
+        actual = unit_values[category]
+        checklist.append(eligibility_item(
+            category.lower(),
+            f"{category} units completed",
+            required,
+            actual if actual is not None else "No source data",
+            None if actual is None else actual >= required,
+            f"course_audit.by_category.{category}",
+            "Curriculum category is not present in the encoded program." if actual is None else "",
+        ))
+    total_required = PRACTICUM_ELIGIBILITY_CONFIG["total_units_required"]
+    checklist.append(eligibility_item(
+        "total",
+        "Total units completed",
+        total_required,
+        total if audit.get("required_count") else "No curriculum data",
+        None if not audit.get("required_count") else total >= total_required,
+        "course_audit.completed_units",
+        "No encoded curriculum is available for verification." if not audit.get("required_count") else "",
+    ))
+    stage_results = {}
+    for rule in PRACTICUM_ELIGIBILITY_CONFIG["stage_requirements"]:
+        passed = stage_evidence[rule["key"]]
+        if not passed and stage_known:
+            passed = stage_index >= STAGES.index(rule["minimum_stage"])
+        actual = student.current_stage if stage_known else case.current_gate if case else "No source data"
+        result = None if not stage_known and not case else bool(passed)
+        stage_results[rule["key"]] = result is True
+        checklist.append(eligibility_item(
+            rule["key"],
+            rule["label"],
+            "Completed",
+            actual,
+            result,
+            "student.current_stage / research_case.current_gate",
+            "Academic/research milestone data needs verification." if result is None else "",
+        ))
+
+    needs_verification = any(item["passed"] is None for item in checklist)
+    eligible = bool(
+        student.program.has_practicum
+        and student.standing == "Active"
+        and not needs_verification
+        and all(item["passed"] is True for item in checklist)
+    )
+    status = "Eligible" if eligible else "Needs verification" if needs_verification else "Not eligible"
     return {
         "eligible": eligible,
-        "status": "Eligible for Practicum" if eligible else "Not Eligible",
-        "basic_units_completed": basic,
-        "major_units_completed": major,
-        "cognate_units_completed": cognate,
+        "status": status,
+        "basic_units_completed": unit_values["Basic"],
+        "major_units_completed": unit_values["Major"],
+        "cognate_units_completed": unit_values["Cognate"],
         "total_units_completed": total,
-        "title_completed": title_completed,
-        "proposal_completed": proposal_completed,
-        "ethics_completed": ethics_completed,
-        "final_completed": final_completed,
+        "title_completed": stage_results["title"],
+        "proposal_completed": stage_results["proposal"],
+        "ethics_completed": stage_results["ethics"],
+        "final_completed": stage_results["final"],
+        "needs_verification": needs_verification,
+        "config": PRACTICUM_ELIGIBILITY_CONFIG,
         "checklist": checklist,
     }
 
 
 PRACTICUM_TIMELINE = [
-    "Eligible for Practicum",
+    "MOA Preparation",
     "MOA Submitted",
     "MOA Under Review",
     "Practicum In Progress",
     "Documents Submitted",
+    "Documents Under Review",
     "Hours Incomplete",
     "Additional Certificates Requested",
-    "Completed",
-    "Sent to Dean",
+    "Practicum Completion Recorded",
+    "Status Report Sent to Dean",
     "Dean Reviewed",
 ]
 
 
 def practicum_timeline(record: PracticumRecord | None, eligibility: dict) -> list[dict]:
-    if not eligibility["eligible"]:
-        return [{"label": "Not Eligible", "state": "current"}] + [
-            {"label": label, "state": "upcoming"} for label in PRACTICUM_TIMELINE
-        ]
     status_alias = {
         "MOA Received": "MOA Submitted",
         "Under Review": "MOA Under Review",
-        "Report Sent to Dean": "Sent to Dean",
+        "Completed": "Practicum Completion Recorded",
+        "Report Sent to Dean": "Status Report Sent to Dean",
     }
-    current = status_alias.get(record.status if record else "", record.status if record else "Eligible for Practicum")
+    current = status_alias.get(record.status if record else "", record.status if record else "MOA Preparation")
     if record and record.document_status in {"Uploaded", "Pending Review", "Verified"} and current in {"MOA Submitted", "MOA Under Review", "Practicum In Progress"}:
         current = "Documents Submitted"
     current_index = PRACTICUM_TIMELINE.index(current) if current in PRACTICUM_TIMELINE else 0
@@ -3689,11 +4184,13 @@ def practicum_timeline(record: PracticumRecord | None, eligibility: dict) -> lis
 def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: Student) -> None:
     record.moa_status = (data.get("moa_status") or record.moa_status or "Pending Review").strip()
     record.practicum_site = (data.get("practicum_site") or data.get("site") or record.practicum_site or "").strip()
+    record.supervisor_name = (data.get("supervisor_name") or record.supervisor_name or "").strip()
     record.required_hours = max(safe_int(data.get("required_hours"), record.required_hours or 0), 0)
     record.completed_hours = max(safe_int(data.get("completed_hours"), record.completed_hours or 0), 0)
     record.certificate_count = max(safe_int(data.get("certificate_count"), record.certificate_count or 0), 0)
     record.document_status = (data.get("document_status") or record.document_status or "Pending Review").strip()
     record.remarks = (data.get("remarks") or record.remarks or "").strip()
+    record.completion_status = (data.get("completion_status") or record.completion_status or "Pending").strip()
     moa_attachment = request_attachment_from_payload(student, "practicum", data)
     if moa_attachment:
         record.moa_attachment_id = moa_attachment.id
@@ -3729,7 +4226,9 @@ def apply_withdrawal_payload(application: WithdrawalApplication, data: MultiDict
     application.effective_term = (data.get("effective_term") or application.effective_term or "").strip()
     application.fee_status = (data.get("fee_status") or application.fee_status or "Pending").strip()
     application.requirement_status = (data.get("requirement_status") or application.requirement_status or "Pending").strip()
-    application.dean_decision = (data.get("dean_decision") or application.dean_decision or "Pending").strip()
+    # Dean decisions are accepted only through the Dean approval endpoint.
+    # Staff actions below record routing and follow-through without impersonating
+    # the approving role.
     application.staff_remarks = (data.get("staff_remarks") or application.staff_remarks or "").strip()
     application.academic_coordinator_remarks = (
         data.get("academic_coordinator_remarks") or application.academic_coordinator_remarks or ""
@@ -3761,7 +4260,8 @@ def graduation_eligibility(student: Student) -> dict:
         f"{row['course'].code} - {row['course'].title}"
         for row in audit["missing"] + audit["incomplete"]
     ]
-    coursework_complete = audit["missing_count"] == 0 and audit["eligibility"].get("units_complete")
+    coursework_known = audit.get("required_count", 0) > 0
+    coursework_complete = coursework_known and audit["missing_count"] == 0 and audit["eligibility"].get("units_complete")
 
     research_case = (
         ResearchCase.query.filter_by(student_id=student.id)
@@ -3770,6 +4270,7 @@ def graduation_eligibility(student: Student) -> dict:
     )
     research_missing = []
     research_complete = False
+    research_known = research_case is not None
     if research_case:
         completion_payload = research_milestone_payload(student, "Completion Evidence")
         research_missing = [
@@ -3784,10 +4285,12 @@ def graduation_eligibility(student: Student) -> dict:
     practicum_required = bool(student.program.has_practicum)
     practicum_record = latest_practicum_record(student.id)
     practicum_complete = not practicum_required
+    practicum_known = not practicum_required
     missing_practicum = ""
     practicum_status = "Not Required"
     if practicum_required:
         if practicum_record:
+            practicum_known = True
             enough_hours = (practicum_record.completed_hours or 0) >= (practicum_record.required_hours or 0)
             practicum_complete = enough_hours and practicum_record.status in {"Completed", "Report Sent to Dean", "Dean Reviewed"}
             practicum_status = practicum_record.status
@@ -3804,28 +4307,80 @@ def graduation_eligibility(student: Student) -> dict:
         Task.student_id == student.id,
         Task.status.in_(["Pending", "Overdue"]),
     ).order_by(Task.due_at.asc()).all()
-    eligible = coursework_complete and research_complete and practicum_complete
-    if missing_coursework:
+    checklist = [
+        eligibility_item(
+            "coursework",
+            "Course units completed",
+            audit.get("total_units") or "Encoded curriculum total",
+            audit.get("completed_units") if coursework_known else "No curriculum data",
+            coursework_complete if coursework_known else None,
+            "course_audit.completed_units",
+            "Coursework source data needs verification." if not coursework_known else "",
+        ),
+        eligibility_item(
+            "thesis",
+            "Thesis / research completion",
+            "Verified completion evidence",
+            research_case.status if research_case else "No research case",
+            research_complete if research_known else None,
+            "research_case + completion document checks",
+            "Research completion source data needs verification." if not research_known else "",
+        ),
+        eligibility_item(
+            "practicum",
+            "Practicum completed",
+            "Completed" if practicum_required else "Not required",
+            practicum_status,
+            practicum_complete if practicum_known else None,
+            "program.has_practicum + practicum_record",
+            "Practicum completion needs verification." if not practicum_known else "",
+        ),
+        eligibility_item(
+            "documents",
+            "Required completion documents",
+            "Complete",
+            "Complete" if research_complete else f"{len(research_missing)} item(s) unresolved",
+            research_complete if research_known else None,
+            "document_check.Completion Evidence",
+            "Exact certificate requirements remain subject to GS office confirmation.",
+        ),
+    ]
+    needs_verification = any(item["passed"] is None for item in checklist)
+    eligible = all(item["passed"] is True for item in checklist)
+    overall_status = "Eligible" if eligible else "Needs verification" if needs_verification else "Not eligible"
+    if not coursework_known:
+        next_owner = "Academic Coordinator"
+        next_action = "Verify the graduation coursework source data"
+    elif missing_coursework:
         next_owner = "Academic Coordinator"
         next_action = "Resolve graduation missing coursework"
+    elif not research_known:
+        next_owner = "Research Coordinator"
+        next_action = "Verify the graduation research source data"
     elif research_missing:
         next_owner = "Research Coordinator"
         next_action = "Resolve graduation missing research requirements"
-    elif missing_practicum:
+    elif practicum_required and not practicum_known:
+        next_owner = "Academic Coordinator"
+        next_action = "Verify practicum completion for graduation"
+    elif practicum_required and not practicum_complete:
         next_owner = "Student"
-        next_action = "Complete practicum requirements"
+        next_action = "Complete the practicum requirement before graduation endorsement"
     else:
         next_owner = "Graduate School Staff"
         next_action = "Prepare graduation endorsement list"
 
     return {
         "eligible": bool(eligible),
-        "coursework_status": "Complete" if coursework_complete else "Incomplete",
-        "research_status": "Complete" if research_complete else "Incomplete",
+        "status": overall_status,
+        "needs_verification": needs_verification,
+        "coursework_status": "Complete" if coursework_complete else "Needs verification" if not coursework_known else "Incomplete",
+        "research_status": "Complete" if research_complete else "Needs verification" if not research_known else "Incomplete",
         "practicum_status": practicum_status if practicum_required else "Not Required",
         "missing_coursework": missing_coursework,
         "missing_research_requirements": research_missing,
         "missing_practicum_requirement": missing_practicum,
+        "checklist": checklist,
         "pending_tasks": [task_dict(task) for task in open_tasks],
         "next_owner": next_owner,
         "next_action": next_action,
@@ -3854,8 +4409,199 @@ def graduation_notes(endorsement: GraduationEndorsement) -> str:
     )
 
 
+def workflow_case_record(slug: str, student_id: int):
+    if slug == "practicum":
+        return latest_practicum_record(student_id)
+    if slug == "withdrawal":
+        return latest_withdrawal_application(student_id)
+    if slug == "graduation":
+        return latest_graduation_endorsement(student_id)
+    return None
+
+
+def workflow_record_status(slug: str, record) -> str:
+    if not record:
+        return "Not Submitted"
+    return record.endorsement_status if slug == "graduation" else record.status
+
+
+def set_workflow_record_status(slug: str, record, status: str) -> None:
+    if slug == "graduation":
+        record.endorsement_status = status
+    else:
+        record.status = status
+    if hasattr(record, "updated_at"):
+        record.updated_at = now_utc()
+
+
+def latest_open_student_return(slug: str, student_id: int) -> WorkflowMessage | None:
+    return (
+        WorkflowMessage.query.filter_by(
+            transaction_slug=slug,
+            student_id=student_id,
+            recipient_role="Student",
+            action_type="return",
+            status="Open",
+        )
+        .order_by(WorkflowMessage.created_at.desc(), WorkflowMessage.id.desc())
+        .first()
+    )
+
+
+def resolve_student_returns(slug: str, student_id: int) -> None:
+    """Close visible return notices after the student successfully resubmits."""
+    for message in WorkflowMessage.query.filter_by(
+        transaction_slug=slug,
+        student_id=student_id,
+        recipient_role="Student",
+        action_type="return",
+        status="Open",
+    ).all():
+        message.status = "Responded"
+        message.resolved_at = now_utc()
+
+
+def practicum_student_submission_stage(record: PracticumRecord | None) -> str:
+    """Identify the only practicum form section a student may edit now."""
+    if not record:
+        return "moa"
+    status = record.status
+    if status == "Returned for Clarification":
+        returned = latest_open_student_return("practicum", record.student_id)
+        prior = returned.previous_status if returned else ""
+        return "completion" if prior in {
+            "Practicum In Progress", "Hours Incomplete", "Documents Submitted",
+            "Documents Under Review", "Additional Certificates Requested", "Completed",
+        } or record.certificate_attachment_id else "moa"
+    if status in {"Practicum In Progress", "Hours Incomplete", "Additional Certificates Requested"}:
+        return "completion"
+    return "locked"
+
+
+def workflow_backflow_status(slug: str, record, recipient_label: str, previous_status: str) -> str:
+    """Move a returned case to the recipient's real swimlane without losing data."""
+    if recipient_label == "Student":
+        return "Returned for Clarification"
+    if slug == "practicum":
+        completion_side = previous_status in {
+            "Practicum In Progress", "Hours Incomplete", "Documents Submitted",
+            "Documents Under Review", "Additional Certificates Requested", "Completed",
+            "Report Sent to Dean", "Dean Reviewed",
+        }
+        return {
+            "Graduate School Staff": "Documents Submitted" if completion_side else "MOA Submitted",
+            "Academic Coordinator": "Documents Under Review" if completion_side else "MOA Under Review",
+            "Dean": "Report Sent to Dean",
+        }.get(recipient_label, previous_status)
+    if slug == "withdrawal":
+        return {
+            "Graduate School Staff": "Submitted to GS Staff",
+            "Academic Coordinator": "Approved - Follow-through",
+            "Dean": "Dean Review",
+            "Registrar": "Registrar Review",
+        }.get(recipient_label, previous_status)
+    return {
+        "Graduate School Staff": "Endorsement Prepared" if previous_status in {
+            "Ready for Dean Review", "Returned for Revision", "Dean Approved",
+            "Sent to Registrar", "Registrar Received",
+        } else "For Review",
+        "Academic Coordinator": "Coursework Review",
+        "Research Coordinator": "Research Review",
+        "Dean": "Ready for Dean Review",
+        "Registrar": "Sent to Registrar",
+    }.get(recipient_label, previous_status)
+
+
+def create_workflow_message(
+    slug: str,
+    student: Student,
+    account: UserAccount,
+    recipient_label: str,
+    template: str,
+    comment: str,
+    action_type: str,
+) -> WorkflowMessage:
+    if recipient_label not in WORKFLOW_RECIPIENTS:
+        raise ValueError("Choose a valid message recipient or workflow stage.")
+    if template not in WORKFLOW_MESSAGE_TEMPLATES:
+        raise ValueError("Choose a valid message template.")
+    if template in {"Other", "Other / Custom comment"} and not comment.strip():
+        raise ValueError("Enter a custom comment when the Other template is selected.")
+    if action_type not in {"note", "return", "forward", "response"}:
+        raise ValueError("Choose a valid message action.")
+
+    record = workflow_case_record(slug, student.id)
+    if not record:
+        raise ValueError("This student does not have an active request in this workflow.")
+    previous_status = workflow_record_status(slug, record)
+    new_status = previous_status
+    if action_type == "return":
+        new_status = workflow_backflow_status(slug, record, recipient_label, previous_status)
+        set_workflow_record_status(slug, record, new_status)
+    elif action_type == "response":
+        latest_return = (
+            WorkflowMessage.query.filter_by(
+                transaction_slug=slug,
+                student_id=student.id,
+                action_type="return",
+                status="Open",
+            )
+            .order_by(WorkflowMessage.created_at.desc(), WorkflowMessage.id.desc())
+            .first()
+        )
+        if not latest_return:
+            raise ValueError("There is no open clarification request to answer.")
+        new_status = latest_return.previous_status or previous_status
+        set_workflow_record_status(slug, record, new_status)
+        latest_return.status = "Responded"
+        latest_return.resolved_at = now_utc()
+
+    message = WorkflowMessage(
+        transaction_slug=slug,
+        student_id=student.id,
+        sender_role=ROLE_LABELS.get(account.role, account.role),
+        sender_name=account.full_name,
+        recipient_role=recipient_label,
+        template=template,
+        comment=comment.strip(),
+        action_type=action_type,
+        previous_status=previous_status,
+        new_status=new_status,
+        status="Responded" if action_type == "response" else "Open",
+        resolved_at=now_utc() if action_type == "response" else None,
+    )
+    db.session.add(message)
+
+    action_label = {
+        "return": "returned for clarification",
+        "forward": "forwarded with a note",
+        "response": "clarification response submitted",
+        "note": "message sent",
+    }[action_type]
+    task_title = (
+        f"Respond to {TRANSACTION_BY_SLUG[slug]['title']} clarification"
+        if action_type == "return"
+        else f"Review {TRANSACTION_BY_SLUG[slug]['title']} message"
+    )
+    add_task(student.id, task_title, recipient_label, 3, 35)
+    notes = f"{template}. {comment.strip()}".strip()
+    add_log(
+        slug,
+        student.id,
+        workflow_actor_label(account),
+        "Workflow message",
+        f"{TRANSACTION_BY_SLUG[slug]['title']} {action_label}",
+        recipient_label,
+        notes,
+        previous_status=previous_status,
+        new_status=new_status,
+    )
+    return message
+
+
 def workflow_approval_item(kind: str, item) -> dict:
     student = item.student
+    meta = workflow_case_meta(kind, student.id)
     if kind == "practicum":
         return {
             "id": item.id,
@@ -3866,6 +4612,9 @@ def workflow_approval_item(kind: str, item) -> dict:
             "student": student_brief(student),
             "submitted_at": iso(item.report_sent_at or item.updated_at),
             "details": practicum_notes(item),
+            "timeline": practicum_timeline(item, practicum_eligibility(student)),
+            "record": practicum_record_dict(item, include_student=False),
+            **meta,
         }
     if kind == "withdrawal":
         return {
@@ -3874,9 +4623,12 @@ def workflow_approval_item(kind: str, item) -> dict:
             "title": f"Withdrawal request · {student.name}",
             "subtitle": f"{student.program.code} · effective {item.effective_term or 'term pending'}",
             "status": item.dean_decision,
+            "workflow_status": item.status,
             "student": student_brief(student),
             "submitted_at": iso(item.created_at),
             "details": withdrawal_notes(item),
+            "record": withdrawal_application_dict(item, include_student=False),
+            **meta,
         }
     return {
         "id": item.id,
@@ -3888,6 +4640,13 @@ def workflow_approval_item(kind: str, item) -> dict:
         "submitted_at": iso(item.submitted_at or item.updated_at),
         "review_window": item.review_window,
         "details": graduation_notes(item),
+        "record": graduation_endorsement_dict(item, include_student=False),
+        "eligibility": {
+            "eligible": item.coursework_status == "Complete" and item.research_status == "Complete",
+            "coursework_status": item.coursework_status,
+            "research_status": item.research_status,
+        },
+        **meta,
     }
 
 
@@ -3901,7 +4660,10 @@ def workflow_approvals_payload() -> dict:
     )
     pending.extend(
         workflow_approval_item("withdrawal", item)
-        for item in WithdrawalApplication.query.filter(WithdrawalApplication.dean_decision == "Pending")
+        for item in WithdrawalApplication.query.filter(
+            WithdrawalApplication.dean_decision == "Pending",
+            WithdrawalApplication.status == "Dean Review",
+        )
         .order_by(WithdrawalApplication.created_at.asc())
         .all()
     )
@@ -3921,7 +4683,7 @@ def workflow_approvals_payload() -> dict:
     )
     recent.extend(
         workflow_approval_item("graduation", item)
-        for item in GraduationEndorsement.query.filter(GraduationEndorsement.endorsement_status.in_(["Dean Approved", "Sent to Registrar", "Returned for Revision"]))
+        for item in GraduationEndorsement.query.filter(GraduationEndorsement.endorsement_status.in_(["Dean Approved", "Sent to Registrar", "Registrar Received", "Returned for Revision"]))
         .order_by(GraduationEndorsement.updated_at.desc())
         .limit(6)
         .all()
@@ -4059,6 +4821,7 @@ def practicum_roster_payload() -> list[dict]:
             "student": student_brief(student),
             "eligibility": eligibility,
             "record": practicum_record_dict(record) if record else None,
+            "timeline": practicum_timeline(record, eligibility),
             "moa_status": record.moa_status if record else "Not Submitted",
             "documents_status": record.document_status if record else "Not Submitted",
             "hours_status": (
@@ -4071,15 +4834,16 @@ def practicum_roster_payload() -> list[dict]:
             "dean_report_status": (
                 practicum_record_dict(record, include_student=False)["dean_report_status"] if record else "Not Sent"
             ),
+            **workflow_case_meta("practicum", student.id),
         })
-    return rows
+    return sorted(rows, key=lambda item: item["last_activity_at"] or "", reverse=True)
 
 
 def withdrawal_roster_payload() -> list[dict]:
-    return [
-        withdrawal_application_dict(item)
-        for item in WithdrawalApplication.query.order_by(WithdrawalApplication.created_at.desc()).all()
-    ]
+    rows = []
+    for item in WithdrawalApplication.query.order_by(WithdrawalApplication.updated_at.desc()).all():
+        rows.append({**withdrawal_application_dict(item), **workflow_case_meta("withdrawal", item.student_id)})
+    return rows
 
 
 def graduation_candidate_payload() -> list[dict]:
@@ -4099,8 +4863,9 @@ def graduation_candidate_payload() -> list[dict]:
             "student": student_brief(student),
             "eligibility": eligibility,
             "endorsement": graduation_endorsement_dict(endorsement) if endorsement else None,
+            **workflow_case_meta("graduation", student.id),
         })
-    return rows
+    return sorted(rows, key=lambda item: item["last_activity_at"] or "", reverse=True)
 
 
 def serialize_transaction_context(slug: str, selected_student_id: int | None, specialization: str = "") -> dict:
@@ -4110,11 +4875,12 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
     if slug != "student-handoff" and selected_student_id:
         selected_student = Student.query.get(selected_student_id)
 
+    activity_query = TransactionLog.query if slug in {"practicum", "withdrawal", "graduation"} else human_activity_query()
     recent_logs = (
-        human_activity_query()
+        activity_query
         .filter(TransactionLog.transaction_slug == slug)
         .order_by(TransactionLog.created_at.desc())
-        .limit(8)
+        .limit(30)
         .all()
     )
 
@@ -4123,6 +4889,10 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         "transaction": TRANSACTION_BY_SLUG[slug],
         "selected_student": student_brief(selected_student) if selected_student else None,
         "recent_logs": [log_dict(l) for l in recent_logs],
+        "message_templates": WORKFLOW_MESSAGE_TEMPLATES,
+        "message_recipients": list(WORKFLOW_RECIPIENTS),
+        "deployment_policy_questions": DEPLOYMENT_POLICY_QUESTIONS,
+        "eligibility_config": PRACTICUM_ELIGIBILITY_CONFIG,
         "gate_requirements": {
             gate: required_documents_for_gate(gate)
             for gate in [
@@ -4463,7 +5233,17 @@ def merge_student_records(target: Student, source: Student, overwrite_profile: b
     return moved
 
 
-def add_log(slug: str, student_id: int | None, actor: str, source: str, result: str, next_owner: str, notes: str) -> None:
+def add_log(
+    slug: str,
+    student_id: int | None,
+    actor: str,
+    source: str,
+    result: str,
+    next_owner: str,
+    notes: str,
+    previous_status: str | None = None,
+    new_status: str | None = None,
+) -> None:
     # Every workflow records what happened, who acted, where the evidence came
     # from, and who owns the next action.
     db.session.add(
@@ -4475,6 +5255,8 @@ def add_log(slug: str, student_id: int | None, actor: str, source: str, result: 
             result=result,
             next_owner=next_owner,
             notes=notes,
+            previous_status=previous_status,
+            new_status=new_status,
         )
     )
 
@@ -5357,22 +6139,63 @@ def handle_practicum(data: MultiDict) -> int:
         db.session.add(record)
     apply_practicum_payload(record, data, student)
     requested_status = (data.get("status") or "").strip()
+    previous_status = record.status
 
-    if requested_status in {"MOA Under Review", "Practicum In Progress"}:
+    if requested_status == "MOA Under Review":
+        account = require_workflow_actor("staff")
+        if record.status not in {"MOA Submitted", "MOA Received"}:
+            raise ValueError("Only a submitted MOA can be forwarded to the Academic Coordinator.")
         record.status = requested_status
-        record.moa_status = "Under Review" if requested_status == "MOA Under Review" else "Verified"
+        record.moa_status = "Under Review"
         next_owner = "Academic Coordinator"
-        add_task(student.id, "Review practicum MOA and certificates", "Academic Coordinator", 5, 30)
+        add_task(student.id, "Receive and review practicum MOA", "Academic Coordinator", 5, 30)
+    elif requested_status == "Practicum In Progress":
+        account = require_workflow_actor("academic_coordinator")
+        if record.status != "MOA Under Review":
+            raise ValueError("The MOA must be forwarded by GS Staff before Academic Coordinator review.")
+        record.status = requested_status
+        record.moa_status = "Verified"
+        next_owner = "Student"
+        add_task(student.id, "Complete practicum hours and prepare certificates", "Student", 14, 30)
+    elif requested_status == "Documents Under Review":
+        account = require_workflow_actor("staff")
+        if record.status not in {"Hours Incomplete", "Documents Submitted"}:
+            raise ValueError("Only submitted practicum documents can be forwarded to the Academic Coordinator.")
+        if not record.certificate_attachment_id:
+            raise ValueError("Practicum documents must be submitted before they can be forwarded for review.")
+        record.status = "Documents Under Review"
+        next_owner = "Academic Coordinator"
+        add_task(student.id, "Review practicum certificates and hours", "Academic Coordinator", 5, 45)
     elif requested_status in {"Hours Incomplete", "Additional Certificates Requested"}:
+        account = require_workflow_actor("academic_coordinator")
+        if record.status != "Documents Under Review":
+            raise ValueError("GS Staff must forward the practicum documents before certificates can be reviewed.")
         record.status = "Additional Certificates Requested"
         add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
         student.risk_level = "Medium"
         next_owner = "Student"
+        record.completion_status = "Incomplete - additional evidence required"
+    elif requested_status == "Not Accepted - New Organization Required":
+        account = require_workflow_actor("academic_coordinator")
+        if record.status not in {"Documents Under Review", "Completed"}:
+            raise ValueError("Review submitted practicum documents before recording a non-accepted completion.")
+        record.status = requested_status
+        record.completion_status = "Not accepted - another organization required"
+        add_task(student.id, "Arrange another practicum organization and submit an updated MOA", "Student", 10, 55)
+        student.risk_level = "Medium"
+        next_owner = "Student"
     elif requested_status == "Dean Reviewed":
+        account = require_workflow_actor("dean")
         record.status = "Dean Reviewed"
         record.dean_reviewed_at = now_utc()
         next_owner = "Graduate School Staff"
     elif requested_status in {"Report Sent to Dean", "Completed"}:
+        account = require_workflow_actor("academic_coordinator")
+        expected_status = "Completed" if requested_status == "Report Sent to Dean" else None
+        if expected_status and record.status != expected_status:
+            raise ValueError("Record practicum completion before sending the status report to the Dean.")
+        if requested_status == "Completed" and record.status not in {"Documents Under Review", "Practicum In Progress"}:
+            raise ValueError("The Academic Coordinator must receive the submitted documents before recording completion.")
         if record.completed_hours < record.required_hours:
             raise ValueError("Practicum cannot be completed until the required hours are met.")
         if record.document_status not in {"Verified", "Complete"} and requested_status == "Report Sent to Dean":
@@ -5380,23 +6203,26 @@ def handle_practicum(data: MultiDict) -> int:
         record.status = requested_status
         if requested_status == "Report Sent to Dean":
             record.report_sent_at = record.report_sent_at or now_utc()
+            record.completion_status = "Completed and accepted"
             add_task(student.id, "Review practicum status report", "Dean", 5, 35)
             next_owner = "Dean"
         else:
             record.document_status = "Verified"
+            record.completion_status = "Completed hours pending report review"
             next_owner = "Academic Coordinator"
     else:
-        record.status = requested_status or record.status or "MOA Submitted"
-        next_owner = "Graduate School Staff"
+        raise ValueError("Choose the next available practicum workflow action.")
 
     add_log(
         "practicum",
         student.id,
-        "Graduate School Staff / Academic Coordinator",
+        workflow_actor_label(account),
         data.get("source_reference", "") or (record.moa_attachment.original_name if record.moa_attachment else "Practicum workflow"),
         f"Practicum status updated: {record.status}",
         next_owner,
         practicum_notes(record),
+        previous_status=previous_status,
+        new_status=record.status,
     )
     return student.id
 
@@ -5405,57 +6231,96 @@ def handle_withdrawal(data: MultiDict) -> int:
     student = Student.query.get_or_404(int(data["student_id"]))
     application = latest_withdrawal_application(student.id)
     if not application:
-        application = WithdrawalApplication(student_id=student.id)
-        db.session.add(application)
+        raise ValueError("The student must submit a withdrawal request before staff can process it.")
     apply_withdrawal_payload(application, data)
+    previous_status = application.status
 
-    if application.dean_decision == "Denied":
-        application.status = "Denied"
-        student.standing = "Active"
-        if student.current_stage == "Withdrawal In Progress":
-            student.current_stage = "Coursework"
-        next_owner = "Graduate School Staff"
-        result = "Withdrawal denied; student informed and remains Active"
-    elif application.dean_decision == "Returned":
-        application.status = "Returned"
-        next_owner = "Student"
-        result = "Withdrawal returned for revision"
-        add_task(student.id, "Revise withdrawal request", "Student", 5, 35)
-    elif application.dean_decision == "Approved":
-        student.current_stage = "Withdrawal In Progress"
-        if application.requirement_status != "Complete":
-            application.status = "Requirements Pending"
-            next_owner = "Student"
-            result = "Withdrawal approved; waiting for student requirements"
-            add_task(student.id, "Complete withdrawal requirements", "Student", 7, 40)
-        elif application.fee_status != "Cleared" or application.registrar_status not in {"Confirmed", "Record Updated"}:
-            application.status = "Registrar Review"
-            next_owner = "Registrar"
-            result = "Withdrawal requirements complete; registrar confirmation needed"
-            add_task(student.id, "Confirm fee status / update withdrawal record", "Registrar", 5, 45)
-        else:
-            application.status = "Withdrawn Confirmed"
-            application.completed_at = application.completed_at or now_utc()
-            student.standing = "Withdrawn"
-            student.current_stage = "Withdrawn"
-            student.enrollment_tag = "Withdrawn"
-            next_owner = "Graduate School Staff"
-            result = "Confirmed withdrawal recorded; student is now withdrawn"
-            add_task(student.id, "Record confirmed withdrawal notice", "Graduate School Staff", 2, 30)
-    else:
+    action = (data.get("workflow_action") or "").strip()
+    if action == "forward_to_dean":
+        account = require_workflow_actor("staff")
+        if application.dean_decision != "Pending" or application.status != "Submitted to GS Staff":
+            raise ValueError("Only a newly submitted withdrawal request can be forwarded to the Dean.")
         application.status = "Dean Review"
         next_owner = "Dean"
-        result = "Withdrawal request recorded for Dean review"
+        result = "Withdrawal request recorded and forwarded to the Dean"
         add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+    elif action == "coordinator_follow_through":
+        account = require_workflow_actor("academic_coordinator")
+        if application.dean_decision != "Approved" or application.status != "Approved - Follow-through":
+            raise ValueError("Coordinator follow-through is available only after Dean approval.")
+        student.current_stage = "Withdrawal In Progress"
+        application.status = "Coordinator Follow-through Complete"
+        next_owner = "Graduate School Staff"
+        result = "Academic Coordinator follow-through recorded and approval sent to GS Staff"
+        add_task(student.id, "Inform student of approved withdrawal and requirements", "Graduate School Staff", 3, 40)
+    elif action == "notify_student_of_approval":
+        account = require_workflow_actor("staff")
+        if application.status != "Coordinator Follow-through Complete":
+            raise ValueError("Academic Coordinator follow-through must be complete before informing the student.")
+        application.status = "Requirements Pending"
+        next_owner = "Student"
+        result = "GS Staff informed the student of approval and required completion documents"
+        add_task(student.id, "Complete withdrawal requirements", "Student", 7, 40)
+    elif action == "verify_requirements":
+        account = require_workflow_actor("staff")
+        if application.status != "Requirements Submitted" or not application.proof_attachment_id:
+            raise ValueError("The student must submit the withdrawal form and proof before staff verification.")
+        application.requirement_status = "Complete"
+        application.status = "Registrar Review"
+        next_owner = "Registrar"
+        result = "Withdrawal form and proof verified; Registrar fee confirmation requested"
+        add_task(student.id, "Confirm withdrawal fee status", "Registrar", 5, 45)
+    elif action == "return_requirements":
+        account = require_workflow_actor("staff")
+        if application.status != "Requirements Submitted":
+            raise ValueError("Only submitted withdrawal requirements can be returned for completion.")
+        application.requirement_status = "Incomplete"
+        application.status = "Requirements Pending"
+        next_owner = "Student"
+        result = "Withdrawal requirements marked incomplete and returned to the student"
+        add_task(student.id, "Complete and resubmit withdrawal requirements", "Student", 5, 45)
+    elif action == "record_fee_clearance":
+        account = require_workflow_actor("registrar")
+        if application.status != "Registrar Review" or application.requirement_status != "Complete":
+            raise ValueError("Verify the withdrawal requirements before recording Registrar fee clearance.")
+        application.fee_status = "Cleared"
+        application.registrar_status = "Fee Confirmed"
+        application.status = "Fee Cleared"
+        next_owner = "Graduate School Staff"
+        result = "Registrar fee status confirmed; final GS requirements confirmation is ready"
+    elif action == "confirm_withdrawal":
+        account = require_workflow_actor("staff")
+        if application.status != "Fee Cleared" or application.fee_status != "Cleared" or application.requirement_status != "Complete":
+            raise ValueError("Requirements and Registrar fee clearance must be complete before confirming withdrawal.")
+        application.status = "Withdrawal Confirmed"
+        next_owner = "Registrar"
+        result = "GS Staff recorded the confirmed withdrawal and informed the student; Registrar record update requested"
+        add_task(student.id, "Update the student record for confirmed withdrawal", "Registrar", 3, 45)
+    elif action == "record_registrar_update":
+        account = require_workflow_actor("registrar")
+        if application.status != "Withdrawal Confirmed":
+            raise ValueError("GS Staff must confirm the completed withdrawal before the Registrar record update.")
+        application.registrar_status = "Record Updated"
+        application.status = "Withdrawn Confirmed"
+        application.completed_at = application.completed_at or now_utc()
+        student.standing = "Withdrawn"
+        student.current_stage = "Withdrawn"
+        student.enrollment_tag = "Withdrawn"
+        next_owner = "Graduate School Staff"
+        result = "Registrar update recorded; student is now withdrawn"
+    else:
+        raise ValueError("Choose the next available withdrawal workflow action.")
 
     add_log(
         "withdrawal",
         student.id,
-        "Graduate School Staff",
+        workflow_actor_label(account),
         data.get("source_reference", "") or "Withdrawal workflow",
         result,
         next_owner,
         withdrawal_notes(application),
+        previous_status=previous_status,
+        new_status=application.status,
     )
     return student.id
 
@@ -5466,6 +6331,7 @@ def handle_graduation(data: MultiDict) -> int:
     if not endorsement:
         endorsement = GraduationEndorsement(student_id=student.id)
         db.session.add(endorsement)
+    previous_status = endorsement.endorsement_status
     eligibility = graduation_eligibility(student)
     apply_graduation_eligibility(endorsement, eligibility)
     endorsement.review_window = (data.get("review_window") or endorsement.review_window or "Current review window").strip()
@@ -5475,42 +6341,186 @@ def handle_graduation(data: MultiDict) -> int:
     if data.get("registrar_status"):
         endorsement.registrar_status = data.get("registrar_status")
 
-    if not eligibility["eligible"]:
+    if requested_status == "Coursework Review":
+        account = require_workflow_actor("staff")
+        if endorsement.endorsement_status not in {"For Review", "Not Eligible"}:
+            raise ValueError("GS Staff can start coursework review only for a compiled or previously ineligible candidate.")
+        endorsement.endorsement_status = "Coursework Review"
+        next_owner = "Academic Coordinator"
+        result = "Graduation candidate list compiled and sent for coursework review"
+        add_task(student.id, "Check graduation coursework completion", "Academic Coordinator", 5, 45)
+    elif requested_status == "Research Review":
+        account = require_workflow_actor("academic_coordinator")
+        if endorsement.endorsement_status != "Coursework Review":
+            raise ValueError("GS Staff must send the candidate for coursework review first.")
+        if eligibility["coursework_status"] != "Complete":
+            endorsement.endorsement_status = "Coursework Incomplete"
+            next_owner = "Graduate School Staff"
+            result = "Coursework reviewed as incomplete; missing coursework sent to GS Staff"
+            add_task(student.id, "List missing graduation coursework and inform the student", "Graduate School Staff", 5, 35)
+        else:
+            endorsement.endorsement_status = "Research Review"
+            next_owner = "Research Coordinator"
+            result = "Coursework completion verified and candidate sent for research validation"
+            add_task(student.id, "Validate graduation research completion evidence", "Research Coordinator", 5, 45)
+    elif requested_status == "Eligibility Confirmed":
+        account = require_workflow_actor("research_coordinator")
+        if endorsement.endorsement_status != "Research Review":
+            raise ValueError("The Academic Coordinator must verify coursework before research validation.")
+        if eligibility["research_status"] != "Complete":
+            endorsement.endorsement_status = "Research Incomplete"
+            next_owner = "Graduate School Staff"
+            result = "Research requirements reviewed as incomplete; missing evidence sent to GS Staff"
+            add_task(student.id, "List missing graduation research requirements and inform the student", "Graduate School Staff", 5, 35)
+        elif eligibility["practicum_status"] not in {"Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"}:
+            endorsement.endorsement_status = "Practicum Incomplete"
+            next_owner = eligibility["next_owner"]
+            result = "Practicum completion is incomplete or needs verification before endorsement"
+            add_task(student.id, eligibility["next_action"], eligibility["next_owner"], 5, 35)
+        else:
+            endorsement.endorsement_status = "Eligibility Confirmed"
+            next_owner = "Graduate School Staff"
+            result = "Coursework and research requirements validated for endorsement preparation"
+            add_task(student.id, "Prepare graduation endorsement list", "Graduate School Staff", 5, 45)
+    elif requested_status == "Not Eligible":
+        account = require_workflow_actor("staff")
+        if endorsement.endorsement_status not in {"Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"}:
+            raise ValueError("A coordinator review must identify missing requirements before GS Staff records ineligibility.")
         endorsement.endorsement_status = "Not Eligible"
-        next_owner = eligibility["next_owner"]
-        result = "Graduation candidate marked not eligible; missing requirements listed"
-        add_task(student.id, eligibility["next_action"], next_owner, 7, 35)
+        next_owner = "Student"
+        result = "Missing graduation requirements listed; student recorded as not eligible"
+    elif requested_status == "Endorsement Prepared":
+        account = require_workflow_actor("staff")
+        if endorsement.endorsement_status != "Eligibility Confirmed":
+            raise ValueError("Coursework and research reviews must be complete before preparing the endorsement list.")
+        endorsement.endorsement_status = "Endorsement Prepared"
+        next_owner = "Graduate School Staff"
+        result = "Graduation endorsement list prepared"
     elif requested_status == "Ready for Dean Review":
+        account = require_workflow_actor("staff")
+        if endorsement.endorsement_status not in {"Endorsement Prepared", "Returned for Revision"}:
+            raise ValueError("Prepare or revise the endorsement list before sending it to the Dean.")
         endorsement.endorsement_status = "Ready for Dean Review"
         endorsement.submitted_at = now_utc()
         next_owner = "Dean"
         result = "Graduation endorsement list prepared for Dean review"
         add_task(student.id, "Review graduation endorsement list", "Dean", 5, 55)
-    elif requested_status == "For Review":
-        endorsement.endorsement_status = "For Review"
-        next_owner = "Graduate School Staff"
-        result = "Graduation endorsement list prepared for staff review"
     elif requested_status == "Sent to Registrar":
-        raise ValueError("Only the Dean can export and hand off an approved endorsement list to the Registrar.")
-    elif requested_status == "Returned for Revision":
-        endorsement.endorsement_status = "Returned for Revision"
+        raise ValueError("Use the export action on a Dean-approved endorsement to hand it off to the Registrar.")
+    elif requested_status == "Registrar Received":
+        account = require_workflow_actor("registrar")
+        if endorsement.endorsement_status != "Sent to Registrar":
+            raise ValueError("The endorsed list must be sent to the Registrar before receipt can be recorded.")
+        endorsement.endorsement_status = "Registrar Received"
+        endorsement.registrar_status = "Received"
+        endorsement.registrar_received_at = now_utc()
         next_owner = "Graduate School Staff"
-        result = "Graduation endorsement list revised after return"
+        result = "Registrar receipt of the endorsed graduation list recorded"
     else:
-        endorsement.endorsement_status = "For Review"
-        next_owner = "Graduate School Staff"
-        result = "Graduation endorsement candidate reviewed"
+        raise ValueError("Choose the next available graduation workflow action.")
 
     add_log(
         "graduation",
         student.id,
-        "Graduate School Staff",
+        workflow_actor_label(account),
         data.get("source_reference", "") or "Graduation endorsement workflow",
         result,
         next_owner,
         graduation_notes(endorsement),
+        previous_status=previous_status,
+        new_status=endorsement.endorsement_status,
     )
     return student.id
+
+
+def reset_workflow_demo_case(slug: str, student: Student) -> dict:
+    """Remove one student's demo case without touching academic source data."""
+    request_types = {
+        "practicum": {"practicum"},
+        "withdrawal": {"withdrawal"},
+        "graduation": {"graduation", "graduation-endorsement"},
+    }[slug]
+    task_terms = {
+        "practicum": ("practicum",),
+        "withdrawal": ("withdrawal",),
+        "graduation": ("graduation", "endorsement list", "endorsed list"),
+    }[slug]
+
+    removed_records = 0
+    if slug == "practicum":
+        records = PracticumRecord.query.filter_by(student_id=student.id).all()
+        for record in records:
+            record.moa_attachment_id = None
+            record.certificate_attachment_id = None
+            db.session.delete(record)
+        removed_records = len(records)
+    elif slug == "withdrawal":
+        records = WithdrawalApplication.query.filter_by(student_id=student.id).all()
+        for application in records:
+            application.request_attachment_id = None
+            application.proof_attachment_id = None
+            db.session.delete(application)
+        removed_records = len(records)
+
+        # Withdrawal is the only reset that may need to restore lifecycle state.
+        student.standing = "Active"
+        student.enrollment_tag = "Enrolled"
+        if student.current_stage in {"Withdrawal In Progress", "Withdrawn"}:
+            research_case = (
+                ResearchCase.query.filter_by(student_id=student.id)
+                .order_by(ResearchCase.opened_at.desc())
+                .first()
+            )
+            stage_by_gate = {
+                "Form 1 - Title Defense": "Proposal Development",
+                "Form 4 - Proposal Defense Readiness": "Proposal Defense",
+                "Ethics Review": "Data Collection",
+                "Final Defense": "Final Defense",
+                "Completion Evidence": "Final Defense",
+            }
+            student.current_stage = stage_by_gate.get(research_case.current_gate, "Coursework") if research_case else "Coursework"
+    else:
+        records = GraduationEndorsement.query.filter_by(student_id=student.id).all()
+        for endorsement in records:
+            endorsement.request_attachment_id = None
+            db.session.delete(endorsement)
+        removed_records = len(records)
+
+    db.session.flush()
+
+    attachments = StudentRequestAttachment.query.filter(
+        StudentRequestAttachment.student_id == student.id,
+        StudentRequestAttachment.request_type.in_(request_types),
+    ).all()
+    stored_names = [attachment.stored_name for attachment in attachments]
+    for attachment in attachments:
+        db.session.delete(attachment)
+
+    removed_tasks = 0
+    for task in Task.query.filter_by(student_id=student.id).all():
+        if any(term in (task.title or "").lower() for term in task_terms):
+            db.session.delete(task)
+            removed_tasks += 1
+
+    removed_logs = TransactionLog.query.filter_by(
+        student_id=student.id,
+        transaction_slug=slug,
+    ).delete(synchronize_session=False)
+    removed_messages = WorkflowMessage.query.filter_by(
+        student_id=student.id,
+        transaction_slug=slug,
+    ).delete(synchronize_session=False)
+    db.session.flush()
+    recompute_risk(student)
+    return {
+        "student_id": student.id,
+        "records_removed": removed_records,
+        "attachments_removed": len(attachments),
+        "tasks_removed": removed_tasks,
+        "logs_removed": removed_logs,
+        "messages_removed": removed_messages,
+        "stored_names": stored_names,
+    }
 
 
 TRANSACTION_HANDLERS = {
@@ -7267,6 +8277,33 @@ def ensure_schedule_request_schema() -> None:
     db.session.commit()
 
 
+def ensure_workflow_activity_schema() -> None:
+    """Add auditable transition fields without resetting an existing demo DB."""
+    db.create_all()
+    inspector = inspect(db.engine)
+    if "transaction_log" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("transaction_log")}
+    additions = {
+        "previous_status": "VARCHAR(100)",
+        "new_status": "VARCHAR(100)",
+    }
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE transaction_log ADD COLUMN {name} {sql_type}"))
+    inspector = inspect(db.engine)
+    if "practicum_record" in inspector.get_table_names():
+        practicum_existing = {column["name"] for column in inspector.get_columns("practicum_record")}
+        practicum_additions = {
+            "supervisor_name": "VARCHAR(160)",
+            "completion_status": "VARCHAR(80) DEFAULT 'Pending'",
+        }
+        for name, sql_type in practicum_additions.items():
+            if name not in practicum_existing:
+                db.session.execute(text(f"ALTER TABLE practicum_record ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+
+
 def seed_database(count: int = 350) -> None:
     # Deterministic seed data keeps demos repeatable while still showing varied
     # stages, risks, documents, panels, schedules, and activity history.
@@ -7583,10 +8620,12 @@ def seed_workflow_cases() -> None:
         .all()
     )
     practicum_statuses = [
+        ("MOA Submitted", 200, 0, "Missing", 0),
+        ("Documents Under Review", 200, 200, "Pending Review", 2),
         ("Hours Incomplete", 200, 144, "Pending Review", 1),
         ("Report Sent to Dean", 200, 220, "Verified", 3),
-        ("Dean Reviewed", 200, 214, "Verified", 3),
         ("Completed", 200, 205, "Verified", 2),
+        ("Not Accepted - New Organization Required", 200, 200, "Returned", 2),
     ]
     if practicum_students:
         demo_practicum_student = practicum_students[0]
@@ -7606,18 +8645,24 @@ def seed_workflow_cases() -> None:
             db.session.add(demo_case)
         else:
             demo_case.current_gate = "Final Defense"
-    for idx, student in enumerate(practicum_students[:4]):
+    for idx, student in enumerate(practicum_students[:6]):
         status, required, completed, document_status, cert_count = practicum_statuses[idx]
         record = PracticumRecord(
             student_id=student.id,
             moa_status="Uploaded",
             moa_uploaded=True,
             practicum_site=random.choice(["USLS Center for Psychological Services", "Guidance Center", "Partner Community Clinic"]),
+            supervisor_name=random.choice(["Dr. Ana Reyes", "Maria Santos, RGC", "Paolo Cruz"]),
             required_hours=required,
             completed_hours=completed,
             document_status=document_status,
             certificate_count=cert_count,
             remarks="Seeded practicum monitoring case.",
+            completion_status=(
+                "Not accepted - another organization required" if status == "Not Accepted - New Organization Required"
+                else "Completed and accepted" if status in {"Completed", "Report Sent to Dean", "Dean Reviewed"}
+                else "Pending"
+            ),
             status=status,
             report_sent_at=now_utc() - timedelta(days=2) if status in {"Report Sent to Dean", "Dean Reviewed"} else None,
             dean_reviewed_at=now_utc() - timedelta(days=1) if status == "Dean Reviewed" else None,
@@ -7627,18 +8672,20 @@ def seed_workflow_cases() -> None:
             add_task(student.id, "Submit additional practicum certificates", "Student", 5, 45)
         if status == "Report Sent to Dean":
             add_task(student.id, "Review practicum status report", "Dean", 4, 35)
-        add_log("practicum", student.id, "Demo Data", "Seeded practicum", f"Practicum status: {status}", "Dean" if status == "Report Sent to Dean" else "Academic Coordinator", practicum_notes(record))
+        add_log("practicum", student.id, "Demo Data", "Seeded practicum", f"Practicum status: {status}", "Dean" if status == "Report Sent to Dean" else "Academic Coordinator", practicum_notes(record), previous_status="Submitted", new_status=status)
 
     withdrawal_students = (
         Student.query.filter(Student.standing == "Active")
         .order_by(Student.student_number.asc())
         .offset(10)
-        .limit(4)
+        .limit(6)
         .all()
     )
     withdrawal_cases = [
+        ("Pending", "Pending", "Pending", "Pending", "Submitted to GS Staff"),
         ("Pending", "Pending", "Pending", "Pending", "Dean Review"),
         ("Approved", "Pending", "Pending", "Pending", "Requirements Pending"),
+        ("Returned", "Incomplete", "Pending", "Pending", "Returned for Clarification"),
         ("Denied", "Pending", "Pending", "Pending", "Denied"),
         ("Approved", "Complete", "Cleared", "Record Updated", "Withdrawn Confirmed"),
     ]
@@ -7666,7 +8713,20 @@ def seed_workflow_cases() -> None:
             student.standing = "Withdrawn"
             student.current_stage = "Withdrawn"
             student.enrollment_tag = "Withdrawn"
-        add_log("withdrawal", student.id, "Demo Data", "Seeded withdrawal", f"Withdrawal status: {status}", "Dean" if dean == "Pending" else "Graduate School Staff", withdrawal_notes(application))
+        add_log("withdrawal", student.id, "Demo Data", "Seeded withdrawal", f"Withdrawal status: {status}", "Dean" if dean == "Pending" else "Graduate School Staff", withdrawal_notes(application), previous_status="Submitted", new_status=status)
+        if status == "Returned for Clarification":
+            db.session.add(WorkflowMessage(
+                transaction_slug="withdrawal",
+                student_id=student.id,
+                sender_role="Graduate School Staff",
+                sender_name="Demo GS Staff",
+                recipient_role="Student",
+                template="Missing required document",
+                comment="Please upload the signed withdrawal request form.",
+                action_type="return",
+                previous_status="Staff Review",
+                new_status="Returned for Clarification",
+            ))
 
     candidate_students = (
         Student.query.filter(Student.current_stage.in_(["Final Defense", "Completed", "Writing"]))
@@ -7731,7 +8791,7 @@ def seed_workflow_cases() -> None:
             add_task(student.id, "Review graduation endorsement list", "Dean", 4, 55)
         elif endorsement.endorsement_status == "Not Eligible":
             add_task(student.id, eligibility["next_action"], eligibility["next_owner"], 7, 35)
-        add_log("graduation", student.id, "Demo Data", "Seeded graduation endorsement", f"Graduation endorsement: {endorsement.endorsement_status}", "Dean" if endorsement.endorsement_status == "Ready for Dean Review" else eligibility["next_owner"], graduation_notes(endorsement))
+        add_log("graduation", student.id, "Demo Data", "Seeded graduation endorsement", f"Graduation endorsement: {endorsement.endorsement_status}", "Dean" if endorsement.endorsement_status == "Ready for Dean Review" else eligibility["next_owner"], graduation_notes(endorsement), previous_status="Candidate Review", new_status=endorsement.endorsement_status)
 
 
 def ensure_faculty_demo_names() -> int:
@@ -7771,17 +8831,28 @@ def ensure_faculty_demo_profiles() -> int:
 
 
 def ensure_demo_accounts() -> None:
-    staff = UserAccount.query.filter_by(email="staff@gs.local").first()
-    if not staff:
-        db.session.add(
-            UserAccount(
-                email="staff@gs.local",
-                full_name="Graduate School Staff Demo",
-                password_hash=generate_password_hash("DemoPass123!"),
-                role="staff",
-                active=True,
+    backoffice_accounts = [
+        ("staff@gs.local", "Graduate School Staff Demo", "staff"),
+        ("academic@gs.local", "Academic Coordinator Demo", "academic_coordinator"),
+        ("research@gs.local", "Research Coordinator Demo", "research_coordinator"),
+        ("registrar@gs.local", "Registrar Demo", "registrar"),
+    ]
+    for email, full_name, role in backoffice_accounts:
+        account = UserAccount.query.filter_by(email=email).first()
+        if not account:
+            db.session.add(
+                UserAccount(
+                    email=email,
+                    full_name=full_name,
+                    password_hash=generate_password_hash("DemoPass123!"),
+                    role=role,
+                    active=True,
+                )
             )
-        )
+        else:
+            account.full_name = full_name
+            account.role = role
+            account.active = True
 
     # Dean account — the approver role. Approval authority follows whoever holds
     # this role, so changing the Dean is an account change, not a code change.
@@ -7832,6 +8903,7 @@ app = create_app()
 
 with app.app_context():
     ensure_schedule_request_schema()
+    ensure_workflow_activity_schema()
 
 
 if __name__ == "__main__":

@@ -6,25 +6,35 @@ import { ErrorNote } from "../components/ui";
 
 const DEMO = {
   staff: { email: "staff@gs.local", password: "DemoPass123!" },
+  academic_coordinator: { email: "academic@gs.local", password: "DemoPass123!" },
+  research_coordinator: { email: "research@gs.local", password: "DemoPass123!" },
+  registrar: { email: "registrar@gs.local", password: "DemoPass123!" },
   dean: { email: "dean@gs.local", password: "DemoPass123!" },
   student: { email: "student@gs.local", password: "DemoPass123!" },
 };
 
-const HOME = { staff: "/", dean: "/approvals", student: "/student" };
+const HOME = { staff: "/", academic_coordinator: "/workflow/practicum", research_coordinator: "/workflow/graduation", registrar: "/workflow/withdrawal", dean: "/approvals", student: "/student" };
 const LABEL = { staff: "Staff", dean: "Dean", student: "Student" };
+const STAFF_ACCOUNTS = [
+  { role: "staff", label: "GS Staff", detail: "Intake and records" },
+  { role: "academic_coordinator", label: "Academic Coordinator", detail: "Coursework and practicum" },
+  { role: "research_coordinator", label: "Research Coordinator", detail: "Research completion" },
+  { role: "registrar", label: "Registrar", detail: "External confirmations" },
+];
 
 export default function Login() {
   const { user, login, loading, error } = useAuth();
   const navigate = useNavigate();
   const [role, setRole] = useState("staff");
+  const [staffAccount, setStaffAccount] = useState("staff");
   const [form, setForm] = useState(DEMO.staff);
   const [localError, setLocalError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    setForm(DEMO[role]);
+    setForm(DEMO[role === "staff" ? staffAccount : role]);
     setLocalError("");
-  }, [role]);
+  }, [role, staffAccount]);
 
   if (user?.role) return <Navigate to={HOME[user.role] || "/"} replace />;
 
@@ -52,9 +62,28 @@ export default function Login() {
               Graduate School Lifecycle Portal
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-600">
-              Sign in with the demo staff or student account to access the correct workspace.
+              Sign in with a role-specific demo account to access the correct workflow steps.
             </p>
           </div>
+
+          {role === "staff" && (
+            <div className="mb-5">
+              <p className="field-label">Choose staff responsibility</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {STAFF_ACCOUNTS.map((account) => (
+                  <button
+                    key={account.role}
+                    type="button"
+                    onClick={() => setStaffAccount(account.role)}
+                    className={`cursor-pointer rounded-xl border px-3 py-3 text-left transition-colors ${staffAccount === account.role ? "border-brand-500 bg-brand-50 ring-1 ring-brand-200" : "border-slate-200 bg-white hover:border-brand-200 hover:bg-slate-50"}`}
+                  >
+                    <span className="block text-sm font-bold text-ink">{account.label}</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{account.detail}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
@@ -110,7 +139,7 @@ export default function Login() {
                 </>
               ) : (
                 <>
-                  <LockKeyhole className="h-4 w-4" /> Sign in as {LABEL[role] || "Staff"}
+                  <LockKeyhole className="h-4 w-4" /> Sign in as {role === "staff" ? STAFF_ACCOUNTS.find((item) => item.role === staffAccount)?.label : LABEL[role] || "Staff"}
                 </>
               )}
             </button>

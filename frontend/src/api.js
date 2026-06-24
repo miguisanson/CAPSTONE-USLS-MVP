@@ -86,6 +86,15 @@ export const api = {
   },
   submitTransaction: (slug, payload) =>
     request(`/transactions/${slug}`, { method: "POST", body: JSON.stringify(payload) }),
+  sendWorkflowMessage: (slug, payload) =>
+    request(`/transactions/${slug}/messages`, { method: "POST", body: JSON.stringify(payload) }),
+  graduationBatchAction: (payload) =>
+    request("/graduation/batch-actions", { method: "POST", body: JSON.stringify(payload) }),
+  resetWorkflowDemo: (slug, studentId) =>
+    request(`/transactions/${slug}/demo-reset`, {
+      method: "POST",
+      body: JSON.stringify({ student_id: studentId }),
+    }),
   importHandoff: async (file) => {
     const form = new FormData();
     form.append("file", file);

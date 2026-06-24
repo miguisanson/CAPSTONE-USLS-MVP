@@ -6,6 +6,7 @@ import { useAuth } from "../auth";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
 import { formatDate } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
+import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 
 const DEAN_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
@@ -16,11 +17,23 @@ const DEAN_NAV = [
   { id: "reports", label: "Reports / Analytics", icon: BarChart3 },
 ];
 
+const CLARIFICATION_TEMPLATES = [
+  "Missing required document",
+  "Document is unclear or unreadable",
+  "Eligibility information needs verification",
+  "Units completed do not match records",
+  "Thesis/practicum status needs confirmation",
+  "Please clarify request details",
+  "This request requires additional review",
+  "Other",
+];
+
 export default function DeanApprovals() {
   const { user, logout } = useAuth();
   const { data, loading, error, refetch } = useApi(() => api.approvals(), []);
   const [busy, setBusy] = useState(0);
   const [note, setNote] = useState({});
+  const [template, setTemplate] = useState({});
   const [msg, setMsg] = useState("");
   const [actErr, setActErr] = useState("");
   const [view, setView] = useState("overview");
@@ -76,7 +89,10 @@ export default function DeanApprovals() {
     setMsg("");
     setActErr("");
     try {
-      const res = await api.decideWorkflowApproval(item.type, item.id, { decision, note: note[key] || "" });
+      const selectedTemplate = template[key] || "";
+      const customNote = note[key] || "";
+      const combinedNote = [selectedTemplate !== "Other" ? selectedTemplate : "", customNote].filter(Boolean).join(" · ");
+      const res = await api.decideWorkflowApproval(item.type, item.id, { decision, note: combinedNote });
       setMsg(res.message);
       refetch();
     } catch (e) {
@@ -221,6 +237,8 @@ export default function DeanApprovals() {
                     item={item}
                     note={note}
                     setNote={setNote}
+                    template={template}
+                    setTemplate={setTemplate}
                     busy={busy}
                     onDecide={decideWorkflow}
                   />
@@ -288,11 +306,21 @@ function DeanListFilters({ filters, setFilters, programs, statuses }) {
   );
 }
 
-function WorkflowApprovalCard({ item, note, setNote, busy, onDecide }) {
+function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, busy, onDecide }) {
   const key = `${item.type}-${item.id}`;
   const isBusy = busy === key;
   const approveLabel = item.type === "practicum" ? "Mark reviewed" : item.type === "withdrawal" ? "Approve" : "Approve & send";
   const returnLabel = item.type === "withdrawal" ? "Return" : "Return for revision";
+  const timeline = item.type === "practicum"
+    ? (item.timeline || []).map((step) => ({ ...step, optional: ["Hours Incomplete", "Additional Certificates Requested"].includes(step.label) }))
+    : item.type === "withdrawal"
+      ? withdrawalTimelineSteps(item.workflow_status)
+      : graduationTimelineSteps(item.status, item.eligibility || { eligible: true, coursework_status: "Complete" });
+  const timelineTitle = item.type === "practicum"
+    ? "Practicum workflow timeline"
+    : item.type === "withdrawal"
+      ? "Withdrawal workflow timeline"
+      : "Graduation endorsement timeline";
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -305,12 +333,21 @@ function WorkflowApprovalCard({ item, note, setNote, busy, onDecide }) {
       <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-600">
         {item.details}
       </p>
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <WorkflowTimeline steps={timeline} title={timelineTitle} />
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <select value={template[key] || ""} onChange={(e) => setTemplate((current) => ({ ...current, [key]: e.target.value }))} className="field-input cursor-pointer" aria-label="Clarification message template">
+        <option value="">Optional message template</option>
+        {CLARIFICATION_TEMPLATES.map((item) => <option key={item}>{item}</option>)}
+      </select>
       <input
         value={note[key] || ""}
         onChange={(e) => setNote((n) => ({ ...n, [key]: e.target.value }))}
-        placeholder="Optional note to Graduate School staff..."
-        className="field-input mt-3"
+        placeholder={template[key] === "Other" ? "Enter a custom clarification message..." : "Optional details..."}
+        className="field-input"
       />
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={isBusy} onClick={() => onDecide(item, item.type === "practicum" ? "review" : "approve")} className="btn-primary">
           <CheckCircle2 className="h-4 w-4" /> {approveLabel}
