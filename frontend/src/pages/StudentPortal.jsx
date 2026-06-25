@@ -37,6 +37,7 @@ const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal
 const STUDENT_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
   { id: "lifecycle", label: "Lifecycle Status", icon: Activity },
+  { id: "courses", label: "My Courses", icon: ClipboardCheck },
   { id: "research", label: "Research Submission", icon: FileCheck },
   { id: "schedule", label: "Defense Schedule", icon: CalendarCheck },
   { id: "loa", label: "Leave of Absence", icon: CalendarOff },
@@ -143,6 +144,7 @@ export default function StudentPortal() {
               <StudentHero data={data} />
               {view === "overview" && <div className="grid grid-cols-1 gap-5 lg:grid-cols-12"><div className="space-y-5 lg:col-span-8"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /><ActivityPanel logs={data.logs} /></div><div className="space-y-5 lg:col-span-4"><TasksPanel tasks={data.tasks} /><SchedulePanel schedules={data.schedules} /><RecommendationsPanel recommendations={data.recommendations} /></div></div>}
               {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
+              {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
               {["research", "schedule", "loa", "readmission", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
               {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
               {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
@@ -303,6 +305,104 @@ function WorkflowStatusPanel({ data }) {
         })}
       </div>
     </Card>
+  );
+}
+
+function MyCoursesPanel({ data, onSaved }) {
+  const courses = data.course_records || [];
+  const requests = data.course_drop_requests || [];
+  const currentCourses = courses.filter((course) => ["Enrolled", "Current", "Incomplete"].includes(course.status) && !course.drop_request);
+  const droppable = currentCourses;
+  const [activeCourseId, setActiveCourseId] = useState(currentCourses[0]?.course_id || "");
+  const [form, setForm] = useState({ reason: "", term_label: "", attachment_id: null });
+  const { busy, error, message, submit } = useSubmitRequest("course-drop", onSaved);
+  const activeCourse = courses.find((course) => String(course.course_id) === String(activeCourseId));
+  const selectedTerm = activeCourse?.term_label || data.current_term?.label || "Current term";
+
+  useEffect(() => {
+    setActiveCourseId((current) => {
+      if (currentCourses.some((course) => String(course.course_id) === String(current))) return current;
+      return currentCourses[0]?.course_id || "";
+    });
+  }, [data.student.id, currentCourses[0]?.course_id]);
+
+  function onSubmit(event) {
+    event.preventDefault();
+    if (!activeCourse) return;
+    submit({
+      course_id: activeCourse.course_id,
+      term_label: selectedTerm,
+      reason: form.reason,
+      attachment_id: form.attachment_id,
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card className="p-6">
+        <SectionTitle title="My Courses" subtitle="Your current coursework status, grades, and pending drop requests" icon={ClipboardCheck} />
+        {courses.length ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2.5">Subject</th>
+                  <th className="px-3 py-2.5">Status</th>
+                  <th className="px-3 py-2.5">Grade</th>
+                  <th className="px-3 py-2.5">Term</th>
+                  <th className="px-3 py-2.5">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((course) => (
+                  <tr key={course.id} className="border-b border-slate-50">
+                    <td className="px-4 py-2.5"><p className="font-semibold text-ink">{course.code}</p><p className="text-xs text-slate-500">{course.title}</p>{course.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                    <td className="px-3 py-2.5"><StatusBadge value={course.status} dot={false} /></td>
+                    <td className="px-3 py-2.5"><p className="font-semibold text-ink">{course.grade_value || "No grade"}</p><p className="text-xs text-slate-400">{course.grade_status}</p></td>
+                    <td className="px-3 py-2.5 text-slate-600">{course.term_label || "Not recorded"}</td>
+                    <td className="px-3 py-2.5 text-slate-600">{course.remarks || (course.incomplete_deadline ? `Incomplete due ${formatDate(course.incomplete_deadline)}` : "—")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState icon={ClipboardCheck} title="No course records yet" hint="Your coursework list appears after Graduate School staff or the Academic Coordinator imports or syncs your curriculum." />
+        )}
+      </Card>
+
+      <Card className="p-6">
+        <SectionTitle title="Drop Subject Request" subtitle="Submitting a request does not change your record until the Academic Coordinator approves it" icon={LogOut} />
+        {requests.length > 0 && (
+          <div className="mb-4 grid gap-2 md:grid-cols-2">
+            {requests.slice(0, 4).map((request) => (
+              <div key={request.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-ink">{request.course_code}</p><StatusBadge value={request.status} dot={false} /></div>
+                <p className="mt-1 text-xs text-slate-500">{request.term_label || "No term"} · {formatDate(request.created_at)}</p>
+                {request.reviewer_remarks && <p className="mt-2 text-xs text-slate-600">{request.reviewer_remarks}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        {currentCourses.length ? (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <Field label="Subject to drop" required>
+              <Select value={activeCourseId} onChange={(event) => setActiveCourseId(event.target.value)} options={droppable.map((course) => ({ value: course.course_id, label: `${course.code} — ${course.title}` }))} required />
+            </Field>
+            <Field label="Term">
+              <div className="field-input bg-slate-50 text-slate-600">{selectedTerm}</div>
+            </Field>
+            <Field label="Reason for dropping" required>
+              <Textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} required />
+            </Field>
+            <RequestPdfUpload requestType="course-drop" label="Optional drop form/supporting PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+            <SubmitState busy={busy} error={error} message={message} disabled={!form.reason.trim()} disabledHint={!form.reason.trim() ? "Enter your reason before submitting." : ""} label="Submit drop request" />
+          </form>
+        ) : (
+          <EmptyState icon={LogOut} title="No currently enrolled subjects" hint="Only enrolled or current subjects can be requested for dropping." />
+        )}
+      </Card>
+    </div>
   );
 }
 

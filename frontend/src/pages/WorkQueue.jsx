@@ -76,6 +76,7 @@ export default function WorkQueue() {
                   <th className="px-3 py-3">Student</th>
                   <th className="px-3 py-3">Due</th>
                   <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -99,6 +100,15 @@ export default function WorkQueue() {
                     </td>
                     <td className="px-3 py-3">
                       <StatusBadge value={task.overdue ? "Overdue" : task.status} dot={false} />
+                    </td>
+                    <td className="px-3 py-3">
+                      {task.action_url ? (
+                        <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">
+                          {task.action_label || "Open"}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-300">-</span>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -379,6 +379,11 @@ class CourseRecord(db.Model):
     status = db.Column(db.String(40), nullable=False)
     term_label = db.Column(db.String(40))
     evidence_reference = db.Column(db.String(160))
+    grade_value = db.Column(db.String(40))
+    grade_status = db.Column(db.String(40), nullable=False, default="No Grade")
+    incomplete_deadline = db.Column(db.Date)
+    resolved_at = db.Column(db.DateTime)
+    remarks = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, default=now_utc)
 
     course = db.relationship("Course")
@@ -495,6 +500,25 @@ class WithdrawalApplication(db.Model):
 
     request_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[request_attachment_id])
     proof_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[proof_attachment_id])
+
+
+class CourseDropRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    term_label = db.Column(db.String(80))
+    reason = db.Column(db.Text)
+    attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    status = db.Column(db.String(60), nullable=False, default="Submitted")
+    reviewer_remarks = db.Column(db.Text)
+    decided_by = db.Column(db.String(160))
+    decided_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
+    course = db.relationship("Course")
+    attachment = db.relationship("StudentRequestAttachment")
 
 
 class GraduationEndorsement(db.Model):
@@ -724,14 +748,20 @@ def student_brief(student: Student) -> dict:
 
 def course_audit_dict(audit: dict) -> dict:
     def row(item):
+        record = item["record"]
         return {
+            "course_id": item["course"].id,
             "code": item["course"].code,
             "title": item["course"].title,
             "units": item["course"].units,
             "recommended_term": item["course"].recommended_term,
             "status": item["status"],
-            "term_label": item["record"].term_label if item["record"] else None,
-            "evidence_reference": item["record"].evidence_reference if item["record"] else None,
+            "term_label": record.term_label if record else None,
+            "evidence_reference": record.evidence_reference if record else None,
+            "grade_value": record.grade_value if record else "",
+            "grade_status": record.grade_status if record else "No Grade",
+            "incomplete_deadline": record.incomplete_deadline.isoformat() if record and record.incomplete_deadline else None,
+            "remarks": record.remarks if record else "",
         }
 
     return {
@@ -748,6 +778,59 @@ def course_audit_dict(audit: dict) -> dict:
         "by_category": audit.get("by_category", []),
         "eligibility": audit.get("eligibility", {}),
     }
+
+
+def course_record_dict(record: CourseRecord, pending_drop: "CourseDropRequest | None" = None) -> dict:
+    return {
+        "id": record.id,
+        "course_id": record.course_id,
+        "code": record.course.code if record.course else None,
+        "title": record.course.title if record.course else None,
+        "units": record.course.units if record.course else 0,
+        "category": record.course.category if record.course else None,
+        "status": record.status,
+        "term_label": record.term_label,
+        "evidence_reference": record.evidence_reference,
+        "grade_value": record.grade_value or "",
+        "grade_status": record.grade_status or "No Grade",
+        "incomplete_deadline": record.incomplete_deadline.isoformat() if record.incomplete_deadline else None,
+        "resolved_at": iso(record.resolved_at),
+        "remarks": record.remarks or "",
+        "updated_at": iso(record.updated_at),
+        "drop_request": course_drop_request_dict(pending_drop, include_student=False) if pending_drop else None,
+    }
+
+
+def latest_course_drop_request(student_id: int, course_id: int) -> "CourseDropRequest | None":
+    return (
+        CourseDropRequest.query.filter_by(student_id=student_id, course_id=course_id)
+        .order_by(CourseDropRequest.created_at.desc(), CourseDropRequest.id.desc())
+        .first()
+    )
+
+
+def course_drop_request_dict(request_item: "CourseDropRequest | None", include_student: bool = True) -> dict | None:
+    if not request_item:
+        return None
+    data = {
+        "id": request_item.id,
+        "student_id": request_item.student_id,
+        "course_id": request_item.course_id,
+        "course_code": request_item.course.code if request_item.course else None,
+        "course_title": request_item.course.title if request_item.course else None,
+        "term_label": request_item.term_label,
+        "reason": request_item.reason,
+        "status": request_item.status,
+        "reviewer_remarks": request_item.reviewer_remarks,
+        "decided_by": request_item.decided_by,
+        "decided_at": iso(request_item.decided_at),
+        "created_at": iso(request_item.created_at),
+        "updated_at": iso(request_item.updated_at),
+        "attachment": attachment_dict(request_item.attachment),
+    }
+    if include_student and request_item.student:
+        data["student"] = student_brief(request_item.student)
+    return data
 
 
 def research_case_dict(case: ResearchCase | None) -> dict | None:
@@ -1088,6 +1171,11 @@ def workflow_case_meta(slug: str, student_id: int) -> dict:
 
 
 def task_dict(task: Task) -> dict:
+    action_url = None
+    action_label = None
+    if task.title.startswith("Review course drop request"):
+        action_url = "/workflow/course-audit"
+        action_label = "Open Course Audit"
     return {
         "id": task.id,
         "student_id": task.student_id,
@@ -1098,6 +1186,8 @@ def task_dict(task: Task) -> dict:
         "status": task.status,
         "priority": task.priority,
         "overdue": task.status != "Done" and task.due_at < date.today(),
+        "action_url": action_url,
+        "action_label": action_label,
     }
 
 
@@ -1189,7 +1279,7 @@ BACKOFFICE_ROLES = {
 }
 
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"practicum", "graduation", "withdrawal"},
+    "academic_coordinator": {"course-audit", "practicum", "graduation", "withdrawal"},
     "research_coordinator": {"graduation"},
     "registrar": {"graduation", "withdrawal"},
 }
@@ -1960,9 +2050,20 @@ def register_routes(app: Flask) -> None:
         practicum_eligibility_result = practicum_eligibility(student)
         withdrawal_application = latest_withdrawal_application(student.id)
         graduation_endorsement = latest_graduation_endorsement(student.id)
+        current_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
+        pending_drop_by_course = {
+            item.course_id: item
+            for item in CourseDropRequest.query.filter_by(student_id=student.id, status="Submitted").all()
+        }
+        course_records = (
+            CourseRecord.query.join(Course)
+            .filter(CourseRecord.student_id == student.id)
+            .order_by(Course.category, Course.code)
+            .all()
+        )
 
         return jsonify(
             {
@@ -1970,6 +2071,15 @@ def register_routes(app: Flask) -> None:
                 "stages": STAGES,
                 "stage_index": STAGES.index(student.current_stage) if student.current_stage in STAGES else 0,
                 "course_audit": course_audit_dict(audit),
+                "current_term": term_dict(current_term) if current_term else None,
+                "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
+                "course_drop_requests": [
+                    course_drop_request_dict(item, include_student=False)
+                    for item in CourseDropRequest.query.filter_by(student_id=student.id)
+                    .order_by(CourseDropRequest.created_at.desc())
+                    .limit(20)
+                    .all()
+                ],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
@@ -2056,6 +2166,16 @@ def register_routes(app: Flask) -> None:
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
+        pending_drop_by_course = {
+            item.course_id: item
+            for item in CourseDropRequest.query.filter_by(student_id=student.id, status="Submitted").all()
+        }
+        course_records = (
+            CourseRecord.query.join(Course)
+            .filter(CourseRecord.student_id == student.id)
+            .order_by(Course.category, Course.code)
+            .all()
+        )
 
         portal_student = student_brief(student)
         portal_student["current_stage"] = student_portal_stage(student, research_case)
@@ -2066,6 +2186,14 @@ def register_routes(app: Flask) -> None:
                 "stages": STAGES,
                 "stage_index": STAGES.index(portal_student["current_stage"]) if portal_student["current_stage"] in STAGES else 0,
                 "course_audit": course_audit_dict(audit),
+                "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
+                "course_drop_requests": [
+                    course_drop_request_dict(item, include_student=False)
+                    for item in CourseDropRequest.query.filter_by(student_id=student.id)
+                    .order_by(CourseDropRequest.created_at.desc())
+                    .limit(20)
+                    .all()
+                ],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
@@ -2260,7 +2388,7 @@ def register_routes(app: Flask) -> None:
         student = Student.query.get_or_404(account.student_id)
         request_type = (request.form.get("request_type") or "").strip()
         uploaded = request.files.get("file")
-        if request_type not in {"leave-of-absence", "readmission", "practicum", "withdrawal", "graduation", "graduation-endorsement"}:
+        if request_type not in {"leave-of-absence", "readmission", "practicum", "withdrawal", "graduation", "graduation-endorsement", "course-drop"}:
             return jsonify({"error": "Choose a valid request type."}), 400
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a PDF application file."}), 400
@@ -2278,6 +2406,45 @@ def register_routes(app: Flask) -> None:
                 "url": f"/api/student-request-attachments/{attachment.id}/file",
             },
         })
+
+    @app.route("/api/student-portal/requests/course-drop", methods=["POST"])
+    @require_api_login("student")
+    def student_course_drop_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        course = Course.query.get_or_404(safe_int(data.get("course_id")))
+        record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+        if not record or record.status not in {"Enrolled", "Current", "Incomplete"}:
+            return jsonify({"error": "Only current, enrolled, or incomplete subjects can be requested for dropping."}), 400
+        active = CourseDropRequest.query.filter_by(student_id=student.id, course_id=course.id, status="Submitted").first()
+        if active:
+            return jsonify({"error": "You already submitted a drop request for this subject."}), 400
+        reason = (data.get("reason") or "").strip()
+        if not reason:
+            return jsonify({"error": "Enter the reason for dropping this subject."}), 400
+        attachment = request_attachment_from_payload(student, "course-drop", data)
+        request_item = CourseDropRequest(
+            student_id=student.id,
+            course_id=course.id,
+            term_label=(data.get("term_label") or record.term_label or "").strip(),
+            reason=reason,
+            attachment_id=attachment.id if attachment else None,
+            status="Submitted",
+        )
+        db.session.add(request_item)
+        add_task(student.id, f"Review course drop request for {course.code}", "Academic Coordinator", 3, 45)
+        add_log(
+            "course-audit",
+            student.id,
+            "Student",
+            attachment.original_name if attachment else "Student portal",
+            f"Drop request submitted for {course.code}",
+            "Academic Coordinator",
+            f"Reason: {reason}. Term: {request_item.term_label or record.term_label or 'Not specified'}.",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Drop request submitted. The Academic Coordinator will review it before your record changes."})
 
     @app.route("/api/student-portal/requests/leave-of-absence", methods=["POST"])
     @require_api_login("student")
@@ -3199,6 +3366,7 @@ def register_routes(app: Flask) -> None:
 
     # ---- Course Audit (end-of-term, per-subject roster) ------------------
     @app.route("/api/course-audit/subjects")
+    @require_api_login("staff", "academic_coordinator")
     def course_audit_subjects():
         program_id = request.args.get("program_id", type=int)
         query = Course.query
@@ -3226,9 +3394,15 @@ def register_routes(app: Flask) -> None:
         return jsonify({"items": items})
 
     @app.route("/api/course-audit/roster")
+    @require_api_login("staff", "academic_coordinator")
     def course_audit_roster():
         course_id = request.args.get("course_id", type=int)
+        term_filter = (request.args.get("term") or "").strip()
         course = Course.query.get_or_404(course_id)
+        pending_drop_by_student = {
+            item.student_id: item
+            for item in CourseDropRequest.query.filter_by(course_id=course.id, status="Submitted").all()
+        }
         rows = (
             db.session.query(CourseRecord, Student)
             .join(Student, Student.id == CourseRecord.student_id)
@@ -3236,24 +3410,40 @@ def register_routes(app: Flask) -> None:
             .order_by(Student.last_name.asc(), Student.first_name.asc())
             .all()
         )
-        students = [{
-            "student_id": s.id, "name": s.name, "student_number": s.student_number,
-            "program_code": s.program.code, "status": rec.status,
-            "completed": rec.status == "Completed", "term_label": rec.term_label,
-        } for rec, s in rows]
+        students = []
+        for rec, s in rows:
+            in_selected_term = not term_filter or (rec.term_label or "") == term_filter
+            status = rec.status if in_selected_term else "Missing"
+            students.append({
+                "student_id": s.id, "name": s.name, "student_number": s.student_number,
+                "program_code": s.program.code, "status": status,
+                "completed": status == "Completed", "term_label": rec.term_label if in_selected_term else term_filter,
+                "grade_value": (rec.grade_value or "") if in_selected_term else "",
+                "grade_status": (rec.grade_status or "No Grade") if in_selected_term else "No Grade",
+                "incomplete_deadline": rec.incomplete_deadline.isoformat() if in_selected_term and rec.incomplete_deadline else "",
+                "remarks": (rec.remarks or "") if in_selected_term else "",
+                "drop_request": course_drop_request_dict(pending_drop_by_student.get(s.id), include_student=False),
+            })
         return jsonify({
             "course": {"id": course.id, "code": course.code, "title": course.title},
             "students": students,
         })
 
     @app.route("/api/course-audit/roster", methods=["POST"])
+    @require_api_login("academic_coordinator")
     def course_audit_roster_save():
         data = request.get_json(silent=True) or {}
         course = Course.query.get_or_404(int(data.get("course_id") or 0))
         completions = data.get("completions") or {}
         status_updates = data.get("statuses") or data.get("status_updates") or {}
+        grades = data.get("grades") or {}
+        grade_statuses = data.get("grade_statuses") or {}
+        deadlines = data.get("incomplete_deadlines") or {}
+        remarks = data.get("remarks") or {}
         term = (data.get("term") or "").strip()
-        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Dropped", "Missing"}
+        account = current_account()
+        actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
+        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Dropped", "Missing", "Failed"}
         changed = 0
         changed_students: set[int] = set()
         status_counts: dict[str, int] = {}
@@ -3281,13 +3471,39 @@ def register_routes(app: Flask) -> None:
                 student = Student.query.get(sid)
                 if not student:
                     continue
-            if rec.status == new_status:
-                continue
+            previous = rec.status
+            previous_grade = rec.grade_value or ""
+            previous_grade_status = rec.grade_status or "No Grade"
             rec.status = new_status
             rec.updated_at = now_utc()
             rec.evidence_reference = "Course audit update"
             if term:
                 rec.term_label = term
+            grade_value = str(grades.get(sid_str, grades.get(sid, rec.grade_value or "")) or "").strip()
+            rec.grade_value = grade_value or None
+            explicit_grade_status = str(grade_statuses.get(sid_str, grade_statuses.get(sid, "")) or "").strip()
+            if new_status == "Completed":
+                rec.grade_status = explicit_grade_status or "Passed"
+                rec.resolved_at = rec.resolved_at or now_utc()
+                rec.incomplete_deadline = None
+            elif new_status == "Incomplete":
+                rec.grade_status = "Incomplete"
+                deadline_value = str(deadlines.get(sid_str, deadlines.get(sid, "")) or "").strip()
+                rec.incomplete_deadline = parse_date(deadline_value) if deadline_value else rec.incomplete_deadline
+                add_task(student.id, f"Resolve incomplete grade for {course.code}", "Academic Coordinator", 14, 35)
+                if rec.incomplete_deadline and rec.incomplete_deadline < date.today():
+                    add_task(student.id, f"Review overdue incomplete grade for {course.code}", "Academic Coordinator", 1, 60)
+            elif new_status == "Failed":
+                rec.grade_status = "Failed"
+                rec.resolved_at = rec.resolved_at or now_utc()
+                rec.incomplete_deadline = None
+            else:
+                rec.grade_status = explicit_grade_status or ("No Grade" if new_status in {"Current", "Enrolled", "Missing", "Dropped"} else rec.grade_status or "No Grade")
+                if new_status in {"Current", "Enrolled", "Missing", "Dropped"}:
+                    rec.resolved_at = None
+            rec.remarks = str(remarks.get(sid_str, remarks.get(sid, rec.remarks or "")) or "").strip() or None
+            if rec.status == previous and (rec.grade_value or "") == previous_grade and (rec.grade_status or "No Grade") == previous_grade_status:
+                continue
             changed += 1
             changed_students.add(student.id)
             status_counts[new_status] = status_counts.get(new_status, 0) + 1
@@ -3295,7 +3511,7 @@ def register_routes(app: Flask) -> None:
             if audit["missing_count"] == 0 and student.current_stage in ("Admission", "Coursework"):
                 student.current_stage = "Proposal Development"
             recompute_risk(student)
-            add_log("course-audit", sid, "Academic Coordinator", f"Course audit {term}".strip(),
+            add_log("course-audit", sid, actor, f"Course audit {term}".strip(),
                     f"{course.code} marked {new_status}",
                     "Academic Coordinator", f"End-of-term course audit for {course.code}.")
         if changed:
@@ -3303,7 +3519,7 @@ def register_routes(app: Flask) -> None:
             add_log(
                 "course-audit",
                 None,
-                "Academic Coordinator",
+                actor,
                 "Course audit summary",
                 f"{course.code} audit saved: {changed} record(s) updated",
                 "Academic Coordinator",
@@ -3314,6 +3530,87 @@ def register_routes(app: Flask) -> None:
             "ok": True, "course": course.code, "updated": changed,
             "message": f"Saved {course.code} audit — {changed} student record(s) updated.",
         })
+
+    @app.route("/api/course-drop/requests")
+    @require_api_login("staff", "academic_coordinator")
+    def course_drop_requests():
+        status = (request.args.get("status") or "Submitted").strip()
+        query = CourseDropRequest.query
+        if status:
+            query = query.filter(CourseDropRequest.status == status)
+        return jsonify({
+            "items": [
+                course_drop_request_dict(item)
+                for item in query.order_by(CourseDropRequest.created_at.desc()).limit(100).all()
+            ]
+        })
+
+    @app.route("/api/course-drop/requests/<int:request_id>/decide", methods=["POST"])
+    @require_api_login("academic_coordinator")
+    def course_drop_decide(request_id: int):
+        data = request.get_json(silent=True) or {}
+        request_item = CourseDropRequest.query.get_or_404(request_id)
+        if request_item.status != "Submitted":
+            return jsonify({"error": "This drop request has already been reviewed."}), 400
+        decision = (data.get("decision") or "").strip().lower()
+        remarks = (data.get("remarks") or "").strip()
+        account = current_account()
+        actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
+        record = CourseRecord.query.filter_by(student_id=request_item.student_id, course_id=request_item.course_id).first()
+        if decision == "approve":
+            if not record:
+                record = CourseRecord(student_id=request_item.student_id, course_id=request_item.course_id, status="Missing")
+                db.session.add(record)
+            previous = record.status
+            record.status = "Dropped"
+            record.grade_status = "No Grade"
+            record.resolved_at = None
+            record.remarks = remarks or record.remarks
+            record.updated_at = now_utc()
+            request_item.status = "Approved"
+            result = f"Drop request approved for {request_item.course.code}"
+            add_log(
+                "course-audit",
+                request_item.student_id,
+                actor,
+                "Student course drop request",
+                result,
+                "Student",
+                remarks or f"Course status changed from {previous or 'Missing'} to Dropped.",
+                previous_status=previous,
+                new_status="Dropped",
+            )
+        elif decision == "reject":
+            request_item.status = "Rejected"
+            result = f"Drop request rejected for {request_item.course.code}"
+            add_log(
+                "course-audit",
+                request_item.student_id,
+                actor,
+                "Student course drop request",
+                result,
+                "Student",
+                remarks or "Course status unchanged.",
+                previous_status=record.status if record else None,
+                new_status=record.status if record else None,
+            )
+        else:
+            return jsonify({"error": "Choose approve or reject."}), 400
+        request_item.reviewer_remarks = remarks
+        request_item.decided_by = account.full_name if account else "Academic Coordinator"
+        request_item.decided_at = now_utc()
+        request_item.updated_at = now_utc()
+        Task.query.filter(
+            Task.student_id == request_item.student_id,
+            Task.owner_role == "Academic Coordinator",
+            Task.status.in_(["Pending", "Overdue"]),
+            Task.title == f"Review course drop request for {request_item.course.code}",
+        ).update({"status": "Done"}, synchronize_session=False)
+        student = Student.query.get(request_item.student_id)
+        if student:
+            recompute_risk(student)
+        db.session.commit()
+        return jsonify({"ok": True, "message": result, "request": course_drop_request_dict(request_item)})
 
     # ---- Reset uploaded monitoring data (so the Excel upload can be re-tested) ----
     @app.route("/api/admin/reset-uploaded-data", methods=["POST"])
@@ -3326,6 +3623,7 @@ def register_routes(app: Flask) -> None:
         if ids:
             PanelAssignment.query.filter(PanelAssignment.student_id.in_(ids)).delete(synchronize_session=False)
             ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(ids)).delete(synchronize_session=False)
+            CourseDropRequest.query.filter(CourseDropRequest.student_id.in_(ids)).delete(synchronize_session=False)
             for student in imported:
                 db.session.delete(student)  # cascades course records, docs, tasks, logs
         removed_courses = 0
@@ -7929,7 +8227,7 @@ def compute_course_audit(student: Student) -> dict:
             cat["completed_units"] += units
         elif status in ["Current", "Enrolled"]:
             current.append(row)
-        elif status in ["Incomplete", "Dropped"]:
+        elif status in ["Incomplete", "Dropped", "Failed"]:
             incomplete.append(row)
         else:
             missing.append(row)
@@ -8301,6 +8599,25 @@ def ensure_workflow_activity_schema() -> None:
         for name, sql_type in practicum_additions.items():
             if name not in practicum_existing:
                 db.session.execute(text(f"ALTER TABLE practicum_record ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+
+
+def ensure_course_workflow_schema() -> None:
+    """Add coursework grade/drop fields to existing demo databases."""
+    db.create_all()
+    inspector = inspect(db.engine)
+    if "course_record" in inspector.get_table_names():
+        existing = {column["name"] for column in inspector.get_columns("course_record")}
+        additions = {
+            "grade_value": "VARCHAR(40)",
+            "grade_status": "VARCHAR(40) DEFAULT 'No Grade'",
+            "incomplete_deadline": "DATE",
+            "resolved_at": "DATETIME",
+            "remarks": "TEXT",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE course_record ADD COLUMN {name} {sql_type}"))
     db.session.commit()
 
 
@@ -8876,6 +9193,21 @@ def ensure_demo_accounts() -> None:
         or Student.query.order_by(Student.student_number.asc()).first()
     )
     if linked_student:
+        latest_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        linked_records = (
+            CourseRecord.query.filter_by(student_id=linked_student.id)
+            .join(Course)
+            .order_by(Course.code.asc())
+            .all()
+        )
+        if linked_records and not any(record.status in {"Enrolled", "Current", "Incomplete"} for record in linked_records):
+            for record in linked_records[:2]:
+                record.status = "Current"
+                record.grade_status = "No Grade"
+                record.term_label = latest_term.label if latest_term else record.term_label
+                record.evidence_reference = "Demo student current-course setup"
+                record.updated_at = now_utc()
+
         demo_missing = DocumentCheck.query.filter_by(
             student_id=linked_student.id,
             gate="Form 4 - Proposal Defense Readiness",
@@ -8904,6 +9236,7 @@ app = create_app()
 with app.app_context():
     ensure_schedule_request_schema()
     ensure_workflow_activity_schema()
+    ensure_course_workflow_schema()
 
 
 if __name__ == "__main__":

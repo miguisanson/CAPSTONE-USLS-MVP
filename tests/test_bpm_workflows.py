@@ -11,6 +11,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 
 from app import (  # noqa: E402
     Course,
+    CourseDropRequest,
     CourseRecord,
     DocumentCheck,
     GraduationEndorsement,
@@ -28,6 +29,7 @@ from app import (  # noqa: E402
     graduation_eligibility,
     ensure_demo_accounts,
     required_documents_for_gate,
+    task_dict,
     workflow_approvals_payload,
 )
 
@@ -36,6 +38,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         try:
+            with app.app_context():
+                db.session.remove()
+                db.engine.dispose()
             os.unlink(_DB_FILE.name)
         except FileNotFoundError:
             pass
@@ -338,6 +343,94 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Graduate School Staff").filter(Task.title.contains("missing graduation research")).first())
             self._transition(staff, "graduation", {"student_id": self.student_id, "endorsement_status": "Not Eligible"})
             self.assertEqual(endorsement.endorsement_status, "Not Eligible")
+
+    def test_course_audit_bulk_grades_and_incomplete_do_not_auto_fail(self):
+        with app.app_context():
+            academic = self._academic_client()
+            staff = self._staff_client()
+            response = staff.post("/api/course-audit/roster", json={
+                "course_id": self.course_id,
+                "statuses": {str(self.student_id): "Completed"},
+            })
+            self.assertEqual(response.status_code, 403)
+
+            response = academic.post("/api/course-audit/roster", json={
+                "course_id": self.course_id,
+                "term": "AY 2026-2027 Term 1",
+                "statuses": {str(self.student_id): "Completed"},
+                "grades": {str(self.student_id): "1.25"},
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            record = CourseRecord.query.filter_by(student_id=self.student_id, course_id=self.course_id).first()
+            self.assertEqual(record.status, "Completed")
+            self.assertEqual(record.grade_status, "Passed")
+            self.assertEqual(record.grade_value, "1.25")
+
+            response = academic.post("/api/course-audit/roster", json={
+                "course_id": self.course_id,
+                "statuses": {str(self.student_id): "Incomplete"},
+                "incomplete_deadlines": {str(self.student_id): "2020-01-01"},
+                "remarks": {str(self.student_id): "Awaiting final output"},
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(record)
+            self.assertEqual(record.status, "Incomplete")
+            self.assertEqual(record.grade_status, "Incomplete")
+            self.assertIsNotNone(Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("overdue incomplete")).first())
+            self.assertNotEqual(record.status, "Failed")
+
+            response = academic.post("/api/course-audit/roster", json={
+                "course_id": self.course_id,
+                "statuses": {str(self.student_id): "Failed"},
+                "grades": {str(self.student_id): "5.00"},
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(record)
+            self.assertEqual(record.status, "Failed")
+            self.assertEqual(record.grade_status, "Failed")
+            student = db.session.get(Student, self.student_id)
+            self.assertFalse(graduation_eligibility(student)["eligible"])
+
+    def test_course_drop_request_requires_academic_coordinator_approval(self):
+        with app.app_context():
+            record = CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Enrolled", term_label="AY 2026-2027 Term 1")
+            db.session.add(record)
+            student_account = UserAccount(
+                email="drop-student@example.test",
+                full_name="Drop Request Student",
+                password_hash=generate_password_hash("test-password"),
+                role="student",
+                student_id=self.student_id,
+                active=True,
+            )
+            db.session.add(student_account)
+            db.session.commit()
+
+            student_client = self._role_client(student_account.id, "student")
+            response = student_client.post("/api/student-portal/requests/course-drop", json={
+                "course_id": self.course_id,
+                "term_label": "AY 2026-2027 Term 1",
+                "reason": "Schedule conflict",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(record)
+            self.assertEqual(record.status, "Enrolled")
+            drop = CourseDropRequest.query.filter_by(student_id=self.student_id, course_id=self.course_id).first()
+            self.assertEqual(drop.status, "Submitted")
+            task = Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("Review course drop request")).first()
+            self.assertIsNotNone(task)
+            self.assertEqual(task_dict(task)["action_url"], "/workflow/course-audit")
+
+            staff_response = self._staff_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve"})
+            self.assertEqual(staff_response.status_code, 403)
+            response = self._academic_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve", "remarks": "Approved for demo"})
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(record)
+            db.session.refresh(drop)
+            self.assertEqual(record.status, "Dropped")
+            self.assertEqual(drop.status, "Approved")
+            db.session.refresh(task)
+            self.assertEqual(task.status, "Done")
 
     def test_demo_backoffice_accounts_sign_in_as_distinct_roles(self):
         with app.app_context():

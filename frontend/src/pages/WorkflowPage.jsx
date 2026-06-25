@@ -29,6 +29,7 @@ import {
   Trash2,
   Eye,
   Search,
+  MoreVertical,
   SlidersHorizontal,
   HelpCircle,
   History,
@@ -126,6 +127,7 @@ export default function WorkflowPage() {
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
   const overviewWorkflow = OVERVIEW_WORKFLOWS.has(slug);
+  const hideSideRail = overviewWorkflow || slug === "course-audit";
 
   useEffect(() => {
     if (!studentLabel && context?.selected_student?.search_label) {
@@ -211,8 +213,8 @@ export default function WorkflowPage() {
       )}
       <ErrorNote message={submitError} />
 
-      <div className={overviewWorkflow ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
-        <div className={overviewWorkflow ? "space-y-5" : "space-y-5 lg:col-span-2"}>
+      <div className={hideSideRail ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
+        <div className={hideSideRail ? "space-y-5" : "space-y-5 lg:col-span-2"}>
           {needsStudent && (
             <Card className="p-6">
               <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
@@ -264,7 +266,7 @@ export default function WorkflowPage() {
         </div>
 
         {/* Side rail */}
-        {!overviewWorkflow && <div className="space-y-5">
+        {!hideSideRail && <div className="space-y-5">
           <Card className="p-6">
             <SectionTitle title="How this works" icon={Sparkles} />
             <p className="text-sm leading-relaxed text-slate-600">{workflowGuidance(slug)}</p>
@@ -668,12 +670,741 @@ function HandoffForm({ meta, context, submit, submitting }) {
 // Course Audit — roster (by subject) or sheet upload
 // ---------------------------------------------------------------------------
 function CourseAuditPanel({ meta }) {
+  const [tab, setTab] = useState("class");
+  const tabs = [
+    { id: "class", label: "Course enrollment and grade audit", icon: ClipboardCheck },
+    { id: "drops", label: "Drop requests", icon: LogOut },
+  ];
   return (
-    <div className="space-y-6">
-      <HandoffImport context="audit" />
-      <div className="border-t border-slate-200 pt-6">
-        <CourseAuditRoster meta={meta} />
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {tabs.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-brand-50 hover:text-brand-700"}`}
+            >
+              <Icon className="h-4 w-4" /> {item.label}
+            </button>
+          );
+        })}
       </div>
+      {tab === "class" && <CourseRosterGradeWorkspace meta={meta} />}
+      {tab === "drops" && <CourseDropReviewPanelV2 />}
+    </div>
+  );
+}
+
+function CourseDropReviewPanelV2() {
+  const { user } = useAuth();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [remarks, setRemarks] = useState({});
+  const [expanded, setExpanded] = useState({});
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.courseDropRequests("Submitted");
+      setItems(res.items || []);
+    } catch (err) {
+      setError(err.message || "Could not load course drop requests.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function decide(item, decision) {
+    setNotice("");
+    setError("");
+    try {
+      const res = await api.decideCourseDrop(item.id, { decision, remarks: remarks[item.id] || "" });
+      setNotice(res.message);
+      await load();
+    } catch (err) {
+      setError(err.message || "Could not review this request.");
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <SectionTitle title="Student drop requests" subtitle="Review pending student requests from the Academic Coordinator queue." icon={LogOut} />
+      <ErrorNote message={error} />
+      {notice && <div className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{notice}</div>}
+      {loading ? (
+        <Spinner label="Loading drop requests..." />
+      ) : items.length ? (
+        <div className="space-y-3">
+          {items.map((item) => {
+            const isOpen = !!expanded[item.id];
+            return (
+              <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{item.student?.name} - {item.course_code}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.course_title} - {item.term_label || "No term"} - submitted {formatDate(item.created_at)}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => setExpanded((current) => ({ ...current, [item.id]: !isOpen }))} className="btn-ghost cursor-pointer px-3 py-2 text-xs">
+                      {isOpen ? "Hide details" : "Details"}
+                    </button>
+                    <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "approve")} className="btn-primary cursor-pointer px-3 py-2">Approve drop</button>
+                    <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "reject")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Reject</button>
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Student reason</p>
+                      <p className="mt-1 text-sm text-slate-600">{item.reason}</p>
+                    </div>
+                    {item.attachment && <a href={item.attachment.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View attached PDF</a>}
+                    <Input value={remarks[item.id] || ""} onChange={(e) => setRemarks((current) => ({ ...current, [item.id]: e.target.value }))} placeholder="Reviewer remarks" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState icon={LogOut} title="No pending course drop requests" hint="Approved drops update the student's course audit automatically." />
+      )}
+    </Card>
+  );
+}
+
+function CourseDropReviewPanel() {
+  const { user } = useAuth();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [remarks, setRemarks] = useState({});
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.courseDropRequests("Submitted");
+      setItems(res.items || []);
+    } catch (err) {
+      setError(err.message || "Could not load course drop requests.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function decide(item, decision) {
+    setNotice("");
+    setError("");
+    try {
+      const res = await api.decideCourseDrop(item.id, { decision, remarks: remarks[item.id] || "" });
+      setNotice(res.message);
+      await load();
+    } catch (err) {
+      setError(err.message || "Could not review this request.");
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <SectionTitle title="Student drop requests" subtitle="Requests stay pending until the Academic Coordinator approves or rejects them" icon={LogOut} />
+      <ErrorNote message={error} />
+      {notice && <div className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{notice}</div>}
+      {loading ? (
+        <Spinner label="Loading drop requests..." />
+      ) : items.length ? (
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">{item.student?.name} · {item.course_code}</p>
+                  <p className="mt-1 text-xs text-slate-500">{item.course_title} · {item.term_label || "No term"} · submitted {formatDate(item.created_at)}</p>
+                  <p className="mt-2 text-sm text-slate-600">{item.reason}</p>
+                  {item.attachment && <a href={item.attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View attached PDF</a>}
+                </div>
+                <StatusBadge value={item.status} dot={false} />
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+                <Input value={remarks[item.id] || ""} onChange={(e) => setRemarks((current) => ({ ...current, [item.id]: e.target.value }))} placeholder="Reviewer remarks" />
+                <div className="flex gap-2">
+                  <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "approve")} className="btn-primary cursor-pointer px-3 py-2">Approve drop</button>
+                  <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "reject")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Reject</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState icon={LogOut} title="No pending course drop requests" hint="Approved drops update the student's course audit automatically." />
+      )}
+    </Card>
+  );
+}
+
+function deriveCourseOutcome(value) {
+  const grade = String(value || "").trim().toLowerCase();
+  if (!grade) return { status: "Current", grade_status: "No Grade" };
+  if (["inc", "incomplete"].includes(grade)) return { status: "Incomplete", grade_status: "Incomplete" };
+  if (["f", "fail", "failed", "5", "5.0", "5.00"].includes(grade)) return { status: "Failed", grade_status: "Failed" };
+  return { status: "Completed", grade_status: "Passed" };
+}
+
+function CourseRosterGradeWorkspace({ meta }) {
+  const [programId, setProgramId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [term, setTerm] = useState("");
+  const [roster, setRoster] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [addStudentId, setAddStudentId] = useState("");
+  const [openMenu, setOpenMenu] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"]);
+
+  useEffect(() => {
+    setSubjects([]);
+    setCourseId("");
+    setRoster(null);
+    setError("");
+    api.courseAuditSubjects(programId || undefined).then((res) => setSubjects(res.items || [])).catch((err) => setError(err.message));
+  }, [programId]);
+
+  function hydrate(res) {
+    setRoster(res);
+    setEdits(Object.fromEntries((res.students || []).map((student) => [student.student_id, {
+      status: student.status,
+      grade_value: student.grade_value || "",
+      grade_status: student.grade_status || "No Grade",
+      remarks: student.remarks || "",
+    }])));
+    setAddStudentId("");
+    setOpenMenu(null);
+  }
+
+  useEffect(() => {
+    if (!courseId) {
+      setRoster(null);
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    setError("");
+    api.courseAuditRoster(courseId, term).then(hydrate).catch((err) => setError(err.message)).finally(() => setLoading(false));
+  }, [courseId, term]);
+
+  const allStudents = roster?.students || [];
+  const classStudents = allStudents.filter((student) => classStatuses.has(edits[student.student_id]?.status || student.status));
+  const availableStudents = allStudents.filter((student) => !classStatuses.has(edits[student.student_id]?.status || student.status));
+
+  function addStudent() {
+    if (!addStudentId) return;
+    setEdits((current) => ({
+      ...current,
+      [addStudentId]: {
+        ...(current[addStudentId] || {}),
+        status: "Enrolled",
+        grade_value: current[addStudentId]?.grade_value || "",
+        grade_status: "No Grade",
+      },
+    }));
+    setAddStudentId("");
+  }
+
+  function removeStudent(id) {
+    setEdits((current) => ({
+      ...current,
+      [id]: { ...(current[id] || {}), status: "Missing", grade_value: "", grade_status: "No Grade" },
+    }));
+    setOpenMenu(null);
+  }
+
+  function updateGrade(id, value) {
+    const outcome = deriveCourseOutcome(value);
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), grade_value: value, ...outcome } }));
+  }
+
+  function updateRemarks(id, value) {
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), remarks: value } }));
+  }
+
+  async function save() {
+    if (!roster) return;
+    setSaving(true);
+    setError("");
+    try {
+      const ids = allStudents.map((student) => student.student_id);
+      const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
+      const res = await api.saveCourseAudit({
+        course_id: roster.course.id,
+        term,
+        statuses: build("status", "Missing"),
+        grades: build("grade_value"),
+        grade_statuses: build("grade_status", "No Grade"),
+        remarks: build("remarks"),
+      });
+      setResult(res);
+      hydrate(await api.courseAuditRoster(roster.course.id, term));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle title="Course enrollment and grade audit" subtitle="Select a term and subject, manage the class list, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Program">
+          <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
+        </Field>
+        <Field label="Subject" required>
+          <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
+        </Field>
+        <Field label="Term">
+          <Select value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Current / all terms" options={(meta?.terms || []).map((item) => item.label)} />
+        </Field>
+      </div>
+      <ErrorNote message={error} />
+      {result && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-5 w-5" /> {result.message}</div>}
+      {loading ? (
+        <Spinner label="Loading class roster..." />
+      ) : !courseId ? (
+        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the selected term's class list." />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <Field label="Add student to class">
+              <Select value={addStudentId} onChange={(event) => setAddStudentId(event.target.value)} placeholder={availableStudents.length ? "Choose student" : "No available students"} options={availableStudents.map((student) => ({ value: student.student_id, label: `${student.name} - ${student.student_number}` }))} />
+            </Field>
+            <button type="button" onClick={addStudent} disabled={!addStudentId} className="btn-primary cursor-pointer px-4 py-2">Add student</button>
+          </div>
+          {classStudents.length ? (
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+                <p className="text-sm font-semibold text-ink">{roster.course.code} - {roster.course.title}</p>
+                <p className="text-xs text-slate-500">{term || "Current / all terms"} · {classStudents.length} student(s)</p>
+              </div>
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                      <th className="px-4 py-2.5">Student</th>
+                      <th className="px-3 py-2.5">Status</th>
+                      <th className="px-3 py-2.5">Grade</th>
+                      <th className="px-3 py-2.5">Remarks</th>
+                      <th className="px-3 py-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classStudents.map((student) => {
+                      const edit = edits[student.student_id] || {};
+                      const status = edit.status || student.status;
+                      return (
+                        <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
+                          <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                          <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
+                          <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /><p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>
+                          <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /></td>
+                          <td className="relative px-3 py-2.5 text-right">
+                            <button type="button" onClick={() => setOpenMenu(openMenu === student.student_id ? null : student.student_id)} className="inline-grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Open actions for ${student.name}`}><MoreVertical className="h-4 w-4" /></button>
+                            {openMenu === student.student_id && (
+                              <div className="absolute right-3 z-20 mt-1 w-40 rounded-xl border border-slate-200 bg-white p-1 text-left shadow-lift">
+                                <button type="button" onClick={() => removeStudent(student.student_id)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Remove student</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <EmptyState icon={ClipboardCheck} title="No students in this class" hint="Use Add student to class to build the roster for this term." />
+          )}
+          <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : "Save course audit"}</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CourseClassWorkspace({ meta, mode }) {
+  const [programId, setProgramId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [term, setTerm] = useState("");
+  const [roster, setRoster] = useState(null);
+  const [selected, setSelected] = useState({});
+  const [edits, setEdits] = useState({});
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    setSubjects([]);
+    setCourseId("");
+    setRoster(null);
+    setError("");
+    api.courseAuditSubjects(programId || undefined).then((res) => setSubjects(res.items || [])).catch((err) => setError(err.message));
+  }, [programId]);
+
+  function hydrate(res) {
+    setRoster(res);
+    setSelected(Object.fromEntries((res.students || []).map((student) => [student.student_id, false])));
+    setEdits(Object.fromEntries((res.students || []).map((student) => [student.student_id, {
+      status: student.status,
+      grade_value: student.grade_value || "",
+      grade_status: student.grade_status || "No Grade",
+      remarks: student.remarks || "",
+    }])));
+  }
+
+  useEffect(() => {
+    if (!courseId) {
+      setRoster(null);
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    setError("");
+    api.courseAuditRoster(courseId).then(hydrate).catch((err) => setError(err.message)).finally(() => setLoading(false));
+  }, [courseId]);
+
+  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"]);
+  const allStudents = roster?.students || [];
+  const visibleStudents = allStudents.filter((student) => mode === "enrollment" || classStatuses.has(edits[student.student_id]?.status || student.status));
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+  const allSelected = visibleStudents.length > 0 && visibleStudents.every((student) => selected[student.student_id]);
+  const title = mode === "enrollment" ? "Course enrollment" : "Grade audit";
+  const subtitle = mode === "enrollment"
+    ? "Select a term and subject, then add students to the class roster or remove mistaken entries."
+    : "Enter grades for students already in the class. Blank keeps the subject current; INC marks incomplete; 5.00 or F marks failed.";
+
+  function toggle(id) {
+    setSelected((current) => ({ ...current, [id]: !current[id] }));
+  }
+
+  function toggleAll() {
+    const next = !allSelected;
+    setSelected((current) => ({ ...current, ...Object.fromEntries(visibleStudents.map((student) => [student.student_id, next])) }));
+  }
+
+  function setSelectedStatus(status) {
+    setEdits((current) => {
+      const next = { ...current };
+      visibleStudents.forEach((student) => {
+        if (selected[student.student_id]) {
+          next[student.student_id] = {
+            ...(next[student.student_id] || {}),
+            status,
+            grade_value: status === "Missing" ? "" : next[student.student_id]?.grade_value || "",
+            grade_status: status === "Missing" || status === "Enrolled" ? "No Grade" : next[student.student_id]?.grade_status || "No Grade",
+          };
+        }
+      });
+      return next;
+    });
+  }
+
+  function updateGrade(id, value) {
+    const outcome = deriveCourseOutcome(value);
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), grade_value: value, ...outcome } }));
+  }
+
+  function updateRemarks(id, value) {
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), remarks: value } }));
+  }
+
+  async function save() {
+    if (!roster) return;
+    setSaving(true);
+    setError("");
+    try {
+      const ids = allStudents.map((student) => student.student_id);
+      const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
+      const res = await api.saveCourseAudit({
+        course_id: roster.course.id,
+        term,
+        statuses: build("status", "Missing"),
+        grades: build("grade_value"),
+        grade_statuses: build("grade_status", "No Grade"),
+        remarks: build("remarks"),
+      });
+      setResult(res);
+      hydrate(await api.courseAuditRoster(roster.course.id));
+      setEditing(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <SectionTitle title={title} subtitle={subtitle} icon={mode === "enrollment" ? Users : ClipboardCheck} />
+        {roster && <button type="button" onClick={() => setEditing((value) => !value)} className="btn-ghost cursor-pointer px-3 py-2">{editing ? "Normal view" : "Edit view"}</button>}
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Program">
+          <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
+        </Field>
+        <Field label="Subject" required>
+          <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
+        </Field>
+        <Field label="Term">
+          <Input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="AY 2025-2026 Term 1" />
+        </Field>
+      </div>
+      <ErrorNote message={error} />
+      {result && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-5 w-5" /> {result.message}</div>}
+      {loading ? (
+        <Spinner label="Loading class roster..." />
+      ) : !courseId ? (
+        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the class list." />
+      ) : visibleStudents.length ? (
+        <>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+              <p className="text-sm font-semibold text-ink">{roster.course.code} - {roster.course.title}</p>
+              <p className="text-xs text-slate-500">{editing ? `${selectedCount} selected` : `${visibleStudents.length} student(s)`}</p>
+            </div>
+            {editing && mode === "enrollment" && (
+              <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3">
+                <button type="button" onClick={() => setSelectedStatus("Enrolled")} className="btn-ghost cursor-pointer px-3 py-2">Add selected to class</button>
+                <button type="button" onClick={() => setSelectedStatus("Missing")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Remove selected</button>
+              </div>
+            )}
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                    {editing && <th className="px-3 py-2.5 text-center"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 accent-brand-600 cursor-pointer" aria-label="Select all students" /></th>}
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-3 py-2.5">Status</th>
+                    {mode === "grades" && <th className="px-3 py-2.5">Grade</th>}
+                    <th className="px-3 py-2.5">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleStudents.map((student) => {
+                    const edit = edits[student.student_id] || {};
+                    const status = edit.status || student.status;
+                    return (
+                      <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
+                        {editing && <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[student.student_id]} onChange={() => toggle(student.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${student.name}`} /></td>}
+                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                        <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
+                        {mode === "grades" && <td className="px-3 py-2.5">{editing ? <Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /> : <p className="font-semibold text-ink">{edit.grade_value || "No grade"}</p>}<p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>}
+                        <td className="px-3 py-2.5">{editing ? <Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /> : <span className="text-slate-600">{edit.remarks || "-"}</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {editing && <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : mode === "enrollment" ? "Save enrollment" : "Save grade audit"}</button>}
+        </>
+      ) : (
+        <EmptyState icon={ClipboardCheck} title={mode === "grades" ? "No students in this class yet" : "No students found"} hint={mode === "grades" ? "Use Course enrollment first to add students to this class." : ""} />
+      )}
+    </div>
+  );
+}
+
+function CourseAuditRosterV2({ meta }) {
+  const [programId, setProgramId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [term, setTerm] = useState("");
+  const [roster, setRoster] = useState(null);
+  const [selected, setSelected] = useState({});
+  const [edits, setEdits] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const statuses = ["Missing", "Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"];
+
+  useEffect(() => {
+    setSubjects([]);
+    setCourseId("");
+    setRoster(null);
+    api.courseAuditSubjects(programId || undefined).then((res) => setSubjects(res.items)).catch((e) => setError(e.message));
+  }, [programId]);
+
+  function hydrate(res) {
+    setRoster(res);
+    setSelected(Object.fromEntries(res.students.map((s) => [s.student_id, ["Enrolled", "Current"].includes(s.status)])));
+    setEdits(Object.fromEntries(res.students.map((s) => [s.student_id, {
+      status: s.status,
+      grade_value: s.grade_value || "",
+      grade_status: s.grade_status || "No Grade",
+      incomplete_deadline: s.incomplete_deadline || "",
+      remarks: s.remarks || "",
+    }])));
+  }
+
+  useEffect(() => {
+    if (!courseId) {
+      setRoster(null);
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    api.courseAuditRoster(courseId).then(hydrate).catch((e) => setError(e.message)).finally(() => setLoading(false));
+  }, [courseId]);
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+  const allSelected = roster && roster.students.length > 0 && selectedCount === roster.students.length;
+
+  function toggle(id) {
+    setSelected((current) => ({ ...current, [id]: !current[id] }));
+  }
+  function toggleAll() {
+    if (!roster) return;
+    const next = !allSelected;
+    setSelected(Object.fromEntries(roster.students.map((s) => [s.student_id, next])));
+  }
+  function updateStudent(id, key, value) {
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), [key]: value } }));
+  }
+  function bulkStatus(status) {
+    if (!roster) return;
+    setEdits((current) => {
+      const next = { ...current };
+      roster.students.forEach((student) => {
+        if (selected[student.student_id]) {
+          next[student.student_id] = {
+            ...(next[student.student_id] || {}),
+            status,
+            grade_status: status === "Completed" ? "Passed" : status === "Incomplete" ? "Incomplete" : status === "Failed" ? "Failed" : "No Grade",
+          };
+        }
+      });
+      return next;
+    });
+  }
+
+  async function save() {
+    if (!roster) return;
+    setSaving(true);
+    setError("");
+    try {
+      const ids = roster.students.map((s) => s.student_id);
+      const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
+      const res = await api.saveCourseAudit({
+        course_id: roster.course.id,
+        term,
+        statuses: build("status", "Missing"),
+        grades: build("grade_value"),
+        grade_statuses: build("grade_status", "No Grade"),
+        incomplete_deadlines: build("incomplete_deadline"),
+        remarks: build("remarks"),
+      });
+      setResult(res);
+      hydrate(await api.courseAuditRoster(roster.course.id));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle title="Course enrollment and grade audit" subtitle="Bulk enroll a class, then record completions, incompletes, failures, drops, and grades" icon={ClipboardCheck} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Program">
+          <Select value={programId} onChange={(e) => setProgramId(e.target.value)} placeholder="All programs" options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))} />
+        </Field>
+        <Field label="Subject" required>
+          <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))} />
+        </Field>
+        <Field label="Audit term">
+          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 Term 1" />
+        </Field>
+      </div>
+      <ErrorNote message={error} />
+      {result && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-5 w-5" /> {result.message}</div>}
+      {loading ? (
+        <Spinner label="Loading class roster..." />
+      ) : !courseId ? (
+        <EmptyState icon={ClipboardCheck} title="Choose a subject to audit" hint="Pick a subject above to see its class roster." />
+      ) : roster && roster.students.length > 0 ? (
+        <>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+              <p className="text-sm font-semibold text-ink">{roster.course.code} — {roster.course.title}</p>
+              <p className="text-xs text-slate-500">{selectedCount} of {roster.students.length} selected</p>
+            </div>
+            <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3">
+              {["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"].map((status) => (
+                <button key={status} type="button" onClick={() => bulkStatus(status)} className={`btn-ghost cursor-pointer px-3 py-2 ${status === "Failed" ? "text-red-600" : ""}`}>Mark {status.toLowerCase()}</button>
+              ))}
+            </div>
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                    <th className="px-3 py-2.5 text-center"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 accent-brand-600 cursor-pointer" aria-label="Select all students" /></th>
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-3 py-2.5">Status</th>
+                    <th className="px-3 py-2.5">Grade</th>
+                    <th className="px-3 py-2.5">Incomplete deadline</th>
+                    <th className="px-3 py-2.5">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roster.students.map((s) => {
+                    const edit = edits[s.student_id] || {};
+                    return (
+                      <tr key={s.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
+                        <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[s.student_id]} onChange={() => toggle(s.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${s.name}`} /></td>
+                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{s.name}</p><p className="text-xs text-slate-400">{s.student_number} · {s.program_code}</p>{s.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                        <td className="px-3 py-2.5"><Select value={edit.status || s.status} onChange={(e) => updateStudent(s.student_id, "status", e.target.value)} options={statuses} placeholder="" /></td>
+                        <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(e) => updateStudent(s.student_id, "grade_value", e.target.value)} placeholder="e.g. 1.25" /><p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>
+                        <td className="px-3 py-2.5"><Input type="date" value={edit.incomplete_deadline || ""} onChange={(e) => updateStudent(s.student_id, "incomplete_deadline", e.target.value)} disabled={edit.status !== "Incomplete"} /></td>
+                        <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(e) => updateStudent(s.student_id, "remarks", e.target.value)} placeholder="Optional" /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : "Save class audit"}</button>
+        </>
+      ) : (
+        <EmptyState icon={ClipboardCheck} title="No students found for this subject" />
+      )}
     </div>
   );
 }
