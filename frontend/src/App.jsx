@@ -25,7 +25,7 @@ function homeFor(user) {
   if (!user) return "/login";
   if (user.role === "student") return "/student";
   if (user.role === "dean") return "/approvals";
-  if (user.role === "academic_coordinator") return "/workflow/practicum";
+  if (user.role === "academic_coordinator") return "/workflow/research-gate";
   if (user.role === "research_coordinator") return "/workflow/graduation";
   if (user.role === "registrar") return "/workflow/withdrawal";
   return "/";

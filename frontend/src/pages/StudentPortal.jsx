@@ -522,14 +522,8 @@ function ResearchRequestForm({ data, onSaved }) {
       <Field label="Message to the Research Coordinator" hint="Optional context for this submission.">
         <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
       </Field>
-      <SubmitState
-        busy={busy}
-        error={error}
-        message={message}
-        disabled={!milestone?.student_uploads_ready || (progress.stage === "Title Defense" && !form.research_title.trim())}
-        label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Enter the research title shown on Form 1." : ""}
-      />
+      {error && <ErrorNote message={error} />}
+      {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{message}</div>}
     </form>
   );
 }
@@ -540,11 +534,12 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
   const [error, setError] = useState("");
   const needed = requirement.required_file_count;
   const files = requirement.files || [];
-  const conceptPapersLocked = panelLocked && requirement.item_name === "Three concept papers";
+  const titlePackageItem = requirement.item_name === "Form 1 - Application for Title Defense" || requirement.item_name === "Three concept papers";
+  const titlePackageLocked = panelLocked && titlePackageItem;
 
   async function upload(file) {
-    if (conceptPapersLocked) {
-      setError("Concept papers are locked because a panel has already been matched.");
+    if (titlePackageLocked) {
+      setError("Title-defense uploads are locked because a panel has already been matched.");
       return;
     }
     if (!file) return;
@@ -564,8 +559,8 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
     }
   }
 
-  async function removeConceptPaper(file) {
-    if (conceptPapersLocked) return;
+  async function removeResearchFile(file) {
+    if (titlePackageLocked) return;
     const confirmed = window.confirm(`Remove "${file.name}"? This will revoke the Academic Coordinator endorsement and clear the current Panel Matching result.`);
     if (!confirmed) return;
     setRemovingId(file.id);
@@ -590,9 +585,9 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={requirement.status_label} dot={false} />
-          <label className={`btn-ghost ${conceptPapersLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-          {conceptPapersLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {conceptPapersLocked ? "Locked after panel match" : busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
-          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || conceptPapersLocked} onChange={(e) => upload(e.target.files?.[0])} />
+          <label className={`btn-ghost ${titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+          {titlePackageLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
+          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
           </label>
         </div>
       </div>
@@ -603,8 +598,8 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
               <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
                 {file.name}<Eye className="h-3.5 w-3.5" />
               </a>
-              {requirement.item_name === "Three concept papers" && (
-                <button type="button" onClick={() => removeConceptPaper(file)} disabled={conceptPapersLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={conceptPapersLocked ? "Locked after panel matching" : "Remove concept paper"}>
+              {titlePackageItem && (
+                <button type="button" onClick={() => removeResearchFile(file)} disabled={titlePackageLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -612,7 +607,7 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
           ))}
         </div>
       )}
-      {requirement.item_name === "Three concept papers" && files.length > 0 && <p className={`mt-2 text-xs ${conceptPapersLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{conceptPapersLocked ? "This concept-paper set is read-only because a panel has already been matched." : "Removing any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete three-paper set must be endorsed again."}</p>}
+      {titlePackageItem && files.length > 0 && <p className={`mt-2 text-xs ${titlePackageLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{titlePackageLocked ? "This title-defense package is read-only because a panel has already been matched." : "Removing Form 1 or any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete title-defense package must be endorsed again."}</p>}
       {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
     </div>
   );

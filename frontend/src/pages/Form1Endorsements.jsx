@@ -5,7 +5,7 @@ import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, SectionTitle, Spinner, StatusBadge } from "../components/ui";
 import { formatDate } from "../lib/format";
 
-export default function Form1Endorsements() {
+export function Form1EndorsementQueue({ embedded = false }) {
   const { data, loading, error, refetch } = useApi(() => api.form1Endorsements(), []);
   const [selectedId, setSelectedId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -145,12 +145,14 @@ export default function Form1Endorsements() {
 
   if (loading) return <Spinner label="Loading Form 1 endorsement queue..." />;
 
+  const Frame = embedded ? "div" : Card;
+
   return (
-    <div className="space-y-5 animate-fade-up">
-      <Card className="p-6">
+    <div className={embedded ? "space-y-5" : "space-y-5 animate-fade-up"}>
+      <Frame className={embedded ? "" : "p-6"}>
         <SectionTitle title="Form 1 Endorsements" subtitle="Academic Coordinator review and in-system signature queue" icon={FileSignature} />
         <p className="text-sm text-slate-600">Review the student's uploaded Form 1 and details before endorsing. The endorsement immediately updates Research Gate progress.</p>
-      </Card>
+      </Frame>
       <ErrorNote message={error || submitError} />
       {message && <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" />{message}</div>}
 
@@ -202,4 +204,8 @@ export default function Form1Endorsements() {
       )}
     </div>
   );
+}
+
+export default function Form1Endorsements() {
+  return <Form1EndorsementQueue />;
 }

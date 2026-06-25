@@ -46,6 +46,7 @@ import StudentPicker from "../components/StudentPicker";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 import { formatDate } from "../lib/format";
 import { useAuth } from "../auth";
+import { Form1EndorsementQueue } from "./Form1Endorsements";
 
 const WORKFLOW_ROLE_LABELS = {
   staff: "Graduate School Staff",
@@ -247,11 +248,12 @@ export default function WorkflowPage() {
             <Card className="p-6">
               <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
             </Card>
+          ) : slug === "research-gate" ? (
+            <ResearchGateForm {...formProps} />
           ) : (
             <Card className="p-6">
               {slug === "student-handoff" && <HandoffPanel {...formProps} />}
               {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
-              {slug === "research-gate" && <ResearchGateForm {...formProps} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
               {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
               {slug === "practicum" && <PracticumRoster {...formProps} />}
@@ -935,7 +937,8 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
 // ---------------------------------------------------------------------------
 // Research Gate
 // ---------------------------------------------------------------------------
-function ResearchGateForm({ context, studentId, submit, submitting }) {
+function ResearchGateForm({ context, studentId, submit, submitting, result, submitError }) {
+  const { user } = useAuth();
   const student = context.selected_student || {};
   const researchCase = context.research_case || {};
   const progress = context.research_progress || {};
@@ -944,6 +947,9 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
   const completed = requirements.filter((item) => item.status === "Complete");
   const pending = requirements.filter((item) => item.status !== "Complete");
   const panel = context.panel_status || {};
+  const scheduleRequirement = requirements.find((item) => item.source_type?.includes("schedule"));
+  const outcomeRequirement = requirements.find((item) => item.source_type === "system_defense_result");
+  const canRecordDefenseOutcome = user?.role === "staff" && outcomeRequirement && scheduleRequirement?.status === "Complete";
 
   function onSubmit(e) {
     e.preventDefault();
@@ -1003,10 +1009,10 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
                 </div>
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
                   <StatusBadge value={requirement.status_label} dot={false} />
-                  {requirement.source_type === "coordinator_endorsement" && (
-                    <Link to="/form1-endorsements" className="btn-primary cursor-pointer justify-center whitespace-nowrap">
+                  {requirement.source_type === "coordinator_endorsement" && user?.role === "academic_coordinator" && (
+                    <a href="#form1-endorsement-queue" className="btn-primary cursor-pointer justify-center whitespace-nowrap">
                       <UserRoundCheck className="h-4 w-4" /> Form 1 endorsements
-                    </Link>
+                    </a>
                   )}
                 </div>
               </div>
@@ -1031,6 +1037,41 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
       </div>
 
       <SubmitButton submitting={submitting}>Verify submitted requirements</SubmitButton>
+      <WorkflowSubmitFeedback result={result} error={submitError} />
+
+      {outcomeRequirement && (
+        <section className={`rounded-2xl border p-5 ${outcomeRequirement.status === "Complete" ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Defense result gate</p>
+              <h3 className="mt-1 font-display text-lg font-semibold text-ink">{outcomeRequirement.label}</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                {scheduleRequirement?.status === "Complete"
+                  ? "Record whether the scheduled defense was passed before the student can move to the next Research Gate stage."
+                  : "Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded."}
+              </p>
+            </div>
+            <StatusBadge value={outcomeRequirement.status_label} dot={false} />
+          </div>
+          {user?.role === "staff" && outcomeRequirement.status !== "Complete" && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" disabled={!canRecordDefenseOutcome || submitting} onClick={() => submit({ student_id: studentId, defense_outcome: "Passed" })} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60">
+                <CheckCircle2 className="h-4 w-4" /> Mark Passed
+              </button>
+              <button type="button" disabled={!canRecordDefenseOutcome || submitting} onClick={() => submit({ student_id: studentId, defense_outcome: "Failed" })} className="btn-ghost cursor-pointer px-4 py-2 text-red-700 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
+                <X className="h-4 w-4" /> Mark Failed
+              </button>
+              {!canRecordDefenseOutcome && <p className="self-center text-xs font-semibold text-amber-700">Schedule confirmation is required before recording the result.</p>}
+            </div>
+          )}
+        </section>
+      )}
+
+      {user?.role === "academic_coordinator" && (
+        <section id="form1-endorsement-queue" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <Form1EndorsementQueue embedded />
+        </section>
+      )}
     </form>
   );
 }

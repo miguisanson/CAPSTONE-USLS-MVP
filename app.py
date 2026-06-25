@@ -1189,7 +1189,7 @@ BACKOFFICE_ROLES = {
 }
 
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"practicum", "graduation", "withdrawal"},
+    "academic_coordinator": {"research-gate", "practicum", "graduation", "withdrawal"},
     "research_coordinator": {"graduation"},
     "registrar": {"graduation", "withdrawal"},
 }
@@ -2158,8 +2158,8 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": f"This upload belongs to {progress['stage']}, the automatically detected current stage."}), 400
         if item_name not in required_documents_for_gate(gate):
             return jsonify({"error": "Choose a valid requirement for this gate."}), 400
-        if item_name == "Three concept papers" and PanelAssignment.query.filter_by(student_id=student.id).count():
-            return jsonify({"error": "Concept papers are locked because a panel has already been matched."}), 409
+        if gate == "Form 1 - Title Defense" and item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and PanelAssignment.query.filter_by(student_id=student.id).count():
+            return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
         presentation = research_requirement_presentation(gate, item_name)
         if not presentation or presentation["source_type"] != "student_upload":
             return jsonify({"error": "This requirement is completed by staff or by the system and does not accept a student upload."}), 400
@@ -2193,10 +2193,11 @@ def register_routes(app: Flask) -> None:
         student = Student.query.get_or_404(account.student_id)
         evidence = ResearchEvidenceFile.query.filter_by(id=evidence_id, student_id=student.id).first_or_404()
         doc = evidence.document_check
-        if doc.item_name != "Three concept papers":
-            return jsonify({"error": "Only concept-paper uploads can be removed from the student view."}), 400
-        if PanelAssignment.query.filter_by(student_id=student.id).count():
-            return jsonify({"error": "Concept papers are locked because a panel has already been matched."}), 409
+        removable_title_items = {"Form 1 - Application for Title Defense", "Three concept papers"}
+        if doc.item_name not in removable_title_items:
+            return jsonify({"error": "Only Form 1 and concept-paper uploads can be removed from the student view."}), 400
+        if doc.gate == "Form 1 - Title Defense" and PanelAssignment.query.filter_by(student_id=student.id).count():
+            return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
 
         stored_path = UPLOAD_ROOT / evidence.stored_name
         original_name = evidence.original_name
@@ -2215,7 +2216,7 @@ def register_routes(app: Flask) -> None:
         doc.evidence_reference = ", ".join(item.original_name for item in remaining) or None
         doc.updated_at = now_utc()
 
-        # The endorsement and panel recommendation approve the exact paper set.
+        # The endorsement and panel recommendation approve the exact title package.
         # Any deletion changes that set, so both downstream results are revoked.
         panel_invalidated = True
         PanelAssignment.query.filter_by(student_id=student.id).delete()
@@ -2238,16 +2239,16 @@ def register_routes(app: Flask) -> None:
             student.id,
             "Student",
             original_name,
-            "Concept paper removed",
+            f"{doc.item_name} removed",
             "Student" if len(remaining) < required_count else "Academic Coordinator",
-            f"Student removed a concept-paper upload. {len(remaining)} of {required_count} remain. "
+            f"Student removed a title-defense upload. {len(remaining)} of {required_count} remain for {doc.item_name}. "
             "Academic Coordinator endorsement was revoked and Panel Matching was cleared.",
         )
         db.session.commit()
         stored_path.unlink(missing_ok=True)
         return jsonify({
             "ok": True,
-            "message": "Concept paper removed. The Academic Coordinator must endorse the completed three-paper set again, and Panel Matching must be rerun.",
+            "message": "Upload removed. The Academic Coordinator must endorse the completed title-defense package again, and Panel Matching must be rerun.",
             "remaining_count": len(remaining),
             "panel_invalidated": panel_invalidated,
             "endorsement_revoked": endorsement_revoked,
@@ -2580,8 +2581,8 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
-        if doc.item_name == "Three concept papers" and PanelAssignment.query.filter_by(student_id=student.id).count():
-            return jsonify({"error": "Concept papers are locked because a panel has already been matched."}), 409
+        if doc.gate == "Form 1 - Title Defense" and doc.item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and PanelAssignment.query.filter_by(student_id=student.id).count():
+            return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Please choose a PDF supporting document."}), 400
@@ -2654,7 +2655,7 @@ def register_routes(app: Flask) -> None:
         return Response(body, mimetype="text/html")
 
     @app.route("/api/research-gate/form1-endorsements")
-    @require_api_login("staff")
+    @require_api_login("academic_coordinator")
     def form1_endorsement_queue():
         form_docs = (
             DocumentCheck.query.filter_by(gate="Form 1 - Title Defense", item_name="Form 1 - Application for Title Defense")
@@ -2678,7 +2679,7 @@ def register_routes(app: Flask) -> None:
         return jsonify({"items": rows})
 
     @app.route("/api/research-gate/form1-endorsements/<int:student_id>", methods=["POST"])
-    @require_api_login("staff")
+    @require_api_login("academic_coordinator")
     def endorse_form1(student_id: int):
         student = Student.query.get_or_404(student_id)
         data = request_payload()
@@ -4997,14 +4998,18 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             )
             context["assigned_panel"] = [panel_assignment_dict(p) for p in assignments]
             requirements = progress["milestone"]["requirements"]
+            schedule_blockers = [
+                item for item in requirements
+                if item["source_type"] not in {"system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result"}
+            ]
             context["schedule_readiness"] = {
                 "stage": progress["stage"],
                 "gate": progress["gate"],
                 "status": progress["status"],
-                "ready": progress["milestone"]["overall_complete"],
+                "ready": all(item["status"] == "Complete" for item in schedule_blockers),
                 "requirements": requirements,
-                "completed_count": sum(item["status"] == "Complete" for item in requirements),
-                "pending_count": sum(item["status"] != "Complete" for item in requirements),
+                "completed_count": sum(item["status"] == "Complete" for item in schedule_blockers),
+                "pending_count": sum(item["status"] != "Complete" for item in schedule_blockers),
                 "research_title": research_case.title,
                 "adviser_name": research_case.adviser_name or selected_student.adviser_name,
             }
@@ -5851,6 +5856,41 @@ def handle_research_gate(data: MultiDict) -> int:
     student = Student.query.get_or_404(int(data["student_id"]))
     research_case, progress = sync_research_progress(student)
     gate = progress["gate"]
+    defense_outcome = (data.get("defense_outcome") or "").strip()
+    if defense_outcome:
+        account = require_workflow_actor("staff")
+        if defense_outcome not in {"Passed", "Failed"}:
+            raise ValueError("Choose Passed or Failed for the defense result.")
+        defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+        if not defense_type:
+            raise ValueError("This Research Gate stage does not use a defense result.")
+        if not active_schedule_for_gate(student, gate):
+            raise ValueError(f"Confirm the {defense_type} schedule before recording a defense result.")
+        incomplete = [
+            item["label"]
+            for item in progress["milestone"]["requirements"]
+            if item["source_type"] != "system_defense_result" and item["status"] != "Complete"
+        ]
+        if incomplete:
+            raise ValueError("Complete the current Research Gate requirements before recording the defense result: " + ", ".join(incomplete))
+        next_owner = "Student" if defense_outcome == "Failed" else "Research Coordinator"
+        if defense_outcome == "Failed":
+            reset_research_gate_after_failed_defense(student, gate)
+            add_task(student.id, f"Resubmit {defense_type} requirements", "Student", 5, 45)
+        add_log(
+            "research-gate",
+            student.id,
+            "GS Staff",
+            gate,
+            f"{defense_type}: {defense_outcome}",
+            next_owner,
+            (
+                f"{workflow_actor_label(account)} recorded that the student {defense_outcome.lower()} the scheduled {defense_type}. "
+                + ("The current-stage documents were reset for resubmission." if defense_outcome == "Failed" else "The student may proceed to the next Research Gate stage.")
+            ),
+        )
+        sync_research_progress(student)
+        return student.id
     required_items = required_documents_for_gate(gate)
     checks = ensure_research_document_checks(student.id, gate)
     submitted_items = set()
@@ -5863,7 +5903,6 @@ def handle_research_gate(data: MultiDict) -> int:
         present = (
             presentation["source_type"] == "staff"
             and research_student_uploads_ready(student, gate)
-            and research_milestone_submission(student, gate)
         ) or state["status"] == "Complete" or (
             presentation["source_type"] == "student_upload" and state["status"] == "Submitted"
         )
@@ -6004,6 +6043,7 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         item["label"]
         for item in progress["milestone"]["requirements"]
         if item["status"] != "Complete"
+        and item["source_type"] not in {"system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result"}
     ]
     if missing_requirements and not override_requirements:
         raise ValueError(
@@ -7404,6 +7444,24 @@ RESEARCH_MILESTONES = {
     },
 }
 
+RESEARCH_GATE_DEFENSE_TYPES = {
+    "Form 1 - Title Defense": "Title Defense",
+    "Form 4 - Proposal Defense Readiness": "Proposal Defense",
+    "Final Defense": "Final Defense",
+}
+
+RESEARCH_DEFENSE_RESULT_ITEMS = {
+    "Form 1 - Title Defense": "Title defense result",
+    "Form 4 - Proposal Defense Readiness": "Proposal defense result",
+    "Final Defense": "Final defense result",
+}
+
+RESEARCH_DEFENSE_SCHEDULE_ITEMS = {
+    "Form 1 - Title Defense": "Confirmed title defense schedule",
+    "Form 4 - Proposal Defense Readiness": "Agreed defense schedule in Form 4",
+    "Final Defense": "Agreed final defense schedule",
+}
+
 # The first incomplete milestone is the student's detected Research Gate stage.
 # Completion Evidence remains available to graduation checks, but it does not
 # create a fifth student-facing research stage.
@@ -7431,6 +7489,18 @@ RESEARCH_REQUIREMENTS = {
         "label": "Academic Coordinator endorsement",
         "description": "Recorded by the Academic Coordinator after reviewing the submission.",
         "source_type": "coordinator_endorsement",
+        "required_file_count": 0,
+    },
+    "Confirmed title defense schedule": {
+        "label": "Confirmed title defense schedule",
+        "description": "Added automatically after staff confirms a shared title defense schedule.",
+        "source_type": "system_title_schedule",
+        "required_file_count": 0,
+    },
+    "Title defense result": {
+        "label": "Title defense result",
+        "description": "Recorded by GS Staff after the scheduled title defense.",
+        "source_type": "system_defense_result",
         "required_file_count": 0,
     },
     "Recommended panel set": {
@@ -7469,6 +7539,12 @@ RESEARCH_REQUIREMENTS = {
         "source_type": "system_proposal_schedule",
         "required_file_count": 0,
     },
+    "Proposal defense result": {
+        "label": "Proposal defense result",
+        "description": "Recorded by GS Staff after the scheduled proposal defense.",
+        "source_type": "system_defense_result",
+        "required_file_count": 0,
+    },
     "Form 4 - Endorsement for Final Defense": {
         "label": "Final defense endorsement",
         "description": "Recorded by the adviser or Research Coordinator after final-manuscript review.",
@@ -7497,6 +7573,12 @@ RESEARCH_REQUIREMENTS = {
         "label": "Confirmed final defense schedule",
         "description": "Added automatically after staff confirms a shared final defense schedule.",
         "source_type": "system_final_schedule",
+        "required_file_count": 0,
+    },
+    "Final defense result": {
+        "label": "Final defense result",
+        "description": "Recorded by GS Staff after the scheduled final defense.",
+        "source_type": "system_defense_result",
         "required_file_count": 0,
     },
     "Soft copy of final manuscript": {
@@ -7623,15 +7705,20 @@ def research_requirement_state(
             and concept_paper_package_ready(student.id)
         )
         return {"status": "Complete" if complete else "Pending", "status_label": "Endorsed" if complete else "Pending"}
-    if source_type in {"system_proposal_schedule", "system_final_schedule"}:
-        schedule_query = ScheduleRequest.query.filter(
-            ScheduleRequest.student_id == student.id,
-            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
-        ) if student else None
-        schedules = schedule_query.order_by(ScheduleRequest.created_at.desc()).all() if schedule_query else []
-        expected = "Proposal Defense" if source_type == "system_proposal_schedule" else "Final Defense"
-        complete = any(expected in (schedule.notes or "") for schedule in schedules)
+    if source_type in {"system_title_schedule", "system_proposal_schedule", "system_final_schedule"}:
+        complete = bool(student and active_schedule_for_gate(student, gate))
         return {"status": "Complete" if complete else "Pending", "status_label": "Completed" if complete else "Pending confirmed schedule"}
+    if source_type == "system_defense_result":
+        outcome = latest_defense_outcome(student, gate) if student else None
+        if outcome and outcome["result"] == "Passed":
+            return {"status": "Complete", "status_label": "Passed"}
+        if outcome and outcome["result"] == "Failed":
+            return {"status": "Pending", "status_label": "Failed - resubmit requirements"}
+        schedule_complete = bool(student and active_schedule_for_gate(student, gate))
+        return {
+            "status": "Pending",
+            "status_label": "Awaiting defense result" if schedule_complete else "Pending confirmed schedule",
+        }
     if not student or not research_student_uploads_ready(student, gate):
         return {"status": "Pending", "status_label": "Waiting for student files"}
     if not research_milestone_submission(student, gate):
@@ -7685,6 +7772,8 @@ def research_stage_status(milestone: dict) -> str:
     requirements = milestone["requirements"]
     if milestone["overall_complete"]:
         return "Complete"
+    if any(item["source_type"] == "system_defense_result" and item["status_label"].startswith("Failed") for item in requirements):
+        return "Defense Failed - Resubmit Requirements"
     if any(item["status"] == "Missing" for item in requirements if item["student_upload"]):
         return "Missing Requirements"
     if any(item["status"] == "Submitted" for item in requirements):
@@ -7768,6 +7857,8 @@ def required_documents_for_gate(gate: str) -> list[str]:
             "Form 1 - Application for Title Defense",
             "Three concept papers",
             "Academic Coordinator endorsement/e-signature",
+            "Confirmed title defense schedule",
+            "Title defense result",
         ]
     if gate == "Form 4 - Proposal Defense Readiness":
         return [
@@ -7776,6 +7867,7 @@ def required_documents_for_gate(gate: str) -> list[str]:
             "Adviser e-signature/endorsement",
             "Form 4.1 Statistical Consultation Form or qualitative exemption",
             "Agreed defense schedule in Form 4",
+            "Proposal defense result",
         ]
     if gate == "Ethics Review":
         return ["Ethics Clearance"]
@@ -7786,6 +7878,7 @@ def required_documents_for_gate(gate: str) -> list[str]:
             "Ethics Clearance",
             "Panel received manuscript at least 14 days before defense",
             "Agreed final defense schedule",
+            "Final defense result",
         ]
     return [
         "Soft copy of final manuscript",
@@ -7847,6 +7940,79 @@ def infer_submitted_research_items(gate: str, package_text: str) -> set[str]:
         if any(alias.lower() in text_value for alias in aliases):
             detected.add(item)
     return detected
+
+
+def latest_defense_outcome(student: Student, gate: str) -> dict | None:
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    if not student or not defense_type:
+        return None
+    log = (
+        TransactionLog.query.filter_by(
+            transaction_slug="research-gate",
+            student_id=student.id,
+            source_reference=gate,
+        )
+        .filter(TransactionLog.result.in_([f"{defense_type}: Passed", f"{defense_type}: Failed"]))
+        .order_by(TransactionLog.created_at.desc())
+        .first()
+    )
+    if not log:
+        return None
+    return {
+        "result": "Passed" if log.result.endswith(": Passed") else "Failed",
+        "defense_type": defense_type,
+        "gate": gate,
+        "recorded_at": iso(log.created_at),
+        "notes": log.notes,
+    }
+
+
+def active_schedule_for_gate(student: Student, gate: str) -> ScheduleRequest | None:
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    if not student or not defense_type:
+        return None
+    return (
+        ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+            ScheduleRequest.defense_type == defense_type,
+        )
+        .order_by(ScheduleRequest.confirmed_at.desc(), ScheduleRequest.created_at.desc())
+        .first()
+    )
+
+
+def reset_research_gate_after_failed_defense(student: Student, gate: str) -> list[str]:
+    removed_paths = []
+    docs = DocumentCheck.query.filter_by(student_id=student.id, gate=gate).all()
+    for doc in docs:
+        presentation = research_requirement_presentation(gate, doc.item_name)
+        if not presentation:
+            continue
+        if presentation["source_type"] == "student_upload":
+            for evidence in list(doc.evidence_files):
+                removed_paths.append(evidence.stored_name)
+                db.session.delete(evidence)
+            doc.status = "Missing"
+            doc.evidence_reference = None
+        elif presentation["source_type"] in {"staff", "coordinator_endorsement", "system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result"}:
+            doc.status = "Missing"
+            doc.evidence_reference = None
+        doc.updated_at = now_utc()
+    if gate == "Form 1 - Title Defense":
+        revoke_form1_endorsement(student.id)
+        PanelAssignment.query.filter_by(student_id=student.id).delete()
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    if defense_type:
+        active_schedules = ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+            ScheduleRequest.defense_type == defense_type,
+        ).all()
+        for schedule in active_schedules:
+            schedule.status = "Failed"
+            schedule.conflict_reason = "Defense marked failed; student must resubmit this Research Gate stage."
+    return removed_paths
 
 
 def research_case_type(student: Student) -> str:
