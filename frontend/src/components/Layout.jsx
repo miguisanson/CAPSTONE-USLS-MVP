@@ -52,7 +52,7 @@ const NAV_GROUPS = [
       { to: "/curriculum-planning", label: "2 · Curriculum Planning", icon: BookOpenCheck },
       { to: "/course-adjustments", label: "3 · Course Adjustments", icon: SlidersHorizontal },
       { to: "/workflow/course-audit", label: "4 · Course Audit", icon: ClipboardCheck },
-      { to: "/workflow/research-gate", label: "5 · Research Gate", icon: FileCheck },
+      { to: "/workflow/research-gate", label: "5 - Research Gate", icon: FileCheck },
       { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
       { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
       { to: "/workflow/practicum", label: "8 · Practicum", icon: Briefcase },
@@ -113,9 +113,13 @@ function NavItem({ to, label, icon: Icon, end, onClick }) {
 
 function SidebarContent({ onNavigate, user }) {
   const allowedPaths = ROLE_PATHS[user?.role];
-  const groups = allowedPaths
-    ? NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => allowedPaths.has(item.to)) })).filter((group) => group.items.length)
-    : NAV_GROUPS;
+  const roleAllowed = (item) => !item.roles || item.roles.includes(user?.role);
+  const groups = NAV_GROUPS
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => roleAllowed(item) && (!allowedPaths || allowedPaths.has(item.to))),
+    }))
+    .filter((group) => group.items.length);
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 px-5 py-5">
