@@ -33,6 +33,13 @@ db = SQLAlchemy()
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "research_evidence"
 REQUEST_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "student_requests"
+BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+RAG_DOCUMENT_PATHS = [
+    BASE_DIR / "data",
+    BASE_DIR / "Documents" / "USLS_Documents",
+]
+_RAG_CHAT_ENGINE = None
+_RAG_LOAD_ERROR = None
 
 # This demo keeps the Flask API, SQLAlchemy models, workflow rules, RAG prototype,
 # and seed data in one file so evaluators can trace a workflow end-to-end quickly.
@@ -1755,6 +1762,138 @@ def _status_sentence(student: Student, ind: dict) -> str:
     return ", ".join(bits) + "."
 
 
+def _rag_document_files() -> list[Path]:
+    configured = os.getenv("RAG_DOCUMENT_DIRS", "").strip()
+    roots = [Path(p.strip()) for p in configured.split(os.pathsep) if p.strip()] if configured else RAG_DOCUMENT_PATHS
+    supported = {".pdf", ".docx", ".txt", ".md"}
+    files: list[Path] = []
+    for root in roots:
+        path = root if root.is_absolute() else BASE_DIR / root
+        if path.is_file() and path.suffix.lower() in supported and path.stat().st_size > 0:
+            files.append(path)
+        elif path.is_dir():
+            files.extend(
+                item
+                for item in path.rglob("*")
+                if item.is_file() and item.suffix.lower() in supported and item.stat().st_size > 0
+            )
+    return sorted(dict.fromkeys(files))
+
+
+def _load_rag_chat_engine():
+    """Build and cache a LlamaIndex chat engine over local handbook/research files."""
+    global _RAG_CHAT_ENGINE, _RAG_LOAD_ERROR
+    if _RAG_CHAT_ENGINE is not None:
+        return _RAG_CHAT_ENGINE
+    if _RAG_LOAD_ERROR is not None:
+        raise RuntimeError(_RAG_LOAD_ERROR)
+
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    if not api_key:
+        _RAG_LOAD_ERROR = "GOOGLE_API_KEY not found in .env file."
+        raise RuntimeError(_RAG_LOAD_ERROR)
+
+    files = _rag_document_files()
+    if not files:
+        _RAG_LOAD_ERROR = "No RAG documents found. Add PDF, DOCX, TXT, or MD files to data/ or Documents/USLS_Documents/."
+        raise RuntimeError(_RAG_LOAD_ERROR)
+
+    try:
+        from llama_index.core import Settings, SimpleDirectoryReader, VectorStoreIndex
+        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+        from llama_index.llms.gemini import Gemini
+        from llama_index.readers.file import PyMuPDFReader
+    except ImportError as exc:
+        _RAG_LOAD_ERROR = (
+            "LlamaIndex RAG packages are not installed. Run pip install -r requirements.txt, "
+            f"then restart the app. Missing import: {exc}"
+        )
+        raise RuntimeError(_RAG_LOAD_ERROR) from exc
+
+    try:
+        Settings.llm = Gemini(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            api_key=api_key,
+        )
+    except TypeError:
+        Settings.llm = Gemini(model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    Settings.embed_model = HuggingFaceEmbedding(
+        model_name=os.getenv("RAG_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+    )
+    Settings.chunk_size = int(os.getenv("RAG_CHUNK_SIZE", "512"))
+    Settings.chunk_overlap = int(os.getenv("RAG_CHUNK_OVERLAP", "50"))
+
+    reader = SimpleDirectoryReader(
+        input_files=[str(path) for path in files],
+        file_extractor={".pdf": PyMuPDFReader()},
+    )
+    documents = reader.load_data()
+    if not documents:
+        _RAG_LOAD_ERROR = "RAG documents were found, but no readable text could be loaded."
+        raise RuntimeError(_RAG_LOAD_ERROR)
+
+    index = VectorStoreIndex.from_documents(documents)
+    _RAG_CHAT_ENGINE = index.as_chat_engine(chat_mode="context", verbose=False)
+    return _RAG_CHAT_ENGINE
+
+
+def _rag_citations(response, limit: int = 5) -> list[dict]:
+    citations = []
+    seen = set()
+    for idx, node in enumerate(getattr(response, "source_nodes", []) or []):
+        metadata = getattr(node.node, "metadata", {}) or {}
+        file_name = metadata.get("file_name") or metadata.get("filename") or metadata.get("file_path") or "Document"
+        page = metadata.get("page_label") or metadata.get("page")
+        source = f"{file_name}, p. {page}" if page else str(file_name)
+        text = (getattr(node.node, "text", "") or "").strip()
+        key = (source, text[:80])
+        if key in seen:
+            continue
+        seen.add(key)
+        citations.append({
+            "id": f"rag-{idx}",
+            "title": Path(str(file_name)).name,
+            "source": source,
+            "text": text[:700],
+        })
+        if len(citations) >= limit:
+            break
+    return citations
+
+
+def _case_context_for_rag(student: Student | None, payload: dict | None, snippets: list[dict]) -> str:
+    context = []
+    if student and payload:
+        context.append("Student context: " + _status_sentence(student, payload["indicators"]))
+        if payload["recommendations"]:
+            context.append(
+                "Open recommendations: "
+                + "; ".join(f"{r['recommendation']} ({r['owner']})" for r in payload["recommendations"][:3])
+            )
+    if snippets:
+        context.append(
+            "Known policy snippets: "
+            + " ".join(f"{s['title']}: {s['text']}" for s in snippets)
+        )
+    return "\n".join(context)
+
+
+def call_document_rag(question: str, snippets: list[dict], payload: dict | None, student: Student | None) -> tuple[str, list[dict]]:
+    chat_engine = _load_rag_chat_engine()
+    case_context = _case_context_for_rag(student, payload, snippets)
+    prompt = (
+        "Answer as the USLS Graduate School assistant. Use the retrieved handbook and research guideline "
+        "documents as the primary source. If student context is provided, use it only for that student's live "
+        "status and do not invent approvals, decisions, or missing records. If the documents do not answer the "
+        "question, say what is missing.\n\n"
+    )
+    if case_context:
+        prompt += case_context + "\n\n"
+    prompt += f"Question: {question}"
+    response = chat_engine.chat(prompt)
+    return str(response).strip(), _rag_citations(response)
+
+
 def local_grounded_answer(question: str, student: Student | None, payload: dict | None, snippets: list[dict]) -> str:
     """Offline, deterministic responder. Grounds answers in computed indicators + retrieved policy.
     Stands in for Google AI Studio so the feature is demonstrable without an API key."""
@@ -1839,22 +1978,24 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
 
     # The assistant is advisory only: it retrieves policy snippets and explains
     # backend-computed facts. It never changes records or approves decisions.
-    api_key = os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     mode = "offline"
+    rag_citations = []
     if api_key:
         try:
-            answer = call_google_ai_studio(question, snippets, payload, api_key)
-            mode = "google-ai-studio"
+            answer, rag_citations = call_document_rag(question, snippets, payload, student)
+            mode = "document-rag"
         except Exception:
             answer = local_grounded_answer(question, student, payload, snippets)
             mode = "offline-fallback"
     else:
         answer = local_grounded_answer(question, student, payload, snippets)
 
+    policy_citations = [{"id": s["id"], "title": s["title"], "source": s["source"], "text": s["text"]} for s in snippets]
     return {
         "answer": answer,
         "mode": mode,
-        "citations": [{"id": s["id"], "title": s["title"], "source": s["source"], "text": s["text"]} for s in snippets],
+        "citations": rag_citations or policy_citations,
         "grounded": payload["indicators"] if payload else None,
         "recommendations": payload["recommendations"] if payload else [],
         "student": student_brief(student) if student else None,
