@@ -330,6 +330,10 @@ class AcademicTerm(db.Model):
     label = db.Column(db.String(40), unique=True, nullable=False)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
+    is_active_planning_term = db.Column(db.Boolean, default=False)
+    planning_window_open = db.Column(db.Date)
+    planning_window_close = db.Column(db.Date)
+    status = db.Column(db.String(20))
 
 
 class Course(db.Model):
@@ -354,8 +358,12 @@ class CourseOfferingPlan(db.Model):
     approved_at = db.Column(db.DateTime)
     approved_by = db.Column(db.String(120))  # the account that approved (by role, not hardcoded)
     published_at = db.Column(db.DateTime)
+    target_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
+    reference_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
 
     program = db.relationship("Program")
+    target_term = db.relationship("AcademicTerm", foreign_keys=[target_term_id])
+    reference_term = db.relationship("AcademicTerm", foreign_keys=[reference_term_id])
     offerings = db.relationship("CourseOffering", backref="plan", lazy=True, cascade="all, delete-orphan")
 
 
@@ -369,6 +377,20 @@ class CourseOffering(db.Model):
     status = db.Column(db.String(40), nullable=False, default="Suggested")
     notes = db.Column(db.String(220))
 
+    course = db.relationship("Course")
+
+
+class CurriculumOffering(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey("program.id"), nullable=False)
+    academic_year = db.Column(db.String(20), nullable=False)
+    semester = db.Column(db.String(20), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    added_by = db.Column(db.String(160))
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    program = db.relationship("Program")
     course = db.relationship("Course")
 
 
@@ -714,7 +736,31 @@ def program_dict(program: Program) -> dict:
 
 
 def term_dict(term: AcademicTerm) -> dict:
-    return {"id": term.id, "label": term.label, "start_date": iso(term.start_date), "end_date": iso(term.end_date)}
+    return {
+        "id": term.id,
+        "label": term.label,
+        "start_date": iso(term.start_date),
+        "end_date": iso(term.end_date),
+        "planning_window_open": iso(term.planning_window_open),
+        "planning_window_close": iso(term.planning_window_close),
+        "status": term.status,
+        "is_active_planning_term": bool(term.is_active_planning_term),
+    }
+
+
+def get_active_term() -> AcademicTerm | None:
+    active = AcademicTerm.query.filter_by(is_active_planning_term=True).first()
+    if active:
+        return active
+    return AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+
+
+def split_academic_term_label(label: str) -> tuple[str, str]:
+    ay_match = re.search(r"(\d{4}\s*-\s*\d{4})", label or "")
+    term_match = re.search(r"(Term\s*\d+)", label or "", flags=re.IGNORECASE)
+    academic_year = ay_match.group(1).replace(" ", "") if ay_match else ""
+    semester = term_match.group(1).title().replace("  ", " ") if term_match else ""
+    return academic_year, semester
 
 
 def faculty_dict(faculty: Faculty) -> dict:
@@ -1274,6 +1320,29 @@ def course_offering_dict(offering: CourseOffering) -> dict:
     }
 
 
+def curriculum_offering_dict(offering: CurriculumOffering) -> dict:
+    return {
+        "id": offering.id,
+        "program_id": offering.program_id,
+        "program_code": offering.program.code if offering.program else None,
+        "academic_year": offering.academic_year,
+        "semester": offering.semester,
+        "course_id": offering.course_id,
+        "course_code": offering.course.code if offering.course else None,
+        "course_title": offering.course.title if offering.course else None,
+        "course_units": offering.course.units if offering.course else None,
+        "course_category": offering.course.category if offering.course else None,
+        "added_by": offering.added_by,
+        "created_at": iso(offering.created_at),
+        "updated_at": iso(offering.updated_at),
+    }
+
+
+def default_academic_year_options() -> list[str]:
+    today_year = date.today().year
+    return [f"{year}-{year + 1}" for year in range(today_year, today_year - 5, -1)]
+
+
 def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
     if not plan:
         return None
@@ -1290,6 +1359,10 @@ def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
         "approved_at": iso(plan.approved_at),
         "approved_by": plan.approved_by,
         "published_at": iso(plan.published_at),
+        "target_term_id": plan.target_term_id,
+        "reference_term_id": plan.reference_term_id,
+        "target_term": term_dict(plan.target_term) if plan.target_term else None,
+        "reference_term": term_dict(plan.reference_term) if plan.reference_term else None,
         "offerings": [course_offering_dict(o) for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
     }
 
@@ -2127,6 +2200,94 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    def parse_api_date(value):
+        if not value:
+            return None
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Dates must use YYYY-MM-DD format.")
+
+    @app.route("/api/terms/active")
+    @require_api_login(*BACKOFFICE_ROLES)
+    def active_term():
+        term = get_active_term()
+        return jsonify({"term": term_dict(term) if term else None})
+
+    @app.route("/api/admin/terms")
+    @require_api_login("staff")
+    def admin_terms_list():
+        terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
+        return jsonify({"items": [term_dict(term) for term in terms]})
+
+    @app.route("/api/admin/terms", methods=["POST"])
+    @require_api_login("staff")
+    def admin_terms_create():
+        data = request.get_json(silent=True) or {}
+        label = (data.get("label") or "").strip()
+        if not label:
+            return jsonify({"error": "Term label is required."}), 400
+        if not all(split_academic_term_label(label)):
+            return jsonify({"error": "Term label must look like AY 2026-2027 Term 1."}), 400
+        try:
+            term = AcademicTerm(
+                label=label,
+                start_date=parse_api_date(data.get("start_date")),
+                end_date=parse_api_date(data.get("end_date")),
+                planning_window_open=parse_api_date(data.get("planning_window_open")),
+                planning_window_close=parse_api_date(data.get("planning_window_close")),
+                status=(data.get("status") or "").strip() or None,
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if not term.start_date or not term.end_date:
+            return jsonify({"error": "Start and end dates are required."}), 400
+        db.session.add(term)
+        db.session.commit()
+        return jsonify({"ok": True, "term": term_dict(term)})
+
+    @app.route("/api/admin/terms/<int:term_id>", methods=["PATCH"])
+    @require_api_login("staff")
+    def admin_terms_update(term_id: int):
+        term = AcademicTerm.query.get_or_404(term_id)
+        data = request.get_json(silent=True) or {}
+        if "label" in data:
+            label = (data.get("label") or "").strip()
+            if not label:
+                return jsonify({"error": "Term label is required."}), 400
+            if not all(split_academic_term_label(label)):
+                return jsonify({"error": "Term label must look like AY 2026-2027 Term 1."}), 400
+            term.label = label
+        try:
+            for field in ["start_date", "end_date", "planning_window_open", "planning_window_close"]:
+                if field in data:
+                    setattr(term, field, parse_api_date(data.get(field)))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if "status" in data:
+            term.status = (data.get("status") or "").strip() or None
+        if not term.start_date or not term.end_date:
+            return jsonify({"error": "Start and end dates are required."}), 400
+        db.session.commit()
+        return jsonify({"ok": True, "term": term_dict(term)})
+
+    @app.route("/api/admin/terms/<int:term_id>/set-active", methods=["PATCH"])
+    @require_api_login("staff")
+    def admin_terms_set_active(term_id: int):
+        term = AcademicTerm.query.get_or_404(term_id)
+        current = AcademicTerm.query.filter_by(is_active_planning_term=True).first()
+        if current and current.id != term.id:
+            blocked = CourseOfferingPlan.query.filter(
+                or_(CourseOfferingPlan.target_term_id == current.id, CourseOfferingPlan.term_label == current.label),
+                CourseOfferingPlan.status.in_(["Submitted", "Approved"]),
+            ).count()
+            if blocked:
+                return jsonify({"error": "Current active term has submitted or approved course offering plans. Resolve them before switching.", "blocked_plans": blocked}), 409
+        AcademicTerm.query.update({AcademicTerm.is_active_planning_term: False})
+        term.is_active_planning_term = True
+        db.session.commit()
+        return jsonify({"ok": True, "term": term_dict(term)})
+
     # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
     @require_api_login("staff")
@@ -2263,7 +2424,7 @@ def register_routes(app: Flask) -> None:
         practicum_eligibility_result = practicum_eligibility(student)
         withdrawal_application = latest_withdrawal_application(student.id)
         graduation_endorsement = latest_graduation_endorsement(student.id)
-        current_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        current_term = get_active_term()
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
@@ -3345,18 +3506,129 @@ def register_routes(app: Flask) -> None:
         )
 
     @app.route("/api/curriculum-planning")
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def curriculum_planning():
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
         if not program:
             return jsonify({"error": "No program found."}), 404
         term_id = request.args.get("term_id", type=int)
-        term = AcademicTerm.query.get(term_id) if term_id else AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
         return jsonify(curriculum_planning_payload(program, term))
 
+    @app.route("/api/curriculum-planning/offerings")
+    @require_api_login("staff", "academic_coordinator")
+    def curriculum_offering_list():
+        program_id = request.args.get("program_id", type=int)
+        term_id = request.args.get("term_id", type=int)
+        academic_year = (request.args.get("academic_year") or "").strip()
+        semester = (request.args.get("semester") or "").strip()
+        selected_term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
+        if selected_term and term_id:
+            parsed_ay, parsed_semester = split_academic_term_label(selected_term.label)
+            academic_year = parsed_ay or academic_year
+            semester = parsed_semester or semester
+        query = CurriculumOffering.query
+        if program_id:
+            query = query.filter_by(program_id=program_id)
+        if academic_year:
+            query = query.filter_by(academic_year=academic_year)
+        if semester:
+            query = query.filter_by(semester=semester)
+        items = query.order_by(
+            CurriculumOffering.academic_year.desc(),
+            CurriculumOffering.semester,
+            CurriculumOffering.id,
+        ).all()
+        term_years = {
+            match.group(1)
+            for term in AcademicTerm.query.all()
+            for match in [re.search(r"(\d{4}-\d{4})", term.label or "")]
+            if match
+        }
+        all_ay = sorted(
+            {o.academic_year for o in CurriculumOffering.query.all()} | term_years | set(default_academic_year_options()),
+            reverse=True,
+        )
+        all_sem = ["Term 1", "Term 2", "Term 3"]
+        terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
+        programs = Program.query.order_by(Program.code).all()
+        courses = (
+            Course.query.filter_by(program_id=program_id).order_by(Course.code).all()
+            if program_id else []
+        )
+        return jsonify({
+            "items": [curriculum_offering_dict(o) for o in items],
+            "academic_years": all_ay,
+            "semesters": all_sem,
+            "terms": [term_dict(t) for t in terms],
+            "active_term": term_dict(get_active_term()) if get_active_term() else None,
+            "selected_term": term_dict(selected_term) if selected_term else None,
+            "programs": [program_dict(p) for p in programs],
+            "courses": [
+                {"id": c.id, "code": c.code, "title": c.title, "category": c.category, "units": c.units}
+                for c in courses
+            ],
+        })
+
+    @app.route("/api/curriculum-planning/offerings", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def curriculum_offering_add():
+        data = request.get_json(silent=True) or {}
+        program = Program.query.get_or_404(int(data.get("program_id") or 0))
+        term_id = data.get("term_id")
+        selected_term = AcademicTerm.query.get(int(term_id)) if term_id else None
+        academic_year = (data.get("academic_year") or "").strip()
+        semester = (data.get("semester") or "").strip()
+        if selected_term:
+            parsed_ay, parsed_semester = split_academic_term_label(selected_term.label)
+            academic_year = parsed_ay or academic_year
+            semester = parsed_semester or semester
+        course_ids = [int(c) for c in (data.get("course_ids") or []) if c]
+        account = current_account()
+        if not academic_year or not semester:
+            return jsonify({"error": "Academic year and semester are required."}), 400
+        if not course_ids:
+            return jsonify({"error": "Select at least one subject to add."}), 400
+        added = 0
+        for course_id in course_ids:
+            course = Course.query.get(course_id)
+            if not course or course.program_id != program.id:
+                continue
+            exists = CurriculumOffering.query.filter_by(
+                program_id=program.id,
+                academic_year=academic_year,
+                semester=semester,
+                course_id=course_id,
+            ).first()
+            if exists:
+                continue
+            db.session.add(CurriculumOffering(
+                program_id=program.id,
+                academic_year=academic_year,
+                semester=semester,
+                course_id=course_id,
+                added_by=account.full_name if account else None,
+            ))
+            added += 1
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "added": added,
+            "message": f"Added {added} subject(s) to the {semester} offering list.",
+        })
+
+    @app.route("/api/curriculum-planning/offerings/<int:offering_id>", methods=["DELETE"])
+    @require_api_login("staff", "academic_coordinator")
+    def curriculum_offering_delete(offering_id: int):
+        offering = CurriculumOffering.query.get_or_404(offering_id)
+        course_code = offering.course.code if offering.course else "Subject"
+        db.session.delete(offering)
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"Removed {course_code} from the offering list."})
+
     @app.route("/api/curriculum-planning/subjects", methods=["POST"])
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def curriculum_planning_create_subject():
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
@@ -3410,7 +3682,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/curriculum-planning/generate", methods=["POST"])
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def curriculum_planning_generate():
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
@@ -3466,7 +3738,7 @@ def register_routes(app: Flask) -> None:
         if not program:
             return jsonify({"error": "No program found."}), 404
         term_id = request.args.get("term_id", type=int)
-        term = AcademicTerm.query.get(term_id) if term_id else AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
         return jsonify(course_adjustments_payload(program, term))
 
     @app.route("/api/course-adjustments/plan", methods=["POST"])
@@ -3474,21 +3746,30 @@ def register_routes(app: Flask) -> None:
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
         action = data.get("action") or "draft"
-        latest_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        latest_term = get_active_term()
+        reference_term = AcademicTerm.query.filter(AcademicTerm.id != latest_term.id).order_by(AcademicTerm.start_date.desc()).first() if latest_term else None
         term_label = (data.get("term_label") or "").strip() or (latest_term.label if latest_term else "Current Term")
         plan = (
             CourseOfferingPlan.query.filter_by(program_id=program.id, term_label=term_label)
             .order_by(CourseOfferingPlan.created_at.desc())
             .first()
         )
+        if plan:
+            if latest_term:
+                plan.target_term_id = latest_term.id
+            if reference_term:
+                plan.reference_term_id = reference_term.id
         if action == "draft":
             if not plan:
                 plan = CourseOfferingPlan(program_id=program.id, term_label=term_label, status="Draft")
                 db.session.add(plan)
                 db.session.flush()
+            if latest_term:
+                plan.target_term_id = latest_term.id
+            if reference_term:
+                plan.reference_term_id = reference_term.id
             plan.status = "Draft"
             CourseOffering.query.filter_by(plan_id=plan.id).delete()
-            demand_by_course = {row["course"]["id"]: row for row in course_demand_rows(program)}
             # If the Academic Coordinator edited the offer list, honour their choices;
             # otherwise fall back to the demand-suggested offerings.
             selections = data.get("selections")
@@ -3496,29 +3777,28 @@ def register_routes(app: Flask) -> None:
                 plan.notes = data.get("notes") or "Draft set by the Academic Coordinator from the suggested demand."
                 for sel in selections:
                     cid = int(sel.get("course_id"))
-                    row = demand_by_course.get(cid, {})
                     db.session.add(
                         CourseOffering(
                             plan_id=plan.id,
                             course_id=cid,
-                            demand_count=row.get("demand_count", 0),
-                            section_count=int(sel.get("section_count") or row.get("suggested_sections", 1)),
-                            availability_count=row.get("availability_count", 0),
+                            demand_count=0,
+                            section_count=int(sel.get("section_count") or 0),
+                            availability_count=0,
                             status="Offered" if sel.get("offer", True) else "Not Offered",
-                            notes=row.get("recommendation", "Selected by Academic Coordinator"),
+                            notes=sel.get("notes") or "Selected by Academic Coordinator",
                         )
                     )
                 result = "Draft offering plan saved from the coordinator's selections"
             else:
                 plan.notes = data.get("notes") or "Draft generated from current missing-subject demand."
-                for row in course_demand_rows(program):
+                for row in course_demand_rows(program, latest_term):
                     db.session.add(
                         CourseOffering(
                             plan_id=plan.id,
                             course_id=row["course"]["id"],
-                            demand_count=row["demand_count"],
+                            demand_count=0,
                             section_count=row["suggested_sections"],
-                            availability_count=row["availability_count"],
+                            availability_count=0,
                             status="Suggested" if row["demand_count"] > 0 else "Not Offered",
                             notes=row["recommendation"],
                         )
@@ -3529,6 +3809,21 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "Save a draft offering plan first."}), 400
             if plan.status not in ("Draft", "Returned"):
                 return jsonify({"error": "Only a draft can be submitted for approval."}), 400
+            live_demand = {row["course"]["id"]: row for row in course_demand_rows(program, latest_term)}
+            existing = {offering.course_id: offering for offering in plan.offerings}
+            for course_id, row in live_demand.items():
+                offering = existing.get(course_id)
+                if not offering:
+                    offering = CourseOffering(
+                        plan_id=plan.id,
+                        course_id=course_id,
+                        status="Suggested" if row["demand_count"] > 0 else "Not Offered",
+                        section_count=row["suggested_sections"],
+                    )
+                    db.session.add(offering)
+                offering.demand_count = row["demand_count"]
+                offering.availability_count = row["availability_count"]
+                offering.notes = offering.notes or row["recommendation"]
             plan.status = "Submitted"
             plan.submitted_at = now_utc()
             plan.notes = data.get("notes") or plan.notes
@@ -9131,7 +9426,7 @@ def student_semester_subjects(student: Student, term: AcademicTerm | None) -> di
 
 
 def curriculum_planning_payload(program: Program, term: AcademicTerm | None = None) -> dict:
-    term = term or AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+    term = term or get_active_term()
     courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
     student_query = Student.query.filter_by(program_id=program.id)
     if term:
@@ -9284,18 +9579,39 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
 
 
 def course_adjustments_payload(program: Program, term: AcademicTerm | None = None) -> dict:
-    term = term or AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+    term = term or get_active_term()
     demand = course_demand_rows(program, term)
+    min_threshold = 5
+    high_threshold = 15
+
+    def demand_status(count: int) -> str:
+        if count >= high_threshold:
+            return "high"
+        if count >= min_threshold:
+            return "meets_minimum"
+        if count > 0:
+            return "below_minimum"
+        return "no_demand"
+
     latest_plan = (
-        CourseOfferingPlan.query.filter_by(program_id=program.id)
+        CourseOfferingPlan.query.filter_by(program_id=program.id, term_label=term.label if term else None)
         .order_by(CourseOfferingPlan.updated_at.desc())
         .first()
     )
+    saved_by_course = {offering.course_id: offering for offering in latest_plan.offerings} if latest_plan else {}
+    for row in demand:
+        saved = saved_by_course.get(row["course"]["id"])
+        row["demand_status"] = demand_status(row["demand_count"])
+        row["offering_status"] = saved.status if saved else ("Suggested" if row["demand_count"] > 0 else None)
+        row["section_count"] = saved.section_count if saved else row["suggested_sections"]
+        row["offering_notes"] = saved.notes if saved else row["recommendation"]
     return {
         "program": program_dict(program),
         "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
         "term": term_dict(term) if term else None,
         "terms": [term_dict(item) for item in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
+        "active_term": term_dict(get_active_term()) if get_active_term() else None,
+        "planning_window_open": True,
         "summary": {
             "demand_subjects": len(demand),
             "total_demand": sum(row["demand_count"] for row in demand),
@@ -9578,6 +9894,38 @@ def ensure_course_workflow_schema() -> None:
         for name, sql_type in additions.items():
             if name not in existing:
                 db.session.execute(text(f"ALTER TABLE course_record ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+
+
+def ensure_curriculum_offering_schema() -> None:
+    db.create_all()
+    inspector = inspect(db.engine)
+    tables = set(inspector.get_table_names())
+    if "academic_term" in tables:
+        existing = {column["name"] for column in inspector.get_columns("academic_term")}
+        additions = {
+            "is_active_planning_term": "BOOLEAN DEFAULT 0",
+            "planning_window_open": "DATE",
+            "planning_window_close": "DATE",
+            "status": "VARCHAR(20)",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE academic_term ADD COLUMN {name} {sql_type}"))
+        active_count = db.session.execute(text("SELECT COUNT(*) FROM academic_term WHERE is_active_planning_term = 1")).scalar() or 0
+        if active_count == 0:
+            latest_id = db.session.execute(text("SELECT id FROM academic_term ORDER BY start_date DESC LIMIT 1")).scalar()
+            if latest_id:
+                db.session.execute(text("UPDATE academic_term SET is_active_planning_term = 1 WHERE id = :term_id"), {"term_id": latest_id})
+    if "course_offering_plan" in tables:
+        existing = {column["name"] for column in inspector.get_columns("course_offering_plan")}
+        additions = {
+            "target_term_id": "INTEGER",
+            "reference_term_id": "INTEGER",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE course_offering_plan ADD COLUMN {name} {sql_type}"))
     db.session.commit()
 
 
@@ -10512,6 +10860,7 @@ with app.app_context():
     ensure_student_comprehensive_exam_schema()
     ensure_workflow_activity_schema()
     ensure_course_workflow_schema()
+    ensure_curriculum_offering_schema()
     ensure_user_account_schema()
     # Data repair runs last, after every column-adding migration above, because it
     # queries CourseRecord/Student which now include the newly added columns.

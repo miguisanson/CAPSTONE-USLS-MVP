@@ -1227,7 +1227,7 @@ function CourseRosterGradeWorkspace({ meta }) {
                         <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
                           <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                           <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
-                          <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /><p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>
+                          <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /></td>
                           <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /></td>
                           <td className="relative px-3 py-2.5 text-right">
                             <button type="button" onClick={() => setOpenMenu(openMenu === student.student_id ? null : student.student_id)} className="inline-grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Open actions for ${student.name}`}><MoreVertical className="h-4 w-4" /></button>
@@ -1424,7 +1424,7 @@ function CourseClassWorkspace({ meta, mode }) {
                         {editing && <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[student.student_id]} onChange={() => toggle(student.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${student.name}`} /></td>}
                         <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                         <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
-                        {mode === "grades" && <td className="px-3 py-2.5">{editing ? <Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /> : <p className="font-semibold text-ink">{edit.grade_value || "No grade"}</p>}<p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>}
+                        {mode === "grades" && <td className="px-3 py-2.5">{editing ? <Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /> : <p className="font-semibold text-ink">{edit.grade_value || "No grade"}</p>}</td>}
                         <td className="px-3 py-2.5">{editing ? <Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /> : <span className="text-slate-600">{edit.remarks || "-"}</span>}</td>
                       </tr>
                     );
@@ -1593,7 +1593,7 @@ function CourseAuditRosterV2({ meta }) {
                         <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[s.student_id]} onChange={() => toggle(s.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${s.name}`} /></td>
                         <td className="px-4 py-2.5"><p className="font-semibold text-ink">{s.name}</p><p className="text-xs text-slate-400">{s.student_number} · {s.program_code}</p>{s.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                         <td className="px-3 py-2.5"><Select value={edit.status || s.status} onChange={(e) => updateStudent(s.student_id, "status", e.target.value)} options={statuses} placeholder="" /></td>
-                        <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(e) => updateStudent(s.student_id, "grade_value", e.target.value)} placeholder="e.g. 1.25" /><p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>
+                        <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(e) => updateStudent(s.student_id, "grade_value", e.target.value)} placeholder="e.g. 1.25" /></td>
                         <td className="px-3 py-2.5"><Input type="date" value={edit.incomplete_deadline || ""} onChange={(e) => updateStudent(s.student_id, "incomplete_deadline", e.target.value)} disabled={edit.status !== "Incomplete"} /></td>
                         <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(e) => updateStudent(s.student_id, "remarks", e.target.value)} placeholder="Optional" /></td>
                       </tr>

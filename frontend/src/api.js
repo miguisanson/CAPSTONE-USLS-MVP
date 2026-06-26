@@ -31,6 +31,14 @@ export const api = {
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request("/auth/logout", { method: "POST", body: JSON.stringify({}) }),
   meta: () => request("/meta"),
+  terms: () => request("/admin/terms"),
+  activeTerm: () => request("/terms/active"),
+  createTerm: (payload) =>
+    request("/admin/terms", { method: "POST", body: JSON.stringify(payload) }),
+  updateTerm: (id, payload) =>
+    request(`/admin/terms/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  setActiveTerm: (id) =>
+    request(`/admin/terms/${id}/set-active`, { method: "PATCH", body: JSON.stringify({}) }),
   dashboard: (params = {}) => {
     const qs = queryString(params);
     return request(`/dashboard${qs ? `?${qs}` : ""}`);
@@ -120,6 +128,14 @@ export const api = {
     const qs = queryString(actual);
     return request(`/curriculum-planning${qs ? `?${qs}` : ""}`);
   },
+  curriculumOfferings: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/curriculum-planning/offerings${qs ? `?${qs}` : ""}`);
+  },
+  addCurriculumOfferings: (payload) =>
+    request("/curriculum-planning/offerings", { method: "POST", body: JSON.stringify(payload) }),
+  deleteCurriculumOffering: (id) =>
+    request(`/curriculum-planning/offerings/${id}`, { method: "DELETE" }),
   generateCurriculum: (payload) =>
     request("/curriculum-planning/generate", { method: "POST", body: JSON.stringify(payload) }),
   createCurriculumSubject: (payload) =>

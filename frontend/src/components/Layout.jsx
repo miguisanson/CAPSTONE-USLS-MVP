@@ -44,6 +44,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/students", label: "Students", icon: Users },
       { to: "/faculty", label: "Faculty", icon: UsersRound },
+      { to: "/admin/terms", label: "Term Management", icon: CalendarCheck, roles: ["staff"] },
       { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
     ],
   },
@@ -51,7 +52,7 @@ const NAV_GROUPS = [
     label: "Lifecycle workflows",
     items: [
       { to: "/workflow/student-handoff", label: "1 · Student Handoff", icon: UserPlus },
-      { to: "/curriculum-planning", label: "2 · Curriculum Planning", icon: BookOpenCheck },
+      { to: "/curriculum-planning", label: "2 · Curriculum planning", icon: BookOpenCheck },
       { to: "/course-adjustments", label: "3 · Course Adjustments", icon: SlidersHorizontal },
       { to: "/workflow/course-audit", label: "4 · Course Audit", icon: ClipboardCheck },
       { to: "/workflow/research-gate", label: "5 - Research Gate", icon: FileCheck },
@@ -88,7 +89,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/monitoring-sheet", "/workflow/course-audit", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
+  academic_coordinator: new Set(["/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
   research_coordinator: new Set(["/workflow/graduation", "/work-queue"]),
   registrar: new Set(["/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
 };
