@@ -153,6 +153,7 @@ export const api = {
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),
   assistantSuggestions: () => request("/assistant/suggestions"),
   studentPortalContext: () => request("/student-portal/context"),
+  facultyPortalContext: () => request("/faculty-portal/context"),
   submitStudentRequest: (type, payload) =>
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
   uploadResearchEvidence: async (gate, itemName, file) => {

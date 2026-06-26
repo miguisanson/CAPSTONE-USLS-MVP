@@ -19,11 +19,13 @@ import StudentPortal from "./pages/StudentPortal";
 import DeanApprovals from "./pages/DeanApprovals";
 import Login from "./pages/Login";
 import Form1Endorsements from "./pages/Form1Endorsements";
+import FacultyPortal from "./pages/FacultyPortal";
 
 // Where each role lands by default.
 function homeFor(user) {
   if (!user) return "/login";
   if (user.role === "student") return "/student";
+  if (user.role === "faculty") return "/faculty-portal";
   if (user.role === "dean") return "/approvals";
   if (user.role === "academic_coordinator") return "/workflow/course-audit";
   if (user.role === "research_coordinator") return "/workflow/graduation";
@@ -53,6 +55,14 @@ export default function App() {
         element={
           <RoleOnly user={user} role="dean">
             <DeanApprovals />
+          </RoleOnly>
+        }
+      />
+      <Route
+        path="/faculty-portal"
+        element={
+          <RoleOnly user={user} role="faculty">
+            <FacultyPortal />
           </RoleOnly>
         }
       />

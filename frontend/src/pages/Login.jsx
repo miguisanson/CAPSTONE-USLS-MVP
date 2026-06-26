@@ -11,9 +11,10 @@ const DEMO = {
   registrar: { email: "registrar@gs.local", password: "DemoPass123!" },
   dean: { email: "dean@gs.local", password: "DemoPass123!" },
   student: { email: "student@gs.local", password: "DemoPass123!" },
+  faculty: { email: "faculty@gs.local", password: "DemoPass123!" },
 };
 
-const HOME = { staff: "/", academic_coordinator: "/workflow/practicum", research_coordinator: "/workflow/graduation", registrar: "/workflow/withdrawal", dean: "/approvals", student: "/student" };
+const HOME = { staff: "/", academic_coordinator: "/workflow/practicum", research_coordinator: "/workflow/graduation", registrar: "/workflow/withdrawal", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
 const LABEL = { staff: "Staff", dean: "Dean", student: "Student" };
 const STAFF_ACCOUNTS = [
   { role: "staff", label: "GS Staff", detail: "Intake and records" },
@@ -92,8 +93,9 @@ export default function Login() {
             <p className="mt-1 text-sm text-slate-500">Accounts are created by the Graduate School office.</p>
           </div>
 
-          <div className="mb-5 grid grid-cols-3 gap-2 rounded-xl bg-slate-100 p-1">
+          <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
             <ModeButton active={role === "staff"} icon={UserCog} label="Staff" onClick={() => setRole("staff")} />
+            <ModeButton active={role === "faculty"} icon={GraduationCap} label="Faculty" onClick={() => setRole("faculty")} />
             <ModeButton active={role === "dean"} icon={Gavel} label="Dean" onClick={() => setRole("dean")} />
             <ModeButton active={role === "student"} icon={UserRound} label="Student" onClick={() => setRole("student")} />
           </div>

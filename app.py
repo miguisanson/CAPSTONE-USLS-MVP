@@ -317,10 +317,12 @@ class UserAccount(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(40), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"))
+    faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"))
     active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=now_utc)
 
     student = db.relationship("Student")
+    faculty = db.relationship("Faculty")
 
 
 class AcademicTerm(db.Model):
@@ -1335,6 +1337,7 @@ def account_dict(account: UserAccount) -> dict:
         "full_name": account.full_name,
         "role": account.role,
         "student_id": account.student_id,
+        "faculty_id": account.faculty_id,
     }
 
 
@@ -1358,6 +1361,7 @@ ROLE_LABELS = {
     "registrar": "Registrar",
     "dean": "Dean",
     "student": "Student",
+    "faculty": "Faculty Member",
 }
 
 WORKFLOW_MESSAGE_TEMPLATES = [
@@ -2082,7 +2086,7 @@ def register_routes(app: Flask) -> None:
         role = (body.get("role") or "").strip().lower()
         email = (body.get("email") or "").strip().lower()
         password = body.get("password") or ""
-        if role not in ["staff", "student", "dean"]:
+        if role not in ["staff", "student", "dean", "faculty"]:
             return jsonify({"error": "Choose an account type to sign in."}), 400
         account = UserAccount.query.filter_by(email=email, active=True).first()
         role_matches = bool(
@@ -3270,6 +3274,66 @@ def register_routes(app: Flask) -> None:
     def faculty_list():
         faculty = Faculty.query.filter(Faculty.active.is_(True)).order_by(Faculty.name).all()
         return jsonify({"items": [faculty_profile_dict(f) for f in faculty]})
+
+    @app.route("/api/faculty-portal/context")
+    @require_api_login("faculty")
+    def faculty_portal_context():
+        # The signed-in faculty member sees the panels they sit on, each student's
+        # research title and scheduled defense, plus their own availability profile.
+        account = current_account()
+        faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
+        if not faculty:
+            return jsonify({"error": "This faculty account is not linked to a faculty record yet."}), 400
+        assignments = (
+            PanelAssignment.query.filter_by(faculty_id=faculty.id)
+            .order_by(PanelAssignment.assigned_at.desc())
+            .all()
+        )
+        panels = []
+        for assignment in assignments:
+            student = Student.query.get(assignment.student_id)
+            if not student:
+                continue
+            research_case = (
+                ResearchCase.query.filter_by(student_id=student.id)
+                .order_by(ResearchCase.opened_at.desc())
+                .first()
+            )
+            schedule = (
+                ScheduleRequest.query.filter_by(student_id=student.id)
+                .order_by(ScheduleRequest.created_at.desc())
+                .first()
+            )
+            panels.append({
+                "student": student_brief(student),
+                "panel_role": assignment.panel_role,
+                "research_title": research_case.title if research_case else None,
+                "stage": student.current_stage,
+                "defense": schedule_request_dict(schedule) if schedule else None,
+            })
+        upcoming = (
+            FacultyAvailability.query.filter(
+                FacultyAvailability.faculty_id == faculty.id,
+                FacultyAvailability.available_date >= date.today(),
+            )
+            .order_by(FacultyAvailability.available_date, FacultyAvailability.start_time)
+            .limit(20)
+            .all()
+        )
+        return jsonify({
+            "faculty": faculty_profile_dict(faculty),
+            "panels": panels,
+            "panel_count": len(panels),
+            "working_hours": faculty_working_hours(faculty),
+            "availability": [
+                {
+                    "date": iso(slot.available_date),
+                    "start": slot.start_time.strftime("%H:%M"),
+                    "end": slot.end_time.strftime("%H:%M"),
+                }
+                for slot in upcoming
+            ],
+        })
 
     @app.route("/api/faculty/<int:faculty_id>/calendar.ics")
     def faculty_calendar_feed(faculty_id: int):
@@ -10148,6 +10212,7 @@ def seed_simulation_demo() -> None:
         # availability window — this guarantees defense scheduling finds a common slot.
         ("Dr. Teodoro Ramos", "Learning analytics, online learning assessment, and educational data science"),
     ]
+    sim_faculty_objs = []
     for name, spec in sim_faculty:
         faculty = Faculty.query.filter_by(name=name).first()
         if not faculty:
@@ -10157,6 +10222,7 @@ def seed_simulation_demo() -> None:
         else:
             faculty.specialization = spec
             faculty.active = True
+        sim_faculty_objs.append(faculty)
         if not FacultyWorkingHour.query.filter_by(faculty_id=faculty.id).count():
             for weekday in range(5):
                 db.session.add(
@@ -10177,6 +10243,25 @@ def seed_simulation_demo() -> None:
                 db.session.add(FacultyAvailability(
                     faculty_id=faculty.id, available_date=date.today() + timedelta(days=offset),
                     start_time=time(13, 0), end_time=time(16, 0)))
+
+    # Seat the prepared faculty on one existing research-stage student's panel so the
+    # Faculty portal (faculty@gs.local -> Dr. Liwayway Bautista) shows live panels out of
+    # the box, before the Student A walkthrough assigns them Andrea's panel too.
+    if len(sim_faculty_objs) >= 4:
+        panel_student = (
+            Student.query.filter(Student.current_stage.in_(["Final Defense", "Writing", "Data Collection"]))
+            .order_by(Student.id.asc())
+            .first()
+        )
+        if panel_student and not PanelAssignment.query.filter_by(
+            student_id=panel_student.id, faculty_id=sim_faculty_objs[0].id
+        ).first():
+            PanelAssignment.query.filter_by(student_id=panel_student.id).delete()
+            roles_seq = ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
+            for index, fac in enumerate(sim_faculty_objs[:4]):
+                db.session.add(PanelAssignment(
+                    student_id=panel_student.id, faculty_id=fac.id,
+                    panel_role=roles_seq[index], score=100, eligibility_note="Prepared demo panel"))
 
     term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
     home_program = Program.query.filter_by(code="MAED").first() or program
@@ -10302,6 +10387,17 @@ def ensure_demo_request_submission_logs() -> int:
     return created
 
 
+def ensure_user_account_schema() -> None:
+    """Add the faculty link column to user_account on existing demo databases."""
+    inspector = inspect(db.engine)
+    if "user_account" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("user_account")}
+    if "faculty_id" not in existing:
+        db.session.execute(text("ALTER TABLE user_account ADD COLUMN faculty_id INTEGER"))
+        db.session.commit()
+
+
 def ensure_demo_accounts() -> None:
     backoffice_accounts = [
         ("staff@gs.local", "Graduate School Staff Demo", "staff"),
@@ -10385,6 +10481,28 @@ def ensure_demo_accounts() -> None:
         student_account.student_id = linked_student.id
         student_account.full_name = f"{linked_student.name} Demo"
 
+    # Faculty member login — linked to a real Faculty record so the faculty portal
+    # can show that adviser's assigned panels and availability.
+    linked_faculty = (
+        Faculty.query.filter_by(name="Dr. Liwayway Bautista").first()
+        or Faculty.query.filter_by(active=True).order_by(Faculty.id.asc()).first()
+    )
+    if linked_faculty:
+        faculty_account = UserAccount.query.filter_by(email="faculty@gs.local").first()
+        if not faculty_account:
+            faculty_account = UserAccount(
+                email="faculty@gs.local",
+                full_name=f"{linked_faculty.name} (Faculty)",
+                password_hash=generate_password_hash("DemoPass123!"),
+                role="faculty",
+                active=True,
+            )
+            db.session.add(faculty_account)
+        faculty_account.role = "faculty"
+        faculty_account.faculty_id = linked_faculty.id
+        faculty_account.full_name = f"{linked_faculty.name} (Faculty)"
+        faculty_account.active = True
+
 
 app = create_app()
 
@@ -10394,6 +10512,7 @@ with app.app_context():
     ensure_student_comprehensive_exam_schema()
     ensure_workflow_activity_schema()
     ensure_course_workflow_schema()
+    ensure_user_account_schema()
     # Data repair runs last, after every column-adding migration above, because it
     # queries CourseRecord/Student which now include the newly added columns.
     ensure_demo_comprehensive_exam_consistency()
