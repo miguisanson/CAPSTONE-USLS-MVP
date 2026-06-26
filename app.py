@@ -285,6 +285,7 @@ class Student(db.Model):
     standing = db.Column(db.String(60), nullable=False, default="Active")
     # Current-term enrollment tag (per AC notes): Enrolled / LOA / AWOL / Completed.
     enrollment_tag = db.Column(db.String(20), nullable=False, default="Enrolled")
+    comprehensive_status = db.Column(db.String(2))
     risk_level = db.Column(db.String(20), nullable=False, default="Low")
     adviser_name = db.Column(db.String(120))
     created_at = db.Column(db.DateTime, default=now_utc)
@@ -324,6 +325,10 @@ class AcademicTerm(db.Model):
     label = db.Column(db.String(40), unique=True, nullable=False)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
+    is_active_planning_term = db.Column(db.Boolean, default=False)
+    planning_window_open = db.Column(db.Date)
+    planning_window_close = db.Column(db.Date)
+    status = db.Column(db.String(20))
 
 
 class Course(db.Model):
@@ -340,6 +345,8 @@ class CourseOfferingPlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     program_id = db.Column(db.Integer, db.ForeignKey("program.id"), nullable=False)
     term_label = db.Column(db.String(60), nullable=False)
+    target_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
+    reference_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
     status = db.Column(db.String(40), nullable=False, default="Draft")
     notes = db.Column(db.String(260))
     created_at = db.Column(db.DateTime, default=now_utc)
@@ -350,6 +357,8 @@ class CourseOfferingPlan(db.Model):
     published_at = db.Column(db.DateTime)
 
     program = db.relationship("Program")
+    target_term = db.relationship("AcademicTerm", foreign_keys=[target_term_id])
+    reference_term = db.relationship("AcademicTerm", foreign_keys=[reference_term_id])
     offerings = db.relationship("CourseOffering", backref="plan", lazy=True, cascade="all, delete-orphan")
 
 
@@ -694,8 +703,48 @@ def program_dict(program: Program) -> dict:
     }
 
 
-def term_dict(term: AcademicTerm) -> dict:
-    return {"id": term.id, "label": term.label, "start_date": iso(term.start_date), "end_date": iso(term.end_date)}
+def term_display_parts(label: str) -> tuple[str, str]:
+    school_year = ""
+    semester = ""
+    ay_match = re.search(r"(AY\s+\d{4}\s*-\s*\d{4})", label or "", re.I)
+    if ay_match:
+        school_year = ay_match.group(1).replace("  ", " ").upper()
+    term_match = re.search(r"(term|semester)\s*([A-Za-z0-9]+)", label or "", re.I)
+    if term_match:
+        semester = f"{term_match.group(1).title()} {term_match.group(2)}"
+    return school_year, semester
+
+
+def term_dict(term: AcademicTerm | None) -> dict | None:
+    if not term:
+        return None
+    school_year, semester = term_display_parts(term.label)
+    return {
+        "id": term.id,
+        "label": term.label,
+        "school_year": school_year,
+        "semester": semester,
+        "start_date": iso(term.start_date),
+        "end_date": iso(term.end_date),
+        "planning_window_open": iso(term.planning_window_open),
+        "planning_window_close": iso(term.planning_window_close),
+        "status": term.status,
+        "is_active_planning_term": bool(term.is_active_planning_term),
+    }
+
+
+def get_active_term() -> AcademicTerm | None:
+    active = AcademicTerm.query.filter_by(is_active_planning_term=True).first()
+    if active:
+        return active
+    return AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+
+
+def get_reference_term(active_term: AcademicTerm | None = None) -> AcademicTerm | None:
+    query = AcademicTerm.query
+    if active_term:
+        query = query.filter(AcademicTerm.id != active_term.id)
+    return query.order_by(AcademicTerm.start_date.desc()).first()
 
 
 def faculty_dict(faculty: Faculty) -> dict:
@@ -1220,6 +1269,10 @@ def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
         "program_id": plan.program_id,
         "program_code": plan.program.code if plan.program else None,
         "term_label": plan.term_label,
+        "target_term": term_dict(plan.target_term),
+        "reference_term": term_dict(plan.reference_term),
+        "target_term_id": plan.target_term_id,
+        "reference_term_id": plan.reference_term_id,
         "status": plan.status,
         "notes": plan.notes,
         "created_at": iso(plan.created_at),
@@ -1708,7 +1761,7 @@ POLICY_SNIPPETS = [
      "text": "Programs requiring practicum track the required hours, the MOA, and uploaded certificates as completion evidence."},
     {"id": "course-audit", "title": "Course Audit & Curriculum", "source": "AC Student Monitoring",
      "tags": ["course audit", "subjects", "curriculum", "completion", "missing"],
-     "text": "Course audit maps completed, current, and missing subjects against the curriculum. Clearing all subjects signals readiness to move to proposal development."},
+     "text": "Course audit maps completed, enrolled, and missing subjects against the curriculum. Clearing all subject units makes the student eligible for the comprehensive exam; only a passed comprehensive exam allows research to start."},
     {"id": "escalation", "title": "Delay, Time-in-Stage & Escalation", "source": "Monitoring Policy",
      "tags": ["delay", "delayed", "time in stage", "escalation", "overdue", "follow up", "stalled"],
      "text": "Cases that exceed the allowed time-in-stage or carry overdue tasks are escalated to the responsible coordinator; incomplete evidence is returned to the student queue."},
@@ -1915,8 +1968,8 @@ def local_grounded_answer(question: str, student: Student | None, payload: dict 
         out.append(_status_sentence(student, ind))
         if ind["missing_subjects"] == 0:
             out.append(
-                "Course-audit eligibility: cleared. All required subjects are marked completed, so the backend rule "
-                "can advance an Admission or Coursework student to Proposal Development."
+                "Course-audit eligibility: cleared for comprehensive exam. All required subject units are marked "
+                "completed; the student may start research only after passing the comprehensive exam."
             )
         else:
             out.append(
@@ -2063,6 +2116,103 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    @app.route("/api/terms/active")
+    @require_api_login()
+    def active_term():
+        return jsonify({"term": term_dict(get_active_term())})
+
+    def term_payload_values(data: MultiDict, existing: AcademicTerm | None = None) -> dict:
+        label = (data.get("label") or (existing.label if existing else "") or "").strip()
+        start_date = parse_date(data.get("start_date") or (existing.start_date.isoformat() if existing and existing.start_date else ""))
+        end_date = parse_date(data.get("end_date") or (existing.end_date.isoformat() if existing and existing.end_date else ""))
+        if not label:
+            raise ValueError("Term label is required.")
+        if not start_date or not end_date:
+            raise ValueError("Start and end dates are required.")
+        if end_date < start_date:
+            raise ValueError("End date must be after the start date.")
+        window_open = parse_date(
+            data.get("planning_window_open")
+            if "planning_window_open" in data
+            else (existing.planning_window_open.isoformat() if existing and existing.planning_window_open else "")
+        )
+        window_close = parse_date(
+            data.get("planning_window_close")
+            if "planning_window_close" in data
+            else (existing.planning_window_close.isoformat() if existing and existing.planning_window_close else "")
+        )
+        if window_open and window_close and window_close < window_open:
+            raise ValueError("Planning window close must be after the open date.")
+        raw_status = data.get("status") if "status" in data else (existing.status if existing else "")
+        status = (raw_status or "").strip() or None
+        allowed_statuses = {"upcoming", "active", "closed", "archived"}
+        if status and status not in allowed_statuses:
+            raise ValueError("Choose a valid status: upcoming, active, closed, or archived.")
+        return {
+            "label": label,
+            "start_date": start_date,
+            "end_date": end_date,
+            "planning_window_open": window_open,
+            "planning_window_close": window_close,
+            "status": status,
+        }
+
+    @app.route("/api/admin/terms")
+    @require_api_login("staff")
+    def admin_terms():
+        terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
+        return jsonify({"items": [term_dict(term) for term in terms], "active": term_dict(get_active_term())})
+
+    @app.route("/api/admin/terms", methods=["POST"])
+    @require_api_login("staff")
+    def admin_terms_create():
+        data = request_payload()
+        try:
+            values = term_payload_values(data)
+            term = AcademicTerm(**values)
+            db.session.add(term)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "term": term_dict(term), "message": f"Created {term.label}."})
+
+    @app.route("/api/admin/terms/<int:term_id>", methods=["PATCH"])
+    @require_api_login("staff")
+    def admin_terms_update(term_id: int):
+        term = AcademicTerm.query.get_or_404(term_id)
+        data = request_payload()
+        try:
+            values = term_payload_values(data, existing=term)
+            for key, value in values.items():
+                setattr(term, key, value)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "term": term_dict(term), "message": f"Updated {term.label}."})
+
+    @app.route("/api/admin/terms/<int:term_id>/set-active", methods=["PATCH"])
+    @require_api_login("staff")
+    def admin_terms_set_active(term_id: int):
+        term = AcademicTerm.query.get_or_404(term_id)
+        current = AcademicTerm.query.filter_by(is_active_planning_term=True).first()
+        if current and current.id != term.id:
+            blocking = CourseOfferingPlan.query.filter(
+                CourseOfferingPlan.target_term_id == current.id,
+                CourseOfferingPlan.status.in_(["Submitted", "Approved"]),
+            ).count()
+            if blocking:
+                return jsonify({
+                    "error": "The current active planning term has submitted or approved offering plans. Resolve them before switching.",
+                    "conflict_count": blocking,
+                    "current_term": term_dict(current),
+                }), 409
+        AcademicTerm.query.update({AcademicTerm.is_active_planning_term: False})
+        term.is_active_planning_term = True
+        db.session.commit()
+        return jsonify({"ok": True, "term": term_dict(term), "message": f"{term.label} is now the active planning term."})
+
     # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
     @require_api_login("staff")
@@ -2191,7 +2341,7 @@ def register_routes(app: Flask) -> None:
         practicum_eligibility_result = practicum_eligibility(student)
         withdrawal_application = latest_withdrawal_application(student.id)
         graduation_endorsement = latest_graduation_endorsement(student.id)
-        current_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        current_term = get_active_term()
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
@@ -2304,6 +2454,7 @@ def register_routes(app: Flask) -> None:
         practicum_eligibility_result = practicum_eligibility(student)
         withdrawal_application = latest_withdrawal_application(student.id)
         graduation_endorsement = latest_graduation_endorsement(student.id)
+        current_term = get_active_term()
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
@@ -2327,6 +2478,7 @@ def register_routes(app: Flask) -> None:
                 "stages": STAGES,
                 "stage_index": STAGES.index(portal_student["current_stage"]) if portal_student["current_stage"] in STAGES else 0,
                 "course_audit": course_audit_dict(audit),
+                "current_term": term_dict(current_term),
                 "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
                 "course_drop_requests": [
                     course_drop_request_dict(item, include_student=False)
@@ -3149,7 +3301,7 @@ def register_routes(app: Flask) -> None:
         )
 
     @app.route("/api/curriculum-planning")
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def curriculum_planning():
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
@@ -3158,7 +3310,7 @@ def register_routes(app: Flask) -> None:
         return jsonify(curriculum_planning_payload(program))
 
     @app.route("/api/curriculum-planning/subjects", methods=["POST"])
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def curriculum_planning_create_subject():
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
@@ -3212,7 +3364,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/curriculum-planning/generate", methods=["POST"])
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def curriculum_planning_generate():
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
@@ -3274,16 +3426,26 @@ def register_routes(app: Flask) -> None:
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
         action = data.get("action") or "draft"
-        latest_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        latest_term = get_active_term()
+        reference_term = get_reference_term(latest_term)
         term_label = (data.get("term_label") or "").strip() or (latest_term.label if latest_term else "Current Term")
         plan = (
             CourseOfferingPlan.query.filter_by(program_id=program.id, term_label=term_label)
             .order_by(CourseOfferingPlan.created_at.desc())
             .first()
         )
+        if plan and latest_term:
+            plan.target_term_id = latest_term.id
+            plan.reference_term_id = reference_term.id if reference_term else None
         if action == "draft":
             if not plan:
-                plan = CourseOfferingPlan(program_id=program.id, term_label=term_label, status="Draft")
+                plan = CourseOfferingPlan(
+                    program_id=program.id,
+                    term_label=term_label,
+                    status="Draft",
+                    target_term_id=latest_term.id if latest_term else None,
+                    reference_term_id=reference_term.id if reference_term else None,
+                )
                 db.session.add(plan)
                 db.session.flush()
             plan.status = "Draft"
@@ -3572,7 +3734,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/course-audit/roster", methods=["POST"])
-    @require_api_login("academic_coordinator")
+    @require_api_login("staff", "academic_coordinator")
     def course_audit_roster_save():
         data = request.get_json(silent=True) or {}
         course = Course.query.get_or_404(int(data.get("course_id") or 0))
@@ -3649,9 +3811,7 @@ def register_routes(app: Flask) -> None:
             changed += 1
             changed_students.add(student.id)
             status_counts[new_status] = status_counts.get(new_status, 0) + 1
-            audit = compute_course_audit(student)
-            if audit["missing_count"] == 0 and student.current_stage in ("Admission", "Coursework"):
-                student.current_stage = "Proposal Development"
+            compute_course_audit(student)
             recompute_risk(student)
             add_log("course-audit", sid, actor, f"Course audit {term}".strip(),
                     f"{course.code} marked {new_status}",
@@ -3688,7 +3848,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/course-drop/requests/<int:request_id>/decide", methods=["POST"])
-    @require_api_login("academic_coordinator")
+    @require_api_login("staff", "academic_coordinator")
     def course_drop_decide(request_id: int):
         data = request.get_json(silent=True) or {}
         request_item = CourseDropRequest.query.get_or_404(request_id)
@@ -3783,6 +3943,7 @@ def register_routes(app: Flask) -> None:
 
     # ---- Monitoring grid (spreadsheet view, one program at a time) -------
     @app.route("/api/monitoring/grid")
+    @require_api_login("staff", "academic_coordinator")
     def monitoring_grid():
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
@@ -3837,13 +3998,13 @@ def register_routes(app: Flask) -> None:
         course_units = {c.id: (c.units or 3) for c in courses}
         total_units_all = sum(course_units.values())
 
-        def milestones(stage: str) -> dict:
+        def milestones(stage: str, comprehensive_passed: bool) -> dict:
             idx = STAGES.index(stage) if stage in STAGES else 0
             return {
-                "title": stage != "LOA" and idx >= STAGES.index("Proposal Development"),
-                "proposal": idx >= STAGES.index("Proposal Defense"),
-                "ethics": idx >= STAGES.index("Data Collection"),
-                "final": idx >= STAGES.index("Final Defense"),
+                "title": comprehensive_passed and stage != "LOA" and idx >= STAGES.index("Proposal Development"),
+                "proposal": comprehensive_passed and idx >= STAGES.index("Proposal Defense"),
+                "ethics": comprehensive_passed and idx >= STAGES.index("Data Collection"),
+                "final": comprehensive_passed and idx >= STAGES.index("Final Defense"),
             }
 
         rows = []
@@ -3858,6 +4019,10 @@ def register_routes(app: Flask) -> None:
                     done += 1
                     done_units += course_units[c.id]
             units_complete = total_units_all > 0 and done_units >= total_units_all
+            stage_idx = STAGES.index(s.current_stage) if s.current_stage in STAGES else 0
+            research_started = stage_idx >= STAGES.index("Proposal Development")
+            computed_comprehensive_status = "P" if units_complete and research_started else "F" if units_complete else ""
+            comprehensive_status = s.comprehensive_status if s.comprehensive_status is not None else computed_comprehensive_status
             rows.append({
                 "id": s.id, "name": s.name, "student_number": s.student_number,
                 "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
@@ -3866,7 +4031,8 @@ def register_routes(app: Flask) -> None:
                 "rate": round(done / len(courses) * 100, 1) if courses else 0,
                 "completed_units": done_units, "total_units": total_units_all,
                 "eligible": units_complete,
-                "milestones": milestones(s.current_stage),
+                "comprehensive_status": comprehensive_status,
+                "milestones": milestones(s.current_stage, comprehensive_status == "P"),
             })
 
         progress = request.args.get("progress", "").strip()
@@ -3888,6 +4054,22 @@ def register_routes(app: Flask) -> None:
             "total_units": total_units_all,
             "students": rows,
         })
+
+    @app.route("/api/monitoring/compre/<int:student_id>", methods=["PATCH"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_compre_update(student_id: int):
+        student = Student.query.get_or_404(student_id)
+        data = request.get_json(silent=True) or {}
+        status = (data.get("status") or "").strip().upper()
+        if status not in {"", "P", "F"}:
+            return jsonify({"error": "Choose P, F, or blank for the comprehensive exam status."}), 400
+        audit = compute_course_audit(student)
+        if not audit.get("eligibility", {}).get("units_complete"):
+            return jsonify({"error": "Comprehensive exam status can only be changed after all required subject units are completed."}), 400
+        student.comprehensive_status = status or None
+        student.updated_at = now_utc()
+        db.session.commit()
+        return jsonify({"ok": True, "student_id": student.id, "status": status})
 
     # Population-level queue of rule-based recommendations.
     @app.route("/api/decision-support")
@@ -6274,9 +6456,6 @@ def handle_course_audit(data: MultiDict) -> int:
     if audit["missing_count"] > 0:
         add_task(student.id, "Resolve missing curriculum subjects", "Academic Coordinator", 7, 25)
         student.risk_level = "Medium" if audit["missing_count"] >= 3 else student.risk_level
-    if audit["missing_count"] == 0:
-        student.current_stage = "Proposal Development"
-
     add_log(
         "course-audit",
         student.id,
@@ -8666,6 +8845,7 @@ def course_demand_rows(program: Program) -> list[dict]:
     # Subject demand counts only currently ENROLLED students who have not yet taken
     # the subject (LOA / AWOL / Completed are excluded), per the AC's process.
     demand: dict[int, dict] = {}
+    all_courses = Course.query.filter_by(program_id=program.id).order_by(Course.code).all()
     students = (
         Student.query.filter_by(program_id=program.id, enrollment_tag="Enrolled")
         .order_by(Student.last_name)
@@ -8686,20 +8866,30 @@ def course_demand_rows(program: Program) -> list[dict]:
             course = item["course"]
             if course.id not in demand:
                 demand[course.id] = {"course": course, "students": []}
-            demand[course.id]["students"].append(student)
+            record = item.get("record")
+            issues = []
+            if item.get("status") == "Incomplete" or (record and record.grade_status == "Incomplete"):
+                issues.append("Incomplete grade")
+            elif item.get("status") in {"Failed", "Dropped"}:
+                issues.append(f"{item.get('status')} subject")
+            demand[course.id]["students"].append({"student": student, "issues": issues})
 
     rows = []
-    for item in demand.values():
+    for course in all_courses:
+        item = demand.get(course.id, {"course": course, "students": []})
         count = len(item["students"])
-        suggested_sections = max(1, (count + 24) // 25)
+        suggested_sections = max(1, (count + 24) // 25) if count else 0
         if count >= 15:
             recommendation = "Offer this term"
             priority = "High"
         elif count >= 5:
             recommendation = "Review section feasibility"
             priority = "Medium"
-        else:
+        elif count >= 1:
             recommendation = "Monitor demand"
+            priority = "Low"
+        else:
+            recommendation = "No current demand"
             priority = "Low"
         rows.append({
             "course": {
@@ -8707,36 +8897,100 @@ def course_demand_rows(program: Program) -> list[dict]:
                 "code": item["course"].code,
                 "title": item["course"].title,
                 "category": item["course"].category,
+                "program_id": program.id,
+                "program_code": program.code,
             },
+            "program": program_dict(program),
             "demand_count": count,
-            "student_sample": [student_brief(s) for s in item["students"][:5]],
+            "student_sample": [student_brief(entry["student"]) for entry in item["students"][:5]],
+            "students": [
+                {
+                    "student_id": entry["student"].id,
+                    "full_name": entry["student"].name,
+                    "id_number": entry["student"].student_number,
+                    "track": entry["student"].current_stage,
+                    "ay_entry": entry["student"].entry_year,
+                    "conditional_issues": entry["issues"],
+                }
+                for entry in item["students"]
+            ],
             "suggested_sections": suggested_sections,
             "availability_count": availability_count,
             "priority": priority,
             "recommendation": recommendation,
         })
     rows.sort(key=lambda row: (-row["demand_count"], row["course"]["code"]))
-    return rows[:20]
+    return rows
 
 
 def course_adjustments_payload(program: Program) -> dict:
-    demand = course_demand_rows(program)
+    min_threshold = 5
+    high_threshold = 15
+    active_term = get_active_term()
+    today = date.today()
+
+    def planning_window_is_open(term: AcademicTerm | None) -> bool:
+        return bool(
+            term
+            and term.planning_window_open
+            and term.planning_window_close
+            and term.planning_window_open <= today <= term.planning_window_close
+        )
+
+    def demand_status(count: int) -> str:
+        if count >= high_threshold:
+            return "high"
+        if count >= min_threshold:
+            return "meets_minimum"
+        if count >= 1:
+            return "below_minimum"
+        return "no_demand"
+
+    programs = Program.query.order_by(Program.code).all()
+    demand = []
+    for demand_program in programs:
+        for row in course_demand_rows(demand_program):
+            row["demand_status"] = demand_status(row["demand_count"])
+            demand.append(row)
+    visible_demand = [row for row in demand if row["program"]["id"] == program.id]
     latest_plan = (
         CourseOfferingPlan.query.filter_by(program_id=program.id)
         .order_by(CourseOfferingPlan.updated_at.desc())
         .first()
     )
+    latest_plans = {
+        p.id: CourseOfferingPlan.query.filter_by(program_id=p.id)
+        .order_by(CourseOfferingPlan.updated_at.desc())
+        .first()
+        for p in programs
+    }
+    students_with_demand = {
+        student["student_id"]
+        for row in demand
+        for student in row.get("students", [])
+    }
     return {
         "program": program_dict(program),
-        "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+        "programs": [program_dict(p) for p in programs],
+        "active_term": {
+            "id": active_term.id,
+            "label": active_term.label,
+            "planning_window_open": active_term.planning_window_open.isoformat() if active_term.planning_window_open else None,
+            "planning_window_close": active_term.planning_window_close.isoformat() if active_term.planning_window_close else None,
+            "is_active_planning_term": bool(active_term.is_active_planning_term),
+        } if active_term else None,
+        "planning_window_open": planning_window_is_open(active_term),
         "summary": {
-            "demand_subjects": len(demand),
+            "programs_with_demand": len({row["program"]["id"] for row in demand if row["demand_count"] > 0}),
+            "enrolled_students": len(students_with_demand),
+            "demand_subjects": sum(1 for row in demand if row["demand_count"] > 0),
             "total_demand": sum(row["demand_count"] for row in demand),
-            "high_priority": sum(1 for row in demand if row["priority"] == "High"),
-            "suggested_sections": sum(row["suggested_sections"] for row in demand),
+            "high_priority": sum(1 for row in demand if row["demand_status"] == "high"),
+            "suggested_sections": sum(row["suggested_sections"] for row in visible_demand),
         },
         "demand": demand,
         "latest_plan": course_offering_plan_dict(latest_plan),
+        "latest_plans": {str(pid): course_offering_plan_dict(plan) for pid, plan in latest_plans.items()},
     }
 
 
@@ -8913,6 +9167,10 @@ def ensure_course_workflow_schema() -> None:
     """Add coursework grade/drop fields to existing demo databases."""
     db.create_all()
     inspector = inspect(db.engine)
+    if "student" in inspector.get_table_names():
+        student_existing = {column["name"] for column in inspector.get_columns("student")}
+        if "comprehensive_status" not in student_existing:
+            db.session.execute(text("ALTER TABLE student ADD COLUMN comprehensive_status VARCHAR(2)"))
     if "course_record" in inspector.get_table_names():
         existing = {column["name"] for column in inspector.get_columns("course_record")}
         additions = {
@@ -8925,6 +9183,33 @@ def ensure_course_workflow_schema() -> None:
         for name, sql_type in additions.items():
             if name not in existing:
                 db.session.execute(text(f"ALTER TABLE course_record ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+
+
+def ensure_term_planning_schema() -> None:
+    """Add term-planning fields to existing demo databases."""
+    db.create_all()
+    inspector = inspect(db.engine)
+    if "academic_term" in inspector.get_table_names():
+        existing = {column["name"] for column in inspector.get_columns("academic_term")}
+        additions = {
+            "is_active_planning_term": "BOOLEAN DEFAULT 0",
+            "planning_window_open": "DATE",
+            "planning_window_close": "DATE",
+            "status": "VARCHAR(20)",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE academic_term ADD COLUMN {name} {sql_type}"))
+    if "course_offering_plan" in inspector.get_table_names():
+        existing = {column["name"] for column in inspector.get_columns("course_offering_plan")}
+        additions = {
+            "target_term_id": "INTEGER",
+            "reference_term_id": "INTEGER",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE course_offering_plan ADD COLUMN {name} {sql_type}"))
     db.session.commit()
 
 
@@ -8955,14 +9240,24 @@ def seed_database(count: int = 350) -> None:
     db.session.flush()
 
     terms = []
-    for label, start in [
+    term_specs = [
         ("AY 2024-2025 Term 1", date(2024, 8, 1)),
         ("AY 2024-2025 Term 2", date(2025, 1, 10)),
         ("AY 2025-2026 Term 1", date(2025, 8, 1)),
         ("AY 2025-2026 Term 2", date(2026, 1, 10)),
         ("AY 2026-2027 Term 1", date(2026, 8, 1)),
-    ]:
-        term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
+    ]
+    for idx, (label, start) in enumerate(term_specs):
+        status = "archived" if start < date(2026, 1, 1) else "active" if start.year == 2026 else "upcoming"
+        term = AcademicTerm(
+            label=label,
+            start_date=start,
+            end_date=start + timedelta(days=120),
+            planning_window_open=start - timedelta(days=90),
+            planning_window_close=start - timedelta(days=21),
+            status=status,
+            is_active_planning_term=idx == len(term_specs) - 1,
+        )
         db.session.add(term)
         terms.append(term)
 
@@ -9544,6 +9839,7 @@ with app.app_context():
     ensure_schedule_request_schema()
     ensure_workflow_activity_schema()
     ensure_course_workflow_schema()
+    ensure_term_planning_schema()
 
 
 if __name__ == "__main__":

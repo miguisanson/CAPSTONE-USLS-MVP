@@ -19,6 +19,7 @@ import StudentPortal from "./pages/StudentPortal";
 import DeanApprovals from "./pages/DeanApprovals";
 import Login from "./pages/Login";
 import Form1Endorsements from "./pages/Form1Endorsements";
+import TermManagement from "./pages/TermManagement";
 
 // Where each role lands by default.
 function homeFor(user) {
@@ -76,6 +77,14 @@ export default function App() {
                 <Route path="/assistant" element={<Assistant />} />
                 <Route path="/workflow/:slug" element={<WorkflowPage />} />
                 <Route path="/form1-endorsements" element={<Form1Endorsements />} />
+                <Route
+                  path="/admin/terms"
+                  element={
+                    <RoleOnly user={user} role="staff">
+                      <TermManagement />
+                    </RoleOnly>
+                  }
+                />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>

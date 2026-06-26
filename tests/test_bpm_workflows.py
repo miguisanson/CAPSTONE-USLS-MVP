@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from datetime import date
 
 from werkzeug.security import generate_password_hash
 
@@ -10,8 +11,10 @@ _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 
 from app import (  # noqa: E402
+    AcademicTerm,
     Course,
     CourseDropRequest,
+    CourseOfferingPlan,
     CourseRecord,
     DocumentCheck,
     GraduationEndorsement,
@@ -26,6 +29,7 @@ from app import (  # noqa: E402
     WithdrawalApplication,
     app,
     db,
+    get_active_term,
     graduation_eligibility,
     ensure_demo_accounts,
     required_documents_for_gate,
@@ -352,7 +356,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "course_id": self.course_id,
                 "statuses": {str(self.student_id): "Completed"},
             })
-            self.assertEqual(response.status_code, 403)
+            self.assertEqual(response.status_code, 200, response.get_json())
 
             response = academic.post("/api/course-audit/roster", json={
                 "course_id": self.course_id,
@@ -421,8 +425,16 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertIsNotNone(task)
             self.assertEqual(task_dict(task)["action_url"], "/workflow/course-audit")
 
-            staff_response = self._staff_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve"})
-            self.assertEqual(staff_response.status_code, 403)
+            staff_response = self._staff_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve", "remarks": "Approved by staff"})
+            self.assertEqual(staff_response.status_code, 200, staff_response.get_json())
+            db.session.refresh(record)
+            db.session.refresh(drop)
+            self.assertEqual(record.status, "Dropped")
+            self.assertEqual(drop.status, "Approved")
+
+            drop.status = "Submitted"
+            record.status = "Enrolled"
+            db.session.commit()
             response = self._academic_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve", "remarks": "Approved for demo"})
             self.assertEqual(response.status_code, 200, response.get_json())
             db.session.refresh(record)
@@ -449,6 +461,83 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200, response.get_json())
             self.assertEqual(response.get_json()["user"]["role"], role)
+
+    def test_active_term_fallback_and_staff_term_management(self):
+        with app.app_context():
+            old_term = AcademicTerm(label="AY 2025-2026 Term 2", start_date=date(2026, 1, 10), end_date=date(2026, 5, 10))
+            new_term = AcademicTerm(label="AY 2026-2027 Term 1", start_date=date(2026, 8, 1), end_date=date(2026, 12, 1))
+            db.session.add_all([old_term, new_term])
+            db.session.commit()
+            self.assertEqual(get_active_term().id, new_term.id)
+
+            staff = self._staff_client()
+            response = staff.patch(f"/api/admin/terms/{old_term.id}/set-active", json={})
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(old_term)
+            db.session.refresh(new_term)
+            self.assertTrue(old_term.is_active_planning_term)
+            self.assertFalse(new_term.is_active_planning_term)
+            self.assertEqual(get_active_term().id, old_term.id)
+
+            response = staff.post("/api/admin/terms", json={
+                "label": "AY 2027-2028 Term 1",
+                "start_date": "2027-08-01",
+                "end_date": "2027-12-01",
+                "planning_window_open": "2027-05-01",
+                "planning_window_close": "2027-07-01",
+                "status": "upcoming",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            self.assertEqual(response.get_json()["term"]["school_year"], "AY 2027-2028")
+
+    def test_set_active_term_blocks_submitted_or_approved_offering_plan(self):
+        with app.app_context():
+            current = AcademicTerm(
+                label="AY 2026-2027 Term 1",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 1),
+                is_active_planning_term=True,
+            )
+            next_term = AcademicTerm(label="AY 2026-2027 Term 2", start_date=date(2027, 1, 10), end_date=date(2027, 5, 10))
+            db.session.add_all([current, next_term])
+            db.session.flush()
+            db.session.add(CourseOfferingPlan(
+                program_id=self.program_id,
+                term_label=current.label,
+                target_term_id=current.id,
+                status="Submitted",
+            ))
+            db.session.commit()
+
+            response = self._staff_client().patch(f"/api/admin/terms/{next_term.id}/set-active", json={})
+            self.assertEqual(response.status_code, 409, response.get_json())
+            db.session.refresh(current)
+            db.session.refresh(next_term)
+            self.assertTrue(current.is_active_planning_term)
+            self.assertFalse(next_term.is_active_planning_term)
+
+    def test_course_adjustment_plan_tags_target_and_reference_terms(self):
+        with app.app_context():
+            reference = AcademicTerm(label="AY 2025-2026 Term 2", start_date=date(2026, 1, 10), end_date=date(2026, 5, 10))
+            target = AcademicTerm(
+                label="AY 2026-2027 Term 1",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 1),
+                is_active_planning_term=True,
+            )
+            db.session.add_all([reference, target])
+            db.session.commit()
+
+            response = self._staff_client().post("/api/course-adjustments/plan", json={
+                "program_id": self.program_id,
+                "action": "draft",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            plan = CourseOfferingPlan.query.filter_by(program_id=self.program_id, term_label=target.label).first()
+            self.assertIsNotNone(plan)
+            self.assertEqual(plan.target_term_id, target.id)
+            self.assertEqual(plan.reference_term_id, reference.id)
+            self.assertEqual(plan.term_label, target.label)
 
     def test_workflow_clarification_can_be_returned_and_answered(self):
         with app.app_context():

@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   FileCheck,
   CalendarCheck,
+  CalendarRange,
   Menu,
   X,
   GraduationCap,
@@ -18,8 +19,8 @@ import {
   ChevronRight,
   Lightbulb,
   Bot,
-  Table2,
   FileText,
+  Table2,
   BookOpenCheck,
   SlidersHorizontal,
   UsersRound,
@@ -42,7 +43,8 @@ const NAV_GROUPS = [
     items: [
       { to: "/students", label: "Students", icon: Users },
       { to: "/faculty", label: "Faculty", icon: UsersRound },
-      { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
+      { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2, roles: ["academic_coordinator"] },
+      { to: "/admin/terms", label: "Term Management", icon: CalendarRange, roles: ["staff"] },
     ],
   },
   {
@@ -86,7 +88,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/monitoring-sheet", "/workflow/course-audit", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
+  academic_coordinator: new Set(["/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
   research_coordinator: new Set(["/workflow/graduation", "/work-queue"]),
   registrar: new Set(["/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
 };

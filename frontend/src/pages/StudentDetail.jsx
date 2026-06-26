@@ -147,7 +147,7 @@ export default function StudentDetail() {
               <div className="mb-1 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-700">Units completed</span>
                 <span className="font-bold text-brand-700">
-                  {course_audit.completed_units} / {course_audit.total_units} units ({course_audit.units_rate}%)
+                  {course_audit.completed_units} / {course_audit.total_units} UNITS ({course_audit.units_rate}%)
                 </span>
               </div>
               <ProgressBar value={course_audit.units_rate} />
@@ -156,7 +156,7 @@ export default function StudentDetail() {
                   {course_audit.by_category.map((cat) => (
                     <span key={cat.category} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                       {cat.category}
-                      <span className="text-slate-400">{cat.completed_units}/{cat.total_units}u</span>
+                      <span className="text-slate-400">{cat.completed_units}/{cat.total_units} UNITS</span>
                     </span>
                   ))}
                 </div>
@@ -167,7 +167,7 @@ export default function StudentDetail() {
             {course_audit.eligibility && (
               <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Eligibility (requires all {course_audit.total_units} units)
+                  Eligibility (requires all {course_audit.total_units} UNITS)
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {[

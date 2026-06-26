@@ -38,6 +38,7 @@ import {
   List,
   Send,
   CheckSquare,
+  ChevronDown,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -740,7 +741,7 @@ function CourseDropReviewPanelV2() {
   }
 
   return (
-    <Card className="p-5">
+    <div className="space-y-4">
       <SectionTitle title="Student drop requests" subtitle="Review pending student requests from the Academic Coordinator queue." icon={LogOut} />
       <ErrorNote message={error} />
       {notice && <div className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{notice}</div>}
@@ -758,11 +759,16 @@ function CourseDropReviewPanelV2() {
                     <p className="mt-1 text-xs text-slate-500">{item.course_title} - {item.term_label || "No term"} - submitted {formatDate(item.created_at)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" onClick={() => setExpanded((current) => ({ ...current, [item.id]: !isOpen }))} className="btn-ghost cursor-pointer px-3 py-2 text-xs">
-                      {isOpen ? "Hide details" : "Details"}
+                    <button type="button" disabled={!["staff", "academic_coordinator"].includes(user?.role)} onClick={() => decide(item, "approve")} className="btn-primary cursor-pointer px-3 py-2">Approve drop</button>
+                    <button type="button" disabled={!["staff", "academic_coordinator"].includes(user?.role)} onClick={() => decide(item, "reject")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Reject</button>
+                    <button
+                      type="button"
+                      onClick={() => setExpanded((current) => ({ ...current, [item.id]: !isOpen }))}
+                      className="inline-grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                      aria-label={isOpen ? "Hide drop request details" : "Show drop request details"}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                     </button>
-                    <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "approve")} className="btn-primary cursor-pointer px-3 py-2">Approve drop</button>
-                    <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "reject")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Reject</button>
                   </div>
                 </div>
                 {isOpen && (
@@ -782,7 +788,7 @@ function CourseDropReviewPanelV2() {
       ) : (
         <EmptyState icon={LogOut} title="No pending course drop requests" hint="Approved drops update the student's course audit automatically." />
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -876,6 +882,7 @@ function CourseRosterGradeWorkspace({ meta }) {
   const [roster, setRoster] = useState(null);
   const [edits, setEdits] = useState({});
   const [addStudentId, setAddStudentId] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -900,6 +907,7 @@ function CourseRosterGradeWorkspace({ meta }) {
       remarks: student.remarks || "",
     }])));
     setAddStudentId("");
+    setStudentSearch("");
     setOpenMenu(null);
   }
 
@@ -911,12 +919,17 @@ function CourseRosterGradeWorkspace({ meta }) {
     setLoading(true);
     setResult(null);
     setError("");
-    api.courseAuditRoster(courseId, term).then(hydrate).catch((err) => setError(err.message)).finally(() => setLoading(false));
-  }, [courseId, term]);
+    api.courseAuditRoster(courseId).then(hydrate).catch((err) => setError(err.message)).finally(() => setLoading(false));
+  }, [courseId]);
 
   const allStudents = roster?.students || [];
   const classStudents = allStudents.filter((student) => classStatuses.has(edits[student.student_id]?.status || student.status));
   const availableStudents = allStudents.filter((student) => !classStatuses.has(edits[student.student_id]?.status || student.status));
+  const matchingStudents = availableStudents.filter((student) => {
+    const needle = studentSearch.trim().toLowerCase();
+    if (!needle) return true;
+    return `${student.name} ${student.student_number} ${student.program_code}`.toLowerCase().includes(needle);
+  });
 
   function addStudent() {
     if (!addStudentId) return;
@@ -930,6 +943,7 @@ function CourseRosterGradeWorkspace({ meta }) {
       },
     }));
     setAddStudentId("");
+    setStudentSearch("");
   }
 
   function removeStudent(id) {
@@ -958,14 +972,13 @@ function CourseRosterGradeWorkspace({ meta }) {
       const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
       const res = await api.saveCourseAudit({
         course_id: roster.course.id,
-        term,
         statuses: build("status", "Missing"),
         grades: build("grade_value"),
         grade_statuses: build("grade_status", "No Grade"),
         remarks: build("remarks"),
       });
       setResult(res);
-      hydrate(await api.courseAuditRoster(roster.course.id, term));
+      hydrate(await api.courseAuditRoster(roster.course.id));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -975,16 +988,13 @@ function CourseRosterGradeWorkspace({ meta }) {
 
   return (
     <div className="space-y-5">
-      <SectionTitle title="Course enrollment and grade audit" subtitle="Select a term and subject, manage the class list, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <SectionTitle title="Course enrollment and grade audit" subtitle="Select a subject, manage the class list, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Program">
           <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
         </Field>
         <Field label="Subject" required>
           <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
-        </Field>
-        <Field label="Term">
-          <Select value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Current / all terms" options={(meta?.terms || []).map((item) => item.label)} />
         </Field>
       </div>
       <ErrorNote message={error} />
@@ -992,20 +1002,14 @@ function CourseRosterGradeWorkspace({ meta }) {
       {loading ? (
         <Spinner label="Loading class roster..." />
       ) : !courseId ? (
-        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the selected term's class list." />
+        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the class list." />
       ) : (
         <>
-          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <Field label="Add student to class">
-              <Select value={addStudentId} onChange={(event) => setAddStudentId(event.target.value)} placeholder={availableStudents.length ? "Choose student" : "No available students"} options={availableStudents.map((student) => ({ value: student.student_id, label: `${student.name} - ${student.student_number}` }))} />
-            </Field>
-            <button type="button" onClick={addStudent} disabled={!addStudentId} className="btn-primary cursor-pointer px-4 py-2">Add student</button>
-          </div>
           {classStudents.length ? (
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
                 <p className="text-sm font-semibold text-ink">{roster.course.code} - {roster.course.title}</p>
-                <p className="text-xs text-slate-500">{term || "Current / all terms"} · {classStudents.length} student(s)</p>
+                <p className="text-xs text-slate-500">{classStudents.length} student(s)</p>
               </div>
               <div className="overflow-auto">
                 <table className="w-full text-sm">
@@ -1026,7 +1030,7 @@ function CourseRosterGradeWorkspace({ meta }) {
                         <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
                           <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                           <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
-                          <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /><p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>
+                          <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /></td>
                           <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /></td>
                           <td className="relative px-3 py-2.5 text-right">
                             <button type="button" onClick={() => setOpenMenu(openMenu === student.student_id ? null : student.student_id)} className="inline-grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Open actions for ${student.name}`}><MoreVertical className="h-4 w-4" /></button>
@@ -1044,8 +1048,34 @@ function CourseRosterGradeWorkspace({ meta }) {
               </div>
             </div>
           ) : (
-            <EmptyState icon={ClipboardCheck} title="No students in this class" hint="Use Add student to class to build the roster for this term." />
+            <EmptyState icon={ClipboardCheck} title="No students in this class" hint="Use Add student to class to build the roster." />
           )}
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div>
+              <p className="text-sm font-semibold text-ink">Add student to class</p>
+              <p className="text-xs text-slate-500">Search by student name or ID, then add the student to this subject list.</p>
+            </div>
+            <Input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search student name or ID" />
+            <div className="max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white">
+              {matchingStudents.length ? matchingStudents.slice(0, 20).map((student) => (
+                <button
+                  key={student.student_id}
+                  type="button"
+                  onClick={() => setAddStudentId(String(student.student_id))}
+                  className={`flex w-full items-center justify-between gap-3 border-b border-slate-50 px-3 py-2.5 text-left hover:bg-brand-50 ${String(student.student_id) === String(addStudentId) ? "bg-brand-50" : ""}`}
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-ink">{student.name}</span>
+                    <span className="text-xs text-slate-400">{student.student_number} - {student.program_code}</span>
+                  </span>
+                  {String(student.student_id) === String(addStudentId) && <CheckCircle2 className="h-4 w-4 text-brand-600" />}
+                </button>
+              )) : (
+                <p className="px-3 py-4 text-sm text-slate-500">No available students match your search.</p>
+              )}
+            </div>
+            <button type="button" onClick={addStudent} disabled={!addStudentId} className="btn-primary w-full cursor-pointer px-4 py-2 sm:w-auto">Add selected student</button>
+          </div>
           <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : "Save course audit"}</button>
         </>
       )}

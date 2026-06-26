@@ -9,6 +9,10 @@ const STATUS_STYLES = {
   Critical: "bg-red-100 text-red-800 ring-red-300",
   // standing
   Active: "bg-brand-50 text-brand-700 ring-brand-200",
+  Upcoming: "bg-amber-50 text-amber-700 ring-amber-200",
+  Open: "bg-brand-50 text-brand-700 ring-brand-200",
+  Closed: "bg-slate-100 text-slate-700 ring-slate-200",
+  Archived: "bg-slate-100 text-slate-700 ring-slate-200",
   "On Leave": "bg-amber-50 text-amber-700 ring-amber-200",
   "Withdrawal In Progress": "bg-amber-50 text-amber-700 ring-amber-200",
   Withdrawn: "bg-slate-100 text-slate-700 ring-slate-200",

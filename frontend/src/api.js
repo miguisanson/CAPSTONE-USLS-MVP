@@ -114,6 +114,16 @@ export const api = {
     const qs = queryString(actual);
     return request(`/monitoring/grid${qs ? `?${qs}` : ""}`);
   },
+  saveCompreStatus: (studentId, status) =>
+    request(`/monitoring/compre/${studentId}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  terms: () => request("/admin/terms"),
+  activeTerm: () => request("/terms/active"),
+  createTerm: (payload) =>
+    request("/admin/terms", { method: "POST", body: JSON.stringify(payload) }),
+  updateTerm: (id, payload) =>
+    request(`/admin/terms/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  setActiveTerm: (id) =>
+    request(`/admin/terms/${id}/set-active`, { method: "PATCH", body: JSON.stringify({}) }),
   curriculumPlanning: (programId) =>
     request(`/curriculum-planning${programId ? `?program_id=${programId}` : ""}`),
   generateCurriculum: (payload) =>
