@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   UserPlus,
@@ -30,16 +30,33 @@ import {
   Inbox,
   Eye,
   Search,
+  MoreVertical,
   SlidersHorizontal,
   History,
   Download,
+  HelpCircle,
+  MessageSquare,
+  Columns3,
+  List,
+  Send,
+  CheckSquare,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from "../components/ui";
 import { Field, Input, Textarea, Select, CheckList, RadioRow } from "../components/forms";
 import StudentPicker from "../components/StudentPicker";
+import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 import { formatDate } from "../lib/format";
+import { useAuth } from "../auth";
+import { Form1EndorsementQueue } from "./Form1Endorsements";
+
+const WORKFLOW_ROLE_LABELS = {
+  staff: "Graduate School Staff",
+  academic_coordinator: "Academic Coordinator",
+  research_coordinator: "Research Coordinator",
+  registrar: "Registrar",
+};
 
 const ICONS = {
   "student-handoff": UserPlus,
@@ -74,8 +91,11 @@ const NEEDS_STUDENT = {
   graduation: false,
 };
 
+const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation"]);
+
 export default function WorkflowPage() {
   const { slug } = useParams();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: meta } = useApi(() => api.meta(), []);
   const [studentId, setStudentId] = useState(() => {
@@ -87,6 +107,7 @@ export default function WorkflowPage() {
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [supportModal, setSupportModal] = useState("");
 
   // Keep the same student while staff move through research gate, panel
   // matching, and scheduling. The query string also makes the view shareable.
@@ -127,6 +148,8 @@ export default function WorkflowPage() {
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
   const usesQueue = USES_REQUEST_QUEUE[slug];
+  const overviewWorkflow = OVERVIEW_WORKFLOWS.has(slug);
+  const hideSideRail = overviewWorkflow || slug === "course-audit";
 
   useEffect(() => {
     if (!usesQueue || loading || !studentId || !context?.submitted_requests) return;
@@ -169,14 +192,22 @@ export default function WorkflowPage() {
     setSpecialization,
     submit,
     submitting,
+    refreshing: loading,
+    result,
+    submitError,
+    clearSubmitFeedback: () => {
+      setResult(null);
+      setSubmitError("");
+    },
     refetch,
+    accountRole: user?.role,
   };
 
   return (
     <div className="space-y-5 animate-fade-up">
       {/* Header */}
       <Card className="p-6">
-        <div className="flex items-start gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white">
             <Icon className="h-6 w-6" />
           </span>
@@ -194,6 +225,16 @@ export default function WorkflowPage() {
               </p>
             </div>
           </div>
+          {overviewWorkflow && (
+            <div className="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:justify-end">
+              <button type="button" onClick={() => setSupportModal("guide")} className="btn-ghost cursor-pointer px-3 py-2">
+                <HelpCircle className="h-4 w-4" /> How this works
+              </button>
+              <button type="button" onClick={() => setSupportModal("activity")} className="btn-ghost cursor-pointer px-3 py-2">
+                <History className="h-4 w-4" /> View recent activity
+              </button>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -204,8 +245,8 @@ export default function WorkflowPage() {
       )}
       <ErrorNote message={submitError} />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
+      <div className={hideSideRail ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
+        <div className={hideSideRail ? "space-y-5" : "space-y-5 lg:col-span-2"}>
           {needsStudent && !usesQueue && (
             <Card className="p-6">
               <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
@@ -254,21 +295,22 @@ export default function WorkflowPage() {
                 <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
               </Card>
             )
-          ) : loading ? (
+          ) : loading && !context ? (
             <Card className="p-6">
               <Spinner label="Loading workflow data…" />
             </Card>
-          ) : error ? (
+          ) : error && !context ? (
             <Card className="p-6">
               <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
             </Card>
           ) : usesQueue && !context?.selected_request ? (
             null
+          ) : slug === "research-gate" ? (
+            <ResearchGateForm {...formProps} />
           ) : (
             <Card className="p-6">
               {slug === "student-handoff" && <HandoffPanel {...formProps} />}
               {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
-              {slug === "research-gate" && <ResearchGateForm {...formProps} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
               {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
               {slug === "practicum" && <PracticumRoster {...formProps} />}
@@ -281,7 +323,7 @@ export default function WorkflowPage() {
         </div>
 
         {/* Side rail */}
-        <div className="space-y-5">
+        {!hideSideRail && <div className="space-y-5">
           <Card className="p-6">
             <SectionTitle title="How this works" icon={Sparkles} />
             <p className="text-sm leading-relaxed text-slate-600">{workflowGuidance(slug)}</p>
@@ -304,8 +346,17 @@ export default function WorkflowPage() {
               <EmptyState title="No recent actions" />
             )}
           </Card>
-        </div>
+        </div>}
       </div>
+      {supportModal && (
+        <WorkflowSupportModal
+          slug={slug}
+          mode={supportModal}
+          logs={context?.recent_logs || []}
+          policyQuestions={context?.deployment_policy_questions || []}
+          onClose={() => setSupportModal("")}
+        />
+      )}
     </div>
   );
 }
@@ -822,12 +873,741 @@ function HandoffForm({ meta, context, submit, submitting }) {
 // Course Audit — roster (by subject) or sheet upload
 // ---------------------------------------------------------------------------
 function CourseAuditPanel({ meta }) {
+  const [tab, setTab] = useState("class");
+  const tabs = [
+    { id: "class", label: "Course enrollment and grade audit", icon: ClipboardCheck },
+    { id: "drops", label: "Drop requests", icon: LogOut },
+  ];
   return (
-    <div className="space-y-6">
-      <HandoffImport context="audit" />
-      <div className="border-t border-slate-200 pt-6">
-        <CourseAuditRoster meta={meta} />
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {tabs.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-brand-50 hover:text-brand-700"}`}
+            >
+              <Icon className="h-4 w-4" /> {item.label}
+            </button>
+          );
+        })}
       </div>
+      {tab === "class" && <CourseRosterGradeWorkspace meta={meta} />}
+      {tab === "drops" && <CourseDropReviewPanelV2 />}
+    </div>
+  );
+}
+
+function CourseDropReviewPanelV2() {
+  const { user } = useAuth();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [remarks, setRemarks] = useState({});
+  const [expanded, setExpanded] = useState({});
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.courseDropRequests("Submitted");
+      setItems(res.items || []);
+    } catch (err) {
+      setError(err.message || "Could not load course drop requests.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function decide(item, decision) {
+    setNotice("");
+    setError("");
+    try {
+      const res = await api.decideCourseDrop(item.id, { decision, remarks: remarks[item.id] || "" });
+      setNotice(res.message);
+      await load();
+    } catch (err) {
+      setError(err.message || "Could not review this request.");
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <SectionTitle title="Student drop requests" subtitle="Review pending student requests from the Academic Coordinator queue." icon={LogOut} />
+      <ErrorNote message={error} />
+      {notice && <div className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{notice}</div>}
+      {loading ? (
+        <Spinner label="Loading drop requests..." />
+      ) : items.length ? (
+        <div className="space-y-3">
+          {items.map((item) => {
+            const isOpen = !!expanded[item.id];
+            return (
+              <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{item.student?.name} - {item.course_code}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.course_title} - {item.term_label || "No term"} - submitted {formatDate(item.created_at)}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => setExpanded((current) => ({ ...current, [item.id]: !isOpen }))} className="btn-ghost cursor-pointer px-3 py-2 text-xs">
+                      {isOpen ? "Hide details" : "Details"}
+                    </button>
+                    <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "approve")} className="btn-primary cursor-pointer px-3 py-2">Approve drop</button>
+                    <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "reject")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Reject</button>
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Student reason</p>
+                      <p className="mt-1 text-sm text-slate-600">{item.reason}</p>
+                    </div>
+                    {item.attachment && <a href={item.attachment.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View attached PDF</a>}
+                    <Input value={remarks[item.id] || ""} onChange={(e) => setRemarks((current) => ({ ...current, [item.id]: e.target.value }))} placeholder="Reviewer remarks" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState icon={LogOut} title="No pending course drop requests" hint="Approved drops update the student's course audit automatically." />
+      )}
+    </Card>
+  );
+}
+
+function CourseDropReviewPanel() {
+  const { user } = useAuth();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [remarks, setRemarks] = useState({});
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.courseDropRequests("Submitted");
+      setItems(res.items || []);
+    } catch (err) {
+      setError(err.message || "Could not load course drop requests.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function decide(item, decision) {
+    setNotice("");
+    setError("");
+    try {
+      const res = await api.decideCourseDrop(item.id, { decision, remarks: remarks[item.id] || "" });
+      setNotice(res.message);
+      await load();
+    } catch (err) {
+      setError(err.message || "Could not review this request.");
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <SectionTitle title="Student drop requests" subtitle="Requests stay pending until the Academic Coordinator approves or rejects them" icon={LogOut} />
+      <ErrorNote message={error} />
+      {notice && <div className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{notice}</div>}
+      {loading ? (
+        <Spinner label="Loading drop requests..." />
+      ) : items.length ? (
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">{item.student?.name} · {item.course_code}</p>
+                  <p className="mt-1 text-xs text-slate-500">{item.course_title} · {item.term_label || "No term"} · submitted {formatDate(item.created_at)}</p>
+                  <p className="mt-2 text-sm text-slate-600">{item.reason}</p>
+                  {item.attachment && <a href={item.attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View attached PDF</a>}
+                </div>
+                <StatusBadge value={item.status} dot={false} />
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+                <Input value={remarks[item.id] || ""} onChange={(e) => setRemarks((current) => ({ ...current, [item.id]: e.target.value }))} placeholder="Reviewer remarks" />
+                <div className="flex gap-2">
+                  <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "approve")} className="btn-primary cursor-pointer px-3 py-2">Approve drop</button>
+                  <button type="button" disabled={user?.role !== "academic_coordinator"} onClick={() => decide(item, "reject")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Reject</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState icon={LogOut} title="No pending course drop requests" hint="Approved drops update the student's course audit automatically." />
+      )}
+    </Card>
+  );
+}
+
+function deriveCourseOutcome(value) {
+  const grade = String(value || "").trim().toLowerCase();
+  if (!grade) return { status: "Current", grade_status: "No Grade" };
+  if (["inc", "incomplete"].includes(grade)) return { status: "Incomplete", grade_status: "Incomplete" };
+  if (["f", "fail", "failed", "5", "5.0", "5.00"].includes(grade)) return { status: "Failed", grade_status: "Failed" };
+  return { status: "Completed", grade_status: "Passed" };
+}
+
+function CourseRosterGradeWorkspace({ meta }) {
+  const [programId, setProgramId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [term, setTerm] = useState("");
+  const [roster, setRoster] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [addStudentId, setAddStudentId] = useState("");
+  const [openMenu, setOpenMenu] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"]);
+
+  useEffect(() => {
+    setSubjects([]);
+    setCourseId("");
+    setRoster(null);
+    setError("");
+    api.courseAuditSubjects(programId || undefined).then((res) => setSubjects(res.items || [])).catch((err) => setError(err.message));
+  }, [programId]);
+
+  function hydrate(res) {
+    setRoster(res);
+    setEdits(Object.fromEntries((res.students || []).map((student) => [student.student_id, {
+      status: student.status,
+      grade_value: student.grade_value || "",
+      grade_status: student.grade_status || "No Grade",
+      remarks: student.remarks || "",
+    }])));
+    setAddStudentId("");
+    setOpenMenu(null);
+  }
+
+  useEffect(() => {
+    if (!courseId) {
+      setRoster(null);
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    setError("");
+    api.courseAuditRoster(courseId, term).then(hydrate).catch((err) => setError(err.message)).finally(() => setLoading(false));
+  }, [courseId, term]);
+
+  const allStudents = roster?.students || [];
+  const classStudents = allStudents.filter((student) => classStatuses.has(edits[student.student_id]?.status || student.status));
+  const availableStudents = allStudents.filter((student) => !classStatuses.has(edits[student.student_id]?.status || student.status));
+
+  function addStudent() {
+    if (!addStudentId) return;
+    setEdits((current) => ({
+      ...current,
+      [addStudentId]: {
+        ...(current[addStudentId] || {}),
+        status: "Enrolled",
+        grade_value: current[addStudentId]?.grade_value || "",
+        grade_status: "No Grade",
+      },
+    }));
+    setAddStudentId("");
+  }
+
+  function removeStudent(id) {
+    setEdits((current) => ({
+      ...current,
+      [id]: { ...(current[id] || {}), status: "Missing", grade_value: "", grade_status: "No Grade" },
+    }));
+    setOpenMenu(null);
+  }
+
+  function updateGrade(id, value) {
+    const outcome = deriveCourseOutcome(value);
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), grade_value: value, ...outcome } }));
+  }
+
+  function updateRemarks(id, value) {
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), remarks: value } }));
+  }
+
+  async function save() {
+    if (!roster) return;
+    setSaving(true);
+    setError("");
+    try {
+      const ids = allStudents.map((student) => student.student_id);
+      const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
+      const res = await api.saveCourseAudit({
+        course_id: roster.course.id,
+        term,
+        statuses: build("status", "Missing"),
+        grades: build("grade_value"),
+        grade_statuses: build("grade_status", "No Grade"),
+        remarks: build("remarks"),
+      });
+      setResult(res);
+      hydrate(await api.courseAuditRoster(roster.course.id, term));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle title="Course enrollment and grade audit" subtitle="Select a term and subject, manage the class list, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Program">
+          <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
+        </Field>
+        <Field label="Subject" required>
+          <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
+        </Field>
+        <Field label="Term">
+          <Select value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Current / all terms" options={(meta?.terms || []).map((item) => item.label)} />
+        </Field>
+      </div>
+      <ErrorNote message={error} />
+      {result && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-5 w-5" /> {result.message}</div>}
+      {loading ? (
+        <Spinner label="Loading class roster..." />
+      ) : !courseId ? (
+        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the selected term's class list." />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <Field label="Add student to class">
+              <Select value={addStudentId} onChange={(event) => setAddStudentId(event.target.value)} placeholder={availableStudents.length ? "Choose student" : "No available students"} options={availableStudents.map((student) => ({ value: student.student_id, label: `${student.name} - ${student.student_number}` }))} />
+            </Field>
+            <button type="button" onClick={addStudent} disabled={!addStudentId} className="btn-primary cursor-pointer px-4 py-2">Add student</button>
+          </div>
+          {classStudents.length ? (
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+                <p className="text-sm font-semibold text-ink">{roster.course.code} - {roster.course.title}</p>
+                <p className="text-xs text-slate-500">{term || "Current / all terms"} · {classStudents.length} student(s)</p>
+              </div>
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                      <th className="px-4 py-2.5">Student</th>
+                      <th className="px-3 py-2.5">Status</th>
+                      <th className="px-3 py-2.5">Grade</th>
+                      <th className="px-3 py-2.5">Remarks</th>
+                      <th className="px-3 py-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classStudents.map((student) => {
+                      const edit = edits[student.student_id] || {};
+                      const status = edit.status || student.status;
+                      return (
+                        <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
+                          <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                          <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
+                          <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /><p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>
+                          <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /></td>
+                          <td className="relative px-3 py-2.5 text-right">
+                            <button type="button" onClick={() => setOpenMenu(openMenu === student.student_id ? null : student.student_id)} className="inline-grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Open actions for ${student.name}`}><MoreVertical className="h-4 w-4" /></button>
+                            {openMenu === student.student_id && (
+                              <div className="absolute right-3 z-20 mt-1 w-40 rounded-xl border border-slate-200 bg-white p-1 text-left shadow-lift">
+                                <button type="button" onClick={() => removeStudent(student.student_id)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Remove student</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <EmptyState icon={ClipboardCheck} title="No students in this class" hint="Use Add student to class to build the roster for this term." />
+          )}
+          <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : "Save course audit"}</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CourseClassWorkspace({ meta, mode }) {
+  const [programId, setProgramId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [term, setTerm] = useState("");
+  const [roster, setRoster] = useState(null);
+  const [selected, setSelected] = useState({});
+  const [edits, setEdits] = useState({});
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    setSubjects([]);
+    setCourseId("");
+    setRoster(null);
+    setError("");
+    api.courseAuditSubjects(programId || undefined).then((res) => setSubjects(res.items || [])).catch((err) => setError(err.message));
+  }, [programId]);
+
+  function hydrate(res) {
+    setRoster(res);
+    setSelected(Object.fromEntries((res.students || []).map((student) => [student.student_id, false])));
+    setEdits(Object.fromEntries((res.students || []).map((student) => [student.student_id, {
+      status: student.status,
+      grade_value: student.grade_value || "",
+      grade_status: student.grade_status || "No Grade",
+      remarks: student.remarks || "",
+    }])));
+  }
+
+  useEffect(() => {
+    if (!courseId) {
+      setRoster(null);
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    setError("");
+    api.courseAuditRoster(courseId).then(hydrate).catch((err) => setError(err.message)).finally(() => setLoading(false));
+  }, [courseId]);
+
+  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"]);
+  const allStudents = roster?.students || [];
+  const visibleStudents = allStudents.filter((student) => mode === "enrollment" || classStatuses.has(edits[student.student_id]?.status || student.status));
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+  const allSelected = visibleStudents.length > 0 && visibleStudents.every((student) => selected[student.student_id]);
+  const title = mode === "enrollment" ? "Course enrollment" : "Grade audit";
+  const subtitle = mode === "enrollment"
+    ? "Select a term and subject, then add students to the class roster or remove mistaken entries."
+    : "Enter grades for students already in the class. Blank keeps the subject current; INC marks incomplete; 5.00 or F marks failed.";
+
+  function toggle(id) {
+    setSelected((current) => ({ ...current, [id]: !current[id] }));
+  }
+
+  function toggleAll() {
+    const next = !allSelected;
+    setSelected((current) => ({ ...current, ...Object.fromEntries(visibleStudents.map((student) => [student.student_id, next])) }));
+  }
+
+  function setSelectedStatus(status) {
+    setEdits((current) => {
+      const next = { ...current };
+      visibleStudents.forEach((student) => {
+        if (selected[student.student_id]) {
+          next[student.student_id] = {
+            ...(next[student.student_id] || {}),
+            status,
+            grade_value: status === "Missing" ? "" : next[student.student_id]?.grade_value || "",
+            grade_status: status === "Missing" || status === "Enrolled" ? "No Grade" : next[student.student_id]?.grade_status || "No Grade",
+          };
+        }
+      });
+      return next;
+    });
+  }
+
+  function updateGrade(id, value) {
+    const outcome = deriveCourseOutcome(value);
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), grade_value: value, ...outcome } }));
+  }
+
+  function updateRemarks(id, value) {
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), remarks: value } }));
+  }
+
+  async function save() {
+    if (!roster) return;
+    setSaving(true);
+    setError("");
+    try {
+      const ids = allStudents.map((student) => student.student_id);
+      const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
+      const res = await api.saveCourseAudit({
+        course_id: roster.course.id,
+        term,
+        statuses: build("status", "Missing"),
+        grades: build("grade_value"),
+        grade_statuses: build("grade_status", "No Grade"),
+        remarks: build("remarks"),
+      });
+      setResult(res);
+      hydrate(await api.courseAuditRoster(roster.course.id));
+      setEditing(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <SectionTitle title={title} subtitle={subtitle} icon={mode === "enrollment" ? Users : ClipboardCheck} />
+        {roster && <button type="button" onClick={() => setEditing((value) => !value)} className="btn-ghost cursor-pointer px-3 py-2">{editing ? "Normal view" : "Edit view"}</button>}
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Program">
+          <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
+        </Field>
+        <Field label="Subject" required>
+          <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
+        </Field>
+        <Field label="Term">
+          <Input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="AY 2025-2026 Term 1" />
+        </Field>
+      </div>
+      <ErrorNote message={error} />
+      {result && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-5 w-5" /> {result.message}</div>}
+      {loading ? (
+        <Spinner label="Loading class roster..." />
+      ) : !courseId ? (
+        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the class list." />
+      ) : visibleStudents.length ? (
+        <>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+              <p className="text-sm font-semibold text-ink">{roster.course.code} - {roster.course.title}</p>
+              <p className="text-xs text-slate-500">{editing ? `${selectedCount} selected` : `${visibleStudents.length} student(s)`}</p>
+            </div>
+            {editing && mode === "enrollment" && (
+              <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3">
+                <button type="button" onClick={() => setSelectedStatus("Enrolled")} className="btn-ghost cursor-pointer px-3 py-2">Add selected to class</button>
+                <button type="button" onClick={() => setSelectedStatus("Missing")} className="btn-ghost cursor-pointer px-3 py-2 text-red-600">Remove selected</button>
+              </div>
+            )}
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                    {editing && <th className="px-3 py-2.5 text-center"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 accent-brand-600 cursor-pointer" aria-label="Select all students" /></th>}
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-3 py-2.5">Status</th>
+                    {mode === "grades" && <th className="px-3 py-2.5">Grade</th>}
+                    <th className="px-3 py-2.5">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleStudents.map((student) => {
+                    const edit = edits[student.student_id] || {};
+                    const status = edit.status || student.status;
+                    return (
+                      <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
+                        {editing && <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[student.student_id]} onChange={() => toggle(student.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${student.name}`} /></td>}
+                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                        <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
+                        {mode === "grades" && <td className="px-3 py-2.5">{editing ? <Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /> : <p className="font-semibold text-ink">{edit.grade_value || "No grade"}</p>}<p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>}
+                        <td className="px-3 py-2.5">{editing ? <Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /> : <span className="text-slate-600">{edit.remarks || "-"}</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {editing && <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : mode === "enrollment" ? "Save enrollment" : "Save grade audit"}</button>}
+        </>
+      ) : (
+        <EmptyState icon={ClipboardCheck} title={mode === "grades" ? "No students in this class yet" : "No students found"} hint={mode === "grades" ? "Use Course enrollment first to add students to this class." : ""} />
+      )}
+    </div>
+  );
+}
+
+function CourseAuditRosterV2({ meta }) {
+  const [programId, setProgramId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [term, setTerm] = useState("");
+  const [roster, setRoster] = useState(null);
+  const [selected, setSelected] = useState({});
+  const [edits, setEdits] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const statuses = ["Missing", "Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"];
+
+  useEffect(() => {
+    setSubjects([]);
+    setCourseId("");
+    setRoster(null);
+    api.courseAuditSubjects(programId || undefined).then((res) => setSubjects(res.items)).catch((e) => setError(e.message));
+  }, [programId]);
+
+  function hydrate(res) {
+    setRoster(res);
+    setSelected(Object.fromEntries(res.students.map((s) => [s.student_id, ["Enrolled", "Current"].includes(s.status)])));
+    setEdits(Object.fromEntries(res.students.map((s) => [s.student_id, {
+      status: s.status,
+      grade_value: s.grade_value || "",
+      grade_status: s.grade_status || "No Grade",
+      incomplete_deadline: s.incomplete_deadline || "",
+      remarks: s.remarks || "",
+    }])));
+  }
+
+  useEffect(() => {
+    if (!courseId) {
+      setRoster(null);
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    api.courseAuditRoster(courseId).then(hydrate).catch((e) => setError(e.message)).finally(() => setLoading(false));
+  }, [courseId]);
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+  const allSelected = roster && roster.students.length > 0 && selectedCount === roster.students.length;
+
+  function toggle(id) {
+    setSelected((current) => ({ ...current, [id]: !current[id] }));
+  }
+  function toggleAll() {
+    if (!roster) return;
+    const next = !allSelected;
+    setSelected(Object.fromEntries(roster.students.map((s) => [s.student_id, next])));
+  }
+  function updateStudent(id, key, value) {
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), [key]: value } }));
+  }
+  function bulkStatus(status) {
+    if (!roster) return;
+    setEdits((current) => {
+      const next = { ...current };
+      roster.students.forEach((student) => {
+        if (selected[student.student_id]) {
+          next[student.student_id] = {
+            ...(next[student.student_id] || {}),
+            status,
+            grade_status: status === "Completed" ? "Passed" : status === "Incomplete" ? "Incomplete" : status === "Failed" ? "Failed" : "No Grade",
+          };
+        }
+      });
+      return next;
+    });
+  }
+
+  async function save() {
+    if (!roster) return;
+    setSaving(true);
+    setError("");
+    try {
+      const ids = roster.students.map((s) => s.student_id);
+      const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
+      const res = await api.saveCourseAudit({
+        course_id: roster.course.id,
+        term,
+        statuses: build("status", "Missing"),
+        grades: build("grade_value"),
+        grade_statuses: build("grade_status", "No Grade"),
+        incomplete_deadlines: build("incomplete_deadline"),
+        remarks: build("remarks"),
+      });
+      setResult(res);
+      hydrate(await api.courseAuditRoster(roster.course.id));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle title="Course enrollment and grade audit" subtitle="Bulk enroll a class, then record completions, incompletes, failures, drops, and grades" icon={ClipboardCheck} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Program">
+          <Select value={programId} onChange={(e) => setProgramId(e.target.value)} placeholder="All programs" options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))} />
+        </Field>
+        <Field label="Subject" required>
+          <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))} />
+        </Field>
+        <Field label="Audit term">
+          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 Term 1" />
+        </Field>
+      </div>
+      <ErrorNote message={error} />
+      {result && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-5 w-5" /> {result.message}</div>}
+      {loading ? (
+        <Spinner label="Loading class roster..." />
+      ) : !courseId ? (
+        <EmptyState icon={ClipboardCheck} title="Choose a subject to audit" hint="Pick a subject above to see its class roster." />
+      ) : roster && roster.students.length > 0 ? (
+        <>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+              <p className="text-sm font-semibold text-ink">{roster.course.code} — {roster.course.title}</p>
+              <p className="text-xs text-slate-500">{selectedCount} of {roster.students.length} selected</p>
+            </div>
+            <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3">
+              {["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"].map((status) => (
+                <button key={status} type="button" onClick={() => bulkStatus(status)} className={`btn-ghost cursor-pointer px-3 py-2 ${status === "Failed" ? "text-red-600" : ""}`}>Mark {status.toLowerCase()}</button>
+              ))}
+            </div>
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                    <th className="px-3 py-2.5 text-center"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 accent-brand-600 cursor-pointer" aria-label="Select all students" /></th>
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-3 py-2.5">Status</th>
+                    <th className="px-3 py-2.5">Grade</th>
+                    <th className="px-3 py-2.5">Incomplete deadline</th>
+                    <th className="px-3 py-2.5">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roster.students.map((s) => {
+                    const edit = edits[s.student_id] || {};
+                    return (
+                      <tr key={s.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
+                        <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[s.student_id]} onChange={() => toggle(s.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${s.name}`} /></td>
+                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{s.name}</p><p className="text-xs text-slate-400">{s.student_number} · {s.program_code}</p>{s.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                        <td className="px-3 py-2.5"><Select value={edit.status || s.status} onChange={(e) => updateStudent(s.student_id, "status", e.target.value)} options={statuses} placeholder="" /></td>
+                        <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(e) => updateStudent(s.student_id, "grade_value", e.target.value)} placeholder="e.g. 1.25" /><p className="mt-1 text-[11px] text-slate-400">{edit.grade_status || "No Grade"}</p></td>
+                        <td className="px-3 py-2.5"><Input type="date" value={edit.incomplete_deadline || ""} onChange={(e) => updateStudent(s.student_id, "incomplete_deadline", e.target.value)} disabled={edit.status !== "Incomplete"} /></td>
+                        <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(e) => updateStudent(s.student_id, "remarks", e.target.value)} placeholder="Optional" /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : "Save class audit"}</button>
+        </>
+      ) : (
+        <EmptyState icon={ClipboardCheck} title="No students found for this subject" />
+      )}
     </div>
   );
 }
@@ -1089,7 +1869,8 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
 // ---------------------------------------------------------------------------
 // Research Gate
 // ---------------------------------------------------------------------------
-function ResearchGateForm({ context, studentId, submit, submitting }) {
+function ResearchGateForm({ context, studentId, submit, submitting, result, submitError }) {
+  const { user } = useAuth();
   const student = context.selected_student || {};
   const researchCase = context.research_case || {};
   const progress = context.research_progress || {};
@@ -1098,6 +1879,9 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
   const completed = requirements.filter((item) => item.status === "Complete");
   const pending = requirements.filter((item) => item.status !== "Complete");
   const panel = context.panel_status || {};
+  const scheduleRequirement = requirements.find((item) => item.source_type?.includes("schedule"));
+  const outcomeRequirement = requirements.find((item) => item.source_type === "system_defense_result");
+  const canRecordDefenseOutcome = user?.role === "staff" && outcomeRequirement && scheduleRequirement?.status === "Complete";
 
   function onSubmit(e) {
     e.preventDefault();
@@ -1157,10 +1941,10 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
                 </div>
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
                   <StatusBadge value={requirement.status_label} dot={false} />
-                  {requirement.source_type === "coordinator_endorsement" && (
-                    <Link to="/form1-endorsements" className="btn-primary cursor-pointer justify-center whitespace-nowrap">
+                  {requirement.source_type === "coordinator_endorsement" && user?.role === "academic_coordinator" && (
+                    <a href="#form1-endorsement-queue" className="btn-primary cursor-pointer justify-center whitespace-nowrap">
                       <UserRoundCheck className="h-4 w-4" /> Form 1 endorsements
-                    </Link>
+                    </a>
                   )}
                 </div>
               </div>
@@ -1185,6 +1969,41 @@ function ResearchGateForm({ context, studentId, submit, submitting }) {
       </div>
 
       <SubmitButton submitting={submitting}>Verify submitted requirements</SubmitButton>
+      <WorkflowSubmitFeedback result={result} error={submitError} />
+
+      {outcomeRequirement && (
+        <section className={`rounded-2xl border p-5 ${outcomeRequirement.status === "Complete" ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Defense result gate</p>
+              <h3 className="mt-1 font-display text-lg font-semibold text-ink">{outcomeRequirement.label}</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                {scheduleRequirement?.status === "Complete"
+                  ? "Record whether the scheduled defense was passed before the student can move to the next Research Gate stage."
+                  : "Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded."}
+              </p>
+            </div>
+            <StatusBadge value={outcomeRequirement.status_label} dot={false} />
+          </div>
+          {user?.role === "staff" && outcomeRequirement.status !== "Complete" && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" disabled={!canRecordDefenseOutcome || submitting} onClick={() => submit({ student_id: studentId, defense_outcome: "Passed" })} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60">
+                <CheckCircle2 className="h-4 w-4" /> Mark Passed
+              </button>
+              <button type="button" disabled={!canRecordDefenseOutcome || submitting} onClick={() => submit({ student_id: studentId, defense_outcome: "Failed" })} className="btn-ghost cursor-pointer px-4 py-2 text-red-700 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
+                <X className="h-4 w-4" /> Mark Failed
+              </button>
+              {!canRecordDefenseOutcome && <p className="self-center text-xs font-semibold text-amber-700">Schedule confirmation is required before recording the result.</p>}
+            </div>
+          )}
+        </section>
+      )}
+
+      {user?.role === "academic_coordinator" && (
+        <section id="form1-endorsement-queue" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <Form1EndorsementQueue embedded />
+        </section>
+      )}
     </form>
   );
 }
@@ -1806,8 +2625,462 @@ function ScheduleHistory({ schedules }) {
 // ---------------------------------------------------------------------------
 // Practicum
 // ---------------------------------------------------------------------------
-function PracticumRoster({ context, submit, submitting }) {
-  const [expanded, setExpanded] = useState(null);
+function useDemoCaseReset(slug, refetch) {
+  const [resettingId, setResettingId] = useState(null);
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
+
+  async function resetCase(student) {
+    const confirmed = window.confirm(
+      `Reset the ${slug} demo case for ${student.name}?\n\nThis removes only this student's ${slug} records, uploaded request PDFs, related tasks, and activity entries. Academic and research source data are kept.`
+    );
+    if (!confirmed) return;
+    setResettingId(student.id);
+    setResetMessage("");
+    setResetError("");
+    try {
+      const result = await api.resetWorkflowDemo(slug, student.id);
+      setResetMessage(result.message);
+      await refetch();
+    } catch (error) {
+      setResetError(error.message || "Could not reset this demo case.");
+    } finally {
+      setResettingId(null);
+    }
+  }
+
+  function clearResetFeedback() {
+    setResetMessage("");
+    setResetError("");
+  }
+
+  return { resettingId, resetMessage, resetError, resetCase, clearResetFeedback };
+}
+
+function DemoResetButton({ student, resettingId, onReset }) {
+  const busy = resettingId === student.id;
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => onReset(student)}
+      className="btn-ghost cursor-pointer px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+    >
+      <RotateCcw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
+      {busy ? "Resetting…" : "Reset demo case"}
+    </button>
+  );
+}
+
+function DemoResetFeedback({ message, error }) {
+  return (
+    <>
+      {message && <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{message}</div>}
+      {error && <ErrorNote message={error} />}
+    </>
+  );
+}
+
+function WorkflowSubmitFeedback({ result, error }) {
+  return (
+    <div aria-live="polite">
+      {result?.message && (
+        <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
+          <CheckCircle2 className="h-4 w-4 shrink-0" /> {result.message}
+        </div>
+      )}
+      {error && <ErrorNote message={error} />}
+    </div>
+  );
+}
+
+function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, footer }) {
+  const closeButtonRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+
+    function onKeyDown(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const modal = closeButtonRef.current?.closest('[role="dialog"]');
+      const focusable = modal ? [...modal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')] : [];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${id}-title`}
+        aria-describedby={`${id}-description`}
+        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+      >
+        <header className="flex shrink-0 items-start gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id={`${id}-title`} className="font-display text-xl font-semibold text-ink">{title}</h2>
+              {status && <StatusBadge value={status} dot={false} />}
+            </div>
+            <p id={`${id}-description`} className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:ring-2 focus:ring-brand-500"
+            aria-label="Close case details"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+          <button type="button" onClick={onClose} className="btn-ghost cursor-pointer px-4 py-2">Close details</button>
+          <div className="flex flex-wrap justify-end gap-2">{footer}</div>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+const WORKFLOW_GUIDES = {
+  withdrawal: {
+    purpose: "Records a voluntary withdrawal request without changing the official Registrar record prematurely.",
+    submitter: "The student submits the request form and supporting proof.",
+    reviewers: "Graduate School Staff records and routes it; the Dean decides; the Academic Coordinator and Registrar complete follow-through.",
+    stages: ["Submitted", "Staff review", "Dean review", "Requirements and fee confirmation", "Registrar update"],
+    incomplete: "Any reviewer can return the case with a specific clarification message. The student remains Active until every approved follow-through step is complete.",
+    final: "Completed means the Registrar update is recorded and the monitoring record can safely show the student as Withdrawn.",
+  },
+  practicum: {
+    purpose: "Tracks the practicum MOA, placement, required hours, certificates, completion review, and Dean report for programs that require practicum.",
+    submitter: "The student submits the MOA first, then separately submits certificates and completion evidence.",
+    reviewers: "Graduate School Staff records and forwards submissions; the Academic Coordinator reviews the MOA, hours, and certificates; the Dean reviews the status report.",
+    stages: ["MOA submitted", "Eligibility and MOA review", "Practicum in progress", "Completion review", "Report sent to Dean"],
+    incomplete: "Missing or unclear evidence is returned with a message. Insufficient or unaccepted hours remain incomplete and may require another placement.",
+    final: "Completed means required hours and documents were accepted; Dean Reviewed closes the monitoring report.",
+  },
+  graduation: {
+    purpose: "Prepares a Graduate School recommendation and endorsed candidate list; it does not replace the official Registrar graduation process.",
+    submitter: "Students may request readiness review, while GS Staff compiles the review window and candidate list.",
+    reviewers: "The Academic Coordinator checks coursework, the Research Coordinator validates completion evidence, and the Dean approves the endorsement list.",
+    stages: ["Candidate review", "Requirements checks", "Batch preparation", "Dean endorsement", "Registrar handoff"],
+    incomplete: "A candidate can be returned individually or as part of a batch with the unresolved requirement clearly named.",
+    final: "Endorsed means the Dean-approved list was handed off to the Registrar for the official process.",
+  },
+};
+
+function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClose }) {
+  const guide = WORKFLOW_GUIDES[slug];
+  const title = mode === "activity" ? "Recent workflow activity" : `How ${guide ? slug : "this workflow"} works`;
+  return (
+    <WorkflowCaseModal
+      id={`${slug}-${mode}`}
+      title={title}
+      subtitle={mode === "activity" ? "A timestamped audit trail of recent actions and handoffs" : "A concise guide for students and reviewers"}
+      onClose={onClose}
+    >
+      {mode === "activity" ? (
+        <WorkflowActivityList logs={logs} />
+      ) : guide ? (
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Detail label="Purpose" value={guide.purpose} />
+            <Detail label="Who submits" value={guide.submitter} />
+            <Detail label="Who reviews" value={guide.reviewers} />
+            <Detail label="When something is incomplete" value={guide.incomplete} />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Main stages</p>
+            <ol className="mt-2 grid gap-2 sm:grid-cols-2">
+              {guide.stages.map((stage, index) => <li key={stage} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs text-brand-700">{index + 1}</span>{stage}</li>)}
+            </ol>
+          </div>
+          <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900"><span className="font-semibold">What completion means: </span>{guide.final}</div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">Admin note · confirm with Sir De Paula / GS office before production</p>
+            <ul className="mt-2 space-y-1.5 text-sm text-amber-800">{policyQuestions.map((question) => <li key={question}>• {question}</li>)}</ul>
+          </div>
+        </div>
+      ) : null}
+    </WorkflowCaseModal>
+  );
+}
+
+function WorkflowActivityList({ logs }) {
+  if (!logs.length) return <EmptyState title="No activity yet" hint="New submissions, messages, and decisions will appear here." />;
+  return (
+    <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
+      {logs.map((log) => (
+        <li key={log.id} className="relative rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+          <span className="absolute -left-[27px] top-4 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-ink">{log.result}</p>
+            <time className="text-xs text-slate-400">{formatDateTime(log.created_at)}</time>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">{log.actor_role}{log.student_name ? ` · ${log.student_name}` : ""}</p>
+          {(log.previous_status || log.new_status) && <p className="mt-2 text-xs font-semibold text-slate-600">{log.previous_status || "—"} <span className="mx-1 text-slate-300">→</span> {log.new_status || "—"}</p>}
+          {log.notes && <p className="mt-2 text-xs leading-relaxed text-slate-500">{log.notes}</p>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
+  const student = row.student || row.endorsement?.student;
+  const [form, setForm] = useState({
+    action_type: "return",
+    recipient_role: "Student",
+    template: context?.message_templates?.[0] || "Missing required document",
+    comment: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  async function save(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.sendWorkflowMessage(slug, { student_id: student.id, ...form });
+      await onSaved(result.message);
+      onClose();
+    } catch (err) {
+      setError(err.message || "Could not save the workflow message.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <WorkflowCaseModal
+      id={`${slug}-message-${student.id}`}
+      title="Message / return for clarification"
+      subtitle={`${student.name} · ${student.student_number}`}
+      onClose={onClose}
+      footer={<button type="submit" form={`${slug}-message-form-${student.id}`} disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><Send className="h-4 w-4" /> {busy ? "Saving…" : "Send message"}</button>}
+    >
+      <form id={`${slug}-message-form-${student.id}`} onSubmit={save} className="space-y-4">
+        <ErrorNote message={error} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Action">
+            <select value={form.action_type} onChange={update("action_type")} className="field-input cursor-pointer">
+              <option value="return">Return for clarification</option>
+              <option value="note">Send note to current reviewer</option>
+              <option value="forward">Forward with note</option>
+            </select>
+          </Field>
+          <Field label="Recipient / next stage">
+            <Select value={form.recipient_role} onChange={update("recipient_role")} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar"]} />
+          </Field>
+        </div>
+        <Field label="Message template">
+          <Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} />
+        </Field>
+        <Field label={form.template === "Other" ? "Custom comment" : "Optional details"} required={form.template === "Other"}>
+          <Textarea value={form.comment} onChange={update("comment")} required={form.template === "Other"} placeholder="Add the exact file, record, or detail that needs attention." />
+        </Field>
+        <p className="text-xs leading-relaxed text-slate-500">Returning the case changes its status to Returned for Clarification and creates a visible task for the selected recipient. A note keeps the current stage unchanged.</p>
+      </form>
+    </WorkflowCaseModal>
+  );
+}
+
+function CaseMessageHistory({ messages = [] }) {
+  if (!messages.length) return null;
+  return (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400"><MessageSquare className="h-4 w-4" /> Messages and clarifications</p>
+      <ul className="mt-3 space-y-3">
+        {messages.map((message) => (
+          <li key={message.id} className="rounded-xl bg-slate-50 p-3 text-sm">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="font-semibold text-ink">{message.template}</p>
+              <StatusBadge value={message.status} dot={false} />
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{message.sender_role} → {message.recipient_role} · {formatDateTime(message.created_at)}</p>
+            {message.comment && <p className="mt-2 text-sm leading-relaxed text-slate-600">{message.comment}</p>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function GraduationBatchModal({ rows, context, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    action: "send_to_dean",
+    recipient_role: "Graduate School Staff",
+    template: "This request requires additional review",
+    comment: "",
+    review_window: rows.find((row) => row.endorsement?.review_window)?.endorsement?.review_window || "AY 2026-2027 Graduation Review",
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  const blocked = form.action === "send_to_dean" ? rows.filter((row) => row.eligibility.status !== "Eligible") : [];
+
+  async function confirm(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.graduationBatchAction({ student_ids: rows.map((row) => row.student.id), ...form });
+      await onSaved(result);
+      onClose();
+    } catch (err) {
+      setError(err.message || "Could not apply the graduation group action.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <WorkflowCaseModal
+      id="graduation-batch-action"
+      title="Confirm graduation group action"
+      subtitle={`${rows.length} selected candidate${rows.length === 1 ? "" : "s"}`}
+      onClose={onClose}
+      footer={<button type="submit" form="graduation-batch-form" disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applying…" : "Confirm group action"}</button>}
+    >
+      <form id="graduation-batch-form" onSubmit={confirm} className="space-y-4">
+        <ErrorNote message={error} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Group action">
+            <select value={form.action} onChange={update("action")} className="field-input cursor-pointer">
+              <option value="send_to_dean">Prepare and send eligible candidates to Dean</option>
+              <option value="return">Return selected candidates for clarification</option>
+              <option value="assign">Assign reviewer</option>
+              <option value="note">Add shared note</option>
+            </select>
+          </Field>
+          <Field label="Recipient / reviewer">
+            <Select value={form.recipient_role} onChange={update("recipient_role")} placeholder="" options={context?.message_recipients || []} />
+          </Field>
+        </div>
+        {form.action === "send_to_dean" && <Field label="Review window"><Input value={form.review_window} onChange={update("review_window")} /></Field>}
+        {form.action !== "send_to_dean" && <Field label="Message template"><Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} /></Field>}
+        <Field label="Comment" required={form.template === "Other" && form.action !== "send_to_dean"}><Textarea value={form.comment} onChange={update("comment")} required={form.template === "Other" && form.action !== "send_to_dean"} /></Field>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-ink">Action summary</p>
+          <p className="mt-1 text-sm text-slate-600">{rows.length} candidate(s) selected · {rows.length - blocked.length} can be included · {blocked.length} will be skipped.</p>
+          {blocked.length > 0 && <ul className="mt-2 space-y-1 text-xs text-amber-700">{blocked.slice(0, 8).map((row) => <li key={row.student.id}>{row.student.name}: {row.eligibility.status}</li>)}</ul>}
+        </div>
+      </form>
+    </WorkflowCaseModal>
+  );
+}
+
+const PRACTICUM_BOARD_COLUMNS = [
+  { label: "Submitted", statuses: ["MOA Submitted", "MOA Received"] },
+  { label: "Eligibility Review", statuses: ["MOA Under Review"] },
+  { label: "Documents Review", statuses: ["Documents Submitted", "Documents Under Review"] },
+  { label: "In Progress", statuses: ["Practicum In Progress", "Hours Incomplete", "Additional Certificates Requested"] },
+  { label: "Completion Review", statuses: ["Completed"] },
+  { label: "Completed", statuses: ["Report Sent to Dean", "Dean Reviewed"] },
+  { label: "Returned", statuses: ["Returned for Clarification", "Not Accepted - New Organization Required"] },
+];
+
+const WITHDRAWAL_BOARD_COLUMNS = [
+  { label: "Submitted", statuses: ["Submitted to GS Staff"] },
+  { label: "Staff Review", statuses: ["Coordinator Follow-through Complete", "Requirements Pending", "Requirements Submitted", "Registrar Review", "Fee Cleared", "Withdrawal Confirmed"] },
+  { label: "Dean Review", statuses: ["Dean Review"] },
+  { label: "Returned for Clarification", statuses: ["Returned", "Returned for Clarification"] },
+  { label: "Approved", statuses: ["Approved - Follow-through", "Withdrawn Confirmed"] },
+  { label: "Rejected / Cancelled", statuses: ["Denied", "Cancelled"] },
+];
+
+function WorkflowBoard({ columns, rows, getStatus, renderCard, empty }) {
+  if (!rows.length) return <EmptyState title={empty} />;
+  return (
+    <div className="flex snap-x gap-4 overflow-x-auto pb-3">
+      {columns.map((column) => {
+        const items = rows.filter((row) => column.statuses.includes(getStatus(row)));
+        return (
+          <section key={column.label} className="w-[290px] shrink-0 snap-start rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+            <header className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
+            </header>
+            <div className="space-y-3">{items.length ? items.map(renderCard) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function ViewModeToggle({ value, onChange }) {
+  return (
+    <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1" aria-label="Choose request overview layout">
+      <button type="button" onClick={() => onChange("board")} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${value === "board" ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}><Columns3 className="h-4 w-4" /> Board</button>
+      <button type="button" onClick={() => onChange("table")} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${value === "table" ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}><List className="h-4 w-4" /> Table</button>
+    </div>
+  );
+}
+
+function PracticumBoardCard({ row, onOpen, onMessage }) {
+  return (
+    <article key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
+      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-400">{row.student.student_number} · {row.student.program_code}</p></div>{row.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>{row.record.practicum_site || "Site pending"}</span><span className="text-right">{row.record.completed_hours}/{row.record.required_hours} hrs</span><span>{row.eligibility.status}</span><span className="text-right">Updated {formatDate(row.last_activity_at || row.record.updated_at)}</span><span className="col-span-2">Submitted {formatDate(row.record.created_at)}</span></div>
+      <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
+      <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button><button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button></div>
+    </article>
+  );
+}
+
+function WithdrawalBoardCard({ item, onOpen, onMessage }) {
+  return (
+    <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
+      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} · {item.student.program_code}</p></div>{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
+      <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.reason || "No reason provided"}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Submitted {formatDate(item.created_at)}</span><span className="text-right">Updated {formatDate(item.updated_at)}</span><span className="col-span-2">Effective: {item.effective_term || "Pending"}</span></div>
+      <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {item.next_action_owner || "Awaiting review"}</p>
+      <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button><button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button></div>
+    </article>
+  );
+}
+
+function PracticumRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [messageRow, setMessageRow] = useState(null);
+  const [messageNotice, setMessageNotice] = useState("");
+  const [viewMode, setViewMode] = useState("board");
+  const reset = useDemoCaseReset("practicum", refetch);
   const rows = context.roster || [];
   const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
@@ -1824,37 +3097,61 @@ function PracticumRoster({ context, submit, submitting }) {
     const record = row.record;
     if (!record) return null;
     const base = { student_id: row.student.id };
-    if (["MOA Submitted", "MOA Received"].includes(record.status)) {
+    if (accountRole === "staff" && ["MOA Submitted", "MOA Received"].includes(record.status)) {
       return { label: "Forward to Academic Coordinator", payload: { ...base, status: "MOA Under Review", moa_status: "Under Review" } };
     }
-    if (record.status === "MOA Under Review") {
+    if (accountRole === "academic_coordinator" && record.status === "MOA Under Review") {
       return { label: "Mark practicum in progress", payload: { ...base, status: "Practicum In Progress", moa_status: "Verified" } };
     }
-    if (["Hours Incomplete", "Documents Submitted"].includes(record.status) && row.hours_status !== "Complete") {
+    if (accountRole === "staff" && ["Hours Incomplete", "Documents Submitted"].includes(record.status)) {
+      return { label: "Forward documents to Academic Coordinator", payload: { ...base, status: "Documents Under Review" } };
+    }
+    if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && row.hours_status !== "Complete") {
       return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" } };
     }
-    if (["Documents Submitted", "Practicum In Progress", "Hours Incomplete"].includes(record.status) && row.hours_status === "Complete") {
+    if (accountRole === "academic_coordinator" && ["Documents Under Review", "Practicum In Progress"].includes(record.status) && row.hours_status === "Complete") {
       return { label: "Verify completion", payload: { ...base, status: "Completed", document_status: "Verified" } };
     }
-    if (record.status === "Completed") {
+    if (accountRole === "academic_coordinator" && record.status === "Completed") {
       return { label: "Send status report to Dean", payload: { ...base, status: "Report Sent to Dean", document_status: "Verified" } };
     }
     return null;
   }
+  const selectedRow = rows.find((row) => row.student.id === selectedStudentId) || null;
+  const selectedAction = selectedRow ? actionFor(selectedRow) : null;
+
+  function openCase(studentId) {
+    clearSubmitFeedback();
+    reset.clearResetFeedback();
+    setSelectedStudentId(studentId);
+  }
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Practicum student submissions" subtitle="Eligibility is computed from progress data; student-entered MOA, documents, and hours are read-only here" icon={Briefcase} />
-      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible for Practicum", "Not Eligible"]} count={filteredRows.length} total={rows.length} />
-      <WorkflowTable
+      <SectionTitle title="Practicum student submissions" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · GS Staff forwards submissions; the Academic Coordinator reviews MOAs, certificates, and hours`} icon={Briefcase} />
+      {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
+      <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
+      <div className="flex justify-end"><ViewModeToggle value={viewMode} onChange={setViewMode} /></div>
+      {viewMode === "board" ? (
+        <WorkflowBoard
+          columns={PRACTICUM_BOARD_COLUMNS}
+          rows={filteredRows.filter((row) => row.record)}
+          getStatus={(row) => row.record.status}
+          empty="No recent practicum submissions match the filters."
+          renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
+        />
+      ) : <WorkflowTable
         headers={["Student", "Eligibility", "MOA", "Documents", "Hours", "Coordinator", "Dean report", "Action"]}
         empty="No practicum-program students found."
         rows={filteredRows}
         render={(row) => {
-          const action = actionFor(row);
           return (
-            <>
-              <tr key={row.student.id} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+              <tr
+                key={row.student.id}
+                onClick={() => openCase(row.student.id)}
+                className="cursor-pointer border-b border-slate-100 align-top transition-colors hover:bg-brand-50/60"
+              >
                 <StudentCell student={row.student} />
                 <td className="px-3 py-3"><StatusBadge value={row.eligibility.status} dot={false} /></td>
                 <td className="px-3 py-3"><StatusBadge value={row.moa_status} dot={false} /></td>
@@ -1863,51 +3160,96 @@ function PracticumRoster({ context, submit, submitting }) {
                 <td className="px-3 py-3"><StatusBadge value={row.coordinator_review_status} dot={false} /></td>
                 <td className="px-3 py-3"><StatusBadge value={row.dean_report_status} dot={false} /></td>
                 <td className="px-3 py-3">
-                  <div className="flex min-w-[180px] flex-col gap-2">
-                    <button type="button" onClick={() => setExpanded(expanded === row.student.id ? null : row.student.id)} className="btn-ghost px-3 py-2"><Eye className="h-4 w-4" /> View details</button>
-                    {action ? <button type="button" disabled={submitting} onClick={() => submit(action.payload)} className="btn-primary px-3 py-2">{action.label}</button> : <span className="text-xs text-slate-400">{row.record ? "No staff action due" : "Awaiting student submission"}</span>}
-                  </div>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); openCase(row.student.id); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> Open case</button>
                 </td>
               </tr>
-              {expanded === row.student.id && <PracticumDetailRow row={row} colSpan={8} />}
-            </>
           );
         }}
-      />
+      />}
+      {selectedRow && (
+        <WorkflowCaseModal
+          id={`practicum-case-${selectedRow.student.id}`}
+          title={selectedRow.student.name}
+          subtitle={`${selectedRow.student.student_number} · ${selectedRow.student.program_code} · Practicum case`}
+          status={selectedRow.record?.status || "Not Submitted"}
+          onClose={() => setSelectedStudentId(null)}
+          footer={(
+            <>
+              {accountRole === "staff" && selectedRow.record && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
+              {selectedRow.record && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
+              {accountRole === "academic_coordinator" && ["Documents Under Review", "Completed"].includes(selectedRow.record?.status) && <button type="button" disabled={submitting || refreshing} onClick={() => submit({ student_id: selectedRow.student.id, status: "Not Accepted - New Organization Required" })} className="btn-ghost cursor-pointer px-4 py-2 text-red-600">Mark not accepted</button>}
+              {selectedAction ? (
+                <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
+                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
+                </button>
+              ) : (
+                <span className="self-center text-xs font-semibold text-slate-500">{selectedRow.record ? `No ${WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.` : "Awaiting student submission."}</span>
+              )}
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <WorkflowSubmitFeedback result={result} error={submitError} />
+            <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+            <PracticumCaseDetails row={selectedRow} />
+            <CaseMessageHistory messages={selectedRow.messages} />
+          </div>
+        </WorkflowCaseModal>
+      )}
+      {messageRow && <WorkflowMessageModal slug="practicum" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
     </div>
   );
 }
 
-function PracticumDetailRow({ row, colSpan }) {
+function PracticumCaseDetails({ row }) {
   const record = row.record;
+  const timeline = (row.timeline || record?.timeline || []).map((step) => ({
+    ...step,
+    optional: ["Hours Incomplete", "Additional Certificates Requested"].includes(step.label),
+  }));
   return (
-    <tr className="border-b border-brand-100 bg-brand-50/40">
-      <td colSpan={colSpan} className="px-4 py-4">
-        <div className="grid gap-4 lg:grid-cols-3">
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <Detail label="Eligibility" value={row.eligibility.status} />
+        <Detail label="MOA" value={row.moa_status} />
+        <Detail label="Documents" value={row.documents_status} />
+        <Detail label="Hours" value={record ? `${record.completed_hours}/${record.required_hours}` : "Not started"} />
+        <Detail label="Supervisor" value={record?.supervisor_name || "Not provided"} />
+        <Detail label="Completion" value={record?.completion_status || "Pending"} />
+      </div>
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 lg:grid-cols-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Automatic eligibility</p>
-            <ul className="mt-2 grid gap-1.5 text-xs text-slate-600 sm:grid-cols-2">
-              {row.eligibility.checklist.map((item) => <li key={item.key} className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${item.complete ? "bg-brand-500" : "bg-red-400"}`} />{item.label}{item.required ? `: ${item.actual}/${item.required}` : ""}</li>)}
-            </ul>
+            <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white">
+              {row.eligibility.checklist.map((item) => (
+                <div key={item.key} className="grid gap-1 border-b border-slate-100 px-3 py-2.5 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-3">
+                  <div><p className="text-sm font-semibold text-slate-700">{item.label}</p>{item.note && <p className="text-xs text-slate-400">{item.note}</p>}</div>
+                  <p className="text-xs font-semibold text-slate-500">{String(item.actual_value ?? item.actual)}{item.required_value != null ? ` / ${item.required_value}` : ""}</p>
+                  <StatusBadge value={item.status || (item.complete ? "Passed" : "Not met")} dot={false} />
+                </div>
+              ))}
+            </div>
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Student submission</p>
             <p className="mt-2 text-sm font-semibold text-ink">{record?.practicum_site || "No site submitted"}</p>
+            <p className="mt-1 text-xs text-slate-500">Supervisor: {record?.supervisor_name || "Not provided"}</p>
             <p className="mt-1 text-xs text-slate-500">Certificates: {record?.certificate_count || 0} · {record?.remarks || "No student remarks"}</p>
             <div className="mt-2 flex flex-wrap gap-2">{record?.moa_attachment && <a className="btn-ghost px-3 py-1.5" href={record.moa_attachment.url} target="_blank" rel="noreferrer">MOA <ArrowUpRight className="h-3.5 w-3.5" /></a>}{record?.certificate_attachment && <a className="btn-ghost px-3 py-1.5" href={record.certificate_attachment.url} target="_blank" rel="noreferrer">Documents <ArrowUpRight className="h-3.5 w-3.5" /></a>}</div>
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Workflow timeline</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">{(record?.timeline || []).map((step) => <span key={step.label} className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${step.state === "current" ? "bg-brand-600 text-white" : step.state === "complete" ? "bg-brand-100 text-brand-700" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>{step.label}</span>)}</div>
-          </div>
-        </div>
-      </td>
-    </tr>
+      </div>
+      <WorkflowTimeline steps={timeline} title="Practicum workflow timeline" />
+    </div>
   );
 }
 
-function WithdrawalRoster({ context, submit, submitting }) {
-  const [expanded, setExpanded] = useState(null);
+function WithdrawalRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+  const [messageRow, setMessageRow] = useState(null);
+  const [messageNotice, setMessageNotice] = useState("");
+  const [viewMode, setViewMode] = useState("board");
+  const reset = useDemoCaseReset("withdrawal", refetch);
   const rows = context.roster || [];
   const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
   const programs = useMemo(() => uniqueValues(rows.map((item) => item.student.program_code)), [rows]);
@@ -1921,77 +3263,261 @@ function WithdrawalRoster({ context, submit, submitting }) {
   }), [rows, filters]);
   function actionFor(item) {
     const base = { student_id: item.student_id };
-    if (item.dean_decision === "Pending") return { label: "Forward to Dean", payload: { ...base, dean_decision: "Pending" } };
-    if (item.dean_decision === "Approved" && item.requirement_status !== "Complete") return { label: "Confirm form & proof", payload: { ...base, requirement_status: "Complete" } };
-    if (item.dean_decision === "Approved" && item.fee_status !== "Cleared") return { label: "Record fee clearance", payload: { ...base, requirement_status: "Complete", fee_status: "Cleared" } };
-    if (item.dean_decision === "Approved" && item.registrar_status !== "Record Updated") return { label: "Confirm Registrar update", payload: { ...base, requirement_status: "Complete", fee_status: "Cleared", registrar_status: "Record Updated" } };
+    if (accountRole === "staff" && item.dean_decision === "Pending" && item.status === "Submitted to GS Staff") return { label: "Record & forward to Dean", payload: { ...base, workflow_action: "forward_to_dean" } };
+    if (accountRole === "academic_coordinator" && item.dean_decision === "Approved" && item.status === "Approved - Follow-through") return { label: "Record coordinator follow-through", payload: { ...base, workflow_action: "coordinator_follow_through" } };
+    if (accountRole === "staff" && item.status === "Coordinator Follow-through Complete") return { label: "Inform student of approval", payload: { ...base, workflow_action: "notify_student_of_approval" } };
+    if (accountRole === "staff" && item.status === "Requirements Submitted") return { label: "Verify form & proof", payload: { ...base, workflow_action: "verify_requirements" } };
+    if (accountRole === "registrar" && item.status === "Registrar Review") return { label: "Confirm Registrar fee status", payload: { ...base, workflow_action: "record_fee_clearance" } };
+    if (accountRole === "staff" && item.status === "Fee Cleared") return { label: "Confirm completed withdrawal", payload: { ...base, workflow_action: "confirm_withdrawal" } };
+    if (accountRole === "registrar" && item.status === "Withdrawal Confirmed") return { label: "Update student record", payload: { ...base, workflow_action: "record_registrar_update" } };
     return null;
   }
+  const selectedCurrent = rows.find((item) => item.id === selectedCaseId) || null;
+  const selectedItem = selectedCurrent || selectedSnapshot;
+  const selectedAction = selectedCurrent ? actionFor(selectedCurrent) : null;
+  const withdrawalSteps = withdrawalTimelineSteps(selectedCurrent?.status || (reset.resetMessage ? undefined : selectedItem?.status));
+
+  useEffect(() => {
+    if (selectedCurrent) setSelectedSnapshot(selectedCurrent);
+  }, [selectedCurrent]);
+
+  function openCase(item) {
+    clearSubmitFeedback();
+    reset.clearResetFeedback();
+    setSelectedCaseId(item.id);
+    setSelectedSnapshot(item);
+  }
+
+  function closeCase() {
+    setSelectedCaseId(null);
+    setSelectedSnapshot(null);
+  }
+
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted withdrawal requests" subtitle="Withdrawal is the in-progress request; Withdrawn is applied only after requirements, fees, and Registrar update are confirmed" icon={LogOut} />
+      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Withdrawn is applied only after requirements, fees, and Registrar update are confirmed`} icon={LogOut} />
+      {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
+      <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
-      <WorkflowTable headers={["Student", "Request date", "Effective term", "Reason", "Status", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
-        const action = actionFor(item);
-        return <>
-          <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+      <div className="flex justify-end"><ViewModeToggle value={viewMode} onChange={setViewMode} /></div>
+      {viewMode === "board" ? (
+        <WorkflowBoard
+          columns={WITHDRAWAL_BOARD_COLUMNS}
+          rows={filteredRows}
+          getStatus={(item) => item.status}
+          empty="No recent withdrawal requests match the filters."
+          renderCard={(item) => <WithdrawalBoardCard key={item.id} item={item} onOpen={() => openCase(item)} onMessage={() => setMessageRow(item)} />}
+        />
+      ) : <WorkflowTable headers={["Student", "Request date", "Effective term", "Reason", "Status", "Next owner", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
+        return (
+          <tr
+            key={item.id}
+            onClick={() => openCase(item)}
+            className="cursor-pointer border-b border-slate-100 align-top transition-colors hover:bg-brand-50/60"
+          >
             <StudentCell student={item.student} />
             <td className="px-3 py-3 text-sm text-slate-600">{formatDate(item.created_at)}</td>
             <td className="px-3 py-3 text-sm text-slate-600">{item.effective_term || "—"}</td>
             <td className="max-w-[240px] px-3 py-3 text-sm text-slate-600"><span className="line-clamp-2">{item.reason || "No reason provided"}</span></td>
             <td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td>
-            <td className="px-3 py-3"><div className="flex min-w-[170px] flex-col gap-2"><button type="button" onClick={() => setExpanded(expanded === item.id ? null : item.id)} className="btn-ghost px-3 py-2"><Eye className="h-4 w-4" /> View details</button>{action && <button type="button" disabled={submitting} onClick={() => submit(action.payload)} className="btn-primary px-3 py-2">{action.label}</button>}</div></td>
+            <td className="px-3 py-3 text-xs font-semibold text-slate-600">{item.next_action_owner || "—"}{item.unresolved_messages > 0 && <p className="mt-1 text-amber-700">{item.unresolved_messages} concern(s)</p>}</td>
+            <td className="px-3 py-3"><button type="button" onClick={(event) => { event.stopPropagation(); openCase(item); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> Open case</button></td>
           </tr>
-          {expanded === item.id && <tr className="border-b border-brand-100 bg-brand-50/40"><td colSpan={6} className="px-4 py-4"><div className="grid gap-3 text-sm sm:grid-cols-4"><Detail label="Dean" value={item.dean_decision} /><Detail label="Requirements" value={item.requirement_status} /><Detail label="Fee status" value={item.fee_status} /><Detail label="Registrar" value={item.registrar_status} /></div><div className="mt-3 flex flex-wrap gap-2">{item.request_attachment && <a href={item.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}{item.proof_attachment && <a href={item.proof_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost px-3 py-1.5">Proof <ArrowUpRight className="h-3.5 w-3.5" /></a>}</div></td></tr>}
-        </>;
-      }} />
+        );
+      }} />}
+      {selectedItem && (
+        <WorkflowCaseModal
+          id={`withdrawal-case-${selectedItem.id}`}
+          title={selectedItem.student.name}
+          subtitle={`${selectedItem.student.student_number} · ${selectedItem.student.program_code} · Withdrawal case`}
+          status={selectedCurrent?.status || (reset.resetMessage ? "Reset" : selectedItem.status)}
+          onClose={closeCase}
+          footer={(
+            <>
+              {accountRole === "staff" && selectedCurrent && <DemoResetButton student={selectedCurrent.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
+              {selectedCurrent && <button type="button" onClick={() => setMessageRow(selectedCurrent)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
+              {accountRole === "staff" && selectedCurrent?.status === "Requirements Submitted" && (
+                <button type="button" disabled={submitting || refreshing} onClick={() => submit({ student_id: selectedCurrent.student_id, workflow_action: "return_requirements" })} className="btn-ghost cursor-pointer px-4 py-2">
+                  Return incomplete requirements
+                </button>
+              )}
+              {selectedAction ? (
+                <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
+                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
+                </button>
+              ) : (
+                <span className="self-center text-xs font-semibold text-slate-500">{selectedCurrent ? `No ${WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.` : "This demo case has been reset."}</span>
+              )}
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <WorkflowSubmitFeedback result={result} error={submitError} />
+            <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+            <div className="grid gap-3 sm:grid-cols-4">
+              <Detail label="Dean" value={selectedCurrent?.dean_decision || selectedItem.dean_decision} />
+              <Detail label="Requirements" value={selectedCurrent?.requirement_status || selectedItem.requirement_status} />
+              <Detail label="Fee status" value={selectedCurrent?.fee_status || selectedItem.fee_status} />
+              <Detail label="Registrar" value={selectedCurrent?.registrar_status || selectedItem.registrar_status} />
+            </div>
+            <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
+            <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Request</p>
+              <p className="mt-2 text-sm font-semibold text-ink">Effective {selectedItem.effective_term || "term pending"}</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedItem.reason || "No reason provided"}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedItem.request_attachment && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
+                {selectedItem.proof_attachment && <a href={selectedItem.proof_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Proof <ArrowUpRight className="h-3.5 w-3.5" /></a>}
+              </div>
+            </div>
+          </div>
+        </WorkflowCaseModal>
+      )}
+      {messageRow && <WorkflowMessageModal slug="withdrawal" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
     </div>
   );
 }
 
-function GraduationRoster({ context, submit, submitting }) {
-  const [expanded, setExpanded] = useState(null);
+function GraduationRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [messageRow, setMessageRow] = useState(null);
+  const [messageNotice, setMessageNotice] = useState("");
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [batchOpen, setBatchOpen] = useState(false);
+  const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
   const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map((row) => row.endorsement?.endorsement_status || "Not Prepared")), [rows]);
   const filteredRows = useMemo(() => rows.filter((row) => {
     const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name}`.toLowerCase();
-    const eligibility = row.eligibility.eligible ? "Eligible" : "Not Eligible";
+    const eligibility = row.eligibility.status;
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
       && (!filters.status || (row.endorsement?.endorsement_status || "Not Prepared") === filters.status)
       && (!filters.secondary || eligibility === filters.secondary);
   }), [rows, filters]);
+  const selectedRows = rows.filter((row) => selectedIds.has(row.student.id));
+  function toggleSelected(studentId) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
+      return next;
+    });
+  }
+  function selectRows(predicate) {
+    setSelectedIds(new Set(filteredRows.filter(predicate).map((row) => row.student.id)));
+  }
   function actionFor(row) {
     const status = row.endorsement?.endorsement_status;
     const base = { student_id: row.student.id, review_window: row.endorsement?.review_window || "AY 2026-2027 Graduation Review" };
-    if (!row.eligibility.eligible) return { label: "Record eligibility review", payload: { ...base, endorsement_status: "For Review" } };
-    if (!status || status === "Not Eligible") return { label: "Prepare endorsement list", payload: { ...base, endorsement_status: "For Review" } };
-    if (["For Review", "Returned for Revision"].includes(status)) return { label: status === "Returned for Revision" ? "Resend revised list to Dean" : "Send endorsement list to Dean", payload: { ...base, endorsement_status: "Ready for Dean Review" } };
+    if (accountRole === "staff" && (!status || ["For Review", "Not Eligible"].includes(status))) return { label: status === "Not Eligible" ? "Restart role-based review" : "Compile & send to Academic Coordinator", payload: { ...base, endorsement_status: "Coursework Review" } };
+    if (accountRole === "academic_coordinator" && status === "Coursework Review") return { label: "Record coursework review", payload: { ...base, endorsement_status: "Research Review" } };
+    if (accountRole === "research_coordinator" && status === "Research Review") return { label: "Validate research requirements", payload: { ...base, endorsement_status: "Eligibility Confirmed" } };
+    if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return { label: "List missing requirements & mark not eligible", payload: { ...base, endorsement_status: "Not Eligible" } };
+    if (accountRole === "staff" && status === "Eligibility Confirmed") return { label: "Prepare endorsement list", payload: { ...base, endorsement_status: "Endorsement Prepared" } };
+    if (accountRole === "staff" && ["Endorsement Prepared", "Returned for Revision"].includes(status)) return { label: status === "Returned for Revision" ? "Resend revised list to Dean" : "Send endorsement list to Dean", payload: { ...base, endorsement_status: "Ready for Dean Review" } };
+    if (accountRole === "registrar" && status === "Sent to Registrar") return { label: "Record Registrar receipt", payload: { ...base, endorsement_status: "Registrar Received", registrar_status: "Received" } };
     return null;
+  }
+  const selectedRow = rows.find((row) => row.student.id === selectedStudentId) || null;
+  const selectedAction = selectedRow ? actionFor(selectedRow) : null;
+  const selectedEndorsement = selectedRow?.endorsement || null;
+  const graduationSteps = selectedRow ? graduationTimelineSteps(selectedEndorsement?.endorsement_status, selectedRow.eligibility) : [];
+
+  function openCase(studentId) {
+    clearSubmitFeedback();
+    reset.clearResetFeedback();
+    setSelectedStudentId(studentId);
   }
   return (
     <div className="space-y-4">
-      <SectionTitle title="Graduation endorsement candidates" subtitle="Staff compiles and revises the list; only the Dean can export and hand the approved list to the Registrar" icon={GraduationCap} />
-      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not Eligible"]} count={filteredRows.length} total={rows.length} />
-      <WorkflowTable headers={["Student", "Coursework", "Missing coursework", "Research", "Missing research", "Eligibility", "Endorsement", "Action"]} empty="No graduation candidates match the selected filters." rows={filteredRows} render={(row) => {
+      <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns Registrar export`} icon={GraduationCap} />
+      {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
+      <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+        <span className="mr-auto text-sm font-semibold text-slate-700">{selectedIds.size} selected</span>
+        <button type="button" onClick={() => selectRows((row) => row.eligibility.status === "Eligible")} className="btn-ghost cursor-pointer px-3 py-2">Select all eligible</button>
+        <button type="button" onClick={() => selectRows((row) => row.unresolved_messages > 0 || row.next_action_owner === WORKFLOW_ROLE_LABELS[accountRole])} className="btn-ghost cursor-pointer px-3 py-2">Select needs action</button>
+        {selectedIds.size > 0 && <button type="button" onClick={() => setSelectedIds(new Set())} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
+        <button type="button" disabled={!selectedIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> Apply group action</button>
+      </div>
+      <WorkflowTable headers={["Select", "Student", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement", "Updated", "Action"]} empty="No candidates match the current filters." rows={filteredRows} render={(row) => {
         const endorsement = row.endorsement;
-        const action = actionFor(row);
-        return <>
-          <tr key={row.student.id} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+        return (
+          <tr
+            key={row.student.id}
+            onClick={() => openCase(row.student.id)}
+            className="cursor-pointer border-b border-slate-100 align-top transition-colors hover:bg-brand-50/60"
+          >
+            <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(row.student.id)} onChange={() => toggleSelected(row.student.id)} onClick={(event) => event.stopPropagation()} className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name}`} /></td>
             <StudentCell student={row.student} />
             <td className="px-3 py-3"><StatusBadge value={row.eligibility.coursework_status} dot={false} /></td>
-            <td className="max-w-[220px] px-3 py-3 text-xs text-slate-500">{row.eligibility.missing_coursework?.slice(0, 2).join("; ") || "None"}</td>
             <td className="px-3 py-3"><StatusBadge value={row.eligibility.research_status} dot={false} /></td>
-            <td className="max-w-[220px] px-3 py-3 text-xs text-slate-500">{row.eligibility.missing_research_requirements?.slice(0, 2).join("; ") || "None"}</td>
-            <td className="px-3 py-3"><StatusBadge value={row.eligibility.eligible ? "Eligible" : "Not Eligible"} dot={false} /></td>
+            <td className="px-3 py-3"><StatusBadge value={row.eligibility.practicum_status} dot={false} /></td>
+            <td className="px-3 py-3"><StatusBadge value={row.eligibility.status} dot={false} />{row.unresolved_messages > 0 && <p className="mt-1 text-xs font-semibold text-amber-700">{row.unresolved_messages} concern(s)</p>}</td>
             <td className="px-3 py-3"><StatusBadge value={endorsement?.endorsement_status || "Not Prepared"} dot={false} /></td>
-            <td className="px-3 py-3"><div className="flex min-w-[175px] flex-col gap-2"><button type="button" onClick={() => setExpanded(expanded === row.student.id ? null : row.student.id)} className="btn-ghost px-3 py-2"><Eye className="h-4 w-4" /> Candidate details</button>{action && <button type="button" disabled={submitting} onClick={() => submit(action.payload)} className="btn-primary px-3 py-2">{action.label}</button>}{endorsement?.endorsement_status === "Dean Approved" && <span className="rounded-lg bg-brand-50 px-3 py-2 text-center text-xs font-semibold text-brand-700 ring-1 ring-brand-200">Awaiting Dean export</span>}</div></td>
+            <td className="px-3 py-3 text-xs text-slate-500">{formatDate(row.last_activity_at || endorsement?.updated_at)}</td>
+            <td className="px-3 py-3"><div className="flex gap-2"><button type="button" onClick={(event) => { event.stopPropagation(); openCase(row.student.id); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> View</button>{endorsement && <button type="button" onClick={(event) => { event.stopPropagation(); setMessageRow(row); }} className="btn-ghost cursor-pointer px-3 py-2"><MessageSquare className="h-4 w-4" /> Message</button>}</div></td>
           </tr>
-          {expanded === row.student.id && <tr className="border-b border-brand-100 bg-brand-50/40"><td colSpan={8} className="px-4 py-4"><div className="grid gap-3 text-sm sm:grid-cols-4"><Detail label="Program" value={row.student.program_name} /><Detail label="Academic Coordinator" value={row.eligibility.coursework_status} /><Detail label="Research Coordinator" value={row.eligibility.research_status} /><Detail label="Dean remarks" value={endorsement?.dean_remarks || "None"} /></div></td></tr>}
-        </>;
+        );
       }} />
+      {selectedRow && (
+        <WorkflowCaseModal
+          id={`graduation-case-${selectedRow.student.id}`}
+          title={selectedRow.student.name}
+          subtitle={`${selectedRow.student.student_number} · ${selectedRow.student.program_code} · Graduation endorsement`}
+          status={selectedEndorsement?.endorsement_status || selectedRow.eligibility.status}
+          onClose={() => setSelectedStudentId(null)}
+          footer={(
+            <>
+              {accountRole === "staff" && selectedEndorsement && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
+              {selectedEndorsement && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
+              {selectedAction ? (
+                <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
+                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
+                </button>
+              ) : selectedEndorsement?.endorsement_status === "Dean Approved" ? (
+                <span className="self-center rounded-lg bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700 ring-1 ring-brand-200">Awaiting Dean export</span>
+              ) : (
+                <span className="self-center text-xs font-semibold text-slate-500">No {WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.</span>
+              )}
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <WorkflowSubmitFeedback result={result} error={submitError} />
+            <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Detail label="Program" value={selectedRow.student.program_name} />
+              <Detail label="Coursework" value={selectedRow.eligibility.coursework_status} />
+              <Detail label="Research" value={selectedRow.eligibility.research_status} />
+              <Detail label="Practicum" value={selectedRow.eligibility.practicum_status} />
+              <Detail label="Eligibility" value={selectedRow.eligibility.status} />
+            </div>
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              {selectedRow.eligibility.checklist?.map((item) => <div key={item.key} className="grid gap-2 border-b border-slate-100 px-4 py-3 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div><p className="text-sm font-semibold text-slate-700">{item.label}</p><p className="text-xs text-slate-400">Source: {item.source_field}</p></div><p className="text-xs font-semibold text-slate-500">{String(item.actual_value)}</p><StatusBadge value={item.status} dot={false} /></div>)}
+            </div>
+            {selectedEndorsement?.dean_remarks && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"><span className="font-semibold text-ink">Dean remarks: </span>{selectedEndorsement.dean_remarks}</div>}
+            <WorkflowTimeline steps={graduationSteps} title="Graduation endorsement timeline" />
+            <CaseMessageHistory messages={selectedRow.messages} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing coursework</p>
+                {selectedRow.eligibility.missing_coursework?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_coursework.map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing research requirements</p>
+                {selectedRow.eligibility.missing_research_requirements?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_research_requirements.map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
+              </div>
+            </div>
+          </div>
+        </WorkflowCaseModal>
+      )}
+      {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
+      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} context={context} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
     </div>
   );
 }
@@ -2327,6 +3853,14 @@ function shortDate(value) {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function formatTime(value) {

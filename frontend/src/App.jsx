@@ -25,8 +25,13 @@ function homeFor(user) {
   if (!user) return "/login";
   if (user.role === "student") return "/student";
   if (user.role === "dean") return "/approvals";
+  if (user.role === "academic_coordinator") return "/workflow/course-audit";
+  if (user.role === "research_coordinator") return "/workflow/graduation";
+  if (user.role === "registrar") return "/workflow/withdrawal";
   return "/";
 }
+
+const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coordinator", "registrar"]);
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -54,7 +59,7 @@ export default function App() {
       <Route
         path="/*"
         element={
-          <StaffOnly user={user}>
+          <BackofficeOnly user={user}>
             <Layout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -74,16 +79,16 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>
-          </StaffOnly>
+          </BackofficeOnly>
         }
       />
     </Routes>
   );
 }
 
-function StaffOnly({ user, children }) {
+function BackofficeOnly({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== "staff") return <Navigate to={homeFor(user)} replace />;
+  if (!BACKOFFICE_ROLES.has(user.role)) return <Navigate to={homeFor(user)} replace />;
   return children;
 }
 

@@ -12,16 +12,18 @@ const CELL = {
   Enrolled: { cls: "bg-amber-100 text-amber-700", mark: "·" },
   Incomplete: { cls: "bg-amber-200 text-amber-800", mark: "!" },
   Dropped: { cls: "bg-slate-200 text-slate-500", mark: "×" },
+  Failed: { cls: "bg-red-100 text-red-700", mark: "F" },
   Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
 };
 
-const STATUS_CYCLE = ["Missing", "Completed", "Current", "Incomplete"];
+const STATUS_CYCLE = ["Missing", "Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"];
 const CELL_VIEW = {
   Completed: { cls: "bg-brand-500 text-white", mark: "C" },
   Current: { cls: "bg-blue-100 text-blue-700", mark: "R" },
   Enrolled: { cls: "bg-blue-100 text-blue-700", mark: "R" },
   Incomplete: { cls: "bg-amber-200 text-amber-800", mark: "I" },
   Dropped: { cls: "bg-slate-200 text-slate-500", mark: "D" },
+  Failed: { cls: "bg-red-100 text-red-700", mark: "F" },
   Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
 };
 
@@ -187,8 +189,10 @@ export default function MonitoringGrid() {
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Completed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Current</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-amber-300" /> Incomplete</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-100 ring-1 ring-red-200" /> Failed</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-200 ring-1 ring-slate-300" /> Dropped</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>
-        <span className="text-slate-400">Cycle: Not taken - Completed - Current - Incomplete</span>
+        <span className="text-slate-400">Cycle: Not taken - Enrolled - Current - Completed - Incomplete - Failed - Dropped</span>
         {saving && <span className="text-brand-600">Saving…</span>}
       </div>
 

@@ -86,6 +86,15 @@ export const api = {
   },
   submitTransaction: (slug, payload) =>
     request(`/transactions/${slug}`, { method: "POST", body: JSON.stringify(payload) }),
+  sendWorkflowMessage: (slug, payload) =>
+    request(`/transactions/${slug}/messages`, { method: "POST", body: JSON.stringify(payload) }),
+  graduationBatchAction: (payload) =>
+    request("/graduation/batch-actions", { method: "POST", body: JSON.stringify(payload) }),
+  resetWorkflowDemo: (slug, studentId) =>
+    request(`/transactions/${slug}/demo-reset`, {
+      method: "POST",
+      body: JSON.stringify({ student_id: studentId }),
+    }),
   importHandoff: async (file) => {
     const form = new FormData();
     form.append("file", file);
@@ -131,9 +140,14 @@ export const api = {
     request("/course-adjustments/plan", { method: "POST", body: JSON.stringify(payload) }),
   courseAuditSubjects: (programId) =>
     request(`/course-audit/subjects${programId ? `?program_id=${programId}` : ""}`),
-  courseAuditRoster: (courseId) => request(`/course-audit/roster?course_id=${courseId}`),
+  courseAuditRoster: (courseId, term = "") =>
+    request(`/course-audit/roster?course_id=${courseId}${term ? `&term=${encodeURIComponent(term)}` : ""}`),
   saveCourseAudit: (payload) =>
     request("/course-audit/roster", { method: "POST", body: JSON.stringify(payload) }),
+  courseDropRequests: (status = "Submitted") =>
+    request(`/course-drop/requests${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  decideCourseDrop: (requestId, payload) =>
+    request(`/course-drop/requests/${requestId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
   decisionSupport: () => request("/decision-support"),
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),

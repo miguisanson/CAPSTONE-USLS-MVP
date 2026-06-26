@@ -54,7 +54,7 @@ const NAV_GROUPS = [
       { to: "/curriculum-planning", label: "2 · Curriculum Planning", icon: BookOpenCheck },
       { to: "/course-adjustments", label: "3 · Course Adjustments", icon: SlidersHorizontal },
       { to: "/workflow/course-audit", label: "4 · Course Audit", icon: ClipboardCheck },
-      { to: "/workflow/research-gate", label: "5 · Research Gate", icon: FileCheck },
+      { to: "/workflow/research-gate", label: "5 - Research Gate", icon: FileCheck },
       { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
       { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
       { to: "/workflow/practicum", label: "8 · Practicum", icon: Briefcase },
@@ -80,6 +80,19 @@ const NAV_GROUPS = [
   },
 ];
 
+const ROLE_LABELS = {
+  staff: "Graduate School Staff",
+  academic_coordinator: "Academic Coordinator",
+  research_coordinator: "Research Coordinator",
+  registrar: "Registrar",
+};
+
+const ROLE_PATHS = {
+  academic_coordinator: new Set(["/monitoring-sheet", "/workflow/course-audit", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
+  research_coordinator: new Set(["/workflow/graduation", "/work-queue"]),
+  registrar: new Set(["/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
+};
+
 function NavItem({ to, label, icon: Icon, end, onClick }) {
   return (
     <NavLink
@@ -100,7 +113,15 @@ function NavItem({ to, label, icon: Icon, end, onClick }) {
   );
 }
 
-function SidebarContent({ onNavigate, onResetDemo, resettingDemo }) {
+function SidebarContent({ onNavigate, user, onResetDemo, resettingDemo }) {
+  const allowedPaths = ROLE_PATHS[user?.role];
+  const roleAllowed = (item) => !item.roles || item.roles.includes(user?.role);
+  const groups = NAV_GROUPS
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => roleAllowed(item) && (!allowedPaths || allowedPaths.has(item.to))),
+    }))
+    .filter((group) => group.items.length);
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 px-5 py-5">
@@ -114,7 +135,7 @@ function SidebarContent({ onNavigate, onResetDemo, resettingDemo }) {
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label}>
             <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{group.label}</p>
             <div className="space-y-1">
@@ -127,6 +148,7 @@ function SidebarContent({ onNavigate, onResetDemo, resettingDemo }) {
       </nav>
 
       <div className="border-t border-slate-200 px-5 py-4">
+        <p className="mb-1 text-xs font-bold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
         <p className="text-[11px] leading-relaxed text-slate-400">
           Demo dataset · figures are computed live from recorded transactions.
         </p>
@@ -167,7 +189,7 @@ export default function Layout({ children }) {
       {/* Desktop sidebar */}
       <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:block">
         <div className="sticky top-0 h-screen">
-          <SidebarContent onResetDemo={resetDemo} resettingDemo={resettingDemo} />
+          <SidebarContent user={user} onResetDemo={resetDemo} resettingDemo={resettingDemo} />
         </div>
       </aside>
 
@@ -184,7 +206,7 @@ export default function Layout({ children }) {
             >
               <X className="h-5 w-5" />
             </button>
-            <SidebarContent onNavigate={() => setMobileOpen(false)} onResetDemo={resetDemo} resettingDemo={resettingDemo} />
+            <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} onResetDemo={resetDemo} resettingDemo={resettingDemo} />
           </aside>
         </div>
       )}
@@ -203,7 +225,7 @@ export default function Layout({ children }) {
           <Breadcrumb path={location.pathname} />
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex">
-              {user?.full_name || "Graduate School Staff"}
+              {user?.full_name || "Graduate School Staff"} · {ROLE_LABELS[user?.role] || "Staff"}
             </span>
             <button
               type="button"

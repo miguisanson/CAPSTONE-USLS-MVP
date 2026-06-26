@@ -5,12 +5,20 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
 import { formatDate, relativeDays } from "../lib/format";
+import { useAuth } from "../auth";
 
 const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar", "Student", "Panel Chair", "Adviser"];
+const ACCOUNT_OWNER = {
+  staff: "Graduate School Staff",
+  academic_coordinator: "Academic Coordinator",
+  research_coordinator: "Research Coordinator",
+  registrar: "Registrar",
+};
 
 export default function WorkQueue() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [owner, setOwner] = useState(searchParams.get("owner") || "");
+  const [owner, setOwner] = useState(searchParams.get("owner") || (user?.role === "staff" ? "" : ACCOUNT_OWNER[user?.role] || ""));
   const [status, setStatus] = useState(searchParams.get("status") || "");
   const [query, setQuery] = useState("");
   const { data, loading, error } = useApi(() => api.tasks({ owner, status }), [owner, status]);
@@ -68,6 +76,7 @@ export default function WorkQueue() {
                   <th className="px-3 py-3">Student</th>
                   <th className="px-3 py-3">Due</th>
                   <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -76,10 +85,12 @@ export default function WorkQueue() {
                     <td className="px-5 py-3 font-semibold text-ink">{task.title}</td>
                     <td className="px-3 py-3 text-slate-600">{task.owner_role}</td>
                     <td className="px-3 py-3">
-                      {task.student_id ? (
+                      {task.student_id && user?.role === "staff" ? (
                         <Link to={`/students/${task.student_id}`} className="font-semibold text-brand-700 hover:underline">
                           {task.student_name}
                         </Link>
+                      ) : task.student_id ? (
+                        <span className="font-semibold text-ink">{task.student_name}</span>
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
@@ -89,6 +100,15 @@ export default function WorkQueue() {
                     </td>
                     <td className="px-3 py-3">
                       <StatusBadge value={task.overdue ? "Overdue" : task.status} dot={false} />
+                    </td>
+                    <td className="px-3 py-3">
+                      {task.action_url ? (
+                        <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">
+                          {task.action_label || "Open"}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-300">-</span>
+                      )}
                     </td>
                   </tr>
                 ))}

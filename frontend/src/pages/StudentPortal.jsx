@@ -17,6 +17,7 @@ import {
   Lock,
   LogOut,
   Mail,
+  MessageSquare,
   Send,
   Trash2,
   UserCheck,
@@ -29,12 +30,14 @@ import { Card, EmptyState, ErrorNote, ProgressBar, SectionTitle, Spinner, Status
 import { CheckList, Field, Input, Select, Textarea } from "../components/forms";
 import { formatDate, initials, relativeDays } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
+import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 
 const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Ethics Review", "Final Defense", "Completion Evidence"]);
 
 const STUDENT_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
   { id: "lifecycle", label: "Lifecycle Status", icon: Activity },
+  { id: "courses", label: "My Courses", icon: ClipboardCheck },
   { id: "research", label: "Research Submission", icon: FileCheck },
   { id: "schedule", label: "Defense Schedule", icon: CalendarCheck },
   { id: "loa", label: "Leave of Absence", icon: CalendarOff },
@@ -42,6 +45,7 @@ const STUDENT_NAV = [
   { id: "practicum", label: "Practicum", icon: Briefcase },
   { id: "withdrawal", label: "Withdrawal Request", icon: LogOut },
   { id: "graduation", label: "Graduation Status", icon: GraduationCap },
+  { id: "inbox", label: "Inbox / Messages", icon: Mail },
   { id: "documents", label: "Documents / Submissions", icon: FileUp },
 ];
 
@@ -140,7 +144,9 @@ export default function StudentPortal() {
               <StudentHero data={data} />
               {view === "overview" && <div className="grid grid-cols-1 gap-5 lg:grid-cols-12"><div className="space-y-5 lg:col-span-8"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /><ActivityPanel logs={data.logs} /></div><div className="space-y-5 lg:col-span-4"><TasksPanel tasks={data.tasks} /><SchedulePanel schedules={data.schedules} /><RecommendationsPanel recommendations={data.recommendations} /></div></div>}
               {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
+              {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
               {["research", "schedule", "loa", "readmission", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
+              {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
               {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
             </>
           ) : null}
@@ -273,7 +279,7 @@ function WorkflowStatusPanel({ data }) {
   rows.push({
     label: "Graduation Endorsement",
     icon: GraduationCap,
-    status: data.graduation_endorsement?.endorsement_status || (data.graduation_eligibility?.eligible ? "For Review" : "Not Eligible"),
+    status: data.graduation_endorsement?.endorsement_status || data.graduation_eligibility?.status || "Needs verification",
     detail: data.graduation_endorsement
       ? `Coursework: ${data.graduation_endorsement.coursework_status} · research: ${data.graduation_endorsement.research_status}`
       : data.graduation_eligibility?.next_action || "No graduation endorsement request submitted yet.",
@@ -299,6 +305,104 @@ function WorkflowStatusPanel({ data }) {
         })}
       </div>
     </Card>
+  );
+}
+
+function MyCoursesPanel({ data, onSaved }) {
+  const courses = data.course_records || [];
+  const requests = data.course_drop_requests || [];
+  const currentCourses = courses.filter((course) => ["Enrolled", "Current", "Incomplete"].includes(course.status) && !course.drop_request);
+  const droppable = currentCourses;
+  const [activeCourseId, setActiveCourseId] = useState(currentCourses[0]?.course_id || "");
+  const [form, setForm] = useState({ reason: "", term_label: "", attachment_id: null });
+  const { busy, error, message, submit } = useSubmitRequest("course-drop", onSaved);
+  const activeCourse = courses.find((course) => String(course.course_id) === String(activeCourseId));
+  const selectedTerm = activeCourse?.term_label || data.current_term?.label || "Current term";
+
+  useEffect(() => {
+    setActiveCourseId((current) => {
+      if (currentCourses.some((course) => String(course.course_id) === String(current))) return current;
+      return currentCourses[0]?.course_id || "";
+    });
+  }, [data.student.id, currentCourses[0]?.course_id]);
+
+  function onSubmit(event) {
+    event.preventDefault();
+    if (!activeCourse) return;
+    submit({
+      course_id: activeCourse.course_id,
+      term_label: selectedTerm,
+      reason: form.reason,
+      attachment_id: form.attachment_id,
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card className="p-6">
+        <SectionTitle title="My Courses" subtitle="Your current coursework status, grades, and pending drop requests" icon={ClipboardCheck} />
+        {courses.length ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2.5">Subject</th>
+                  <th className="px-3 py-2.5">Status</th>
+                  <th className="px-3 py-2.5">Grade</th>
+                  <th className="px-3 py-2.5">Term</th>
+                  <th className="px-3 py-2.5">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((course) => (
+                  <tr key={course.id} className="border-b border-slate-50">
+                    <td className="px-4 py-2.5"><p className="font-semibold text-ink">{course.code}</p><p className="text-xs text-slate-500">{course.title}</p>{course.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                    <td className="px-3 py-2.5"><StatusBadge value={course.status} dot={false} /></td>
+                    <td className="px-3 py-2.5"><p className="font-semibold text-ink">{course.grade_value || "No grade"}</p><p className="text-xs text-slate-400">{course.grade_status}</p></td>
+                    <td className="px-3 py-2.5 text-slate-600">{course.term_label || "Not recorded"}</td>
+                    <td className="px-3 py-2.5 text-slate-600">{course.remarks || (course.incomplete_deadline ? `Incomplete due ${formatDate(course.incomplete_deadline)}` : "—")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState icon={ClipboardCheck} title="No course records yet" hint="Your coursework list appears after Graduate School staff or the Academic Coordinator imports or syncs your curriculum." />
+        )}
+      </Card>
+
+      <Card className="p-6">
+        <SectionTitle title="Drop Subject Request" subtitle="Submitting a request does not change your record until the Academic Coordinator approves it" icon={LogOut} />
+        {requests.length > 0 && (
+          <div className="mb-4 grid gap-2 md:grid-cols-2">
+            {requests.slice(0, 4).map((request) => (
+              <div key={request.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-ink">{request.course_code}</p><StatusBadge value={request.status} dot={false} /></div>
+                <p className="mt-1 text-xs text-slate-500">{request.term_label || "No term"} · {formatDate(request.created_at)}</p>
+                {request.reviewer_remarks && <p className="mt-2 text-xs text-slate-600">{request.reviewer_remarks}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        {currentCourses.length ? (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <Field label="Subject to drop" required>
+              <Select value={activeCourseId} onChange={(event) => setActiveCourseId(event.target.value)} options={droppable.map((course) => ({ value: course.course_id, label: `${course.code} — ${course.title}` }))} required />
+            </Field>
+            <Field label="Term">
+              <div className="field-input bg-slate-50 text-slate-600">{selectedTerm}</div>
+            </Field>
+            <Field label="Reason for dropping" required>
+              <Textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} required />
+            </Field>
+            <RequestPdfUpload requestType="course-drop" label="Optional drop form/supporting PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+            <SubmitState busy={busy} error={error} message={message} disabled={!form.reason.trim()} disabledHint={!form.reason.trim() ? "Enter your reason before submitting." : ""} label="Submit drop request" />
+          </form>
+        ) : (
+          <EmptyState icon={LogOut} title="No currently enrolled subjects" hint="Only enrolled or current subjects can be requested for dropping." />
+        )}
+      </Card>
+    </div>
   );
 }
 
@@ -356,6 +460,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
           <ActiveIcon className="h-4 w-4 text-brand-700" /> {activeRequest?.label}
         </div>
+        {["practicum", "withdrawal", "graduation"].includes(active) && <StudentClarificationPanel slug={active} data={data} onSaved={onSaved} />}
         {activeLocked ? (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
             <Lock className="mt-0.5 h-4 w-4 text-slate-400" />
@@ -374,6 +479,48 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
         )}
       </div>
     </Card>
+  );
+}
+
+function StudentClarificationPanel({ slug, data, onSaved }) {
+  const messages = (data.workflow_messages || []).filter((item) => item.transaction_slug === slug && item.recipient_role === "Student" && item.status === "Open" && item.action_type === "return");
+  const latest = messages[0];
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  if (!latest) return null;
+
+  async function respond() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await api.sendWorkflowMessage(slug, {
+        action_type: "response",
+        recipient_role: latest.sender_role,
+        template: "Please clarify request details",
+        comment,
+      });
+      setNotice(result.message);
+      setComment("");
+      onSaved();
+    } catch (err) {
+      setError(err.message || "Could not send your clarification response.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <div className="flex items-start gap-3"><MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><p className="text-sm font-semibold text-amber-950">Clarification requested</p><p className="mt-1 text-sm text-amber-800">{latest.template}{latest.comment ? ` · ${latest.comment}` : ""}</p><p className="mt-1 text-xs text-amber-700">From {latest.sender_role} · {formatDate(latest.created_at)}</p></div></div>
+      <label className="mt-3 block text-xs font-semibold text-amber-900" htmlFor={`${slug}-clarification-response`}>Your response</label>
+      <textarea id={`${slug}-clarification-response`} value={comment} onChange={(event) => setComment(event.target.value)} className="field-input mt-1 min-h-24" placeholder="Explain what you updated or ask a follow-up question." />
+      <ErrorNote message={error} />
+      {notice && <p aria-live="polite" className="mt-2 text-sm font-semibold text-brand-700">{notice}</p>}
+      <button type="button" disabled={busy || !comment.trim()} onClick={respond} className="btn-primary mt-3 cursor-pointer"><Send className="h-4 w-4" /> {busy ? "Sending…" : "Send clarification response"}</button>
+    </div>
   );
 }
 
@@ -404,15 +551,23 @@ function ResearchRequestForm({ data, onSaved }) {
   const progress = data.research_progress || {};
   const milestone = progress.milestone || {};
   const gate = progress.gate || milestone.value || "";
-  const [form, setForm] = useState({ research_title: data.research_case?.title || "", submitted_package: "" });
+  // Treat the backend placeholder as empty, and never overwrite a title the student
+  // has typed or that was auto-filled from Form 1. A data refresh after each upload
+  // must not wipe it — otherwise submitting fails with "Enter the research title".
+  const PENDING_TITLE = "Research title pending Form 1 submission";
+  const savedTitle = data.research_case?.title && data.research_case.title !== PENDING_TITLE ? data.research_case.title : "";
+  const [form, setForm] = useState({ research_title: savedTitle, submitted_package: "" });
   const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
   const [prefillNote, setPrefillNote] = useState("");
   const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
   const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
 
   useEffect(() => {
-    setForm((current) => ({ ...current, research_title: data.research_case?.title || "" }));
-  }, [data.student.id, data.research_case?.title]);
+    setForm((current) => ({
+      ...current,
+      research_title: current.research_title && current.research_title !== PENDING_TITLE ? current.research_title : savedTitle,
+    }));
+  }, [data.student.id, savedTitle]);
 
   function set(key) {
     return (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -503,11 +658,12 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
   const [error, setError] = useState("");
   const needed = requirement.required_file_count;
   const files = requirement.files || [];
-  const conceptPapersLocked = panelLocked && requirement.item_name === "Three concept papers";
+  const titlePackageItem = requirement.item_name === "Form 1 - Application for Title Defense" || requirement.item_name === "Three concept papers";
+  const titlePackageLocked = panelLocked && titlePackageItem;
 
   async function upload(file) {
-    if (conceptPapersLocked) {
-      setError("Concept papers are locked because a panel has already been matched.");
+    if (titlePackageLocked) {
+      setError("Title-defense uploads are locked because a panel has already been matched.");
       return;
     }
     if (!file) return;
@@ -527,8 +683,8 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
     }
   }
 
-  async function removeConceptPaper(file) {
-    if (conceptPapersLocked) return;
+  async function removeResearchFile(file) {
+    if (titlePackageLocked) return;
     const confirmed = window.confirm(`Remove "${file.name}"? This will revoke the Academic Coordinator endorsement and clear the current Panel Matching result.`);
     if (!confirmed) return;
     setRemovingId(file.id);
@@ -553,9 +709,9 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={requirement.status_label} dot={false} />
-          <label className={`btn-ghost ${conceptPapersLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-          {conceptPapersLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {conceptPapersLocked ? "Locked after panel match" : busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
-          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || conceptPapersLocked} onChange={(e) => upload(e.target.files?.[0])} />
+          <label className={`btn-ghost ${titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+          {titlePackageLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
+          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
           </label>
         </div>
       </div>
@@ -566,8 +722,8 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
               <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
                 {file.name}<Eye className="h-3.5 w-3.5" />
               </a>
-              {requirement.item_name === "Three concept papers" && (
-                <button type="button" onClick={() => removeConceptPaper(file)} disabled={conceptPapersLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={conceptPapersLocked ? "Locked after panel matching" : "Remove concept paper"}>
+              {titlePackageItem && (
+                <button type="button" onClick={() => removeResearchFile(file)} disabled={titlePackageLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -575,7 +731,7 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
           ))}
         </div>
       )}
-      {requirement.item_name === "Three concept papers" && files.length > 0 && <p className={`mt-2 text-xs ${conceptPapersLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{conceptPapersLocked ? "This concept-paper set is read-only because a panel has already been matched." : "Removing any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete three-paper set must be endorsed again."}</p>}
+      {titlePackageItem && files.length > 0 && <p className={`mt-2 text-xs ${titlePackageLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{titlePackageLocked ? "This title-defense package is read-only because a panel has already been matched." : "Removing Form 1 or any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete title-defense package must be endorsed again."}</p>}
       {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
     </div>
   );
@@ -652,6 +808,46 @@ function ReadmissionRequestForm({ data, onSaved }) {
   );
 }
 
+function StageCard({ number, title, state = "locked", helper = "", children }) {
+  const styles = {
+    active: "border-brand-300 bg-white",
+    complete: "border-brand-200 bg-brand-50/40",
+    pending: "border-amber-200 bg-amber-50/40",
+    returned: "border-red-200 bg-red-50/40",
+    locked: "border-slate-200 bg-slate-50/60",
+  };
+  const labels = { active: "Current stage", complete: "Completed", pending: "Pending review", returned: "Needs revision", locked: "Locked" };
+  return (
+    <section className={`rounded-2xl border p-4 ${styles[state] || styles.locked}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${state === "active" ? "bg-brand-600 text-white" : state === "returned" ? "bg-red-100 text-red-700" : state === "complete" ? "bg-brand-100 text-brand-700" : "bg-slate-200 text-slate-500"}`}>{number}</span>
+          <div><h3 className="text-sm font-semibold text-ink">{title}</h3>{helper && <p className="mt-1 text-xs leading-relaxed text-slate-500">{helper}</p>}</div>
+        </div>
+        <StatusBadge value={labels[state] || state} dot={false} />
+      </div>
+      {children && <div className="mt-4 border-t border-slate-200/80 pt-4">{children}</div>}
+    </section>
+  );
+}
+
+function SavedWorkflowFiles({ files = [], empty = "No files submitted yet." }) {
+  if (!files.length) return <p className="text-xs text-slate-500">{empty}</p>;
+  return (
+    <div>
+      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Already submitted</p>
+      <ul className="space-y-2">
+        {files.map((file) => (
+          <li key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-700">{file.name}</p><p className="text-xs text-slate-400">Uploaded by {file.uploaded_by || "Student"} · {formatDate(file.uploaded_at)}</p></div>
+            <a href={file.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5"><Eye className="h-3.5 w-3.5" /> View file</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function WithdrawalRequestForm({ data, onSaved }) {
   const existing = data.withdrawal_application;
   const [form, setForm] = useState({
@@ -668,13 +864,13 @@ function WithdrawalRequestForm({ data, onSaved }) {
     submit({ student_id: data.student.id, ...form });
   }
 
-  const steps = ["Request Submitted", "Dean Review", "Approved Follow-through", "Requirements Submitted", "Staff / Fee Check", "Registrar Update", "Withdrawn"];
-  const activeIndex = existing?.status === "Withdrawn Confirmed" ? 6 : existing?.status === "Requirements Submitted" ? 3 : existing?.dean_decision === "Approved" ? 2 : existing ? 1 : 0;
-  const followThrough = existing?.dean_decision === "Approved" && existing?.status !== "Withdrawn Confirmed";
+  const withdrawalSteps = withdrawalTimelineSteps(existing?.status);
+  const followThrough = existing?.dean_decision === "Approved" && existing?.status === "Requirements Pending";
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {existing && <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Submitted withdrawal request</p><p className="text-xs text-slate-500">Request date {formatDate(existing.created_at)} · effective {existing.effective_term || "term pending"}</p></div><StatusBadge value={existing.status} dot={false} /></div><div className="mt-3 flex flex-wrap gap-1.5">{steps.map((step, index) => <span key={step} className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${index === activeIndex ? "bg-brand-600 text-white" : index < activeIndex ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-400"}`}>{step}</span>)}</div>{existing.dean_decision === "Denied" && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">The Dean denied this request. Your lifecycle standing remains Active.</p>}</div>}
+      {existing && <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Submitted withdrawal request</p><p className="text-xs text-slate-500">Request date {formatDate(existing.created_at)} · effective {existing.effective_term || "term pending"}</p></div><StatusBadge value={existing.status} dot={false} /></div>{existing.dean_decision === "Denied" && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">The Dean denied this request. Your lifecycle standing remains Active.</p>}</div>}
+      <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
       {!followThrough && !existing && <>
       <Field label="Effective term" required>
         <Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 Term 1" />
@@ -685,7 +881,8 @@ function WithdrawalRequestForm({ data, onSaved }) {
       <RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
       <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label="Submit withdrawal request" />
       </>}
-      {followThrough && <><p className="text-sm text-slate-600">The Dean approved your request. Complete the required withdrawal form/clearance steps, then upload the form and proof for staff verification.</p><RequestPdfUpload requestType="withdrawal" label="Completed withdrawal form and proof PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, proof_attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.proof_attachment_id} disabledHint={!form.proof_attachment_id ? "Upload the completed form and proof first." : ""} label="Submit withdrawal requirements" /></>}
+      {existing?.status === "Approved - Follow-through" && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">The Dean approved your request. Wait for the Academic Coordinator and Graduate School staff to record the effective-term follow-through and notify you to complete the requirements.</p>}
+      {followThrough && <><p className="text-sm text-slate-600">The approved-request follow-through is complete. Finish the required withdrawal form/clearance steps, then upload the form and proof for staff verification.</p><RequestPdfUpload requestType="withdrawal" label="Completed withdrawal form and proof PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, proof_attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.proof_attachment_id} disabledHint={!form.proof_attachment_id ? "Upload the completed form and proof first." : ""} label="Submit withdrawal requirements" /></>}
     </form>
   );
 }
@@ -693,11 +890,21 @@ function WithdrawalRequestForm({ data, onSaved }) {
 function PracticumRequestForm({ data, onSaved }) {
   const existing = data.practicum_record;
   const eligibility = data.practicum_eligibility || {};
-  const timeline = data.practicum_timeline || existing?.timeline || [];
+  const status = existing?.status || "Not Submitted";
+  const latestReturn = (data.workflow_messages || []).find((message) => message.transaction_slug === "practicum" && message.recipient_role === "Student" && message.action_type === "return" && message.status === "Open");
+  const returned = status === "Returned for Clarification";
+  const completionStatuses = new Set(["Practicum In Progress", "Hours Incomplete", "Additional Certificates Requested"]);
+  const returnedToCompletion = returned && (["Practicum In Progress", "Hours Incomplete", "Documents Submitted", "Documents Under Review", "Additional Certificates Requested", "Completed"].includes(latestReturn?.previous_status) || Boolean(existing?.certificate_attachment));
+  const moaEditable = !existing || (returned && !returnedToCompletion);
+  const completionEditable = completionStatuses.has(status) || returnedToCompletion;
+  const moaPending = ["MOA Submitted", "MOA Received", "MOA Under Review"].includes(status);
+  const documentsPending = ["Documents Submitted", "Documents Under Review"].includes(status);
+  const reviewComplete = ["Completed", "Report Sent to Dean", "Dean Reviewed"].includes(status);
   const [form, setForm] = useState({
     attachment_id: existing?.moa_attachment?.id || null,
     certificate_attachment_id: existing?.certificate_attachment?.id || null,
     practicum_site: existing?.practicum_site || "",
+    supervisor_name: existing?.supervisor_name || "",
     required_hours: existing?.required_hours || 200,
     completed_hours: existing?.completed_hours || 0,
     certificate_count: existing?.certificate_count || 0,
@@ -711,6 +918,7 @@ function PracticumRequestForm({ data, onSaved }) {
       attachment_id: existing?.moa_attachment?.id || null,
       certificate_attachment_id: existing?.certificate_attachment?.id || null,
       practicum_site: existing?.practicum_site || "",
+      supervisor_name: existing?.supervisor_name || "",
       required_hours: existing?.required_hours || 200,
       completed_hours: existing?.completed_hours || 0,
       certificate_count: existing?.certificate_count || 0,
@@ -723,75 +931,45 @@ function PracticumRequestForm({ data, onSaved }) {
     submit({
       student_id: data.student.id,
       ...form,
-      moa_uploaded: Boolean(form.attachment_id),
-      moa_status: form.attachment_id ? "Uploaded" : "Missing",
-      document_status: form.certificate_attachment_id ? "Pending Review" : "Missing",
     });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><p className="text-sm font-semibold text-ink">Practicum eligibility</p><p className="mt-0.5 text-xs text-slate-500">Automatically checked from your monitoring sheet and research milestones.</p></div>
-          <StatusBadge value={eligibility.status || "Not Eligible"} dot={false} />
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {(eligibility.checklist || []).map((item) => (
-            <div key={item.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
-              <span className="font-medium text-slate-600">{item.label}</span>
-              <span className={`font-bold ${item.complete ? "text-brand-700" : "text-red-600"}`}>{item.required ? `${item.actual}/${item.required}` : item.complete ? "Complete" : "Incomplete"}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      {existing && (
-        <div className="rounded-xl border border-slate-100 bg-white px-3.5 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-ink">{existing.practicum_site || "Practicum site pending"}</p>
-            <StatusBadge value={existing.status} dot={false} />
-          </div>
-          <p className="mt-1 text-xs text-slate-500">{existing.completed_hours}/{existing.required_hours} hours · certificates: {existing.certificate_count}</p>
-        </div>
-      )}
-      <div>
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Status timeline</p>
-        <div className="flex flex-wrap gap-1.5">
-          {timeline.map((step) => <span key={step.label} className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold ${step.state === "current" ? "bg-brand-600 text-white" : step.state === "complete" ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-400"}`}>{step.label}</span>)}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Practicum site / company" required>
-          <Input value={form.practicum_site} onChange={set("practicum_site")} required />
-        </Field>
-        <Field label="Required hours" required>
-          <Input type="number" min="1" value={form.required_hours} readOnly aria-readonly="true" title="Set by the Graduate School requirement" />
-        </Field>
-        <Field label="Completed hours" required>
-          <Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required />
-        </Field>
-        <Field label="Number of certificates">
-          <Input type="number" min="0" value={form.certificate_count} onChange={set("certificate_count")} />
-        </Field>
-      </div>
-      <RequestPdfUpload requestType="practicum" label="1 · Practicum MOA PDF (separate upload)" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-      <RequestPdfUpload requestType="practicum" label="2 · Completion certificates/forms/hours proof PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />
-      <Field label="Remarks">
-        <Textarea value={form.remarks} onChange={set("remarks")} />
-      </Field>
-      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || !eligibility.eligible} disabledHint={!eligibility.eligible ? "Complete all 6/9/6/21-unit and research-stage eligibility requirements first." : !form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label="Submit practicum record" />
+      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current practicum stage</p><p className="mt-1 text-xs text-slate-500">Only the requirements due now can be edited. Completed submissions stay available below.</p></div><StatusBadge value={status} dot={false} /></div></div>
+
+      <StageCard number={1} title="Eligibility Check / Pre-Practicum Requirements" state={eligibility.eligible ? "complete" : "pending"} helper="Automatically checked from your monitoring sheet and research milestones.">
+        <div className="grid gap-2 sm:grid-cols-2">{(eligibility.checklist || []).map((item) => <div key={item.key} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs"><span className="font-medium text-slate-600">{item.label}</span><span className={`font-bold ${item.passed === true ? "text-brand-700" : item.passed === false ? "text-red-600" : "text-amber-700"}`}>{item.status || (item.complete ? "Passed" : "Not met")}</span></div>)}</div>
+      </StageCard>
+
+      <StageCard number={2} title="MOA Submission" state={moaEditable ? (returned ? "returned" : "active") : moaPending ? "pending" : existing?.moa_attachment ? "complete" : "locked"} helper={moaEditable ? "What you need to submit now: practicum site details and the signed MOA PDF." : moaPending ? "Your MOA is saved and waiting for staff / Academic Coordinator review." : "Completed MOA information is read-only while you continue to the next stage."}>
+        {moaEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Practicum site / company" required><Input value={form.practicum_site} onChange={set("practicum_site")} required /></Field><Field label="Supervisor name"><Input value={form.supervisor_name} onChange={set("supervisor_name")} /></Field></div><RequestPdfUpload requestType="practicum" label="Practicum MOA PDF" initialAttachment={existing?.moa_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks"><Textarea value={form.remarks} onChange={set("remarks")} /></Field>{!eligibility.eligible && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Your monitoring record still needs eligibility verification. You may submit the MOA now for Graduate School recording.</p>}<SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label={returned ? "Resubmit MOA stage" : "Submit MOA stage"} /></div> : <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase text-slate-400">Practicum site</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.practicum_site || "Not provided"}</p></div><div><p className="text-xs font-bold uppercase text-slate-400">Supervisor</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.supervisor_name || "Not provided"}</p></div></div>{existing?.moa_attachment && <SavedWorkflowFiles files={[existing.moa_attachment]} />}</div>}
+      </StageCard>
+
+      <StageCard number={3} title="Practicum Document Submission" state={completionEditable ? (returned ? "returned" : "active") : documentsPending ? "pending" : existing?.certificate_attachment ? "complete" : "locked"} helper={completionEditable ? "What you need to submit now: completed hours and one PDF containing the required completion documents." : documentsPending ? "Your completion documents are saved and under review." : "Available after the MOA is approved and the practicum is marked in progress."}>
+        {completionEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-3"><Field label="Required hours"><Input type="number" value={form.required_hours} readOnly aria-readonly="true" /></Field><Field label="Completed hours" required><Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required /></Field><Field label="Number of certificates"><Input type="number" min="0" value={form.certificate_count} onChange={set("certificate_count")} /></Field></div><RequestPdfUpload requestType="practicum" label="Completion certificates / forms / hours proof PDF" initialAttachment={existing?.certificate_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.certificate_attachment_id} disabledHint={!form.certificate_attachment_id ? "Upload the completion documents before submitting." : ""} label={returned ? "Resubmit completion stage" : "Submit completion stage"} /></div> : existing?.certificate_attachment ? <div className="space-y-3"><p className="text-sm text-slate-600">{existing.completed_hours}/{existing.required_hours} hours · {existing.certificate_count} certificate(s)</p><SavedWorkflowFiles files={[existing.certificate_attachment]} /></div> : null}
+      </StageCard>
+
+      <StageCard number={4} title="Review / Approval" state={reviewComplete ? "complete" : documentsPending ? "pending" : "locked"} helper={documentsPending ? "Graduate School staff and the Academic Coordinator are checking the submitted hours and documents." : reviewComplete ? "The completion evidence was accepted." : "Available after Step 3 is submitted."} />
+      <StageCard number={5} title="Completion / Final Verification" state={status === "Dean Reviewed" ? "complete" : ["Completed", "Report Sent to Dean"].includes(status) ? "pending" : "locked"} helper={status === "Dean Reviewed" ? "Final practicum monitoring review is complete." : status === "Report Sent to Dean" ? "The status report is awaiting Dean review." : "Available after the completion review is approved."} />
+
+      {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} empty="No practicum files submitted yet." />}
     </form>
   );
 }
 
 function GraduationRequestForm({ data, onSaved }) {
+  const existing = data.graduation_endorsement;
   const [form, setForm] = useState({
-    attachment_id: data.graduation_endorsement?.request_attachment?.id || null,
-    review_window: data.graduation_endorsement?.review_window || "AY 2026-2027 Graduation Review",
+    attachment_id: existing?.request_attachment?.id || null,
+    review_window: existing?.review_window || "AY 2026-2027 Graduation Review",
   });
   const { busy, error, message, submit } = useSubmitRequest("graduation", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const eligibility = data.graduation_eligibility || {};
+  const status = existing?.endorsement_status || "Not Submitted";
+  const applicationEditable = !existing || ["Not Eligible", "Returned for Clarification"].includes(status);
+  const returned = status === "Returned for Clarification";
   const missing = [
     ...(eligibility.missing_coursework || []).map((item) => `Coursework: ${item}`),
     ...(eligibility.missing_research_requirements || []).map((item) => `Research: ${item}`),
@@ -803,26 +981,20 @@ function GraduationRequestForm({ data, onSaved }) {
     submit({ student_id: data.student.id, ...form });
   }
 
+  useEffect(() => setForm({ attachment_id: existing?.request_attachment?.id || null, review_window: existing?.review_window || "AY 2026-2027 Graduation Review" }), [data.student.id, existing?.id, existing?.updated_at]);
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field label="Review window / term" required>
-        <Input value={form.review_window} onChange={set("review_window")} required />
-      </Field>
-      <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-ink">Monitoring eligibility recommendation</p>
-          <StatusBadge value={eligibility.eligible ? "Ready for Dean Review" : "Not Eligible"} dot={false} />
-        </div>
-        {missing.length ? (
-          <ul className="mt-2 space-y-1 text-xs text-slate-500">
-            {missing.slice(0, 8).map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        ) : (
-          <p className="mt-2 text-xs text-slate-500">No missing requirements are currently flagged by the monitoring layer.</p>
-        )}
-      </div>
-      <RequestPdfUpload requestType="graduation" label="Optional graduation endorsement/supporting PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-      <SubmitState busy={busy} error={error} message={message} label="Submit graduation endorsement request" />
+      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current graduation stage</p><p className="mt-1 text-xs text-slate-500">Your application stays visible while each reviewing office completes its part.</p></div><StatusBadge value={status} dot={false} /></div></div>
+      <StageCard number={1} title="Application / Review Window" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: the review window and any supporting graduation PDF." : "Your submitted application is saved and read-only during review."}>
+        {applicationEditable ? <div className="space-y-4"><Field label="Review window / term" required><Input value={form.review_window} onChange={set("review_window")} required /></Field><RequestPdfUpload requestType="graduation" label="Optional graduation endorsement / supporting PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.review_window}</p><SavedWorkflowFiles files={existing?.attachments || []} /></div>}
+      </StageCard>
+      <StageCard number={2} title="Staff and Coursework Review" state={["For Review", "Coursework Review"].includes(status) ? "pending" : ["Research Review", "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar", "Registrar Received"].includes(status) ? "complete" : "locked"} helper={["For Review", "Coursework Review"].includes(status) ? "Graduate School staff and the Academic Coordinator are reviewing your coursework record." : "This stage opens after the application is submitted."} />
+      <StageCard number={3} title="Requirements Validation" state={["Research Review", "Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status) ? "pending" : ["Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar", "Registrar Received"].includes(status) ? "complete" : status === "Not Eligible" ? "returned" : "locked"} helper={status === "Not Eligible" ? "Resolve the listed missing requirements before resubmitting your application." : "Coursework, research, practicum, and completion records are checked here."}>
+        <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">Monitoring eligibility recommendation</p><StatusBadge value={eligibility.status || (eligibility.eligible ? "Eligible" : "Needs verification")} dot={false} /></div>{missing.length ? <ul className="mt-2 space-y-1 text-xs text-slate-500">{missing.slice(0, 8).map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500">No missing requirements are currently flagged by the monitoring layer.</p>}</div>
+      </StageCard>
+      <StageCard number={4} title="Dean Endorsement" state={status === "Returned for Revision" ? "returned" : status === "Ready for Dean Review" ? "pending" : ["Dean Approved", "Sent to Registrar", "Registrar Received"].includes(status) ? "complete" : "locked"} helper={status === "Returned for Revision" ? "The endorsement list was returned to staff for correction. Your own submission remains saved." : status === "Ready for Dean Review" ? "The prepared endorsement is awaiting Dean action." : "Available after eligibility is confirmed and staff prepares the endorsement."} />
+      <StageCard number={5} title="Registrar Handoff" state={status === "Registrar Received" ? "complete" : ["Dean Approved", "Sent to Registrar"].includes(status) ? "pending" : "locked"} helper={status === "Registrar Received" ? "Registrar receipt has been recorded." : status === "Dean Approved" ? "The Dean-approved list is ready for export and handoff." : "Available after Dean approval."} />
     </form>
   );
 }
@@ -867,10 +1039,12 @@ function ScheduleRequestForm({ studentId, onSaved }) {
   );
 }
 
-function RequestPdfUpload({ requestType, label, onUploaded }) {
-  const [attachment, setAttachment] = useState(null);
+function RequestPdfUpload({ requestType, label, onUploaded, initialAttachment = null }) {
+  const [attachment, setAttachment] = useState(initialAttachment);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => setAttachment(initialAttachment), [initialAttachment?.id]);
 
   async function upload(file) {
     if (!file) return;
