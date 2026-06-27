@@ -318,6 +318,7 @@ function MyCoursesPanel({ data, onSaved }) {
   const { busy, error, message, submit } = useSubmitRequest("course-drop", onSaved);
   const activeCourse = courses.find((course) => String(course.course_id) === String(activeCourseId));
   const selectedTerm = activeCourse?.term_label || data.current_term?.label || "Current term";
+  const courseStatusLabel = (status) => status === "Missing" ? "Not taken" : status;
 
   useEffect(() => {
     setActiveCourseId((current) => {
@@ -357,7 +358,7 @@ function MyCoursesPanel({ data, onSaved }) {
                 {courses.map((course) => (
                   <tr key={course.id} className="border-b border-slate-50">
                     <td className="px-4 py-2.5"><p className="font-semibold text-ink">{course.code}</p><p className="text-xs text-slate-500">{course.title}</p>{course.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
-                    <td className="px-3 py-2.5"><StatusBadge value={course.status} dot={false} /></td>
+                    <td className="px-3 py-2.5"><StatusBadge value={courseStatusLabel(course.status)} dot={false} /></td>
                     <td className="px-3 py-2.5"><p className="font-semibold text-ink">{course.grade_value || "No grade"}</p><p className="text-xs text-slate-400">{course.grade_status}</p></td>
                     <td className="px-3 py-2.5 text-slate-600">{course.term_label || "Not recorded"}</td>
                     <td className="px-3 py-2.5 text-slate-600">{course.remarks || (course.incomplete_deadline ? `Incomplete due ${formatDate(course.incomplete_deadline)}` : "—")}</td>

@@ -14,7 +14,7 @@ const DEMO = {
   faculty: { email: "faculty@gs.local", password: "DemoPass123!" },
 };
 
-const HOME = { staff: "/", academic_coordinator: "/workflow/practicum", research_coordinator: "/workflow/graduation", registrar: "/workflow/withdrawal", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
+const HOME = { staff: "/", academic_coordinator: "/workflow/course-audit", research_coordinator: "/workflow/graduation", registrar: "/workflow/withdrawal", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
 const LABEL = { staff: "Staff", dean: "Dean", student: "Student" };
 const STAFF_ACCOUNTS = [
   { role: "staff", label: "GS Staff", detail: "Intake and records" },

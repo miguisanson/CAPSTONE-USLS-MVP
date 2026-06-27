@@ -333,6 +333,7 @@ class AcademicTerm(db.Model):
     is_active_planning_term = db.Column(db.Boolean, default=False)
     planning_window_open = db.Column(db.Date)
     planning_window_close = db.Column(db.Date)
+    grade_submission_deadline = db.Column(db.Date)
     status = db.Column(db.String(20))
 
 
@@ -743,6 +744,7 @@ def term_dict(term: AcademicTerm) -> dict:
         "end_date": iso(term.end_date),
         "planning_window_open": iso(term.planning_window_open),
         "planning_window_close": iso(term.planning_window_close),
+        "grade_submission_deadline": iso(term.grade_submission_deadline),
         "status": term.status,
         "is_active_planning_term": bool(term.is_active_planning_term),
     }
@@ -1288,7 +1290,7 @@ def workflow_case_meta(slug: str, student_id: int) -> dict:
 def task_dict(task: Task) -> dict:
     action_url = None
     action_label = None
-    if task.title.startswith("Review course drop request"):
+    if task.title.startswith("Review course drop request") or task.title.startswith("Review overdue incomplete grade"):
         action_url = "/workflow/course-audit"
         action_label = "Open Course Audit"
     return {
@@ -1422,7 +1424,7 @@ BACKOFFICE_ROLES = {
 }
 
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"practicum", "graduation", "withdrawal"},
+    "academic_coordinator": {"course-audit", "practicum", "graduation", "withdrawal"},
     "research_coordinator": {"graduation"},
     "registrar": {"graduation", "withdrawal"},
 }
@@ -1520,6 +1522,7 @@ def workflow_actor_label(account: UserAccount) -> str:
 # deterministically from recorded transactions, never by the assistant/LLM.
 STALL_WARN_DAYS = 120
 STALL_HIGH_DAYS = 210
+INCOMPLETE_REVIEW_GRACE_DAYS = 7
 
 
 def student_indicators(student: Student) -> dict:
@@ -2236,6 +2239,7 @@ def register_routes(app: Flask) -> None:
                 end_date=parse_api_date(data.get("end_date")),
                 planning_window_open=parse_api_date(data.get("planning_window_open")),
                 planning_window_close=parse_api_date(data.get("planning_window_close")),
+                grade_submission_deadline=parse_api_date(data.get("grade_submission_deadline")),
                 status=(data.get("status") or "").strip() or None,
             )
         except ValueError as exc:
@@ -2259,7 +2263,7 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "Term label must look like AY 2026-2027 Term 1."}), 400
             term.label = label
         try:
-            for field in ["start_date", "end_date", "planning_window_open", "planning_window_close"]:
+            for field in ["start_date", "end_date", "planning_window_open", "planning_window_close", "grade_submission_deadline"]:
                 if field in data:
                     setattr(term, field, parse_api_date(data.get(field)))
         except ValueError as exc:
@@ -2292,6 +2296,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/dashboard")
     @require_api_login("staff")
     def dashboard():
+        sync_overdue_incomplete_alerts(commit=True)
         return jsonify(dashboard_stats(request.args))
 
     @app.route("/api/dashboard/drilldown")
@@ -2386,6 +2391,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/students/<int:student_id>")
     @require_api_login("staff")
     def student_detail(student_id: int):
+        sync_overdue_incomplete_alerts(commit=True)
         student = Student.query.get_or_404(student_id)
         audit = compute_course_audit(student)
         research_case, research_progress = sync_research_progress(student)
@@ -2494,6 +2500,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/student-portal/context")
     @require_api_login("student")
     def student_portal_context():
+        sync_overdue_incomplete_alerts(commit=True)
         account = current_account()
         student_id = account.student_id if account else None
         if not student_id:
@@ -2537,6 +2544,7 @@ def register_routes(app: Flask) -> None:
         practicum_eligibility_result = practicum_eligibility(student)
         withdrawal_application = latest_withdrawal_application(student.id)
         graduation_endorsement = latest_graduation_endorsement(student.id)
+        current_term = get_active_term()
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
@@ -2560,6 +2568,7 @@ def register_routes(app: Flask) -> None:
                 "stages": STAGES,
                 "stage_index": STAGES.index(portal_student["current_stage"]) if portal_student["current_stage"] in STAGES else 0,
                 "course_audit": course_audit_dict(audit),
+                "current_term": term_dict(current_term) if current_term else None,
                 "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
                 "course_drop_requests": [
                     course_drop_request_dict(item, include_student=False)
@@ -3341,6 +3350,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/tasks")
     @require_api_login(*BACKOFFICE_ROLES)
     def tasks_list():
+        sync_overdue_incomplete_alerts(commit=True)
         owner = request.args.get("owner", "").strip()
         status = request.args.get("status", "").strip()
         query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
@@ -3366,6 +3376,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports")
     @require_api_login("staff")
     def reports():
+        sync_overdue_incomplete_alerts(commit=True)
         return jsonify(reports_payload(request.args))
 
     @app.route("/api/graduation/endorsed.csv", methods=["POST"])
@@ -4048,13 +4059,17 @@ def register_routes(app: Flask) -> None:
             .all()
         )
         students = []
+        active_term = get_active_term()
+        active_term_label = active_term.label if active_term else ""
+        class_statuses = {"Enrolled", "Current", "Completed", "Incomplete", "Dropped", "Failed"}
         for rec, s in rows:
-            in_selected_term = not term_filter or (rec.term_label or "") == term_filter
+            record_term_label = rec.term_label or (active_term_label if rec.status in class_statuses else "")
+            in_selected_term = not term_filter or record_term_label == term_filter
             status = rec.status if in_selected_term else "Missing"
             students.append({
                 "student_id": s.id, "name": s.name, "student_number": s.student_number,
                 "program_code": s.program.code, "status": status,
-                "completed": status == "Completed", "term_label": rec.term_label if in_selected_term else term_filter,
+                "completed": status == "Completed", "term_label": record_term_label if in_selected_term else term_filter,
                 "grade_value": (rec.grade_value or "") if in_selected_term else "",
                 "grade_status": (rec.grade_status or "No Grade") if in_selected_term else "No Grade",
                 "incomplete_deadline": rec.incomplete_deadline.isoformat() if in_selected_term and rec.incomplete_deadline else "",
@@ -4077,7 +4092,8 @@ def register_routes(app: Flask) -> None:
         grade_statuses = data.get("grade_statuses") or {}
         deadlines = data.get("incomplete_deadlines") or {}
         remarks = data.get("remarks") or {}
-        term = (data.get("term") or "").strip()
+        active_term = get_active_term()
+        term = (data.get("term") or "").strip() or (active_term.label if active_term else "")
         account = current_account()
         actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
         allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Dropped", "Missing", "Failed"}
@@ -4127,9 +4143,7 @@ def register_routes(app: Flask) -> None:
                 rec.grade_status = "Incomplete"
                 deadline_value = str(deadlines.get(sid_str, deadlines.get(sid, "")) or "").strip()
                 rec.incomplete_deadline = parse_date(deadline_value) if deadline_value else rec.incomplete_deadline
-                add_task(student.id, f"Resolve incomplete grade for {course.code}", "Academic Coordinator", 14, 35)
-                if rec.incomplete_deadline and rec.incomplete_deadline < date.today():
-                    add_task(student.id, f"Review overdue incomplete grade for {course.code}", "Academic Coordinator", 1, 60)
+                ensure_task(student.id, f"Resolve incomplete grade for {course.code}", "Academic Coordinator", date.today() + timedelta(days=14), 35)
             elif new_status == "Failed":
                 rec.grade_status = "Failed"
                 rec.resolved_at = rec.resolved_at or now_utc()
@@ -4153,6 +4167,7 @@ def register_routes(app: Flask) -> None:
                     f"{course.code} marked {new_status}",
                     "Academic Coordinator", f"End-of-term course audit for {course.code}.")
         if changed:
+            sync_overdue_incomplete_alerts()
             status_summary = ", ".join(f"{status}: {count}" for status, count in sorted(status_counts.items()))
             add_log(
                 "course-audit",
@@ -4420,6 +4435,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/decision-support")
     @require_api_login("staff")
     def decision_support():
+        sync_overdue_incomplete_alerts(commit=True)
         return jsonify(portfolio_recommendations())
 
     # RAG-style policy/case guidance endpoint.
@@ -4538,11 +4554,16 @@ def register_routes(app: Flask) -> None:
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
             return jsonify({"error": str(exc)}), 400
+        message = "Saved. The student record, queue, and monitoring indicators were updated."
+        if slug == "student-handoff" and student_id:
+            account = UserAccount.query.filter_by(student_id=student_id, role="student", active=True).first()
+            if account:
+                message = f"Saved. Student portal account created: {account.email} / {SIM_STUDENT_PASSWORD}."
         return jsonify(
             {
                 "ok": True,
                 "student_id": student_id,
-                "message": "Saved. The student record, queue, and monitoring indicators were updated.",
+                "message": message,
             }
         )
 
@@ -6370,6 +6391,91 @@ def add_task(student_id: int, title: str, owner: str, days: int, priority: int =
     )
 
 
+def ensure_task(student_id: int, title: str, owner: str, due_at: date, priority: int = 20, status: str = "Pending") -> Task:
+    existing = (
+        Task.query.filter(
+            Task.student_id == student_id,
+            Task.title == title,
+            Task.owner_role == owner,
+            Task.status.in_(["Pending", "Overdue"]),
+        )
+        .order_by(Task.due_at.asc(), Task.id.asc())
+        .first()
+    )
+    if existing:
+        existing.due_at = min(existing.due_at, due_at)
+        existing.priority = max(existing.priority or 0, priority)
+        if status == "Overdue" or existing.due_at < date.today():
+            existing.status = "Overdue"
+        return existing
+    task = Task(
+        student_id=student_id,
+        title=title,
+        owner_role=owner,
+        due_at=due_at,
+        priority=priority,
+        status=status,
+    )
+    db.session.add(task)
+    return task
+
+
+def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
+    """Flag overdue INC records without changing the grade outcome."""
+    today = date.today()
+    changed = 0
+    records = (
+        CourseRecord.query.join(Student)
+        .join(Course)
+        .filter(
+            CourseRecord.status == "Incomplete",
+            CourseRecord.incomplete_deadline.isnot(None),
+            CourseRecord.incomplete_deadline < today,
+        )
+        .all()
+    )
+    for record in records:
+        if not record.student or not record.course:
+            continue
+        review_title = f"Review overdue incomplete grade for {record.course.code}"
+        student_title = f"Complete overdue incomplete grade for {record.course.code}"
+        review_due = record.incomplete_deadline + timedelta(days=INCOMPLETE_REVIEW_GRACE_DAYS)
+        review_status = "Overdue" if review_due < today else "Pending"
+        ensure_task(record.student_id, review_title, "Academic Coordinator", review_due, 75, review_status)
+        ensure_task(record.student_id, student_title, "Student", record.incomplete_deadline, 65, "Overdue")
+        note = (
+            f"{record.course.code} incomplete deadline passed on {record.incomplete_deadline.isoformat()}. "
+            f"Academic Coordinator review is due {review_due.isoformat()} if the grade remains incomplete."
+        )
+        if note not in (record.remarks or ""):
+            record.remarks = f"{record.remarks}\n{note}".strip() if record.remarks else note
+            changed += 1
+        record.updated_at = now_utc()
+        result = f"{record.course.code} incomplete deadline overdue"
+        already_logged = TransactionLog.query.filter_by(
+            transaction_slug="course-audit",
+            student_id=record.student_id,
+            source_reference="Incomplete grade deadline monitor",
+            result=result,
+        ).first()
+        if not already_logged:
+            add_log(
+                "course-audit",
+                record.student_id,
+                "System",
+                "Incomplete grade deadline monitor",
+                result,
+                "Academic Coordinator",
+                note,
+                previous_status="Incomplete",
+                new_status="Incomplete",
+            )
+            changed += 1
+    if commit and changed:
+        db.session.commit()
+    return changed
+
+
 # ---------------------------------------------------------------------------
 # Student Handoff via file upload — AC Student Monitoring sheet importer
 # ---------------------------------------------------------------------------
@@ -6643,7 +6749,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
         if row.get("comprehensive_exam_passed"):
             student.comprehensive_exam_status = "Passed"
         if is_new or not student.email:
-            student.email = f"{str(row['idno']).lower()}@student.usls.edu.ph"
+            student.email = unique_student_email(row["first_name"], row["last_name"], row["idno"], student.id if not is_new else None)
         completed = sum(1 for v in row["subjects"].values() if v)
         student.current_stage = _stage_from_sheet(
             row["milestones"], completed, row.get("comprehensive_exam_passed", False)
@@ -6771,7 +6877,7 @@ def handle_student_handoff(data: MultiDict) -> int:
         student_number=student_number,
         first_name=first_name,
         last_name=last_name,
-        email=(data.get("email") or "").strip() or f"{student_number.lower()}@student.usls.edu.ph",
+        email=(data.get("email") or "").strip().lower() or unique_student_email(first_name, last_name, student_number),
         program_id=program.id,
         entry_year=int(data.get("entry_year") or date.today().year),
         current_stage="Admission",
@@ -6780,6 +6886,7 @@ def handle_student_handoff(data: MultiDict) -> int:
     )
     db.session.add(student)
     db.session.flush()
+    account = ensure_student_account(student, student.email)
     sync_student_curriculum(student)
 
     term = AcademicTerm.query.get(int(data["term_id"]))
@@ -6825,7 +6932,8 @@ def handle_student_handoff(data: MultiDict) -> int:
         "GS Staff",
         f"Program: {program.code}; Compared {len(submitted_onboarding)} received item(s) against "
         f"{len(onboarding_requirements())} required item(s). Missing: "
-        f"{', '.join(missing_items) if missing_items else 'None'}",
+        f"{', '.join(missing_items) if missing_items else 'None'}. "
+        f"Student portal account: {account.email}.",
     )
     return student.id
 
@@ -9907,6 +10015,7 @@ def ensure_curriculum_offering_schema() -> None:
             "is_active_planning_term": "BOOLEAN DEFAULT 0",
             "planning_window_open": "DATE",
             "planning_window_close": "DATE",
+            "grade_submission_deadline": "DATE",
             "status": "VARCHAR(20)",
         }
         for name, sql_type in additions.items():
@@ -10511,11 +10620,43 @@ def ensure_faculty_demo_profiles() -> int:
 
 SIM_PROGRAM_CODE = "MAEDS"
 SIM_STUDENT_PASSWORD = "DemoPass123!"
+STUDENT_EMAIL_DOMAIN = os.getenv("STUDENT_EMAIL_DOMAIN", "student.usls.edu.ph")
+
+
+def _email_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", ".", (value or "").strip().lower()).strip(".")
+    return slug or "student"
+
+
+def default_student_email(first_name: str, last_name: str, student_number: str = "") -> str:
+    first = _email_slug(first_name)
+    last = _email_slug(last_name)
+    local = f"{first}.{last}" if first != "student" or last != "student" else _email_slug(student_number)
+    return f"{local}@{STUDENT_EMAIL_DOMAIN}"
+
+
+def unique_student_email(first_name: str, last_name: str, student_number: str = "", current_student_id: int | None = None) -> str:
+    base = default_student_email(first_name, last_name, student_number)
+    local, _, domain = base.partition("@")
+    candidate = base
+    suffix = 2
+    while True:
+        with db.session.no_autoflush:
+            student_query = Student.query.filter(func.lower(Student.email) == candidate.lower())
+            if current_student_id:
+                student_query = student_query.filter(Student.id != current_student_id)
+            student_exists = student_query.first() is not None
+            account_exists = UserAccount.query.filter(func.lower(UserAccount.email) == candidate.lower()).first() is not None
+        if not student_exists and not account_exists:
+            return candidate
+        candidate = f"{local}{suffix}@{domain}"
+        suffix += 1
 
 
 def ensure_student_account(student: Student, email: str, password: str = SIM_STUDENT_PASSWORD) -> UserAccount:
     # Idempotently link (or create) a student-portal account so a handed-off student
     # can sign in to upload concept papers and file LOA / withdrawal requests.
+    email = (email or student.email or "").strip().lower()
     account = UserAccount.query.filter_by(email=email).first()
     if not account:
         account = UserAccount(

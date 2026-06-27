@@ -9,6 +9,7 @@ const EMPTY_FORM = {
   end_date: "",
   planning_window_open: "",
   planning_window_close: "",
+  grade_submission_deadline: "",
   status: "upcoming",
 };
 
@@ -55,6 +56,7 @@ export default function TermManagement() {
       end_date: term.end_date || "",
       planning_window_open: term.planning_window_open || "",
       planning_window_close: term.planning_window_close || "",
+      grade_submission_deadline: term.grade_submission_deadline || "",
       status: term.status || "upcoming",
     });
     setFormOpen(true);
@@ -88,8 +90,8 @@ export default function TermManagement() {
     }
   }
 
-  async function setActive(term) {
-    if (term.is_active_planning_term) return;
+  async function setActive(term, checked = true) {
+    if (!checked || term.is_active_planning_term) return;
     if (!window.confirm(`Set ${term.label} as the active planning term?`)) return;
     setBusy(`active-${term.id}`);
     setError("");
@@ -116,7 +118,7 @@ export default function TermManagement() {
             <div>
               <h1 className="font-display text-2xl font-semibold text-ink">Term management</h1>
               <p className="mt-1 text-sm text-slate-600">
-                Maintain academic terms and choose the active planning term used by demand and planning pages.
+                Maintain academic terms, planning windows, and grade submission deadlines.
               </p>
               <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
                 <p><span className="font-bold uppercase tracking-wide text-slate-400">Who uses it · </span>GS Staff</p>
@@ -157,6 +159,9 @@ export default function TermManagement() {
             <Field label="Planning closes">
               <input type="date" value={form.planning_window_close} onChange={setField("planning_window_close")} className="field-input" />
             </Field>
+            <Field label="Grade deadline">
+              <input type="date" value={form.grade_submission_deadline} onChange={setField("grade_submission_deadline")} className="field-input" />
+            </Field>
             <Field label="Stored status">
               <select value={form.status} onChange={setField("status")} className="field-input cursor-pointer">
                 <option value="upcoming">Upcoming</option>
@@ -186,10 +191,11 @@ export default function TermManagement() {
                   <th className="px-5 py-3">Term</th>
                   <th className="px-3 py-3">Dates</th>
                   <th className="px-3 py-3">Planning window</th>
+                  <th className="px-3 py-3">Grade deadline</th>
                   <th className="px-3 py-3">Window status</th>
                   <th className="px-3 py-3">Stored status</th>
-                  <th className="px-3 py-3">Active</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
+                  <th className="px-3 py-3 text-center">Active</th>
+                  <th className="px-5 py-3 text-right">Edit</th>
                 </tr>
               </thead>
               <tbody>
@@ -198,19 +204,24 @@ export default function TermManagement() {
                     <td className="px-5 py-3 font-semibold text-ink">{term.label}</td>
                     <td className="px-3 py-3 text-slate-600">{formatDate(term.start_date)} - {formatDate(term.end_date)}</td>
                     <td className="px-3 py-3 text-slate-600">{formatDate(term.planning_window_open)} - {formatDate(term.planning_window_close)}</td>
+                    <td className="px-3 py-3 text-slate-600">{formatDate(term.grade_submission_deadline)}</td>
                     <td className="px-3 py-3"><StatusBadge value={planningStatus(term)} dot /></td>
-                    <td className="px-3 py-3"><StatusBadge value={term.status || "Not set"} dot={false} /></td>
-                    <td className="px-3 py-3">
-                      {term.is_active_planning_term ? <StatusBadge value="Active planning" /> : <span className="text-xs text-slate-400">No</span>}
+                    <td className="px-3 py-3"><StatusBadge value={storedStatusLabel(term.status)} dot={false} /></td>
+                    <td className="px-3 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!term.is_active_planning_term}
+                        disabled={busy === `active-${term.id}`}
+                        onChange={(event) => setActive(term, event.target.checked)}
+                        className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`Set ${term.label} as active planning term`}
+                      />
+                      {term.is_active_planning_term && <span className="sr-only">Active planning term</span>}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => openEdit(term)} className="btn-ghost px-3 py-2">
-                          <Pencil className="h-4 w-4" /> Edit
-                        </button>
-                        <button type="button" onClick={() => setActive(term)} disabled={term.is_active_planning_term || busy === `active-${term.id}`} className="btn-primary">
-                          {busy === `active-${term.id}` ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <CheckCircle2 className="h-4 w-4" />}
-                          Set active
+                        <button type="button" onClick={() => openEdit(term)} className="btn-ghost px-3 py-2" aria-label={`Edit ${term.label}`} title="Edit">
+                          <Pencil className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
@@ -249,4 +260,14 @@ function planningStatus(term) {
   if (open && close && open <= today && close >= today) return "Open";
   if (close && close < today) return "Closed";
   return "Not set";
+}
+
+function storedStatusLabel(value) {
+  const labels = {
+    active: "Active",
+    upcoming: "Upcoming",
+    closed: "Closed",
+    archived: "Archived",
+  };
+  return labels[value] || "Not set";
 }

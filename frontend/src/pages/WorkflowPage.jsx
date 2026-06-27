@@ -1083,6 +1083,15 @@ function CourseRosterGradeWorkspace({ meta }) {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"]);
+  const activeTermLabel = useMemo(() => {
+    const terms = meta?.terms || [];
+    return terms.find((item) => item.is_active_planning_term)?.label || terms[0]?.label || "";
+  }, [meta?.terms]);
+  const selectedTerm = (meta?.terms || []).find((item) => item.label === term);
+
+  useEffect(() => {
+    if (!term && activeTermLabel) setTerm(activeTermLabel);
+  }, [activeTermLabel, term]);
 
   useEffect(() => {
     setSubjects([]);
@@ -1098,6 +1107,7 @@ function CourseRosterGradeWorkspace({ meta }) {
       status: student.status,
       grade_value: student.grade_value || "",
       grade_status: student.grade_status || "No Grade",
+      incomplete_deadline: student.incomplete_deadline || "",
       remarks: student.remarks || "",
     }])));
     setAddStudentId("");
@@ -1150,6 +1160,10 @@ function CourseRosterGradeWorkspace({ meta }) {
     setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), remarks: value } }));
   }
 
+  function updateIncompleteDeadline(id, value) {
+    setEdits((current) => ({ ...current, [id]: { ...(current[id] || {}), incomplete_deadline: value } }));
+  }
+
   async function save() {
     if (!roster) return;
     setSaving(true);
@@ -1159,14 +1173,15 @@ function CourseRosterGradeWorkspace({ meta }) {
       const build = (key, fallback = "") => Object.fromEntries(ids.map((id) => [id, edits[id]?.[key] || fallback]));
       const res = await api.saveCourseAudit({
         course_id: roster.course.id,
-        term,
+        term: term || activeTermLabel,
         statuses: build("status", "Missing"),
         grades: build("grade_value"),
         grade_statuses: build("grade_status", "No Grade"),
+        incomplete_deadlines: build("incomplete_deadline"),
         remarks: build("remarks"),
       });
       setResult(res);
-      hydrate(await api.courseAuditRoster(roster.course.id, term));
+      hydrate(await api.courseAuditRoster(roster.course.id, term || activeTermLabel));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1176,7 +1191,7 @@ function CourseRosterGradeWorkspace({ meta }) {
 
   return (
     <div className="space-y-5">
-      <SectionTitle title="Course enrollment and grade audit" subtitle="Select a term and subject, manage the class list, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
+      <SectionTitle title="Course enrollment and grade audit" subtitle="Select the term first, add students to the class roster, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Program">
           <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
@@ -1188,6 +1203,11 @@ function CourseRosterGradeWorkspace({ meta }) {
           <Select value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Current / all terms" options={(meta?.terms || []).map((item) => item.label)} />
         </Field>
       </div>
+      {selectedTerm?.grade_submission_deadline && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+          Grade submission deadline for {selectedTerm.label}: {formatDate(selectedTerm.grade_submission_deadline)}
+        </div>
+      )}
       <ErrorNote message={error} />
       {result && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-5 w-5" /> {result.message}</div>}
       {loading ? (
@@ -1214,7 +1234,9 @@ function CourseRosterGradeWorkspace({ meta }) {
                     <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                       <th className="px-4 py-2.5">Student</th>
                       <th className="px-3 py-2.5">Status</th>
+                      <th className="px-3 py-2.5">Term</th>
                       <th className="px-3 py-2.5">Grade</th>
+                      <th className="px-3 py-2.5">Incomplete deadline</th>
                       <th className="px-3 py-2.5">Remarks</th>
                       <th className="px-3 py-2.5 text-right">Actions</th>
                     </tr>
@@ -1227,7 +1249,9 @@ function CourseRosterGradeWorkspace({ meta }) {
                         <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
                           <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                           <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
+                          <td className="px-3 py-2.5 text-slate-600">{student.term_label || term || activeTermLabel || "Not recorded"}</td>
                           <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /></td>
+                          <td className="px-3 py-2.5"><Input type="date" value={edit.incomplete_deadline || ""} onChange={(event) => updateIncompleteDeadline(student.student_id, event.target.value)} disabled={status !== "Incomplete"} /></td>
                           <td className="px-3 py-2.5"><Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /></td>
                           <td className="relative px-3 py-2.5 text-right">
                             <button type="button" onClick={() => setOpenMenu(openMenu === student.student_id ? null : student.student_id)} className="inline-grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Open actions for ${student.name}`}><MoreVertical className="h-4 w-4" /></button>
