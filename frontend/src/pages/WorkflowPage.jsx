@@ -182,7 +182,7 @@ export default function WorkflowPage() {
     }
   }
 
-  if (!tx) return <Spinner label="Loading workflow…" />;
+  if (!tx) return <Spinner label="Loading workflowÃ¢â‚¬Â¦" />;
 
   const formProps = {
     meta,
@@ -216,11 +216,11 @@ export default function WorkflowPage() {
             <p className="mt-1 text-sm text-slate-600">{tx.short}</p>
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
               <p>
-                <span className="font-bold uppercase tracking-wide text-slate-400">Who uses it · </span>
+                <span className="font-bold uppercase tracking-wide text-slate-400">Who uses it Ã‚Â· </span>
                 {tx.actor}
               </p>
               <p>
-                <span className="font-bold uppercase tracking-wide text-slate-400">Data captured · </span>
+                <span className="font-bold uppercase tracking-wide text-slate-400">Data captured Ã‚Â· </span>
                 {tx.data}
               </p>
             </div>
@@ -297,7 +297,7 @@ export default function WorkflowPage() {
             )
           ) : loading && !context ? (
             <Card className="p-6">
-              <Spinner label="Loading workflow data…" />
+              <Spinner label="Loading workflow dataÃ¢â‚¬Â¦" />
             </Card>
           ) : error && !context ? (
             <Card className="p-6">
@@ -336,7 +336,7 @@ export default function WorkflowPage() {
                   <li key={log.id} className="rounded-xl border border-slate-100 p-3">
                     <p className="text-sm font-semibold text-ink">{log.result}</p>
                     <p className="text-xs text-slate-500">
-                      {log.student_name || log.source_reference || "Workflow"} · {formatDate(log.created_at)}
+                      {log.student_name || log.source_reference || "Workflow"} Ã‚Â· {formatDate(log.created_at)}
                     </p>
                     {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
                   </li>
@@ -383,7 +383,7 @@ function RequestQueue({ requests, selectedId, onPick, onClear }) {
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">{selected.name}</p>
               <p className="text-xs text-slate-500">
-                {selected.student_number} · {selected.program_code} · submitted {formatDate(selected.submitted_at)}
+                {selected.student_number} Ã‚Â· {selected.program_code} Ã‚Â· submitted {formatDate(selected.submitted_at)}
               </p>
             </div>
             <button type="button" onClick={onClear} className="btn-ghost shrink-0">
@@ -407,7 +407,7 @@ function RequestQueue({ requests, selectedId, onPick, onClear }) {
                   <StatusBadge value="Pending Review" dot={false} />
                 </div>
                 <p className="truncate text-xs text-slate-500">
-                  {r.student_number} · {r.program_code} · submitted {formatDate(r.submitted_at)}
+                  {r.student_number} Ã‚Â· {r.program_code} Ã‚Â· submitted {formatDate(r.submitted_at)}
                 </p>
               </div>
               <div className="col-span-12 min-w-0 text-sm text-slate-600 sm:col-span-5">
@@ -454,7 +454,7 @@ function SubmitButton({ submitting, children }) {
     <button type="submit" disabled={submitting} className="btn-primary w-full sm:w-auto">
       {submitting ? (
         <>
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Saving…
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> SavingÃ¢â‚¬Â¦
         </>
       ) : (
         children
@@ -464,7 +464,7 @@ function SubmitButton({ submitting, children }) {
 }
 
 // ---------------------------------------------------------------------------
-// Student Handoff — file upload (primary) with a manual fallback
+// Student Handoff Ã¢â‚¬â€ file upload (primary) with a manual fallback
 // ---------------------------------------------------------------------------
 function HandoffPanel(props) {
   return (
@@ -535,8 +535,8 @@ function HandoffImport({ context }) {
         title={isAudit ? "Update audits from monitoring sheet" : "Import from monitoring sheet"}
         subtitle={
           isAudit
-            ? "Upload the latest AC Student Monitoring sheet — each student's completed subjects are updated from it"
-            : "Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically"
+            ? "Upload the latest AC Student Monitoring sheet Ã¢â‚¬â€ each student's completed subjects are updated from it"
+            : "Upload the AC Student Monitoring Excel file Ã¢â‚¬â€ students, programs, and course audits are created automatically"
         }
         icon={FileSpreadsheet}
         action={
@@ -594,7 +594,7 @@ function HandoffImport({ context }) {
           <span className="btn-ghost cursor-pointer">{file ? "Choose a different file" : "Browse files"}</span>
         </label>
         <p className="mt-3 text-xs text-slate-400">
-          Expected format: AC Student Monitoring template — program in cell A1, one student per row.
+          Expected format: AC Student Monitoring template Ã¢â‚¬â€ program in cell A1, one student per row.
         </p>
       </div>
 
@@ -604,7 +604,7 @@ function HandoffImport({ context }) {
         <button type="button" onClick={runImport} disabled={!file || busy} className="btn-primary w-full sm:w-auto">
           {busy ? (
             <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Importing…
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> ImportingÃ¢â‚¬Â¦
             </>
           ) : (
             <>
@@ -622,7 +622,7 @@ function HandoffImport({ context }) {
         </button>
       </div>
       <p className="text-xs text-slate-400">
-        “Reset uploaded data” removes students/subjects added by sheet uploads so you can re-test the import. Seeded demo students are kept.
+        Ã¢â‚¬Å“Reset uploaded dataÃ¢â‚¬Â removes students/subjects added by sheet uploads so you can re-test the import. Seeded demo students are kept.
       </p>
 
       {result && (
@@ -659,9 +659,9 @@ function HandoffImport({ context }) {
               <ul className="space-y-2">
                 {result.duplicates.slice(0, 8).map((d) => (
                   <li key={`${d.incoming_student_number}-${d.matched_student.id}`} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                    <p className="font-semibold text-ink">{d.incoming_name || d.matched_student.name} · {d.incoming_student_number}</p>
+                    <p className="font-semibold text-ink">{d.incoming_name || d.matched_student.name} Ã‚Â· {d.incoming_student_number}</p>
                     <p className="text-xs text-slate-500">
-                      Student is in the system as {d.matched_student.name} · {d.matched_student.student_number}.
+                      Student is in the system as {d.matched_student.name} Ã‚Â· {d.matched_student.student_number}.
                     </p>
                   </li>
                 ))}
@@ -679,9 +679,9 @@ function HandoffImport({ context }) {
                   <ul className="space-y-2">
                 {result.conflicts.slice(0, 5).map((c) => (
                   <li key={`${c.incoming_student_number}-${c.matched_student.id}`} className="rounded-lg bg-white px-3 py-2 text-sm">
-                    <p className="font-semibold text-ink">{c.incoming_name || "Unnamed student"} · {c.incoming_student_number}</p>
+                    <p className="font-semibold text-ink">{c.incoming_name || "Unnamed student"} Ã‚Â· {c.incoming_student_number}</p>
                     <p className="text-xs text-slate-500">
-                      Possible match: {c.matched_student.name} · {c.matched_student.student_number}. Verify first; existing profile values are kept unless overwrite is selected.
+                      Possible match: {c.matched_student.name} Ã‚Â· {c.matched_student.student_number}. Verify first; existing profile values are kept unless overwrite is selected.
                     </p>
                   </li>
                 ))}
@@ -702,7 +702,7 @@ function HandoffImport({ context }) {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
                       <p className="text-xs text-slate-400">
-                        {s.student_number} · {s.program_code} · {s.stage} · {s.completed}/{s.total_subjects} subjects
+                        {s.student_number} Ã‚Â· {s.program_code} Ã‚Â· {s.stage} Ã‚Â· {s.completed}/{s.total_subjects} subjects
                       </p>
                     </div>
                     <Link
@@ -734,7 +734,7 @@ function HandoffImport({ context }) {
                 <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{upload.original_name}</p>
-                    <p className="text-xs text-slate-500">{upload.program} · {upload.rows} students · {formatDate(upload.uploaded_at)}</p>
+                    <p className="text-xs text-slate-500">{upload.program} Ã‚Â· {upload.rows} students Ã‚Â· {formatDate(upload.uploaded_at)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge value={upload.conflict_count ? `${upload.conflict_count} conflicts` : "No conflicts"} dot={false} />
@@ -748,14 +748,14 @@ function HandoffImport({ context }) {
                     <div className="space-y-2">
                       {upload.conflicts.map((conflict) => (
                         <div key={`${upload.id}-${conflict.incoming_student_number}`} className="rounded-lg bg-amber-50 p-3">
-                          <p className="text-sm font-semibold text-amber-900">{conflict.incoming_name} · {conflict.incoming_student_number}</p>
+                          <p className="text-sm font-semibold text-amber-900">{conflict.incoming_name} Ã‚Â· {conflict.incoming_student_number}</p>
                           <p className="mt-0.5 text-xs text-amber-800">Changed: {(conflict.differences || []).join(", ")}</p>
                           {conflict.category_comparison?.length > 0 && (
                             <div className="mt-2 grid grid-cols-3 gap-2">
                               {conflict.category_comparison.map((item) => (
                                 <div key={item.category} className="rounded-md bg-white px-2 py-1.5 text-center text-xs ring-1 ring-amber-100">
                                   <p className="font-bold text-slate-700">{item.category}</p>
-                                  <p className="text-slate-500">Current {item.current}u → Uploaded {item.uploaded}u</p>
+                                  <p className="text-slate-500">Current {item.current}u Ã¢â€ â€™ Uploaded {item.uploaded}u</p>
                                 </div>
                               ))}
                             </div>
@@ -788,7 +788,7 @@ function ResultStat({ label, value }) {
 }
 
 // ---------------------------------------------------------------------------
-// Student Handoff — manual entry (fallback)
+// Student Handoff Ã¢â‚¬â€ manual entry (fallback)
 // ---------------------------------------------------------------------------
 function HandoffForm({ meta, context, submit, submitting }) {
   const onboarding = context.onboarding_requirements || [];
@@ -815,7 +815,7 @@ function HandoffForm({ meta, context, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Or add a student manually" subtitle="One-off entry — compares received onboarding items against requirements" icon={UserPlus} />
+      <SectionTitle title="Or add a student manually" subtitle="One-off entry Ã¢â‚¬â€ compares received onboarding items against requirements" icon={UserPlus} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="First name" required>
           <Input value={form.first_name} onChange={set("first_name")} required />
@@ -828,7 +828,7 @@ function HandoffForm({ meta, context, submit, submitting }) {
             value={form.program_id}
             onChange={set("program_id")}
             required
-            options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
+            options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} Ã¢â‚¬â€ ${p.name}` }))}
           />
         </Field>
         <Field label="Entry term" required>
@@ -870,7 +870,7 @@ function HandoffForm({ meta, context, submit, submitting }) {
 }
 
 // ---------------------------------------------------------------------------
-// Course Audit — roster (by subject) or sheet upload
+// Course Audit Ã¢â‚¬â€ roster (by subject) or sheet upload
 // ---------------------------------------------------------------------------
 function CourseAuditPanel({ meta }) {
   const [tab, setTab] = useState("class");
@@ -1037,8 +1037,8 @@ function CourseDropReviewPanel() {
             <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-ink">{item.student?.name} · {item.course_code}</p>
-                  <p className="mt-1 text-xs text-slate-500">{item.course_title} · {item.term_label || "No term"} · submitted {formatDate(item.created_at)}</p>
+                  <p className="text-sm font-semibold text-ink">{item.student?.name} Ã‚Â· {item.course_code}</p>
+                  <p className="mt-1 text-xs text-slate-500">{item.course_title} Ã‚Â· {item.term_label || "No term"} Ã‚Â· submitted {formatDate(item.created_at)}</p>
                   <p className="mt-2 text-sm text-slate-600">{item.reason}</p>
                   {item.attachment && <a href={item.attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View attached PDF</a>}
                 </div>
@@ -1226,7 +1226,7 @@ function CourseRosterGradeWorkspace({ meta }) {
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
                 <p className="text-sm font-semibold text-ink">{roster.course.code} - {roster.course.title}</p>
-                <p className="text-xs text-slate-500">{term || "Current / all terms"} · {classStudents.length} student(s)</p>
+                <p className="text-xs text-slate-500">{term || "Current / all terms"} Ã‚Â· {classStudents.length} student(s)</p>
               </div>
               <div className="overflow-auto">
                 <table className="w-full text-sm">
@@ -1247,7 +1247,7 @@ function CourseRosterGradeWorkspace({ meta }) {
                       const status = edit.status || student.status;
                       return (
                         <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
-                          <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                          <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} Ã‚Â· {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                           <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
                           <td className="px-3 py-2.5 text-slate-600">{student.term_label || term || activeTermLabel || "Not recorded"}</td>
                           <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /></td>
@@ -1446,7 +1446,7 @@ function CourseClassWorkspace({ meta, mode }) {
                     return (
                       <tr key={student.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
                         {editing && <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[student.student_id]} onChange={() => toggle(student.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${student.name}`} /></td>}
-                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} Ã‚Â· {student.program_code}</p>{student.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                         <td className="px-3 py-2.5"><StatusBadge value={status} dot={false} /></td>
                         {mode === "grades" && <td className="px-3 py-2.5">{editing ? <Input value={edit.grade_value || ""} onChange={(event) => updateGrade(student.student_id, event.target.value)} placeholder="1.25, INC, 5.00" /> : <p className="font-semibold text-ink">{edit.grade_value || "No grade"}</p>}</td>}
                         <td className="px-3 py-2.5">{editing ? <Input value={edit.remarks || ""} onChange={(event) => updateRemarks(student.student_id, event.target.value)} placeholder="Optional" /> : <span className="text-slate-600">{edit.remarks || "-"}</span>}</td>
@@ -1570,10 +1570,10 @@ function CourseAuditRosterV2({ meta }) {
       <SectionTitle title="Course enrollment and grade audit" subtitle="Bulk enroll a class, then record completions, incompletes, failures, drops, and grades" icon={ClipboardCheck} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Program">
-          <Select value={programId} onChange={(e) => setProgramId(e.target.value)} placeholder="All programs" options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))} />
+          <Select value={programId} onChange={(e) => setProgramId(e.target.value)} placeholder="All programs" options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} Ã¢â‚¬â€ ${p.name}` }))} />
         </Field>
         <Field label="Subject" required>
-          <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))} />
+          <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} options={subjects.map((s) => ({ value: s.id, label: `${s.code} Ã¢â‚¬â€ ${s.title} (${s.completed}/${s.enrolled})` }))} />
         </Field>
         <Field label="Audit term">
           <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 Term 1" />
@@ -1589,7 +1589,7 @@ function CourseAuditRosterV2({ meta }) {
         <>
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
-              <p className="text-sm font-semibold text-ink">{roster.course.code} — {roster.course.title}</p>
+              <p className="text-sm font-semibold text-ink">{roster.course.code} Ã¢â‚¬â€ {roster.course.title}</p>
               <p className="text-xs text-slate-500">{selectedCount} of {roster.students.length} selected</p>
             </div>
             <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3">
@@ -1615,7 +1615,7 @@ function CourseAuditRosterV2({ meta }) {
                     return (
                       <tr key={s.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
                         <td className="px-3 py-2.5 text-center"><input type="checkbox" checked={!!selected[s.student_id]} onChange={() => toggle(s.student_id)} className="h-5 w-5 accent-brand-600 cursor-pointer" aria-label={`Select ${s.name}`} /></td>
-                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{s.name}</p><p className="text-xs text-slate-400">{s.student_number} · {s.program_code}</p>{s.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
+                        <td className="px-4 py-2.5"><p className="font-semibold text-ink">{s.name}</p><p className="text-xs text-slate-400">{s.student_number} Ã‚Â· {s.program_code}</p>{s.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
                         <td className="px-3 py-2.5"><Select value={edit.status || s.status} onChange={(e) => updateStudent(s.student_id, "status", e.target.value)} options={statuses} placeholder="" /></td>
                         <td className="px-3 py-2.5"><Input value={edit.grade_value || ""} onChange={(e) => updateStudent(s.student_id, "grade_value", e.target.value)} placeholder="e.g. 1.25" /></td>
                         <td className="px-3 py-2.5"><Input type="date" value={edit.incomplete_deadline || ""} onChange={(e) => updateStudent(s.student_id, "incomplete_deadline", e.target.value)} disabled={edit.status !== "Incomplete"} /></td>
@@ -1721,14 +1721,14 @@ function CourseAuditRoster({ meta }) {
             value={programId}
             onChange={(e) => setProgramId(e.target.value)}
             placeholder="All programs"
-            options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
+            options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} Ã¢â‚¬â€ ${p.name}` }))}
           />
         </Field>
         <Field label="Subject" required>
           <Select
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
-            options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))}
+            options={subjects.map((s) => ({ value: s.id, label: `${s.code} Ã¢â‚¬â€ ${s.title} (${s.completed}/${s.enrolled})` }))}
           />
         </Field>
         <Field label="Audit term" hint="Recorded on each updated subject">
@@ -1745,7 +1745,7 @@ function CourseAuditRoster({ meta }) {
       )}
 
       {loading ? (
-        <Spinner label="Loading class roster…" />
+        <Spinner label="Loading class rosterÃ¢â‚¬Â¦" />
       ) : !courseId ? (
         <EmptyState icon={ClipboardCheck} title="Choose a subject to audit" hint="Pick a subject above to see its enrolled students." />
       ) : roster && roster.students.length > 0 ? (
@@ -1753,7 +1753,7 @@ function CourseAuditRoster({ meta }) {
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
               <p className="text-sm font-semibold text-ink">
-                {roster.course.code} — {roster.course.title}
+                {roster.course.code} Ã¢â‚¬â€ {roster.course.title}
               </p>
               <p className="text-xs text-slate-500">
                 {completedCount} of {roster.students.length} marked completed
@@ -1777,7 +1777,7 @@ function CourseAuditRoster({ meta }) {
                   <tr key={s.student_id} className="border-b border-slate-50 hover:bg-brand-50/40">
                     <td className="px-4 py-2.5">
                       <p className="font-semibold text-ink">{s.name}</p>
-                      <p className="text-xs text-slate-400">{s.student_number} · {s.program_code}</p>
+                      <p className="text-xs text-slate-400">{s.student_number} Ã‚Â· {s.program_code}</p>
                     </td>
                     <td className="px-3 py-2.5">
                       <StatusBadge value={s.status} dot={false} />
@@ -1799,7 +1799,7 @@ function CourseAuditRoster({ meta }) {
           <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">
             {saving ? (
               <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Saving…
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> SavingÃ¢â‚¬Â¦
               </>
             ) : (
               "Save audit"
@@ -1814,7 +1814,7 @@ function CourseAuditRoster({ meta }) {
 }
 
 // ---------------------------------------------------------------------------
-// Course Audit (legacy single-student form — retained but unused)
+// Course Audit (legacy single-student form Ã¢â‚¬â€ retained but unused)
 // ---------------------------------------------------------------------------
 function CourseAuditForm({ context, studentId, submit, submitting }) {
   const audit = context.course_audit;
@@ -1856,7 +1856,7 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
             value={form.course_id}
             onChange={set("course_id")}
             required
-            options={(context.courses || []).map((c) => ({ value: c.id, label: `${c.code} — ${c.title}` }))}
+            options={(context.courses || []).map((c) => ({ value: c.id, label: `${c.code} Ã¢â‚¬â€ ${c.title}` }))}
           />
         </Field>
         <Field label="Status" required>
@@ -1878,7 +1878,7 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
             {context.offering_demand.slice(0, 6).map((row) => (
               <li key={row.code} className="flex items-center justify-between text-sm">
                 <span className="text-slate-700">
-                  <span className="font-semibold">{row.code}</span> · {row.title}
+                  <span className="font-semibold">{row.code}</span> Ã‚Â· {row.title}
                 </span>
                 <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{row.count} students</span>
               </li>
@@ -1905,7 +1905,10 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
   const panel = context.panel_status || {};
   const scheduleRequirement = requirements.find((item) => item.source_type?.includes("schedule"));
   const outcomeRequirement = requirements.find((item) => item.source_type === "system_defense_result");
-  const canRecordDefenseOutcome = user?.role === "staff" && outcomeRequirement && scheduleRequirement?.status === "Complete";
+  const nonOutcomeRequirements = requirements.filter((item) => item.source_type !== "system_defense_result");
+  const stageRequirementsComplete = nonOutcomeRequirements.every((item) => item.status === "Complete");
+  const canRecordDefenseOutcome = user?.role === "staff" && outcomeRequirement && stageRequirementsComplete && (!scheduleRequirement || scheduleRequirement.status === "Complete");
+  const outcomeSubject = progress.stage === "Ethics Review" ? "review" : "defense";
 
   function onSubmit(e) {
     e.preventDefault();
@@ -1961,7 +1964,7 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink">{requirement.label}</p>
                   <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
-                  <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{requirement.student_upload ? `Student upload · ${requirement.file_count}/${requirement.required_file_count} files` : "Staff / system managed"}</p>
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{requirement.student_upload ? `Student upload Ã‚Â· ${requirement.file_count}/${requirement.required_file_count} files` : "Staff / system managed"}</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
                   <StatusBadge value={requirement.status_label} dot={false} />
@@ -1975,7 +1978,7 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
               <div className="mt-2 flex flex-wrap gap-2">
                 {(requirement.files || []).map((file) => (
                   <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 transition-colors hover:bg-brand-100">
-                    {file.name} · PDF · {formatDate(file.uploaded_at)} <ArrowUpRight className="h-3.5 w-3.5" />
+                    {file.name} Ã‚Â· PDF Ã‚Â· {formatDate(file.uploaded_at)} <ArrowUpRight className="h-3.5 w-3.5" />
                   </a>
                 ))}
               </div>
@@ -1986,10 +1989,10 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><p className="text-sm font-semibold text-ink">Panel Matching</p><p className="text-xs text-slate-500">System-generated from the three concept papers.</p></div>
+          <div><p className="text-sm font-semibold text-ink">Panel Matching</p><p className="text-xs text-slate-500">System-generated from the current Research Gate source files.</p></div>
           <div className="flex items-center gap-2"><StatusBadge value={panel.status || "Not yet generated"} dot={false} /><Link to={`/workflow/panel-matching?student_id=${studentId}`} className="btn-ghost cursor-pointer">Open matching <ArrowUpRight className="h-4 w-4" /></Link></div>
         </div>
-        {panel.recommendations?.length > 0 && <p className="mt-2 text-xs text-slate-600">{panel.recommendations.map((item) => item.faculty_name).filter(Boolean).join(" · ")}</p>}
+        {panel.recommendations?.length > 0 && <p className="mt-2 text-xs text-slate-600">{panel.recommendations.map((item) => item.faculty_name).filter(Boolean).join(" / ")}</p>}
       </div>
 
       <SubmitButton submitting={submitting}>Verify submitted requirements</SubmitButton>
@@ -1999,12 +2002,14 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
         <section className={`rounded-2xl border p-5 ${outcomeRequirement.status === "Complete" ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Defense result gate</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Stage result gate</p>
               <h3 className="mt-1 font-display text-lg font-semibold text-ink">{outcomeRequirement.label}</h3>
               <p className="mt-1 text-sm text-slate-600">
-                {scheduleRequirement?.status === "Complete"
-                  ? "Record whether the scheduled defense was passed before the student can move to the next Research Gate stage."
-                  : "Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded."}
+                {canRecordDefenseOutcome
+                  ? `Record whether the ${outcomeSubject} was passed before the student can move to the next Research Gate stage.`
+                  : scheduleRequirement && scheduleRequirement.status !== "Complete"
+                  ? "Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded."
+                  : `Complete the current Research Gate requirements first. The student cannot move to the next stage until a passing ${outcomeSubject} result is recorded.`}
               </p>
             </div>
             <StatusBadge value={outcomeRequirement.status_label} dot={false} />
@@ -2017,7 +2022,7 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
               <button type="button" disabled={!canRecordDefenseOutcome || submitting} onClick={() => submit({ student_id: studentId, defense_outcome: "Failed" })} className="btn-ghost cursor-pointer px-4 py-2 text-red-700 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
                 <X className="h-4 w-4" /> Mark Failed
               </button>
-              {!canRecordDefenseOutcome && <p className="self-center text-xs font-semibold text-amber-700">Schedule confirmation is required before recording the result.</p>}
+              {!canRecordDefenseOutcome && <p className="self-center text-xs font-semibold text-amber-700">{scheduleRequirement && scheduleRequirement.status !== "Complete" ? "Schedule confirmation is required before recording the result." : "Complete the current stage requirements before recording the result."}</p>}
             </div>
           )}
         </section>
@@ -2056,10 +2061,6 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
     submit({ student_id: studentId, faculty_ids: selectedIds });
   }
 
-  function runMatching() {
-    refetch();
-  }
-
   function selectFaculty(index, value) {
     setSelectedIds((current) => {
       const next = [...current];
@@ -2075,15 +2076,16 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className={`text-sm font-semibold ${profile.ready ? "text-brand-800" : "text-amber-900"}`}>
-              {profile.ready ? "Concept-paper content ready" : (profile.concept_paper_count || 0) < 3 ? "Three concept papers are required" : "Readable PDF text is required"}
+              {profile.ready ? "Research evidence ready" : (profile.concept_paper_count || 0) < (profile.required_file_count || 1) ? "Required matching PDFs are missing" : "Readable PDF text is required"}
             </p>
             <p className={`mt-1 text-xs ${profile.ready ? "text-brand-700" : "text-amber-800"}`}>
-              {profile.concept_paper_count || 0} of 3 PDFs uploaded · {profile.readable_paper_count || 0} of 3 successfully read. Source: {profile.source || "No research evidence yet"}.
+              {profile.concept_paper_count || 0} of {profile.required_file_count || 3} matching PDF(s) uploaded - {profile.readable_paper_count || 0} successfully read for {profile.matching_gate_label || "this stage"}. Source: {profile.source || "No research evidence yet"}.
             </p>
           </div>
           <StatusBadge value={profile.ready ? "Ready" : "Blocked"} dot={false} />
         </div>
         {profile.research_title && <p className="mt-3 text-sm font-medium text-slate-700">Research title <span className="font-normal text-slate-500">(display only; excluded from matching)</span>: {profile.research_title}</p>}
+        {profile.rag_summary && <p className="mt-2 text-xs leading-relaxed text-brand-700">RAG summary: {profile.rag_summary}</p>}
         {profile.keywords?.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {profile.keywords.map((keyword) => <span key={keyword} className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">{keyword}</span>)}
@@ -2111,16 +2113,9 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
         <MiniBox label="Availability" value="30%" tone="blue" />
         <MiniBox label="Workload / suitability" value="20%" tone="amber" />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm text-slate-600">{context.research_case_type || "Thesis"} panel needs {roles.length} members: {roles.join(", ")}.</p>
-        <button type="button" disabled={!profile.ready} onClick={runMatching} className="btn-primary cursor-pointer">
-          <Sparkles className="h-4 w-4" /> Analyze PDF content and match panel
-        </button>
-      </div>
-
-      {profile.ready && visibleRecommendations.length === 0 && (
+      {profile.ready && context.research_prerequisite?.research_allowed !== false && visibleRecommendations.length === 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          No eligible faculty profiles were found. Add an active faculty profile with specialization and availability data, then run matching again.
+          No eligible faculty profiles were found. Add an active faculty profile with specialization and availability data.
         </div>
       )}
 
@@ -2152,7 +2147,7 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
                 <td className="px-3 py-2.5"><p className="font-medium text-slate-700">{r.workload} active</p><p className="text-xs text-slate-400">panel assignments</p></td>
                 <td className="px-3 py-2.5 text-right">
                   <span className="rounded-lg bg-brand-100 px-2 py-1 text-xs font-bold text-brand-700">{r.score}/100</span>
-                  <p className="mt-1 whitespace-nowrap text-[10px] text-slate-400">{r.score_breakdown?.specialization}/50 · {r.score_breakdown?.availability}/30 · {r.score_breakdown?.suitability}/20</p>
+                  <p className="mt-1 whitespace-nowrap text-[10px] text-slate-400">{r.score_breakdown?.specialization}/50 - {r.score_breakdown?.availability}/30 - {r.score_breakdown?.suitability}/20</p>
                 </td>
               </tr>
             ))}
@@ -2171,7 +2166,7 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
               {role}
               <select value={selectedIds[index] || ""} onChange={(event) => selectFaculty(index, event.target.value)} className="mt-1.5 w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
                 <option value="">Select faculty</option>
-                {recs.map((item) => <option key={item.faculty_id} value={item.faculty_id}>{item.faculty_name} — {item.score}/100</option>)}
+                {recs.map((item) => <option key={item.faculty_id} value={item.faculty_id}>{item.faculty_name} - {item.score}/100</option>)}
               </select>
             </label>
           ))}
@@ -2463,93 +2458,6 @@ function AvailabilityWorkspace({
         </section>
       )}
 
-      {participants.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-ink">Panel availability</p>
-              <p className="text-xs text-slate-500">Detailed source availability for each adviser and panelist.</p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-              <UserRoundCheck className="h-3.5 w-3.5" />
-              {participants.length} participants
-            </span>
-          </div>
-          <div className="overflow-x-auto rounded-2xl border border-slate-200">
-            <table className="min-w-[760px] w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-50 text-left">
-                  <th className="sticky left-0 z-10 w-36 border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                    Date
-                  </th>
-                  {participants.map((participant) => (
-                    <th key={participant.faculty_id} className="min-w-44 border-b border-slate-200 px-3 py-3">
-                      <p className="font-semibold text-ink">{participant.name}</p>
-                      <p className="mt-0.5 text-xs font-normal text-slate-500">{participant.role} · {participant.college}</p>
-                      <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        participant.calendar_connected
-                          ? "bg-green-50 text-green-700 ring-1 ring-green-100"
-                          : "bg-slate-100 text-slate-500"
-                      }`}>
-                        {participant.calendar_connected ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                        {participant.calendar_status || (participant.calendar_connected ? "Google checked" : "Profile only")}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDates.map((day) => {
-                  const hasOverlap = possibleDates.has(day);
-                  return (
-                    <tr key={day} className={hasOverlap ? "bg-brand-50/55" : "bg-white"}>
-                      <td className={`sticky left-0 z-10 border-r border-t border-slate-200 px-3 py-3 ${hasOverlap ? "bg-brand-50" : "bg-white"}`}>
-                        <p className="font-semibold text-ink">{shortDate(day)}</p>
-                        {hasOverlap && <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-brand-700">Overlap found</p>}
-                      </td>
-                      {participants.map((participant) => {
-                        const slots = participant.slots.filter((slot) => slot.date === day);
-                        const busy = (participant.google_busy || []).filter((slot) => slot.date === day);
-                        return (
-                          <td key={participant.faculty_id} className="border-t border-slate-200 px-3 py-3 align-top">
-                            {slots.length || busy.length ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {slots.map((slot) => (
-                                  <span
-                                    key={`${slot.start}-${slot.end}`}
-                                    className={`rounded-lg px-2 py-1 text-xs font-medium ring-1 ${
-                                      slot.blocked_by_google
-                                        ? "bg-amber-50 text-amber-800 ring-amber-200"
-                                        : "bg-white text-slate-700 ring-slate-200"
-                                    }`}
-                                  >
-                                    {timeRange(slot.start, slot.end)}
-                                  </span>
-                                ))}
-                                {busy.map((slot) => (
-                                  <span key={`busy-${slot.start}-${slot.end}`} className="rounded-lg bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100">
-                                    Busy {timeRange(slot.start, slot.end)}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-xs font-medium text-slate-400">Unavailable</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {visibleDates.length === 0 && (
-              <div className="p-8 text-center text-sm text-slate-500">No availability was recorded inside this date window.</div>
-            )}
-          </div>
-        </div>
-      )}
-
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -2633,8 +2541,8 @@ function ScheduleHistory({ schedules }) {
         {schedules.map((schedule) => (
           <div key={schedule.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
+              <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} Ã‚Â· {shortDate(schedule.preferred_date)} {schedule.start_time ? `Ã‚Â· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} Ã‚Â· {schedule.venue || "Arrangement pending"} Ã‚Â· Forms: {schedule.required_forms_status || "Not recorded"}</p>
               {schedule.conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.conflict_reason}</p>}
               {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
             </div>
@@ -2691,7 +2599,7 @@ function DemoResetButton({ student, resettingId, onReset }) {
       className="btn-ghost cursor-pointer px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-700"
     >
       <RotateCcw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
-      {busy ? "Resetting…" : "Reset demo case"}
+      {busy ? "ResettingÃ¢â‚¬Â¦" : "Reset demo case"}
     </button>
   );
 }
@@ -2853,8 +2761,8 @@ function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClose }) {
           </div>
           <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900"><span className="font-semibold">What completion means: </span>{guide.final}</div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-900">Admin note · confirm with Sir De Paula / GS office before production</p>
-            <ul className="mt-2 space-y-1.5 text-sm text-amber-800">{policyQuestions.map((question) => <li key={question}>• {question}</li>)}</ul>
+            <p className="text-sm font-semibold text-amber-900">Admin note Ã‚Â· confirm with Sir De Paula / GS office before production</p>
+            <ul className="mt-2 space-y-1.5 text-sm text-amber-800">{policyQuestions.map((question) => <li key={question}>Ã¢â‚¬Â¢ {question}</li>)}</ul>
           </div>
         </div>
       ) : null}
@@ -2873,8 +2781,8 @@ function WorkflowActivityList({ logs }) {
             <p className="text-sm font-semibold text-ink">{log.result}</p>
             <time className="text-xs text-slate-400">{formatDateTime(log.created_at)}</time>
           </div>
-          <p className="mt-1 text-xs text-slate-500">{log.actor_role}{log.student_name ? ` · ${log.student_name}` : ""}</p>
-          {(log.previous_status || log.new_status) && <p className="mt-2 text-xs font-semibold text-slate-600">{log.previous_status || "—"} <span className="mx-1 text-slate-300">→</span> {log.new_status || "—"}</p>}
+          <p className="mt-1 text-xs text-slate-500">{log.actor_role}{log.student_name ? ` Ã‚Â· ${log.student_name}` : ""}</p>
+          {(log.previous_status || log.new_status) && <p className="mt-2 text-xs font-semibold text-slate-600">{log.previous_status || "Ã¢â‚¬â€"} <span className="mx-1 text-slate-300">Ã¢â€ â€™</span> {log.new_status || "Ã¢â‚¬â€"}</p>}
           {log.notes && <p className="mt-2 text-xs leading-relaxed text-slate-500">{log.notes}</p>}
         </li>
       ))}
@@ -2913,9 +2821,9 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
     <WorkflowCaseModal
       id={`${slug}-message-${student.id}`}
       title="Message / return for clarification"
-      subtitle={`${student.name} · ${student.student_number}`}
+      subtitle={`${student.name} Ã‚Â· ${student.student_number}`}
       onClose={onClose}
-      footer={<button type="submit" form={`${slug}-message-form-${student.id}`} disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><Send className="h-4 w-4" /> {busy ? "Saving…" : "Send message"}</button>}
+      footer={<button type="submit" form={`${slug}-message-form-${student.id}`} disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><Send className="h-4 w-4" /> {busy ? "SavingÃ¢â‚¬Â¦" : "Send message"}</button>}
     >
       <form id={`${slug}-message-form-${student.id}`} onSubmit={save} className="space-y-4">
         <ErrorNote message={error} />
@@ -2955,7 +2863,7 @@ function CaseMessageHistory({ messages = [] }) {
               <p className="font-semibold text-ink">{message.template}</p>
               <StatusBadge value={message.status} dot={false} />
             </div>
-            <p className="mt-1 text-xs text-slate-500">{message.sender_role} → {message.recipient_role} · {formatDateTime(message.created_at)}</p>
+            <p className="mt-1 text-xs text-slate-500">{message.sender_role} Ã¢â€ â€™ {message.recipient_role} Ã‚Â· {formatDateTime(message.created_at)}</p>
             {message.comment && <p className="mt-2 text-sm leading-relaxed text-slate-600">{message.comment}</p>}
           </li>
         ))}
@@ -2998,7 +2906,7 @@ function GraduationBatchModal({ rows, context, onClose, onSaved }) {
       title="Confirm graduation group action"
       subtitle={`${rows.length} selected candidate${rows.length === 1 ? "" : "s"}`}
       onClose={onClose}
-      footer={<button type="submit" form="graduation-batch-form" disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applying…" : "Confirm group action"}</button>}
+      footer={<button type="submit" form="graduation-batch-form" disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "ApplyingÃ¢â‚¬Â¦" : "Confirm group action"}</button>}
     >
       <form id="graduation-batch-form" onSubmit={confirm} className="space-y-4">
         <ErrorNote message={error} />
@@ -3020,7 +2928,7 @@ function GraduationBatchModal({ rows, context, onClose, onSaved }) {
         <Field label="Comment" required={form.template === "Other" && form.action !== "send_to_dean"}><Textarea value={form.comment} onChange={update("comment")} required={form.template === "Other" && form.action !== "send_to_dean"} /></Field>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-sm font-semibold text-ink">Action summary</p>
-          <p className="mt-1 text-sm text-slate-600">{rows.length} candidate(s) selected · {rows.length - blocked.length} can be included · {blocked.length} will be skipped.</p>
+          <p className="mt-1 text-sm text-slate-600">{rows.length} candidate(s) selected Ã‚Â· {rows.length - blocked.length} can be included Ã‚Â· {blocked.length} will be skipped.</p>
           {blocked.length > 0 && <ul className="mt-2 space-y-1 text-xs text-amber-700">{blocked.slice(0, 8).map((row) => <li key={row.student.id}>{row.student.name}: {row.eligibility.status}</li>)}</ul>}
         </div>
       </form>
@@ -3079,7 +2987,7 @@ function ViewModeToggle({ value, onChange }) {
 function PracticumBoardCard({ row, onOpen, onMessage }) {
   return (
     <article key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
-      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-400">{row.student.student_number} · {row.student.program_code}</p></div>{row.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
+      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-400">{row.student.student_number} Ã‚Â· {row.student.program_code}</p></div>{row.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>{row.record.practicum_site || "Site pending"}</span><span className="text-right">{row.record.completed_hours}/{row.record.required_hours} hrs</span><span>{row.eligibility.status}</span><span className="text-right">Updated {formatDate(row.last_activity_at || row.record.updated_at)}</span><span className="col-span-2">Submitted {formatDate(row.record.created_at)}</span></div>
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
       <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button><button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button></div>
@@ -3090,7 +2998,7 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
 function WithdrawalBoardCard({ item, onOpen, onMessage }) {
   return (
     <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
-      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} · {item.student.program_code}</p></div>{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
+      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} Ã‚Â· {item.student.program_code}</p></div>{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
       <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.reason || "No reason provided"}</p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Submitted {formatDate(item.created_at)}</span><span className="text-right">Updated {formatDate(item.updated_at)}</span><span className="col-span-2">Effective: {item.effective_term || "Pending"}</span></div>
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {item.next_action_owner || "Awaiting review"}</p>
@@ -3152,7 +3060,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Practicum student submissions" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · GS Staff forwards submissions; the Academic Coordinator reviews MOAs, certificates, and hours`} icon={Briefcase} />
+      <SectionTitle title="Practicum student submissions" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view Ã‚Â· GS Staff forwards submissions; the Academic Coordinator reviews MOAs, certificates, and hours`} icon={Briefcase} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
@@ -3180,7 +3088,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
                 <td className="px-3 py-3"><StatusBadge value={row.eligibility.status} dot={false} /></td>
                 <td className="px-3 py-3"><StatusBadge value={row.moa_status} dot={false} /></td>
                 <td className="px-3 py-3"><StatusBadge value={row.documents_status} dot={false} /></td>
-                <td className="px-3 py-3 text-sm text-slate-600">{row.record ? `${row.record.completed_hours}/${row.record.required_hours}` : "—"}<div className="mt-1"><StatusBadge value={row.hours_status} dot={false} /></div></td>
+                <td className="px-3 py-3 text-sm text-slate-600">{row.record ? `${row.record.completed_hours}/${row.record.required_hours}` : "Ã¢â‚¬â€"}<div className="mt-1"><StatusBadge value={row.hours_status} dot={false} /></div></td>
                 <td className="px-3 py-3"><StatusBadge value={row.coordinator_review_status} dot={false} /></td>
                 <td className="px-3 py-3"><StatusBadge value={row.dean_report_status} dot={false} /></td>
                 <td className="px-3 py-3">
@@ -3194,7 +3102,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
         <WorkflowCaseModal
           id={`practicum-case-${selectedRow.student.id}`}
           title={selectedRow.student.name}
-          subtitle={`${selectedRow.student.student_number} · ${selectedRow.student.program_code} · Practicum case`}
+          subtitle={`${selectedRow.student.student_number} Ã‚Â· ${selectedRow.student.program_code} Ã‚Â· Practicum case`}
           status={selectedRow.record?.status || "Not Submitted"}
           onClose={() => setSelectedStudentId(null)}
           footer={(
@@ -3204,7 +3112,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
               {accountRole === "academic_coordinator" && ["Documents Under Review", "Completed"].includes(selectedRow.record?.status) && <button type="button" disabled={submitting || refreshing} onClick={() => submit({ student_id: selectedRow.student.id, status: "Not Accepted - New Organization Required" })} className="btn-ghost cursor-pointer px-4 py-2 text-red-600">Mark not accepted</button>}
               {selectedAction ? (
                 <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
-                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
+                  {submitting ? "SavingÃ¢â‚¬Â¦" : refreshing ? "UpdatingÃ¢â‚¬Â¦" : selectedAction.label}
                 </button>
               ) : (
                 <span className="self-center text-xs font-semibold text-slate-500">{selectedRow.record ? `No ${WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.` : "Awaiting student submission."}</span>
@@ -3258,7 +3166,7 @@ function PracticumCaseDetails({ row }) {
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Student submission</p>
             <p className="mt-2 text-sm font-semibold text-ink">{record?.practicum_site || "No site submitted"}</p>
             <p className="mt-1 text-xs text-slate-500">Supervisor: {record?.supervisor_name || "Not provided"}</p>
-            <p className="mt-1 text-xs text-slate-500">Certificates: {record?.certificate_count || 0} · {record?.remarks || "No student remarks"}</p>
+            <p className="mt-1 text-xs text-slate-500">Certificates: {record?.certificate_count || 0} Ã‚Â· {record?.remarks || "No student remarks"}</p>
             <div className="mt-2 flex flex-wrap gap-2">{record?.moa_attachment && <a className="btn-ghost px-3 py-1.5" href={record.moa_attachment.url} target="_blank" rel="noreferrer">MOA <ArrowUpRight className="h-3.5 w-3.5" /></a>}{record?.certificate_attachment && <a className="btn-ghost px-3 py-1.5" href={record.certificate_attachment.url} target="_blank" rel="noreferrer">Documents <ArrowUpRight className="h-3.5 w-3.5" /></a>}</div>
           </div>
       </div>
@@ -3319,7 +3227,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Withdrawn is applied only after requirements, fees, and Registrar update are confirmed`} icon={LogOut} />
+      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view Ã‚Â· Withdrawn is applied only after requirements, fees, and Registrar update are confirmed`} icon={LogOut} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
@@ -3341,10 +3249,10 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
           >
             <StudentCell student={item.student} />
             <td className="px-3 py-3 text-sm text-slate-600">{formatDate(item.created_at)}</td>
-            <td className="px-3 py-3 text-sm text-slate-600">{item.effective_term || "—"}</td>
+            <td className="px-3 py-3 text-sm text-slate-600">{item.effective_term || "Ã¢â‚¬â€"}</td>
             <td className="max-w-[240px] px-3 py-3 text-sm text-slate-600"><span className="line-clamp-2">{item.reason || "No reason provided"}</span></td>
             <td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td>
-            <td className="px-3 py-3 text-xs font-semibold text-slate-600">{item.next_action_owner || "—"}{item.unresolved_messages > 0 && <p className="mt-1 text-amber-700">{item.unresolved_messages} concern(s)</p>}</td>
+            <td className="px-3 py-3 text-xs font-semibold text-slate-600">{item.next_action_owner || "Ã¢â‚¬â€"}{item.unresolved_messages > 0 && <p className="mt-1 text-amber-700">{item.unresolved_messages} concern(s)</p>}</td>
             <td className="px-3 py-3"><button type="button" onClick={(event) => { event.stopPropagation(); openCase(item); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> Open case</button></td>
           </tr>
         );
@@ -3353,7 +3261,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
         <WorkflowCaseModal
           id={`withdrawal-case-${selectedItem.id}`}
           title={selectedItem.student.name}
-          subtitle={`${selectedItem.student.student_number} · ${selectedItem.student.program_code} · Withdrawal case`}
+          subtitle={`${selectedItem.student.student_number} Ã‚Â· ${selectedItem.student.program_code} Ã‚Â· Withdrawal case`}
           status={selectedCurrent?.status || (reset.resetMessage ? "Reset" : selectedItem.status)}
           onClose={closeCase}
           footer={(
@@ -3367,7 +3275,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
               )}
               {selectedAction ? (
                 <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
-                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
+                  {submitting ? "SavingÃ¢â‚¬Â¦" : refreshing ? "UpdatingÃ¢â‚¬Â¦" : selectedAction.label}
                 </button>
               ) : (
                 <span className="self-center text-xs font-semibold text-slate-500">{selectedCurrent ? `No ${WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.` : "This demo case has been reset."}</span>
@@ -3457,7 +3365,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   }
   return (
     <div className="space-y-4">
-      <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns Registrar export`} icon={GraduationCap} />
+      <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view Ã‚Â· AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns Registrar export`} icon={GraduationCap} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
@@ -3492,7 +3400,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
         <WorkflowCaseModal
           id={`graduation-case-${selectedRow.student.id}`}
           title={selectedRow.student.name}
-          subtitle={`${selectedRow.student.student_number} · ${selectedRow.student.program_code} · Graduation endorsement`}
+          subtitle={`${selectedRow.student.student_number} Ã‚Â· ${selectedRow.student.program_code} Ã‚Â· Graduation endorsement`}
           status={selectedEndorsement?.endorsement_status || selectedRow.eligibility.status}
           onClose={() => setSelectedStudentId(null)}
           footer={(
@@ -3501,7 +3409,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
               {selectedEndorsement && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
               {selectedAction ? (
                 <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
-                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
+                  {submitting ? "SavingÃ¢â‚¬Â¦" : refreshing ? "UpdatingÃ¢â‚¬Â¦" : selectedAction.label}
                 </button>
               ) : selectedEndorsement?.endorsement_status === "Dean Approved" ? (
                 <span className="self-center rounded-lg bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700 ring-1 ring-brand-200">Awaiting Dean export</span>
@@ -3530,11 +3438,11 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing coursework</p>
-                {selectedRow.eligibility.missing_coursework?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_coursework.map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
+                {selectedRow.eligibility.missing_coursework?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_coursework.map((item) => <li key={item}>Ã¢â‚¬Â¢ {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing research requirements</p>
-                {selectedRow.eligibility.missing_research_requirements?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_research_requirements.map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
+                {selectedRow.eligibility.missing_research_requirements?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_research_requirements.map((item) => <li key={item}>Ã¢â‚¬Â¢ {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
               </div>
             </div>
           </div>
@@ -3560,7 +3468,7 @@ function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel
         <label className="relative block">
           <span className="sr-only">Search list</span>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={filters.query} onChange={update("query")} className="field-input pl-10" placeholder="Search name, ID, program…" aria-label="Search list" />
+          <input value={filters.query} onChange={update("query")} className="field-input pl-10" placeholder="Search name, ID, programÃ¢â‚¬Â¦" aria-label="Search list" />
         </label>
         <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
         <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter by workflow status"><option value="">All workflow statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
@@ -3579,11 +3487,11 @@ function uniqueValues(values) {
 }
 
 function StudentCell({ student }) {
-  return <td className="px-3 py-3"><p className="text-sm font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p></td>;
+  return <td className="px-3 py-3"><p className="text-sm font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-400">{student.student_number} Ã‚Â· {student.program_code}</p></td>;
 }
 
 function Detail({ label, value }) {
-  return <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 font-semibold text-slate-700">{value || "—"}</p></div>;
+  return <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 font-semibold text-slate-700">{value || "Ã¢â‚¬â€"}</p></div>;
 }
 
 function PracticumForm({ context, studentId, submit, submitting }) {
@@ -3643,7 +3551,7 @@ function PracticumForm({ context, studentId, submit, submitting }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-ink">{current.practicum_site || "Practicum site not set"}</p>
-              <p className="text-xs text-slate-500">{current.completed_hours}/{current.required_hours} hours · {current.certificate_count} certificate(s)</p>
+              <p className="text-xs text-slate-500">{current.completed_hours}/{current.required_hours} hours Ã‚Â· {current.certificate_count} certificate(s)</p>
             </div>
             <StatusBadge value={current.status} dot={false} />
           </div>
@@ -3738,7 +3646,7 @@ function WithdrawalForm({ context, studentId, submit, submitting }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-ink">Effective {current.effective_term || "term pending"}</p>
-              <p className="text-xs text-slate-500">Dean: {current.dean_decision} · requirements: {current.requirement_status} · fees: {current.fee_status}</p>
+              <p className="text-xs text-slate-500">Dean: {current.dean_decision} Ã‚Â· requirements: {current.requirement_status} Ã‚Â· fees: {current.fee_status}</p>
             </div>
             <StatusBadge value={current.status} dot={false} />
           </div>
@@ -3880,7 +3788,7 @@ function shortDate(value) {
 }
 
 function formatDateTime(value) {
-  if (!value) return "—";
+  if (!value) return "Ã¢â‚¬â€";
   return new Intl.DateTimeFormat("en-PH", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -4093,7 +4001,7 @@ function MiniBox({ label, value, tone }) {
 function workflowGuidance(slug) {
   const map = {
     "student-handoff":
-      "The registrar's data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically — no manual typing.",
+      "The registrar's data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically Ã¢â‚¬â€ no manual typing.",
     "leave-of-absence":
       "Leave of Absence is a stop/pause process. Staff record the uploaded application, check prior LOA eligibility, forward the request to the Dean, record the decision, update the student's status only when approved, and send the notice.",
     readmission:
@@ -4103,7 +4011,7 @@ function workflowGuidance(slug) {
     "research-gate":
       "Reads the student's stored PDF evidence for the selected gate. Staff can evaluate existing files and adviser revisions, but cannot manually mark an absent document as received.",
     "panel-matching":
-      "Reads the body text of all three uploaded concept papers, extracts significant keywords, then ranks faculty expertise with availability, college fit, and current panel load. Research titles and filenames are excluded.",
+      "Runs RAG over the current Research Gate source files, generates panel-matching keywords against faculty specialties and availability, then ranks faculty expertise with college fit and current panel load. Research titles and filenames are excluded.",
     "defense-scheduling":
       "Opens only after panel matching. The date spread compares adviser and panel availability, respects weekday work hours, and shows weekends only when faculty recorded an explicit override.",
     practicum:

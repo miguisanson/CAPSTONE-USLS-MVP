@@ -87,7 +87,7 @@ export default function App() {
                 <Route path="/decision-support" element={<DecisionSupport />} />
                 <Route path="/assistant" element={<Assistant />} />
                 <Route path="/workflow/:slug" element={<WorkflowPage />} />
-                <Route path="/form1-endorsements" element={<Form1Endorsements />} />
+                <Route path="/form1-endorsements" element={<RoleOnly user={user} role="academic_coordinator"><Form1Endorsements /></RoleOnly>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>

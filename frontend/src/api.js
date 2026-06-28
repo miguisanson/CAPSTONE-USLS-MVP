@@ -200,6 +200,8 @@ export const api = {
   },
   deleteResearchEvidence: (evidenceId) =>
     request(`/student-portal/research-evidence/${evidenceId}`, { method: "DELETE" }),
+  deleteForm1Endorsement: () =>
+    request("/student-portal/form1-endorsement", { method: "DELETE" }),
   form1Endorsements: () => request("/research-gate/form1-endorsements"),
   endorseForm1: (studentId, payload) =>
     request(`/research-gate/form1-endorsements/${studentId}`, {

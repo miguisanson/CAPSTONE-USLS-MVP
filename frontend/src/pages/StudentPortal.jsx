@@ -560,8 +560,11 @@ function ResearchRequestForm({ data, onSaved }) {
   const [form, setForm] = useState({ research_title: savedTitle, submitted_package: "" });
   const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
   const [prefillNote, setPrefillNote] = useState("");
+  const [removingEndorsement, setRemovingEndorsement] = useState(false);
+  const [endorsementError, setEndorsementError] = useState("");
   const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
   const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
+  const titlePackageLocked = Boolean(data.panel?.length);
 
   useEffect(() => {
     setForm((current) => ({
@@ -576,11 +579,28 @@ function ResearchRequestForm({ data, onSaved }) {
 
   function onSubmit(e) {
     e.preventDefault();
+    if (progress.stage === "Title Defense") return;
     submit({
       student_id: data.student.id,
       research_title: form.research_title,
       submitted_package: form.submitted_package,
     });
+  }
+
+  async function removeForm1Endorsement() {
+    if (titlePackageLocked) return;
+    const confirmed = window.confirm("Remove the Academic Coordinator Form 1 endorsement? The completed title-defense package must be endorsed again before Panel Matching.");
+    if (!confirmed) return;
+    setRemovingEndorsement(true);
+    setEndorsementError("");
+    try {
+      await api.deleteForm1Endorsement();
+      await onSaved();
+    } catch (err) {
+      setEndorsementError(err.message || "Could not remove the Form 1 endorsement.");
+    } finally {
+      setRemovingEndorsement(false);
+    }
   }
 
   async function handleEvidenceSaved(result, requirement) {
@@ -632,23 +652,45 @@ function ResearchRequestForm({ data, onSaved }) {
                   <p className="text-sm font-semibold text-ink">{requirement.label}</p>
                   <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
                 </div>
-                <StatusBadge value={requirement.status_label} dot={false} />
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                  <StatusBadge value={requirement.status_label} dot={false} />
+                  {requirement.source_type === "coordinator_endorsement" && data.form1_endorsement && (
+                    <button
+                      type="button"
+                      onClick={removeForm1Endorsement}
+                      disabled={titlePackageLocked || removingEndorsement}
+                      className="btn-ghost cursor-pointer px-3 py-1.5 text-xs text-red-700 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      title={titlePackageLocked ? "Locked after panel matching" : "Remove Form 1 endorsement"}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> {removingEndorsement ? "Removing..." : "Remove"}
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
+          {endorsementError && <p className="mt-2 text-xs font-medium text-red-600">{endorsementError}</p>}
         </div>
       )}
-      <Field label="Message to the Research Coordinator" hint="Optional context for this submission.">
-        <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
-      </Field>
-      <SubmitState
-        busy={busy}
-        error={error}
-        message={message}
-        disabled={!milestone?.student_uploads_ready || (progress.stage === "Title Defense" && !form.research_title.trim())}
-        label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Upload Form 1 so the research title can be read automatically." : ""}
-      />
+      {progress.stage !== "Title Defense" && (
+        <Field label="Message to the Research Coordinator" hint="Optional context for this submission.">
+          <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
+        </Field>
+      )}
+      {progress.stage === "Title Defense" ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          Title-defense uploads move forward through Academic Coordinator endorsement, Panel Matching, Defense Scheduling, then the staff pass/fail result.
+        </div>
+      ) : (
+        <SubmitState
+          busy={busy}
+          error={error}
+          message={message}
+          disabled={!milestone?.student_uploads_ready}
+          label={`Submit ${milestone?.short_label || "milestone"} for review`}
+          disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
+        />
+      )}
     </form>
   );
 }
