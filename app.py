@@ -9614,6 +9614,7 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
                 previous_gate,
                 f"Research Gate advanced from {previous_gate} to {progress['gate']}; panel must be rematched.",
             )
+            progress = detected_research_progress(student)
         # Only student form/document data may replace the displayed title.
         if clean_title:
             research_case.title = clean_title
