@@ -28,11 +28,11 @@ matched faculty, and Students B & C, and it removes any previously uploaded test
 > Student A's account is **created automatically** when you upload her monitoring sheet
 > (the import message shows the exact login). It does not exist until the handoff.
 
-### Sample files (`Documents/USLS_Documents/Simulation/`)
-- `AC-Student-Monitoring - MAEDS (Student A - Andrea Villanueva).xlsx` — the handoff sheet
-- `Form1 - Title Defense Application (Student A - prefill sample).pdf` — auto-fills the title
-- `Student_A_Concept_Papers/` — three **real** research PDFs (learning analytics / online
-  learning / machine learning) used for keyword-based panel matching
+### Sample files (`Documents/Simulation/`, numbered in upload order)
+- `1 - AC Monitoring Sheet (upload at Handoff).xlsx` — the handoff sheet (official AC template format)
+- `2 - Form 1 Title Defense (auto-fill).pdf` — auto-fills the research title
+- `3 - Concept Paper 1 - Learning Analytics.pdf`, `4 - Concept Paper 2 - Machine Learning.pdf`,
+  `5 - Concept Paper 3 - Online Learning.pdf` — three **real** research PDFs for keyword-based panel matching
 
 ---
 
