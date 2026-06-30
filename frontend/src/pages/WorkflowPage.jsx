@@ -291,9 +291,15 @@ export default function WorkflowPage() {
 
           {needsStudent && !studentId ? (
             usesQueue ? null : (
-              <Card className="p-6">
-                <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
-              </Card>
+              slug === "research-gate" && user?.role === "academic_coordinator" ? (
+                <section id="form1-endorsement-queue" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <Form1EndorsementQueue embedded />
+                </section>
+              ) : (
+                <Card className="p-6">
+                  <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
+                </Card>
+              )
             )
           ) : loading && !context ? (
             <Card className="p-6">
@@ -1941,11 +1947,6 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
                 </div>
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
                   <StatusBadge value={requirement.status_label} dot={false} />
-                  {requirement.source_type === "coordinator_endorsement" && user?.role === "academic_coordinator" && (
-                    <a href="#form1-endorsement-queue" className="btn-primary cursor-pointer justify-center whitespace-nowrap">
-                      <UserRoundCheck className="h-4 w-4" /> Form 1 endorsements
-                    </a>
-                  )}
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">

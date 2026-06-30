@@ -1350,7 +1350,7 @@ BACKOFFICE_ROLES = {
 # Registrar is external to the Graduate School: registrar steps are file hand-offs that
 # GS Staff records, not an in-system login role.
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"practicum", "graduation", "withdrawal"},
+    "academic_coordinator": {"research-gate", "practicum", "graduation", "withdrawal"},
     "research_coordinator": {"graduation"},
 }
 
@@ -3096,7 +3096,7 @@ def register_routes(app: Flask) -> None:
         return Response(body, mimetype="text/html")
 
     @app.route("/api/research-gate/form1-endorsements")
-    @require_api_login("academic_coordinator", "staff")
+    @require_api_login("academic_coordinator")
     def form1_endorsement_queue():
         form_docs = (
             DocumentCheck.query.filter_by(gate="Form 1 - Title Defense", item_name="Form 1 - Application for Title Defense")
@@ -3120,7 +3120,7 @@ def register_routes(app: Flask) -> None:
         return jsonify({"items": rows})
 
     @app.route("/api/research-gate/form1-endorsements/<int:student_id>", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff")
+    @require_api_login("academic_coordinator")
     def endorse_form1(student_id: int):
         student = Student.query.get_or_404(student_id)
         try:
@@ -10509,7 +10509,8 @@ def ensure_demo_accounts() -> None:
         )
 
     linked_student = (
-        Student.query.join(Program)
+        Student.query.filter_by(first_name="Miguel", last_name="Yu").first()
+        or Student.query.join(Program)
         .filter(Program.has_practicum.is_(True), Student.standing == "Active")
         .order_by(Student.student_number.asc())
         .first()

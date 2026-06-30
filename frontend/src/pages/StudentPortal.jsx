@@ -52,7 +52,7 @@ const STUDENT_NAV = [
 const REQUEST_GROUPS = [
   {
     title: "Research & Defense",
-    description: "Upload your milestone files, submit them for review, then request scheduling after a panel is assigned.",
+    description: "Upload your milestone files, track review status, then request scheduling after a panel is assigned.",
     items: [
       { id: "research", label: "Research Submission", icon: FileCheck },
       {
@@ -556,8 +556,7 @@ function ResearchRequestForm({ data, onSaved }) {
   // must not wipe it — otherwise submitting fails with "Enter the research title".
   const PENDING_TITLE = "Research title pending Form 1 submission";
   const savedTitle = data.research_case?.title && data.research_case.title !== PENDING_TITLE ? data.research_case.title : "";
-  const [form, setForm] = useState({ research_title: savedTitle, submitted_package: "" });
-  const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
+  const [form, setForm] = useState({ research_title: savedTitle });
   const [prefillNote, setPrefillNote] = useState("");
   const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
   const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
@@ -573,15 +572,6 @@ function ResearchRequestForm({ data, onSaved }) {
     return (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   }
 
-  function onSubmit(e) {
-    e.preventDefault();
-    submit({
-      student_id: data.student.id,
-      research_title: form.research_title,
-      submitted_package: form.submitted_package,
-    });
-  }
-
   async function handleEvidenceSaved(result, requirement) {
     if (requirement?.item_name === "Form 1 - Application for Title Defense" && result?.research_title) {
       setForm((current) => ({ ...current, research_title: result.research_title }));
@@ -591,7 +581,7 @@ function ResearchRequestForm({ data, onSaved }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <div className="space-y-4">
       <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-wide text-brand-600">Automatically detected stage</p><p className="mt-1 font-display text-xl font-semibold text-ink">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusBadge value={progress.status || "Pending"} dot={false} /></div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
@@ -637,18 +627,7 @@ function ResearchRequestForm({ data, onSaved }) {
           </div>
         </div>
       )}
-      <Field label="Message to the Research Coordinator" hint="Optional context for this submission.">
-        <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
-      </Field>
-      <SubmitState
-        busy={busy}
-        error={error}
-        message={message}
-        disabled={!milestone?.student_uploads_ready || (progress.stage === "Title Defense" && !form.research_title.trim())}
-        label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Upload Form 1 so the research title can be read automatically." : ""}
-      />
-    </form>
+    </div>
   );
 }
 
