@@ -2131,6 +2131,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/dashboard")
     @require_api_login("staff")
     def dashboard():
+        sweep_lapsed_incompletes()  # keep lapsed Incompletes auto-failed during a session
         return jsonify(dashboard_stats(request.args))
 
     @app.route("/api/dashboard/drilldown")
@@ -9581,6 +9582,47 @@ def ensure_course_workflow_schema() -> None:
     db.session.commit()
 
 
+def sweep_lapsed_incompletes() -> int:
+    """Auto-fail Incompletes whose completion deadline has passed, then notify.
+
+    Rule (decided): an Incomplete not completed by its deadline is automatically converted
+    to Failed; the student and Academic Coordinator are notified (activity log + a follow-up
+    task) rather than waiting for a manual decision.
+    """
+    today = date.today()
+    lapsed = (
+        CourseRecord.query.join(Course)
+        .filter(
+            CourseRecord.grade_status == "Incomplete",
+            CourseRecord.incomplete_deadline.isnot(None),
+            CourseRecord.incomplete_deadline < today,
+        )
+        .all()
+    )
+    changed = 0
+    for record in lapsed:
+        course = record.course
+        deadline = record.incomplete_deadline
+        record.status = "Failed"
+        record.grade_status = "Failed"
+        record.resolved_at = now_utc()
+        note = f"Auto-failed: Incomplete not completed by {iso(deadline)}."
+        record.remarks = (f"{record.remarks} | {note}" if record.remarks else note)
+        record.updated_at = now_utc()
+        add_log(
+            "course-audit", record.student_id, "System",
+            "Incomplete deadline lapsed",
+            f"{course.code} auto-marked Failed (Incomplete lapsed {iso(deadline)})",
+            "Academic Coordinator",
+            "Automatic conversion of a lapsed Incomplete to Failed. Student and Academic Coordinator notified.",
+        )
+        add_task(record.student_id, f"Review auto-failed Incomplete: {course.code}", "Academic Coordinator", 0, 55)
+        changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+
 def seed_database(count: int = 350) -> None:
     # Deterministic seed data keeps demos repeatable while still showing varied
     # stages, risks, documents, panels, schedules, and activity history.
@@ -10331,6 +10373,28 @@ def seed_simulation_demo() -> None:
                 "Student filed a withdrawal request from the portal for the demo simulation.")
     ensure_student_account(student_c, "student-c@gs.local")
 
+    # Demo case for the Incomplete -> auto-fail rule (checklist 4a): one student carries an
+    # Incomplete already past its deadline, so the startup/dashboard sweep converts it to Failed
+    # and notifies the Academic Coordinator. (Left lapsed here; the sweep does the conversion.)
+    lapse_student = (
+        Student.query.filter(
+            Student.enrollment_tag == "Enrolled",
+            Student.current_stage == "Coursework",          # not research-stage, so the
+            Student.student_number.like("GS-2026-%"),        # comp-exam repair won't re-complete it
+        )
+        .order_by(Student.id.desc())
+        .first()
+    )
+    if lapse_student:
+        rec = CourseRecord.query.filter_by(student_id=lapse_student.id).first()
+        if rec and rec.grade_status != "Failed":
+            rec.status = "Incomplete"
+            rec.grade_status = "Incomplete"
+            rec.incomplete_deadline = date.today() - timedelta(days=20)
+            rec.resolved_at = None
+            rec.remarks = "Seeded demo: Incomplete past its deadline (auto-fail case)."
+            rec.updated_at = now_utc()
+
 
 def ensure_demo_request_submission_logs() -> int:
     created = 0
@@ -10515,6 +10579,7 @@ with app.app_context():
     # Data repair runs last, after every column-adding migration above, because it
     # queries CourseRecord/Student which now include the newly added columns.
     ensure_demo_comprehensive_exam_consistency()
+    sweep_lapsed_incompletes()  # convert any Incompletes already past their deadline
 
 
 if __name__ == "__main__":

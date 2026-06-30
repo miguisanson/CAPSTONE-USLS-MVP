@@ -31,7 +31,7 @@ out and a status is recorded by GS Staff).
 - Academic Coordinator records the final grade before the deadline → status resolves to a grade. ✅
   - **4a. Never completes (deadline passes) — RULE (decided):** the system **automatically converts
     the Incomplete to Failed once the deadline passes, and notifies the student + Academic
-    Coordinator** (logged for review). ❌ to build
+    Coordinator** (activity log + a follow-up task for the AC). ✅
 
 ## 5. Student files a Leave of Absence
 - Student files LOA (portal) → GS Staff checks prior-LOA eligibility → routed to Dean → Dean
@@ -45,12 +45,11 @@ out and a status is recorded by GS Staff).
 - A student with no enrollment / no filed LOA for the term is flagged AWOL.
 - Today AWOL exists only as a status tag. **Needs:** a workflow to formally mark AWOL and act on it. ❌ to build
 
-## 8. Student returns from AWOL
-  - **8a. Over the 5-year residency period — ❓ RULE TO CONFIRM:** what happens — readmission denied,
-    or allowed only with a special Dean/curriculum re-validation? (Need the exact policy.)
-  - **8b. Under the classified/allowed period — ❓ RULE TO CONFIRM:** return path (e.g., readmission
-    with updated study plan). (Need the exact policy.)
-- **Needs:** 5-year residency limit check on return, branching on the confirmed rules. ❌ to build (after rules confirmed)
+## 8. Student returns from AWOL  — RULES (decided)
+- The residency clock is **5 years from program entry; approved LOA pauses it**.
+  - **8a. Over the 5-year period:** readmission is **denied** — the student must **re-apply as new**.
+  - **8b. Within the period:** the student is **auto-reactivated to Active** (no Dean approval needed).
+- **Needs:** AWOL workflow + 5-year residency check on return, branching on the above. ❌ to build
 
 ## 9. Student is enrolled but on residency with no subjects
 - A student who has finished coursework and is only continuing residency (research only, no
@@ -87,8 +86,7 @@ out and a status is recorded by GS Staff).
   owner/status), so work can be tracked per student and as a group/list. ✅
 
 ## Open rules needing your decision
-1. **8a / 8b** — exact AWOL-return policy over vs. under the 5-year residency period.
-2. **12b** — how far to push edge-case handling ("expect the worst") per workflow.
+1. **12b** — how far to push edge-case handling ("expect the worst") per workflow.
 
 ## Build queue (approved)
 Registrar removal → Incomplete auto-fail+notify (4a) → AWOL + 5-year rule (7,8) → Residency clock
