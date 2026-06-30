@@ -1345,13 +1345,13 @@ BACKOFFICE_ROLES = {
     "staff",
     "academic_coordinator",
     "research_coordinator",
-    "registrar",
 }
 
+# Registrar is external to the Graduate School: registrar steps are file hand-offs that
+# GS Staff records, not an in-system login role.
 ROLE_TRANSACTION_ACCESS = {
     "academic_coordinator": {"practicum", "graduation", "withdrawal"},
     "research_coordinator": {"graduation"},
-    "registrar": {"graduation", "withdrawal"},
 }
 
 ROLE_LABELS = {
@@ -3245,7 +3245,7 @@ def register_routes(app: Flask) -> None:
                 "Registrar",
                 item.dean_remarks or "Dean-approved Registrar handoff.",
             )
-            add_task(item.student_id, "Record receipt of endorsed graduation list", "Registrar", 3, 40)
+            add_task(item.student_id, "Record receipt of endorsed graduation list from the Registrar", "Graduate School Staff", 3, 40)
             writer.writerow([
                 item.student.student_number,
                 item.student.name,
@@ -7156,7 +7156,7 @@ def handle_withdrawal(data: MultiDict) -> int:
         application.status = "Registrar Review"
         next_owner = "Registrar"
         result = "Withdrawal form and proof verified; Registrar fee confirmation requested"
-        add_task(student.id, "Confirm withdrawal fee status", "Registrar", 5, 45)
+        add_task(student.id, "Confirm withdrawal fee status with the Registrar", "Graduate School Staff", 5, 45)
     elif action == "return_requirements":
         account = require_workflow_actor("staff")
         if application.status != "Requirements Submitted":
@@ -7167,7 +7167,7 @@ def handle_withdrawal(data: MultiDict) -> int:
         result = "Withdrawal requirements marked incomplete and returned to the student"
         add_task(student.id, "Complete and resubmit withdrawal requirements", "Student", 5, 45)
     elif action == "record_fee_clearance":
-        account = require_workflow_actor("registrar")
+        account = require_workflow_actor("staff")  # GS Staff records the external registrar's confirmation
         if application.status != "Registrar Review" or application.requirement_status != "Complete":
             raise ValueError("Verify the withdrawal requirements before recording Registrar fee clearance.")
         application.fee_status = "Cleared"
@@ -7182,9 +7182,9 @@ def handle_withdrawal(data: MultiDict) -> int:
         application.status = "Withdrawal Confirmed"
         next_owner = "Registrar"
         result = "GS Staff recorded the confirmed withdrawal and informed the student; Registrar record update requested"
-        add_task(student.id, "Update the student record for confirmed withdrawal", "Registrar", 3, 45)
+        add_task(student.id, "Update the student record for confirmed withdrawal", "Graduate School Staff", 3, 45)
     elif action == "record_registrar_update":
-        account = require_workflow_actor("registrar")
+        account = require_workflow_actor("staff")  # GS Staff records the external registrar's confirmation
         if application.status != "Withdrawal Confirmed":
             raise ValueError("GS Staff must confirm the completed withdrawal before the Registrar record update.")
         application.registrar_status = "Record Updated"
@@ -7295,7 +7295,7 @@ def handle_graduation(data: MultiDict) -> int:
     elif requested_status == "Sent to Registrar":
         raise ValueError("Use the export action on a Dean-approved endorsement to hand it off to the Registrar.")
     elif requested_status == "Registrar Received":
-        account = require_workflow_actor("registrar")
+        account = require_workflow_actor("staff")  # GS Staff records the external registrar's confirmation
         if endorsement.endorsement_status != "Sent to Registrar":
             raise ValueError("The endorsed list must be sent to the Registrar before receipt can be recorded.")
         endorsement.endorsement_status = "Registrar Received"
@@ -10403,7 +10403,6 @@ def ensure_demo_accounts() -> None:
         ("staff@gs.local", "Graduate School Staff Demo", "staff"),
         ("academic@gs.local", "Academic Coordinator Demo", "academic_coordinator"),
         ("research@gs.local", "Research Coordinator Demo", "research_coordinator"),
-        ("registrar@gs.local", "Registrar Demo", "registrar"),
     ]
     for email, full_name, role in backoffice_accounts:
         account = UserAccount.query.filter_by(email=email).first()
