@@ -29,9 +29,9 @@ out and a status is recorded by GS Staff).
 
 ## 4. Student completes an Incomplete grade
 - Academic Coordinator records the final grade before the deadline → status resolves to a grade. ✅
-  - **4a. Never completes (deadline passes) — RULE (decided):** the system **automatically converts
-    the Incomplete to Failed once the deadline passes, and notifies the student + Academic
-    Coordinator** (activity log + a follow-up task for the AC). ✅
+  - **4a. Never completes within one year — RULE (per Handbook §3.5):** the system **auto-assigns
+    3.0 (master's) / 2.0 (doctorate) — "passed, no credit" — and flags the subject for RETAKE**
+    (not a failure), notifying the student + Academic Coordinator (activity log + retake task). ✅
 
 ## 5. Student files a Leave of Absence
 - Student files LOA (portal) → GS Staff checks prior-LOA eligibility → routed to Dean → Dean

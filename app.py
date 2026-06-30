@@ -3786,7 +3786,7 @@ def register_routes(app: Flask) -> None:
         term = (data.get("term") or "").strip()
         account = current_account()
         actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
-        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Dropped", "Missing", "Failed"}
+        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Dropped", "Missing", "Failed", "Retake Required"}
         changed = 0
         changed_students: set[int] = set()
         status_counts: dict[str, int] = {}
@@ -9583,11 +9583,12 @@ def ensure_course_workflow_schema() -> None:
 
 
 def sweep_lapsed_incompletes() -> int:
-    """Auto-fail Incompletes whose completion deadline has passed, then notify.
+    """Resolve Incompletes not removed within the one-year window, per Handbook §3.5.
 
-    Rule (decided): an Incomplete not completed by its deadline is automatically converted
-    to Failed; the student and Academic Coordinator are notified (activity log + a follow-up
-    task) rather than waiting for a manual decision.
+    Rule: an Incomplete left unremoved past its deadline is automatically given 3.0
+    (master's) / 2.0 (doctorate) -- "passed but no credit" -- and the subject must be
+    RETAKEN (it is NOT a failure). The student and Academic Coordinator are notified
+    (activity log + a retake follow-up task).
     """
     today = date.today()
     lapsed = (
@@ -9603,20 +9604,28 @@ def sweep_lapsed_incompletes() -> int:
     for record in lapsed:
         course = record.course
         deadline = record.incomplete_deadline
-        record.status = "Failed"
-        record.grade_status = "Failed"
+        student = db.session.get(Student, record.student_id)
+        is_doctorate = bool(student and (student.program.name or "").lower().startswith("doctor"))
+        no_credit_grade = "2.0" if is_doctorate else "3.0"
+        record.status = "Retake Required"
+        record.grade_status = "No Credit"
+        record.grade_value = no_credit_grade
         record.resolved_at = now_utc()
-        note = f"Auto-failed: Incomplete not completed by {iso(deadline)}."
+        note = (
+            f"Incomplete not removed within one year (lapsed {iso(deadline)}): auto-assigned "
+            f"{no_credit_grade} (passed, no credit) per Handbook 3.5; subject must be retaken."
+        )
         record.remarks = (f"{record.remarks} | {note}" if record.remarks else note)
         record.updated_at = now_utc()
         add_log(
             "course-audit", record.student_id, "System",
             "Incomplete deadline lapsed",
-            f"{course.code} auto-marked Failed (Incomplete lapsed {iso(deadline)})",
+            f"{course.code}: Incomplete lapsed -> {no_credit_grade} (no credit); retake required",
             "Academic Coordinator",
-            "Automatic conversion of a lapsed Incomplete to Failed. Student and Academic Coordinator notified.",
+            "Per Handbook 3.5, an unremoved Incomplete becomes 3.0 (master's) / 2.0 (doctorate) with "
+            "no credit and the subject must be retaken. Student and Academic Coordinator notified.",
         )
-        add_task(record.student_id, f"Review auto-failed Incomplete: {course.code}", "Academic Coordinator", 0, 55)
+        add_task(record.student_id, f"Schedule retake - {course.code} (Incomplete lapsed, no credit)", "Academic Coordinator", 0, 55)
         changed += 1
     if changed:
         db.session.commit()
