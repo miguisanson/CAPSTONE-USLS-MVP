@@ -32,6 +32,14 @@ Merge of all team branches (v1.8-khloe + v1.9) onto the v1.7 line, plus role and
 - Form 1 sample regenerated as a valid, text-extractable PDF.
 - Migration order fixed so data-repair runs after column-adding migrations.
 
+### Added (later)
+- **Leave of Absence & Readmission → board + table parity** with Withdrawal: status-column
+  board (For Review / Approved / Returned / Denied), board/table toggle, search + status
+  filters, click-into processing form. Backed by a roster that derives each request's current
+  status from its latest workflow log.
+- **Incomplete lapse rule corrected to Handbook §3.5**: lapsed Incomplete → 3.0 (master's) /
+  2.0 (doctorate) "no credit" + Retake Required (not Failed).
+
 ### In progress (approved build queue)
 - Incomplete → auto-fail + notify (4a)
 - AWOL workflow + 5-year residency rule (7, 8)

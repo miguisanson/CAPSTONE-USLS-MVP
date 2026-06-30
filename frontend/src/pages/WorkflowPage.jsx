@@ -91,7 +91,15 @@ const NEEDS_STUDENT = {
   graduation: false,
 };
 
-const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation"]);
+const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation", "leave-of-absence", "readmission"]);
+
+// Board columns for the request rosters (Leave of Absence, Readmission).
+const REQUEST_BOARD_COLUMNS = [
+  { label: "For Review", statuses: ["Pending Review", "In Progress"] },
+  { label: "Approved", statuses: ["Approved"] },
+  { label: "Returned for Revision", statuses: ["Returned for Revision"] },
+  { label: "Denied", statuses: ["Denied"] },
+];
 
 export default function WorkflowPage() {
   const { slug } = useParams();
@@ -364,24 +372,25 @@ export default function WorkflowPage() {
 // Submitted-request queue for student-initiated workflows (LOA / Readmission).
 function RequestQueue({ requests, selectedId, onPick, onClear }) {
   const list = requests || [];
+  const [viewMode, setViewMode] = useState("board");
+  const [filters, setFilters] = useState({ query: "", status: "" });
   const selected = list.find((r) => r.id === selectedId);
-  return (
-    <Card className="p-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle
-          title="Submitted requests"
-          subtitle="Student-submitted applications waiting for staff review"
-          icon={Inbox}
-        />
-        <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
-          <Users className="h-4 w-4" /> {list.length} pending
-        </div>
-      </div>
-      {selected ? (
+  const pendingCount = list.filter((r) => r.status === "Pending Review").length;
+  const filtered = list.filter((r) => {
+    const hay = `${r.name} ${r.student_number} ${r.program_code} ${r.request_label || ""}`.toLowerCase();
+    return (!filters.query || hay.includes(filters.query.toLowerCase())) && (!filters.status || r.status === filters.status);
+  });
+
+  if (selected) {
+    return (
+      <Card className="p-6">
         <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">{selected.name}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-ink">{selected.name}</p>
+                <StatusBadge value={selected.status} dot={false} />
+              </div>
               <p className="text-xs text-slate-500">
                 {selected.student_number} · {selected.program_code} · submitted {formatDate(selected.submitted_at)}
               </p>
@@ -392,44 +401,84 @@ function RequestQueue({ requests, selectedId, onPick, onClear }) {
           </div>
           <RequestSummary request={selected} compact />
         </div>
-      ) : list.length ? (
-        <div className="overflow-hidden rounded-xl border border-slate-200">
-          <div className="grid grid-cols-12 gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-            <div className="col-span-12 sm:col-span-5">Student</div>
-            <div className="col-span-12 sm:col-span-5">Request</div>
-            <div className="col-span-12 text-right sm:col-span-2">Action</div>
-          </div>
-          {list.map((r) => (
-            <div key={r.request_log_id || r.id} className="grid grid-cols-12 items-center gap-3 border-t border-slate-100 px-4 py-3">
-              <div className="col-span-12 min-w-0 sm:col-span-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-ink">{r.name}</p>
-                  <StatusBadge value="Pending Review" dot={false} />
-                </div>
-                <p className="truncate text-xs text-slate-500">
-                  {r.student_number} · {r.program_code} · submitted {formatDate(r.submitted_at)}
-                </p>
-              </div>
-              <div className="col-span-12 min-w-0 text-sm text-slate-600 sm:col-span-5">
-                <p className="truncate font-semibold text-ink">{r.request_label || "Student request"}</p>
-                <p className="truncate text-xs text-slate-500">{r.attachment || "Application PDF uploaded"}</p>
-              </div>
-              <div className="col-span-12 flex justify-start sm:col-span-2 sm:justify-end">
-                <button type="button" onClick={() => onPick(r)} className="btn-primary px-3 py-2">
-                  <Eye className="h-4 w-4" /> Review
-                </button>
-              </div>
-            </div>
-          ))}
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <SectionTitle title="Submitted requests" subtitle="Student-filed applications, grouped by current status" icon={Inbox} />
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500"><Users className="h-4 w-4" /> {pendingCount} for review</span>
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </div>
-      ) : (
-        <EmptyState
-          icon={Inbox}
-          title="No submitted requests yet"
-          hint="When a student files this from their portal, they'll appear here for you to act on."
+      </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input type="search" value={filters.query} onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))} placeholder="Search name, number, or program…" className="field-input pl-9" />
+        </div>
+        <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className="field-input cursor-pointer sm:w-56" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          {["Pending Review", "Approved", "Returned for Revision", "Denied"].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+      {!list.length ? (
+        <EmptyState icon={Inbox} title="No submitted requests yet" hint="When a student files this from their portal, they'll appear here for you to act on." />
+      ) : viewMode === "board" ? (
+        <WorkflowBoard
+          columns={REQUEST_BOARD_COLUMNS}
+          rows={filtered}
+          getStatus={(r) => r.status}
+          renderCard={(r) => <RequestBoardCard key={r.request_log_id || r.id} item={r} onOpen={() => onPick(r)} />}
+          empty="No requests match the filters"
         />
+      ) : (
+        <RequestTable rows={filtered} onOpen={onPick} />
       )}
     </Card>
+  );
+}
+
+function RequestBoardCard({ item, onOpen }) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{item.name}</p><p className="text-xs text-slate-400">{item.student_number} · {item.program_code}</p></div>
+        <StatusBadge value={item.status} dot={false} />
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.request_label || "Student request"}</p>
+      <div className="mt-2 text-xs text-slate-500">Submitted {formatDate(item.submitted_at)}</div>
+      <p className="mt-2 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {item.next_action_owner || "GS Staff"}</p>
+      <div className="mt-3"><button type="button" onClick={onOpen} className="btn-ghost w-full cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> {item.status === "Pending Review" ? "Review" : "View"}</button></div>
+    </article>
+  );
+}
+
+function RequestTable({ rows, onOpen }) {
+  if (!rows.length) return <EmptyState icon={Inbox} title="No requests match the filters" hint="Try clearing the search or status filter." />;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200">
+      <table className="w-full min-w-[640px] text-sm">
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <th className="px-4 py-3">Student</th><th className="px-3 py-3">Request</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Submitted</th><th className="px-3 py-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.request_log_id || r.id} className="border-b border-slate-50 hover:bg-slate-50/60">
+              <td className="px-4 py-3"><p className="font-semibold text-ink">{r.name}</p><p className="text-xs text-slate-400">{r.student_number} · {r.program_code}</p></td>
+              <td className="px-3 py-3 text-slate-600">{r.request_label || "Student request"}</td>
+              <td className="px-3 py-3"><StatusBadge value={r.status} dot={false} /></td>
+              <td className="px-3 py-3 text-slate-500">{formatDate(r.submitted_at)}</td>
+              <td className="px-3 py-3 text-right"><button type="button" onClick={() => onOpen(r)} className="btn-ghost cursor-pointer px-3 py-1.5"><Eye className="h-3.5 w-3.5" /> {r.status === "Pending Review" ? "Review" : "View"}</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

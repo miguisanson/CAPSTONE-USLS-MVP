@@ -5550,11 +5550,24 @@ def submitted_request_students(request_type: str) -> list[dict]:
             .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
             .first()
         )
-        if not latest_log or latest_log.id != log.id:
-            continue
         student = Student.query.get(log.student_id)
         if not student:
             continue
+        # Derive the request's current status from the latest workflow log so the board
+        # can group requests across columns (pending vs. the recorded Dean decision).
+        decided = bool(latest_log and latest_log.id != log.id)
+        if decided:
+            result_text = (latest_log.result or "").lower()
+            if "approved" in result_text:
+                status = "Approved"
+            elif "denied" in result_text or "deny" in result_text:
+                status = "Denied"
+            elif "return" in result_text:
+                status = "Returned for Revision"
+            else:
+                status = "In Progress"
+        else:
+            status = "Pending Review"
         attachment = latest_request_attachment(student.id, request_type)
         row = {
             **student_brief(student),
@@ -5562,10 +5575,12 @@ def submitted_request_students(request_type: str) -> list[dict]:
             "submitted_at": iso(log.created_at),
             "source_reference": log.source_reference,
             "notes": log.notes,
-            "last_result": None,
+            "last_result": (latest_log.result if decided else None),
+            "last_decision_at": (iso(latest_log.created_at) if decided else None),
+            "next_action_owner": (latest_log.next_owner if latest_log else "GS Staff"),
             "attachment": attachment.original_name if attachment else log.source_reference,
             "attachment_detail": attachment_dict(attachment),
-            "status": "Pending Review",
+            "status": status,
         }
         if request_type == "leave-of-absence":
             period = request_notes_value(log.notes, "Requested period")
