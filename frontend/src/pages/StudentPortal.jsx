@@ -32,7 +32,7 @@ import { formatDate, initials, relativeDays } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 
-const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Ethics Review", "Final Defense", "Completion Evidence"]);
+const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
 const STUDENT_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
@@ -687,7 +687,7 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
 
   async function removeResearchFile(file) {
     if (titlePackageLocked) return;
-    const confirmed = window.confirm(`Remove "${file.name}"? This will revoke the Academic Coordinator endorsement and clear the current Panel Matching result.`);
+    const confirmed = window.confirm(`Remove "${file.name}"? This will clear the current Panel Matching result for this stage.`);
     if (!confirmed) return;
     setRemovingId(file.id);
     setError("");
@@ -739,7 +739,7 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
                   <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
                     {file.name}<Eye className="h-3.5 w-3.5" />
                   </a>
-                  {titlePackageItem && (
+                  {requirement.student_upload && (
                     <button type="button" onClick={() => removeResearchFile(file)} disabled={titlePackageLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

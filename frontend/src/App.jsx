@@ -29,7 +29,7 @@ function homeFor(user) {
   if (user.role === "faculty") return "/faculty-portal";
   if (user.role === "dean") return "/approvals";
   if (user.role === "academic_coordinator") return "/workflow/course-audit";
-  if (user.role === "research_coordinator") return "/workflow/graduation";
+  if (user.role === "research_coordinator") return "/workflow/research-gate";
   if (user.role === "registrar") return "/workflow/withdrawal";
   return "/";
 }
@@ -87,7 +87,14 @@ export default function App() {
                 <Route path="/decision-support" element={<DecisionSupport />} />
                 <Route path="/assistant" element={<Assistant />} />
                 <Route path="/workflow/:slug" element={<WorkflowPage />} />
-                <Route path="/form1-endorsements" element={<Form1Endorsements />} />
+                <Route
+                  path="/form1-endorsements"
+                  element={
+                    <RoleOnly user={user} role="academic_coordinator">
+                      <Form1Endorsements />
+                    </RoleOnly>
+                  }
+                />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>

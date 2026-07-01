@@ -1900,6 +1900,7 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
   const progress = context.research_progress || {};
   const milestone = context.current_milestone || progress.milestone || {};
   const requirements = milestone.requirements || [];
+  const [ethicsReview, setEthicsReview] = useState({ status: "Cleared", date: new Date().toISOString().slice(0, 10) });
   const completed = requirements.filter((item) => item.status === "Complete");
   const pending = requirements.filter((item) => item.status !== "Complete");
   const panel = context.panel_status || {};
@@ -1910,6 +1911,14 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
   function onSubmit(e) {
     e.preventDefault();
     submit({ student_id: studentId });
+  }
+
+  function recordEthicsClearance() {
+    submit({
+      student_id: studentId,
+      ethics_clearance_status: ethicsReview.status,
+      ethics_clearance_date: ethicsReview.date,
+    });
   }
 
   return (
@@ -1970,6 +1979,11 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
                       <UserRoundCheck className="h-4 w-4" /> Form 1 endorsements
                     </a>
                   )}
+                  {requirement.item_name === "Ethics Clearance" && user?.role === "research_coordinator" && (
+                    <button type="button" disabled={!requirement.files?.length} onClick={() => document.getElementById("ethics-clearance-record")?.scrollIntoView({ behavior: "smooth", block: "center" })} className="btn-ghost cursor-pointer justify-center whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60">
+                      <FileCheck className="h-4 w-4" /> Record clearance
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -1984,9 +1998,34 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
         </div>
       </div>
 
+      {requirements.some((item) => item.item_name === "Ethics Clearance") && (
+        <section id="ethics-clearance-record" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-ink">Research Protocol Form 5.2 ethics clearance</p>
+              <p className="mt-1 text-xs text-slate-500">Preview the signed Ethics Office form, then record the clearance status and date before panel matching or scheduling can proceed.</p>
+            </div>
+            <StatusBadge value={requirements.find((item) => item.item_name === "Ethics clearance status and date")?.status_label || "Pending"} dot={false} />
+          </div>
+          {user?.role === "research_coordinator" && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+              <Field label="Clearance status">
+                <Select value={ethicsReview.status} onChange={(event) => setEthicsReview((current) => ({ ...current, status: event.target.value }))} options={["Cleared", "Returned", "Not cleared"]} />
+              </Field>
+              <Field label="Clearance date">
+                <Input type="date" value={ethicsReview.date} onChange={(event) => setEthicsReview((current) => ({ ...current, date: event.target.value }))} />
+              </Field>
+              <button type="button" disabled={submitting} onClick={recordEthicsClearance} className="btn-primary mt-6 cursor-pointer px-4 py-2">
+                <CheckCircle2 className="h-4 w-4" /> Record ethics clearance
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><p className="text-sm font-semibold text-ink">Panel Matching</p><p className="text-xs text-slate-500">System-generated from the three concept papers.</p></div>
+          <div><p className="text-sm font-semibold text-ink">Panel Matching</p><p className="text-xs text-slate-500">System-generated from the active paper body after required clearances.</p></div>
           <div className="flex items-center gap-2"><StatusBadge value={panel.status || "Not yet generated"} dot={false} /><Link to={`/workflow/panel-matching?student_id=${studentId}`} className="btn-ghost cursor-pointer">Open matching <ArrowUpRight className="h-4 w-4" /></Link></div>
         </div>
         {panel.recommendations?.length > 0 && <p className="mt-2 text-xs text-slate-600">{panel.recommendations.map((item) => item.faculty_name).filter(Boolean).join(" · ")}</p>}
@@ -2009,7 +2048,7 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
             </div>
             <StatusBadge value={outcomeRequirement.status_label} dot={false} />
           </div>
-          {user?.role === "staff" && outcomeRequirement.status !== "Complete" && (
+          {user?.role === "staff" && outcomeRequirement && (
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" disabled={!canRecordDefenseOutcome || submitting} onClick={() => submit({ student_id: studentId, defense_outcome: "Passed" })} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60">
                 <CheckCircle2 className="h-4 w-4" /> Mark Passed
@@ -2043,6 +2082,17 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
   const visibleRecommendations = recs.slice(0, Math.max(8, roles.length || 0));
   const finalizedPanel = context.assigned_panel || [];
   const selectionComplete = selectedIds.length === roles.length && new Set(selectedIds).size === roles.length;
+  const sourceLabel = profile.source_label || "research manuscript";
+  const documentCount = profile.document_count ?? profile.concept_paper_count ?? 0;
+  const readableCount = profile.readable_document_count ?? profile.readable_paper_count ?? 0;
+  const requiredCount = profile.required_file_count || 1;
+  const ragModeLabel = {
+    "document-rag": "Document RAG",
+    "local-rag": "Local RAG",
+    "local-rag-fallback": "Local RAG fallback",
+    waiting: "Waiting for RAG",
+  }[profile.rag_mode] || "RAG analysis";
+  const ragStatus = profile.ready ? `Analyzed with ${ragModeLabel}` : "Waiting for RAG analysis";
 
   useEffect(() => {
     const finalizedIds = finalizedPanel.map((item) => item.faculty_id).filter(Boolean);
@@ -2056,10 +2106,6 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
     submit({ student_id: studentId, faculty_ids: selectedIds });
   }
 
-  function runMatching() {
-    refetch();
-  }
-
   function selectFaculty(index, value) {
     setSelectedIds((current) => {
       const next = [...current];
@@ -2070,18 +2116,29 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Panel recommendation workspace" subtitle="Review the research evidence, run the scoring model, adjust the shortlist, then finalize the panel" icon={Users} action={<Link to="/faculty" className="btn-ghost cursor-pointer"><Users className="h-4 w-4" /> Faculty profiles</Link>} />
+      <SectionTitle title="Panel recommendation workspace" subtitle="Review the research evidence, adjust the RAG-generated shortlist, then finalize the panel" icon={Users} action={<Link to="/faculty" className="btn-ghost cursor-pointer"><Users className="h-4 w-4" /> Faculty profiles</Link>} />
       <div className={`rounded-xl border px-4 py-3 ${profile.ready ? "border-brand-200 bg-brand-50" : "border-amber-200 bg-amber-50"}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className={`text-sm font-semibold ${profile.ready ? "text-brand-800" : "text-amber-900"}`}>
-              {profile.ready ? "Concept-paper content ready" : (profile.concept_paper_count || 0) < 3 ? "Three concept papers are required" : "Readable PDF text is required"}
+              {profile.ready ? `${sourceLabel} content ready` : profile.blocked_reason || `Readable ${sourceLabel} PDF text is required`}
             </p>
             <p className={`mt-1 text-xs ${profile.ready ? "text-brand-700" : "text-amber-800"}`}>
-              {profile.concept_paper_count || 0} of 3 PDFs uploaded · {profile.readable_paper_count || 0} of 3 successfully read. Source: {profile.source || "No research evidence yet"}.
+              {documentCount} of {requiredCount} PDFs uploaded. {readableCount} of {requiredCount} successfully read. Source: {profile.source || "No research evidence yet"}.
             </p>
           </div>
-          <StatusBadge value={profile.ready ? "Ready" : "Blocked"} dot={false} />
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge value={ragStatus} dot={false} />
+            <StatusBadge value={profile.ready ? "Ready" : "Blocked"} dot={false} />
+          </div>
+        </div>
+        <div className={`mt-3 rounded-lg border px-3 py-2 text-xs ${profile.ready ? "border-brand-200 bg-white/80 text-brand-800" : "border-amber-200 bg-white/70 text-amber-900"}`}>
+          <p className="font-semibold">{ragStatus}</p>
+          <p className="mt-1 leading-relaxed">
+            {profile.ready
+              ? profile.rag_summary || "The uploaded document body was analyzed against faculty specializations and availability before ranking panel candidates."
+              : profile.blocked_reason || "Upload readable source PDFs so the system can run RAG analysis for panel matching."}
+          </p>
         </div>
         {profile.research_title && <p className="mt-3 text-sm font-medium text-slate-700">Research title <span className="font-normal text-slate-500">(display only; excluded from matching)</span>: {profile.research_title}</p>}
         {profile.keywords?.length > 0 && (
@@ -2111,11 +2168,8 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
         <MiniBox label="Availability" value="30%" tone="blue" />
         <MiniBox label="Workload / suitability" value="20%" tone="amber" />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm text-slate-600">{context.research_case_type || "Thesis"} panel needs {roles.length} members: {roles.join(", ")}.</p>
-        <button type="button" disabled={!profile.ready} onClick={runMatching} className="btn-primary cursor-pointer">
-          <Sparkles className="h-4 w-4" /> Analyze PDF content and match panel
-        </button>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm text-slate-600">{context.research_case_type || "Thesis"} panel needs {roles.length} members: {roles.join(", ")}. Recommendations refresh automatically from the active stage uploads.</p>
       </div>
 
       {profile.ready && visibleRecommendations.length === 0 && (
@@ -2213,6 +2267,9 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
   const panel = context.assigned_panel || [];
   const requiredPanelCount = context.panel_roles?.length || 4;
   const panelComplete = panel.length >= requiredPanelCount;
+  const isFailedStageRetry = schedules.some(
+    (schedule) => schedule.defense_type === form.defense_type && schedule.defense_outcome === "Failed"
+  );
 
   useEffect(() => {
     setWindow({
@@ -2225,7 +2282,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
       preferred_end_date: availability.window_end || "",
       selected_start: "",
       selected_end: "",
-      defense_type: readiness.stage === "Ethics Review" ? "Proposal Defense" : (readiness.stage || "Proposal Defense"),
+      defense_type: readiness.stage || "Proposal Defense",
       override_requirements: false,
       override_conflicts: false,
     }));
@@ -2346,7 +2403,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
         form={form}
         chooseSlot={chooseSlot}
       />
-      <div className="border-t border-slate-200 pt-5"><p className="text-sm font-semibold text-ink">Final schedule</p><p className="text-xs text-slate-500">Only staff can finalize or reschedule this record.</p></div>
+      <div className="border-t border-slate-200 pt-5"><p className="text-sm font-semibold text-ink">Final schedule</p><p className="text-xs text-slate-500">Only staff can finalize this stage schedule.</p></div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Selected date" required>
           <Input type="date" value={form.preferred_date} min={window.start} max={window.end} onChange={set("preferred_date")} required />
@@ -2381,7 +2438,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
       <button type="submit" disabled={submitting || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements)} className="btn-primary w-full sm:w-auto">
-        {submitting ? "Saving..." : schedules.length ? "Finalize reschedule" : "Set defense schedule"}
+        {submitting ? "Saving..." : isFailedStageRetry ? "Finalize reschedule" : "Set defense schedule"}
       </button>
       {schedules.length > 0 && <ScheduleHistory schedules={schedules} />}
     </form>
@@ -2635,10 +2692,10 @@ function ScheduleHistory({ schedules }) {
             <div>
               <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
               <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
-              {schedule.conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.conflict_reason}</p>}
+              {schedule.display_conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.display_conflict_reason}</p>}
               {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
             </div>
-            <StatusBadge value={schedule.status} />
+            <StatusBadge value={schedule.display_status || schedule.status} />
           </div>
         ))}
       </div>

@@ -89,8 +89,8 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
-  research_coordinator: new Set(["/workflow/graduation", "/work-queue"]),
+  academic_coordinator: new Set(["/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/research-gate", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
+  research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
   registrar: new Set(["/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
 };
 

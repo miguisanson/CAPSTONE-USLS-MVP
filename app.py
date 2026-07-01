@@ -663,6 +663,7 @@ class PanelAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
     faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"), nullable=False)
+    gate = db.Column(db.String(80))
     panel_role = db.Column(db.String(60), nullable=False)
     score = db.Column(db.Integer, default=0)
     eligibility_note = db.Column(db.String(220))
@@ -1058,6 +1059,7 @@ def panel_assignment_dict(assignment: PanelAssignment) -> dict:
     return {
         "id": assignment.id,
         "faculty_id": assignment.faculty_id,
+        "gate": assignment.gate,
         "panel_role": assignment.panel_role,
         "score": assignment.score,
         "eligibility_note": assignment.eligibility_note,
@@ -1074,6 +1076,29 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
         panelists = json.loads(req.panel_snapshot or "[]")
     except (TypeError, json.JSONDecodeError):
         panelists = []
+    gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(req.defense_type or "")
+    outcome = latest_defense_outcome(req.student, gate) if gate and req.student else None
+    display_status = req.status
+    display_conflict_reason = req.conflict_reason
+    if req.status == "Rescheduled" and req.defense_type:
+        older_same_stage_schedule = ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == req.student_id,
+            ScheduleRequest.defense_type == req.defense_type,
+            ScheduleRequest.created_at < req.created_at,
+        ).first()
+        if not older_same_stage_schedule:
+            display_status = "Scheduled"
+    if outcome and outcome["result"] == "Passed":
+        display_status = "Finished"
+        if display_conflict_reason in {
+            "Superseded by a staff-approved reschedule.",
+            "Superseded by a staff-approved schedule update.",
+        }:
+            display_conflict_reason = None
+    elif outcome and outcome["result"] == "Failed":
+        display_status = "Failed"
+    elif req.status == "Cancelled" and display_conflict_reason == "Superseded by a staff-approved reschedule.":
+        display_conflict_reason = "Superseded by a staff-approved schedule update."
     return {
         "id": req.id,
         "preferred_date": iso(req.preferred_date),
@@ -1084,6 +1109,9 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
         "mode": req.mode,
         "venue": req.venue,
         "status": req.status,
+        "display_status": display_status,
+        "defense_outcome": outcome["result"] if outcome else None,
+        "display_conflict_reason": display_conflict_reason,
         "matched_count": req.matched_count,
         "panelists": panelists,
         "required_forms_status": req.required_forms_status,
@@ -1444,8 +1472,8 @@ BACKOFFICE_ROLES = {
 }
 
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"course-audit", "practicum", "graduation", "withdrawal"},
-    "research_coordinator": {"graduation"},
+    "academic_coordinator": {"course-audit", "research-gate", "practicum", "graduation", "withdrawal"},
+    "research_coordinator": {"research-gate", "graduation"},
     "registrar": {"graduation", "withdrawal"},
 }
 
@@ -2554,9 +2582,7 @@ def register_routes(app: Flask) -> None:
             .order_by(DocumentCheck.gate, DocumentCheck.item_name)
             .all()
         )
-        panel = (
-            PanelAssignment.query.filter_by(student_id=student.id).order_by(PanelAssignment.score.desc()).all()
-        )
+        panel = active_panel_assignments(student, research_progress["gate"])
         schedules = (
             ScheduleRequest.query.filter_by(student_id=student.id)
             .order_by(ScheduleRequest.created_at.desc())
@@ -2674,11 +2700,7 @@ def register_routes(app: Flask) -> None:
             .limit(5)
             .all()
         )
-        panel = (
-            PanelAssignment.query.filter_by(student_id=student.id)
-            .order_by(PanelAssignment.score.desc())
-            .all()
-        )
+        panel = active_panel_assignments(student, research_progress["gate"])
         tasks = (
             Task.query.filter(
                 Task.student_id == student.id,
@@ -2867,7 +2889,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": f"This upload belongs to {progress['stage']}, the automatically detected current stage."}), 400
         if item_name not in required_documents_for_gate(gate):
             return jsonify({"error": "Choose a valid requirement for this gate."}), 400
-        if gate == "Form 1 - Title Defense" and item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and PanelAssignment.query.filter_by(student_id=student.id).count():
+        if gate == "Form 1 - Title Defense" and item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and active_panel_assignments(student, gate):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
         presentation = research_requirement_presentation(gate, item_name)
         if not presentation or presentation["source_type"] != "student_upload":
@@ -2922,10 +2944,10 @@ def register_routes(app: Flask) -> None:
         student = Student.query.get_or_404(account.student_id)
         evidence = ResearchEvidenceFile.query.filter_by(id=evidence_id, student_id=student.id).first_or_404()
         doc = evidence.document_check
-        removable_title_items = {"Form 1 - Application for Title Defense", "Three concept papers"}
-        if doc.item_name not in removable_title_items:
-            return jsonify({"error": "Only Form 1 and concept-paper uploads can be removed from the student view."}), 400
-        if doc.gate == "Form 1 - Title Defense" and PanelAssignment.query.filter_by(student_id=student.id).count():
+        presentation = research_requirement_presentation(doc.gate, doc.item_name)
+        if not presentation or presentation["source_type"] != "student_upload":
+            return jsonify({"error": "Only student-uploaded research evidence can be removed from the student view."}), 400
+        if doc.gate == "Form 1 - Title Defense" and active_panel_assignments(student, doc.gate):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
 
         stored_path = UPLOAD_ROOT / evidence.stored_name
@@ -2945,23 +2967,25 @@ def register_routes(app: Flask) -> None:
         doc.evidence_reference = ", ".join(item.original_name for item in remaining) or None
         doc.updated_at = now_utc()
 
-        # The endorsement and panel recommendation approve the exact title package.
-        # Any deletion changes that set, so both downstream results are revoked.
+        # Any student upload used by the current gate can affect that gate's
+        # matching source, so clear only the active gate panel.
         panel_invalidated = True
-        PanelAssignment.query.filter_by(student_id=student.id).delete()
-        endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first()
-        endorsement_revoked = bool(endorsement)
-        if endorsement:
-            db.session.delete(endorsement)
-        endorsement_doc = DocumentCheck.query.filter_by(
-            student_id=student.id,
-            gate="Form 1 - Title Defense",
-            item_name="Academic Coordinator endorsement/e-signature",
-        ).first()
-        if endorsement_doc:
-            endorsement_doc.status = "Missing"
-            endorsement_doc.evidence_reference = None
-            endorsement_doc.updated_at = now_utc()
+        clear_panel_for_research_gate(student, doc.gate)
+        endorsement_revoked = False
+        if doc.gate == "Form 1 - Title Defense":
+            endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first()
+            endorsement_revoked = bool(endorsement)
+            if endorsement:
+                db.session.delete(endorsement)
+            endorsement_doc = DocumentCheck.query.filter_by(
+                student_id=student.id,
+                gate="Form 1 - Title Defense",
+                item_name="Academic Coordinator endorsement/e-signature",
+            ).first()
+            if endorsement_doc:
+                endorsement_doc.status = "Missing"
+                endorsement_doc.evidence_reference = None
+                endorsement_doc.updated_at = now_utc()
         sync_research_progress(student)
         add_log(
             "research-gate",
@@ -2970,8 +2994,9 @@ def register_routes(app: Flask) -> None:
             original_name,
             f"{doc.item_name} removed",
             "Student" if len(remaining) < required_count else "Academic Coordinator",
-            f"Student removed a title-defense upload. {len(remaining)} of {required_count} remain for {doc.item_name}. "
-            "Academic Coordinator endorsement was revoked and Panel Matching was cleared.",
+            f"Student removed a {doc.gate} upload. {len(remaining)} of {required_count} remain for {doc.item_name}. "
+            + ("Academic Coordinator endorsement was revoked and " if endorsement_revoked else "")
+            + "Panel Matching was cleared for this stage.",
         )
         db.session.commit()
         stored_path.unlink(missing_ok=True)
@@ -3315,7 +3340,7 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        if not PanelAssignment.query.filter_by(student_id=student.id).first():
+        if not active_panel_assignments(student):
             return jsonify({"error": "Panel matching must be completed before requesting a defense schedule."}), 400
         source = (data.get("venue") or "").strip()
         preferred_date = (data.get("preferred_date") or "").strip()
@@ -3349,7 +3374,7 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
-        if doc.gate == "Form 1 - Title Defense" and doc.item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and PanelAssignment.query.filter_by(student_id=student.id).count():
+        if doc.gate == "Form 1 - Title Defense" and doc.item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and active_panel_assignments(student, doc.gate):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
@@ -3445,7 +3470,7 @@ def register_routes(app: Flask) -> None:
         return Response(body, mimetype="text/html")
 
     @app.route("/api/research-gate/form1-endorsements")
-    @require_api_login("academic_coordinator", "staff")
+    @require_api_login("academic_coordinator")
     def form1_endorsement_queue():
         form_docs = (
             DocumentCheck.query.filter_by(gate="Form 1 - Title Defense", item_name="Form 1 - Application for Title Defense")
@@ -3469,7 +3494,7 @@ def register_routes(app: Flask) -> None:
         return jsonify({"items": rows})
 
     @app.route("/api/research-gate/form1-endorsements/<int:student_id>", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff")
+    @require_api_login("academic_coordinator")
     def endorse_form1(student_id: int):
         student = Student.query.get_or_404(student_id)
         try:
@@ -5225,7 +5250,12 @@ def dashboard_drilldown_payload(filters) -> dict:
         rows = []
         for item in requests:
             case = ResearchCase.query.filter_by(student_id=item.student_id).order_by(ResearchCase.opened_at.desc()).first()
-            panel = PanelAssignment.query.filter_by(student_id=item.student_id).order_by(PanelAssignment.score.desc()).all()
+            panel_gate = case.current_gate if case else "Form 1 - Title Defense"
+            panel = (
+                PanelAssignment.query.filter_by(student_id=item.student_id, gate=panel_gate)
+                .order_by(PanelAssignment.score.desc())
+                .all()
+            )
             rows.append({
                 "id": item.id,
                 "student": student_brief(item.student),
@@ -5265,7 +5295,7 @@ PRACTICUM_ELIGIBILITY_CONFIG = {
     "stage_requirements": [
         {"key": "title", "label": "Title stage", "minimum_stage": "Proposal Development"},
         {"key": "proposal", "label": "Proposal stage", "minimum_stage": "Data Collection"},
-        {"key": "ethics", "label": "Ethics stage", "minimum_stage": "Data Collection"},
+        {"key": "ethics", "label": "Ethics clearance", "minimum_stage": "Data Collection"},
         {"key": "final", "label": "Final stage", "minimum_stage": "Final Defense"},
     ],
 }
@@ -6226,7 +6256,6 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             for gate in [
                 "Form 1 - Title Defense",
                 "Form 4 - Proposal Defense Readiness",
-                "Ethics Review",
                 "Final Defense",
                 "Completion Evidence",
             ]
@@ -6285,11 +6314,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             context["form1_endorsement"] = form1_endorsement_dict(
                 Form1Endorsement.query.filter_by(student_id=selected_student.id).first()
             )
-            final_panel = (
-                PanelAssignment.query.filter_by(student_id=selected_student.id)
-                .order_by(PanelAssignment.score.desc())
-                .all()
-            )
+            final_panel = active_panel_assignments(selected_student, progress["gate"])
             matching_profile = research_matching_profile(selected_student)
             context["panel_status"] = {
                 "status": (
@@ -6326,23 +6351,17 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     "workload": row["workload"],
                     "score_breakdown": row["score_breakdown"],
                 }
-                for row in (recommend_panel(selected_student) if prerequisite["research_allowed"] else [])[: max(12, len(panel_roles_for_student(selected_student)), 4)]
+                for row in (recommend_panel(selected_student) if prerequisite["research_allowed"] and matching_profile["ready"] else [])[: max(12, len(panel_roles_for_student(selected_student)), 4)]
             ]
             context["assigned_panel"] = [
                 panel_assignment_dict(p)
-                for p in PanelAssignment.query.filter_by(student_id=selected_student.id)
-                .order_by(PanelAssignment.score.desc())
-                .all()
+                for p in active_panel_assignments(selected_student, matching_profile["gate"])
             ]
         if slug == "defense-scheduling":
             prerequisite = comprehensive_exam_eligibility(selected_student)
             context["research_prerequisite"] = prerequisite
             research_case, progress = sync_research_progress(selected_student)
-            assignments = (
-                PanelAssignment.query.filter_by(student_id=selected_student.id)
-                .order_by(PanelAssignment.score.desc())
-                .all()
-            )
+            assignments = active_panel_assignments(selected_student, progress["gate"])
             context["assigned_panel"] = [panel_assignment_dict(p) for p in assignments]
             requirements = progress["milestone"]["requirements"]
             schedule_blockers = [
@@ -6376,6 +6395,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     parse_time(slot["start"]),
                     parse_time(slot["end"]),
                     "",
+                    progress["stage"],
                 )
                 slot["conflicts"] = conflicts
                 slot["conflict_free"] = not conflicts
@@ -6422,7 +6442,6 @@ def student_directory_brief(student: Student) -> dict:
     stage_by_gate = {
         "Form 1 - Title Defense": "Title Defense",
         "Form 4 - Proposal Defense Readiness": "Proposal Defense",
-        "Ethics Review": "Ethics Review",
         "Final Defense": "Final Defense",
         "Completion Evidence": "Completed",
     }
@@ -6559,9 +6578,9 @@ def merge_student_records(target: Student, source: Student, overwrite_profile: b
             row.student_id = target.id
             moved["related_records"] += 1
 
-    target_panel_keys = {(p.faculty_id, p.panel_role): p for p in PanelAssignment.query.filter_by(student_id=target.id).all()}
+    target_panel_keys = {(p.faculty_id, p.panel_role, p.gate): p for p in PanelAssignment.query.filter_by(student_id=target.id).all()}
     for panel in PanelAssignment.query.filter_by(student_id=source.id).all():
-        existing = target_panel_keys.get((panel.faculty_id, panel.panel_role))
+        existing = target_panel_keys.get((panel.faculty_id, panel.panel_role, panel.gate))
         if existing:
             existing.score = max(existing.score or 0, panel.score or 0)
             db.session.delete(panel)
@@ -7340,6 +7359,48 @@ def handle_research_gate(data: MultiDict) -> int:
     require_research_prerequisite(student)
     research_case, progress = sync_research_progress(student)
     gate = progress["gate"]
+    ethics_clearance_status = (data.get("ethics_clearance_status") or "").strip()
+    if ethics_clearance_status:
+        account = require_workflow_actor("research_coordinator")
+        if gate != "Form 4 - Proposal Defense Readiness":
+            raise ValueError("Ethics clearance is recorded during the Proposal Defense stage.")
+        allowed_statuses = {"Cleared", "Returned", "Not cleared"}
+        if ethics_clearance_status not in allowed_statuses:
+            raise ValueError("Choose Cleared, Returned, or Not cleared for the ethics clearance status.")
+        clearance_date = (data.get("ethics_clearance_date") or "").strip()
+        if ethics_clearance_status == "Cleared" and not clearance_date:
+            raise ValueError("Enter the ethics clearance date before marking the form Cleared.")
+        checks = ensure_research_document_checks(student.id, gate)
+        clearance_doc = next((doc for doc in checks if doc.item_name == "Ethics Clearance"), None)
+        record_doc = next((doc for doc in checks if doc.item_name == "Ethics clearance status and date"), None)
+        if not clearance_doc or not clearance_doc.evidence_files:
+            raise ValueError("Preview an uploaded Research Protocol Form 5.2 ethics clearance before recording the status.")
+        label = (
+            f"{ethics_clearance_status} on {clearance_date}"
+            if clearance_date
+            else ethics_clearance_status
+        )
+        clearance_doc.status = "Complete" if ethics_clearance_status == "Cleared" else ethics_clearance_status
+        clearance_doc.evidence_reference = label
+        clearance_doc.updated_at = now_utc()
+        if record_doc:
+            record_doc.status = "Complete" if ethics_clearance_status == "Cleared" else ethics_clearance_status
+            record_doc.evidence_reference = label
+            record_doc.updated_at = now_utc()
+        next_owner = "Research Coordinator" if ethics_clearance_status == "Cleared" else "Student"
+        if ethics_clearance_status != "Cleared":
+            add_task(student.id, "Resolve ethics clearance form", "Student", 5, 45)
+        add_log(
+            "research-gate",
+            student.id,
+            workflow_actor_label(account),
+            clearance_doc.evidence_reference,
+            f"Ethics clearance {ethics_clearance_status}",
+            next_owner,
+            f"Research Coordinator recorded Research Protocol Form 5.2 as {label}.",
+        )
+        sync_research_progress(student)
+        return student.id
     defense_outcome = (data.get("defense_outcome") or "").strip()
     if defense_outcome:
         account = require_workflow_actor("staff")
@@ -7426,8 +7487,12 @@ def handle_research_gate(data: MultiDict) -> int:
     for item in required_items:
         status = "Missing" if item in missing_items else "Complete"
         existing = next(doc for doc in checks if doc.item_name == item)
+        if item == "Ethics Clearance" and item not in missing_items:
+            ethics_record = next((doc for doc in checks if doc.item_name == "Ethics clearance status and date"), None)
+            if not ethics_record or ethics_record.status != "Complete":
+                status = existing.status if existing.status in {"Returned", "Not cleared"} else "Submitted"
         existing.status = status
-        if existing.evidence_files:
+        if existing.evidence_files and item != "Ethics Clearance":
             existing.evidence_reference = ", ".join(file.original_name for file in existing.evidence_files)
         existing.updated_at = now_utc()
 
@@ -7457,7 +7522,7 @@ def handle_panel_matching(data: MultiDict) -> int:
     require_research_prerequisite(student)
     matching_profile = research_matching_profile(student)
     if not matching_profile["ready"]:
-        raise ValueError("Panel matching requires readable text extracted from all three concept-paper PDFs. Replace scanned or image-only files with searchable PDFs.")
+        raise ValueError(matching_profile.get("blocked_reason") or "Panel matching requires readable research manuscript body text.")
     recommendations = recommend_panel(student)
     required_roles = panel_roles_for_student(student)
     selected_ids = []
@@ -7481,12 +7546,13 @@ def handle_panel_matching(data: MultiDict) -> int:
             raise ValueError("One of the selected faculty members is no longer eligible for panel assignment.")
         selected_rows.append(row)
 
-    PanelAssignment.query.filter_by(student_id=student.id).delete()
+    clear_panel_for_research_gate(student, matching_profile["gate"])
     for index, row in enumerate(selected_rows):
         db.session.add(
             PanelAssignment(
                 student_id=student.id,
                 faculty_id=row["faculty"].id,
+                gate=matching_profile["gate"],
                 panel_role=required_roles[index],
                 score=row["score"],
                 eligibility_note=row["note"],
@@ -7498,7 +7564,7 @@ def handle_panel_matching(data: MultiDict) -> int:
         student.id,
         "Research Coordinator",
         data.get("source_reference", ""),
-        f"{len(required_roles)}-member {research_case_type(student)} panel matched from uploaded concept papers",
+        f"{len(required_roles)}-member {research_case_type(student)} panel matched from uploaded {matching_profile['source_label']}",
         "Research Coordinator",
         "; ".join(
             [
@@ -7531,13 +7597,21 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         if item["status"] != "Complete"
         and item["source_type"] not in {"system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result"}
     ]
+    ethics_pending = [
+        item["label"]
+        for item in progress["milestone"]["requirements"]
+        if item["item_name"] in {"Ethics Clearance", "Ethics clearance status and date"}
+        and item["status"] != "Complete"
+    ]
+    if ethics_pending:
+        raise ValueError("The Research Coordinator must review and record the Research Protocol Form 5.2 ethics clearance before Defense Scheduling.")
     if missing_requirements and not override_requirements:
         raise ValueError(
             "Research Gate requirements are still pending: "
             + ", ".join(missing_requirements)
             + ". Review them or confirm the staff override."
         )
-    panel = PanelAssignment.query.filter_by(student_id=student.id).all()
+    panel = active_panel_assignments(student, progress["gate"])
     if not panel:
         raise ValueError("Complete Panel Matching before creating a defense schedule.")
     panel_ids = [assignment.faculty_id for assignment in panel]
@@ -7585,7 +7659,7 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     elif not selected_window_ok:
         status_reason.append(f"only {matched_count} of {len(participants)} participants share that time")
     conflicts = defense_schedule_conflicts(
-        student, panel, preferred_date, selected_start, selected_end, venue
+        student, panel, preferred_date, selected_start, selected_end, venue, defense_type
     )
     status_reason.extend(conflicts)
     if status_reason and not override_conflicts:
@@ -7598,14 +7672,21 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         else "time not selected"
     )
     previous_schedule = (
-        ScheduleRequest.query.filter_by(student_id=student.id)
+        ScheduleRequest.query.filter_by(student_id=student.id, defense_type=defense_type)
         .order_by(ScheduleRequest.created_at.desc())
         .first()
     )
-    action_label = "Rescheduled" if previous_schedule else "Scheduled"
+    gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(defense_type)
+    latest_outcome = latest_defense_outcome(student, gate) if gate else None
+    is_failed_stage_retry = bool(previous_schedule and latest_outcome and latest_outcome["result"] == "Failed")
+    action_label = "Rescheduled" if is_failed_stage_retry else "Scheduled"
     if previous_schedule and previous_schedule.status in ACTIVE_DEFENSE_STATUSES:
         previous_schedule.status = "Cancelled"
-        previous_schedule.conflict_reason = "Superseded by a staff-approved reschedule."
+        previous_schedule.conflict_reason = (
+            "Superseded by a staff-approved reschedule after a failed defense."
+            if is_failed_stage_retry
+            else "Superseded by a staff-approved schedule update."
+        )
     panel_snapshot = [
         {
             "faculty_id": assignment.faculty_id,
@@ -8000,7 +8081,6 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
             stage_by_gate = {
                 "Form 1 - Title Defense": "Proposal Development",
                 "Form 4 - Proposal Defense Readiness": "Proposal Defense",
-                "Ethics Review": "Data Collection",
                 "Final Defense": "Final Defense",
                 "Completion Evidence": "Final Defense",
             }
@@ -8705,13 +8785,17 @@ def store_research_evidence(
         if stream.read(5) != b"%PDF-":
             target.unlink(missing_ok=True)
             raise ValueError("The selected file is not a valid PDF.")
+    extracted_text = extract_pdf_text(target)
+    if item_name == "Proposal manuscript" and looks_like_proposal_endorsement(extracted_text):
+        target.unlink(missing_ok=True)
+        raise ValueError("Upload the proposal manuscript body, not the proposal endorsement form.")
     evidence = ResearchEvidenceFile(
         student_id=student.id,
         document_check_id=doc.id,
         original_name=original_name,
         stored_name=stored_name,
         mime_type="application/pdf",
-        extracted_text=extract_pdf_text(target),
+        extracted_text=extracted_text,
     )
     db.session.add(evidence)
     doc.status = "Submitted"
@@ -8782,11 +8866,188 @@ def extract_research_phrases(text: str, limit: int = 14) -> list[str]:
     return (recognized + frequent_terms)[:limit]
 
 
+def faculty_matching_profiles() -> list[dict]:
+    rows = []
+    for faculty in Faculty.query.filter_by(active=True).all():
+        profile_text = " ".join(
+            part for part in [faculty.name, faculty.specialization, faculty.role, faculty.college] if part
+        )
+        rows.append({
+            "id": faculty.id,
+            "name": faculty.name,
+            "specialization": faculty.specialization or "",
+            "college": faculty.college or "",
+            "tokens": set(matching_tokens(profile_text)),
+            "text": profile_text,
+        })
+    return rows
+
+
+def retrieve_faculty_for_panel_matching(paper_text: str, faculty_profiles: list[dict], limit: int = 8) -> list[dict]:
+    paper_counts = Counter(matching_tokens(paper_text))
+    ranked = []
+    for profile in faculty_profiles:
+        overlap = [token for token, _count in paper_counts.most_common() if token in profile["tokens"]]
+        phrase_hits = [
+            phrase for phrase in RESEARCH_KEY_PHRASES
+            if phrase in (paper_text or "").lower() and set(matching_tokens(phrase)).intersection(profile["tokens"])
+        ]
+        score = sum(min(paper_counts[token], 3) for token in overlap[:10]) + len(phrase_hits) * 2
+        if score:
+            ranked.append({**profile, "retrieval_score": score, "matched_terms": (phrase_hits + overlap)[:8]})
+    return sorted(ranked, key=lambda item: item["retrieval_score"], reverse=True)[:limit]
+
+
+def parse_panel_matching_rag_response(response_text: str) -> dict:
+    text_value = (response_text or "").strip()
+    match = re.search(r"\{.*\}", text_value, flags=re.S)
+    if not match:
+        return {}
+    try:
+        payload = json.loads(match.group(0))
+    except Exception:
+        return {}
+    keywords = [str(item).strip().lower() for item in payload.get("keywords", []) if str(item).strip()]
+    faculty_matches = []
+    for item in payload.get("faculty_matches", []):
+        try:
+            faculty_id = int(item.get("faculty_id"))
+        except Exception:
+            continue
+        faculty_matches.append({
+            "faculty_id": faculty_id,
+            "rationale": str(item.get("rationale", "")).strip()[:220],
+            "matched_terms": [str(term).strip().lower() for term in item.get("matched_terms", []) if str(term).strip()][:8],
+        })
+    return {
+        "keywords": keywords[:18],
+        "summary": str(payload.get("summary", "")).strip()[:500],
+        "faculty_matches": faculty_matches,
+    }
+
+
+def generate_local_panel_matching_rag(paper_text: str, retrieved_faculty: list[dict], limit: int = 18) -> dict:
+    base_keywords = extract_research_phrases(paper_text, limit)
+    faculty_terms = []
+    faculty_matches = []
+    for profile in retrieved_faculty:
+        terms = profile.get("matched_terms", [])[:6]
+        faculty_terms.extend(terms)
+        faculty_matches.append({
+            "faculty_id": profile["id"],
+            "faculty_name": profile["name"],
+            "rationale": "Retrieved from faculty specialization overlap with the uploaded manuscript body.",
+            "matched_terms": terms,
+        })
+    keywords = []
+    for term in base_keywords + faculty_terms:
+        cleaned = re.sub(r"\s+", " ", term).strip().lower()
+        if cleaned and cleaned not in keywords:
+            keywords.append(cleaned)
+    return {
+        "keywords": keywords[:limit],
+        "summary": paper_excerpt(paper_text, 420),
+        "faculty_matches": faculty_matches,
+        "mode": "local-rag",
+    }
+
+
+def generate_panel_matching_keywords_with_rag(paper_text: str, retrieved_faculty: list[dict], limit: int = 18) -> dict:
+    local_payload = generate_local_panel_matching_rag(paper_text, retrieved_faculty, limit)
+    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")):
+        return local_payload
+    snippets = "\n".join(
+        f"- faculty_id={item['id']}; {item['name']}; {item['specialization']}; matched_terms={', '.join(item.get('matched_terms', []))}"
+        for item in retrieved_faculty
+    )
+    prompt = (
+        "Analyze the uploaded research manuscript body and the retrieved faculty specialization snippets. "
+        "Return only compact JSON with keys: summary, keywords, faculty_matches. "
+        "keywords must be research-domain terms useful for panel matching. faculty_matches must include "
+        "faculty_id, matched_terms, and rationale. Do not use filenames or title metadata.\n\n"
+        f"Manuscript body excerpt:\n{paper_excerpt(paper_text, 5000)}\n\n"
+        f"Retrieved faculty specialization snippets:\n{snippets}"
+    )
+    try:
+        response = _load_rag_chat_engine().chat(prompt)
+        parsed = parse_panel_matching_rag_response(str(response))
+        if parsed.get("keywords"):
+            parsed["mode"] = "document-rag"
+            parsed["faculty_matches"] = parsed.get("faculty_matches") or local_payload["faculty_matches"]
+            parsed["summary"] = parsed.get("summary") or local_payload["summary"]
+            return parsed
+    except Exception:
+        pass
+    return {**local_payload, "mode": "local-rag-fallback"}
+
+
 def paper_excerpt(text: str, limit: int = 220) -> str:
     cleaned = re.sub(r"\s+", " ", text or "").strip()
     if len(cleaned) <= limit:
         return cleaned
     return cleaned[:limit].rsplit(" ", 1)[0] + "..."
+
+
+PANEL_MATCHING_SOURCE_ITEMS = {
+    "Form 1 - Title Defense": ["Three concept papers"],
+    "Form 4 - Proposal Defense Readiness": ["Proposal manuscript"],
+    "Final Defense": ["Final manuscript"],
+}
+
+
+def panel_matching_body_text(text: str, research_title: str = "") -> str:
+    title_key = identity_text(research_title)
+    kept = []
+    for raw_line in (text or "").splitlines():
+        line = re.sub(r"\s+", " ", raw_line).strip()
+        if not line:
+            continue
+        lower = line.lower()
+        line_key = identity_text(line)
+        if title_key and line_key == title_key:
+            continue
+        if lower.startswith(("research title", "title:", "paper title", "manuscript title", "file name", "filename")):
+            continue
+        if any(marker in lower for marker in ("endorsement for proposal defense", "endorsed by", "adviser endorsement", "e-signature", "signature")):
+            continue
+        if len(line) <= 80 and re.fullmatch(r"[A-Z0-9 .,:;()/-]+", line):
+            continue
+        kept.append(line)
+    return "\n".join(kept).strip()
+
+
+def looks_like_proposal_endorsement(text: str) -> bool:
+    lower = (text or "").lower()
+    endorsement_hits = sum(
+        marker in lower
+        for marker in (
+            "endorsement for proposal defense",
+            "form 4",
+            "adviser endorsement",
+            "recommending approval",
+            "e-signature",
+        )
+    )
+    manuscript_hits = sum(
+        marker in lower
+        for marker in ("abstract", "introduction", "methodology", "review of related literature", "references")
+    )
+    return endorsement_hits >= 2 and manuscript_hits < 2
+
+
+def panel_matching_source_files(student: Student, gate: str) -> tuple[list[ResearchEvidenceFile], list[str]]:
+    source_items = PANEL_MATCHING_SOURCE_ITEMS.get(gate) or ["Three concept papers"]
+    files = (
+        ResearchEvidenceFile.query.join(DocumentCheck)
+        .filter(
+            ResearchEvidenceFile.student_id == student.id,
+            DocumentCheck.gate == gate,
+            DocumentCheck.item_name.in_(source_items),
+        )
+        .order_by(ResearchEvidenceFile.uploaded_at.desc())
+        .all()
+    )
+    return files, source_items
 
 
 def research_matching_profile(student: Student) -> dict:
@@ -8795,18 +9056,14 @@ def research_matching_profile(student: Student) -> dict:
         .order_by(ResearchCase.opened_at.desc())
         .first()
     )
-    concept_files = (
-        ResearchEvidenceFile.query.join(DocumentCheck)
-        .filter(
-            ResearchEvidenceFile.student_id == student.id,
-            DocumentCheck.item_name == "Three concept papers",
-        )
-        .order_by(ResearchEvidenceFile.uploaded_at.desc())
-        .all()
+    research_case, progress = sync_research_progress(student)
+    gate = progress["gate"]
+    source_files, source_items = panel_matching_source_files(student, gate)
+    required_count = sum(
+        research_requirement_presentation(gate, item)["required_file_count"]
+        for item in source_items
     )
-    # Only the latest three PDFs make up the current concept-paper set. Older
-    # replacement uploads stay in the audit trail but do not skew retrieval.
-    analyzed_files = concept_files[:3]
+    analyzed_files = source_files[:required_count]
     # Legacy uploads may predate the PDF parser dependency. Re-read their
     # actual PDF bodies instead of falling back to filenames or metadata.
     for item in analyzed_files:
@@ -8817,33 +9074,93 @@ def research_matching_profile(student: Student) -> dict:
             extracted = extract_pdf_text(stored_path)
             if extracted.strip():
                 item.extracted_text = extracted
-    readable_files = [item for item in analyzed_files if (item.extracted_text or "").strip()]
     title = research_case.title if research_case else ""
+    source_documents = []
+    for item in analyzed_files:
+        raw_text = item.extracted_text or ""
+        body_text = panel_matching_body_text(raw_text, title)
+        if gate == "Form 4 - Proposal Defense Readiness" and looks_like_proposal_endorsement(raw_text):
+            body_text = ""
+        source_documents.append((item, body_text))
+    readable_files = [(item, body_text) for item, body_text in source_documents if body_text.strip()]
+    ethics_record = None
+    if gate == "Form 4 - Proposal Defense Readiness":
+        ethics_record = DocumentCheck.query.filter_by(
+            student_id=student.id,
+            gate=gate,
+            item_name="Ethics clearance status and date",
+        ).first()
+    ethics_ready = gate != "Form 4 - Proposal Defense Readiness" or bool(ethics_record and ethics_record.status == "Complete")
     # Ground matching in PDF body text only. Filenames, research titles, and
     # program labels are display metadata and never enter keyword extraction.
-    paper_text = "\n".join(item.extracted_text or "" for item in readable_files)
+    paper_text = "\n".join(body_text for _item, body_text in readable_files)
     query_text = paper_text.strip()
-    keywords = extract_research_phrases(paper_text, 16)
+    retrieved_faculty = retrieve_faculty_for_panel_matching(paper_text, faculty_matching_profiles())
+    rag_payload = generate_panel_matching_keywords_with_rag(paper_text, retrieved_faculty, 18) if query_text else {
+        "keywords": [],
+        "summary": "",
+        "faculty_matches": [],
+        "mode": "waiting",
+    }
+    keywords = rag_payload.get("keywords") or extract_research_phrases(paper_text, 16)
+    ready = len(analyzed_files) >= required_count and len(readable_files) >= required_count and ethics_ready
+    blocked_reason = ""
+    if len(analyzed_files) < required_count:
+        blocked_reason = f"Upload the required panel-matching source first: {', '.join(source_items)}."
+    elif len(readable_files) < required_count:
+        blocked_reason = "Panel matching requires readable PDF body text from the uploaded manuscript source."
+    elif not ethics_ready:
+        blocked_reason = "The Research Coordinator must record the Research Protocol Form 5.2 ethics clearance before Panel Matching."
     return {
         "research_title": title,
+        "gate": gate,
+        "source_items": source_items,
+        "source_label": ", ".join(source_items),
+        "required_file_count": required_count,
+        "document_count": len(analyzed_files),
+        "readable_document_count": len(readable_files),
+        "ethics_ready": ethics_ready,
+        "blocked_reason": blocked_reason,
         "concept_paper_count": len(analyzed_files),
         "concept_papers": [
             {
                 "id": item.id,
                 "name": item.original_name,
                 "url": f"/api/research-evidence/{item.id}/file",
-                "extracted": bool((item.extracted_text or "").strip()),
-                "keywords": extract_research_phrases(item.extracted_text or "", 6),
-                "excerpt": paper_excerpt(item.extracted_text or ""),
+                "extracted": bool(body_text.strip()),
+                "keywords": extract_research_phrases(body_text, 6),
+                "excerpt": paper_excerpt(body_text),
             }
-            for item in analyzed_files
+            for item, body_text in source_documents
         ],
         "keywords": keywords,
+        "rag_summary": rag_payload.get("summary", ""),
+        "rag_faculty_matches": rag_payload.get("faculty_matches", []),
+        "rag_mode": rag_payload.get("mode", "local-rag"),
         "query_text": query_text,
         "readable_paper_count": len(readable_files),
-        "ready": len(analyzed_files) >= 3 and len(readable_files) >= 3,
-        "source": "PDF body text only; research titles and filenames excluded" if len(readable_files) >= 3 else "Waiting for readable PDF body text",
+        "ready": ready,
+        "source": f"{', '.join(source_items)} body text only; research titles and filenames excluded" if ready else blocked_reason or "Waiting for readable PDF body text",
     }
+
+
+def current_panel_gate(student: Student) -> str:
+    _research_case, progress = sync_research_progress(student)
+    return progress["gate"]
+
+
+def active_panel_assignments(student: Student, gate: str | None = None) -> list[PanelAssignment]:
+    gate = gate or current_panel_gate(student)
+    return (
+        PanelAssignment.query.filter_by(student_id=student.id, gate=gate)
+        .order_by(PanelAssignment.score.desc())
+        .all()
+    )
+
+
+def clear_panel_for_research_gate(student: Student, gate: str | None = None) -> int:
+    gate = gate or current_panel_gate(student)
+    return PanelAssignment.query.filter_by(student_id=student.id, gate=gate).delete()
 
 
 def split_items(value: str) -> list[str]:
@@ -8890,7 +9207,10 @@ def schedule_panel_ids(schedule: ScheduleRequest) -> set[int]:
     if not ids:
         ids = {
             row.faculty_id
-            for row in PanelAssignment.query.filter_by(student_id=schedule.student_id).all()
+            for row in PanelAssignment.query.filter_by(
+                student_id=schedule.student_id,
+                gate=RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "", "Form 1 - Title Defense"),
+            ).all()
         }
     other_student = Student.query.get(schedule.student_id)
     adviser = Faculty.query.filter_by(name=other_student.adviser_name, active=True).first() if other_student else None
@@ -8906,23 +9226,29 @@ def defense_schedule_conflicts(
     selected_start: time | None,
     selected_end: time | None,
     venue: str,
+    defense_type: str | None = None,
 ) -> list[str]:
     if not selected_start or not selected_end:
         return []
     participant_ids = {item["faculty"].id for item in defense_participants(student, assignments)}
     conflicts = []
     candidates = ScheduleRequest.query.filter(
-        ScheduleRequest.student_id != student.id,
         ScheduleRequest.preferred_date == day,
         ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
     ).all()
     for schedule in candidates:
+        if schedule.student_id == student.id and schedule.defense_type == defense_type:
+            continue
         if not schedule.start_time or not schedule.end_time:
             continue
         if selected_start >= schedule.end_time or selected_end <= schedule.start_time:
             continue
         other = schedule.student
         label = f"{other.name} ({other.student_number})" if other else f"schedule #{schedule.id}"
+        if schedule.student_id == student.id:
+            conflicts.append(f"Same-student overlap: {schedule.defense_type or 'another defense'} is already scheduled for that time.")
+        else:
+            conflicts.append(f"Schedule overlap with {label}: {schedule.defense_type or 'defense'} is already scheduled for that time.")
         shared = participant_ids & schedule_panel_ids(schedule)
         if shared:
             names = [Faculty.query.get(faculty_id).name for faculty_id in shared if Faculty.query.get(faculty_id)]
@@ -9198,12 +9524,7 @@ RESEARCH_MILESTONES = {
     "Form 4 - Proposal Defense Readiness": {
         "label": "Proposal Defense Readiness",
         "short_label": "Proposal Defense",
-        "description": "Submit the proposal manuscript and consultation evidence. Adviser endorsement and the confirmed schedule are recorded separately.",
-    },
-    "Ethics Review": {
-        "label": "Ethics Review",
-        "short_label": "Ethics Review",
-        "description": "Upload the approved ethics clearance before moving to final-defense preparation.",
+        "description": "Submit the adviser-signed proposal manuscript, adviser-signed endorsements, ethics clearance, and consultation evidence. Panel matching and scheduling open only after the Research Coordinator records the ethics clearance.",
     },
     "Final Defense": {
         "label": "Final Defense Readiness",
@@ -9223,6 +9544,8 @@ RESEARCH_GATE_DEFENSE_TYPES = {
     "Final Defense": "Final Defense",
 }
 
+RESEARCH_DEFENSE_TYPES_TO_GATES = {value: key for key, value in RESEARCH_GATE_DEFENSE_TYPES.items()}
+
 RESEARCH_DEFENSE_RESULT_ITEMS = {
     "Form 1 - Title Defense": "Title defense result",
     "Form 4 - Proposal Defense Readiness": "Proposal defense result",
@@ -9241,7 +9564,6 @@ RESEARCH_DEFENSE_SCHEDULE_ITEMS = {
 RESEARCH_STAGE_SEQUENCE = [
     ("Title Defense", "Form 1 - Title Defense"),
     ("Proposal Defense", "Form 4 - Proposal Defense Readiness"),
-    ("Ethics Review", "Ethics Review"),
     ("Final Defense", "Final Defense"),
 ]
 
@@ -9283,22 +9605,34 @@ RESEARCH_REQUIREMENTS = {
         "required_file_count": 0,
     },
     "Form 4 - Endorsement for Proposal Defense": {
-        "label": "Signed Form 4 endorsement",
-        "description": "The endorsed application for proposal defense.",
-        "source_type": "staff",
-        "required_file_count": 0,
-    },
-    "Proposal manuscript": {
-        "label": "Proposal manuscript",
-        "description": "The proposal manuscript that will be reviewed by the panel.",
+        "label": "Adviser Signed Form 4 Proposal Defense Endorsement",
+        "description": "Upload the adviser-signed Form 4 proposal defense endorsement.",
         "source_type": "student_upload",
         "required_file_count": 1,
     },
-    "Adviser e-signature/endorsement": {
-        "label": "Adviser endorsement",
-        "description": "Recorded by the adviser after manuscript review.",
-        "source_type": "staff",
+    "Proposal manuscript": {
+        "label": "Adviser signed proposal manuscript",
+        "description": "Upload the adviser-signed proposal manuscript that will be reviewed by the panel.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Ethics Clearance": {
+        "label": "Research Protocol Form 5.2 ethics clearance",
+        "description": "Upload the ethics clearance form signed by the Ethics Office.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
+    "Ethics clearance status and date": {
+        "label": "Ethics clearance status and date",
+        "description": "Recorded by the Research Coordinator after previewing the signed ethics clearance.",
+        "source_type": "ethics_clearance_record",
         "required_file_count": 0,
+    },
+    "Adviser e-signature/endorsement": {
+        "label": "Adviser signed proposal manuscript endorsement",
+        "description": "Upload the adviser-signed proposal manuscript endorsement.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
     },
     "Form 4.1 Statistical Consultation Form or qualitative exemption": {
         "label": "Statistical consultation form or qualitative exemption",
@@ -9327,12 +9661,6 @@ RESEARCH_REQUIREMENTS = {
     "Final manuscript": {
         "label": "Final defense manuscript",
         "description": "The manuscript that will be distributed to the final defense panel.",
-        "source_type": "student_upload",
-        "required_file_count": 1,
-    },
-    "Ethics Clearance": {
-        "label": "Ethics clearance",
-        "description": "Upload the approved ethics clearance issued for the research.",
         "source_type": "student_upload",
         "required_file_count": 1,
     },
@@ -9466,10 +9794,25 @@ def research_requirement_state(
         if not enough_files:
             return {"status": "Missing", "status_label": "Upload required"}
         if doc and doc.status == "Complete":
+            if item_name == "Ethics Clearance":
+                return {"status": "Complete", "status_label": doc.evidence_reference or "Cleared"}
             return {"status": "Complete", "status_label": "Verified"}
+        if doc and doc.status in {"Returned", "Not cleared"}:
+            return {"status": "Submitted", "status_label": doc.evidence_reference or doc.status}
         return {"status": "Submitted", "status_label": "Submitted for review"}
+    if source_type == "ethics_clearance_record":
+        clearance = DocumentCheck.query.filter_by(
+            student_id=student.id,
+            gate=gate,
+            item_name="Ethics Clearance",
+        ).first() if student else None
+        complete = bool(clearance and clearance.status == "Complete")
+        return {
+            "status": "Complete" if complete else "Pending",
+            "status_label": clearance.evidence_reference if complete and clearance.evidence_reference else "Pending Research Coordinator record",
+        }
     if source_type == "system_panel":
-        complete = bool(student) and PanelAssignment.query.filter_by(student_id=student.id).count() >= len(panel_roles_for_student(student))
+        complete = bool(student) and len(active_panel_assignments(student, gate)) >= len(panel_roles_for_student(student))
         return {"status": "Complete" if complete else "Pending", "status_label": "Completed" if complete else "Pending panel matching"}
     if source_type == "coordinator_endorsement":
         endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first() if student else None
@@ -9653,7 +9996,6 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
     lifecycle_stage = {
         "Title Defense": "Proposal Development",
         "Proposal Defense": "Proposal Defense",
-        "Ethics Review": "Data Collection",
         "Final Defense": "Final Defense",
     }[progress["stage"]]
     if student.standing == "Active" and student.current_stage != "Completed":
@@ -9674,20 +10016,20 @@ def required_documents_for_gate(gate: str) -> list[str]:
         ]
     if gate == "Form 4 - Proposal Defense Readiness":
         return [
-            "Form 4 - Endorsement for Proposal Defense",
             "Proposal manuscript",
-            "Adviser e-signature/endorsement",
+            "Ethics Clearance",
+            "Ethics clearance status and date",
+            "Recommended panel set",
+            "Form 4 - Endorsement for Proposal Defense",
             "Form 4.1 Statistical Consultation Form or qualitative exemption",
+            "Adviser e-signature/endorsement",
             "Agreed defense schedule in Form 4",
             "Proposal defense result",
         ]
-    if gate == "Ethics Review":
-        return ["Ethics Clearance"]
     if gate == "Final Defense":
         return [
             "Form 4 - Endorsement for Final Defense",
             "Final manuscript",
-            "Ethics Clearance",
             "Panel received manuscript at least 14 days before defense",
             "Agreed final defense schedule",
             "Final defense result",
@@ -9695,7 +10037,6 @@ def required_documents_for_gate(gate: str) -> list[str]:
     return [
         "Soft copy of final manuscript",
         "Panel approval emails",
-        "Ethics Clearance",
         "Turnitin Certificate with SIR not more than 15%",
         "Form 9 - Editor Certification",
         "Form 10 - Approval Sheet",
@@ -9716,9 +10057,11 @@ def research_evidence_aliases(gate: str) -> dict[str, list[str]]:
             "endorsed by ac",
         ],
         "Recommended panel set": ["recommended panel", "panel recommendation", "panel set"],
-        "Form 4 - Endorsement for Proposal Defense": ["form 4", "endorsement for proposal"],
-        "Proposal manuscript": ["proposal manuscript", "proposal paper", "proposal draft"],
-        "Adviser e-signature/endorsement": ["adviser endorsement", "adviser e-signature", "endorsed by adviser"],
+        "Form 4 - Endorsement for Proposal Defense": ["form 4", "endorsement for proposal", "adviser signed form 4"],
+        "Proposal manuscript": ["proposal manuscript", "proposal paper", "proposal draft", "adviser signed proposal manuscript"],
+        "Ethics Clearance": ["ethics clearance", "rerc clearance", "research protocol form 5.2"],
+        "Ethics clearance status and date": ["ethics status", "clearance date", "cleared"],
+        "Adviser e-signature/endorsement": ["adviser endorsement", "adviser e-signature", "endorsed by adviser", "adviser signed proposal manuscript endorsement"],
         "Form 4.1 Statistical Consultation Form or qualitative exemption": [
             "form 4.1",
             "statistical consultation",
@@ -9728,7 +10071,6 @@ def research_evidence_aliases(gate: str) -> dict[str, list[str]]:
         "Agreed defense schedule in Form 4": ["agreed schedule", "schedule in form 4", "defense schedule"],
         "Form 4 - Endorsement for Final Defense": ["form 4", "endorsement for final"],
         "Final manuscript": ["final manuscript", "final paper", "closed-door manuscript"],
-        "Ethics Clearance": ["ethics clearance", "rerc clearance"],
         "Panel received manuscript at least 14 days before defense": [
             "14-day",
             "14 day",
@@ -9813,7 +10155,7 @@ def reset_research_gate_after_failed_defense(student: Student, gate: str) -> lis
         doc.updated_at = now_utc()
     if gate == "Form 1 - Title Defense":
         revoke_form1_endorsement(student.id)
-        PanelAssignment.query.filter_by(student_id=student.id).delete()
+        clear_panel_for_research_gate(student, gate)
     defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
     if defense_type:
         active_schedules = ScheduleRequest.query.filter(
@@ -10248,12 +10590,16 @@ def compute_offering_demand() -> list[dict]:
 
 
 def recommend_panel(student: Student) -> list[dict]:
-    # Local retrieval ranks faculty profiles only against body text extracted
-    # from the three concept papers. Operational constraints are added after
-    # semantic/token overlap so the result remains explainable.
+    # RAG-assisted retrieval analyzes the active gate's uploaded manuscript body
+    # and retrieved faculty profiles; the final rubric stays explainable.
     profile = research_matching_profile(student)
-    query_counts = Counter(matching_tokens(profile["query_text"]))
+    query_counts = Counter(matching_tokens(profile["query_text"] + " " + " ".join(profile.get("keywords", []))))
     analyzed_phrases = profile.get("keywords", [])
+    rag_match_by_id = {
+        item.get("faculty_id"): item
+        for item in profile.get("rag_faculty_matches", [])
+        if item.get("faculty_id")
+    }
     faculty_members = Faculty.query.filter_by(active=True).all()
     rows = []
     for faculty in faculty_members:
@@ -10283,6 +10629,11 @@ def recommend_panel(student: Student) -> list[dict]:
         faculty_tokens = set(matching_tokens(faculty_profile_text))
         faculty_phrase_text = faculty_profile_text.lower()
         matched_keywords = [token for token, _count in query_counts.most_common() if token in faculty_tokens][:6]
+        rag_match = rag_match_by_id.get(faculty.id)
+        rag_terms = [
+            term for term in (rag_match or {}).get("matched_terms", [])
+            if set(matching_tokens(term)).intersection(faculty_tokens)
+        ][:6]
         matched_phrases = [
             phrase
             for phrase in analyzed_phrases
@@ -10295,7 +10646,7 @@ def recommend_panel(student: Student) -> list[dict]:
         # Transparent 50/30/20 rubric. Keyword frequency is capped so repeated
         # boilerplate in a PDF cannot dominate a faculty profile match.
         keyword_points = sum(min(query_counts[token], 3) for token in matched_keywords)
-        specialization_score = min(50, keyword_points * 7 + len(matched_phrases) * 4)
+        specialization_score = min(50, keyword_points * 7 + len(matched_phrases) * 4 + len(rag_terms) * 3 + (8 if rag_match else 0))
         recurring_days = sum(1 for item in faculty_working_hours(faculty) if item["enabled"])
         availability_score = min(30, availability_count * 6)
         if not availability_count and recurring_days:
@@ -10311,7 +10662,9 @@ def recommend_panel(student: Student) -> list[dict]:
             "No availability recorded"
         )
         reasons = []
-        if matched_phrases:
+        if rag_terms:
+            reasons.append(f"RAG match: {', '.join(rag_terms[:2])}")
+        elif matched_phrases:
             reasons.append(f"matches {', '.join(matched_phrases[:2])}")
         elif matched_keywords:
             reasons.append(f"matches {', '.join(matched_keywords[:3])}")
@@ -10324,7 +10677,7 @@ def recommend_panel(student: Student) -> list[dict]:
             "faculty": faculty,
             "score": score,
             "note": note,
-            "matched_keywords": matched_phrases or matched_keywords,
+            "matched_keywords": rag_terms or matched_phrases or matched_keywords,
             "availability_status": availability_status,
             "availability_windows": availability_count,
             "workload": workload,
@@ -10484,6 +10837,29 @@ def ensure_workflow_activity_schema() -> None:
             if name not in practicum_existing:
                 db.session.execute(text(f"ALTER TABLE practicum_record ADD COLUMN {name} {sql_type}"))
     db.session.commit()
+
+
+def ensure_panel_assignment_schema() -> None:
+    inspector = inspect(db.engine)
+    if "panel_assignment" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("panel_assignment")}
+    if "gate" not in existing:
+        db.session.execute(text("ALTER TABLE panel_assignment ADD COLUMN gate VARCHAR(80)"))
+        db.session.commit()
+    assignments = PanelAssignment.query.filter(
+        (PanelAssignment.gate.is_(None)) | (PanelAssignment.gate == "")
+    ).all()
+    if assignments:
+        case_by_student = {
+            case.student_id: case.current_gate
+            for case in ResearchCase.query.filter(
+                ResearchCase.student_id.in_({item.student_id for item in assignments})
+            ).all()
+        }
+        for assignment in assignments:
+            assignment.gate = case_by_student.get(assignment.student_id) or "Form 1 - Title Defense"
+        db.session.commit()
 
 
 def ensure_course_workflow_schema() -> None:
@@ -11261,13 +11637,13 @@ def seed_simulation_demo() -> None:
             .first()
         )
         if panel_student and not PanelAssignment.query.filter_by(
-            student_id=panel_student.id, faculty_id=sim_faculty_objs[0].id
+            student_id=panel_student.id, faculty_id=sim_faculty_objs[0].id, gate="Final Defense"
         ).first():
-            PanelAssignment.query.filter_by(student_id=panel_student.id).delete()
+            PanelAssignment.query.filter_by(student_id=panel_student.id, gate="Final Defense").delete()
             roles_seq = ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
             for index, fac in enumerate(sim_faculty_objs[:4]):
                 db.session.add(PanelAssignment(
-                    student_id=panel_student.id, faculty_id=fac.id,
+                    student_id=panel_student.id, faculty_id=fac.id, gate="Final Defense",
                     panel_role=roles_seq[index], score=100, eligibility_note="Prepared demo panel"))
 
     term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
@@ -11444,7 +11820,8 @@ def ensure_demo_accounts() -> None:
         )
 
     linked_student = (
-        Student.query.join(Program)
+        Student.query.filter_by(first_name="Miguel", last_name="Yu").first()
+        or Student.query.join(Program)
         .filter(Program.has_practicum.is_(True), Student.standing == "Active")
         .order_by(Student.student_number.asc())
         .first()
@@ -11517,6 +11894,7 @@ with app.app_context():
     ensure_schedule_request_schema()
     ensure_monitoring_upload_schema()
     ensure_student_comprehensive_exam_schema()
+    ensure_panel_assignment_schema()
     ensure_workflow_activity_schema()
     ensure_course_workflow_schema()
     ensure_research_evidence_schema()
