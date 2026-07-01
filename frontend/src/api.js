@@ -122,6 +122,8 @@ export const api = {
     const qs = queryString(actual);
     return request(`/monitoring/grid${qs ? `?${qs}` : ""}`);
   },
+  saveCompreExam: (payload) =>
+    request("/monitoring/compre-exam", { method: "POST", body: JSON.stringify(payload) }),
   monitoringUploads: () => request("/monitoring/uploads"),
   curriculumPlanning: (params = {}) => {
     const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
@@ -168,6 +170,10 @@ export const api = {
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),
   assistantSuggestions: () => request("/assistant/suggestions"),
+  loaPolicyReview: (payload) =>
+    request("/leave-of-absence/policy-review", { method: "POST", body: JSON.stringify(payload) }),
+  readmissionPolicyReview: (payload) =>
+    request("/readmission/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   studentPortalContext: () => request("/student-portal/context"),
   facultyPortalContext: () => request("/faculty-portal/context"),
   submitStudentRequest: (type, payload) =>
@@ -200,6 +206,8 @@ export const api = {
   },
   deleteResearchEvidence: (evidenceId) =>
     request(`/student-portal/research-evidence/${evidenceId}`, { method: "DELETE" }),
+  evaluateConceptPaper: (evidenceId) =>
+    request(`/research-evidence/${evidenceId}/concept-paper-compliance`, { method: "POST", body: JSON.stringify({}) }),
   form1Endorsements: () => request("/research-gate/form1-endorsements"),
   endorseForm1: (studentId, payload) =>
     request(`/research-gate/form1-endorsements/${studentId}`, {

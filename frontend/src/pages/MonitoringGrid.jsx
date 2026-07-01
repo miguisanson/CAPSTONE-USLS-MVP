@@ -33,6 +33,18 @@ const MILES = [
   ["ethics", "Ethics"],
   ["final", "Final"],
 ];
+const COMPRE_UNIT_REQUIREMENTS = { Basic: 6, Major: 9, Cognate: 6 };
+const COMPRE_TOTAL_UNITS_REQUIRED = 21;
+const RESEARCH_STAGE_ORDER = [
+  "Admission",
+  "Coursework",
+  "Comprehensive Exam",
+  "Proposal Development",
+  "Proposal Defense",
+  "Data Collection",
+  "Final Defense",
+  "Graduation",
+];
 
 export default function MonitoringGrid() {
   const navigate = useNavigate();
@@ -40,20 +52,22 @@ export default function MonitoringGrid() {
   const selectedProgramId = searchParams.get("program_id") || "";
   const selectedProgress = searchParams.get("progress") || "";
   const selectedRisk = searchParams.get("risk") || "";
+  const selectedEnrollment = searchParams.get("enrollment") || "";
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
   const [progress, setProgress] = useState(selectedProgress);
   const [risk, setRisk] = useState(selectedRisk);
+  const [enrollment, setEnrollment] = useState(selectedEnrollment);
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function load(pid, nextProgress = progress, nextRisk = risk) {
+  function load(pid, nextProgress = progress, nextRisk = risk, nextEnrollment = enrollment) {
     setLoading(true);
     setError("");
     api
-      .monitoringGrid({ program_id: pid || undefined, progress: nextProgress, risk: nextRisk })
+      .monitoringGrid({ program_id: pid || undefined, progress: nextProgress, risk: nextRisk, enrollment: nextEnrollment })
       .then((g) => {
         setGrid(g);
         setProgramId(String(g.program.id));
@@ -65,9 +79,10 @@ export default function MonitoringGrid() {
   useEffect(() => {
     setProgress(selectedProgress);
     setRisk(selectedRisk);
-    load(selectedProgramId, selectedProgress, selectedRisk);
+    setEnrollment(selectedEnrollment);
+    load(selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProgramId, selectedProgress, selectedRisk]);
+  }, [selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment]);
 
   const flatCourses = useMemo(
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
@@ -84,7 +99,10 @@ export default function MonitoringGrid() {
         if (s.id !== studentId) return s;
         const cells = { ...s.cells, [course.id]: nextStatus };
         const completed = flatCourses.reduce((n, c) => n + (cells[c.id] === "Completed" ? 1 : 0), 0);
-        return { ...s, cells, completed, rate: g.course_count ? Math.round((completed / g.course_count) * 1000) / 10 : 0 };
+        return refreshStudentProgress(
+          { ...s, cells, completed, rate: g.course_count ? Math.round((completed / g.course_count) * 1000) / 10 : 0 },
+          g.categories
+        );
       });
       return { ...g, students };
     });
@@ -94,6 +112,54 @@ export default function MonitoringGrid() {
     } catch (e) {
       setError(e.message);
       load(programId); // revert by reloading on failure
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleCompreExam(student) {
+    const nextStatus = nextCompreExamStatus(student);
+    if (!nextStatus) {
+      setError("The student must complete the required units before the comprehensive exam can be marked Passed or Failed.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    setGrid((g) => {
+      if (!g) return g;
+      return {
+        ...g,
+        students: g.students.map((s) => {
+          if (s.id !== student.id) return s;
+          const updated = {
+            ...s,
+            compre_eligibility: {
+              ...s.compre_eligibility,
+              exam_status: nextStatus,
+              passed: nextStatus === "Passed",
+              research_allowed: !!s.compre_eligibility?.eligible && nextStatus === "Passed",
+            },
+          };
+          return refreshStudentProgress(updated, g.categories);
+        }),
+      };
+    });
+    try {
+      const res = await api.saveCompreExam({ student_id: student.id, status: nextStatus });
+      setGrid((g) => {
+        if (!g) return g;
+        return {
+          ...g,
+          students: g.students.map((s) => (
+            s.id === student.id
+              ? { ...s, stage: res.stage, risk: res.risk, eligible: res.eligible, compre_eligibility: res.compre_eligibility, milestones: res.milestones }
+              : s
+          )),
+        };
+      });
+    } catch (e) {
+      setError(e.message);
+      load(programId);
     } finally {
       setSaving(false);
     }
@@ -125,11 +191,13 @@ export default function MonitoringGrid() {
       program_id: next.program_id ?? programId,
       progress: next.progress ?? progress,
       risk: next.risk ?? risk,
+      enrollment: next.enrollment ?? enrollment,
     };
     const params = {};
     if (merged.program_id) params.program_id = merged.program_id;
     if (merged.progress) params.progress = merged.progress;
     if (merged.risk) params.risk = merged.risk;
+    if (merged.enrollment) params.enrollment = merged.enrollment;
     setSearchParams(params, { replace: true });
   }
 
@@ -142,7 +210,7 @@ export default function MonitoringGrid() {
             The full class view — students by row, subjects by column. Click a subject cell to cycle its status.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
           <select
             value={programId}
             onChange={(e) => updateFilters({ program_id: e.target.value })}
@@ -178,6 +246,19 @@ export default function MonitoringGrid() {
               <option key={item} value={item}>{item}</option>
             ))}
           </select>
+          <select
+            value={enrollment}
+            onChange={(e) => updateFilters({ enrollment: e.target.value })}
+            className="field-input cursor-pointer"
+            aria-label="Enrollment status"
+          >
+            <option value="">All enrollment</option>
+            <option value="LOA">LOA</option>
+            <option value="AWOL">AWOL</option>
+            <option value="LOA/AWOL">LOA or AWOL</option>
+            <option value="Enrolled">Enrolled</option>
+            <option value="Withdrawn">Withdrawn</option>
+          </select>
           <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}>
             <Download className="h-4 w-4" /> Export CSV
           </button>
@@ -205,7 +286,7 @@ export default function MonitoringGrid() {
       ) : (
         <Card className="overflow-hidden p-0">
           <div className="overflow-auto" style={{ maxHeight: "72vh" }}>
-            <table className="border-collapse text-xs">
+            <table className="min-w-full border-collapse text-xs">
               <thead>
                 {/* group header row */}
                 <tr>
@@ -220,28 +301,23 @@ export default function MonitoringGrid() {
                     <th
                       key={cat.name}
                       colSpan={cat.courses.length}
-                      className="sticky top-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500"
+                      className="sticky top-0 z-20 h-8 border-b border-r border-slate-200 bg-slate-100 px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500"
                     >
                       <span>{cat.name}</span>
-                      {(["Basic", "Major", "Cognate"].includes(cat.name)) && (
-                        <span className="ml-1 font-semibold normal-case text-slate-400">
-                          ({cat.name === "Basic" ? 6 : cat.name === "Major" ? 9 : 6}u required)
-                        </span>
-                      )}
                     </th>
                   ))}
                   <th
-                    colSpan={MILES.length}
-                    className="sticky top-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500"
+                    rowSpan={2}
+                    className="sticky top-0 z-20 border-b border-r border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500"
+                    style={{ width: 96, minWidth: 96 }}
                   >
-                    Research
+                    Compre Exam
                   </th>
                   <th
-                    rowSpan={2}
-                    className="sticky top-0 z-20 border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500"
-                    style={{ minWidth: 120 }}
+                    colSpan={MILES.length}
+                    className="sticky top-0 z-20 h-8 border-b border-r border-slate-200 bg-slate-100 px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500"
                   >
-                    Progress
+                    Research
                   </th>
                 </tr>
                 {/* column header row */}
@@ -251,7 +327,7 @@ export default function MonitoringGrid() {
                       key={c.id}
                       title={c.title}
                       className="sticky z-20 border-b border-r border-slate-100 bg-white px-1.5 py-2 text-center align-bottom font-semibold text-slate-500"
-                      style={{ top: 34, minWidth: 38, height: 96 }}
+                      style={{ top: 32, minWidth: 38, height: 96 }}
                     >
                       <span style={{ writingMode: "vertical-rl" }} className="inline-block rotate-180 whitespace-nowrap">
                         {c.code}
@@ -262,7 +338,7 @@ export default function MonitoringGrid() {
                     <th
                       key={key}
                       className="sticky z-20 border-b border-r border-slate-100 bg-white px-1.5 py-2 text-center align-bottom font-semibold text-slate-500"
-                      style={{ top: 34, minWidth: 40, height: 96 }}
+                      style={{ top: 32, minWidth: 40, height: 96 }}
                     >
                       <span style={{ writingMode: "vertical-rl" }} className="inline-block rotate-180">{label}</span>
                     </th>
@@ -306,31 +382,18 @@ export default function MonitoringGrid() {
                         </td>
                       );
                     })}
+                    <td className="border-b border-r border-slate-200 px-2 py-1.5 text-center">
+                      <CompreExamBadge student={s} onToggle={() => toggleCompreExam(s)} saving={saving} />
+                    </td>
                     {MILES.map(([key]) => (
                       <td key={key} className="border-b border-r border-slate-100 text-center">
                         {s.milestones[key] ? (
                           <Check className="mx-auto h-4 w-4 text-brand-600" strokeWidth={3} />
                         ) : (
-                          <span className="text-slate-300">–</span>
+                          <span className="text-slate-300">-</span>
                         )}
                       </td>
                     ))}
-                    <td className="border-b border-slate-200 px-3 py-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-brand-500" style={{ width: `${s.rate}%` }} />
-                        </div>
-                        <span className="w-20 shrink-0 text-right text-[11px] font-semibold text-slate-500">
-                          {s.completed}/{s.total} · {s.completed_units}/{s.total_units}u
-                        </span>
-                        <span
-                          title={s.eligible ? "Basic 6 + Major 9 + Cognate 6 = 21 units completed" : "Requires Basic 6 + Major 9 + Cognate 6 = 21 units"}
-                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${s.eligible ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500"}`}
-                        >
-                          {s.compre_eligibility?.passed ? "Compre passed" : s.eligible ? "Compre eligible" : `${s.compre_eligibility?.completed_units || 0}/21u`}
-                        </span>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -340,4 +403,98 @@ export default function MonitoringGrid() {
       )}
     </div>
   );
+}
+
+function compreTitle(student) {
+  if (student.compre_eligibility?.passed) return "Comprehensive exam passed";
+  if (student.compre_eligibility?.eligible) return "Eligible to take the comprehensive exam";
+  return `Not yet eligible: ${student.compre_eligibility?.completed_units || 0}/21 units completed`;
+}
+
+function CompreExamBadge({ student, onToggle, saving }) {
+  const label = compreExamLabel(student);
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={saving || !student.compre_eligibility?.eligible}
+      title={compreTitle(student)}
+      className="inline-flex cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      <StatusBadge value={label} dot={false} className="min-w-[76px] justify-center" />
+    </button>
+  );
+}
+
+function compreExamLabel(student) {
+  const examStatus = (student.compre_eligibility?.exam_status || "").toLowerCase();
+  if (examStatus === "passed") return "Passed";
+  if (examStatus === "failed") return "Failed";
+  if (student.compre_eligibility?.eligible) return "Eligible";
+  return "Not eligible";
+}
+
+function nextCompreExamStatus(student) {
+  if (!student.compre_eligibility?.eligible) return null;
+  const examStatus = (student.compre_eligibility?.exam_status || "Not Taken").toLowerCase();
+  if (examStatus === "passed") return "Failed";
+  if (examStatus === "failed") return "Not Taken";
+  return "Passed";
+}
+
+function refreshStudentProgress(student, categories = []) {
+  const eligibility = computeCompreEligibility(student, categories);
+  const examStatus = student.compre_eligibility?.exam_status || "Not Taken";
+  const updated = {
+    ...student,
+    completed_units: eligibility.total_completed_units,
+    eligible: eligibility.eligible,
+    compre_eligibility: {
+      ...(student.compre_eligibility || {}),
+      eligible: eligibility.eligible,
+      status: eligibility.eligible ? "Eligible for Comprehensive Exam" : "Not Yet Eligible",
+      passed: examStatus.toLowerCase() === "passed",
+      research_allowed: eligibility.eligible && examStatus.toLowerCase() === "passed",
+      categories: eligibility.categories,
+      completed_units: eligibility.completed_units,
+      required_units: COMPRE_TOTAL_UNITS_REQUIRED,
+    },
+  };
+  return { ...updated, milestones: computeResearchMilestones(updated) };
+}
+
+function computeCompreEligibility(student, categories = []) {
+  const cells = student.cells || {};
+  const categoryRows = Object.entries(COMPRE_UNIT_REQUIREMENTS).map(([category, required]) => {
+    const courseGroup = categories.find((item) => item.name === category);
+    const completed = (courseGroup?.courses || []).reduce((sum, course) => (
+      cells[course.id] === "Completed" ? sum + (course.units || 3) : sum
+    ), 0);
+    return { category, completed, required, complete: completed >= required };
+  });
+  const completedUnits = categoryRows.reduce((sum, item) => sum + item.completed, 0);
+  const totalCompletedUnits = categories.reduce((sum, group) => (
+    sum + (group.courses || []).reduce((courseSum, course) => (
+      cells[course.id] === "Completed" ? courseSum + (course.units || 3) : courseSum
+    ), 0)
+  ), 0);
+  return {
+    categories: categoryRows,
+    completed_units: completedUnits,
+    total_completed_units: totalCompletedUnits,
+    eligible: categoryRows.every((item) => item.complete) && completedUnits >= COMPRE_TOTAL_UNITS_REQUIRED,
+  };
+}
+
+function computeResearchMilestones(student) {
+  const stage = student.stage || "";
+  const idx = RESEARCH_STAGE_ORDER.indexOf(stage);
+  const stageIndex = idx >= 0 ? idx : 0;
+  const researchAllowed = !!student.compre_eligibility?.research_allowed;
+  return {
+    title: researchAllowed && stage !== "LOA" && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Proposal Development"),
+    proposal: researchAllowed && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Proposal Defense"),
+    ethics: researchAllowed && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Data Collection"),
+    final: researchAllowed && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Final Defense"),
+  };
 }

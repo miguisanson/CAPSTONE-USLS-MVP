@@ -3907,6 +3907,9 @@ function timeRange(start, end) {
 // ---------------------------------------------------------------------------
 function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
   const selectedRequest = context?.selected_request;
+  const [policyReview, setPolicyReview] = useState(context?.loa_policy_review || null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [form, setForm] = useState({
     request_date: new Date().toISOString().slice(0, 10),
     application_reference: "",
@@ -3922,6 +3925,10 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
+    setPolicyReview(context?.loa_policy_review || null);
+  }, [context?.loa_policy_review]);
+
+  useEffect(() => {
     if (!selectedRequest) return;
     setForm((current) => ({
       ...current,
@@ -3934,6 +3941,28 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
     }));
   }, [selectedRequest?.request_log_id]);
 
+  async function runPolicyReview(applySuggestion = false) {
+    if (!studentId) return;
+    setReviewing(true);
+    setReviewError("");
+    try {
+      const result = await api.loaPolicyReview({ student_id: studentId, ...form });
+      setPolicyReview(result.review);
+      if (applySuggestion && result.review) {
+        setForm((current) => ({
+          ...current,
+          eligibility_status: result.review.recommendation || current.eligibility_status,
+          dean_action: result.review.suggested_dean_action || current.dean_action,
+          staff_notes: current.staff_notes || result.review.summary || "",
+        }));
+      }
+    } catch (err) {
+      setReviewError(err.message || "Could not run the LOA policy review.");
+    } finally {
+      setReviewing(false);
+    }
+  }
+
   function onSubmit(e) {
     e.preventDefault();
     submit({ student_id: studentId, ...form });
@@ -3943,6 +3972,13 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle title="Record leave of absence" subtitle="Records the request, Dean decision, status pause, and notice trail" icon={CalendarOff} />
       <RequestSummary request={selectedRequest} />
+      <LoaPolicyReviewCard
+        review={policyReview}
+        busy={reviewing}
+        error={reviewError}
+        onReview={() => runPolicyReview(false)}
+        onApply={() => runPolicyReview(true)}
+      />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Application attachment / file reference">
           <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
@@ -3990,6 +4026,83 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
   );
 }
 
+function LoaPolicyReviewCard({ review, busy, error, onReview, onApply }) {
+  return (
+    <PolicyReviewCard
+      title="LOA policy review"
+      description="RAG-style check using the LOA/residency policy plus this student request. Staff still records the final decision."
+      emptyText="Run the review after selecting a submitted LOA request."
+      review={review}
+      busy={busy}
+      error={error}
+      onReview={onReview}
+      onApply={onApply}
+    />
+  );
+}
+
+function PolicyReviewCard({ title, description, emptyText, review, busy, error, onReview, onApply }) {
+  const citations = review?.citations || [];
+  return (
+    <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-brand-700 ring-1 ring-brand-100">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink">{title}</p>
+            <p className="mt-0.5 text-xs text-slate-600">
+              {description}
+            </p>
+          </div>
+        </div>
+        {review?.recommendation && <StatusBadge value={review.recommendation} dot={false} />}
+      </div>
+      {review ? (
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-slate-700">{review.summary}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(review.checks || []).map((check) => (
+              <div key={check.label} className="rounded-xl bg-white px-3 py-2 ring-1 ring-black/5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{check.label}</p>
+                  <StatusBadge value={check.status} dot={false} />
+                </div>
+                <p className="mt-1 text-xs text-slate-600">{check.detail}</p>
+              </div>
+            ))}
+          </div>
+          {citations.length > 0 && (
+            <details className="rounded-xl bg-white px-3 py-2 ring-1 ring-black/5">
+              <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-500">Policy sources</summary>
+              <div className="mt-2 space-y-2">
+                {citations.map((citation) => (
+                  <div key={citation.id || citation.title} className="text-xs text-slate-600">
+                    <p className="font-semibold text-slate-700">{citation.title} · {citation.source}</p>
+                    <p className="mt-0.5">{citation.text}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-slate-600">{emptyText}</p>
+      )}
+      {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" onClick={onReview} disabled={busy} className="btn-ghost">
+          <Sparkles className="h-4 w-4" /> {busy ? "Reviewing..." : "Recheck policy"}
+        </button>
+        <button type="button" onClick={onApply} disabled={busy || !review} className="btn-primary">
+          Apply suggestion
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Readmission
 // ---------------------------------------------------------------------------
@@ -3997,6 +4110,9 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
   const requirements = context.readmission_requirements || [];
   const selectedRequest = context?.selected_request;
   const [items, setItems] = useState(requirements);
+  const [policyReview, setPolicyReview] = useState(context?.readmission_policy_review || null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [form, setForm] = useState({
     application_reference: "",
     target_return_term: "",
@@ -4011,6 +4127,7 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
   const toggle = (item) => setItems((r) => (r.includes(item) ? r.filter((x) => x !== item) : [...r, item]));
 
   useEffect(() => setItems(context.readmission_requirements || []), [context.readmission_requirements]);
+  useEffect(() => setPolicyReview(context?.readmission_policy_review || null), [context?.readmission_policy_review]);
 
   useEffect(() => {
     if (!selectedRequest) return;
@@ -4028,10 +4145,43 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
     submit({ student_id: studentId, ...form, readmission_items: items });
   }
 
+  async function runPolicyReview(applySuggestion = false) {
+    if (!studentId) return;
+    setReviewing(true);
+    setReviewError("");
+    try {
+      const result = await api.readmissionPolicyReview({ student_id: studentId, ...form, readmission_items: items });
+      setPolicyReview(result.review);
+      if (applySuggestion && result.review) {
+        setForm((current) => ({
+          ...current,
+          eligibility_status: result.review.recommendation || current.eligibility_status,
+          dean_action: result.review.suggested_dean_action || current.dean_action,
+          missing_requirements: (result.review.missing_requirements || []).join(", "),
+          staff_notes: current.staff_notes || result.review.summary || "",
+        }));
+      }
+    } catch (err) {
+      setReviewError(err.message || "Could not run the readmission policy review.");
+    } finally {
+      setReviewing(false);
+    }
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle title="Record readmission" subtitle="Checks return eligibility, records the Dean decision, and reactivates approved students" icon={UserCheck} />
       <RequestSummary request={selectedRequest} />
+      <PolicyReviewCard
+        title="Readmission policy review"
+        description="RAG-style check using the readmission policy plus this student request. Staff still records the final decision."
+        emptyText="Run the review after selecting a submitted readmission request."
+        review={policyReview}
+        busy={reviewing}
+        error={reviewError}
+        onReview={() => runPolicyReview(false)}
+        onApply={() => runPolicyReview(true)}
+      />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Application attachment / file reference">
           <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />

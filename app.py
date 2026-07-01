@@ -40,8 +40,12 @@ RAG_DOCUMENT_PATHS = [
     BASE_DIR / "data",
     BASE_DIR / "Documents" / "USLS_Documents",
 ]
+CONCEPT_PAPER_RAG_SOURCE = BASE_DIR / "Documents" / "RAG_Source" / "Concept_Paper"
 _RAG_CHAT_ENGINE = None
 _RAG_LOAD_ERROR = None
+PDF_OCR_MIN_WORDS = int(os.getenv("PDF_OCR_MIN_WORDS", "30"))
+PDF_OCR_MAX_PAGES = int(os.getenv("PDF_OCR_MAX_PAGES", "8"))
+PDF_OCR_DPI = int(os.getenv("PDF_OCR_DPI", "200"))
 
 # This demo keeps the Flask API, SQLAlchemy models, workflow rules, RAG prototype,
 # and seed data in one file so evaluators can trace a workflow end-to-end quickly.
@@ -478,6 +482,10 @@ class ResearchEvidenceFile(db.Model):
     stored_name = db.Column(db.String(220), nullable=False, unique=True)
     mime_type = db.Column(db.String(100), nullable=False, default="application/pdf")
     extracted_text = db.Column(db.Text)
+    compliance_status = db.Column(db.String(40))
+    compliance_score = db.Column(db.Integer)
+    compliance_summary = db.Column(db.Text)
+    compliance_result_json = db.Column(db.Text)
     uploaded_at = db.Column(db.DateTime, default=now_utc)
 
 
@@ -849,6 +857,18 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         "categories": categories,
         "completed_units": qualifying_total,
         "required_units": COMPRE_TOTAL_UNITS_REQUIRED,
+    }
+
+
+def monitoring_research_milestones(student: Student) -> dict:
+    stage = student.current_stage
+    idx = STAGES.index(stage) if stage in STAGES else 0
+    research_allowed = comprehensive_exam_eligibility(student)["research_allowed"]
+    return {
+        "title": research_allowed and stage != "LOA" and idx >= STAGES.index("Proposal Development"),
+        "proposal": research_allowed and idx >= STAGES.index("Proposal Defense"),
+        "ethics": research_allowed and idx >= STAGES.index("Data Collection"),
+        "final": research_allowed and idx >= STAGES.index("Final Defense"),
     }
 
 
@@ -1893,6 +1913,140 @@ def retrieve_policy(query: str, k: int = 3) -> list[dict]:
     return [sn for _, sn in scored[:k]]
 
 
+def loa_policy_review(student: Student, request_data: dict | None = None) -> dict:
+    request_data = request_data or {}
+    snippets = retrieve_policy(
+        "leave of absence LOA residency eligibility prior terms approved reason Dean effective period",
+        k=3,
+    )
+    try:
+        prior_count = int(request_data.get("prior_loa_count") or 0)
+    except (TypeError, ValueError):
+        prior_count = 0
+    reason = (request_data.get("reason_remarks") or request_data.get("reason") or "").strip()
+    effective_start = (request_data.get("effective_start") or "").strip()
+    effective_end = (request_data.get("effective_end") or "").strip()
+    application_reference = (request_data.get("application_reference") or request_data.get("attachment") or "").strip()
+    completed_terms = max(0, int((date.today().year - (student.entry_year or date.today().year)) * 3))
+
+    checks = [
+        {
+            "label": "Application document/reference",
+            "status": "Present" if application_reference else "Needs Review",
+            "detail": application_reference or "No uploaded application/reference is attached to this review.",
+        },
+        {
+            "label": "Reason for leave",
+            "status": "Present" if reason else "Needs Review",
+            "detail": reason or "Staff should confirm the student stated an approved reason.",
+        },
+        {
+            "label": "Effective period",
+            "status": "Present" if effective_start and effective_end else "Needs Review",
+            "detail": " to ".join([part for part in [effective_start, effective_end] if part]) or "Start and end term/date are not both recorded.",
+        },
+        {
+            "label": "Prior LOA limit",
+            "status": "Pass" if prior_count < 4 else "Fail",
+            "detail": f"{prior_count} prior LOA term(s) recorded; prototype limit is up to 4 terms total.",
+        },
+        {
+            "label": "Minimum residency",
+            "status": "Pass" if completed_terms >= 1 else "Needs Review",
+            "detail": f"Estimated completed residency: {completed_terms} term(s) from entry year {student.entry_year}.",
+        },
+    ]
+    failed = [item for item in checks if item["status"] == "Fail"]
+    review_needed = [item for item in checks if item["status"] == "Needs Review"]
+    if failed:
+        recommendation = "Not Eligible"
+        suggested_dean_action = "Deny"
+        summary = "The LOA request appears to exceed an eligibility limit. Staff should verify before forwarding or denying."
+    elif review_needed:
+        recommendation = "Needs Review"
+        suggested_dean_action = "Return for Revision"
+        summary = "The LOA request needs staff review because required details are missing or uncertain."
+    else:
+        recommendation = "Eligible"
+        suggested_dean_action = "Approve"
+        summary = "The LOA request appears eligible under the retrieved LOA/residency policy. Dean approval is still required."
+
+    return {
+        "mode": "loa-policy-rag",
+        "recommendation": recommendation,
+        "suggested_dean_action": suggested_dean_action,
+        "summary": summary,
+        "checks": checks,
+        "citations": snippets,
+    }
+
+
+def readmission_policy_review(student: Student, request_data: dict | None = None) -> dict:
+    request_data = request_data or {}
+    snippets = retrieve_policy(
+        "readmission return re-enroll updated study plan adviser endorsement pending accountability LOA",
+        k=3,
+    )
+    if hasattr(request_data, "getlist"):
+        submitted_items = set(request_data.getlist("readmission_items"))
+    else:
+        raw_items = request_data.get("readmission_items") or []
+        submitted_items = set(split_items(raw_items) if isinstance(raw_items, str) else raw_items)
+    requirements = readmission_requirements()
+    missing = [item for item in requirements if item not in submitted_items]
+    target_return_term = (request_data.get("target_return_term") or "").strip()
+    previous_loa_period = (request_data.get("previous_loa_period") or "").strip()
+    application_reference = (request_data.get("application_reference") or request_data.get("attachment") or "").strip()
+    on_leave = student.current_stage == "LOA" or student.enrollment_tag == "LOA" or student.standing == "On Leave"
+
+    checks = [
+        {
+            "label": "Readmission application/reference",
+            "status": "Present" if application_reference else "Needs Review",
+            "detail": application_reference or "No uploaded readmission application/reference is attached to this review.",
+        },
+        {
+            "label": "Previous LOA period",
+            "status": "Present" if previous_loa_period or on_leave else "Needs Review",
+            "detail": previous_loa_period or ("Student is currently marked on LOA." if on_leave else "Previous LOA period is not recorded."),
+        },
+        {
+            "label": "Target return term",
+            "status": "Present" if target_return_term else "Needs Review",
+            "detail": target_return_term or "No target return term is recorded.",
+        },
+        {
+            "label": "Required return documents",
+            "status": "Pass" if not missing else "Needs Review",
+            "detail": "All checklist items are selected." if not missing else "Missing: " + ", ".join(missing),
+        },
+        {
+            "label": "Current LOA/leave status",
+            "status": "Pass" if on_leave else "Needs Review",
+            "detail": "Student is currently recorded as on leave." if on_leave else f"Current status is {student.current_stage}/{student.enrollment_tag}; staff should confirm this is a return from LOA.",
+        },
+    ]
+    review_needed = [item for item in checks if item["status"] == "Needs Review"]
+    if review_needed:
+        recommendation = "Needs Review"
+        suggested_dean_action = "Return for Revision"
+        summary = "The readmission request needs staff review because required return details or checklist items are incomplete."
+    else:
+        recommendation = "Eligible to Return"
+        suggested_dean_action = "Approve"
+        summary = "The readmission request appears ready for Dean approval and reactivation for the target return term."
+
+    return {
+        "mode": "readmission-policy-rag",
+        "recommendation": recommendation,
+        "suggested_dean_action": suggested_dean_action,
+        "summary": summary,
+        "checks": checks,
+        "missing_requirements": missing,
+        "citations": snippets,
+    }
+
+
 def _status_sentence(student: Student, ind: dict) -> str:
     bits = [f"{student.name} ({student.student_number}, {student.program.code}) is at the {ind['stage']} stage"]
     bits.append(f"standing {ind['standing']}, risk {ind['risk']}")
@@ -2724,6 +2878,9 @@ def register_routes(app: Flask) -> None:
             if item_name == "Three concept papers":
                 revoke_form1_endorsement(student.id)
             evidence = store_research_evidence(student, gate, item_name, uploaded)
+            compliance = None
+            if gate == "Form 1 - Title Defense" and item_name == "Three concept papers":
+                compliance = apply_concept_paper_evaluation(evidence)
             parsed_title = ""
             if gate == "Form 1 - Title Defense" and item_name == "Form 1 - Application for Title Defense":
                 parsed = parse_title_defense_text(evidence.extracted_text or "")
@@ -2755,6 +2912,7 @@ def register_routes(app: Flask) -> None:
             "ok": True,
             "document": document_check_dict(evidence.document_check),
             "research_title": parsed_title or (research_case.title if research_case else ""),
+            "compliance": compliance,
         })
 
     @app.route("/api/student-portal/research-evidence/<int:evidence_id>", methods=["DELETE"])
@@ -3230,6 +3388,28 @@ def register_routes(app: Flask) -> None:
             download_name=evidence.original_name,
             mimetype=evidence.mime_type,
         )
+
+    @app.route("/api/research-evidence/<int:evidence_id>/concept-paper-compliance", methods=["POST"])
+    @require_api_login("student", "staff", "academic_coordinator", "research_coordinator")
+    def research_evidence_concept_paper_compliance(evidence_id: int):
+        evidence = ResearchEvidenceFile.query.get_or_404(evidence_id)
+        account = current_account()
+        if account.role == "student" and account.student_id != evidence.student_id:
+            return jsonify({"error": "You can evaluate only your own concept paper."}), 403
+        if not evidence.document_check or evidence.document_check.item_name != "Three concept papers":
+            return jsonify({"error": "Concept paper compliance is available only for concept-paper uploads."}), 400
+        result = apply_concept_paper_evaluation(evidence)
+        add_log(
+            "research-gate",
+            evidence.student_id,
+            workflow_actor_label(account),
+            evidence.original_name,
+            f"Concept paper compliance checked: {result['status']}",
+            "Academic Coordinator",
+            result["summary"],
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "compliance": result})
 
     @app.route("/api/research-gate/template")
     @require_api_login()
@@ -4341,6 +4521,10 @@ def register_routes(app: Flask) -> None:
         if risk:
             risk_values = [item.strip() for item in re.split(r"[,/]", risk) if item.strip()]
             students = students.filter(Student.risk_level.in_(risk_values or [risk]))
+        enrollment = request.args.get("enrollment", "").strip()
+        if enrollment:
+            enrollment_values = [item.strip() for item in re.split(r"[,/]", enrollment) if item.strip()]
+            students = students.filter(Student.enrollment_tag.in_(enrollment_values or [enrollment]))
         students = students.order_by(Student.last_name.asc(), Student.first_name.asc()).all()
         # Keep exception/final statuses together at the bottom: AWOL first, then final Withdrawn.
         students.sort(key=lambda item: (
@@ -4376,17 +4560,6 @@ def register_routes(app: Flask) -> None:
         course_units = {c.id: (c.units or 3) for c in courses}
         total_units_all = sum(course_units.values())
 
-        def milestones(student: Student) -> dict:
-            stage = student.current_stage
-            idx = STAGES.index(stage) if stage in STAGES else 0
-            research_allowed = comprehensive_exam_eligibility(student)["research_allowed"]
-            return {
-                "title": research_allowed and stage != "LOA" and idx >= STAGES.index("Proposal Development"),
-                "proposal": research_allowed and idx >= STAGES.index("Proposal Defense"),
-                "ethics": research_allowed and idx >= STAGES.index("Data Collection"),
-                "final": research_allowed and idx >= STAGES.index("Final Defense"),
-            }
-
         rows = []
         for s in students:
             cells = {}
@@ -4408,7 +4581,7 @@ def register_routes(app: Flask) -> None:
                 "completed_units": done_units, "total_units": total_units_all,
                 "eligible": compre["eligible"],
                 "compre_eligibility": compre,
-                "milestones": milestones(s),
+                "milestones": monitoring_research_milestones(s),
             })
 
         progress = request.args.get("progress", "").strip()
@@ -4429,6 +4602,48 @@ def register_routes(app: Flask) -> None:
             "course_count": len(courses),
             "total_units": total_units_all,
             "students": rows,
+        })
+
+    @app.route("/api/monitoring/compre-exam", methods=["POST"])
+    @require_api_login("academic_coordinator", "staff")
+    def monitoring_compre_exam_save():
+        data = request_payload()
+        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        requested_status = str(data.get("status") or "").strip()
+        allowed = {"Not Taken", "Passed", "Failed"}
+        if requested_status not in allowed:
+            return jsonify({"error": "Choose Eligible, Passed, or Failed for the comprehensive exam status."}), 400
+        eligibility = comprehensive_exam_eligibility(student)
+        if not eligibility["eligible"] and requested_status in {"Passed", "Failed"}:
+            return jsonify({"error": "The student must complete the required units before the comprehensive exam can be marked Passed or Failed."}), 400
+
+        previous_status = student.comprehensive_exam_status or "Not Taken"
+        student.comprehensive_exam_status = requested_status
+        if eligibility["eligible"] and student.current_stage in ("Admission", "Coursework"):
+            student.current_stage = "Comprehensive Exam"
+        recompute_risk(student)
+        account = current_account()
+        actor = f"Academic Coordinator Â· {account.full_name}" if account else "Academic Coordinator"
+        add_log(
+            "course-audit",
+            student.id,
+            actor,
+            "Comprehensive exam status",
+            f"Comprehensive exam marked {requested_status}",
+            "Academic Coordinator",
+            f"Changed from {previous_status} to {requested_status}.",
+        )
+        db.session.commit()
+        updated_eligibility = comprehensive_exam_eligibility(student)
+        return jsonify({
+            "ok": True,
+            "student_id": student.id,
+            "stage": student.current_stage,
+            "risk": student.risk_level,
+            "eligible": updated_eligibility["eligible"],
+            "compre_eligibility": updated_eligibility,
+            "milestones": monitoring_research_milestones(student),
+            "message": f"Comprehensive exam marked {requested_status}.",
         })
 
     # Population-level queue of rule-based recommendations.
@@ -4466,6 +4681,20 @@ def register_routes(app: Flask) -> None:
                 "How is a defense panel composed?",
             ]
         })
+
+    @app.route("/api/leave-of-absence/policy-review", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator", "dean")
+    def leave_of_absence_policy_review():
+        data = request_payload()
+        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        return jsonify({"ok": True, "review": loa_policy_review(student, data)})
+
+    @app.route("/api/readmission/policy-review", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator", "dean")
+    def readmission_policy_review_route():
+        data = request_payload()
+        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        return jsonify({"ok": True, "review": readmission_policy_review(student, data)})
 
     # Supplies each workflow screen with student-specific context before
     # submission, such as current audit status or panel recommendations.
@@ -6024,6 +6253,13 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             (row for row in context["submitted_requests"] if row["id"] == selected_student_id),
             None,
         )
+        if slug == "leave-of-absence" and selected_student and context["selected_request"]:
+            context["loa_policy_review"] = loa_policy_review(selected_student, context["selected_request"])
+        if slug == "readmission" and selected_student and context["selected_request"]:
+            context["readmission_policy_review"] = readmission_policy_review(
+                selected_student,
+                {**context["selected_request"], "readmission_items": readmission_requirements()},
+            )
 
     if selected_student:
         context["panel_roles"] = panel_roles_for_student(selected_student)
@@ -8143,6 +8379,58 @@ def revoke_form1_endorsement(student_id: int) -> bool:
     return revoked
 
 
+def clean_extracted_text(text: str) -> str:
+    # PDF extraction can yield lone surrogate code points that the DB driver cannot
+    # encode, and the stored column is a MySQL TEXT (max 65,535 bytes). Drop invalid
+    # characters and cap to a UTF-8 byte budget so storage is safe on both backends.
+    # The first ~60 KB (title, abstract, introduction, methods) is more than enough
+    # for keyword matching.
+    text = (text or "").encode("utf-8", "ignore").decode("utf-8", "ignore")
+    encoded = text.encode("utf-8")
+    if len(encoded) > 60000:
+        text = encoded[:60000].decode("utf-8", "ignore")
+    return text
+
+
+def readable_word_count(text: str) -> int:
+    return len(re.findall(r"\b\w+\b", text or ""))
+
+
+def ocr_pdf_text(path: Path) -> str:
+    try:
+        import fitz
+        import pytesseract
+        from PIL import Image
+    except Exception:
+        return ""
+
+    tesseract_cmd = os.getenv("TESSERACT_CMD", "").strip()
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+    try:
+        document = fitz.open(str(path))
+    except Exception:
+        return ""
+
+    parts = []
+    matrix = fitz.Matrix(PDF_OCR_DPI / 72, PDF_OCR_DPI / 72)
+    try:
+        for page in document[:PDF_OCR_MAX_PAGES]:
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+            page_text = pytesseract.image_to_string(image).strip()
+            if page_text:
+                parts.append(page_text)
+            if readable_word_count("\n".join(parts)) >= 250:
+                break
+    except Exception:
+        return ""
+    finally:
+        document.close()
+    return clean_extracted_text("\n\n".join(parts))
+
+
 def extract_pdf_text(path: Path) -> str:
     try:
         from pypdf import PdfReader
@@ -8150,17 +8438,219 @@ def extract_pdf_text(path: Path) -> str:
         reader = PdfReader(str(path))
         text = "\n".join((page.extract_text() or "") for page in reader.pages)
     except Exception:
+        text = ""
+    text = clean_extracted_text(text)
+    if readable_word_count(text) >= PDF_OCR_MIN_WORDS:
+        return text
+    ocr_text = ocr_pdf_text(path)
+    return ocr_text if readable_word_count(ocr_text) > readable_word_count(text) else text
+
+
+def extract_docx_text(path: Path) -> str:
+    try:
+        import zipfile
+        import xml.etree.ElementTree as ET
+
+        with zipfile.ZipFile(path) as archive:
+            xml_data = archive.read("word/document.xml")
+        root = ET.fromstring(xml_data)
+        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        return "\n".join(node.text or "" for node in root.findall(".//w:t", namespace))
+    except Exception:
         return ""
-    # PDF extraction can yield lone surrogate code points that the DB driver cannot
-    # encode, and the stored column is a MySQL TEXT (max 65,535 bytes). Drop invalid
-    # characters and cap to a UTF-8 byte budget so storage is safe on both backends.
-    # The first ~60 KB (title, abstract, introduction, methods) is more than enough
-    # for keyword matching.
-    text = text.encode("utf-8", "ignore").decode("utf-8", "ignore")
-    encoded = text.encode("utf-8")
-    if len(encoded) > 60000:
-        text = encoded[:60000].decode("utf-8", "ignore")
-    return text
+
+
+def extract_supported_text(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return extract_pdf_text(path)
+    if suffix == ".docx":
+        return extract_docx_text(path)
+    if suffix in {".txt", ".md"}:
+        try:
+            return path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return ""
+    return ""
+
+
+CONCEPT_PAPER_FALLBACK_GUIDE = """
+Concept paper compliance checklist: the paper should present a clear research title,
+background or rationale, statement of the problem, research objectives or questions,
+scope or significance, methodology or proposed methods, and references or citations.
+The proposal should be coherent enough for Academic Coordinator review and panel
+matching. Missing major sections should be returned for revision.
+"""
+
+
+CONCEPT_PAPER_RULES = [
+    {
+        "id": "title",
+        "label": "Research title",
+        "required": True,
+        "severity": "major",
+        "patterns": [r"\btitle\b", r"\bresearch title\b"],
+        "keywords": ["title"],
+    },
+    {
+        "id": "background",
+        "label": "Background / rationale",
+        "required": True,
+        "severity": "major",
+        "patterns": [r"\bbackground\b", r"\brationale\b", r"\bintroduction\b"],
+        "keywords": ["background", "rationale", "introduction"],
+    },
+    {
+        "id": "problem",
+        "label": "Statement of the problem",
+        "required": True,
+        "severity": "major",
+        "patterns": [r"\bstatement of the problem\b", r"\bproblem statement\b", r"\bresearch problem\b"],
+        "keywords": ["problem"],
+    },
+    {
+        "id": "objectives",
+        "label": "Objectives / research questions",
+        "required": True,
+        "severity": "major",
+        "patterns": [r"\bobjectives?\b", r"\bresearch questions?\b", r"\bspecific objectives?\b"],
+        "keywords": ["objective", "objectives", "questions"],
+    },
+    {
+        "id": "methodology",
+        "label": "Proposed methodology",
+        "required": True,
+        "severity": "major",
+        "patterns": [r"\bmethodology\b", r"\bmethods?\b", r"\bresearch design\b", r"\bdata collection\b"],
+        "keywords": ["methodology", "method", "design", "data"],
+    },
+    {
+        "id": "significance",
+        "label": "Significance / scope",
+        "required": False,
+        "severity": "minor",
+        "patterns": [r"\bsignificance\b", r"\bscope\b", r"\bdelimitation"],
+        "keywords": ["significance", "scope"],
+    },
+    {
+        "id": "references",
+        "label": "References / citations",
+        "required": True,
+        "severity": "major",
+        "patterns": [r"\breferences\b", r"\bbibliography\b", r"\bworks cited\b", r"\bet al\.", r"\(\d{4}\)"],
+        "keywords": ["references", "bibliography", "citation"],
+    },
+]
+
+
+def concept_paper_source_chunks() -> list[dict]:
+    sources = []
+    if CONCEPT_PAPER_RAG_SOURCE.exists():
+        for path in sorted(CONCEPT_PAPER_RAG_SOURCE.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in {".pdf", ".docx", ".txt", ".md"}:
+                continue
+            text = extract_supported_text(path).strip()
+            if text:
+                sources.append({"source": path.name, "text": text})
+    if not sources:
+        sources.append({"source": "Built-in concept paper checklist", "text": CONCEPT_PAPER_FALLBACK_GUIDE})
+
+    chunks = []
+    for source in sources:
+        cleaned = re.sub(r"\s+", " ", source["text"]).strip()
+        if not cleaned:
+            continue
+        parts = re.split(r"(?<=[.!?])\s+", cleaned)
+        current = []
+        for sentence in parts:
+            current.append(sentence)
+            if sum(len(item) for item in current) >= 600:
+                chunks.append({"source": source["source"], "text": " ".join(current)[:900]})
+                current = []
+        if current:
+            chunks.append({"source": source["source"], "text": " ".join(current)[:900]})
+    return chunks or [{"source": "Built-in concept paper checklist", "text": CONCEPT_PAPER_FALLBACK_GUIDE.strip()}]
+
+
+def retrieve_concept_paper_sources(query: str, limit: int = 4) -> list[dict]:
+    query_terms = set(_tokenize(query + " concept paper requirements objectives methodology references"))
+    scored = []
+    for chunk in concept_paper_source_chunks():
+        chunk_terms = set(_tokenize(chunk["text"]))
+        score = len(query_terms & chunk_terms)
+        if "concept" in chunk_terms:
+            score += 2
+        if "paper" in chunk_terms:
+            score += 1
+        scored.append((score, chunk))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [
+        {"id": f"concept-source-{idx}", "title": "Concept Paper Guideline", "source": chunk["source"], "text": chunk["text"]}
+        for idx, (_score, chunk) in enumerate(scored[:limit])
+    ]
+
+
+def evaluate_concept_paper_text(text: str, file_name: str = "Concept paper") -> dict:
+    normalized = re.sub(r"\s+", " ", text or "").strip()
+    lower = normalized.lower()
+    word_count = len(re.findall(r"\b\w+\b", normalized))
+    rule_results = []
+    missing_major = 0
+    present_count = 0
+    for rule in CONCEPT_PAPER_RULES:
+        found = any(re.search(pattern, lower, flags=re.IGNORECASE) for pattern in rule["patterns"])
+        evidence = ""
+        if found:
+            present_count += 1
+            for keyword in rule["keywords"]:
+                match = re.search(rf".{{0,80}}\b{re.escape(keyword)}\b.{{0,120}}", normalized, flags=re.IGNORECASE)
+                if match:
+                    evidence = match.group(0).strip()
+                    break
+        elif rule["required"] and rule["severity"] == "major":
+            missing_major += 1
+        rule_results.append({
+            "id": rule["id"],
+            "label": rule["label"],
+            "required": rule["required"],
+            "status": "Present" if found else "Missing" if rule["required"] else "Not evident",
+            "evidence": evidence,
+        })
+
+    if word_count < 250:
+        status = "Not Enough Evidence"
+    elif missing_major == 0:
+        status = "Compliant"
+    else:
+        status = "Needs Revision"
+    score = max(0, min(100, round((present_count / len(CONCEPT_PAPER_RULES)) * 100)))
+    missing_labels = [item["label"] for item in rule_results if item["status"] == "Missing"]
+    if status == "Compliant":
+        summary = f"{file_name} includes the major concept-paper sections expected for review."
+    elif status == "Not Enough Evidence":
+        summary = f"{file_name} does not contain enough readable text for a reliable compliance check."
+    else:
+        summary = f"{file_name} needs revision before endorsement. Missing: {', '.join(missing_labels)}."
+    citations = retrieve_concept_paper_sources(normalized[:1200] or file_name)
+    return {
+        "status": status,
+        "score": score,
+        "summary": summary,
+        "word_count": word_count,
+        "checks": rule_results,
+        "missing": missing_labels,
+        "citations": citations,
+        "mode": "concept-paper-rag",
+    }
+
+
+def apply_concept_paper_evaluation(evidence: ResearchEvidenceFile) -> dict:
+    result = evaluate_concept_paper_text(evidence.extracted_text or "", evidence.original_name)
+    evidence.compliance_status = result["status"]
+    evidence.compliance_score = result["score"]
+    evidence.compliance_summary = result["summary"]
+    evidence.compliance_result_json = json.dumps(result)
+    return result
 
 
 def parse_title_defense_text(text: str) -> dict:
@@ -9038,7 +9528,17 @@ def research_milestone_payload(student: Student, gate: str) -> dict:
             "status_label": state["status_label"],
             "template_url": f"/api/research-gate/template?student_id={student.id}&gate={quote_plus(gate)}&item_name={quote_plus(item_name)}",
             "files": [
-                {"id": item.id, "name": item.original_name, "mime_type": item.mime_type, "uploaded_at": iso(item.uploaded_at), "url": f"/api/research-evidence/{item.id}/file"}
+                {
+                    "id": item.id,
+                    "name": item.original_name,
+                    "mime_type": item.mime_type,
+                    "uploaded_at": iso(item.uploaded_at),
+                    "url": f"/api/research-evidence/{item.id}/file",
+                    "compliance_status": item.compliance_status,
+                    "compliance_score": item.compliance_score,
+                    "compliance_summary": item.compliance_summary,
+                    "compliance": json.loads(item.compliance_result_json) if item.compliance_result_json else None,
+                }
                 for item in files
             ],
         })
@@ -10002,6 +10502,24 @@ def ensure_course_workflow_schema() -> None:
         for name, sql_type in additions.items():
             if name not in existing:
                 db.session.execute(text(f"ALTER TABLE course_record ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+
+
+def ensure_research_evidence_schema() -> None:
+    """Add concept-paper compliance fields without resetting existing uploads."""
+    db.create_all()
+    inspector = inspect(db.engine)
+    if "research_evidence_file" in inspector.get_table_names():
+        existing = {column["name"] for column in inspector.get_columns("research_evidence_file")}
+        additions = {
+            "compliance_status": "VARCHAR(40)",
+            "compliance_score": "INTEGER",
+            "compliance_summary": "TEXT",
+            "compliance_result_json": "TEXT",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE research_evidence_file ADD COLUMN {name} {sql_type}"))
     db.session.commit()
 
 
@@ -11001,6 +11519,7 @@ with app.app_context():
     ensure_student_comprehensive_exam_schema()
     ensure_workflow_activity_schema()
     ensure_course_workflow_schema()
+    ensure_research_evidence_schema()
     ensure_curriculum_offering_schema()
     ensure_user_account_schema()
     # Data repair runs last, after every column-adding migration above, because it

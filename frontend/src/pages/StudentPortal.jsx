@@ -656,6 +656,7 @@ function ResearchRequestForm({ data, onSaved }) {
 function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [removingId, setRemovingId] = useState(null);
+  const [checkingId, setCheckingId] = useState(null);
   const [error, setError] = useState("");
   const needed = requirement.required_file_count;
   const files = requirement.files || [];
@@ -700,6 +701,19 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
     }
   }
 
+  async function checkConceptPaper(file) {
+    setCheckingId(file.id);
+    setError("");
+    try {
+      await api.evaluateConceptPaper(file.id);
+      await onSaved();
+    } catch (err) {
+      setError(err.message || "Could not check concept paper compliance.");
+    } finally {
+      setCheckingId(null);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -717,24 +731,79 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
         </div>
       </div>
       {files.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 space-y-2">
           {files.map((file) => (
-            <span key={file.id} className="inline-flex overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-200">
-              <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
-                {file.name}<Eye className="h-3.5 w-3.5" />
-              </a>
-              {titlePackageItem && (
-                <button type="button" onClick={() => removeResearchFile(file)} disabled={titlePackageLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </span>
+            <div key={file.id} className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="inline-flex overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
+                  <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
+                    {file.name}<Eye className="h-3.5 w-3.5" />
+                  </a>
+                  {titlePackageItem && (
+                    <button type="button" onClick={() => removeResearchFile(file)} disabled={titlePackageLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </span>
+                {file.compliance_status && (
+                  <div className="flex items-center gap-2">
+                    <StatusBadge value={file.compliance_status} dot={false} />
+                    {Number.isFinite(file.compliance_score) && <span className="text-xs font-semibold text-slate-500">{file.compliance_score}%</span>}
+                  </div>
+                )}
+                {requirement.item_name === "Three concept papers" && (
+                  <button type="button" onClick={() => checkConceptPaper(file)} disabled={checkingId === file.id} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs">
+                    {checkingId === file.id ? "Checking..." : file.compliance_status ? "Recheck" : "Check compliance"}
+                  </button>
+                )}
+              </div>
+              {file.compliance && <ConceptPaperCompliance compliance={file.compliance} />}
+            </div>
           ))}
         </div>
       )}
       {titlePackageItem && files.length > 0 && <p className={`mt-2 text-xs ${titlePackageLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{titlePackageLocked ? "This title-defense package is read-only because a panel has already been matched." : "Removing Form 1 or any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete title-defense package must be endorsed again."}</p>}
       {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
     </div>
+  );
+}
+
+function ConceptPaperCompliance({ compliance }) {
+  const checks = compliance.checks || [];
+  const citations = compliance.citations || [];
+  return (
+    <details className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+      <summary className="cursor-pointer font-semibold text-slate-700">
+        {compliance.summary || "View concept paper compliance check"}
+      </summary>
+      <div className="mt-2 space-y-2">
+        {checks.length > 0 && (
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {checks.map((check) => (
+              <div key={check.id} className="rounded-md border border-slate-100 px-2 py-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-700">{check.label}</span>
+                  <StatusBadge value={check.status} dot={false} />
+                </div>
+                {check.evidence && <p className="mt-1 text-slate-500">{check.evidence}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        {citations.length > 0 && (
+          <div>
+            <p className="font-bold uppercase tracking-wide text-slate-400">Sources</p>
+            <div className="mt-1 space-y-1">
+              {citations.slice(0, 3).map((citation) => (
+                <p key={citation.id} className="rounded-md bg-slate-50 px-2 py-1.5 text-slate-500">
+                  <span className="font-semibold text-slate-700">{citation.source}</span>: {citation.text}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 

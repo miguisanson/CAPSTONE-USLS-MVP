@@ -56,6 +56,7 @@ directory with a full lifecycle record view, a role-filtered **Work Queue**, and
 - Node.js 18+ and npm
 - Git
 - MySQL 8 is **optional** and only needed if you set `DATABASE_URL`.
+- Tesseract OCR is **optional** and only needed if you want scanned/image-only concept-paper PDFs to be readable.
 
 ## Install and Run
 
@@ -105,6 +106,15 @@ npm run setup
 This command creates a local `.venv`, installs the Python dependencies from `requirements.txt`,
 installs the React frontend dependencies, builds the frontend, and creates the demo SQLite
 database with seed data.
+
+For scanned concept-paper PDFs, install the Tesseract OCR desktop/runtime package too. If it is not
+on your system `PATH`, set the executable location in `.env`:
+
+```env
+TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+
+The app first tries normal PDF text extraction, then falls back to OCR when too little text is found.
 
 ### 4. Start the app
 
