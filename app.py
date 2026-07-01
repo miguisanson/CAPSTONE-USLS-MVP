@@ -6563,7 +6563,13 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     effective_end = (data.get("effective_end") or "").strip()
     reason = (data.get("reason_remarks") or "").strip()
     staff_notes = (data.get("staff_notes") or "").strip()
-    prior_loa_count = int(data.get("prior_loa_count") or 0)
+    # Auto-derived (no manual entry): count this student's prior approved LOAs so the
+    # eligibility note is accurate without staff typing it.
+    prior_loa_count = TransactionLog.query.filter(
+        TransactionLog.transaction_slug == "leave-of-absence",
+        TransactionLog.student_id == student.id,
+        TransactionLog.result.like("LOA approved%"),
+    ).count()
     eligibility_status = (data.get("eligibility_status") or "Checked").strip()
     period = " to ".join([part for part in [effective_start, effective_end] if part])
     is_return = dean_action.lower().startswith("return")

@@ -3930,85 +3930,50 @@ function timeRange(start, end) {
 // ---------------------------------------------------------------------------
 // Leave of Absence
 // ---------------------------------------------------------------------------
-function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
+function LeaveOfAbsenceForm({ context, meta, studentId, submit, submitting }) {
   const selectedRequest = context?.selected_request;
-  const [form, setForm] = useState({
-    request_date: new Date().toISOString().slice(0, 10),
-    application_reference: "",
-    effective_start: "",
-    effective_end: "",
-    reason_remarks: "",
-    prior_loa_count: 0,
-    eligibility_status: "Eligible",
-    dean_action: "Approve",
-    staff_notes: "",
-    source_reference: "",
-  });
+  const termOptions = (meta?.terms || []).map((t) => t.label);
+  const filedStart = selectedRequest?.effective_start || "";
+  const filedEnd = selectedRequest?.effective_end || "";
+  const hasFiledPeriod = Boolean(filedStart);
+  const [form, setForm] = useState({ effective_start: "", effective_end: "", dean_action: "Approve", remarks: "" });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
-    if (!selectedRequest) return;
-    setForm((current) => ({
-      ...current,
-      request_date: (selectedRequest.submitted_at || "").slice(0, 10) || current.request_date,
-      application_reference: selectedRequest.attachment || selectedRequest.source_reference || "",
-      effective_start: selectedRequest.effective_start || "",
-      effective_end: selectedRequest.effective_end || "",
-      reason_remarks: selectedRequest.reason_remarks || "",
-      source_reference: selectedRequest.source_reference || selectedRequest.attachment || "",
-    }));
+    setForm({ effective_start: filedStart, effective_end: filedEnd, dean_action: "Approve", remarks: "" });
   }, [selectedRequest?.request_log_id]);
 
   function onSubmit(e) {
     e.preventDefault();
-    submit({ student_id: studentId, ...form });
+    submit({
+      student_id: studentId,
+      dean_action: form.dean_action,
+      effective_start: hasFiledPeriod ? filedStart : form.effective_start,
+      effective_end: hasFiledPeriod ? filedEnd : form.effective_end,
+      reason_remarks: form.remarks,
+      application_reference: selectedRequest?.attachment || "",
+      source_reference: selectedRequest?.source_reference || selectedRequest?.attachment || "",
+    });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Record leave of absence" subtitle="Records the request, Dean decision, status pause, and notice trail" icon={CalendarOff} />
+      <SectionTitle title="Record leave of absence" subtitle="Details come from the student's filed application — just review and record the Dean decision" icon={CalendarOff} />
       <RequestSummary request={selectedRequest} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Application attachment / file reference">
-          <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
-        </Field>
-        <Field label="Request date" required>
-          <Input type="date" value={form.request_date} onChange={set("request_date")} required />
-        </Field>
-        <Field label="Effective start term/date">
-          <Input value={form.effective_start} onChange={set("effective_start")} placeholder="AY 2026-2027 Term 1 or YYYY-MM-DD" />
-        </Field>
-        <Field label="Effective end term/date">
-          <Input value={form.effective_end} onChange={set("effective_end")} placeholder="AY 2026-2027 Term 2 or YYYY-MM-DD" />
-        </Field>
-        <Field label="Prior LOA count">
-          <Input type="number" min="0" value={form.prior_loa_count} onChange={set("prior_loa_count")} />
-        </Field>
-        <Field label="Eligibility status / check result">
-          <Select
-            value={form.eligibility_status}
-            onChange={set("eligibility_status")}
-            placeholder=""
-            options={["Eligible", "Needs Review", "Not Eligible", "Pending Requirements"]}
-          />
-        </Field>
-      </div>
-
+      {selectedRequest?.reason_remarks && <Detail label="Reason (from student)" value={selectedRequest.reason_remarks} />}
+      {hasFiledPeriod ? (
+        <Detail label="Requested leave period" value={filedEnd ? `${filedStart} → ${filedEnd}` : filedStart} />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Effective start term"><Select value={form.effective_start} onChange={set("effective_start")} placeholder="Select term" options={termOptions} /></Field>
+          <Field label="Effective end term"><Select value={form.effective_end} onChange={set("effective_end")} placeholder="Select term" options={termOptions} /></Field>
+        </div>
+      )}
       <Field label="Dean decision">
-        <RadioRow
-          value={form.dean_action}
-          onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))}
-          options={["Approve", "Deny", "Return for Revision"]}
-        />
+        <RadioRow value={form.dean_action} onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))} options={["Approve", "Deny", "Return for Revision"]} />
       </Field>
-      <Field label="Reason / remarks">
-        <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} />
-      </Field>
-      <Field label="Staff notes">
-        <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
-      </Field>
-      <Field label="Source / reference number">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
+      <Field label="Remarks (optional)" hint="Add a note only if there is something to flag.">
+        <Textarea value={form.remarks} onChange={set("remarks")} />
       </Field>
       <SubmitButton submitting={submitting}>Record LOA Decision</SubmitButton>
     </form>
@@ -4018,82 +3983,59 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
 // ---------------------------------------------------------------------------
 // Readmission
 // ---------------------------------------------------------------------------
-function ReadmissionForm({ context, studentId, submit, submitting }) {
-  const requirements = context.readmission_requirements || [];
+function ReadmissionForm({ context, meta, studentId, submit, submitting }) {
   const selectedRequest = context?.selected_request;
-  const [items, setItems] = useState(requirements);
-  const [form, setForm] = useState({
-    application_reference: "",
-    target_return_term: "",
-    previous_loa_period: "",
-    eligibility_status: "Eligible to Return",
-    missing_requirements: "",
-    dean_action: "Approve",
-    staff_notes: "",
-    source_reference: "",
-  });
+  const requirements = context.readmission_requirements || [];
+  const termOptions = (meta?.terms || []).map((t) => t.label);
+  const filedTerm = selectedRequest?.target_return_term || "";
+  const filedPrevLoa = selectedRequest?.previous_loa_period || "";
+  const hasFiledTerm = Boolean(filedTerm);
+  const [form, setForm] = useState({ target_return_term: "", dean_action: "Approve", remarks: "" });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const toggle = (item) => setItems((r) => (r.includes(item) ? r.filter((x) => x !== item) : [...r, item]));
-
-  useEffect(() => setItems(context.readmission_requirements || []), [context.readmission_requirements]);
 
   useEffect(() => {
-    if (!selectedRequest) return;
-    setForm((current) => ({
-      ...current,
-      application_reference: selectedRequest.attachment || selectedRequest.source_reference || "",
-      target_return_term: selectedRequest.target_return_term || "",
-      previous_loa_period: selectedRequest.previous_loa_period || "",
-      source_reference: selectedRequest.source_reference || selectedRequest.attachment || "",
-    }));
+    setForm({ target_return_term: filedTerm, dean_action: "Approve", remarks: "" });
   }, [selectedRequest?.request_log_id]);
 
   function onSubmit(e) {
     e.preventDefault();
-    submit({ student_id: studentId, ...form, readmission_items: items });
+    submit({
+      student_id: studentId,
+      dean_action: form.dean_action,
+      target_return_term: hasFiledTerm ? filedTerm : form.target_return_term,
+      previous_loa_period: filedPrevLoa,
+      readmission_items: requirements, // return requirements are taken as met from the application
+      staff_notes: form.remarks,
+      application_reference: selectedRequest?.attachment || "",
+      source_reference: selectedRequest?.source_reference || selectedRequest?.attachment || "",
+    });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Record readmission" subtitle="Checks return eligibility, records the Dean decision, and reactivates approved students" icon={UserCheck} />
+      <SectionTitle title="Record readmission" subtitle="Return requirements are taken as met from the application — review and record the Dean decision" icon={UserCheck} />
       <RequestSummary request={selectedRequest} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Application attachment / file reference">
-          <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
-        </Field>
-        <Field label="Target return term" required>
-          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 Term 1" />
-        </Field>
-        <Field label="Previous LOA period">
-          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 Term 2 to AY 2026-2027 Term 1" />
-        </Field>
-        <Field label="Eligibility to return status">
-          <Select
-            value={form.eligibility_status}
-            onChange={set("eligibility_status")}
-            placeholder=""
-            options={["Eligible to Return", "Needs Review", "Not Eligible", "Pending Requirements"]}
-          />
-        </Field>
-      </div>
-      <Field label="Eligibility to return checklist" hint="Unticked items are treated as missing requirements.">
-        <CheckList items={requirements} selected={items} onToggle={toggle} />
-      </Field>
-      <Field label="Missing requirements / remarks">
-        <Textarea value={form.missing_requirements} onChange={set("missing_requirements")} />
-      </Field>
+      {filedPrevLoa && <Detail label="Previous LOA period" value={filedPrevLoa} />}
+      {hasFiledTerm ? (
+        <Detail label="Target return term" value={filedTerm} />
+      ) : (
+        <Field label="Target return term"><Select value={form.target_return_term} onChange={set("target_return_term")} placeholder="Select term" options={termOptions} /></Field>
+      )}
+      {requirements.length > 0 && (
+        <div>
+          <p className="field-label">Return requirements on file</p>
+          <div className="mt-2 space-y-1.5">
+            {requirements.map((item) => (
+              <div key={item} className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> {item}</div>
+            ))}
+          </div>
+        </div>
+      )}
       <Field label="Dean decision">
-        <RadioRow
-          value={form.dean_action}
-          onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))}
-          options={["Approve", "Deny", "Return for Revision"]}
-        />
+        <RadioRow value={form.dean_action} onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))} options={["Approve", "Deny", "Return for Revision"]} />
       </Field>
-      <Field label="Staff notes">
-        <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
-      </Field>
-      <Field label="Source / reference number">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
+      <Field label="Remarks (optional)" hint="Add a note only if there is something to flag.">
+        <Textarea value={form.remarks} onChange={set("remarks")} />
       </Field>
       <SubmitButton submitting={submitting}>Record Readmission Decision</SubmitButton>
     </form>
