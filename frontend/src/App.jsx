@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 import { useAuth } from "./auth";
 import Layout from "./components/Layout";
-import { Spinner } from "./components/ui";
+import { Card, EmptyState, Spinner } from "./components/ui";
 import Dashboard from "./pages/Dashboard";
 import Reports from "./pages/Reports";
 import Students from "./pages/Students";
@@ -95,13 +96,25 @@ export default function App() {
                     </RoleOnly>
                   }
                 />
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<UnavailablePage />} />
               </Routes>
             </Layout>
           </BackofficeOnly>
         }
       />
     </Routes>
+  );
+}
+
+function UnavailablePage() {
+  return (
+    <Card>
+      <EmptyState
+        icon={AlertTriangle}
+        title="This page is not available yet"
+        hint="The route exists in the navigation history, but this screen has not been implemented. Use the sidebar to open an available module."
+      />
+    </Card>
   );
 }
 

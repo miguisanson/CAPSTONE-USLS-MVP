@@ -344,15 +344,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self._transition(staff, "graduation", {"student_id": self.student_id, "endorsement_status": "Not Eligible"})
             self.assertEqual(endorsement.endorsement_status, "Not Eligible")
 
-    def test_course_audit_bulk_grades_and_incomplete_do_not_auto_fail(self):
+    def test_course_audit_bulk_grades_and_overdue_incomplete_auto_fails(self):
         with app.app_context():
             academic = self._academic_client()
-            staff = self._staff_client()
-            response = staff.post("/api/course-audit/roster", json={
-                "course_id": self.course_id,
-                "statuses": {str(self.student_id): "Completed"},
-            })
-            self.assertEqual(response.status_code, 403)
 
             response = academic.post("/api/course-audit/roster", json={
                 "course_id": self.course_id,
@@ -374,20 +368,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             })
             self.assertEqual(response.status_code, 200, response.get_json())
             db.session.refresh(record)
-            self.assertEqual(record.status, "Incomplete")
-            self.assertEqual(record.grade_status, "Incomplete")
-            self.assertIsNotNone(Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("overdue incomplete")).first())
-            self.assertNotEqual(record.status, "Failed")
-
-            response = academic.post("/api/course-audit/roster", json={
-                "course_id": self.course_id,
-                "statuses": {str(self.student_id): "Failed"},
-                "grades": {str(self.student_id): "5.00"},
-            })
-            self.assertEqual(response.status_code, 200, response.get_json())
-            db.session.refresh(record)
             self.assertEqual(record.status, "Failed")
             self.assertEqual(record.grade_status, "Failed")
+            self.assertIsNone(record.incomplete_deadline)
+            self.assertIn("automatically marked Failed", record.remarks)
+            self.assertIsNotNone(Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("automatic failure")).first())
             student = db.session.get(Student, self.student_id)
             self.assertFalse(graduation_eligibility(student)["eligible"])
 

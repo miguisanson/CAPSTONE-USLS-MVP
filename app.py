@@ -833,9 +833,89 @@ def student_brief(student: Student) -> dict:
 COMPRE_UNIT_REQUIREMENTS = {"Basic": 6, "Major": 9, "Cognate": 6}
 COMPRE_TOTAL_UNITS_REQUIRED = 21
 
+MONITORING_CURRICULUM_TEMPLATE = [
+    ("200-STAT", "Statistics", "Basic", 3, "Year 1"),
+    ("201-MOR", "Methods of Research", "Basic", 3, "Year 1"),
+    ("202-OD", "Organization Development", "Basic", 3, "Year 1"),
+    ("210-MGRACCT", "Managerial Accounting", "Major", 3, "Year 1"),
+    ("211-ECON", "Economics", "Major", 3, "Year 1"),
+    ("212-MDHR", "Managing and Developing Human Resources", "Major", 3, "Year 1"),
+    ("213COMPFM", "Computerized Financial Management", "Major", 3, "Year 2"),
+    ("214-MRKTMANGT", "Marketing Management", "Major", 3, "Year 2"),
+    ("220", "Cognate 220", "Cognate", 3, "Year 2"),
+    ("221", "Cognate 221", "Cognate", 3, "Year 2"),
+    ("222", "Cognate 222", "Cognate", 3, "Year 2"),
+    ("223", "Cognate 223", "Cognate", 3, "Year 2"),
+    ("224", "Cognate 224", "Cognate", 3, "Year 2"),
+    ("225", "Cognate 225", "Cognate", 3, "Year 2"),
+    ("226", "Cognate 226", "Cognate", 3, "Year 2"),
+    ("227", "Cognate 227", "Cognate", 3, "Year 2"),
+    ("228", "Cognate 228", "Cognate", 3, "Year 2"),
+    ("229", "Cognate 229", "Cognate", 3, "Year 2"),
+]
+
+
+def monitoring_course_code(program_code: str, suffix: str) -> str:
+    return f"{program_code}{suffix}" if suffix[:1].isdigit() else f"{program_code}-{suffix}"
+
+
+def monitoring_course_title(program_code: str, suffix: str, title: str) -> str:
+    if title.startswith("Cognate "):
+        return f"{program_code} {title}"
+    return title
+
+
+def monitoring_template_codes(program_code: str) -> list[str]:
+    return [monitoring_course_code(program_code, suffix) for suffix, *_ in MONITORING_CURRICULUM_TEMPLATE]
+
+
+def monitoring_curriculum_courses(program: Program) -> list[Course]:
+    """Prefer the AC template columns for monitoring when the program has them."""
+    template_codes = monitoring_template_codes(program.code)
+    courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
+    by_code = {course.code: course for course in courses}
+    template_courses = [by_code[code] for code in template_codes if code in by_code]
+    return template_courses if template_courses else courses
+
+
+def ensure_monitoring_template_courses() -> int:
+    """Add the AC monitoring-template subject columns to existing programs."""
+    changed = 0
+    for program in Program.query.all():
+        for suffix, title, category, units, recommended_term in MONITORING_CURRICULUM_TEMPLATE:
+            code = monitoring_course_code(program.code, suffix)
+            expected_title = monitoring_course_title(program.code, suffix, title)
+            course = Course.query.filter_by(program_id=program.id, code=code).first()
+            if not course:
+                db.session.add(Course(
+                    program_id=program.id,
+                    code=code,
+                    title=expected_title,
+                    units=units,
+                    recommended_term=recommended_term,
+                    category=category,
+                ))
+                changed += 1
+                continue
+            if course.title == course.code and expected_title != course.code:
+                course.title = expected_title
+                changed += 1
+            if (course.category or "Core") != category:
+                course.category = category
+                changed += 1
+            if not course.units:
+                course.units = units
+                changed += 1
+            if not course.recommended_term:
+                course.recommended_term = recommended_term
+                changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
 
 def comprehensive_exam_eligibility(student: Student) -> dict:
-    """Apply the AC monitoring template's 6 + 9 + 6 = 21 coursework rule."""
+    """Require all curriculum subjects to be completed before comprehensive exam eligibility."""
     audit = compute_course_audit(student)
     completed = {row["category"]: row["completed_units"] for row in audit.get("by_category", [])}
     categories = [
@@ -848,16 +928,21 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         for category, required in COMPRE_UNIT_REQUIREMENTS.items()
     ]
     qualifying_total = sum(item["completed"] for item in categories)
-    eligible = all(item["complete"] for item in categories) and qualifying_total >= COMPRE_TOTAL_UNITS_REQUIRED
+    missing_count = len(audit.get("missing", [])) + len(audit.get("current", [])) + len(audit.get("incomplete", []))
+    failed_count = sum(1 for row in audit.get("incomplete", []) if row.get("status") == "Failed")
+    eligible = missing_count == 0 and failed_count == 0 and bool(audit.get("completed"))
     return {
         "eligible": eligible,
-        "status": "Eligible for Comprehensive Exam" if eligible else "Not Yet Eligible",
+        "status": "Eligible for Comprehensive Exam" if eligible else "Not Eligible",
         "exam_status": student.comprehensive_exam_status or "Not Taken",
         "passed": (student.comprehensive_exam_status or "").lower() == "passed",
         "research_allowed": eligible and (student.comprehensive_exam_status or "").lower() == "passed",
         "categories": categories,
         "completed_units": qualifying_total,
         "required_units": COMPRE_TOTAL_UNITS_REQUIRED,
+        "missing_subjects": missing_count,
+        "failed_subjects": failed_count,
+        "required_subjects": len(audit.get("completed", [])) + missing_count,
     }
 
 
@@ -876,7 +961,7 @@ def monitoring_research_milestones(student: Student) -> dict:
 def require_research_prerequisite(student: Student) -> dict:
     prerequisite = comprehensive_exam_eligibility(student)
     if not prerequisite["eligible"]:
-        raise ValueError("Complete the Basic 6, Major 9, and Cognate 6 unit requirements before taking the comprehensive exam.")
+        raise ValueError("Complete all curriculum subjects before taking the comprehensive exam.")
     if not prerequisite["passed"]:
         raise ValueError("The comprehensive exam must be marked Passed before starting Title, Proposal, Ethics, or Final research activities.")
     return prerequisite
@@ -1338,7 +1423,7 @@ def workflow_case_meta(slug: str, student_id: int) -> dict:
 def task_dict(task: Task) -> dict:
     action_url = None
     action_label = None
-    if task.title.startswith("Review course drop request") or task.title.startswith("Review overdue incomplete grade"):
+    if task.title.startswith("Review course drop request") or task.title.startswith("Review automatic failure"):
         action_url = "/workflow/course-audit"
         action_label = "Open Course Audit"
     return {
@@ -1570,8 +1655,6 @@ def workflow_actor_label(account: UserAccount) -> str:
 # deterministically from recorded transactions, never by the assistant/LLM.
 STALL_WARN_DAYS = 120
 STALL_HIGH_DAYS = 210
-INCOMPLETE_REVIEW_GRACE_DAYS = 7
-
 
 def student_indicators(student: Student) -> dict:
     """Computed indicators for one student (Table 13 in the proposal)."""
@@ -4329,20 +4412,20 @@ def register_routes(app: Flask) -> None:
             try:
                 sid = int(sid_str)
             except (TypeError, ValueError):
-                continue
+                return jsonify({"error": f"Invalid student id: {sid_str}."}), 400
             if new_status not in allowed_statuses:
-                continue
+                return jsonify({"error": f"Invalid course status for student {sid}: {new_status}."}), 400
             rec = CourseRecord.query.filter_by(student_id=sid, course_id=course.id).first()
             if not rec:
                 student = Student.query.get(sid)
                 if not student:
-                    continue
+                    return jsonify({"error": f"Student {sid} was not found."}), 400
                 rec = CourseRecord(student_id=sid, course_id=course.id)
                 db.session.add(rec)
             else:
                 student = Student.query.get(sid)
                 if not student:
-                    continue
+                    return jsonify({"error": f"Student {sid} was not found."}), 400
             previous = rec.status
             previous_grade = rec.grade_value or ""
             previous_grade_status = rec.grade_status or "No Grade"
@@ -4361,7 +4444,11 @@ def register_routes(app: Flask) -> None:
             elif new_status == "Incomplete":
                 rec.grade_status = "Incomplete"
                 deadline_value = str(deadlines.get(sid_str, deadlines.get(sid, "")) or "").strip()
-                rec.incomplete_deadline = parse_date(deadline_value) if deadline_value else rec.incomplete_deadline
+                if deadline_value:
+                    try:
+                        rec.incomplete_deadline = parse_date(deadline_value)
+                    except ValueError:
+                        return jsonify({"error": f"Invalid incomplete deadline for {student.name}. Use YYYY-MM-DD."}), 400
                 ensure_task(student.id, f"Resolve incomplete grade for {course.code}", "Academic Coordinator", date.today() + timedelta(days=14), 35)
             elif new_status == "Failed":
                 rec.grade_status = "Failed"
@@ -4547,9 +4634,7 @@ def register_routes(app: Flask) -> None:
         if not program:
             return jsonify({"error": "No program found."}), 404
 
-        courses = (
-            Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
-        )
+        courses = monitoring_curriculum_courses(program)
         students = (
             Student.query.filter_by(program_id=program.id)
         )
@@ -4612,7 +4697,7 @@ def register_routes(app: Flask) -> None:
                     done_units += course_units[c.id]
             compre = comprehensive_exam_eligibility(s)
             rows.append({
-                "id": s.id, "name": s.name, "student_number": s.student_number,
+                "id": s.id, "name": s.name, "first_name": s.first_name, "last_name": s.last_name, "student_number": s.student_number,
                 "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
                 "enrollment_tag": s.enrollment_tag,
                 "cells": cells, "completed": done, "total": len(courses),
@@ -4654,7 +4739,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Choose Eligible, Passed, or Failed for the comprehensive exam status."}), 400
         eligibility = comprehensive_exam_eligibility(student)
         if not eligibility["eligible"] and requested_status in {"Passed", "Failed"}:
-            return jsonify({"error": "The student must complete the required units before the comprehensive exam can be marked Passed or Failed."}), 400
+            return jsonify({"error": "The student must complete all curriculum subjects before the comprehensive exam can be marked Passed or Failed."}), 400
 
         previous_status = student.comprehensive_exam_status or "Not Taken"
         student.comprehensive_exam_status = requested_status
@@ -4725,14 +4810,39 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator", "dean")
     def leave_of_absence_policy_review():
         data = request_payload()
-        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        try:
+            student_id = int(data.get("student_id") or 0)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Choose a valid student before running the LOA policy review."}), 400
+        student = Student.query.get_or_404(student_id)
+        try:
+            prior_count = int(data.get("prior_loa_count") or 0)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Prior LOA count must be a whole number."}), 400
+        if prior_count < 0:
+            return jsonify({"error": "Prior LOA count cannot be negative."}), 400
+        for field in ("request_date",):
+            value = (data.get(field) or "").strip()
+            if value:
+                try:
+                    parse_api_date(value)
+                except ValueError:
+                    return jsonify({"error": "Request date must use YYYY-MM-DD format."}), 400
         return jsonify({"ok": True, "review": loa_policy_review(student, data)})
 
     @app.route("/api/readmission/policy-review", methods=["POST"])
     @require_api_login("staff", "academic_coordinator", "dean")
     def readmission_policy_review_route():
         data = request_payload()
-        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        try:
+            student_id = int(data.get("student_id") or 0)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Choose a valid student before running the readmission policy review."}), 400
+        student = Student.query.get_or_404(student_id)
+        submitted_items = set(data.getlist("readmission_items")) if hasattr(data, "getlist") else set()
+        unknown_items = sorted(submitted_items - set(readmission_requirements()))
+        if unknown_items:
+            return jsonify({"error": "Unknown readmission checklist item: " + ", ".join(unknown_items)}), 400
         return jsonify({"ok": True, "review": readmission_policy_review(student, data)})
 
     # Supplies each workflow screen with student-specific context before
@@ -6690,7 +6800,7 @@ def ensure_task(student_id: int, title: str, owner: str, due_at: date, priority:
 
 
 def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
-    """Flag overdue INC records without changing the grade outcome."""
+    """Automatically fail INC records after their completion deadline passes."""
     today = date.today()
     changed = 0
     records = (
@@ -6706,21 +6816,23 @@ def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
     for record in records:
         if not record.student or not record.course:
             continue
-        review_title = f"Review overdue incomplete grade for {record.course.code}"
-        student_title = f"Complete overdue incomplete grade for {record.course.code}"
-        review_due = record.incomplete_deadline + timedelta(days=INCOMPLETE_REVIEW_GRACE_DAYS)
-        review_status = "Overdue" if review_due < today else "Pending"
-        ensure_task(record.student_id, review_title, "Academic Coordinator", review_due, 75, review_status)
-        ensure_task(record.student_id, student_title, "Student", record.incomplete_deadline, 65, "Overdue")
+        deadline = record.incomplete_deadline
+        review_title = f"Review automatic failure for {record.course.code}"
+        ensure_task(record.student_id, review_title, "Academic Coordinator", today, 75, "Pending")
         note = (
-            f"{record.course.code} incomplete deadline passed on {record.incomplete_deadline.isoformat()}. "
-            f"Academic Coordinator review is due {review_due.isoformat()} if the grade remains incomplete."
+            f"{record.course.code} incomplete deadline passed on {deadline.isoformat()}. "
+            "The course was automatically marked Failed."
         )
         if note not in (record.remarks or ""):
             record.remarks = f"{record.remarks}\n{note}".strip() if record.remarks else note
             changed += 1
+        record.status = "Failed"
+        record.grade_status = "Failed"
+        record.resolved_at = record.resolved_at or now_utc()
+        record.incomplete_deadline = None
         record.updated_at = now_utc()
-        result = f"{record.course.code} incomplete deadline overdue"
+        changed += 1
+        result = f"{record.course.code} incomplete deadline auto-failed"
         already_logged = TransactionLog.query.filter_by(
             transaction_slug="course-audit",
             student_id=record.student_id,
@@ -6737,7 +6849,7 @@ def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
                 "Academic Coordinator",
                 note,
                 previous_status="Incomplete",
-                new_status="Incomplete",
+                new_status="Failed",
             )
             changed += 1
     if commit and changed:
@@ -6820,8 +6932,9 @@ def parse_ac_monitoring(stream) -> dict:
     stop_cols = [c for c in list(milestone_cols.values()) + [note_c] if c]
     milestone_start = min(stop_cols) if stop_cols else max_col + 1
 
-    subjects = []  # (col, code)
+    subjects = []  # (col, code, title)
     subject_categories = {}  # code -> Basic / Major / Cognate
+    subject_titles = {}  # code -> display title copied from the sheet header
     current_group = "Core"
     group_map = {"BASIC": "Basic", "MAJOR": "Major", "COGNATE": "Cognate", "COMPRE": "Comprehensive"}
     if yr_c:
@@ -6834,8 +6947,10 @@ def parse_ac_monitoring(stream) -> dict:
                 continue
             if group_label == "TOTAL":
                 continue
-            subjects.append((c, code))
+            title = code
+            subjects.append((c, code, title))
             subject_categories[code] = current_group
+            subject_titles[code] = title
 
     rows = []
     last_ay = None
@@ -6850,7 +6965,7 @@ def parse_ac_monitoring(stream) -> dict:
         first = cell(r, fn_c) if fn_c else ""
         if not last and not first:
             continue
-        subj = {code: bool(cell(r, c)) for c, code in subjects}
+        subj = {code: bool(cell(r, c)) for c, code, _title in subjects}
         milestones = {m: bool(cell(r, mc)) for m, mc in milestone_cols.items() if mc}
         rows.append({
             "idno": idno,
@@ -6871,6 +6986,7 @@ def parse_ac_monitoring(stream) -> dict:
         "program_code": program_code,
         "subjects": [s[1] for s in subjects],
         "subject_categories": subject_categories,
+        "subject_titles": subject_titles,
         "rows": rows,
     }
 
@@ -6950,16 +7066,21 @@ def import_ac_monitoring(parsed: dict) -> dict:
 
     # ensure a Course row exists for each subject code on the sheet (for this program)
     categories = parsed.get("subject_categories", {})
+    titles = parsed.get("subject_titles", {})
     course_by_code: dict[str, Course] = {}
     for code in parsed["subjects"]:
         category = categories.get(code, "Core")
+        title = titles.get(code) or code
         existing = Course.query.filter_by(program_id=program.id, code=code).first()
         if not existing:
-            existing = Course(program_id=program.id, code=code, title=code, units=3, category=category)
+            existing = Course(program_id=program.id, code=code, title=title, units=3, category=category)
             db.session.add(existing)
             db.session.flush()
-        elif (existing.category or "Core") == "Core" and category != "Core":
-            existing.category = category
+        else:
+            if existing.title == existing.code and title != existing.code:
+                existing.title = title
+            if (existing.category or "Core") == "Core" and category != "Core":
+                existing.category = category
         course_by_code[code] = existing
 
     term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
@@ -7212,6 +7333,8 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     # eligibility check, and mark the student on leave only after Dean approval.
     student = Student.query.get_or_404(int(data["student_id"]))
     dean_action = data.get("dean_action", "Approve")
+    if dean_action not in {"Approve", "Deny", "Return for Revision"}:
+        raise ValueError("Choose a valid LOA Dean decision.")
     source = (data.get("source_reference") or data.get("application_reference") or "").strip()
     application_reference = (data.get("application_reference") or "").strip()
     request_date = (data.get("request_date") or "").strip()
@@ -7219,8 +7342,17 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     effective_end = (data.get("effective_end") or "").strip()
     reason = (data.get("reason_remarks") or "").strip()
     staff_notes = (data.get("staff_notes") or "").strip()
-    prior_loa_count = int(data.get("prior_loa_count") or 0)
+    try:
+        prior_loa_count = int(data.get("prior_loa_count") or 0)
+    except (TypeError, ValueError):
+        raise ValueError("Prior LOA count must be a whole number.")
+    if prior_loa_count < 0:
+        raise ValueError("Prior LOA count cannot be negative.")
     eligibility_status = (data.get("eligibility_status") or "Checked").strip()
+    if eligibility_status not in {"Eligible", "Needs Review", "Not Eligible", "Pending Requirements", "Checked"}:
+        raise ValueError("Choose a valid LOA eligibility status.")
+    if dean_action == "Approve" and not (effective_start and effective_end):
+        raise ValueError("Enter the LOA effective start and end before approving.")
     period = " to ".join([part for part in [effective_start, effective_end] if part])
     is_return = dean_action.lower().startswith("return")
 
@@ -7275,16 +7407,25 @@ def handle_readmission(data: MultiDict) -> int:
     # the student only after the Dean approves the return.
     student = Student.query.get_or_404(int(data["student_id"]))
     dean_action = data.get("dean_action", "Approve")
+    if dean_action not in {"Approve", "Deny", "Return for Revision"}:
+        raise ValueError("Choose a valid readmission Dean decision.")
     source = (data.get("source_reference") or data.get("application_reference") or "").strip()
     application_reference = (data.get("application_reference") or "").strip()
     target_return_term = (data.get("target_return_term") or "").strip()
     previous_loa_period = (data.get("previous_loa_period") or "").strip()
     eligibility_status = (data.get("eligibility_status") or "Checked").strip()
+    if eligibility_status not in {"Eligible to Return", "Needs Review", "Not Eligible", "Pending Requirements", "Checked"}:
+        raise ValueError("Choose a valid readmission eligibility status.")
     submitted = set(data.getlist("readmission_items"))
+    unknown_items = sorted(submitted - set(readmission_requirements()))
+    if unknown_items:
+        raise ValueError("Unknown readmission checklist item: " + ", ".join(unknown_items))
     missing = [item for item in readmission_requirements() if item not in submitted]
     missing.extend(split_items(data.get("missing_requirements", "")))
     staff_notes = (data.get("staff_notes") or "").strip()
     is_return = dean_action.lower().startswith("return")
+    if dean_action == "Approve" and not target_return_term:
+        raise ValueError("Enter the target return term before approving readmission.")
 
     if dean_action == "Approve":
         if student.current_stage == "LOA":
@@ -10258,7 +10399,7 @@ def readmission_requirements() -> list[str]:
 def compute_course_audit(student: Student) -> dict:
     # Builds the student's curriculum picture from required program subjects and
     # recorded subject statuses.
-    required_courses = Course.query.filter_by(program_id=student.program_id).order_by(Course.code).all()
+    required_courses = monitoring_curriculum_courses(student.program)
     records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
     completed = []
     current = []
@@ -10291,8 +10432,8 @@ def compute_course_audit(student: Student) -> dict:
         else:
             missing.append(row)
 
-    # Eligibility is unit-driven (per AC notes): comprehensive, final proposal, and
-    # the thesis milestones all require the curriculum's total units to be completed.
+    # Course completion is subject-driven: every curriculum subject must be
+    # completed before downstream comprehensive/research eligibility opens.
     units_complete = total_units > 0 and completed_units >= total_units
     cat_order = ["Basic", "Major", "Cognate", "Core", "Comprehensive"]
 
@@ -10320,7 +10461,7 @@ def compute_course_audit(student: Student) -> dict:
 
 
 def sync_student_curriculum(student: Student, courses: list[Course] | None = None) -> int:
-    curriculum = courses if courses is not None else Course.query.filter_by(program_id=student.program_id).all()
+    curriculum = courses if courses is not None else monitoring_curriculum_courses(student.program)
     existing = {record.course_id for record in CourseRecord.query.filter_by(student_id=student.id).all()}
     created = 0
     for course in curriculum:
@@ -10354,7 +10495,7 @@ def sync_all_curricula() -> dict:
     created = 0
     touched = 0
     for program in Program.query.all():
-        result = sync_program_curriculum(program)
+        result = sync_program_curriculum(program, courses=monitoring_curriculum_courses(program))
         created += result["created"]
         touched += result["students"]
     return {"created": created, "students": touched}
@@ -11007,26 +11148,15 @@ def seed_database(count: int = 350) -> None:
         db.session.add(term)
         terms.append(term)
 
-    course_titles = [
-        "Research Methods",
-        "Advanced Seminar",
-        "Statistics for Graduate Studies",
-        "Program Core I",
-        "Program Core II",
-        "Special Topics",
-        "Thesis/Dissertation Writing",
-        "Practicum/Field Application",
-    ]
     for program in programs:
-        for idx, title in enumerate(course_titles, start=1):
-            category = "Basic" if idx <= 2 else "Major" if idx <= 5 else "Cognate" if idx <= 7 else "Core"
+        for suffix, title, category, units, recommended_term in MONITORING_CURRICULUM_TEMPLATE:
             db.session.add(
                 Course(
                     program_id=program.id,
-                    code=f"{program.code}-{500 + idx}",
-                    title=f"{title} ({program.code})",
-                    units=3,
-                    recommended_term=f"Year {1 if idx <= 4 else 2}",
+                    code=monitoring_course_code(program.code, suffix),
+                    title=monitoring_course_title(program.code, suffix, title),
+                    units=units,
+                    recommended_term=recommended_term,
                     category=category,
                 )
             )
@@ -11994,6 +12124,7 @@ with app.app_context():
     ensure_user_account_schema()
     # Data repair runs last, after every column-adding migration above, because it
     # queries CourseRecord/Student which now include the newly added columns.
+    ensure_monitoring_template_courses()
     ensure_demo_comprehensive_exam_consistency()
 
 
@@ -12007,6 +12138,7 @@ if __name__ == "__main__":
             ensure_faculty_demo_profiles()
             ensure_demo_accounts()
             seed_simulation_demo()
+            ensure_monitoring_template_courses()
             ensure_miguel_yu_research_demo_unlock()
             ensure_demo_request_submission_logs()
             db.session.commit()
@@ -12020,6 +12152,7 @@ if __name__ == "__main__":
         updated_faculty_profiles = ensure_faculty_demo_profiles()
         ensure_demo_accounts()
         seed_simulation_demo()  # self-heal demo fixtures on an already-seeded database
+        ensure_monitoring_template_courses()
         miguel_unlock_changes = ensure_miguel_yu_research_demo_unlock()
         healed_request_logs = ensure_demo_request_submission_logs()
         sync_result = sync_all_curricula()

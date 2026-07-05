@@ -16,7 +16,7 @@ const CELL = {
   Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
 };
 
-const STATUS_CYCLE = ["Missing", "Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"];
+const STATUS_CYCLE = ["Missing", "Current", "Completed", "Incomplete", "Failed", "Dropped"];
 const CELL_VIEW = {
   Completed: { cls: "bg-brand-500 text-white", mark: "C" },
   Current: { cls: "bg-blue-100 text-blue-700", mark: "R" },
@@ -53,11 +53,13 @@ export default function MonitoringGrid() {
   const selectedProgress = searchParams.get("progress") || "";
   const selectedRisk = searchParams.get("risk") || "";
   const selectedEnrollment = searchParams.get("enrollment") || "";
+  const selectedSort = searchParams.get("sort") || "name";
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
   const [progress, setProgress] = useState(selectedProgress);
   const [risk, setRisk] = useState(selectedRisk);
   const [enrollment, setEnrollment] = useState(selectedEnrollment);
+  const [sortBy, setSortBy] = useState(selectedSort);
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -80,6 +82,7 @@ export default function MonitoringGrid() {
     setProgress(selectedProgress);
     setRisk(selectedRisk);
     setEnrollment(selectedEnrollment);
+    setSortBy(selectedSort);
     load(selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment]);
@@ -88,6 +91,21 @@ export default function MonitoringGrid() {
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
     [grid]
   );
+  const sortedStudents = useMemo(() => {
+    const rows = [...(grid?.students || [])];
+    const riskRank = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+    const nameKey = (student) => `${student.last_name || ""}, ${student.first_name || ""}`.toLowerCase();
+    rows.sort((a, b) => {
+      if (sortBy === "entry-newest") return (b.entry_year || 0) - (a.entry_year || 0) || nameKey(a).localeCompare(nameKey(b));
+      if (sortBy === "entry-oldest") return (a.entry_year || 0) - (b.entry_year || 0) || nameKey(a).localeCompare(nameKey(b));
+      if (sortBy === "completed-desc") return (b.completed || 0) - (a.completed || 0) || nameKey(a).localeCompare(nameKey(b));
+      if (sortBy === "completed-asc") return (a.completed || 0) - (b.completed || 0) || nameKey(a).localeCompare(nameKey(b));
+      if (sortBy === "units-desc") return (b.completed_units || 0) - (a.completed_units || 0) || nameKey(a).localeCompare(nameKey(b));
+      if (sortBy === "risk") return (riskRank[a.risk] ?? 4) - (riskRank[b.risk] ?? 4) || nameKey(a).localeCompare(nameKey(b));
+      return nameKey(a).localeCompare(nameKey(b));
+    });
+    return rows;
+  }, [grid?.students, sortBy]);
 
   async function cycleCell(studentId, course, current) {
     const index = STATUS_CYCLE.indexOf(current);
@@ -120,7 +138,7 @@ export default function MonitoringGrid() {
   async function toggleCompreExam(student) {
     const nextStatus = nextCompreExamStatus(student);
     if (!nextStatus) {
-      setError("The student must complete the required units before the comprehensive exam can be marked Passed or Failed.");
+      setError("The student must complete all curriculum subjects before the comprehensive exam can be marked Passed or Failed.");
       return;
     }
     setError("");
@@ -169,9 +187,9 @@ export default function MonitoringGrid() {
     if (!grid) return;
     const header = ["Student", "ID", "Year", ...flatCourses.map((c) => c.code), "Completed", "Total", "% Complete"];
     const lines = [header.join(",")];
-    grid.students.forEach((s) => {
+    sortedStudents.forEach((s) => {
       const row = [
-        `"${s.name}"`, s.student_number, s.entry_year,
+        `"${displayStudentName(s)}"`, s.student_number, s.entry_year,
         ...flatCourses.map((c) => s.cells[c.id] || "Missing"),
         s.completed, s.total, s.rate,
       ];
@@ -192,12 +210,14 @@ export default function MonitoringGrid() {
       progress: next.progress ?? progress,
       risk: next.risk ?? risk,
       enrollment: next.enrollment ?? enrollment,
+      sort: next.sort ?? sortBy,
     };
     const params = {};
     if (merged.program_id) params.program_id = merged.program_id;
     if (merged.progress) params.progress = merged.progress;
     if (merged.risk) params.risk = merged.risk;
     if (merged.enrollment) params.enrollment = merged.enrollment;
+    if (merged.sort && merged.sort !== "name") params.sort = merged.sort;
     setSearchParams(params, { replace: true });
   }
 
@@ -210,7 +230,7 @@ export default function MonitoringGrid() {
             The full class view — students by row, subjects by column. Click a subject cell to cycle its status.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-6">
           <select
             value={programId}
             onChange={(e) => updateFilters({ program_id: e.target.value })}
@@ -233,7 +253,7 @@ export default function MonitoringGrid() {
             <option value="not-started">Not started</option>
             <option value="in-progress">In progress</option>
             <option value="complete">All subjects complete</option>
-            <option value="units-complete">Units complete</option>
+            <option value="units-complete">Eligible for compre</option>
           </select>
           <select
             value={risk}
@@ -259,6 +279,20 @@ export default function MonitoringGrid() {
             <option value="Enrolled">Enrolled</option>
             <option value="Withdrawn">Withdrawn</option>
           </select>
+          <select
+            value={sortBy}
+            onChange={(e) => updateFilters({ sort: e.target.value })}
+            className="field-input cursor-pointer"
+            aria-label="Sort monitoring sheet"
+          >
+            <option value="name">Sort: Last name</option>
+            <option value="entry-newest">Sort: Entry year newest</option>
+            <option value="entry-oldest">Sort: Entry year oldest</option>
+            <option value="completed-desc">Sort: Completed subjects most</option>
+            <option value="completed-asc">Sort: Completed subjects least</option>
+            <option value="units-desc">Sort: Completed units most</option>
+            <option value="risk">Sort: Highest risk</option>
+          </select>
           <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}>
             <Download className="h-4 w-4" /> Export CSV
           </button>
@@ -266,14 +300,14 @@ export default function MonitoringGrid() {
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Completed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Current</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-amber-300" /> Incomplete</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-100 ring-1 ring-red-200" /> Failed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-200 ring-1 ring-slate-300" /> Dropped</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>
-        <span className="text-slate-400">Cycle: Not taken - Enrolled - Current - Completed - Incomplete - Failed - Dropped</span>
+        <span className="text-slate-400">Cycle: Not taken - Current - Completed - Incomplete - Failed - Dropped</span>
         {saving && <span className="text-brand-600">Saving…</span>}
       </div>
 
@@ -285,15 +319,17 @@ export default function MonitoringGrid() {
         <EmptyState icon={Table2} title="No students in this program yet" hint="Import a monitoring sheet under Student Handoff to populate it." />
       ) : (
         <Card className="overflow-hidden p-0">
-          <div className="overflow-auto" style={{ maxHeight: "72vh" }}>
-            <table className="min-w-full border-collapse text-xs">
+          <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500 sm:hidden">
+            Swipe sideways to review all subject columns.
+          </div>
+          <div className="overflow-auto overscroll-x-contain" style={{ maxHeight: "min(72vh, 760px)" }}>
+            <table className="min-w-max border-collapse text-[11px] sm:text-xs">
               <thead>
                 {/* group header row */}
                 <tr>
                   <th
-                    className="sticky left-0 top-0 z-30 border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-left"
+                    className="sticky left-0 top-0 z-30 min-w-[170px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-left sm:min-w-[220px] sm:px-3"
                     rowSpan={2}
-                    style={{ minWidth: 220 }}
                   >
                     <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Student</span>
                   </th>
@@ -327,7 +363,7 @@ export default function MonitoringGrid() {
                       key={c.id}
                       title={c.title}
                       className="sticky z-20 border-b border-r border-slate-100 bg-white px-1.5 py-2 text-center align-bottom font-semibold text-slate-500"
-                      style={{ top: 32, minWidth: 38, height: 96 }}
+                      style={{ top: 32, minWidth: 34, height: 84 }}
                     >
                       <span style={{ writingMode: "vertical-rl" }} className="inline-block rotate-180 whitespace-nowrap">
                         {c.code}
@@ -338,7 +374,7 @@ export default function MonitoringGrid() {
                     <th
                       key={key}
                       className="sticky z-20 border-b border-r border-slate-100 bg-white px-1.5 py-2 text-center align-bottom font-semibold text-slate-500"
-                      style={{ top: 32, minWidth: 40, height: 96 }}
+                      style={{ top: 32, minWidth: 34, height: 84 }}
                     >
                       <span style={{ writingMode: "vertical-rl" }} className="inline-block rotate-180">{label}</span>
                     </th>
@@ -346,17 +382,17 @@ export default function MonitoringGrid() {
                 </tr>
               </thead>
               <tbody>
-                {grid.students.map((s) => (
+                {sortedStudents.map((s) => (
                   <tr key={s.id} className="hover:bg-brand-50/30">
-                    <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-3 py-1.5">
+                    <td className="sticky left-0 z-10 max-w-[170px] border-b border-r border-slate-200 bg-white px-2 py-1.5 sm:max-w-[240px] sm:px-3">
                       <button
                         type="button"
                         onClick={() => navigate(`/students/${s.id}`)}
                         className="flex w-full items-center justify-between gap-2 text-left cursor-pointer"
                       >
                         <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-ink">{s.name}</span>
-                          <span className="mt-0.5 flex items-center gap-1.5">
+                          <span className="block truncate text-xs font-semibold text-ink sm:text-sm">{displayStudentName(s)}</span>
+                          <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
                             <span className="text-[10px] text-slate-400">{s.student_number} · Y{s.entry_year}</span>
                             {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
                               <StatusBadge value={s.enrollment_tag} dot={false} />
@@ -375,7 +411,7 @@ export default function MonitoringGrid() {
                             type="button"
                             onClick={() => cycleCell(s.id, c, status)}
                             title={`${c.code} — ${status}. Click to cycle to the next status.`}
-                            className={`flex h-8 w-full items-center justify-center text-[11px] font-bold transition-colors hover:opacity-80 cursor-pointer ${sty.cls}`}
+                            className={`flex h-7 w-full min-w-8 items-center justify-center text-[10px] font-bold transition-colors hover:opacity-80 cursor-pointer sm:h-8 sm:text-[11px] ${sty.cls}`}
                           >
                             {sty.mark}
                           </button>
@@ -408,7 +444,9 @@ export default function MonitoringGrid() {
 function compreTitle(student) {
   if (student.compre_eligibility?.passed) return "Comprehensive exam passed";
   if (student.compre_eligibility?.eligible) return "Eligible to take the comprehensive exam";
-  return `Not yet eligible: ${student.compre_eligibility?.completed_units || 0}/21 units completed`;
+  const missing = student.compre_eligibility?.missing_subjects;
+  if (Number.isFinite(missing)) return `Not eligible: ${missing} subject(s) still not completed`;
+  return `Not eligible: ${student.compre_eligibility?.completed_units || 0}/21 units completed`;
 }
 
 function CompreExamBadge({ student, onToggle, saving }) {
@@ -452,12 +490,15 @@ function refreshStudentProgress(student, categories = []) {
     compre_eligibility: {
       ...(student.compre_eligibility || {}),
       eligible: eligibility.eligible,
-      status: eligibility.eligible ? "Eligible for Comprehensive Exam" : "Not Yet Eligible",
+      status: eligibility.eligible ? "Eligible for Comprehensive Exam" : "Not Eligible",
       passed: examStatus.toLowerCase() === "passed",
       research_allowed: eligibility.eligible && examStatus.toLowerCase() === "passed",
       categories: eligibility.categories,
       completed_units: eligibility.completed_units,
       required_units: COMPRE_TOTAL_UNITS_REQUIRED,
+      missing_subjects: eligibility.missing_subjects,
+      failed_subjects: eligibility.failed_subjects,
+      required_subjects: eligibility.required_subjects,
     },
   };
   return { ...updated, milestones: computeResearchMilestones(updated) };
@@ -478,12 +519,25 @@ function computeCompreEligibility(student, categories = []) {
       cells[course.id] === "Completed" ? courseSum + (course.units || 3) : courseSum
     ), 0)
   ), 0);
+  const allCourses = categories.flatMap((group) => group.courses || []);
+  const missingSubjects = allCourses.filter((course) => cells[course.id] !== "Completed").length;
+  const failedSubjects = allCourses.filter((course) => cells[course.id] === "Failed").length;
   return {
     categories: categoryRows,
     completed_units: completedUnits,
     total_completed_units: totalCompletedUnits,
-    eligible: categoryRows.every((item) => item.complete) && completedUnits >= COMPRE_TOTAL_UNITS_REQUIRED,
+    missing_subjects: missingSubjects,
+    failed_subjects: failedSubjects,
+    required_subjects: allCourses.length,
+    eligible: allCourses.length > 0 && missingSubjects === 0 && failedSubjects === 0,
   };
+}
+
+function displayStudentName(student) {
+  if (student.last_name || student.first_name) {
+    return `${student.last_name || ""}, ${student.first_name || ""}`.replace(/^, /, "").trim();
+  }
+  return student.name || "Unnamed student";
 }
 
 function computeResearchMilestones(student) {

@@ -3981,6 +3981,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
   const [policyReview, setPolicyReview] = useState(context?.loa_policy_review || null);
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState("");
+  const [reviewNotice, setReviewNotice] = useState("");
   const [form, setForm] = useState({
     request_date: new Date().toISOString().slice(0, 10),
     application_reference: "",
@@ -4016,6 +4017,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
     if (!studentId) return;
     setReviewing(true);
     setReviewError("");
+    setReviewNotice("");
     try {
       const result = await api.loaPolicyReview({ student_id: studentId, ...form });
       setPolicyReview(result.review);
@@ -4024,8 +4026,9 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
           ...current,
           eligibility_status: result.review.recommendation || current.eligibility_status,
           dean_action: result.review.suggested_dean_action || current.dean_action,
-          staff_notes: current.staff_notes || result.review.summary || "",
+          staff_notes: mergeReviewSummary(current.staff_notes, result.review.summary),
         }));
+        setReviewNotice("Suggestion applied to eligibility, Dean decision, and staff notes.");
       }
     } catch (err) {
       setReviewError(err.message || "Could not run the LOA policy review.");
@@ -4047,6 +4050,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
         review={policyReview}
         busy={reviewing}
         error={reviewError}
+        notice={reviewNotice}
         onReview={() => runPolicyReview(false)}
         onApply={() => runPolicyReview(true)}
       />
@@ -4097,7 +4101,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
   );
 }
 
-function LoaPolicyReviewCard({ review, busy, error, onReview, onApply }) {
+function LoaPolicyReviewCard({ review, busy, error, notice, onReview, onApply }) {
   return (
     <PolicyReviewCard
       title="LOA policy review"
@@ -4106,13 +4110,14 @@ function LoaPolicyReviewCard({ review, busy, error, onReview, onApply }) {
       review={review}
       busy={busy}
       error={error}
+      notice={notice}
       onReview={onReview}
       onApply={onApply}
     />
   );
 }
 
-function PolicyReviewCard({ title, description, emptyText, review, busy, error, onReview, onApply }) {
+function PolicyReviewCard({ title, description, emptyText, review, busy, error, notice, onReview, onApply }) {
   const citations = review?.citations || [];
   return (
     <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
@@ -4162,6 +4167,7 @@ function PolicyReviewCard({ title, description, emptyText, review, busy, error, 
         <p className="mt-3 text-sm text-slate-600">{emptyText}</p>
       )}
       {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
+      {notice && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{notice}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={onReview} disabled={busy} className="btn-ghost">
           <Sparkles className="h-4 w-4" /> {busy ? "Reviewing..." : "Recheck policy"}
@@ -4174,6 +4180,13 @@ function PolicyReviewCard({ title, description, emptyText, review, busy, error, 
   );
 }
 
+function mergeReviewSummary(currentNotes, summary) {
+  const existing = String(currentNotes || "").trim();
+  const next = String(summary || "").trim();
+  if (!next || existing.includes(next)) return existing;
+  return existing ? `${existing}\n${next}` : next;
+}
+
 // ---------------------------------------------------------------------------
 // Readmission
 // ---------------------------------------------------------------------------
@@ -4184,6 +4197,7 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
   const [policyReview, setPolicyReview] = useState(context?.readmission_policy_review || null);
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState("");
+  const [reviewNotice, setReviewNotice] = useState("");
   const [form, setForm] = useState({
     application_reference: "",
     target_return_term: "",
@@ -4220,6 +4234,7 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
     if (!studentId) return;
     setReviewing(true);
     setReviewError("");
+    setReviewNotice("");
     try {
       const result = await api.readmissionPolicyReview({ student_id: studentId, ...form, readmission_items: items });
       setPolicyReview(result.review);
@@ -4229,8 +4244,9 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
           eligibility_status: result.review.recommendation || current.eligibility_status,
           dean_action: result.review.suggested_dean_action || current.dean_action,
           missing_requirements: (result.review.missing_requirements || []).join(", "),
-          staff_notes: current.staff_notes || result.review.summary || "",
+          staff_notes: mergeReviewSummary(current.staff_notes, result.review.summary),
         }));
+        setReviewNotice("Suggestion applied to eligibility, Dean decision, missing requirements, and staff notes.");
       }
     } catch (err) {
       setReviewError(err.message || "Could not run the readmission policy review.");
@@ -4250,6 +4266,7 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
         review={policyReview}
         busy={reviewing}
         error={reviewError}
+        notice={reviewNotice}
         onReview={() => runPolicyReview(false)}
         onApply={() => runPolicyReview(true)}
       />

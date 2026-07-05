@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   Briefcase,
   CalendarCheck,
@@ -34,6 +35,12 @@ import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } fr
 
 const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
+const STUDENT_REQUEST_VIEW_BY_SLUG = {
+  practicum: "practicum",
+  withdrawal: "withdrawal",
+  graduation: "graduation",
+};
+
 const STUDENT_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
   { id: "lifecycle", label: "Lifecycle Status", icon: Activity },
@@ -48,6 +55,38 @@ const STUDENT_NAV = [
   { id: "inbox", label: "Inbox / Messages", icon: Mail },
   { id: "documents", label: "Documents / Submissions", icon: FileUp },
 ];
+
+class StudentPortalSectionBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.view !== this.props.view && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Card className="p-6">
+          <EmptyState
+            icon={AlertTriangle}
+            title="This page could not load"
+            hint="Please try another section or refresh the portal. The rest of your student portal is still available."
+          />
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const REQUEST_GROUPS = [
   {
@@ -142,12 +181,14 @@ export default function StudentPortal() {
           ) : student ? (
             <>
               <StudentHero data={data} />
-              {view === "overview" && <div className="grid grid-cols-1 gap-5 lg:grid-cols-12"><div className="space-y-5 lg:col-span-8"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /><ActivityPanel logs={data.logs} /></div><div className="space-y-5 lg:col-span-4"><TasksPanel tasks={data.tasks} /><SchedulePanel schedules={data.schedules} /><RecommendationsPanel recommendations={data.recommendations} /></div></div>}
-              {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
-              {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
-              {["research", "schedule", "loa", "readmission", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
-              {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
-              {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
+              <StudentPortalSectionBoundary view={view}>
+                {view === "overview" && <div className="grid grid-cols-1 gap-5 lg:grid-cols-12"><div className="space-y-5 lg:col-span-8"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /><ActivityPanel logs={data.logs} /></div><div className="space-y-5 lg:col-span-4"><TasksPanel tasks={data.tasks} /><SchedulePanel schedules={data.schedules} /><RecommendationsPanel recommendations={data.recommendations} /></div></div>}
+                {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
+                {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
+                {["research", "schedule", "loa", "readmission", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
+                {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
+                {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
+              </StudentPortalSectionBoundary>
             </>
           ) : null}
         </div>
@@ -522,6 +563,123 @@ function StudentClarificationPanel({ slug, data, onSaved }) {
       {notice && <p aria-live="polite" className="mt-2 text-sm font-semibold text-brand-700">{notice}</p>}
       <button type="button" disabled={busy || !comment.trim()} onClick={respond} className="btn-primary mt-3 cursor-pointer"><Send className="h-4 w-4" /> {busy ? "Sending…" : "Send clarification response"}</button>
     </div>
+  );
+}
+
+function StudentInbox({ data, onSaved, onOpenRequest }) {
+  const [drafts, setDrafts] = useState({});
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const messages = [...(data.workflow_messages || [])].sort((a, b) => {
+    const openA = a.status === "Open" ? 1 : 0;
+    const openB = b.status === "Open" ? 1 : 0;
+    if (openA !== openB) return openB - openA;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+
+  function requestLabel(slug) {
+    const labels = {
+      practicum: "Practicum",
+      withdrawal: "Withdrawal",
+      graduation: "Graduation",
+    };
+    return labels[slug] || slug || "Request";
+  }
+
+  function messageKey(message, index) {
+    return message.id || `${message.transaction_slug || "message"}-${index}`;
+  }
+
+  function canReply(message) {
+    return message.recipient_role === "Student" && message.status === "Open" && message.action_type === "return";
+  }
+
+  async function sendReply(message, key) {
+    const comment = (drafts[key] || "").trim();
+    if (!comment) return;
+    setBusyId(key);
+    setError("");
+    setNotice("");
+    try {
+      const result = await api.sendWorkflowMessage(message.transaction_slug, {
+        action_type: "response",
+        recipient_role: message.sender_role || "Graduate School Staff",
+        template: "Please clarify request details",
+        comment,
+      });
+      setDrafts((current) => ({ ...current, [key]: "" }));
+      setNotice(result.message || "Reply sent.");
+      onSaved();
+    } catch (err) {
+      setError(err.message || "Could not send your reply.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <Card className="p-6">
+      <SectionTitle title="Inbox / Messages" subtitle="Clarifications and staff replies for your requests" icon={Mail} />
+      <ErrorNote message={error} />
+      {notice && <p aria-live="polite" className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{notice}</p>}
+      {!messages.length ? (
+        <EmptyState icon={Mail} title="No messages yet" hint="Clarification requests and staff replies will appear here." />
+      ) : (
+        <div className="space-y-3">
+          {messages.map((message, index) => {
+            const key = messageKey(message, index);
+            const replyAllowed = canReply(message);
+            const targetView = STUDENT_REQUEST_VIEW_BY_SLUG[message.transaction_slug];
+            return (
+              <div key={key} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink">
+                        <MessageSquare className="h-4 w-4 text-brand-700" />
+                        {requestLabel(message.transaction_slug)}
+                      </span>
+                      <StatusBadge value={message.status || "Message"} dot={false} />
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">{message.template || "Message"}</p>
+                    {message.comment && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{message.comment}</p>}
+                    <p className="mt-2 text-xs font-medium text-slate-500">
+                      From {message.sender_role || "Staff"} to {message.recipient_role || "Student"} - {formatDate(message.created_at)}
+                    </p>
+                  </div>
+                  {targetView && (
+                    <button type="button" onClick={() => onOpenRequest(targetView)} className="btn-secondary shrink-0 cursor-pointer">
+                      Open request <ArrowRight className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {replyAllowed && (
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    <label className="text-xs font-semibold text-slate-600" htmlFor={`student-inbox-reply-${key}`}>Your reply</label>
+                    <textarea
+                      id={`student-inbox-reply-${key}`}
+                      value={drafts[key] || ""}
+                      onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))}
+                      className="field-input mt-1 min-h-24"
+                      placeholder="Explain what you updated or ask a follow-up question."
+                    />
+                    <button
+                      type="button"
+                      disabled={busyId === key || !(drafts[key] || "").trim()}
+                      onClick={() => sendReply(message, key)}
+                      className="btn-primary mt-3 cursor-pointer"
+                    >
+                      <Send className="h-4 w-4" /> {busyId === key ? "Sending..." : "Send reply"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
 
