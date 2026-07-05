@@ -174,9 +174,11 @@ export default function WorkflowPage() {
     try {
       const res = await api.submitTransaction(slug, payload);
       setResult(res);
-      refetch();
+      await refetch();
+      return true;
     } catch (err) {
       setSubmitError(err.message || "Could not save. Please review the form.");
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -2804,13 +2806,15 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
     closeButtonRef.current?.focus();
 
     function onKeyDown(event) {
+      const modal = closeButtonRef.current?.closest('[role="dialog"]');
+      const dialogs = [...document.querySelectorAll('[role="dialog"]')];
+      if (modal && dialogs[dialogs.length - 1] !== modal) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
-      const modal = closeButtonRef.current?.closest('[role="dialog"]');
       const focusable = modal ? [...modal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')] : [];
       if (!focusable.length) return;
       const first = focusable[0];
@@ -2944,7 +2948,7 @@ function WorkflowActivityList({ logs }) {
             <p className="text-sm font-semibold text-ink">{log.result}</p>
             <time className="text-xs text-slate-400">{formatDateTime(log.created_at)}</time>
           </div>
-          <p className="mt-1 text-xs text-slate-500">{log.actor_role}{log.student_name ? ` · ${log.student_name}` : ""}</p>
+          <p className="mt-1 text-xs text-slate-500">{log.actor_role}{log.student_name ? ` · ${log.student_name}` : ""}{log.request_id ? ` · Request #${log.request_id}` : ""}{log.action_type ? ` · ${log.action_type}` : ""}</p>
           {(log.previous_status || log.new_status) && <p className="mt-2 text-xs font-semibold text-slate-600">{log.previous_status || "—"} <span className="mx-1 text-slate-300">→</span> {log.new_status || "—"}</p>}
           {log.notes && <p className="mt-2 text-xs leading-relaxed text-slate-500">{log.notes}</p>}
         </li>
@@ -2958,6 +2962,7 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
   const [form, setForm] = useState({
     action_type: "return",
     recipient_role: "Student",
+    visibility: "student_visible",
     template: context?.message_templates?.[0] || "Missing required document",
     comment: "",
   });
@@ -2995,20 +3000,25 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
             <select value={form.action_type} onChange={update("action_type")} className="field-input cursor-pointer">
               <option value="return">Return for clarification</option>
               <option value="note">Send note to current reviewer</option>
-              <option value="forward">Forward with note</option>
             </select>
           </Field>
           <Field label="Recipient / next stage">
-            <Select value={form.recipient_role} onChange={update("recipient_role")} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar"]} />
+            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal" }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar"]} />
           </Field>
         </div>
+        <Field label="Visibility">
+          <select value={form.visibility} onChange={update("visibility")} disabled={form.recipient_role === "Student"} className="field-input cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100">
+            <option value="student_visible">Visible to student</option>
+            <option value="internal">Internal reviewers only</option>
+          </select>
+        </Field>
         <Field label="Message template">
           <Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} />
         </Field>
-        <Field label={form.template === "Other" ? "Custom comment" : "Optional details"} required={form.template === "Other"}>
-          <Textarea value={form.comment} onChange={update("comment")} required={form.template === "Other"} placeholder="Add the exact file, record, or detail that needs attention." />
+        <Field label={form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"} required={form.action_type === "return" || form.template === "Other / Custom comment"}>
+          <Textarea value={form.comment} onChange={update("comment")} required={form.action_type === "return" || form.template === "Other / Custom comment"} placeholder="Add the exact file, record, or detail that needs attention." />
         </Field>
-        <p className="text-xs leading-relaxed text-slate-500">Returning the case changes its status to Returned for Clarification and creates a visible task for the selected recipient. A note keeps the current stage unchanged.</p>
+        <p className="text-xs leading-relaxed text-slate-500">Returning the case moves it back to the selected recipient's stage and requires a reason. Use the case action button for normal forward approval; a note keeps the current stage unchanged.</p>
       </form>
     </WorkflowCaseModal>
   );
@@ -3020,13 +3030,13 @@ function CaseMessageHistory({ messages = [] }) {
     <div className="rounded-xl border border-slate-200 p-4">
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400"><MessageSquare className="h-4 w-4" /> Messages and clarifications</p>
       <ul className="mt-3 space-y-3">
-        {messages.map((message) => (
+        {[...messages].reverse().map((message) => (
           <li key={message.id} className="rounded-xl bg-slate-50 p-3 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <p className="font-semibold text-ink">{message.template}</p>
-              <StatusBadge value={message.status} dot={false} />
+              <span className="flex flex-wrap gap-1.5"><StatusBadge value={message.visibility === "internal" ? "Internal" : "Student visible"} dot={false} /><StatusBadge value={message.status} dot={false} /></span>
             </div>
-            <p className="mt-1 text-xs text-slate-500">{message.sender_role} → {message.recipient_role} · {formatDateTime(message.created_at)}</p>
+            <p className="mt-1 text-xs text-slate-500">{message.sender_name || message.sender_role} ({message.sender_role}) → {message.recipient_role} · {formatDateTime(message.created_at)}</p>
             {message.comment && <p className="mt-2 text-sm leading-relaxed text-slate-600">{message.comment}</p>}
           </li>
         ))}
@@ -3035,10 +3045,78 @@ function CaseMessageHistory({ messages = [] }) {
   );
 }
 
+function WorkflowFileHistory({ files = [] }) {
+  if (!files.length) return <EmptyState title="No uploaded files for this request" />;
+  return (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400"><FileCheck className="h-4 w-4" /> Submitted file history</p>
+      <ul className="mt-3 space-y-2">
+        {files.map((file) => (
+          <li key={file.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">{file.name}</p>
+              <p className="text-xs text-slate-500">Uploaded by {file.uploaded_by || "Uploader not recorded"} ({file.uploaded_by_role || "role not recorded"}) · {formatDateTime(file.uploaded_at)}{file.stage ? ` · ${file.stage}` : ""}</p>
+            </div>
+            {file.file_exists !== false ? <a href={file.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">
+              <Eye className="h-3.5 w-3.5" /> View file
+            </a> : <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">File unavailable</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfirm }) {
+  const [reason, setReason] = useState(action.reason || "");
+  const [error, setError] = useState("");
+  const requiresReason = Boolean(action.requireReason);
+
+  async function confirm(event) {
+    event.preventDefault();
+    if (requiresReason && !reason.trim()) {
+      setError("Enter the exact reason before moving this request.");
+      return;
+    }
+    setError("");
+    const payload = {
+      ...action.payload,
+      ...(requiresReason ? {
+        return_reason: reason.trim(),
+        staff_remarks: reason.trim(),
+        remarks: reason.trim(),
+      } : {}),
+    };
+    const saved = await onConfirm(payload);
+    if (saved) onClose();
+  }
+
+  return (
+    <WorkflowCaseModal
+      id={`${slug}-confirm-transition-${student.id}`}
+      title={`Confirm: ${action.label}`}
+      subtitle={`${student.name} · ${student.student_number} · ${slug}`}
+      onClose={onClose}
+      footer={<button type="submit" form={`${slug}-confirm-transition-form`} disabled={busy} className={action.destructive ? "btn-ghost cursor-pointer px-4 py-2 text-red-600" : "btn-primary cursor-pointer px-4 py-2"}>{busy ? "Saving…" : action.label}</button>}
+    >
+      <form id={`${slug}-confirm-transition-form`} onSubmit={confirm} className="space-y-4">
+        <ErrorNote message={error} />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Workflow movement</p>
+          <p className="mt-2 text-sm font-semibold text-ink">{action.fromStatus || "Current stage"} <span className="mx-1 text-slate-300">→</span> {action.toStatus || action.label}</p>
+          <p className="mt-1 text-xs text-slate-500">This action is recorded against your signed-in account and preserves the submitted fields and files.</p>
+        </div>
+        {requiresReason && <Field label="Required reason" required><Textarea value={reason} onChange={(event) => setReason(event.target.value)} required placeholder="Explain what must be corrected or why this request is moving backward." /></Field>}
+      </form>
+    </WorkflowCaseModal>
+  );
+}
+
 function GraduationBatchModal({ rows, context, onClose, onSaved }) {
   const [form, setForm] = useState({
     action: "send_to_dean",
     recipient_role: "Graduate School Staff",
+    visibility: "internal",
     template: "This request requires additional review",
     comment: "",
     review_window: rows.find((row) => row.endorsement?.review_window)?.endorsement?.review_window || "AY 2026-2027 Graduation Review",
@@ -3083,12 +3161,13 @@ function GraduationBatchModal({ rows, context, onClose, onSaved }) {
             </select>
           </Field>
           <Field label="Recipient / reviewer">
-            <Select value={form.recipient_role} onChange={update("recipient_role")} placeholder="" options={context?.message_recipients || []} />
+            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal" }))} placeholder="" options={context?.message_recipients || []} />
           </Field>
         </div>
+        {form.action !== "send_to_dean" && <Field label="Visibility"><select value={form.visibility} onChange={update("visibility")} disabled={form.recipient_role === "Student"} className="field-input cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100"><option value="student_visible">Visible to student</option><option value="internal">Internal reviewers only</option></select></Field>}
         {form.action === "send_to_dean" && <Field label="Review window"><Input value={form.review_window} onChange={update("review_window")} /></Field>}
         {form.action !== "send_to_dean" && <Field label="Message template"><Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} /></Field>}
-        <Field label="Comment" required={form.template === "Other" && form.action !== "send_to_dean"}><Textarea value={form.comment} onChange={update("comment")} required={form.template === "Other" && form.action !== "send_to_dean"} /></Field>
+        <Field label="Comment" required={(form.template === "Other / Custom comment" || form.action === "return") && form.action !== "send_to_dean"}><Textarea value={form.comment} onChange={update("comment")} required={(form.template === "Other / Custom comment" || form.action === "return") && form.action !== "send_to_dean"} /></Field>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-sm font-semibold text-ink">Action summary</p>
           <p className="mt-1 text-sm text-slate-600">{rows.length} candidate(s) selected · {rows.length - blocked.length} can be included · {blocked.length} will be skipped.</p>
@@ -3118,22 +3197,34 @@ const WITHDRAWAL_BOARD_COLUMNS = [
   { label: "Rejected / Cancelled", statuses: ["Denied", "Cancelled"] },
 ];
 
+const GRADUATION_BOARD_COLUMNS = [
+  { label: "New / Submitted", statuses: ["Not Prepared", "For Review"] },
+  { label: "Coursework Review", statuses: ["Coursework Review", "Coursework Incomplete"] },
+  { label: "Research / Practicum Review", statuses: ["Research Review", "Research Incomplete", "Practicum Incomplete"] },
+  { label: "Preparation", statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"] },
+  { label: "Dean Review", statuses: ["Ready for Dean Review"] },
+  { label: "Approved / Handoff", statuses: ["Dean Approved", "Sent to Registrar", "Registrar Received"] },
+  { label: "Returned / Not Eligible", statuses: ["Not Eligible", "Returned for Clarification"] },
+];
+
 function WorkflowBoard({ columns, rows, getStatus, renderCard, empty }) {
   if (!rows.length) return <EmptyState title={empty} />;
   return (
-    <div className="flex snap-x gap-4 overflow-x-auto pb-3">
-      {columns.map((column) => {
-        const items = rows.filter((row) => column.statuses.includes(getStatus(row)));
-        return (
-          <section key={column.label} className="w-[290px] shrink-0 snap-start rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-            <header className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
-              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
-            </header>
-            <div className="space-y-3">{items.length ? items.map(renderCard) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
-          </section>
-        );
-      })}
+    <div className="max-w-full overflow-x-auto pb-3">
+      <div className="flex w-max snap-x gap-4">
+        {columns.map((column) => {
+          const items = rows.filter((row) => column.statuses.includes(getStatus(row)));
+          return (
+            <section key={column.label} className="w-[290px] shrink-0 snap-start rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+              <header className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
+              </header>
+              <div className="space-y-3">{items.length ? items.map(renderCard) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -3170,23 +3261,42 @@ function WithdrawalBoardCard({ item, onOpen, onMessage }) {
   );
 }
 
+function GraduationBoardCard({ row, selected, onToggle, onOpen, onMessage }) {
+  const status = row.endorsement?.endorsement_status || "Not Prepared";
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
+      <div className="flex items-start gap-2">
+        <input type="checkbox" checked={selected} onChange={onToggle} className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name}`} />
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-400">{row.student.student_number} · {row.student.program_code}</p></div>
+        {row.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">{row.unresolved_messages}</span>}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5"><StatusBadge value={status} dot={false} /><StatusBadge value={row.eligibility.status} dot={false} /></div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Coursework: {row.eligibility.coursework_status}</span><span className="text-right">Research: {row.eligibility.research_status}</span><span className="col-span-2">Updated {formatDate(row.last_activity_at || row.endorsement?.updated_at)}</span></div>
+      <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
+      <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button>{row.endorsement && <button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}</div>
+    </article>
+  );
+}
+
 function PracticumRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
   const [messageNotice, setMessageNotice] = useState("");
   const [viewMode, setViewMode] = useState("board");
+  const [pendingAction, setPendingAction] = useState(null);
   const reset = useDemoCaseReset("practicum", refetch);
   const rows = context.roster || [];
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map((row) => row.record?.status || "Not Submitted")), [rows]);
-  const filteredRows = useMemo(() => rows.filter((row) => {
+  const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((row) => {
     const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.record?.practicum_site || ""}`.toLowerCase();
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
       && (!filters.status || (row.record?.status || "Not Submitted") === filters.status)
-      && (!filters.secondary || row.eligibility.status === filters.secondary);
-  }), [rows, filters]);
+      && (!filters.secondary || row.eligibility.status === filters.secondary)
+      && dateMatches(row.last_activity_at || row.record?.updated_at || row.record?.created_at, filters.dateFrom, filters.dateTo);
+  }), filters.sort, (row) => row.last_activity_at || row.record?.updated_at || row.record?.created_at, (row) => row.student.name), [rows, filters]);
 
   function actionFor(row) {
     const record = row.record;
@@ -3202,7 +3312,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
       return { label: "Forward documents to Academic Coordinator", payload: { ...base, status: "Documents Under Review" } };
     }
     if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && row.hours_status !== "Complete") {
-      return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" } };
+      return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" }, requireReason: true };
     }
     if (accountRole === "academic_coordinator" && ["Documents Under Review", "Practicum In Progress"].includes(record.status) && row.hours_status === "Complete") {
       return { label: "Verify completion", payload: { ...base, status: "Completed", document_status: "Verified" } };
@@ -3272,9 +3382,9 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
             <>
               {accountRole === "staff" && selectedRow.record && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
               {selectedRow.record && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
-              {accountRole === "academic_coordinator" && ["Documents Under Review", "Completed"].includes(selectedRow.record?.status) && <button type="button" disabled={submitting || refreshing} onClick={() => submit({ student_id: selectedRow.student.id, status: "Not Accepted - New Organization Required" })} className="btn-ghost cursor-pointer px-4 py-2 text-red-600">Mark not accepted</button>}
+              {accountRole === "academic_coordinator" && ["Documents Under Review", "Completed"].includes(selectedRow.record?.status) && <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ label: "Mark not accepted", payload: { student_id: selectedRow.student.id, status: "Not Accepted - New Organization Required" }, fromStatus: selectedRow.record.status, toStatus: "Not Accepted - New Organization Required", requireReason: true, destructive: true })} className="btn-ghost cursor-pointer px-4 py-2 text-red-600">Mark not accepted</button>}
               {selectedAction ? (
-                <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
+                <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedRow.record.status, toStatus: selectedAction.payload.status })} className="btn-primary cursor-pointer px-4 py-2">
                   {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
                 </button>
               ) : (
@@ -3288,10 +3398,12 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <PracticumCaseDetails row={selectedRow} />
             <CaseMessageHistory messages={selectedRow.messages} />
+            <WorkflowActivityList logs={selectedRow.history || []} />
           </div>
         </WorkflowCaseModal>
       )}
       {messageRow && <WorkflowMessageModal slug="practicum" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
+      {pendingAction && selectedRow && <WorkflowTransitionModal slug="practicum" student={selectedRow.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
     </div>
   );
 }
@@ -3330,10 +3442,11 @@ function PracticumCaseDetails({ row }) {
             <p className="mt-2 text-sm font-semibold text-ink">{record?.practicum_site || "No site submitted"}</p>
             <p className="mt-1 text-xs text-slate-500">Supervisor: {record?.supervisor_name || "Not provided"}</p>
             <p className="mt-1 text-xs text-slate-500">Certificates: {record?.certificate_count || 0} · {record?.remarks || "No student remarks"}</p>
-            <div className="mt-2 flex flex-wrap gap-2">{record?.moa_attachment && <a className="btn-ghost px-3 py-1.5" href={record.moa_attachment.url} target="_blank" rel="noreferrer">MOA <ArrowUpRight className="h-3.5 w-3.5" /></a>}{record?.certificate_attachment && <a className="btn-ghost px-3 py-1.5" href={record.certificate_attachment.url} target="_blank" rel="noreferrer">Documents <ArrowUpRight className="h-3.5 w-3.5" /></a>}</div>
+            <div className="mt-2 flex flex-wrap gap-2">{record?.moa_attachment?.file_exists && <a className="btn-ghost px-3 py-1.5" href={record.moa_attachment.url} target="_blank" rel="noreferrer">MOA <ArrowUpRight className="h-3.5 w-3.5" /></a>}{record?.certificate_attachment?.file_exists && <a className="btn-ghost px-3 py-1.5" href={record.certificate_attachment.url} target="_blank" rel="noreferrer">Documents <ArrowUpRight className="h-3.5 w-3.5" /></a>}{(record?.moa_attachment?.file_exists === false || record?.certificate_attachment?.file_exists === false) && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">One or more saved files are unavailable</span>}</div>
           </div>
       </div>
       <WorkflowTimeline steps={timeline} title="Practicum workflow timeline" />
+      <WorkflowFileHistory files={record?.attachments || []} />
     </div>
   );
 }
@@ -3344,18 +3457,20 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   const [messageRow, setMessageRow] = useState(null);
   const [messageNotice, setMessageNotice] = useState("");
   const [viewMode, setViewMode] = useState("board");
+  const [pendingAction, setPendingAction] = useState(null);
   const reset = useDemoCaseReset("withdrawal", refetch);
   const rows = context.roster || [];
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
   const programs = useMemo(() => uniqueValues(rows.map((item) => item.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map((item) => item.status)), [rows]);
-  const filteredRows = useMemo(() => rows.filter((item) => {
+  const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((item) => {
     const haystack = `${item.student.name} ${item.student.student_number} ${item.student.program_code} ${item.reason || ""} ${item.effective_term || ""}`.toLowerCase();
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || item.student.program_code === filters.program)
       && (!filters.status || item.status === filters.status)
-      && (!filters.secondary || item.dean_decision === filters.secondary);
-  }), [rows, filters]);
+      && (!filters.secondary || item.dean_decision === filters.secondary)
+      && dateMatches(item.last_activity_at || item.updated_at || item.created_at, filters.dateFrom, filters.dateTo);
+  }), filters.sort, (item) => item.last_activity_at || item.updated_at || item.created_at, (item) => item.student.name), [rows, filters]);
   function actionFor(item) {
     const base = { student_id: item.student_id };
     if (accountRole === "staff" && item.dean_decision === "Pending" && item.status === "Submitted to GS Staff") return { label: "Record & forward to Dean", payload: { ...base, workflow_action: "forward_to_dean" } };
@@ -3431,13 +3546,8 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
             <>
               {accountRole === "staff" && selectedCurrent && <DemoResetButton student={selectedCurrent.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
               {selectedCurrent && <button type="button" onClick={() => setMessageRow(selectedCurrent)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
-              {accountRole === "staff" && selectedCurrent?.status === "Requirements Submitted" && (
-                <button type="button" disabled={submitting || refreshing} onClick={() => submit({ student_id: selectedCurrent.student_id, workflow_action: "return_requirements" })} className="btn-ghost cursor-pointer px-4 py-2">
-                  Return incomplete requirements
-                </button>
-              )}
               {selectedAction ? (
-                <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
+                <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedCurrent.status, toStatus: selectedAction.label })} className="btn-primary cursor-pointer px-4 py-2">
                   {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
                 </button>
               ) : (
@@ -3457,19 +3567,23 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
             </div>
             <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
             <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
+            <WorkflowActivityList logs={selectedCurrent?.history || selectedItem.history || []} />
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Request</p>
               <p className="mt-2 text-sm font-semibold text-ink">Effective {selectedItem.effective_term || "term pending"}</p>
               <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedItem.reason || "No reason provided"}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {selectedItem.request_attachment && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
-                {selectedItem.proof_attachment && <a href={selectedItem.proof_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Proof <ArrowUpRight className="h-3.5 w-3.5" /></a>}
+                {selectedItem.request_attachment?.file_exists && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
+                {selectedItem.proof_attachment?.file_exists && <a href={selectedItem.proof_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Proof <ArrowUpRight className="h-3.5 w-3.5" /></a>}
+                {(selectedItem.request_attachment?.file_exists === false || selectedItem.proof_attachment?.file_exists === false) && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">One or more saved files are unavailable</span>}
               </div>
             </div>
+            <WorkflowFileHistory files={selectedCurrent?.attachments || selectedItem.attachments || []} />
           </div>
         </WorkflowCaseModal>
       )}
       {messageRow && <WorkflowMessageModal slug="withdrawal" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
+      {pendingAction && selectedCurrent && <WorkflowTransitionModal slug="withdrawal" student={selectedCurrent.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
     </div>
   );
 }
@@ -3480,19 +3594,22 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   const [messageNotice, setMessageNotice] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("board");
+  const [pendingAction, setPendingAction] = useState(null);
   const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "" });
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map((row) => row.endorsement?.endorsement_status || "Not Prepared")), [rows]);
-  const filteredRows = useMemo(() => rows.filter((row) => {
+  const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((row) => {
     const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name}`.toLowerCase();
     const eligibility = row.eligibility.status;
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
       && (!filters.status || (row.endorsement?.endorsement_status || "Not Prepared") === filters.status)
-      && (!filters.secondary || eligibility === filters.secondary);
-  }), [rows, filters]);
+      && (!filters.secondary || eligibility === filters.secondary)
+      && dateMatches(row.last_activity_at || row.endorsement?.updated_at || row.endorsement?.created_at, filters.dateFrom, filters.dateTo);
+  }), filters.sort, (row) => row.last_activity_at || row.endorsement?.updated_at || row.endorsement?.created_at, (row) => row.student.name), [rows, filters]);
   const selectedRows = rows.filter((row) => selectedIds.has(row.student.id));
   function toggleSelected(studentId) {
     setSelectedIds((current) => {
@@ -3538,8 +3655,17 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
         <button type="button" onClick={() => selectRows((row) => row.unresolved_messages > 0 || row.next_action_owner === WORKFLOW_ROLE_LABELS[accountRole])} className="btn-ghost cursor-pointer px-3 py-2">Select needs action</button>
         {selectedIds.size > 0 && <button type="button" onClick={() => setSelectedIds(new Set())} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
         <button type="button" disabled={!selectedIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> Apply group action</button>
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </div>
-      <WorkflowTable headers={["Select", "Student", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement", "Updated", "Action"]} empty="No candidates match the current filters." rows={filteredRows} render={(row) => {
+      {viewMode === "board" ? (
+        <WorkflowBoard
+          columns={GRADUATION_BOARD_COLUMNS}
+          rows={filteredRows}
+          getStatus={(row) => row.endorsement?.endorsement_status || "Not Prepared"}
+          empty="No graduation candidates match the current filters."
+          renderCard={(row) => <GraduationBoardCard key={row.student.id} row={row} selected={selectedIds.has(row.student.id)} onToggle={() => toggleSelected(row.student.id)} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
+        />
+      ) : <WorkflowTable headers={["Select", "Student", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement", "Updated", "Action"]} empty="No candidates match the current filters." rows={filteredRows} render={(row) => {
         const endorsement = row.endorsement;
         return (
           <tr
@@ -3558,7 +3684,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
             <td className="px-3 py-3"><div className="flex gap-2"><button type="button" onClick={(event) => { event.stopPropagation(); openCase(row.student.id); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> View</button>{endorsement && <button type="button" onClick={(event) => { event.stopPropagation(); setMessageRow(row); }} className="btn-ghost cursor-pointer px-3 py-2"><MessageSquare className="h-4 w-4" /> Message</button>}</div></td>
           </tr>
         );
-      }} />
+      }} />}
       {selectedRow && (
         <WorkflowCaseModal
           id={`graduation-case-${selectedRow.student.id}`}
@@ -3571,7 +3697,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
               {accountRole === "staff" && selectedEndorsement && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
               {selectedEndorsement && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
               {selectedAction ? (
-                <button type="button" disabled={submitting || refreshing} onClick={() => submit(selectedAction.payload)} className="btn-primary cursor-pointer px-4 py-2">
+                <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedEndorsement?.endorsement_status || "Not Prepared", toStatus: selectedAction.payload.endorsement_status })} className="btn-primary cursor-pointer px-4 py-2">
                   {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
                 </button>
               ) : selectedEndorsement?.endorsement_status === "Dean Approved" ? (
@@ -3598,6 +3724,8 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
             {selectedEndorsement?.dean_remarks && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"><span className="font-semibold text-ink">Dean remarks: </span>{selectedEndorsement.dean_remarks}</div>}
             <WorkflowTimeline steps={graduationSteps} title="Graduation endorsement timeline" />
             <CaseMessageHistory messages={selectedRow.messages} />
+            <WorkflowActivityList logs={selectedRow.history || []} />
+            <WorkflowFileHistory files={selectedEndorsement?.attachments || []} />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing coursework</p>
@@ -3613,6 +3741,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
       )}
       {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
       {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} context={context} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
+      {pendingAction && selectedRow && <WorkflowTransitionModal slug="graduation" student={selectedRow.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
     </div>
   );
 }
@@ -3623,7 +3752,7 @@ function WorkflowTable({ headers, rows, render, empty }) {
 }
 
 function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions, count, total }) {
-  const active = Object.values(filters).filter(Boolean).length;
+  const active = Object.entries(filters).filter(([key, value]) => Boolean(value) && !(key === "sort" && value === "newest")).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
@@ -3634,12 +3763,15 @@ function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel
           <input value={filters.query} onChange={update("query")} className="field-input pl-10" placeholder="Search name, ID, program…" aria-label="Search list" />
         </label>
         <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
-        <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter by workflow status"><option value="">All workflow statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
+        <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter by workflow stage or status"><option value="">All stages / statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
         <select value={filters.secondary} onChange={update("secondary")} className="field-input cursor-pointer" aria-label={`Filter by ${secondaryLabel}`}><option value="">All {secondaryLabel.toLowerCase()}</option>{secondaryOptions.map((option) => <option key={option}>{option}</option>)}</select>
+        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated from</span><input type="date" value={filters.dateFrom || ""} onChange={update("dateFrom")} className="field-input" /></label>
+        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated through</span><input type="date" value={filters.dateTo || ""} onChange={update("dateTo")} className="field-input" /></label>
+        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Sort</span><select value={filters.sort || "newest"} onChange={update("sort")} className="field-input cursor-pointer"><option value="newest">Newest updated</option><option value="oldest">Oldest updated</option><option value="student">Student name</option></select></label>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
         <span>Showing {count} of {total} records</span>
-        {active > 0 && <button type="button" onClick={() => setFilters({ query: "", program: "", status: "", secondary: "" })} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button>}
+        {active > 0 && <button type="button" onClick={() => setFilters({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" })} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button>}
       </div>
     </div>
   );
@@ -3647,6 +3779,24 @@ function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel
 
 function uniqueValues(values) {
   return [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
+}
+
+function dateMatches(value, dateFrom, dateTo) {
+  if (!dateFrom && !dateTo) return true;
+  const timestamp = new Date(value || 0).getTime();
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return false;
+  const from = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+  const to = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
+  return (!from || timestamp >= from) && (!to || timestamp <= to);
+}
+
+function sortWorkflowRows(rows, sort, dateFor, nameFor) {
+  return [...rows].sort((left, right) => {
+    if (sort === "student") return nameFor(left).localeCompare(nameFor(right));
+    const leftDate = new Date(dateFor(left) || 0).getTime();
+    const rightDate = new Date(dateFor(right) || 0).getTime();
+    return sort === "oldest" ? leftDate - rightDate : rightDate - leftDate;
+  });
 }
 
 function StudentCell({ student }) {

@@ -19,7 +19,7 @@ from urllib.parse import quote_plus, urlparse
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, request, send_from_directory, session
+from flask import Flask, Response, has_request_context, jsonify, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, inspect, or_, text
 from werkzeug.datastructures import MultiDict
@@ -505,6 +505,11 @@ class StudentRequestAttachment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
     request_type = db.Column(db.String(60), nullable=False)
+    workflow_request_id = db.Column(db.Integer)
+    workflow_stage = db.Column(db.String(100))
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    uploaded_by_name = db.Column(db.String(160))
+    uploaded_by_role = db.Column(db.String(80))
     original_name = db.Column(db.String(220), nullable=False)
     stored_name = db.Column(db.String(220), nullable=False, unique=True)
     mime_type = db.Column(db.String(100), nullable=False, default="application/pdf")
@@ -602,19 +607,18 @@ class GraduationEndorsement(db.Model):
 
 
 class WorkflowMessage(db.Model):
-    """Clarification note tied to one monitored student workflow.
-
-    The MVP has one active case per workflow/student, so a separate polymorphic
-    case table would add complexity without improving traceability. This table
-    can later gain a case identifier if the GS office decides to retain several
-    concurrent applications of the same type.
-    """
+    """Clarification or status notice tied to one existing workflow case."""
     id = db.Column(db.Integer, primary_key=True)
     transaction_slug = db.Column(db.String(80), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    workflow_request_id = db.Column(db.Integer)
+    workflow_stage = db.Column(db.String(100))
+    sender_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
     sender_role = db.Column(db.String(80), nullable=False)
     sender_name = db.Column(db.String(160), nullable=False)
+    recipient_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
     recipient_role = db.Column(db.String(80), nullable=False)
+    visibility = db.Column(db.String(30), nullable=False, default="student_visible")
     template = db.Column(db.String(180), nullable=False)
     comment = db.Column(db.Text)
     action_type = db.Column(db.String(40), nullable=False, default="note")
@@ -623,6 +627,7 @@ class WorkflowMessage(db.Model):
     status = db.Column(db.String(40), nullable=False, default="Open")
     created_at = db.Column(db.DateTime, default=now_utc)
     resolved_at = db.Column(db.DateTime)
+    read_at = db.Column(db.DateTime)
 
 
 # Faculty reference data used by panel matching and scheduling availability.
@@ -712,6 +717,10 @@ class TransactionLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     transaction_slug = db.Column(db.String(80), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"))
+    workflow_request_id = db.Column(db.Integer)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    action_type = db.Column(db.String(40))
+    visibility = db.Column(db.String(30), nullable=False, default="student_visible")
     actor_role = db.Column(db.String(80), nullable=False)
     source_reference = db.Column(db.String(160))
     result = db.Column(db.String(160), nullable=False)
@@ -1213,27 +1222,37 @@ def attachment_dict(attachment: StudentRequestAttachment | None) -> dict | None:
     file_exists = (REQUEST_UPLOAD_ROOT / attachment.stored_name).exists()
     return {
         "id": attachment.id,
+        "request_id": attachment.workflow_request_id,
+        "stage": attachment.workflow_stage,
         "name": attachment.original_name,
         "uploaded_at": iso(attachment.uploaded_at),
         "url": f"/api/student-request-attachments/{attachment.id}/file",
         "file_exists": file_exists,
-        "uploaded_by": "Student",
-        "uploaded_by_role": "Student",
+        "uploaded_by_user_id": attachment.uploaded_by_user_id,
+        "uploaded_by": attachment.uploaded_by_name or "Uploader not recorded",
+        "uploaded_by_role": attachment.uploaded_by_role or "Unknown",
         "status": "Uploaded",
-        "status_label": "Pending Review",
+        "status_label": "Pending Review" if file_exists else "File unavailable",
     }
 
 
-def workflow_attachments(student_id: int, *request_types: str) -> list[dict]:
+def workflow_attachments(student_id: int, *request_types: str, request_id: int | None = None) -> list[dict]:
     """Return every saved upload for a case, including superseded revisions."""
-    rows = (
-        StudentRequestAttachment.query.filter(
-            StudentRequestAttachment.student_id == student_id,
-            StudentRequestAttachment.request_type.in_(request_types),
-        )
-        .order_by(StudentRequestAttachment.uploaded_at.asc(), StudentRequestAttachment.id.asc())
-        .all()
+    query = StudentRequestAttachment.query.filter(
+        StudentRequestAttachment.student_id == student_id,
+        StudentRequestAttachment.request_type.in_(request_types),
     )
+    if request_id is not None:
+        query = query.filter(
+            or_(
+                StudentRequestAttachment.workflow_request_id == request_id,
+                StudentRequestAttachment.workflow_request_id.is_(None),
+            )
+        )
+    rows = query.order_by(
+        StudentRequestAttachment.uploaded_at.asc(),
+        StudentRequestAttachment.id.asc(),
+    ).all()
     return [attachment_dict(item) for item in rows]
 
 
@@ -1296,7 +1315,7 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
         "timeline": practicum_timeline(record, eligibility),
         "moa_attachment": attachment_dict(record.moa_attachment),
         "certificate_attachment": attachment_dict(record.certificate_attachment),
-        "attachments": workflow_attachments(record.student_id, "practicum"),
+        "attachments": workflow_attachments(record.student_id, "practicum", request_id=record.id),
         "report_sent_at": iso(record.report_sent_at),
         "dean_reviewed_at": iso(record.dean_reviewed_at),
         "created_at": iso(record.created_at),
@@ -1324,7 +1343,7 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
         "status": application.status,
         "request_attachment": attachment_dict(application.request_attachment),
         "proof_attachment": attachment_dict(application.proof_attachment),
-        "attachments": workflow_attachments(application.student_id, "withdrawal"),
+        "attachments": workflow_attachments(application.student_id, "withdrawal", request_id=application.id),
         "decided_at": iso(application.decided_at),
         "completed_at": iso(application.completed_at),
         "created_at": iso(application.created_at),
@@ -1352,7 +1371,12 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
         "dean_remarks": endorsement.dean_remarks,
         "registrar_status": endorsement.registrar_status,
         "request_attachment": attachment_dict(endorsement.request_attachment),
-        "attachments": workflow_attachments(endorsement.student_id, "graduation", "graduation-endorsement"),
+        "attachments": workflow_attachments(
+            endorsement.student_id,
+            "graduation",
+            "graduation-endorsement",
+            request_id=endorsement.id,
+        ),
         "submitted_at": iso(endorsement.submitted_at),
         "dean_decision_at": iso(endorsement.dean_decision_at),
         "registrar_received_at": iso(endorsement.registrar_received_at),
@@ -1365,14 +1389,22 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
 
 
 def workflow_message_dict(message: WorkflowMessage) -> dict:
+    record = workflow_case_record(message.transaction_slug, message.student_id)
+    request_id = message.workflow_request_id or (record.id if record else None)
     return {
         "id": message.id,
+        "request_id": request_id,
+        "thread_key": f"{message.transaction_slug}:{request_id or message.student_id}",
+        "stage": message.workflow_stage,
         "transaction_slug": message.transaction_slug,
         "student_id": message.student_id,
         "student_name": message.student.name if message.student else None,
+        "sender_user_id": message.sender_user_id,
         "sender_role": message.sender_role,
         "sender_name": message.sender_name,
+        "recipient_user_id": message.recipient_user_id,
         "recipient_role": message.recipient_role,
+        "visibility": message.visibility,
         "template": message.template,
         "comment": message.comment,
         "action_type": message.action_type,
@@ -1381,38 +1413,76 @@ def workflow_message_dict(message: WorkflowMessage) -> dict:
         "status": message.status,
         "created_at": iso(message.created_at),
         "resolved_at": iso(message.resolved_at),
+        "read_at": iso(message.read_at),
+        "is_unread": bool(
+            message.visibility == "student_visible"
+            and message.recipient_role == "Student"
+            and message.read_at is None
+        ),
     }
 
 
-def workflow_messages_for(slug: str, student_id: int, limit: int = 20) -> list[dict]:
-    messages = (
-        WorkflowMessage.query.filter_by(transaction_slug=slug, student_id=student_id)
-        .order_by(WorkflowMessage.created_at.desc(), WorkflowMessage.id.desc())
-        .limit(limit)
-        .all()
-    )
+def workflow_messages_for(
+    slug: str,
+    student_id: int,
+    limit: int = 20,
+    request_id: int | None = None,
+    student_visible_only: bool = False,
+) -> list[dict]:
+    query = WorkflowMessage.query.filter_by(transaction_slug=slug, student_id=student_id)
+    if request_id is not None:
+        query = query.filter(
+            or_(
+                WorkflowMessage.workflow_request_id == request_id,
+                WorkflowMessage.workflow_request_id.is_(None),
+            )
+        )
+    if student_visible_only:
+        query = query.filter(WorkflowMessage.visibility == "student_visible")
+    messages = query.order_by(
+        WorkflowMessage.created_at.desc(),
+        WorkflowMessage.id.desc(),
+    ).limit(limit).all()
     return [workflow_message_dict(item) for item in messages]
 
 
 def workflow_case_meta(slug: str, student_id: int) -> dict:
-    latest_log = (
-        TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
-        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-        .first()
-    )
-    open_messages = WorkflowMessage.query.filter_by(
+    record = workflow_case_record(slug, student_id)
+    request_id = record.id if record else None
+    log_query = TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
+    if request_id is not None:
+        log_query = log_query.filter(
+            or_(
+                TransactionLog.workflow_request_id == request_id,
+                TransactionLog.workflow_request_id.is_(None),
+            )
+        )
+    latest_log = log_query.order_by(
+        TransactionLog.created_at.desc(),
+        TransactionLog.id.desc(),
+    ).first()
+    open_query = WorkflowMessage.query.filter_by(
         transaction_slug=slug,
         student_id=student_id,
         status="Open",
-    ).count()
+    )
+    if request_id is not None:
+        open_query = open_query.filter(
+            or_(
+                WorkflowMessage.workflow_request_id == request_id,
+                WorkflowMessage.workflow_request_id.is_(None),
+            )
+        )
+    open_messages = open_query.count()
     return {
+        "request_id": request_id,
         "next_action_owner": latest_log.next_owner if latest_log else None,
         "last_activity_at": iso(latest_log.created_at) if latest_log else None,
         "unresolved_messages": open_messages,
-        "messages": workflow_messages_for(slug, student_id),
+        "messages": workflow_messages_for(slug, student_id, request_id=request_id),
         "history": [
             log_dict(item)
-            for item in TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
+            for item in log_query
             .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
             .limit(30)
             .all()
@@ -1507,6 +1577,10 @@ def log_dict(log: TransactionLog) -> dict:
         "id": log.id,
         "transaction_slug": log.transaction_slug,
         "student_id": log.student_id,
+        "request_id": log.workflow_request_id,
+        "actor_user_id": log.actor_user_id,
+        "action_type": log.action_type,
+        "visibility": log.visibility,
         "student_name": log.student.name if log.student else None,
         "actor_role": log.actor_role,
         "source_reference": log.source_reference,
@@ -1560,6 +1634,16 @@ ROLE_TRANSACTION_ACCESS = {
     "academic_coordinator": {"course-audit", "research-gate", "practicum", "graduation", "withdrawal"},
     "research_coordinator": {"research-gate", "graduation"},
     "registrar": {"graduation", "withdrawal"},
+}
+
+REQUEST_ATTACHMENT_WORKFLOWS = {
+    "leave-of-absence": "leave-of-absence",
+    "readmission": "readmission",
+    "practicum": "practicum",
+    "withdrawal": "withdrawal",
+    "graduation": "graduation",
+    "graduation-endorsement": "graduation",
+    "course-drop": "course-audit",
 }
 
 ROLE_LABELS = {
@@ -2758,6 +2842,35 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    @app.route("/api/student-portal/messages/read", methods=["POST"])
+    @require_api_login("student")
+    def student_workflow_messages_read():
+        account = current_account()
+        data = request_payload()
+        message_ids = sorted({
+            safe_int(value)
+            for value in data.getlist("message_ids")
+            if safe_int(value)
+        })
+        if not message_ids:
+            return jsonify({"error": "Choose at least one message to mark as read."}), 400
+        rows = WorkflowMessage.query.filter(
+            WorkflowMessage.id.in_(message_ids),
+            WorkflowMessage.student_id == account.student_id,
+            WorkflowMessage.visibility == "student_visible",
+            WorkflowMessage.recipient_role == "Student",
+        ).all()
+        read_at = now_utc()
+        for item in rows:
+            item.read_at = item.read_at or read_at
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "updated": len(rows),
+            "message_ids": [item.id for item in rows],
+            "read_at": iso(read_at),
+        })
+
     # Student-facing portal context. This mirrors the staff record but keeps the
     # response focused on what a student needs to see and act on.
     @app.route("/api/student-portal/context")
@@ -2794,7 +2907,13 @@ def register_routes(app: Flask) -> None:
             .all()
         )
         logs = (
-            TransactionLog.query.filter(TransactionLog.student_id == student.id)
+            TransactionLog.query.filter(
+                TransactionLog.student_id == student.id,
+                or_(
+                    TransactionLog.visibility.is_(None),
+                    TransactionLog.visibility != "internal",
+                ),
+            )
             .order_by(TransactionLog.created_at.desc())
             .limit(18)
             .all()
@@ -2852,7 +2971,10 @@ def register_routes(app: Flask) -> None:
                 "logs": [log_dict(l) for l in logs],
                 "workflow_messages": [
                     workflow_message_dict(item)
-                    for item in WorkflowMessage.query.filter_by(student_id=student.id)
+                    for item in WorkflowMessage.query.filter_by(
+                        student_id=student.id,
+                        visibility="student_visible",
+                    )
                     .order_by(WorkflowMessage.created_at.desc())
                     .limit(30)
                     .all()
@@ -3112,12 +3234,27 @@ def register_routes(app: Flask) -> None:
         student = Student.query.get_or_404(account.student_id)
         request_type = (request.form.get("request_type") or "").strip()
         uploaded = request.files.get("file")
-        if request_type not in {"leave-of-absence", "readmission", "practicum", "withdrawal", "graduation", "graduation-endorsement", "course-drop"}:
+        if request_type not in REQUEST_ATTACHMENT_WORKFLOWS:
             return jsonify({"error": "Choose a valid request type."}), 400
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a PDF application file."}), 400
+        if request_type == "practicum":
+            record = latest_practicum_record(student.id)
+            if not record and not practicum_eligibility(student)["eligible"]:
+                return jsonify({"error": "Practicum uploads are locked until the eligibility check is complete."}), 409
+            if practicum_student_submission_stage(record) == "locked":
+                return jsonify({"error": "This practicum stage is awaiting reviewer action. Future uploads are locked."}), 409
+        elif request_type == "withdrawal":
+            application = latest_withdrawal_application(student.id)
+            editable_statuses = {"Returned", "Returned for Clarification", "Denied", "Requirements Pending"}
+            if application and application.status not in editable_statuses:
+                return jsonify({"error": "This withdrawal stage is awaiting reviewer action. Future uploads are locked."}), 409
+        elif request_type in {"graduation", "graduation-endorsement"}:
+            endorsement = latest_graduation_endorsement(student.id)
+            if endorsement and endorsement.endorsement_status not in {"Not Eligible", "Returned for Clarification"}:
+                return jsonify({"error": "This graduation stage is awaiting reviewer action. Future uploads are locked."}), 409
         try:
-            attachment = store_student_request_attachment(student, request_type, uploaded)
+            attachment = store_student_request_attachment(student, request_type, uploaded, account)
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
@@ -3248,6 +3385,11 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Practicum is available only for programs with practicum requirements."}), 400
 
         record = latest_practicum_record(student.id)
+        eligibility = practicum_eligibility(student)
+        if not record and not eligibility["eligible"]:
+            return jsonify({
+                "error": "Your practicum eligibility check is not complete. The MOA stage will unlock after the current requirements are verified."
+            }), 409
         stage = practicum_student_submission_stage(record)
         if stage == "locked":
             return jsonify({"error": "This practicum stage is awaiting reviewer action. Your submitted information remains saved and read-only."}), 400
@@ -3272,6 +3414,8 @@ def register_routes(app: Flask) -> None:
             record.remarks = (data.get("remarks") or record.remarks or "").strip()
             record.status = "MOA Submitted"
             record.updated_at = now_utc()
+            db.session.flush()
+            bind_workflow_attachment(moa_attachment, record, "MOA Submission", account)
             add_task(student.id, "Record and forward practicum MOA", "Graduate School Staff", 3, 45)
             next_owner = "Graduate School Staff"
             message = "MOA submitted. Graduate School staff will record and forward it to the Academic Coordinator."
@@ -3298,14 +3442,16 @@ def register_routes(app: Flask) -> None:
                 message = "Documents and hours submitted. Graduate School staff will record and forward them to the Academic Coordinator."
             add_task(student.id, "Record and forward practicum documents", "Graduate School Staff", 3, 45)
             next_owner = "Graduate School Staff"
+            bind_workflow_attachment(certificate, record, "Practicum Document Submission", account)
 
         resolve_student_returns("practicum", student.id)
 
+        source_attachment = record.certificate_attachment if stage == "completion" else record.moa_attachment
         add_log(
             "practicum",
             student.id,
             "Student",
-            record.moa_attachment.original_name if record.moa_attachment else "Student portal",
+            source_attachment.original_name if source_attachment else "Student portal",
             f"Practicum submission recorded: {record.status}",
             next_owner,
             practicum_notes(record),
@@ -3332,11 +3478,18 @@ def register_routes(app: Flask) -> None:
             ).first()
             if not proof:
                 return jsonify({"error": "Upload a valid withdrawal form/proof PDF."}), 400
+            previous_status = current.status
             current.proof_attachment_id = proof.id
             current.status = "Requirements Submitted"
             current.updated_at = now_utc()
+            bind_workflow_attachment(proof, current, "Withdrawal Requirements", account)
             add_task(student.id, "Check submitted withdrawal form and proof", "Graduate School Staff", 3, 50)
-            add_log("withdrawal", student.id, "Student", proof.original_name, "Withdrawal requirements submitted", "Graduate School Staff", "Approved request follow-through proof is ready for staff verification.")
+            add_log(
+                "withdrawal", student.id, "Student", proof.original_name,
+                "Withdrawal requirements submitted", "Graduate School Staff",
+                "Approved request follow-through proof is ready for staff verification.",
+                previous_status=previous_status, new_status=current.status,
+            )
             db.session.commit()
             return jsonify({"ok": True, "message": "Requirements submitted. Graduate School staff will verify your form and proof."})
         if current and current.status not in {"Denied", "Returned", "Returned for Clarification", "Withdrawn Confirmed"}:
@@ -3366,6 +3519,9 @@ def register_routes(app: Flask) -> None:
         application.completed_at = None
         application.updated_at = now_utc()
         db.session.flush()
+        bind_workflow_attachment(attachment, application, "Withdrawal Application", account)
+        if application.proof_attachment_id:
+            bind_workflow_attachment(application.proof_attachment, application, "Withdrawal Requirements", account)
         resolve_student_returns("withdrawal", student.id)
         add_task(student.id, "Record and forward withdrawal request", "Graduate School Staff", 3, 60)
         add_log(
@@ -3405,6 +3561,8 @@ def register_routes(app: Flask) -> None:
         endorsement.endorsement_status = "For Review"
         endorsement.submitted_at = now_utc()
         endorsement.updated_at = now_utc()
+        db.session.flush()
+        bind_workflow_attachment(attachment, endorsement, "Graduation Application", account)
         resolve_student_returns("graduation", student.id)
         next_owner = "Graduate School Staff"
         add_task(
@@ -3638,8 +3796,20 @@ def register_routes(app: Flask) -> None:
     def student_request_attachment_file(attachment_id: int):
         attachment = StudentRequestAttachment.query.get_or_404(attachment_id)
         account = current_account()
+        workflow_slug = REQUEST_ATTACHMENT_WORKFLOWS.get(attachment.request_type)
         if account.role == "student" and account.student_id != attachment.student_id:
             return jsonify({"error": "You cannot access this file."}), 403
+        if account.role == "faculty":
+            return jsonify({"error": "This account cannot access student request files."}), 403
+        if account.role == "dean" and workflow_slug not in {
+            "leave-of-absence", "readmission", "practicum", "withdrawal", "graduation",
+        }:
+            return jsonify({"error": "This file is outside the Dean review workflows."}), 403
+        allowed = ROLE_TRANSACTION_ACCESS.get(account.role)
+        if allowed is not None and workflow_slug not in allowed:
+            return jsonify({"error": "This file belongs to a workflow not assigned to your role."}), 403
+        if not (REQUEST_UPLOAD_ROOT / attachment.stored_name).is_file():
+            return jsonify({"error": "The uploaded file is unavailable. Ask the submitting user to upload it again."}), 404
         return send_from_directory(
             REQUEST_UPLOAD_ROOT,
             attachment.stored_name,
@@ -3707,6 +3877,7 @@ def register_routes(app: Flask) -> None:
             "Endorsement Status", "Dean Approval Date", "Dean Remarks", "Registrar Handoff Status",
         ])
         for item in rows:
+            previous_status = item.endorsement_status
             item.endorsement_status = "Sent to Registrar"
             item.registrar_status = "Sent - Awaiting Receipt"
             item.updated_at = now_utc()
@@ -3718,6 +3889,8 @@ def register_routes(app: Flask) -> None:
                 "Endorsed graduation list exported and handed off to Registrar",
                 "Registrar",
                 item.dean_remarks or "Dean-approved Registrar handoff.",
+                previous_status=previous_status,
+                new_status=item.endorsement_status,
             )
             add_task(item.student_id, "Record receipt of endorsed graduation list", "Registrar", 3, 40)
             writer.writerow([
@@ -4232,6 +4405,8 @@ def register_routes(app: Flask) -> None:
         note = (data.get("note") or "").strip()
         if decision not in {"approve", "return", "deny", "review"}:
             return jsonify({"error": "Decision must be approve, return, deny, or review."}), 400
+        if decision in {"return", "deny"} and not note:
+            return jsonify({"error": "Enter a comment or reason before returning or denying this request."}), 400
 
         if case_type == "practicum":
             record = PracticumRecord.query.get_or_404(item_id)
@@ -4249,8 +4424,17 @@ def register_routes(app: Flask) -> None:
             if note:
                 record.remarks = "\n".join([part for part in [record.remarks, f"Dean: {note}"] if part])
             if decision == "return":
-                db.session.add(WorkflowMessage(transaction_slug="practicum", student_id=record.student_id, sender_role="Dean", sender_name=account.full_name, recipient_role="Academic Coordinator", template=note or "This request requires additional review", comment=note, action_type="return", previous_status=previous_status, new_status=record.status))
-            add_log("practicum", record.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or practicum_notes(record), previous_status=previous_status, new_status=record.status)
+                workflow_message_record(
+                    "practicum", record.student, account, "Academic Coordinator",
+                    note or "This request requires additional review", note, "return",
+                    previous_status, record.status, visibility="internal",
+                )
+            add_log(
+                "practicum", record.student_id, f"Dean · {account.full_name}",
+                "Approvals", result, next_owner, note or practicum_notes(record),
+                previous_status=previous_status, new_status=record.status,
+                visibility="internal" if decision == "return" else "student_visible",
+            )
 
         elif case_type == "withdrawal":
             application = WithdrawalApplication.query.get_or_404(item_id)
@@ -4282,7 +4466,11 @@ def register_routes(app: Flask) -> None:
             if note:
                 application.staff_remarks = "\n".join([part for part in [application.staff_remarks, f"Dean: {note}"] if part])
             if decision == "return":
-                db.session.add(WorkflowMessage(transaction_slug="withdrawal", student_id=application.student_id, sender_role="Dean", sender_name=account.full_name, recipient_role="Student", template=note or "Please clarify request details", comment=note, action_type="return", previous_status=previous_status, new_status=application.status))
+                workflow_message_record(
+                    "withdrawal", application.student, account, "Student",
+                    note or "Please clarify request details", note, "return",
+                    previous_status, application.status, visibility="student_visible",
+                )
             add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application), previous_status=previous_status, new_status=application.status)
 
         elif case_type == "graduation":
@@ -4306,8 +4494,17 @@ def register_routes(app: Flask) -> None:
             if note:
                 endorsement.dean_remarks = note
             if decision == "return":
-                db.session.add(WorkflowMessage(transaction_slug="graduation", student_id=endorsement.student_id, sender_role="Dean", sender_name=account.full_name, recipient_role="Graduate School Staff", template=note or "This request requires additional review", comment=note, action_type="return", previous_status=previous_status, new_status=endorsement.endorsement_status))
-            add_log("graduation", endorsement.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or graduation_notes(endorsement), previous_status=previous_status, new_status=endorsement.endorsement_status)
+                workflow_message_record(
+                    "graduation", endorsement.student, account, "Graduate School Staff",
+                    note or "This request requires additional review", note, "return",
+                    previous_status, endorsement.endorsement_status, visibility="internal",
+                )
+            add_log(
+                "graduation", endorsement.student_id, f"Dean · {account.full_name}",
+                "Approvals", result, next_owner, note or graduation_notes(endorsement),
+                previous_status=previous_status, new_status=endorsement.endorsement_status,
+                visibility="internal" if decision == "return" else "student_visible",
+            )
         else:
             return jsonify({"error": "Unknown workflow approval type."}), 404
 
@@ -4505,7 +4702,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/course-drop/requests/<int:request_id>/decide", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff")
+    @require_api_login("academic_coordinator")
     def course_drop_decide(request_id: int):
         data = request.get_json(silent=True) or {}
         request_item = CourseDropRequest.query.get_or_404(request_id)
@@ -4971,6 +5168,13 @@ def register_routes(app: Flask) -> None:
                     allowed_recipients.add(returned.sender_role)
             if recipient_role not in allowed_recipients:
                 return jsonify({"error": "Send this message to the staff member or reviewer currently handling your request."}), 403
+        elif action_type == "response":
+            return jsonify({"error": "Reviewers should add a note or return the request instead of using the student response action."}), 403
+        visibility = (data.get("visibility") or (
+            "student_visible" if account.role == "student" or recipient_role == "Student" else "internal"
+        )).strip()
+        if account.role == "student":
+            visibility = "student_visible"
         try:
             message = create_workflow_message(
                 slug,
@@ -4980,6 +5184,7 @@ def register_routes(app: Flask) -> None:
                 (data.get("template") or "Please clarify request details").strip(),
                 data.get("comment") or "",
                 action_type,
+                visibility,
             )
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -5011,8 +5216,13 @@ def register_routes(app: Flask) -> None:
         skipped = []
         recipient = (data.get("recipient_role") or "Graduate School Staff").strip()
         template = (data.get("template") or "This request requires additional review").strip()
-        comment = data.get("comment") or ""
+        comment = (data.get("comment") or "").strip()
+        visibility = (data.get("visibility") or (
+            "student_visible" if recipient == "Student" else "internal"
+        )).strip()
         review_window = (data.get("review_window") or "Current review window").strip()
+        if action == "return" and not comment:
+            return jsonify({"error": "Enter one reason before returning the selected candidates."}), 400
 
         for student_id in student_ids:
             student = db.session.get(Student, student_id)
@@ -5054,12 +5264,22 @@ def register_routes(app: Flask) -> None:
                         previous_status=previous, new_status=endorsement.endorsement_status,
                     )
                 elif action == "return":
-                    create_workflow_message("graduation", student, account, recipient, template, comment, "return")
+                    if account.role == "dean" and (
+                        not endorsement or endorsement.endorsement_status != "Ready for Dean Review"
+                    ):
+                        raise ValueError("Candidate is no longer awaiting Dean review")
+                    create_workflow_message(
+                        "graduation", student, account, recipient, template, comment,
+                        "return", visibility,
+                    )
                 elif action == "assign":
                     add_task(student.id, "Review assigned graduation candidate", recipient, 5, 40)
                     add_log("graduation", student.id, workflow_actor_label(account), "Graduation batch", "Reviewer assigned", recipient, comment or "Batch reviewer assignment")
                 else:
-                    create_workflow_message("graduation", student, account, recipient, template, comment, "note")
+                    create_workflow_message(
+                        "graduation", student, account, recipient, template, comment,
+                        "note", visibility,
+                    )
                 updated.append({"student_id": student.id, "student_name": student.name})
             except ValueError as exc:
                 skipped.append({"student_id": student.id, "student_name": student.name, "reason": str(exc)})
@@ -5834,6 +6054,156 @@ def set_workflow_record_status(slug: str, record, status: str) -> None:
         record.updated_at = now_utc()
 
 
+def workflow_recipient_account(student: Student, recipient_label: str) -> UserAccount | None:
+    role = WORKFLOW_RECIPIENTS.get(recipient_label)
+    if not role:
+        return None
+    query = UserAccount.query.filter_by(role=role, active=True)
+    if role == "student":
+        query = query.filter_by(student_id=student.id)
+    return query.order_by(UserAccount.id.asc()).first()
+
+
+def bind_workflow_attachment(
+    attachment: StudentRequestAttachment | None,
+    record,
+    stage: str,
+    account: UserAccount | None = None,
+) -> None:
+    """Persist the case, stage, and real uploader without changing the file row."""
+    if not attachment or not record:
+        return
+    if not getattr(record, "id", None):
+        db.session.flush()
+    attachment.workflow_request_id = record.id
+    attachment.workflow_stage = stage
+    if account:
+        attachment.uploaded_by_user_id = account.id
+        attachment.uploaded_by_name = account.full_name
+        attachment.uploaded_by_role = ROLE_LABELS.get(account.role, account.role)
+    elif not attachment.uploaded_by_name and getattr(record, "student", None):
+        attachment.uploaded_by_name = record.student.name
+        attachment.uploaded_by_role = "Student"
+
+
+def workflow_message_record(
+    slug: str,
+    student: Student,
+    account: UserAccount | None,
+    recipient_label: str,
+    template: str,
+    comment: str,
+    action_type: str,
+    previous_status: str,
+    new_status: str,
+    *,
+    visibility: str = "student_visible",
+    status: str = "Open",
+) -> WorkflowMessage:
+    record = workflow_case_record(slug, student.id)
+    recipient_account = workflow_recipient_account(student, recipient_label)
+    effective_visibility = "student_visible" if recipient_label == "Student" else visibility
+    if effective_visibility not in {"student_visible", "internal"}:
+        raise ValueError("Choose whether this message is visible to the student or internal to reviewers.")
+    message = WorkflowMessage(
+        transaction_slug=slug,
+        student_id=student.id,
+        workflow_request_id=record.id if record else None,
+        workflow_stage=new_status or previous_status,
+        sender_user_id=account.id if account else None,
+        sender_role=ROLE_LABELS.get(account.role, account.role) if account else "System",
+        sender_name=account.full_name if account else "Workflow System",
+        recipient_user_id=recipient_account.id if recipient_account else None,
+        recipient_role=recipient_label,
+        visibility=effective_visibility,
+        template=template,
+        comment=comment.strip(),
+        action_type=action_type,
+        previous_status=previous_status,
+        new_status=new_status,
+        status=status,
+        read_at=now_utc() if account and account.role == "student" else None,
+    )
+    db.session.add(message)
+    return message
+
+
+def workflow_transition_action(result: str) -> str:
+    value = (result or "").lower()
+    if "return" in value or "revision" in value:
+        return "return"
+    if "reject" in value or "denied" in value or "not accepted" in value:
+        return "reject"
+    if "forward" in value or "sent" in value or "handoff" in value:
+        return "forward"
+    if "approv" in value or "verified" in value or "reviewed" in value or "complete" in value:
+        return "approve"
+    return "transition"
+
+
+def add_student_transition_notice(
+    slug: str,
+    student_id: int | None,
+    result: str,
+    next_owner: str,
+    previous_status: str | None,
+    new_status: str | None,
+) -> None:
+    """Create one student-visible status notice for reviewer transitions."""
+    if (
+        slug not in {"practicum", "withdrawal", "graduation"}
+        or not student_id
+        or not previous_status
+        or not new_status
+        or previous_status == new_status
+        or not has_request_context()
+    ):
+        return
+    account = current_account()
+    if not account or account.role == "student":
+        return
+    student = db.session.get(Student, student_id)
+    record = workflow_case_record(slug, student_id) if student else None
+    if not student or not record:
+        return
+    request_id = record.id
+    pending_messages = [
+        item
+        for item in db.session.new
+        if isinstance(item, WorkflowMessage)
+        and item.transaction_slug == slug
+        and item.student_id == student_id
+        and item.visibility == "student_visible"
+        and item.previous_status == previous_status
+        and item.new_status == new_status
+    ]
+    if pending_messages:
+        return
+    existing = WorkflowMessage.query.filter_by(
+        transaction_slug=slug,
+        student_id=student_id,
+        workflow_request_id=request_id,
+        visibility="student_visible",
+        previous_status=previous_status,
+        new_status=new_status,
+    ).first()
+    if existing:
+        return
+    workflow_message_record(
+        slug,
+        student,
+        account,
+        "Student",
+        result,
+        f"Status changed from {previous_status} to {new_status}. Next owner: {next_owner}.",
+        "notice",
+        previous_status,
+        new_status,
+        visibility="student_visible",
+        status="Sent",
+    )
+
+
 def latest_open_student_return(slug: str, student_id: int) -> WorkflowMessage | None:
     return (
         WorkflowMessage.query.filter_by(
@@ -5866,6 +6236,8 @@ def practicum_student_submission_stage(record: PracticumRecord | None) -> str:
     if not record:
         return "moa"
     status = record.status
+    if status == "Not Accepted - New Organization Required":
+        return "moa"
     if status == "Returned for Clarification":
         returned = latest_open_student_return("practicum", record.student_id)
         prior = returned.previous_status if returned else ""
@@ -5881,6 +6253,10 @@ def practicum_student_submission_stage(record: PracticumRecord | None) -> str:
 def workflow_backflow_status(slug: str, record, recipient_label: str, previous_status: str) -> str:
     """Move a returned case to the recipient's real swimlane without losing data."""
     if recipient_label == "Student":
+        if slug == "withdrawal" and previous_status in {
+            "Requirements Submitted", "Registrar Review", "Fee Cleared", "Withdrawal Confirmed",
+        }:
+            return "Requirements Pending"
         return "Returned for Clarification"
     if slug == "practicum":
         completion_side = previous_status in {
@@ -5920,6 +6296,7 @@ def create_workflow_message(
     template: str,
     comment: str,
     action_type: str,
+    visibility: str = "student_visible",
 ) -> WorkflowMessage:
     if recipient_label not in WORKFLOW_RECIPIENTS:
         raise ValueError("Choose a valid message recipient or workflow stage.")
@@ -5929,6 +6306,14 @@ def create_workflow_message(
         raise ValueError("Enter a custom comment when the Other template is selected.")
     if action_type not in {"note", "return", "forward", "response"}:
         raise ValueError("Choose a valid message action.")
+    if action_type == "return" and not comment.strip():
+        raise ValueError("Enter a comment or reason before returning this request.")
+    if visibility not in {"student_visible", "internal"}:
+        raise ValueError("Choose a valid message visibility.")
+    if account.role == "student":
+        visibility = "student_visible"
+    if recipient_label == "Student" and visibility == "internal":
+        raise ValueError("Messages addressed to the student must be student-visible.")
 
     record = workflow_case_record(slug, student.id)
     if not record:
@@ -5943,6 +6328,7 @@ def create_workflow_message(
             WorkflowMessage.query.filter_by(
                 transaction_slug=slug,
                 student_id=student.id,
+                recipient_role="Student",
                 action_type="return",
                 status="Open",
             )
@@ -5951,26 +6337,24 @@ def create_workflow_message(
         )
         if not latest_return:
             raise ValueError("There is no open clarification request to answer.")
-        new_status = latest_return.previous_status or previous_status
-        set_workflow_record_status(slug, record, new_status)
-        latest_return.status = "Responded"
-        latest_return.resolved_at = now_utc()
+        # A message can clarify the student's intent, but only a successful
+        # stage resubmission should close the return notice and restore review.
+        # Keeping the case returned prevents a reply from locking the form.
+        new_status = previous_status
 
-    message = WorkflowMessage(
-        transaction_slug=slug,
-        student_id=student.id,
-        sender_role=ROLE_LABELS.get(account.role, account.role),
-        sender_name=account.full_name,
-        recipient_role=recipient_label,
-        template=template,
-        comment=comment.strip(),
-        action_type=action_type,
-        previous_status=previous_status,
-        new_status=new_status,
-        status="Responded" if action_type == "response" else "Open",
-        resolved_at=now_utc() if action_type == "response" else None,
+    message = workflow_message_record(
+        slug,
+        student,
+        account,
+        recipient_label,
+        template,
+        comment,
+        action_type,
+        previous_status,
+        new_status,
+        visibility=visibility,
+        status="Sent" if action_type == "response" else "Open",
     )
-    db.session.add(message)
 
     action_label = {
         "return": "returned for clarification",
@@ -5995,6 +6379,7 @@ def create_workflow_message(
         notes,
         previous_status=previous_status,
         new_status=new_status,
+        visibility=visibility,
     )
     return message
 
@@ -6098,9 +6483,32 @@ def workflow_approvals_payload() -> dict:
     recent.sort(key=lambda item: item.get("submitted_at") or "", reverse=True)
     pending.sort(key=lambda item: item.get("submitted_at") or "")
     overview = []
-    overview.extend(workflow_approval_item("practicum", item) for item in PracticumRecord.query.order_by(PracticumRecord.updated_at.desc()).limit(100).all())
-    overview.extend(workflow_approval_item("withdrawal", item) for item in WithdrawalApplication.query.order_by(WithdrawalApplication.updated_at.desc()).limit(100).all())
-    overview.extend(workflow_approval_item("graduation", item) for item in GraduationEndorsement.query.order_by(GraduationEndorsement.updated_at.desc()).limit(100).all())
+    overview.extend(
+        workflow_approval_item("practicum", item)
+        for item in PracticumRecord.query.filter(
+            PracticumRecord.status.in_({
+                "Report Sent to Dean", "Dean Reviewed", "Additional Certificates Requested",
+            })
+        ).order_by(PracticumRecord.updated_at.desc()).limit(100).all()
+    )
+    overview.extend(
+        workflow_approval_item("withdrawal", item)
+        for item in WithdrawalApplication.query.filter(
+            or_(
+                WithdrawalApplication.status == "Dean Review",
+                WithdrawalApplication.dean_decision.in_({"Approved", "Denied", "Returned"}),
+            )
+        ).order_by(WithdrawalApplication.updated_at.desc()).limit(100).all()
+    )
+    overview.extend(
+        workflow_approval_item("graduation", item)
+        for item in GraduationEndorsement.query.filter(
+            GraduationEndorsement.endorsement_status.in_({
+                "Ready for Dean Review", "Returned for Revision", "Dean Approved",
+                "Sent to Registrar", "Registrar Received",
+            })
+        ).order_by(GraduationEndorsement.updated_at.desc()).limit(100).all()
+    )
     overview.sort(key=lambda item: item.get("submitted_at") or "", reverse=True)
     return {"pending": pending, "recent": recent[:12], "overview": overview}
 
@@ -6738,13 +7146,20 @@ def add_log(
     notes: str,
     previous_status: str | None = None,
     new_status: str | None = None,
+    visibility: str = "student_visible",
 ) -> None:
     # Every workflow records what happened, who acted, where the evidence came
     # from, and who owns the next action.
+    account = current_account() if has_request_context() else None
+    record = workflow_case_record(slug, student_id) if student_id and slug in {"practicum", "withdrawal", "graduation"} else None
     db.session.add(
         TransactionLog(
             transaction_slug=slug,
             student_id=student_id,
+            workflow_request_id=record.id if record else None,
+            actor_user_id=account.id if account else None,
+            action_type=workflow_transition_action(result),
+            visibility=visibility if visibility in {"student_visible", "internal"} else "student_visible",
             actor_role=actor,
             source_reference=source,
             result=result,
@@ -6753,6 +7168,14 @@ def add_log(
             previous_status=previous_status,
             new_status=new_status,
         )
+    )
+    add_student_transition_notice(
+        slug,
+        student_id,
+        result,
+        next_owner,
+        previous_status,
+        new_status,
     )
 
 
@@ -7945,7 +8368,16 @@ def handle_practicum(data: MultiDict) -> int:
         account = require_workflow_actor("academic_coordinator")
         if record.status != "Documents Under Review":
             raise ValueError("GS Staff must forward the practicum documents before certificates can be reviewed.")
+        return_reason = (data.get("return_reason") or data.get("remarks") or "").strip()
+        if not return_reason:
+            raise ValueError("Enter a reason before requesting additional practicum evidence.")
         record.status = "Additional Certificates Requested"
+        record.remarks = "\n".join(part for part in [record.remarks, return_reason] if part)
+        workflow_message_record(
+            "practicum", student, account, "Student",
+            "Please upload the correct document.", return_reason, "return",
+            previous_status, record.status, visibility="student_visible",
+        )
         add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
         student.risk_level = "Medium"
         next_owner = "Student"
@@ -7954,8 +8386,19 @@ def handle_practicum(data: MultiDict) -> int:
         account = require_workflow_actor("academic_coordinator")
         if record.status not in {"Documents Under Review", "Completed"}:
             raise ValueError("Review submitted practicum documents before recording a non-accepted completion.")
+        return_reason = (data.get("return_reason") or "").strip()
+        if not return_reason:
+            raise ValueError("Enter a reason before returning this practicum completion to the student.")
         record.status = requested_status
         record.completion_status = "Not accepted - another organization required"
+        if return_reason not in (record.remarks or ""):
+            record.remarks = "\n".join(part for part in [record.remarks, return_reason] if part)
+        workflow_message_record(
+            "practicum", student, account, "Student",
+            "Practicum completion was not accepted; another organization may be required",
+            return_reason, "return", previous_status, record.status,
+            visibility="student_visible",
+        )
         add_task(student.id, "Arrange another practicum organization and submit an updated MOA", "Student", 10, 55)
         student.risk_level = "Medium"
         next_owner = "Student"
@@ -8049,8 +8492,20 @@ def handle_withdrawal(data: MultiDict) -> int:
         account = require_workflow_actor("staff")
         if application.status != "Requirements Submitted":
             raise ValueError("Only submitted withdrawal requirements can be returned for completion.")
+        return_reason = (data.get("return_reason") or data.get("staff_remarks") or "").strip()
+        if not return_reason:
+            raise ValueError("Enter a reason before returning withdrawal requirements to the student.")
         application.requirement_status = "Incomplete"
         application.status = "Requirements Pending"
+        application.staff_remarks = "\n".join(
+            part for part in [application.staff_remarks, return_reason] if part
+        )
+        workflow_message_record(
+            "withdrawal", student, account, "Student",
+            "Returned for revision. Please review the comments and resubmit.",
+            return_reason, "return", previous_status, application.status,
+            visibility="student_visible",
+        )
         next_owner = "Student"
         result = "Withdrawal requirements marked incomplete and returned to the student"
         add_task(student.id, "Complete and resubmit withdrawal requirements", "Student", 5, 45)
@@ -8989,7 +9444,12 @@ def replace_research_evidence_files(doc: DocumentCheck, keep_evidence: ResearchE
     return replaced_paths
 
 
-def store_student_request_attachment(student: Student, request_type: str, uploaded) -> StudentRequestAttachment:
+def store_student_request_attachment(
+    student: Student,
+    request_type: str,
+    uploaded,
+    account: UserAccount | None = None,
+) -> StudentRequestAttachment:
     original_name = secure_filename(uploaded.filename or "")
     if not original_name.lower().endswith(".pdf"):
         raise ValueError("The application must be uploaded as a PDF file.")
@@ -9007,6 +9467,9 @@ def store_student_request_attachment(student: Student, request_type: str, upload
     attachment = StudentRequestAttachment(
         student_id=student.id,
         request_type=request_type,
+        uploaded_by_user_id=account.id if account else None,
+        uploaded_by_name=account.full_name if account else student.name,
+        uploaded_by_role=ROLE_LABELS.get(account.role, account.role) if account else "Student",
         original_name=original_name,
         stored_name=stored_name,
         mime_type="application/pdf",
@@ -10991,21 +11454,61 @@ def ensure_demo_comprehensive_exam_consistency() -> int:
 
 
 def ensure_workflow_activity_schema() -> None:
-    """Add auditable transition fields without resetting an existing demo DB."""
+    """Add workflow traceability fields without resetting an existing demo DB."""
     db.create_all()
     inspector = inspect(db.engine)
-    if "transaction_log" not in inspector.get_table_names():
+    tables = set(inspector.get_table_names())
+    if "transaction_log" not in tables:
         return
     existing = {column["name"] for column in inspector.get_columns("transaction_log")}
     additions = {
         "previous_status": "VARCHAR(100)",
         "new_status": "VARCHAR(100)",
+        "workflow_request_id": "INTEGER",
+        "actor_user_id": "INTEGER",
+        "action_type": "VARCHAR(40)",
+        "visibility": "VARCHAR(30)",
     }
     for name, sql_type in additions.items():
         if name not in existing:
             db.session.execute(text(f"ALTER TABLE transaction_log ADD COLUMN {name} {sql_type}"))
+    if "student_request_attachment" in tables:
+        attachment_existing = {
+            column["name"]
+            for column in inspector.get_columns("student_request_attachment")
+        }
+        attachment_additions = {
+            "workflow_request_id": "INTEGER",
+            "workflow_stage": "VARCHAR(100)",
+            "uploaded_by_user_id": "INTEGER",
+            "uploaded_by_name": "VARCHAR(160)",
+            "uploaded_by_role": "VARCHAR(80)",
+        }
+        for name, sql_type in attachment_additions.items():
+            if name not in attachment_existing:
+                db.session.execute(text(
+                    f"ALTER TABLE student_request_attachment ADD COLUMN {name} {sql_type}"
+                ))
+    if "workflow_message" in tables:
+        message_existing = {
+            column["name"]
+            for column in inspector.get_columns("workflow_message")
+        }
+        message_additions = {
+            "workflow_request_id": "INTEGER",
+            "workflow_stage": "VARCHAR(100)",
+            "sender_user_id": "INTEGER",
+            "recipient_user_id": "INTEGER",
+            "visibility": "VARCHAR(30)",
+            "read_at": "DATETIME",
+        }
+        for name, sql_type in message_additions.items():
+            if name not in message_existing:
+                db.session.execute(text(
+                    f"ALTER TABLE workflow_message ADD COLUMN {name} {sql_type}"
+                ))
     inspector = inspect(db.engine)
-    if "practicum_record" in inspector.get_table_names():
+    if "practicum_record" in tables:
         practicum_existing = {column["name"] for column in inspector.get_columns("practicum_record")}
         practicum_additions = {
             "supervisor_name": "VARCHAR(160)",
@@ -11014,6 +11517,123 @@ def ensure_workflow_activity_schema() -> None:
         for name, sql_type in practicum_additions.items():
             if name not in practicum_existing:
                 db.session.execute(text(f"ALTER TABLE practicum_record ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+
+    student_accounts = {
+        account.student_id: account
+        for account in UserAccount.query.filter_by(role="student", active=True).all()
+        if account.student_id
+    }
+    role_accounts = {}
+    for account in UserAccount.query.filter_by(active=True).order_by(UserAccount.id.asc()).all():
+        role_accounts.setdefault(account.role, account)
+
+    attachment_links: dict[int, tuple[int, str]] = {}
+    for record in PracticumRecord.query.all():
+        if record.moa_attachment_id:
+            attachment_links[record.moa_attachment_id] = (record.id, "MOA Submission")
+        if record.certificate_attachment_id:
+            attachment_links[record.certificate_attachment_id] = (
+                record.id,
+                "Practicum Document Submission",
+            )
+    for application in WithdrawalApplication.query.all():
+        if application.request_attachment_id:
+            attachment_links[application.request_attachment_id] = (
+                application.id,
+                "Withdrawal Application",
+            )
+        if application.proof_attachment_id:
+            attachment_links[application.proof_attachment_id] = (
+                application.id,
+                "Withdrawal Requirements",
+            )
+    for endorsement in GraduationEndorsement.query.all():
+        if endorsement.request_attachment_id:
+            attachment_links[endorsement.request_attachment_id] = (
+                endorsement.id,
+                "Graduation Application",
+            )
+
+    for attachment in StudentRequestAttachment.query.all():
+        link = attachment_links.get(attachment.id)
+        if link:
+            attachment.workflow_request_id = attachment.workflow_request_id or link[0]
+            attachment.workflow_stage = attachment.workflow_stage or link[1]
+        student_account = student_accounts.get(attachment.student_id)
+        if not attachment.uploaded_by_user_id and student_account:
+            attachment.uploaded_by_user_id = student_account.id
+        if not attachment.uploaded_by_name:
+            student = db.session.get(Student, attachment.student_id)
+            attachment.uploaded_by_name = (
+                student_account.full_name
+                if student_account
+                else student.name if student else "Student"
+            )
+        attachment.uploaded_by_role = attachment.uploaded_by_role or "Student"
+        if (
+            attachment.original_name == "Withdrawal_Request_Mendoza.pdf"
+            and attachment.stored_name.startswith("sim-wd-")
+        ):
+            attachment.stored_name = "demo-withdrawal-request.pdf"
+
+    role_by_label = {label: role for role, label in ROLE_LABELS.items()}
+    for message in WorkflowMessage.query.all():
+        record = workflow_case_record(message.transaction_slug, message.student_id)
+        message.workflow_request_id = message.workflow_request_id or (
+            record.id if record else None
+        )
+        message.workflow_stage = message.workflow_stage or message.new_status or message.previous_status
+        if not message.visibility:
+            message.visibility = (
+                "student_visible"
+                if message.sender_role == "Student" or message.recipient_role == "Student"
+                else "internal"
+            )
+        sender_role = role_by_label.get(message.sender_role)
+        if not message.sender_user_id:
+            if sender_role == "student":
+                message.sender_user_id = student_accounts.get(message.student_id).id if student_accounts.get(message.student_id) else None
+            elif sender_role:
+                sender = role_accounts.get(sender_role)
+                message.sender_user_id = sender.id if sender else None
+        recipient_role = WORKFLOW_RECIPIENTS.get(message.recipient_role)
+        if not message.recipient_user_id and recipient_role:
+            recipient = (
+                student_accounts.get(message.student_id)
+                if recipient_role == "student"
+                else role_accounts.get(recipient_role)
+            )
+            message.recipient_user_id = recipient.id if recipient else None
+
+    for log in TransactionLog.query.all():
+        log.visibility = log.visibility or "student_visible"
+        if log.transaction_slug not in {"practicum", "withdrawal", "graduation"}:
+            continue
+        record = workflow_case_record(log.transaction_slug, log.student_id) if log.student_id else None
+        log.workflow_request_id = log.workflow_request_id or (record.id if record else None)
+        log.action_type = log.action_type or workflow_transition_action(log.result)
+        if not log.actor_user_id:
+            for role, label in ROLE_LABELS.items():
+                if log.actor_role == label or log.actor_role.startswith(f"{label} ·"):
+                    actor = (
+                        student_accounts.get(log.student_id)
+                        if role == "student"
+                        else role_accounts.get(role)
+                    )
+                    log.actor_user_id = actor.id if actor else None
+                    break
+        related_messages = WorkflowMessage.query.filter_by(
+            transaction_slug=log.transaction_slug,
+            student_id=log.student_id,
+            previous_status=log.previous_status,
+            new_status=log.new_status,
+        ).all()
+        if any(
+            message.visibility == "internal" and message.action_type != "notice"
+            for message in related_messages
+        ):
+            log.visibility = "internal"
     db.session.commit()
 
 
@@ -11917,7 +12537,7 @@ def seed_simulation_demo() -> None:
     if not WithdrawalApplication.query.filter_by(student_id=student_c.id).first():
         attachment = StudentRequestAttachment(
             student_id=student_c.id, request_type="withdrawal",
-            original_name="Withdrawal_Request_Mendoza.pdf", stored_name=f"sim-wd-{student_c.id}.pdf",
+            original_name="Withdrawal_Request_Mendoza.pdf", stored_name="demo-withdrawal-request.pdf",
             mime_type="application/pdf", uploaded_at=now_utc() - timedelta(days=1))
         db.session.add(attachment)
         db.session.flush()
@@ -12138,6 +12758,7 @@ if __name__ == "__main__":
             ensure_faculty_demo_profiles()
             ensure_demo_accounts()
             seed_simulation_demo()
+            ensure_workflow_activity_schema()
             ensure_monitoring_template_courses()
             ensure_miguel_yu_research_demo_unlock()
             ensure_demo_request_submission_logs()
@@ -12152,6 +12773,7 @@ if __name__ == "__main__":
         updated_faculty_profiles = ensure_faculty_demo_profiles()
         ensure_demo_accounts()
         seed_simulation_demo()  # self-heal demo fixtures on an already-seeded database
+        ensure_workflow_activity_schema()
         ensure_monitoring_template_courses()
         miguel_unlock_changes = ensure_miguel_yu_research_demo_unlock()
         healed_request_logs = ensure_demo_request_submission_logs()

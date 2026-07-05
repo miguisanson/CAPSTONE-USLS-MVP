@@ -21,9 +21,11 @@ from app import (  # noqa: E402
     Student,
     StudentRequestAttachment,
     Task,
+    TransactionLog,
     UserAccount,
     WorkflowMessage,
     WithdrawalApplication,
+    REQUEST_UPLOAD_ROOT,
     app,
     db,
     graduation_eligibility,
@@ -47,6 +49,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def setUp(self):
         app.config.update(TESTING=True)
+        self.created_files = []
         with app.app_context():
             db.drop_all()
             db.create_all()
@@ -81,6 +84,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.registrar_id = self.registrar.id
             self.dean_id = self.dean.id
             db.session.commit()
+
+    def tearDown(self):
+        for path in self.created_files:
+            path.unlink(missing_ok=True)
 
     def _account(self, role, email):
         account = UserAccount(
@@ -166,7 +173,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.commit()
             self._transition(staff, "practicum", {"student_id": self.student.id, "status": "Documents Under Review"})
             self.assertEqual(record.status, "Documents Under Review")
-            self._transition(academic, "practicum", {"student_id": self.student.id, "status": "Additional Certificates Requested"})
+            self._transition(academic, "practicum", {
+                "student_id": self.student.id,
+                "status": "Additional Certificates Requested",
+                "return_reason": "Upload the signed completion certificate.",
+            })
             self.assertEqual(record.status, "Additional Certificates Requested")
 
             record.completed_hours = 200
@@ -221,7 +232,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             application.proof_attachment_id = proof_file.id
             application.status = "Requirements Submitted"
             db.session.commit()
-            self._transition(staff, "withdrawal", {"student_id": self.student.id, "workflow_action": "return_requirements"})
+            self._transition(staff, "withdrawal", {
+                "student_id": self.student.id,
+                "workflow_action": "return_requirements",
+                "return_reason": "Upload the signed clearance page.",
+            })
             self.assertEqual(application.status, "Requirements Pending")
             application.status = "Requirements Submitted"
             db.session.commit()
@@ -250,7 +265,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             denied = WithdrawalApplication(student_id=denied_student.id, status="Dean Review", dean_decision="Pending")
             db.session.add(denied)
             db.session.commit()
-            response = self._dean_client().post(f"/api/approvals/workflow/withdrawal/{denied.id}/decide", json={"decision": "deny"})
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/withdrawal/{denied.id}/decide",
+                json={"decision": "deny", "note": "The request does not meet the approved withdrawal grounds."},
+            )
             self.assertEqual(response.status_code, 200)
             db.session.refresh(denied_student)
             self.assertEqual(denied.status, "Denied")
@@ -301,7 +319,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             dean_item = next(item for item in workflow_approvals_payload()["pending"] if item["type"] == "graduation" and item["id"] == endorsement.id)
             self.assertTrue(dean_item["eligibility"]["eligible"])
 
-            response = self._dean_client().post(f"/api/approvals/workflow/graduation/{endorsement.id}/decide", json={"decision": "return"})
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/graduation/{endorsement.id}/decide",
+                json={"decision": "return", "note": "Correct the endorsement list before resubmitting."},
+            )
             self.assertEqual(response.status_code, 200)
             db.session.refresh(endorsement)
             self.assertEqual(endorsement.endorsement_status, "Returned for Revision")
@@ -440,14 +461,26 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             application = WithdrawalApplication(
                 student_id=self.student_id,
                 reason="Needs clarification test",
+                effective_term="AY 2026-2027 Term 1",
                 status="Dean Review",
                 dean_decision="Pending",
             )
+            request_file = self._attachment("withdrawal", "clarification-request")
+            application.request_attachment_id = request_file.id
             student_account = self._account("student", "student-clarification@example.test")
             student_account.student_id = self.student_id
             db.session.add(application)
             db.session.commit()
             student_account_id = student_account.id
+
+            response = self._staff_client().post("/api/transactions/withdrawal/messages", json={
+                "student_id": self.student_id,
+                "action_type": "return",
+                "recipient_role": "Student",
+                "template": "Missing required document",
+                "comment": "",
+            })
+            self.assertEqual(response.status_code, 400, response.get_json())
 
             response = self._staff_client().post("/api/transactions/withdrawal/messages", json={
                 "student_id": self.student_id,
@@ -461,6 +494,19 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(application.status, "Returned for Clarification")
             message = WorkflowMessage.query.filter_by(student_id=self.student_id, status="Open").first()
             self.assertEqual(message.previous_status, "Dean Review")
+            self.assertEqual(message.workflow_request_id, application.id)
+            self.assertEqual(message.workflow_stage, "Returned for Clarification")
+            self.assertEqual(message.visibility, "student_visible")
+            self.assertEqual(
+                WorkflowMessage.query.filter_by(
+                    transaction_slug="withdrawal",
+                    student_id=self.student_id,
+                    visibility="student_visible",
+                    previous_status="Dean Review",
+                    new_status="Returned for Clarification",
+                ).count(),
+                1,
+            )
 
             student_client = self._role_client(student_account_id, "student")
             response = student_client.post("/api/transactions/withdrawal/messages", json={
@@ -472,8 +518,229 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200, response.get_json())
             db.session.refresh(application)
             db.session.refresh(message)
-            self.assertEqual(application.status, "Dean Review")
+            self.assertEqual(application.status, "Returned for Clarification")
+            self.assertEqual(message.status, "Open")
+            response_message = WorkflowMessage.query.filter_by(
+                student_id=self.student_id,
+                action_type="response",
+            ).first()
+            self.assertEqual(response_message.status, "Sent")
+
+            response = student_client.post("/api/student-portal/requests/withdrawal", json={
+                "reason": application.reason,
+                "effective_term": application.effective_term,
+                "attachment_id": request_file.id,
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(application)
+            db.session.refresh(message)
+            db.session.refresh(request_file)
+            self.assertEqual(application.status, "Submitted to GS Staff")
+            self.assertEqual(application.reason, "Needs clarification test")
+            self.assertEqual(application.request_attachment_id, request_file.id)
             self.assertEqual(message.status, "Responded")
+            self.assertEqual(request_file.workflow_request_id, application.id)
+            self.assertEqual(request_file.workflow_stage, "Withdrawal Application")
+            self.assertEqual(request_file.uploaded_by_user_id, student_account_id)
+            self.assertEqual(request_file.uploaded_by_role, "Student")
+
+    def test_student_practicum_submission_is_locked_until_eligible(self):
+        with app.app_context():
+            attachment = self._attachment("practicum", "locked-moa")
+            student_account = self._account("student", "student-practicum@example.test")
+            student_account.student_id = self.student_id
+            db.session.commit()
+
+            response = self._role_client(student_account.id, "student").post(
+                "/api/student-portal/requests/practicum",
+                json={
+                    "attachment_id": attachment.id,
+                    "practicum_site": "Partner Site",
+                },
+            )
+            self.assertEqual(response.status_code, 409, response.get_json())
+            self.assertIsNone(PracticumRecord.query.filter_by(student_id=self.student_id).first())
+
+    def test_request_files_are_scoped_to_student_and_workflow_role(self):
+        with app.app_context():
+            attachment = self._attachment("withdrawal", "private-request")
+            student_account = self._account("student", "student-files@example.test")
+            student_account.student_id = self.student_id
+            other_record = Student(
+                student_number="GS-2026-OTHER-FILE",
+                first_name="Other",
+                last_name="File Student",
+                email="other-file@example.test",
+                program_id=self.program_id,
+                entry_year=2025,
+                current_stage="Coursework",
+                standing="Active",
+            )
+            db.session.add(other_record)
+            db.session.flush()
+            other_student = self._account("student", "other-student@example.test")
+            other_student.student_id = other_record.id
+            REQUEST_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+            stored_path = REQUEST_UPLOAD_ROOT / attachment.stored_name
+            stored_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+            self.created_files.append(stored_path)
+            db.session.commit()
+
+            response = self._role_client(other_student.id, "student").get(
+                f"/api/student-request-attachments/{attachment.id}/file"
+            )
+            self.assertEqual(response.status_code, 403)
+
+            response = self._research_client().get(
+                f"/api/student-request-attachments/{attachment.id}/file"
+            )
+            self.assertEqual(response.status_code, 403)
+
+            response = self._role_client(student_account.id, "student").get(
+                f"/api/student-request-attachments/{attachment.id}/file"
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.data.startswith(b"%PDF-"))
+            response.close()
+            staff_response = self._staff_client().get(
+                f"/api/student-request-attachments/{attachment.id}/file"
+            )
+            self.assertEqual(staff_response.status_code, 200)
+            staff_response.close()
+            dean_response = self._dean_client().get(
+                f"/api/student-request-attachments/{attachment.id}/file"
+            )
+            self.assertEqual(dean_response.status_code, 200)
+            dean_response.close()
+
+            stored_path.unlink()
+            response = self._role_client(student_account.id, "student").get(
+                f"/api/student-request-attachments/{attachment.id}/file"
+            )
+            self.assertEqual(response.status_code, 404)
+            self.assertIn("unavailable", response.get_json()["error"].lower())
+
+    def test_student_inbox_hides_internal_messages_and_tracks_read_state(self):
+        with app.app_context():
+            application = WithdrawalApplication(
+                student_id=self.student_id,
+                reason="Message privacy test",
+                effective_term="AY 2026-2027 Term 1",
+                status="Dean Review",
+                dean_decision="Pending",
+            )
+            db.session.add(application)
+            student_account = self._account("student", "student-inbox@example.test")
+            student_account.student_id = self.student_id
+            other_record = Student(
+                student_number="GS-2026-OTHER-INBOX",
+                first_name="Other",
+                last_name="Inbox Student",
+                email="other-inbox@example.test",
+                program_id=self.program_id,
+                entry_year=2025,
+                current_stage="Coursework",
+                standing="Active",
+            )
+            db.session.add(other_record)
+            db.session.flush()
+            other_account = self._account("student", "other-inbox-account@example.test")
+            other_account.student_id = other_record.id
+            db.session.commit()
+
+            internal_response = self._staff_client().post("/api/transactions/withdrawal/messages", json={
+                "student_id": self.student_id,
+                "action_type": "note",
+                "recipient_role": "Academic Coordinator",
+                "visibility": "internal",
+                "template": "This request requires additional review",
+                "comment": "Internal reviewer concern.",
+            })
+            self.assertEqual(internal_response.status_code, 200, internal_response.get_json())
+            internal = internal_response.get_json()["item"]
+            self.assertEqual(internal["visibility"], "internal")
+            self.assertEqual(internal["request_id"], application.id)
+            self.assertEqual(internal["stage"], "Dean Review")
+            self.assertEqual(internal["sender_user_id"], self.staff_id)
+
+            visible_response = self._staff_client().post("/api/transactions/withdrawal/messages", json={
+                "student_id": self.student_id,
+                "action_type": "note",
+                "recipient_role": "Student",
+                "visibility": "student_visible",
+                "template": "Please clarify the information entered in this section.",
+                "comment": "Please confirm the requested effective term.",
+            })
+            self.assertEqual(visible_response.status_code, 200, visible_response.get_json())
+            visible = visible_response.get_json()["item"]
+            self.assertTrue(visible["is_unread"])
+
+            student_client = self._role_client(student_account.id, "student")
+            context_response = student_client.get("/api/student-portal/context")
+            self.assertEqual(context_response.status_code, 200, context_response.get_json())
+            inbox_ids = {item["id"] for item in context_response.get_json()["workflow_messages"]}
+            self.assertIn(visible["id"], inbox_ids)
+            self.assertNotIn(internal["id"], inbox_ids)
+            student_log_notes = " ".join(
+                item.get("notes") or ""
+                for item in context_response.get_json()["logs"]
+            )
+            self.assertNotIn("Internal reviewer concern.", student_log_notes)
+            internal_log = TransactionLog.query.filter(
+                TransactionLog.notes.contains("Internal reviewer concern.")
+            ).first()
+            self.assertEqual(internal_log.visibility, "internal")
+
+            read_response = student_client.post("/api/student-portal/messages/read", json={
+                "message_ids": [internal["id"], visible["id"]],
+            })
+            self.assertEqual(read_response.status_code, 200, read_response.get_json())
+            self.assertEqual(read_response.get_json()["message_ids"], [visible["id"]])
+            db.session.refresh(db.session.get(WorkflowMessage, visible["id"]))
+            self.assertIsNotNone(db.session.get(WorkflowMessage, visible["id"]).read_at)
+
+            other_context = self._role_client(other_account.id, "student").get("/api/student-portal/context")
+            self.assertEqual(other_context.status_code, 200, other_context.get_json())
+            other_ids = {item["id"] for item in other_context.get_json()["workflow_messages"]}
+            self.assertNotIn(visible["id"], other_ids)
+            self.assertNotIn(internal["id"], other_ids)
+
+    def test_reviewer_transition_creates_linked_student_notice_and_audit(self):
+        with app.app_context():
+            application = WithdrawalApplication(
+                student_id=self.student_id,
+                reason="Approval notice test",
+                effective_term="AY 2026-2027 Term 1",
+                status="Dean Review",
+                dean_decision="Pending",
+            )
+            db.session.add(application)
+            student_account = self._account("student", "student-notice@example.test")
+            student_account.student_id = self.student_id
+            db.session.commit()
+
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/withdrawal/{application.id}/decide",
+                json={"decision": "approve", "note": "Approved for follow-through."},
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            notice = WorkflowMessage.query.filter_by(
+                transaction_slug="withdrawal",
+                student_id=self.student_id,
+                action_type="notice",
+            ).first()
+            self.assertIsNotNone(notice)
+            self.assertEqual(notice.workflow_request_id, application.id)
+            self.assertEqual(notice.workflow_stage, "Approved - Follow-through")
+            self.assertEqual(notice.visibility, "student_visible")
+            audit = TransactionLog.query.filter_by(
+                transaction_slug="withdrawal",
+                student_id=self.student_id,
+                new_status="Approved - Follow-through",
+            ).order_by(TransactionLog.id.desc()).first()
+            self.assertEqual(audit.workflow_request_id, application.id)
+            self.assertEqual(audit.actor_user_id, self.dean_id)
+            self.assertEqual(audit.action_type, "approve")
 
     def test_graduation_batch_skips_unverified_and_sends_eligible_candidates(self):
         with app.app_context():
@@ -507,6 +774,48 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(len(response.get_json()["updated"]), 1)
             endorsement = GraduationEndorsement.query.filter_by(student_id=student.id).first()
             self.assertEqual(endorsement.endorsement_status, "Ready for Dean Review")
+
+            blocked_student = Student(
+                student_number="GS-2026-BATCH-BLOCKED",
+                first_name="Blocked",
+                last_name="Candidate",
+                email="batch-blocked@example.test",
+                program_id=self.program_id,
+                entry_year=2025,
+                current_stage="Final Defense",
+                standing="Active",
+            )
+            db.session.add(blocked_student)
+            db.session.flush()
+            blocked = GraduationEndorsement(
+                student_id=blocked_student.id,
+                review_window="AY 2026-2027",
+                endorsement_status="For Review",
+            )
+            db.session.add(blocked)
+            db.session.commit()
+
+            response = self._dean_client().post("/api/graduation/batch-actions", json={
+                "student_ids": [student.id, blocked_student.id],
+                "action": "approve",
+                "comment": "Approved in the Dean review batch.",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            self.assertEqual(len(response.get_json()["updated"]), 1)
+            self.assertEqual(len(response.get_json()["skipped"]), 1)
+            db.session.refresh(endorsement)
+            self.assertEqual(endorsement.endorsement_status, "Dean Approved")
+            self.assertEqual(blocked.endorsement_status, "For Review")
+
+            endorsement.endorsement_status = "Ready for Dean Review"
+            db.session.commit()
+            response = self._dean_client().post("/api/graduation/batch-actions", json={
+                "student_ids": [student.id],
+                "action": "return",
+                "recipient_role": "Graduate School Staff",
+                "comment": "",
+            })
+            self.assertEqual(response.status_code, 400, response.get_json())
 
     def test_staff_can_reset_each_demo_case_without_deleting_source_data(self):
         with app.app_context():

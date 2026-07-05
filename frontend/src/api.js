@@ -96,6 +96,11 @@ export const api = {
     request(`/transactions/${slug}`, { method: "POST", body: JSON.stringify(payload) }),
   sendWorkflowMessage: (slug, payload) =>
     request(`/transactions/${slug}/messages`, { method: "POST", body: JSON.stringify(payload) }),
+  markWorkflowMessagesRead: (messageIds) =>
+    request("/student-portal/messages/read", {
+      method: "POST",
+      body: JSON.stringify({ message_ids: messageIds }),
+    }),
   graduationBatchAction: (payload) =>
     request("/graduation/batch-actions", { method: "POST", body: JSON.stringify(payload) }),
   resetWorkflowDemo: (slug, studentId) =>
