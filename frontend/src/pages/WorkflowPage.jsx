@@ -238,12 +238,12 @@ export default function WorkflowPage() {
         </div>
       </Card>
 
-      {result && (
+      {slug !== "defense-scheduling" && result && (
         <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800 animate-fade-up">
           <CheckCircle2 className="h-5 w-5" /> {result.message}
         </div>
       )}
-      <ErrorNote message={submitError} />
+      {slug !== "defense-scheduling" && <ErrorNote message={submitError} />}
 
       <div className={hideSideRail ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
         <div className={hideSideRail ? "space-y-5" : "space-y-5 lg:col-span-2"}>
@@ -2243,7 +2243,7 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
 // ---------------------------------------------------------------------------
 // Defense Scheduling
 // ---------------------------------------------------------------------------
-function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
+function DefenseSchedulingForm({ context, studentId, submit, submitting, result, submitError }) {
   const availability = context.availability || {};
   const readiness = context.schedule_readiness || {};
   const participants = availability.participants || [];
@@ -2293,10 +2293,21 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
       possibleSlots
         .filter(
           (slot) =>
+            slot.conflict_free !== false &&
             (!window.start || slot.date >= window.start) &&
             (!window.end || slot.date <= window.end)
         )
-        .sort((left, right) => Number(right.conflict_free !== false) - Number(left.conflict_free !== false) || `${left.date}${left.start}`.localeCompare(`${right.date}${right.start}`)),
+        .sort((left, right) => `${left.date}${left.start}`.localeCompare(`${right.date}${right.start}`)),
+    [possibleSlots, window]
+  );
+  const blockedSlots = useMemo(
+    () =>
+      possibleSlots.filter(
+        (slot) =>
+          slot.conflict_free === false &&
+          (!window.start || slot.date >= window.start) &&
+          (!window.end || slot.date <= window.end)
+      ),
     [possibleSlots, window]
   );
 
@@ -2396,6 +2407,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
         availability={availability}
         participants={participants}
         filteredSlots={filteredSlots}
+        blockedSlots={blockedSlots}
         visibleDates={visibleDates}
         possibleDates={possibleDates}
         window={window}
@@ -2432,7 +2444,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
       </Field>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-700">
         <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-slate-400" />
-        <span><strong>Calendar/conflict override:</strong> finalize even if lead time, recorded availability, or another defense produces a warning. The reason will be saved.</span>
+        <span><strong>Lead-time override:</strong> finalize despite lead-time warnings. Booked panelists, same-student overlaps, and unavailable panel windows cannot be overridden.</span>
       </label>
       <Field label="Source reference">
         <Input value={form.source_reference} onChange={set("source_reference")} />
@@ -2440,6 +2452,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting }) {
       <button type="submit" disabled={submitting || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements)} className="btn-primary w-full sm:w-auto">
         {submitting ? "Saving..." : isFailedStageRetry ? "Finalize reschedule" : "Set defense schedule"}
       </button>
+      <WorkflowSubmitFeedback result={result} error={submitError} />
       {schedules.length > 0 && <ScheduleHistory schedules={schedules} />}
     </form>
   );
@@ -2449,6 +2462,7 @@ function AvailabilityWorkspace({
   availability,
   participants,
   filteredSlots,
+  blockedSlots,
   visibleDates,
   possibleDates,
   window,
@@ -2491,7 +2505,7 @@ function AvailabilityWorkspace({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p id="availability-overlap-heading" className="text-sm font-semibold text-ink">Availability overlap</p>
-              <p className="text-xs text-slate-500">Darker green means more participants are free. Select a full-overlap cell to choose its two-hour slot.</p>
+              <p className="text-xs text-slate-500">Darker green means more participants are free. Amber full-overlap cells are already booked and cannot be selected.</p>
             </div>
             <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
               <span>0/{participants.length}</span><span className="h-4 w-5 rounded bg-slate-100 ring-1 ring-slate-200" /><span className="h-4 w-5 rounded bg-emerald-200" /><span className="h-4 w-5 rounded bg-emerald-600" /><span>{participants.length}/{participants.length}</span>
@@ -2508,9 +2522,10 @@ function AvailabilityWorkspace({
                     {visibleDates.map((day) => {
                       const count = participants.filter((participant) => participant.slots.some((slot) => slot.date === day && !slot.blocked_by_google && slot.start <= start && slot.end > start) && !(participant.google_busy || []).some((busy) => busy.date === day && busy.start <= start && busy.end > start)).length;
                       const option = filteredSlots.find((slot) => slot.date === day && slot.start === start);
+                      const blockedOption = blockedSlots.find((slot) => slot.date === day && slot.start === start);
                       const selected = form.preferred_date === day && form.selected_start === start;
-                      const tone = count === participants.length ? "bg-emerald-600 text-white hover:bg-emerald-700" : count >= Math.ceil(participants.length * 0.66) ? "bg-emerald-300 text-emerald-950" : count ? "bg-emerald-100 text-emerald-900" : "bg-slate-50 text-slate-400";
-                      return <td key={day} className="border-t border-slate-200 p-1"><button type="button" disabled={!option} onClick={() => option && chooseSlot(option)} aria-label={`${shortDate(day)} ${start}: ${count} of ${participants.length} available${option ? ", selectable" : ""}`} className={`min-h-8 w-full rounded-md px-1 py-1.5 font-bold transition-colors ${tone} ${option ? "cursor-pointer focus:ring-2 focus:ring-brand-500 focus:ring-offset-1" : "cursor-default"} ${selected ? "ring-2 ring-slate-900 ring-offset-1" : ""}`}>{count}/{participants.length}</button></td>;
+                      const tone = blockedOption ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200" : count === participants.length ? "bg-emerald-600 text-white hover:bg-emerald-700" : count >= Math.ceil(participants.length * 0.66) ? "bg-emerald-300 text-emerald-950" : count ? "bg-emerald-100 text-emerald-900" : "bg-slate-50 text-slate-400";
+                      return <td key={day} className="border-t border-slate-200 p-1"><button type="button" disabled={!option} onClick={() => option && chooseSlot(option)} aria-label={`${shortDate(day)} ${start}: ${count} of ${participants.length} available${blockedOption ? ", already booked" : option ? ", selectable" : ""}`} title={blockedOption?.conflicts?.join(" ")} className={`min-h-8 w-full rounded-md px-1 py-1.5 font-bold transition-colors ${tone} ${option ? "cursor-pointer focus:ring-2 focus:ring-brand-500 focus:ring-offset-1" : "cursor-not-allowed"} ${selected ? "ring-2 ring-slate-900 ring-offset-1" : ""}`}>{count}/{participants.length}</button></td>;
                     })}
                   </tr>;
                 })}
@@ -2614,7 +2629,7 @@ function AvailabilityWorkspace({
             <p className="text-xs text-slate-500">Select one to prepare the proposed schedule.</p>
           </div>
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-            {filteredSlots.length} found
+            {filteredSlots.length} conflict-free found
           </span>
         </div>
         {filteredSlots.length ? (
@@ -2645,7 +2660,6 @@ function AvailabilityWorkspace({
                     <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                       <Clock3 className="h-3.5 w-3.5" /> {timeRange(slot.start, slot.end)} - all {slot.matched_count} available
                     </span>
-                    {slot.conflicts?.length > 0 && <span className="mt-1 block text-xs font-semibold text-amber-700">Conflict: {slot.conflicts.join(" ")}</span>}
                   </span>
                   <span className={`h-4 w-4 rounded-full border-2 ${selected ? "border-brand-600 bg-brand-600 ring-2 ring-white" : "border-slate-300"}`} />
                 </button>
@@ -2654,7 +2668,7 @@ function AvailabilityWorkspace({
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
-            No complete overlap appears in this window. Revise the dates or collect updated availability from the adviser and panel.
+            No conflict-free overlap appears in this window. Revise the dates, choose a different panel window, or collect updated availability from the adviser and panel.
           </div>
         )}
       </div>

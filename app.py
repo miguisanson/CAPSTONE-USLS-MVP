@@ -1880,8 +1880,8 @@ POLICY_SNIPPETS = [
      "tags": ["ethics", "clearance", "rerc", "review"],
      "text": "Studies requiring ethics review submit for RERC clearance. Ethics clearance is recorded before data-collection and writing milestones proceed."},
     {"id": "final-defense", "title": "Final Defense Readiness", "source": "GS Research Protocol — Final Defense",
-     "tags": ["final defense", "final", "form 6", "form 7", "14 days"],
-     "text": "Final defense readiness requires the Form 4 endorsement for final defense, the final manuscript, ethics clearance, and the panel receiving the manuscript at least 14 days before the defense."},
+     "tags": ["final defense", "final", "form 6", "form 7"],
+     "text": "Final defense readiness requires the advisor-signed final defense endorsement, the final defense manuscript, ethics clearance, and the confirmed final defense schedule."},
     {"id": "completion", "title": "Completion Evidence", "source": "GS Research Protocol — Completion",
      "tags": ["completion", "turnitin", "editor", "approval sheet", "form 9", "form 10", "similarity"],
      "text": "Completion requires the final manuscript, panel approval, ethics clearance, a Turnitin certificate (similarity not more than 15%), the Form 9 editor certification, and the Form 10 approval sheet."},
@@ -2896,10 +2896,22 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "This requirement is completed by staff or by the system and does not accept a student upload."}), 400
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a PDF file to upload."}), 400
+        replaced_paths: list[Path] = []
         try:
             if item_name == "Three concept papers":
                 revoke_form1_endorsement(student.id)
             evidence = store_research_evidence(student, gate, item_name, uploaded)
+            if item_name == "Ethics Clearance":
+                replaced_paths = replace_research_evidence_files(evidence.document_check, evidence)
+                ethics_record = DocumentCheck.query.filter_by(
+                    student_id=student.id,
+                    gate=gate,
+                    item_name="Ethics clearance status and date",
+                ).first()
+                if ethics_record:
+                    ethics_record.status = "Missing"
+                    ethics_record.evidence_reference = None
+                    ethics_record.updated_at = now_utc()
             compliance = None
             if gate == "Form 1 - Title Defense" and item_name == "Three concept papers":
                 compliance = apply_concept_paper_evaluation(evidence)
@@ -2927,6 +2939,8 @@ def register_routes(app: Flask) -> None:
                 f"Student uploaded file-backed evidence for {gate}. Staff evaluation is derived from stored files.",
             )
             db.session.commit()
+            for path in replaced_paths:
+                path.unlink(missing_ok=True)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -7652,16 +7666,29 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         selected_window_ok = matched_count == len(participants)
 
     status_reason = []
+    availability_conflict = ""
     if not lead_ok:
         status_reason.append(f"{defense_type} needs at least {lead_days} days lead time")
     if not selected_start or not selected_end:
         status_reason.append("select a shared start and end time")
     elif not selected_window_ok:
-        status_reason.append(f"only {matched_count} of {len(participants)} participants share that time")
+        availability_conflict = f"only {matched_count} of {len(participants)} participants share that time"
+        status_reason.append(availability_conflict)
     conflicts = defense_schedule_conflicts(
         student, panel, preferred_date, selected_start, selected_end, venue, defense_type
     )
     status_reason.extend(conflicts)
+    hard_conflicts = []
+    if availability_conflict:
+        hard_conflicts.append(availability_conflict)
+    if has_hard_schedule_conflict(conflicts):
+        hard_conflicts.extend(conflicts)
+    if hard_conflicts:
+        raise ValueError(
+            "Schedule unavailable: "
+            + " ".join(hard_conflicts)
+            + " Choose a conflict-free time where all assigned panelists are available."
+        )
     if status_reason and not override_conflicts:
         raise ValueError(
             "Schedule warning: " + " ".join(status_reason) + " Confirm the schedule override to finalize anyway."
@@ -8805,6 +8832,22 @@ def store_research_evidence(
     return evidence
 
 
+def replace_research_evidence_files(doc: DocumentCheck, keep_evidence: ResearchEvidenceFile) -> list[Path]:
+    replaced_paths: list[Path] = []
+    old_files = ResearchEvidenceFile.query.filter(
+        ResearchEvidenceFile.student_id == keep_evidence.student_id,
+        ResearchEvidenceFile.document_check_id == doc.id,
+        ResearchEvidenceFile.id != keep_evidence.id,
+    ).all()
+    for old_file in old_files:
+        replaced_paths.append(UPLOAD_ROOT / old_file.stored_name)
+        db.session.delete(old_file)
+    doc.evidence_reference = keep_evidence.original_name
+    doc.updated_at = now_utc()
+    db.session.flush()
+    return replaced_paths
+
+
 def store_student_request_attachment(student: Student, request_type: str, uploaded) -> StudentRequestAttachment:
     original_name = secure_filename(uploaded.filename or "")
     if not original_name.lower().endswith(".pdf"):
@@ -9247,8 +9290,6 @@ def defense_schedule_conflicts(
         label = f"{other.name} ({other.student_number})" if other else f"schedule #{schedule.id}"
         if schedule.student_id == student.id:
             conflicts.append(f"Same-student overlap: {schedule.defense_type or 'another defense'} is already scheduled for that time.")
-        else:
-            conflicts.append(f"Schedule overlap with {label}: {schedule.defense_type or 'defense'} is already scheduled for that time.")
         shared = participant_ids & schedule_panel_ids(schedule)
         if shared:
             names = [Faculty.query.get(faculty_id).name for faculty_id in shared if Faculty.query.get(faculty_id)]
@@ -9256,6 +9297,13 @@ def defense_schedule_conflicts(
         if venue.strip() and schedule.venue.strip().casefold() == venue.strip().casefold():
             conflicts.append(f"Venue conflict with {label}: {schedule.venue} is already booked.")
     return conflicts
+
+
+def has_hard_schedule_conflict(conflicts: list[str]) -> bool:
+    return any(
+        conflict.startswith(("Same-student overlap:", "Panel conflict with", "Venue conflict with"))
+        for conflict in conflicts
+    )
 
 
 def faculty_calendar_id(faculty: Faculty) -> str | None:
@@ -9529,7 +9577,7 @@ RESEARCH_MILESTONES = {
     "Final Defense": {
         "label": "Final Defense Readiness",
         "short_label": "Final Defense",
-        "description": "Submit the final manuscript and required clearance. Staff verifies distribution and the confirmed defense schedule.",
+        "description": "Submit the final defense manuscript and advisor-signed final defense endorsement. Staff verifies the confirmed defense schedule.",
     },
     "Completion Evidence": {
         "label": "Final Submission and Completion",
@@ -9653,22 +9701,16 @@ RESEARCH_REQUIREMENTS = {
         "required_file_count": 0,
     },
     "Form 4 - Endorsement for Final Defense": {
-        "label": "Final defense endorsement",
-        "description": "Recorded by the adviser or Research Coordinator after final-manuscript review.",
-        "source_type": "staff",
-        "required_file_count": 0,
+        "label": "Advisor signed Final defense endorsement",
+        "description": "Upload the advisor-signed final defense endorsement.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
     },
     "Final manuscript": {
         "label": "Final defense manuscript",
         "description": "The manuscript that will be distributed to the final defense panel.",
         "source_type": "student_upload",
         "required_file_count": 1,
-    },
-    "Panel received manuscript at least 14 days before defense": {
-        "label": "Panel manuscript distribution verified",
-        "description": "Staff verifies that the panel received the manuscript at least 14 days before defense.",
-        "source_type": "staff",
-        "required_file_count": 0,
     },
     "Agreed final defense schedule": {
         "label": "Confirmed final defense schedule",
@@ -10030,7 +10072,6 @@ def required_documents_for_gate(gate: str) -> list[str]:
         return [
             "Form 4 - Endorsement for Final Defense",
             "Final manuscript",
-            "Panel received manuscript at least 14 days before defense",
             "Agreed final defense schedule",
             "Final defense result",
         ]
@@ -10071,12 +10112,6 @@ def research_evidence_aliases(gate: str) -> dict[str, list[str]]:
         "Agreed defense schedule in Form 4": ["agreed schedule", "schedule in form 4", "defense schedule"],
         "Form 4 - Endorsement for Final Defense": ["form 4", "endorsement for final"],
         "Final manuscript": ["final manuscript", "final paper", "closed-door manuscript"],
-        "Panel received manuscript at least 14 days before defense": [
-            "14-day",
-            "14 day",
-            "two weeks",
-            "panel received manuscript",
-        ],
         "Agreed final defense schedule": ["final defense schedule", "agreed final schedule"],
         "Soft copy of final manuscript": ["soft copy", "final manuscript"],
         "Panel approval emails": ["panel approval", "approval emails", "email approval"],
@@ -10153,9 +10188,9 @@ def reset_research_gate_after_failed_defense(student: Student, gate: str) -> lis
             doc.status = "Missing"
             doc.evidence_reference = None
         doc.updated_at = now_utc()
+    clear_panel_for_research_gate(student, gate)
     if gate == "Form 1 - Title Defense":
         revoke_form1_endorsement(student.id)
-        clear_panel_for_research_gate(student, gate)
     defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
     if defense_type:
         active_schedules = ScheduleRequest.query.filter(
@@ -10192,6 +10227,8 @@ def panel_roles_for_student(student: Student) -> list[str]:
 
 def defense_lead_days(defense_type: str) -> int:
     # Lead-time rule used by scheduling confirmation.
+    if defense_type == "Title Defense":
+        return 0
     if defense_type == "Public Final Defense":
         return 5
     return 14
@@ -11567,6 +11604,57 @@ def ensure_student_account(student: Student, email: str, password: str = SIM_STU
     return account
 
 
+def ensure_miguel_yu_research_demo_unlock() -> int:
+    """Keep the Miguel Yu demo login ready for Research Gate walkthroughs."""
+    student = Student.query.filter_by(first_name="Miguel", last_name="Yu").first()
+    if not student:
+        return 0
+
+    changed = 0
+    if student.comprehensive_exam_status != "Passed":
+        student.comprehensive_exam_status = "Passed"
+        changed += 1
+    if student.standing == "Active" and student.current_stage in {"Admission", "Coursework", "Comprehensive Exam"}:
+        student.current_stage = "Proposal Development"
+        changed += 1
+
+    for record in CourseRecord.query.filter_by(student_id=student.id).all():
+        if record.status != "Completed":
+            record.status = "Completed"
+            record.updated_at = now_utc()
+            changed += 1
+        if record.grade_status in {None, "", "No Grade", "Incomplete", "Failed"}:
+            record.grade_status = "Passed"
+            changed += 1
+
+    account = UserAccount.query.filter_by(email="student@gs.local").first()
+    if not account:
+        account = UserAccount(
+            email="student@gs.local",
+            full_name=f"{student.name} Demo",
+            password_hash=generate_password_hash(SIM_STUDENT_PASSWORD),
+            role="student",
+            active=True,
+        )
+        db.session.add(account)
+        changed += 1
+    if account.student_id != student.id:
+        account.student_id = student.id
+        changed += 1
+    desired_name = f"{student.name} Demo"
+    if account.full_name != desired_name:
+        account.full_name = desired_name
+        changed += 1
+    if account.role != "student":
+        account.role = "student"
+        changed += 1
+    if not account.active:
+        account.active = True
+        changed += 1
+
+    return changed
+
+
 def seed_simulation_demo() -> None:
     # Idempotent end-to-end demo fixtures (safe to re-run on every startup):
     #  - MAEDS: a dedicated empty program so the uploaded Student A sheet's subjects
@@ -11835,7 +11923,11 @@ def ensure_demo_accounts() -> None:
             .order_by(Course.code.asc())
             .all()
         )
-        if linked_records and not any(record.status in {"Enrolled", "Current", "Incomplete"} for record in linked_records):
+        if (
+            linked_student.name != "Miguel Yu"
+            and linked_records
+            and not any(record.status in {"Enrolled", "Current", "Incomplete"} for record in linked_records)
+        ):
             for record in linked_records[:2]:
                 record.status = "Current"
                 record.grade_status = "No Grade"
@@ -11915,6 +12007,7 @@ if __name__ == "__main__":
             ensure_faculty_demo_profiles()
             ensure_demo_accounts()
             seed_simulation_demo()
+            ensure_miguel_yu_research_demo_unlock()
             ensure_demo_request_submission_logs()
             db.session.commit()
             print(f"Seeded {seed_count} students plus supporting workflow data and demo accounts.")
@@ -11927,6 +12020,7 @@ if __name__ == "__main__":
         updated_faculty_profiles = ensure_faculty_demo_profiles()
         ensure_demo_accounts()
         seed_simulation_demo()  # self-heal demo fixtures on an already-seeded database
+        miguel_unlock_changes = ensure_miguel_yu_research_demo_unlock()
         healed_request_logs = ensure_demo_request_submission_logs()
         sync_result = sync_all_curricula()
         db.session.commit()
@@ -11934,6 +12028,8 @@ if __name__ == "__main__":
             print(f"Updated {renamed_faculty} demo faculty placeholder name(s).")
         if updated_faculty_profiles:
             print(f"Expanded {updated_faculty_profiles} demo faculty specialization profile(s).")
+        if miguel_unlock_changes:
+            print("Prepared Miguel Yu for Research Gate demo testing.")
         if healed_request_logs:
             print(f"Added {healed_request_logs} missing demo request submission log(s).")
         if sync_result["created"]:

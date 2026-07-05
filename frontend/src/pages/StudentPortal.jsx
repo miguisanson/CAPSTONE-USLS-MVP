@@ -662,6 +662,7 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
   const files = requirement.files || [];
   const titlePackageItem = requirement.item_name === "Form 1 - Application for Title Defense" || requirement.item_name === "Three concept papers";
   const titlePackageLocked = panelLocked && titlePackageItem;
+  const replacesExistingUpload = requirement.item_name === "Ethics Clearance";
 
   async function upload(file) {
     if (titlePackageLocked) {
@@ -725,7 +726,7 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
         <div className="flex items-center gap-2">
           <StatusBadge value={requirement.status_label} dot={false} />
           <label className={`btn-ghost ${titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-          {titlePackageLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading..." : files.length >= needed ? "Add another" : "Upload PDF"}
+          {titlePackageLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading..." : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
           <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
           </label>
         </div>
