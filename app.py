@@ -772,14 +772,54 @@ def get_active_term() -> AcademicTerm | None:
     active = AcademicTerm.query.filter_by(is_active_planning_term=True).first()
     if active:
         return active
-    return AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+    # Date-aware "current semester": the one in session, else the next upcoming, else latest.
+    today = date.today()
+    current = (
+        AcademicTerm.query.filter(AcademicTerm.start_date <= today, AcademicTerm.end_date >= today)
+        .order_by(AcademicTerm.start_date.desc())
+        .first()
+    )
+    if current:
+        return current
+    upcoming = (
+        AcademicTerm.query.filter(AcademicTerm.start_date > today)
+        .order_by(AcademicTerm.start_date.asc())
+        .first()
+    )
+    return upcoming or AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+
+
+# Academic calendar is semester-based: two semesters per academic year (not trimester).
+SEMESTER_NAMES = ["1st Semester", "2nd Semester"]
+
+
+def academic_semester_label(start_year: int, sem_index: int) -> str:
+    return f"AY {start_year}-{start_year + 1} {SEMESTER_NAMES[sem_index]}"
+
+
+def generate_semester_calendar(from_year: int = 2023, to_year: int = 2030) -> list[tuple[str, date]]:
+    """(label, start_date) for every semester in the range — 1st Sem in Aug, 2nd in Jan."""
+    rows: list[tuple[str, date]] = []
+    for year in range(from_year, to_year + 1):
+        rows.append((academic_semester_label(year, 0), date(year, 8, 1)))
+        rows.append((academic_semester_label(year, 1), date(year + 1, 1, 10)))
+    return rows
+
+
+def upcoming_semester_labels(count: int = 5, reference: date | None = None) -> list[str]:
+    """The current and next few semesters (by label), for student/staff dropdowns."""
+    reference = reference or date.today()
+    terms = AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
+    upcoming = [t for t in terms if (t.end_date or t.start_date) >= reference]
+    chosen = (upcoming or terms[-count:])[:count]
+    return [t.label for t in chosen]
 
 
 def split_academic_term_label(label: str) -> tuple[str, str]:
     ay_match = re.search(r"(\d{4}\s*-\s*\d{4})", label or "")
-    term_match = re.search(r"(Term\s*\d+)", label or "", flags=re.IGNORECASE)
+    sem_match = re.search(r"((?:1st|2nd|3rd|First|Second|Third)\s*Semester|Term\s*\d+)", label or "", flags=re.IGNORECASE)
     academic_year = ay_match.group(1).replace(" ", "") if ay_match else ""
-    semester = term_match.group(1).title().replace("  ", " ") if term_match else ""
+    semester = sem_match.group(1).title().replace("  ", " ") if sem_match else ""
     return academic_year, semester
 
 
@@ -2548,6 +2588,7 @@ def register_routes(app: Flask) -> None:
                 "colleges": COLLEGES,
                 "programs": [program_dict(p) for p in programs],
                 "terms": [term_dict(t) for t in terms],
+                "upcoming_semesters": upcoming_semester_labels(5),
                 "faculty": [faculty_dict(f) for f in faculty],
             }
         )
@@ -2580,7 +2621,7 @@ def register_routes(app: Flask) -> None:
         if not label:
             return jsonify({"error": "Term label is required."}), 400
         if not all(split_academic_term_label(label)):
-            return jsonify({"error": "Term label must look like AY 2026-2027 Term 1."}), 400
+            return jsonify({"error": "Term label must look like AY 2026-2027 1st Semester."}), 400
         try:
             term = AcademicTerm(
                 label=label,
@@ -2609,7 +2650,7 @@ def register_routes(app: Flask) -> None:
             if not label:
                 return jsonify({"error": "Term label is required."}), 400
             if not all(split_academic_term_label(label)):
-                return jsonify({"error": "Term label must look like AY 2026-2027 Term 1."}), 400
+                return jsonify({"error": "Term label must look like AY 2026-2027 1st Semester."}), 400
             term.label = label
         try:
             for field in ["start_date", "end_date", "planning_window_open", "planning_window_close", "grade_submission_deadline"]:
@@ -4036,7 +4077,7 @@ def register_routes(app: Flask) -> None:
             {o.academic_year for o in CurriculumOffering.query.all()} | term_years | set(default_academic_year_options()),
             reverse=True,
         )
-        all_sem = ["Term 1", "Term 2", "Term 3"]
+        all_sem = list(SEMESTER_NAMES)
         terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
         programs = Program.query.order_by(Program.code).all()
         courses = (
@@ -7506,7 +7547,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
                 existing.category = category
         course_by_code[code] = existing
 
-    term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+    term = get_active_term()
 
     created, skipped, sample, conflicts, duplicates = 0, 0, [], [], []
     created_accounts = []
@@ -11715,9 +11756,9 @@ def ensure_curriculum_offering_schema() -> None:
                 db.session.execute(text(f"ALTER TABLE academic_term ADD COLUMN {name} {sql_type}"))
         active_count = db.session.execute(text("SELECT COUNT(*) FROM academic_term WHERE is_active_planning_term = 1")).scalar() or 0
         if active_count == 0:
-            latest_id = db.session.execute(text("SELECT id FROM academic_term ORDER BY start_date DESC LIMIT 1")).scalar()
-            if latest_id:
-                db.session.execute(text("UPDATE academic_term SET is_active_planning_term = 1 WHERE id = :term_id"), {"term_id": latest_id})
+            current = get_active_term()  # date-aware current/next semester, not the far-future latest
+            if current:
+                db.session.execute(text("UPDATE academic_term SET is_active_planning_term = 1 WHERE id = :term_id"), {"term_id": current.id})
     if "course_offering_plan" in tables:
         existing = {column["name"] for column in inspector.get_columns("course_offering_plan")}
         additions = {
@@ -11757,13 +11798,7 @@ def seed_database(count: int = 350) -> None:
     db.session.flush()
 
     terms = []
-    for label, start in [
-        ("AY 2024-2025 Term 1", date(2024, 8, 1)),
-        ("AY 2024-2025 Term 2", date(2025, 1, 10)),
-        ("AY 2025-2026 Term 1", date(2025, 8, 1)),
-        ("AY 2025-2026 Term 2", date(2026, 1, 10)),
-        ("AY 2026-2027 Term 1", date(2026, 8, 1)),
-    ]:
+    for label, start in generate_semester_calendar(2023, 2030):
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
         db.session.add(term)
         terms.append(term)
@@ -12161,7 +12196,7 @@ def seed_workflow_cases() -> None:
         application = WithdrawalApplication(
             student_id=student.id,
             reason="Personal or employment-related withdrawal request.",
-            effective_term="AY 2026-2027 Term 1",
+            effective_term="AY 2026-2027 1st Semester",
             fee_status=fees,
             requirement_status=reqs,
             dean_decision=dean,
@@ -12484,7 +12519,7 @@ def seed_simulation_demo() -> None:
                     student_id=panel_student.id, faculty_id=fac.id, gate="Final Defense",
                     panel_role=roles_seq[index], score=100, eligibility_note="Prepared demo panel"))
 
-    term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+    term = get_active_term()
     home_program = Program.query.filter_by(code="MAED").first() or program
 
     # Student B — Leave of Absence -> Readmission
@@ -12544,7 +12579,7 @@ def seed_simulation_demo() -> None:
         db.session.add(WithdrawalApplication(
             student_id=student_c.id,
             reason="Accepted full-time employment abroad; requesting withdrawal.",
-            effective_term=(term.label if term else "AY 2026-2027 Term 1"),
+            effective_term=(term.label if term else "AY 2026-2027 1st Semester"),
             request_attachment_id=attachment.id, status="Dean Review", dean_decision="Pending"))
         add_task(student_c.id, "Review withdrawal request", "Dean", 3, 60)
         add_log("withdrawal", student_c.id, "Student", attachment.original_name,
@@ -12666,7 +12701,7 @@ def ensure_demo_accounts() -> None:
         or Student.query.order_by(Student.student_number.asc()).first()
     )
     if linked_student:
-        latest_term = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
+        latest_term = get_active_term()
         linked_records = (
             CourseRecord.query.filter_by(student_id=linked_student.id)
             .join(Course)

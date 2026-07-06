@@ -76,10 +76,10 @@ export default function TermManagement() {
     try {
       if (editing) {
         await api.updateTerm(editing.id, form);
-        setMessage("Term updated.");
+        setMessage("Semester updated.");
       } else {
         await api.createTerm(form);
-        setMessage("Term added.");
+        setMessage("Semester added.");
       }
       setFormOpen(false);
       await loadTerms();
@@ -144,8 +144,8 @@ export default function TermManagement() {
             </button>
           </div>
           <form onSubmit={saveTerm} className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <Field label="Term label">
-              <input value={form.label} onChange={setField("label")} className="field-input" placeholder="AY 2026-2027 Term 1" required />
+            <Field label="Semester label">
+              <input value={form.label} onChange={setField("label")} className="field-input" placeholder="AY 2026-2027 1st Semester" required />
             </Field>
             <Field label="Start date">
               <input type="date" value={form.start_date} onChange={setField("start_date")} className="field-input" required />
@@ -188,7 +188,7 @@ export default function TermManagement() {
             <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="px-5 py-3">Term</th>
+                  <th className="px-5 py-3">Semester</th>
                   <th className="px-3 py-3">Dates</th>
                   <th className="px-3 py-3">Planning window</th>
                   <th className="px-3 py-3">Grade deadline</th>

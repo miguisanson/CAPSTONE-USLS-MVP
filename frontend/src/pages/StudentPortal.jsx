@@ -391,7 +391,7 @@ function MyCoursesPanel({ data, onSaved }) {
                   <th className="px-4 py-2.5">Subject</th>
                   <th className="px-3 py-2.5">Status</th>
                   <th className="px-3 py-2.5">Grade</th>
-                  <th className="px-3 py-2.5">Term</th>
+                  <th className="px-3 py-2.5">Semester</th>
                   <th className="px-3 py-2.5">Remarks</th>
                 </tr>
               </thead>
@@ -431,7 +431,7 @@ function MyCoursesPanel({ data, onSaved }) {
             <Field label="Subject to drop" required>
               <Select value={activeCourseId} onChange={(event) => setActiveCourseId(event.target.value)} options={droppable.map((course) => ({ value: course.course_id, label: `${course.code} — ${course.title}` }))} required />
             </Field>
-            <Field label="Term">
+            <Field label="Semester">
               <div className="field-input bg-slate-50 text-slate-600">{selectedTerm}</div>
             </Field>
             <Field label="Reason for dropping" required>
@@ -1101,10 +1101,10 @@ function LoaRequestForm({ studentId, onSaved }) {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Effective start" required>
-          <Input value={form.effective_start} onChange={set("effective_start")} required placeholder="AY 2026-2027 Term 1" />
+          <Input value={form.effective_start} onChange={set("effective_start")} required placeholder="AY 2026-2027 1st Semester" />
         </Field>
         <Field label="Effective end" required>
-          <Input value={form.effective_end} onChange={set("effective_end")} required placeholder="AY 2026-2027 Term 2" />
+          <Input value={form.effective_end} onChange={set("effective_end")} required placeholder="AY 2026-2027 2nd Semester" />
         </Field>
       </div>
       <Field label="Reason / remarks" required>
@@ -1138,10 +1138,10 @@ function ReadmissionRequestForm({ data, onSaved }) {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Target return term" required>
-          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 Term 1" />
+          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 1st Semester" />
         </Field>
         <Field label="Previous LOA period">
-          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 Term 2 to AY 2026-2027 Term 1" />
+          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 2nd Semester to AY 2026-2027 1st Semester" />
         </Field>
       </div>
       <Field label="Requirements included in your application" hint="Select only the items actually included in the uploaded PDF.">
@@ -1240,7 +1240,7 @@ function WithdrawalRequestForm({ data, onSaved }) {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current withdrawal stage</p><p className="mt-1 text-xs text-slate-500">Only the requirements due now can be edited. Earlier submissions remain available below.</p></div><StatusBadge value={status} dot={false} /></div></div>
       <StageCard number={1} title="Withdrawal Application" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: effective term, reason, and the signed withdrawal request PDF." : "Your application details and original file are saved and read-only."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Effective term" required><Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 Term 1" /></Field><Field label="Reason for withdrawal" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"} /></div> : <div className="space-y-3"><p className="text-sm text-slate-600">Effective {existing?.effective_term || "term pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
+        {applicationEditable ? <div className="space-y-4"><Field label="Effective semester" required><Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 1st Semester" /></Field><Field label="Reason for withdrawal" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"} /></div> : <div className="space-y-3"><p className="text-sm text-slate-600">Effective {existing?.effective_term || "term pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
       </StageCard>
       <StageCard number={2} title="Staff Intake / Dean Review" state={denied ? "rejected" : returned ? "returned" : reviewPending ? "pending" : reviewComplete ? "complete" : "locked"} helper={denied ? "The Dean denied this request. Your lifecycle standing remains active." : returned ? "Review the comments, update Step 1, and resubmit." : reviewPending ? "Graduate School staff and the Dean are reviewing the saved application." : reviewComplete ? "The Dean approved the request for follow-through." : "Available after the application is submitted."} />
       <StageCard number={3} title="Approved Request Follow-through" state={followThroughPending ? "pending" : followThroughComplete ? "complete" : "locked"} helper={followThroughPending ? "The Academic Coordinator and Graduate School staff are recording the approved request and preparing the requirements notice." : followThroughComplete ? "Follow-through is complete and the student requirements stage has opened." : "Available after Dean approval."} />

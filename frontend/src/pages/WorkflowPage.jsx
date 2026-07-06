@@ -1201,7 +1201,7 @@ function CourseRosterGradeWorkspace({ meta }) {
         <Field label="Subject" required>
           <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
         </Field>
-        <Field label="Term">
+        <Field label="Semester">
           <Select value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Current / all terms" options={(meta?.terms || []).map((item) => item.label)} />
         </Field>
       </div>
@@ -1236,14 +1236,14 @@ function CourseRosterGradeWorkspace({ meta }) {
                     <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                       <th className="px-4 py-2.5">Student</th>
                       <th className="px-3 py-2.5">Status</th>
-                      <th className="px-3 py-2.5">Term</th>
+                      <th className="px-3 py-2.5">Semester</th>
                       <th className="px-3 py-2.5">Grade</th>
                       <th className="px-3 py-2.5">Incomplete deadline</th>
                       <th className="px-3 py-2.5">Remarks</th>
                       <th className="px-3 py-2.5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="[&>tr>td]:align-middle">
                     {classStudents.map((student) => {
                       const edit = edits[student.student_id] || {};
                       const status = edit.status || student.status;
@@ -1407,8 +1407,8 @@ function CourseClassWorkspace({ meta, mode }) {
         <Field label="Subject" required>
           <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
         </Field>
-        <Field label="Term">
-          <Input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="AY 2025-2026 Term 1" />
+        <Field label="Semester">
+          <Input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="AY 2025-2026 1st Semester" />
         </Field>
       </div>
       <ErrorNote message={error} />
@@ -1578,7 +1578,7 @@ function CourseAuditRosterV2({ meta }) {
           <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))} />
         </Field>
         <Field label="Audit term">
-          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 Term 1" />
+          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 1st Semester" />
         </Field>
       </div>
       <ErrorNote message={error} />
@@ -1734,7 +1734,7 @@ function CourseAuditRoster({ meta }) {
           />
         </Field>
         <Field label="Audit term" hint="Recorded on each updated subject">
-          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 Term 1" />
+          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 1st Semester" />
         </Field>
       </div>
 
@@ -1865,7 +1865,7 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
           <Select value={form.status} onChange={set("status")} placeholder="" options={["Completed", "Current", "Missing", "Incomplete", "Dropped"]} />
         </Field>
         <Field label="AY / Term taken">
-          <Input value={form.term_label} onChange={set("term_label")} placeholder="AY 2025-2026 Term 1" />
+          <Input value={form.term_label} onChange={set("term_label")} placeholder="AY 2025-2026 1st Semester" />
         </Field>
         <Field label="Evidence reference">
           <Input value={form.evidence_reference} onChange={set("evidence_reference")} placeholder="Monitoring sheet row / grade slip" />
@@ -3966,8 +3966,8 @@ function WithdrawalForm({ context, studentId, submit, submitting }) {
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Effective term" required>
-          <Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 Term 1" />
+        <Field label="Effective semester" required>
+          <Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 1st Semester" />
         </Field>
         <Field label="Dean decision">
           <Select value={form.dean_decision} onChange={set("dean_decision")} placeholder="" options={["Pending", "Approved", "Denied", "Returned"]} />
@@ -4211,11 +4211,11 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
         <Field label="Request date" required>
           <Input type="date" value={form.request_date} onChange={set("request_date")} required />
         </Field>
-        <Field label="Effective start term/date">
-          <Input value={form.effective_start} onChange={set("effective_start")} placeholder="AY 2026-2027 Term 1 or YYYY-MM-DD" />
+        <Field label="Effective start semester">
+          <Input value={form.effective_start} onChange={set("effective_start")} placeholder="AY 2026-2027 1st Semester or YYYY-MM-DD" />
         </Field>
-        <Field label="Effective end term/date">
-          <Input value={form.effective_end} onChange={set("effective_end")} placeholder="AY 2026-2027 Term 2 or YYYY-MM-DD" />
+        <Field label="Effective end semester">
+          <Input value={form.effective_end} onChange={set("effective_end")} placeholder="AY 2026-2027 2nd Semester or YYYY-MM-DD" />
         </Field>
         <Field label="Prior LOA count">
           <Input type="number" min="0" value={form.prior_loa_count} onChange={set("prior_loa_count")} />
@@ -4425,10 +4425,10 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
           <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
         </Field>
         <Field label="Target return term" required>
-          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 Term 1" />
+          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 1st Semester" />
         </Field>
         <Field label="Previous LOA period">
-          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 Term 2 to AY 2026-2027 Term 1" />
+          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 2nd Semester to AY 2026-2027 1st Semester" />
         </Field>
         <Field label="Eligibility to return status">
           <Select

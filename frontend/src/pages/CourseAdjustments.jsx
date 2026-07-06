@@ -169,7 +169,7 @@ export default function CourseAdjustments() {
           <div className="flex-1">
             <h1 className="font-display text-2xl font-semibold text-ink">Course demand</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Review live subject demand, adjust sections, and choose which subjects to offer next term.
+              Review live subject demand, adjust sections, and choose which subjects to offer next semester.
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
               <p>
