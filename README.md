@@ -4,6 +4,8 @@ A web platform for the University of St. La Salle Graduate School that consolida
 records, milestone events, scheduling, document checks, and follow-ups into one staff-friendly
 monitoring environment.
 
+See [CHANGELOG.md](CHANGELOG.md) for the dated development history from the initial repository through the current build.
+
 - **Backend:** Python (Flask) JSON API - owns all models, business rules, and the source of truth.
 - **Frontend:** React + Vite + Tailwind CSS single-page app (clean, light, institutional-green UI).
 - **Database:** zero-config **SQLite** by default; **MySQL** supported via `DATABASE_URL`.
@@ -16,8 +18,8 @@ writes SQL-backed records (students, enrollment, course evidence, document check
 assignments, schedule requests, tasks, and an activity trail):
 
 1. **Student Handoff** - creates the monitoring record and compares received onboarding evidence.
-2. **Leave of Absence** - records the application, eligibility check, Dean decision, status pause, and notice.
-3. **Readmission** - records the return request, eligibility-to-return check, Dean decision, re-entry status, and notice.
+2. **Leave of Absence** - staff review the application and eligibility, then forward it for the Dean's decision; an approval pauses the student's status and records the notice.
+3. **Readmission** - staff review return eligibility and forward the request; the Dean's approval reactivates the student and records the notice.
 4. **Course Audit** - maps completed/current/missing subjects against curriculum requirements.
 5. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
 6. **Panel Matching** - scores faculty by specialization, availability, college, and workload.

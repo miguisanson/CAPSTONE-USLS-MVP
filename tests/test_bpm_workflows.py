@@ -31,6 +31,7 @@ from app import (  # noqa: E402
     graduation_eligibility,
     ensure_demo_accounts,
     required_documents_for_gate,
+    submitted_request_students,
     task_dict,
     workflow_approvals_payload,
 )
@@ -437,6 +438,110 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(drop.status, "Approved")
             db.session.refresh(task)
             self.assertEqual(task.status, "Done")
+
+    def test_staff_forwards_loa_and_readmission_but_only_dean_decides(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            db.session.add(TransactionLog(
+                transaction_slug="leave-of-absence",
+                student_id=student.id,
+                actor_role="Student",
+                source_reference="loa-request.pdf",
+                result="LOA application submitted",
+                next_owner="GS Staff",
+                notes=(
+                    "Student submitted a Leave of Absence application for staff eligibility review.\n"
+                    "Requested period: AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester.\n"
+                    "Reason/remarks: Health leave."
+                ),
+            ))
+            db.session.commit()
+
+            response = self._staff_client().post("/api/transactions/leave-of-absence", json={
+                "student_id": student.id,
+                "application_reference": "loa-request.pdf",
+                "effective_start": "AY 2026-2027 1st Semester",
+                "effective_end": "AY 2026-2027 2nd Semester",
+                "reason_remarks": "Health leave",
+                "eligibility_status": "Eligible",
+                "prior_loa_count": 0,
+                "dean_action": "Approve",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(student)
+            self.assertEqual(student.standing, "Active")
+            forwarded = TransactionLog.query.filter_by(
+                transaction_slug="leave-of-absence",
+                student_id=student.id,
+                result="LOA request forwarded to Dean",
+            ).first()
+            self.assertIsNotNone(forwarded)
+            self.assertEqual(forwarded.actor_user_id, self.staff_id)
+            loa_rows = submitted_request_students("leave-of-absence")
+            self.assertEqual(loa_rows[0]["status"], "In Progress")
+            self.assertEqual(loa_rows[0]["next_action_owner"], "Dean")
+
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/leave-of-absence/{forwarded.id}/decide",
+                json={"decision": "approve", "note": "Approved leave."},
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(student)
+            self.assertEqual(student.standing, "On Leave")
+            self.assertEqual(student.enrollment_tag, "LOA")
+            self.assertEqual(submitted_request_students("leave-of-absence")[0]["status"], "Approved")
+
+            db.session.add(TransactionLog(
+                transaction_slug="readmission",
+                student_id=student.id,
+                actor_role="Student",
+                source_reference="readmission-request.pdf",
+                result="Readmission request submitted",
+                next_owner="GS Staff",
+                notes=(
+                    "Student submitted a readmission request for staff review.\n"
+                    "Target return semester: AY 2027-2028 1st Semester.\n"
+                    "Previous LOA period: AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester."
+                ),
+            ))
+            db.session.commit()
+
+            response = self._staff_client().post("/api/transactions/readmission", json={
+                "student_id": student.id,
+                "application_reference": "readmission-request.pdf",
+                "target_return_term": "AY 2027-2028 1st Semester",
+                "previous_loa_period": "AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester",
+                "eligibility_status": "Eligible to Return",
+                "readmission_items": [
+                    "Return intent letter",
+                    "Updated study plan",
+                    "Program/adviser endorsement",
+                    "No pending accountability",
+                ],
+                "dean_action": "Deny",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(student)
+            self.assertEqual(student.standing, "On Leave")
+            forwarded = TransactionLog.query.filter_by(
+                transaction_slug="readmission",
+                student_id=student.id,
+                result="Readmission request forwarded to Dean",
+            ).first()
+            self.assertIsNotNone(forwarded)
+            readmission_rows = submitted_request_students("readmission")
+            self.assertEqual(readmission_rows[0]["status"], "In Progress")
+            self.assertEqual(readmission_rows[0]["next_action_owner"], "Dean")
+
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/readmission/{forwarded.id}/decide",
+                json={"decision": "approve", "note": "Approved return."},
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(student)
+            self.assertEqual(student.standing, "Active")
+            self.assertEqual(student.enrollment_tag, "Enrolled")
+            self.assertEqual(submitted_request_students("readmission")[0]["status"], "Approved")
 
     def test_demo_backoffice_accounts_sign_in_as_distinct_roles(self):
         with app.app_context():

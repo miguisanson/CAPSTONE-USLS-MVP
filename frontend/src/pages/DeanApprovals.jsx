@@ -71,8 +71,10 @@ export default function DeanApprovals() {
   const workflowPending = data?.workflow_pending || [];
   const workflowRecent = data?.workflow_recent || [];
   const workflowOverview = data?.workflow_overview || [];
-  const baseWorkflowPending = view === "overview" ? workflowPending : workflowPending.filter((item) => item.type === view);
-  const baseWorkflowRecent = view === "overview" ? workflowRecent : workflowOverview.filter((item) => item.type === view);
+  const isStandingChange = (item) => ["leave-of-absence", "readmission"].includes(item.type);
+  const belongsToView = (item) => view === "overview" || (view === "leave" ? isStandingChange(item) : item.type === view);
+  const baseWorkflowPending = workflowPending.filter(belongsToView);
+  const baseWorkflowRecent = (view === "overview" ? workflowRecent : workflowOverview).filter(belongsToView);
   const matchesFilters = (item) => {
     const program = item.student?.program_code || item.program_code || "";
     const text = `${item.title || ""} ${item.subtitle || ""} ${item.student?.name || ""} ${item.student?.student_number || ""} ${program}`.toLowerCase();
@@ -83,7 +85,8 @@ export default function DeanApprovals() {
   };
   const visibleWorkflowPending = sortDeanItems(baseWorkflowPending.filter(matchesFilters), filters.sort);
   const visibleWorkflowRecent = sortDeanItems(baseWorkflowRecent.filter(matchesFilters), filters.sort);
-  const visibleWorkflowOverview = sortDeanItems((view === "overview" ? workflowOverview : workflowOverview.filter((item) => item.type === view)).filter(matchesFilters), filters.sort);
+  const visibleWorkflowOverview = sortDeanItems(workflowOverview.filter(belongsToView).filter(matchesFilters), filters.sort);
+  const boardWorkflowRows = visibleWorkflowOverview.filter((item) => !isStandingChange(item));
   const pendingPlans = (data?.pending || []).filter(matchesFilters);
   const recentPlans = (data?.recent || []).filter(matchesFilters);
   const programs = useMemo(() => [...new Set([
@@ -92,7 +95,7 @@ export default function DeanApprovals() {
     ...workflowOverview.map((item) => item.student?.program_code),
   ].filter(Boolean))].sort(), [data, workflowOverview]);
   const statuses = useMemo(() => [...new Set([
-    ...(view === "overview" ? [...(data?.pending || []), ...workflowOverview] : workflowOverview.filter((item) => item.type === view)).flatMap((item) => [item.status, item.workflow_status]),
+    ...(view === "overview" ? [...(data?.pending || []), ...workflowOverview] : workflowOverview.filter(belongsToView)).flatMap((item) => [item.status, item.workflow_status]),
   ].filter(Boolean))].sort(), [data, workflowOverview, view]);
   const approvedGraduation = workflowOverview.filter((item) => item.type === "graduation" && item.status === "Dean Approved" && matchesFilters(item));
   const readyGraduation = visibleWorkflowOverview.filter((item) => item.type === "graduation" && item.status === "Ready for Dean Review");
@@ -249,8 +252,8 @@ export default function DeanApprovals() {
             <button type="button" disabled={!selectedGraduationIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> Apply Dean group action</button>
           </div>
         )}
-        {visibleWorkflowOverview.length > 0 && (
-          <DeanWorkflowBoard rows={visibleWorkflowOverview} onOpen={setSelectedWorkflow} selectedIds={selectedGraduationIds} onToggle={toggleGraduation} />
+        {boardWorkflowRows.length > 0 && (
+          <DeanWorkflowBoard rows={boardWorkflowRows} onOpen={setSelectedWorkflow} selectedIds={selectedGraduationIds} onToggle={toggleGraduation} />
         )}
         {approvedGraduation.length > 0 && (view === "overview" || view === "graduation") && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
@@ -577,14 +580,19 @@ function DeanListFilters({ filters, setFilters, programs, statuses }) {
 function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, recipient, setRecipient, visibility, setVisibility, busy, onDecide, onMessage }) {
   const key = `${item.type}-${item.id}`;
   const isBusy = busy === key;
-  const approveLabel = item.type === "practicum" ? "Mark reviewed" : item.type === "withdrawal" ? "Approve" : "Approve & send";
+  const standingChange = ["leave-of-absence", "readmission"].includes(item.type);
+  const approveLabel = item.type === "practicum" ? "Mark reviewed" : standingChange || item.type === "withdrawal" ? "Approve" : "Approve & send";
   const returnLabel = item.type === "withdrawal" ? "Return" : "Return for revision";
-  const timeline = item.type === "practicum"
+  const timeline = standingChange
+    ? null
+    : item.type === "practicum"
     ? (item.timeline || []).map((step) => ({ ...step, optional: ["Hours Incomplete", "Additional Certificates Requested"].includes(step.label) }))
     : item.type === "withdrawal"
       ? withdrawalTimelineSteps(item.workflow_status)
       : graduationTimelineSteps(item.status, item.eligibility || { eligible: true, coursework_status: "Complete" });
-  const timelineTitle = item.type === "practicum"
+  const timelineTitle = standingChange
+    ? ""
+    : item.type === "practicum"
     ? "Practicum workflow timeline"
     : item.type === "withdrawal"
       ? "Withdrawal workflow timeline"
@@ -594,6 +602,7 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
     (item.type === "practicum" && item.status === "Report Sent to Dean")
     || (item.type === "withdrawal" && item.status === "Pending" && item.workflow_status === "Dean Review")
     || (item.type === "graduation" && item.status === "Ready for Dean Review")
+    || (standingChange && item.workflow_status === "Dean Review")
   );
   return (
     <Card className="p-5">
@@ -607,9 +616,9 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
       <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-600">
         {item.details}
       </p>
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+      {timeline && <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <WorkflowTimeline steps={timeline} title={timelineTitle} />
-      </div>
+      </div>}
       {files.length > 0 && (
         <div className="mt-4 rounded-xl border border-slate-200 p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Submitted files</p>
@@ -628,7 +637,7 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
           <ol className="mt-2 space-y-2">{[...item.history].reverse().map((entry) => <li key={entry.id} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-sm font-semibold text-ink">{entry.result}</p><p className="mt-1 text-xs text-slate-500">{entry.actor_role}{entry.actor_user_id ? ` · User #${entry.actor_user_id}` : ""}{entry.action_type ? ` · ${entry.action_type}` : ""} · {entry.previous_status || "—"} → {entry.new_status || "—"} · {formatDate(entry.created_at)}</p>{entry.notes && <p className="mt-1 text-xs text-slate-600">{entry.notes}</p>}</li>)}</ol>
         </div>
       )}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {!standingChange && <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <select value={template[key] || ""} onChange={(e) => setTemplate((current) => ({ ...current, [key]: e.target.value }))} className="field-input cursor-pointer" aria-label="Clarification message template">
         <option value="">Optional message template</option>
         {CLARIFICATION_TEMPLATES.map((item) => <option key={item}>{item}</option>)}
@@ -644,14 +653,14 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
         aria-label={`Comment or return reason for ${item.student?.name || item.title}`}
         className="field-input"
       />
-      </div>
+      </div>}
       <div className="mt-3 flex flex-wrap gap-2">
         {canDecide && (
           <>
             <button type="button" disabled={isBusy} onClick={() => onDecide(item, item.type === "practicum" ? "review" : "approve")} className="btn-primary">
               <CheckCircle2 className="h-4 w-4" /> {approveLabel}
             </button>
-            {item.type === "withdrawal" && (
+            {(item.type === "withdrawal" || standingChange) && (
               <button type="button" disabled={isBusy} onClick={() => onDecide(item, "deny")} className="btn-ghost text-red-600">
                 <AlertTriangle className="h-4 w-4" /> Deny
               </button>
@@ -661,9 +670,9 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
             </button>
           </>
         )}
-        <button type="button" disabled={busy === `message-${key}`} onClick={() => onMessage(item)} className="btn-ghost">
+        {!standingChange && <button type="button" disabled={busy === `message-${key}`} onClick={() => onMessage(item)} className="btn-ghost">
           <MessageSquare className="h-4 w-4" /> Add comment
-        </button>
+        </button>}
         {!canDecide && (
           <span className="self-center text-xs font-semibold text-slate-500">
             No Dean decision is due at this stage.

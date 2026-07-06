@@ -65,7 +65,7 @@ TRANSACTIONS = [
         "group": "Intake",
         "short": "Create the Graduate School monitoring record from an admission or enrollment signal.",
         "actor": "GS Staff",
-        "data": "Student profile, admission/enrollment signal, program, term, source reference, timestamp, initial status.",
+        "data": "Student profile, admission/enrollment signal, program, semester, source reference, timestamp, initial status.",
     },
     {
         "slug": "leave-of-absence",
@@ -85,7 +85,7 @@ TRANSACTIONS = [
         "group": "Standing",
         "short": "Record a return request after LOA, route the Dean decision, and reactivate approved students.",
         "actor": "Student / GS Staff / Dean",
-        "data": "Application reference, target return term, previous LOA period, return eligibility, missing requirements, Dean decision, status update, notice.",
+        "data": "Application reference, target return semester, previous LOA period, return eligibility, missing requirements, Dean decision, status update, notice.",
     },
     {
         "slug": "course-audit",
@@ -95,7 +95,7 @@ TRANSACTIONS = [
         "group": "Coursework",
         "short": "Map completed, current, and missing subjects to curriculum requirements.",
         "actor": "Academic Coordinator / GS Staff",
-        "data": "Taken/current/missing subjects, AY/term, evidence reference, audit result, offering demand.",
+        "data": "Taken/current/missing subjects, academic year/semester, evidence reference, audit result, offering demand.",
     },
     {
         "slug": "research-gate",
@@ -145,7 +145,7 @@ TRANSACTIONS = [
         "group": "Standing",
         "short": "Record withdrawal requests, route Dean decisions, verify requirements and fees, then close approved withdrawals.",
         "actor": "Student / GS Staff / Dean / Academic Coordinator / Registrar",
-        "data": "Reason, effective term, forms and proof, fee/requirement status, Dean decision, coordinator and registrar remarks.",
+        "data": "Reason, effective semester, forms and proof, fee/requirement status, Dean decision, coordinator and registrar remarks.",
     },
     {
         "slug": "graduation",
@@ -155,7 +155,7 @@ TRANSACTIONS = [
         "group": "Completion",
         "short": "Review candidate eligibility across coursework, research, practicum, Dean endorsement, and Registrar handoff.",
         "actor": "GS Staff / Academic Coordinator / Research Coordinator / Dean / Registrar",
-        "data": "Review term, candidate, coursework/research/practicum status, missing items, endorsement status, Dean and Registrar notes.",
+        "data": "Review semester, candidate, coursework/research/practicum status, missing items, endorsement status, Dean and Registrar notes.",
     },
 ]
 
@@ -2058,10 +2058,10 @@ def portfolio_recommendations(limit: int = 150) -> dict:
 POLICY_SNIPPETS = [
     {"id": "loa-residency", "title": "Leave of Absence & Residency", "source": "GS Research Protocol / Handbook",
      "tags": ["loa", "leave", "residency", "terms", "pause", "eligible", "eligibility"],
-     "text": "A student may file a Leave of Absence with an approved reason. The residency clock is paused for the approved LOA period. LOA is limited (prototype rule: up to 4 terms total) and the student must have completed at least one term of residency before filing. The Dean approves the request; GS Staff records the effective dates."},
+     "text": "A student may file a Leave of Absence with an approved reason. The residency clock is paused for the approved LOA period. LOA is limited (prototype rule: up to 4 semesters total) and the student must have completed at least one semester of residency before filing. The Dean approves the request; GS Staff records the effective dates."},
     {"id": "readmission", "title": "Readmission of Returning Students", "source": "GS Research Protocol / Handbook",
      "tags": ["readmission", "return", "re-enroll", "comeback"],
-     "text": "A returning student files for readmission with a return-intent letter, an updated study plan, a program/adviser endorsement, and clearance of any pending accountability. On approval the student is marked active for the return term."},
+     "text": "A returning student files for readmission with a return-intent letter, an updated study plan, a program/adviser endorsement, and clearance of any pending accountability. On approval the student is marked active for the return semester."},
     {"id": "onboarding", "title": "Admission Handoff & Onboarding", "source": "GS Onboarding Checklist",
      "tags": ["onboarding", "handoff", "admission", "intake", "requirements"],
      "text": "At admission handoff, GS verifies admission approval, the student profile sheet, program assignment, the enrollment signal, and the official transcript. Missing items are flagged and assigned to GS Staff for follow-up."},
@@ -2178,17 +2178,17 @@ def loa_policy_review(student: Student, request_data: dict | None = None) -> dic
         {
             "label": "Effective period",
             "status": "Present" if effective_start and effective_end else "Needs Review",
-            "detail": " to ".join([part for part in [effective_start, effective_end] if part]) or "Start and end term/date are not both recorded.",
+            "detail": " to ".join([part for part in [effective_start, effective_end] if part]) or "Start and end semesters are not both recorded.",
         },
         {
             "label": "Prior LOA limit",
             "status": "Pass" if prior_count < 4 else "Fail",
-            "detail": f"{prior_count} prior LOA term(s) recorded; prototype limit is up to 4 terms total.",
+            "detail": f"{prior_count} prior LOA semester(s) recorded; prototype limit is up to 4 semesters total.",
         },
         {
             "label": "Minimum residency",
             "status": "Pass" if completed_terms >= 1 else "Needs Review",
-            "detail": f"Estimated completed residency: {completed_terms} term(s) from entry year {student.entry_year}.",
+            "detail": f"Estimated completed residency: {completed_terms} semester(s) from entry year {student.entry_year}.",
         },
     ]
     failed = [item for item in checks if item["status"] == "Fail"]
@@ -2246,9 +2246,9 @@ def readmission_policy_review(student: Student, request_data: dict | None = None
             "detail": previous_loa_period or ("Student is currently marked on LOA." if on_leave else "Previous LOA period is not recorded."),
         },
         {
-            "label": "Target return term",
+            "label": "Target return semester",
             "status": "Present" if target_return_term else "Needs Review",
-            "detail": target_return_term or "No target return term is recorded.",
+            "detail": target_return_term or "No target return semester is recorded.",
         },
         {
             "label": "Required return documents",
@@ -2269,7 +2269,7 @@ def readmission_policy_review(student: Student, request_data: dict | None = None
     else:
         recommendation = "Eligible to Return"
         suggested_dean_action = "Approve"
-        summary = "The readmission request appears ready for Dean approval and reactivation for the target return term."
+        summary = "The readmission request appears ready for Dean approval and reactivation for the target return semester."
 
     return {
         "mode": "readmission-policy-rag",
@@ -2619,9 +2619,9 @@ def register_routes(app: Flask) -> None:
         data = request.get_json(silent=True) or {}
         label = (data.get("label") or "").strip()
         if not label:
-            return jsonify({"error": "Term label is required."}), 400
+            return jsonify({"error": "Semester label is required."}), 400
         if not all(split_academic_term_label(label)):
-            return jsonify({"error": "Term label must look like AY 2026-2027 1st Semester."}), 400
+            return jsonify({"error": "Semester label must look like AY 2026-2027 1st Semester."}), 400
         try:
             term = AcademicTerm(
                 label=label,
@@ -2648,9 +2648,9 @@ def register_routes(app: Flask) -> None:
         if "label" in data:
             label = (data.get("label") or "").strip()
             if not label:
-                return jsonify({"error": "Term label is required."}), 400
+                return jsonify({"error": "Semester label is required."}), 400
             if not all(split_academic_term_label(label)):
-                return jsonify({"error": "Term label must look like AY 2026-2027 1st Semester."}), 400
+                return jsonify({"error": "Semester label must look like AY 2026-2027 1st Semester."}), 400
             term.label = label
         try:
             for field in ["start_date", "end_date", "planning_window_open", "planning_window_close", "grade_submission_deadline"]:
@@ -2676,7 +2676,7 @@ def register_routes(app: Flask) -> None:
                 CourseOfferingPlan.status.in_(["Submitted", "Approved"]),
             ).count()
             if blocked:
-                return jsonify({"error": "Current active term has submitted or approved course offering plans. Resolve them before switching.", "blocked_plans": blocked}), 409
+                return jsonify({"error": "The current active semester has submitted or approved course offering plans. Resolve them before switching.", "blocked_plans": blocked}), 409
         AcademicTerm.query.update({AcademicTerm.is_active_planning_term: False})
         term.is_active_planning_term = True
         db.session.commit()
@@ -3344,7 +3344,7 @@ def register_routes(app: Flask) -> None:
             attachment.original_name if attachment else "Student portal",
             f"Drop request submitted for {course.code}",
             "Academic Coordinator",
-            f"Reason: {reason}. Term: {request_item.term_label or record.term_label or 'Not specified'}.",
+            f"Reason: {reason}. Semester: {request_item.term_label or record.term_label or 'Not specified'}.",
         )
         db.session.commit()
         return jsonify({"ok": True, "message": "Drop request submitted. The Academic Coordinator will review it before your record changes."})
@@ -3397,7 +3397,7 @@ def register_routes(app: Flask) -> None:
         missing = [item for item in readmission_requirements() if item not in submitted]
         notes = [
             "Student submitted a readmission request for staff review.",
-            f"Target return term: {data.get('target_return_term') or 'Not specified'}.",
+            f"Target return semester: {data.get('target_return_term') or 'Not specified'}.",
             f"Checklist submitted: {len(submitted)} item(s); missing/not marked: {', '.join(missing) if missing else 'None'}.",
         ]
         if data.get("previous_loa_period"):
@@ -3542,7 +3542,7 @@ def register_routes(app: Flask) -> None:
         if not (data.get("reason") or (current.reason if current else "")):
             return jsonify({"error": "Enter the reason for withdrawal before submitting."}), 400
         if not (data.get("effective_term") or (current.effective_term if current else "")):
-            return jsonify({"error": "Enter the effective term before submitting."}), 400
+            return jsonify({"error": "Enter the effective semester before submitting."}), 400
 
         previous_status = current.status if current else "Not Submitted"
         application = current if current and current.status in {"Returned", "Returned for Clarification"} else WithdrawalApplication(student_id=student.id)
@@ -3573,7 +3573,7 @@ def register_routes(app: Flask) -> None:
             attachment.original_name,
             "Withdrawal request submitted",
             "Graduate School Staff",
-            f"Effective term: {application.effective_term or 'Not specified'}. Reason: {application.reason or 'Not provided'}. File is uploaded for staff recording and forwarding.",
+            f"Effective semester: {application.effective_term or 'Not specified'}. Reason: {application.reason or 'Not provided'}. File is uploaded for staff recording and forwarding.",
             previous_status=previous_status,
             new_status=application.status,
         )
@@ -4276,7 +4276,7 @@ def register_routes(app: Flask) -> None:
         action = data.get("action") or "draft"
         latest_term = get_active_term()
         reference_term = AcademicTerm.query.filter(AcademicTerm.id != latest_term.id).order_by(AcademicTerm.start_date.desc()).first() if latest_term else None
-        term_label = (data.get("term_label") or "").strip() or (latest_term.label if latest_term else "Current Term")
+        term_label = (data.get("term_label") or "").strip() or (latest_term.label if latest_term else "Current Semester")
         plan = (
             CourseOfferingPlan.query.filter_by(program_id=program.id, term_label=term_label)
             .order_by(CourseOfferingPlan.created_at.desc())
@@ -4515,6 +4515,74 @@ def register_routes(app: Flask) -> None:
                 )
             add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application), previous_status=previous_status, new_status=application.status)
 
+        elif case_type in {"leave-of-absence", "readmission"}:
+            forwarded = TransactionLog.query.get_or_404(item_id)
+            expected_result = "LOA request forwarded to Dean" if case_type == "leave-of-absence" else "Readmission request forwarded to Dean"
+            if forwarded.transaction_slug != case_type or forwarded.result != expected_result or forwarded.new_status != "Dean Review":
+                return jsonify({"error": "This request is not awaiting a Dean decision."}), 400
+            latest = (
+                TransactionLog.query.filter_by(transaction_slug=case_type, student_id=forwarded.student_id)
+                .filter(TransactionLog.actor_role != "Demo Data")
+                .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+                .first()
+            )
+            if not latest or latest.id != forwarded.id:
+                return jsonify({"error": "This request already has a newer workflow action."}), 400
+
+            student = forwarded.student
+            previous_status = "Dean Review"
+            if case_type == "leave-of-absence":
+                period = request_notes_value(forwarded.notes, "Requested semester period")
+                if decision == "approve":
+                    student.current_stage = "LOA"
+                    student.standing = "On Leave"
+                    student.enrollment_tag = "LOA"
+                    student.risk_level = "Medium"
+                    result, new_status, next_owner = "LOA approved by Dean", "Approved", "Graduate School Staff"
+                elif decision == "deny":
+                    student.risk_level = "Medium"
+                    result, new_status, next_owner = "LOA denied by Dean", "Denied", "Graduate School Staff"
+                elif decision == "return":
+                    result, new_status, next_owner = "LOA returned by Dean for revision", "Returned for Revision", "Student"
+                    add_task(student.id, "Revise Leave of Absence application", "Student", 5, 35)
+                else:
+                    return jsonify({"error": "LOA decisions must be approve, deny, or return."}), 400
+                detail = f"Requested semester period: {period or 'Not recorded'}."
+            else:
+                return_semester = request_notes_value(forwarded.notes, "Return semester")
+                if decision == "approve":
+                    if student.current_stage == "LOA":
+                        student.current_stage = "Coursework"
+                    student.standing = "Active"
+                    student.enrollment_tag = "Enrolled"
+                    student.risk_level = "Low"
+                    result, new_status, next_owner = "Readmission approved by Dean", "Approved", "Academic Coordinator"
+                    add_task(student.id, "Confirm return-semester study plan", "Academic Coordinator", 5, 25)
+                elif decision == "deny":
+                    student.risk_level = "Medium"
+                    result, new_status, next_owner = "Readmission denied by Dean", "Denied", "Graduate School Staff"
+                elif decision == "return":
+                    result, new_status, next_owner = "Readmission returned by Dean for revision", "Returned for Revision", "Student"
+                    add_task(student.id, "Complete readmission requirements", "Student", 5, 40)
+                else:
+                    return jsonify({"error": "Readmission decisions must be approve, deny, or return."}), 400
+                detail = f"Return semester: {return_semester or 'Not recorded'}."
+
+            resolve_standing_change_tasks(student.id, "Decide", "Dean")
+            workflow_message_record(
+                case_type, student, account, "Student", result,
+                note or f"{detail} Next owner: {next_owner}.",
+                "return" if decision == "return" else "notice",
+                previous_status, new_status,
+                visibility="student_visible",
+                status="Open" if decision == "return" else "Sent",
+            )
+            add_log(
+                case_type, student.id, f"Dean · {account.full_name}", "Approvals",
+                result, next_owner, " ".join(part for part in [detail, note] if part),
+                previous_status=previous_status, new_status=new_status,
+            )
+
         elif case_type == "graduation":
             endorsement = GraduationEndorsement.query.get_or_404(item_id)
             previous_status = endorsement.endorsement_status
@@ -4710,7 +4778,7 @@ def register_routes(app: Flask) -> None:
             recompute_risk(student)
             add_log("course-audit", sid, actor, f"Course audit {term}".strip(),
                     f"{course.code} marked {new_status}",
-                    "Academic Coordinator", f"End-of-term course audit for {course.code}.")
+                    "Academic Coordinator", f"End-of-semester course audit for {course.code}.")
         if changed:
             sync_overdue_incomplete_alerts()
             status_summary = ", ".join(f"{status}: {count}" for status, count in sorted(status_counts.items()))
@@ -5172,6 +5240,8 @@ def register_routes(app: Flask) -> None:
             db.session.rollback()
             return jsonify({"error": str(exc)}), 400
         message = "Saved. The student record, queue, and monitoring indicators were updated."
+        if slug in {"leave-of-absence", "readmission"}:
+            message = "Forwarded to the Dean. The student record will change only after the Dean decides."
         if slug == "student-handoff" and student_id:
             account = UserAccount.query.filter_by(student_id=student_id, role="student", active=True).first()
             if account:
@@ -5909,7 +5979,7 @@ def apply_withdrawal_payload(application: WithdrawalApplication, data: MultiDict
 
 def withdrawal_notes(application: WithdrawalApplication) -> str:
     return (
-        f"Reason: {application.reason or 'Not provided'}; effective term: {application.effective_term or 'Not specified'}; "
+        f"Reason: {application.reason or 'Not provided'}; effective semester: {application.effective_term or 'Not specified'}; "
         f"Dean: {application.dean_decision}; requirements: {application.requirement_status}; "
         f"fees: {application.fee_status}; registrar: {application.registrar_status}; "
         f"AC remarks: {application.academic_coordinator_remarks or 'None'}; staff remarks: {application.staff_remarks or 'None'}."
@@ -6429,6 +6499,30 @@ def create_workflow_message(
 def workflow_approval_item(kind: str, item) -> dict:
     student = item.student
     meta = workflow_case_meta(kind, student.id)
+    if kind in {"leave-of-absence", "readmission"}:
+        attachment = latest_request_attachment(student.id, kind)
+        if kind == "leave-of-absence":
+            request_value = request_notes_value(item.notes, "Requested semester period") or "Semester period not recorded"
+            title = f"Leave of Absence request · {student.name}"
+            subtitle = f"{student.program.code} · {request_value}"
+        else:
+            request_value = request_notes_value(item.notes, "Return semester") or "Return semester not recorded"
+            title = f"Readmission request · {student.name}"
+            subtitle = f"{student.program.code} · {request_value}"
+        return {
+            "id": item.id,
+            "type": kind,
+            "title": title,
+            "subtitle": subtitle,
+            "status": item.new_status or item.result,
+            "workflow_status": item.new_status or item.result,
+            "student": student_brief(student),
+            "submitted_at": iso(item.created_at),
+            "details": item.notes or item.result,
+            "record": {"attachments": [attachment_dict(attachment)] if attachment else []},
+            "request_id": item.id,
+            **meta,
+        }
     if kind == "practicum":
         return {
             "id": item.id,
@@ -6448,7 +6542,7 @@ def workflow_approval_item(kind: str, item) -> dict:
             "id": item.id,
             "type": kind,
             "title": f"Withdrawal request · {student.name}",
-            "subtitle": f"{student.program.code} · effective {item.effective_term or 'term pending'}",
+            "subtitle": f"{student.program.code} · effective {item.effective_term or 'semester pending'}",
             "status": item.dean_decision,
             "workflow_status": item.status,
             "student": student_brief(student),
@@ -6478,7 +6572,50 @@ def workflow_approval_item(kind: str, item) -> dict:
 
 
 def workflow_approvals_payload() -> dict:
+    def latest_standing_logs(slug: str, results: set[str], limit: int = 100) -> list[TransactionLog]:
+        candidates = (
+            TransactionLog.query.filter(
+                TransactionLog.transaction_slug == slug,
+                TransactionLog.result.in_(results),
+                TransactionLog.actor_role != "Demo Data",
+            )
+            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+            .limit(limit * 3)
+            .all()
+        )
+        rows = []
+        seen = set()
+        for candidate in candidates:
+            if not candidate.student_id or candidate.student_id in seen:
+                continue
+            latest = (
+                TransactionLog.query.filter_by(transaction_slug=slug, student_id=candidate.student_id)
+                .filter(TransactionLog.actor_role != "Demo Data")
+                .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+                .first()
+            )
+            seen.add(candidate.student_id)
+            if latest and latest.id == candidate.id:
+                rows.append(candidate)
+            if len(rows) >= limit:
+                break
+        return rows
+
+    standing_pending = {
+        "leave-of-absence": latest_standing_logs("leave-of-absence", {"LOA request forwarded to Dean"}),
+        "readmission": latest_standing_logs("readmission", {"Readmission request forwarded to Dean"}),
+    }
+    standing_recent_results = {
+        "leave-of-absence": {"LOA approved by Dean", "LOA denied by Dean", "LOA returned by Dean for revision"},
+        "readmission": {"Readmission approved by Dean", "Readmission denied by Dean", "Readmission returned by Dean for revision"},
+    }
+    standing_recent = {
+        slug: latest_standing_logs(slug, results, 12)
+        for slug, results in standing_recent_results.items()
+    }
     pending = []
+    for slug, rows in standing_pending.items():
+        pending.extend(workflow_approval_item(slug, item) for item in rows)
     pending.extend(
         workflow_approval_item("practicum", item)
         for item in PracticumRecord.query.filter(PracticumRecord.status == "Report Sent to Dean")
@@ -6501,6 +6638,8 @@ def workflow_approvals_payload() -> dict:
         .all()
     )
     recent = []
+    for slug, rows in standing_recent.items():
+        recent.extend(workflow_approval_item(slug, item) for item in rows)
     recent.extend(
         workflow_approval_item("withdrawal", item)
         for item in WithdrawalApplication.query.filter(WithdrawalApplication.dean_decision.in_(["Approved", "Denied", "Returned"]))
@@ -6525,6 +6664,9 @@ def workflow_approvals_payload() -> dict:
     recent.sort(key=lambda item: item.get("submitted_at") or "", reverse=True)
     pending.sort(key=lambda item: item.get("submitted_at") or "")
     overview = []
+    for slug in standing_pending:
+        overview.extend(workflow_approval_item(slug, item) for item in standing_pending[slug])
+        overview.extend(workflow_approval_item(slug, item) for item in standing_recent[slug])
     overview.extend(
         workflow_approval_item("practicum", item)
         for item in PracticumRecord.query.filter(
@@ -6670,9 +6812,8 @@ def latest_request_attachment(student_id: int, request_type: str) -> StudentRequ
 
 
 def submitted_request_students(request_type: str) -> list[dict]:
-    # Queue rows are pending student submissions, not every uploaded PDF. Once staff
-    # records a Dean decision or returns the case, the latest workflow log is no
-    # longer the student's submission and the row drops out of the queue.
+    # Keep the newest student submission visible after staff forwarding and Dean
+    # review so the staff roster can group current and completed requests.
     submitted_results = {
         "leave-of-absence": {"LOA application submitted"},
         "readmission": {"Readmission request submitted"},
@@ -6698,11 +6839,22 @@ def submitted_request_students(request_type: str) -> list[dict]:
             .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
             .first()
         )
-        if not latest_log or latest_log.id != log.id:
-            continue
         student = Student.query.get(log.student_id)
         if not student:
             continue
+        decided = bool(latest_log and latest_log.id != log.id)
+        if decided:
+            result_text = (latest_log.result or "").lower()
+            if "approved" in result_text:
+                status = "Approved"
+            elif "denied" in result_text or "deny" in result_text:
+                status = "Denied"
+            elif "return" in result_text:
+                status = "Returned for Revision"
+            else:
+                status = "In Progress"
+        else:
+            status = "Pending Review"
         attachment = latest_request_attachment(student.id, request_type)
         row = {
             **student_brief(student),
@@ -6710,10 +6862,12 @@ def submitted_request_students(request_type: str) -> list[dict]:
             "submitted_at": iso(log.created_at),
             "source_reference": log.source_reference,
             "notes": log.notes,
-            "last_result": None,
+            "last_result": latest_log.result if decided else None,
+            "last_decision_at": iso(latest_log.created_at) if decided else None,
+            "next_action_owner": latest_log.next_owner if latest_log else "GS Staff",
             "attachment": attachment.original_name if attachment else log.source_reference,
             "attachment_detail": attachment_dict(attachment),
-            "status": "Pending Review",
+            "status": status,
         }
         if request_type == "leave-of-absence":
             period = request_notes_value(log.notes, "Requested period")
@@ -6730,8 +6884,8 @@ def submitted_request_students(request_type: str) -> list[dict]:
             })
         else:
             row.update({
-                "request_label": request_notes_value(log.notes, "Target return term") or "Readmission request",
-                "target_return_term": request_notes_value(log.notes, "Target return term"),
+                "request_label": request_notes_value(log.notes, "Target return semester") or request_notes_value(log.notes, "Target return term") or "Readmission request",
+                "target_return_term": request_notes_value(log.notes, "Target return semester") or request_notes_value(log.notes, "Target return term"),
                 "previous_loa_period": request_notes_value(log.notes, "Previous LOA period"),
             })
         rows.append(row)
@@ -7793,13 +7947,33 @@ def handle_student_handoff(data: MultiDict) -> int:
     return student.id
 
 
+def pending_student_request_log(student_id: int, slug: str, submitted_result: str) -> TransactionLog:
+    latest = (
+        TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
+        .filter(TransactionLog.actor_role != "Demo Data")
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+        .first()
+    )
+    if not latest or latest.actor_role != "Student" or latest.result != submitted_result:
+        raise ValueError("The student must submit a new request before staff can forward it to the Dean.")
+    return latest
+
+
+def resolve_standing_change_tasks(student_id: int, title_fragment: str, owner: str) -> None:
+    for task in Task.query.filter(
+        Task.student_id == student_id,
+        Task.owner_role == owner,
+        Task.status.in_(["Pending", "Overdue"]),
+        Task.title.contains(title_fragment),
+    ).all():
+        task.status = "Done"
+
+
 def handle_leave_of_absence(data: MultiDict) -> int:
-    # Stop/pause transaction: record the student's LOA application, document the
-    # eligibility check, and mark the student on leave only after Dean approval.
+    # Staff verify and forward. Only the Dean approval endpoint may decide the request.
+    account = require_workflow_actor("staff")
     student = Student.query.get_or_404(int(data["student_id"]))
-    dean_action = data.get("dean_action", "Approve")
-    if dean_action not in {"Approve", "Deny", "Return for Revision"}:
-        raise ValueError("Choose a valid LOA Dean decision.")
+    submission = pending_student_request_log(student.id, "leave-of-absence", "LOA application submitted")
     source = (data.get("source_reference") or data.get("application_reference") or "").strip()
     application_reference = (data.get("application_reference") or "").strip()
     request_date = (data.get("request_date") or "").strip()
@@ -7816,64 +7990,37 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     eligibility_status = (data.get("eligibility_status") or "Checked").strip()
     if eligibility_status not in {"Eligible", "Needs Review", "Not Eligible", "Pending Requirements", "Checked"}:
         raise ValueError("Choose a valid LOA eligibility status.")
-    if dean_action == "Approve" and not (effective_start and effective_end):
-        raise ValueError("Enter the LOA effective start and end before approving.")
+    if not (effective_start and effective_end):
+        raise ValueError("The requested leave start and end semesters are required before forwarding.")
     period = " to ".join([part for part in [effective_start, effective_end] if part])
-    is_return = dean_action.lower().startswith("return")
-
-    if dean_action == "Approve":
-        student.current_stage = "LOA"
-        student.standing = "On Leave"
-        student.enrollment_tag = "LOA"
-        student.risk_level = "Medium"
-        result = "LOA approved; student status set to On Leave"
-        if period:
-            result = f"{result} for {period}"
-        next_owner = "GS Staff"
-        status_note = "Graduate School Staff recorded student status as On Leave."
-    elif dean_action == "Deny":
-        result = "LOA denied; student status unchanged"
-        next_owner = "GS Staff"
-        student.risk_level = "Medium"
-        status_note = f"Graduate School Staff left student status as {student.standing}."
-    elif is_return:
-        result = "LOA returned for revision; student status unchanged"
-        next_owner = "Student"
-        student.risk_level = "Medium"
-        status_note = f"Graduate School Staff left student status as {student.standing}."
-        add_task(student.id, "Revise Leave of Absence application", "Student", 5, 35)
-    else:
-        result = f"LOA decision recorded: {dean_action}"
-        next_owner = "GS Staff"
-        status_note = f"Graduate School Staff left student status as {student.standing}."
-
     notes = [
-        f"LOA request recorded from {application_reference or source or 'uploaded application/email'}"
-        f"{f' on {request_date}' if request_date else ''}.",
-        f"Prior LOA count checked: {prior_loa_count}; eligibility result: {eligibility_status}.",
-        "Graduate School Staff forwarded the LOA request to the Dean.",
-        f"Dean reviewed the LOA request and sent decision: {dean_action}.",
-        status_note,
-        "LOA notice sent to the student. This is a stop/pause process for the approved period.",
+        f"Application reference: {application_reference or source or submission.source_reference or 'uploaded application'}.",
+        f"Request date: {request_date or 'Not recorded'}.",
+        f"Requested semester period: {period}.",
+        f"Prior LOA count: {prior_loa_count}.",
+        f"Eligibility result: {eligibility_status}.",
+        f"Source submission log: {submission.id}.",
     ]
-    if period:
-        notes.append(f"Approved/requested LOA period: {period}.")
     if reason:
         notes.append(f"Reason/remarks: {reason}")
     if staff_notes:
         notes.append(f"Staff notes: {staff_notes}")
-
-    add_log("leave-of-absence", student.id, "GS Staff / Dean", source, result, next_owner, "\n".join(notes))
+    resolve_standing_change_tasks(student.id, "Leave of Absence", "GS Staff")
+    add_task(student.id, "Decide Leave of Absence request", "Dean", 3, 60)
+    add_log(
+        "leave-of-absence", student.id, workflow_actor_label(account),
+        source or application_reference or submission.source_reference or "LOA application",
+        "LOA request forwarded to Dean", "Dean", "\n".join(notes),
+        previous_status="Submitted", new_status="Dean Review",
+    )
     return student.id
 
 
 def handle_readmission(data: MultiDict) -> int:
-    # Return/re-entry transaction: record the readmission request and reactivate
-    # the student only after the Dean approves the return.
+    # Staff verify and forward. Only the Dean approval endpoint may reactivate the student.
+    account = require_workflow_actor("staff")
     student = Student.query.get_or_404(int(data["student_id"]))
-    dean_action = data.get("dean_action", "Approve")
-    if dean_action not in {"Approve", "Deny", "Return for Revision"}:
-        raise ValueError("Choose a valid readmission Dean decision.")
+    submission = pending_student_request_log(student.id, "readmission", "Readmission request submitted")
     source = (data.get("source_reference") or data.get("application_reference") or "").strip()
     application_reference = (data.get("application_reference") or "").strip()
     target_return_term = (data.get("target_return_term") or "").strip()
@@ -7888,53 +8035,27 @@ def handle_readmission(data: MultiDict) -> int:
     missing = [item for item in readmission_requirements() if item not in submitted]
     missing.extend(split_items(data.get("missing_requirements", "")))
     staff_notes = (data.get("staff_notes") or "").strip()
-    is_return = dean_action.lower().startswith("return")
-    if dean_action == "Approve" and not target_return_term:
-        raise ValueError("Enter the target return term before approving readmission.")
-
-    if dean_action == "Approve":
-        if student.current_stage == "LOA":
-            student.current_stage = "Coursework"
-        student.standing = "Active"
-        student.enrollment_tag = "Enrolled"
-        student.risk_level = "Low"
-        result = "Readmission approved; student status set to Active"
-        if target_return_term:
-            result = f"{result} for {target_return_term}"
-        next_owner = "Academic Coordinator"
-        status_note = "Graduate School Staff recorded student status as Active."
-        add_task(student.id, "Confirm return-term study plan", "Academic Coordinator", 5, 25)
-    elif dean_action == "Deny":
-        result = "Readmission denied; student status unchanged"
-        next_owner = "GS Staff"
-        student.risk_level = "Medium"
-        status_note = f"Graduate School Staff left student status as {student.standing}."
-    elif is_return:
-        result = "Readmission returned for revision; student status unchanged"
-        next_owner = "Student"
-        student.risk_level = "Medium"
-        status_note = f"Graduate School Staff left student status as {student.standing}."
-        add_task(student.id, "Complete readmission requirements", "Student", 5, 40)
-    else:
-        result = f"Readmission decision recorded: {dean_action}"
-        next_owner = "GS Staff"
-        status_note = f"Graduate School Staff left student status as {student.standing}."
+    if not target_return_term:
+        raise ValueError("The requested return semester is required before forwarding.")
 
     notes = [
-        f"Readmission request recorded from {application_reference or source or 'uploaded application/email'}.",
-        f"Eligibility to return checked for {target_return_term or 'the target return term'}: {eligibility_status}.",
-        "Graduate School Staff forwarded the readmission request to the Dean.",
-        f"Dean reviewed the readmission request and sent decision: {dean_action}.",
-        status_note,
-        "Readmission notice sent to the student. This is the return/re-entry process after LOA.",
-        f"Return checklist submitted: {len(submitted)} item(s); missing: {', '.join(missing) if missing else 'None'}.",
+        f"Application reference: {application_reference or source or submission.source_reference or 'uploaded application'}.",
+        f"Return semester: {target_return_term}.",
+        f"Previous leave semester: {previous_loa_period or 'Not recorded'}.",
+        f"Eligibility result: {eligibility_status}.",
+        f"Missing requirements: {', '.join(missing) if missing else 'None'}.",
+        f"Source submission log: {submission.id}.",
     ]
-    if previous_loa_period:
-        notes.append(f"Previous LOA period: {previous_loa_period}.")
     if staff_notes:
         notes.append(f"Staff notes: {staff_notes}")
-
-    add_log("readmission", student.id, "GS Staff / Dean", source, result, next_owner, "\n".join(notes))
+    resolve_standing_change_tasks(student.id, "readmission", "GS Staff")
+    add_task(student.id, "Decide readmission request", "Dean", 3, 60)
+    add_log(
+        "readmission", student.id, workflow_actor_label(account),
+        source or application_reference or submission.source_reference or "Readmission application",
+        "Readmission request forwarded to Dean", "Dean", "\n".join(notes),
+        previous_status="Submitted", new_status="Dean Review",
+    )
     return student.id
 
 
@@ -11185,7 +11306,7 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
         count = len(item["students"])
         suggested_sections = max(1, (count + 24) // 25)
         if count >= 15:
-            recommendation = "Offer this term"
+            recommendation = "Offer this semester"
             priority = "High"
         elif count >= 5:
             recommendation = "Review section feasibility"
@@ -12076,7 +12197,7 @@ def seed_database(count: int = 350) -> None:
             "LOA application submitted",
             "GS Staff",
             "Student submitted a Leave of Absence application for staff eligibility review.\n"
-            f"Requested period: AY 2026-2027 Term {1 + (i % 2)} to AY 2026-2027 Term {2 + (i % 2)}.\n"
+            "Requested period: AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester.\n"
             "Reason/remarks: Demo queue case.\n"
             f"Application PDF: {original_name}.",
         )
@@ -12095,9 +12216,9 @@ def seed_database(count: int = 350) -> None:
             "Readmission request submitted",
             "GS Staff",
             "Student submitted a readmission request for staff review.\n"
-            f"Target return term: AY 2026-2027 Term {1 + (i % 2)}.\n"
+            "Target return semester: AY 2026-2027 1st Semester.\n"
             "Checklist submitted: 4 item(s); missing/not marked: None.\n"
-            f"Previous LOA period: AY 2025-2026 Term {2 + (i % 2)}.\n"
+            "Previous LOA period: AY 2025-2026 2nd Semester.\n"
             f"Application PDF: {original_name}.",
         )
 
@@ -12554,7 +12675,7 @@ def seed_simulation_demo() -> None:
             "LOA application submitted",
             "GS Staff",
             "Student submitted a Leave of Absence application for staff eligibility review.\n"
-            "Requested period: AY 2026-2027 Term 1 to AY 2026-2027 Term 2.\n"
+            "Requested period: AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester.\n"
             "Reason/remarks: Family health leave request for the demo simulation.\n"
             f"Application PDF: {original_name}.",
         )
@@ -12621,7 +12742,7 @@ def ensure_demo_request_submission_logs() -> int:
                 "LOA application submitted",
                 "GS Staff",
                 "Student submitted a Leave of Absence application for staff eligibility review.\n"
-                "Requested period: AY 2026-2027 Term 1 to AY 2026-2027 Term 2.\n"
+                "Requested period: AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester.\n"
                 "Reason/remarks: Demo queue case.\n"
                 f"Application PDF: {attachment.original_name}.",
             )
@@ -12635,9 +12756,9 @@ def ensure_demo_request_submission_logs() -> int:
                 "Readmission request submitted",
                 "GS Staff",
                 "Student submitted a readmission request for staff review.\n"
-                "Target return term: AY 2026-2027 Term 1.\n"
+                "Target return semester: AY 2026-2027 1st Semester.\n"
                 "Checklist submitted: 4 item(s); missing/not marked: None.\n"
-                "Previous LOA period: AY 2025-2026 Term 2.\n"
+                "Previous LOA period: AY 2025-2026 2nd Semester.\n"
                 f"Application PDF: {attachment.original_name}.",
             )
         created += 1

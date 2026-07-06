@@ -44,7 +44,7 @@ import {
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from "../components/ui";
-import { Field, Input, Textarea, Select, CheckList, RadioRow } from "../components/forms";
+import { Field, Input, Textarea, Select, CheckList } from "../components/forms";
 import StudentPicker from "../components/StudentPicker";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 import { formatDate } from "../lib/format";
@@ -91,7 +91,14 @@ const NEEDS_STUDENT = {
   graduation: false,
 };
 
-const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation"]);
+const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation", "leave-of-absence", "readmission"]);
+
+const REQUEST_BOARD_COLUMNS = [
+  { label: "For Review", statuses: ["Pending Review", "In Progress"] },
+  { label: "Approved", statuses: ["Approved"] },
+  { label: "Returned for Revision", statuses: ["Returned for Revision"] },
+  { label: "Denied", statuses: ["Denied"] },
+];
 
 export default function WorkflowPage() {
   const { slug } = useParams();
@@ -366,72 +373,157 @@ export default function WorkflowPage() {
 // Submitted-request queue for student-initiated workflows (LOA / Readmission).
 function RequestQueue({ requests, selectedId, onPick, onClear }) {
   const list = requests || [];
+  const [viewMode, setViewMode] = useState("board");
+  const [filters, setFilters] = useState({ query: "", status: "" });
   const selected = list.find((r) => r.id === selectedId);
-  return (
-    <Card className="p-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle
-          title="Submitted requests"
-          subtitle="Student-submitted applications waiting for staff review"
-          icon={Inbox}
-        />
-        <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
-          <Users className="h-4 w-4" /> {list.length} pending
-        </div>
-      </div>
-      {selected ? (
+  const reviewCount = list.filter((r) => ["Pending Review", "In Progress"].includes(r.status)).length;
+  const statuses = uniqueValues(list.map((r) => r.status));
+  const filtered = list.filter((r) => {
+    const haystack = `${r.name} ${r.student_number} ${r.program_code} ${r.request_label || ""}`.toLowerCase();
+    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
+      && (!filters.status || r.status === filters.status);
+  });
+
+  if (selected) {
+    return (
+      <Card className="p-6">
         <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">{selected.name}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-ink">{selected.name}</p>
+                <StatusBadge value={selected.status} dot={false} />
+              </div>
               <p className="text-xs text-slate-500">
                 {selected.student_number} · {selected.program_code} · submitted {formatDate(selected.submitted_at)}
               </p>
             </div>
-            <button type="button" onClick={onClear} className="btn-ghost shrink-0">
+            <button type="button" onClick={onClear} className="btn-ghost shrink-0 cursor-pointer">
               <ArrowUpRight className="h-4 w-4 rotate-180" /> Back to requests
             </button>
           </div>
           <RequestSummary request={selected} compact />
         </div>
-      ) : list.length ? (
-        <div className="overflow-hidden rounded-xl border border-slate-200">
-          <div className="grid grid-cols-12 gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-            <div className="col-span-12 sm:col-span-5">Student</div>
-            <div className="col-span-12 sm:col-span-5">Request</div>
-            <div className="col-span-12 text-right sm:col-span-2">Action</div>
-          </div>
-          {list.map((r) => (
-            <div key={r.request_log_id || r.id} className="grid grid-cols-12 items-center gap-3 border-t border-slate-100 px-4 py-3">
-              <div className="col-span-12 min-w-0 sm:col-span-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-ink">{r.name}</p>
-                  <StatusBadge value="Pending Review" dot={false} />
-                </div>
-                <p className="truncate text-xs text-slate-500">
-                  {r.student_number} · {r.program_code} · submitted {formatDate(r.submitted_at)}
-                </p>
-              </div>
-              <div className="col-span-12 min-w-0 text-sm text-slate-600 sm:col-span-5">
-                <p className="truncate font-semibold text-ink">{r.request_label || "Student request"}</p>
-                <p className="truncate text-xs text-slate-500">{r.attachment || "Application PDF uploaded"}</p>
-              </div>
-              <div className="col-span-12 flex justify-start sm:col-span-2 sm:justify-end">
-                <button type="button" onClick={() => onPick(r)} className="btn-primary px-3 py-2">
-                  <Eye className="h-4 w-4" /> Review
-                </button>
-              </div>
-            </div>
-          ))}
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <SectionTitle title="Submitted requests" subtitle="Student-filed applications grouped by current status" icon={Inbox} />
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
+            <Users className="h-4 w-4" /> {reviewCount} for review
+          </span>
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </div>
-      ) : (
+      </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <label className="relative min-w-[220px] flex-1">
+          <span className="sr-only">Search submitted requests</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={filters.query}
+            onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
+            placeholder="Search name, student ID, or program…"
+            className="field-input pl-9"
+          />
+        </label>
+        <select
+          value={filters.status}
+          onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+          className="field-input cursor-pointer sm:w-56"
+          aria-label="Filter submitted requests by status"
+        >
+          <option value="">All statuses</option>
+          {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+        </select>
+      </div>
+      {!list.length ? (
         <EmptyState
           icon={Inbox}
           title="No submitted requests yet"
-          hint="When a student files this from their portal, they'll appear here for you to act on."
+          hint="Student-filed LOA or readmission requests will appear here."
         />
+      ) : viewMode === "board" ? (
+        <WorkflowBoard
+          columns={REQUEST_BOARD_COLUMNS}
+          rows={filtered}
+          getStatus={(request) => request.status}
+          renderCard={(request) => (
+            <RequestBoardCard key={request.request_log_id || request.id} item={request} onOpen={() => onPick(request)} />
+          )}
+          empty="No requests match the current filters."
+        />
+      ) : (
+        <RequestTable rows={filtered} onOpen={onPick} />
       )}
     </Card>
+  );
+}
+
+function RequestBoardCard({ item, onOpen }) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
+          <p className="text-xs text-slate-400">{item.student_number} · {item.program_code}</p>
+        </div>
+        <StatusBadge value={item.status} dot={false} />
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.request_label || "Student request"}</p>
+      <p className="mt-2 text-xs text-slate-500">Submitted {formatDate(item.submitted_at)}</p>
+      <p className="mt-2 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">
+        Next: {item.next_action_owner || "GS Staff"}
+      </p>
+      <button type="button" onClick={onOpen} className="btn-ghost mt-3 w-full cursor-pointer px-2 py-1.5">
+        <Eye className="h-3.5 w-3.5" /> {item.status === "Pending Review" ? "Review" : "View"}
+      </button>
+    </article>
+  );
+}
+
+function RequestTable({ rows, onOpen }) {
+  if (!rows.length) {
+    return <EmptyState icon={Inbox} title="No requests match the filters" hint="Clear the search or status filter and try again." />;
+  }
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200">
+      <table className="w-full min-w-[720px] text-left text-sm">
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <th className="px-4 py-3">Student</th>
+            <th className="px-3 py-3">Request</th>
+            <th className="px-3 py-3">Status</th>
+            <th className="px-3 py-3">Submitted</th>
+            <th className="px-3 py-3">Next owner</th>
+            <th className="px-3 py-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((request) => (
+            <tr key={request.request_log_id || request.id} className="border-b border-slate-50 transition-colors hover:bg-slate-50/60">
+              <td className="px-4 py-3">
+                <p className="font-semibold text-ink">{request.name}</p>
+                <p className="text-xs text-slate-400">{request.student_number} · {request.program_code}</p>
+              </td>
+              <td className="px-3 py-3 text-slate-600">{request.request_label || "Student request"}</td>
+              <td className="px-3 py-3"><StatusBadge value={request.status} dot={false} /></td>
+              <td className="px-3 py-3 text-slate-500">{formatDate(request.submitted_at)}</td>
+              <td className="px-3 py-3 text-xs font-semibold text-slate-600">{request.next_action_owner || "—"}</td>
+              <td className="px-3 py-3 text-right">
+                <button type="button" onClick={() => onOpen(request)} className="btn-ghost cursor-pointer px-3 py-1.5">
+                  <Eye className="h-3.5 w-3.5" /> {request.status === "Pending Review" ? "Review" : "View"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -833,7 +925,7 @@ function HandoffForm({ meta, context, submit, submitting }) {
             options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
           />
         </Field>
-        <Field label="Entry term" required>
+        <Field label="Entry semester" required>
           <Select value={form.term_id} onChange={set("term_id")} required options={(meta?.terms || []).map((t) => ({ value: t.id, label: t.label }))} />
         </Field>
         <Field label="Admission / enrollment signal" required>
@@ -958,7 +1050,7 @@ function CourseDropReviewPanelV2() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-ink">{item.student?.name} - {item.course_code}</p>
-                    <p className="mt-1 text-xs text-slate-500">{item.course_title} - {item.term_label || "No term"} - submitted {formatDate(item.created_at)}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.course_title} - {item.term_label || "No semester recorded"} - submitted {formatDate(item.created_at)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button type="button" onClick={() => setExpanded((current) => ({ ...current, [item.id]: !isOpen }))} className="btn-ghost cursor-pointer px-3 py-2 text-xs">
@@ -1040,7 +1132,7 @@ function CourseDropReviewPanel() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-ink">{item.student?.name} · {item.course_code}</p>
-                  <p className="mt-1 text-xs text-slate-500">{item.course_title} · {item.term_label || "No term"} · submitted {formatDate(item.created_at)}</p>
+                  <p className="mt-1 text-xs text-slate-500">{item.course_title} · {item.term_label || "No semester recorded"} · submitted {formatDate(item.created_at)}</p>
                   <p className="mt-2 text-sm text-slate-600">{item.reason}</p>
                   {item.attachment && <a href={item.attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View attached PDF</a>}
                 </div>
@@ -1193,7 +1285,7 @@ function CourseRosterGradeWorkspace({ meta }) {
 
   return (
     <div className="space-y-5">
-      <SectionTitle title="Course enrollment and grade audit" subtitle="Select the term first, add students to the class roster, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
+      <SectionTitle title="Course enrollment and grade audit" subtitle="Select the semester first, add students to the class roster, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Program">
           <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
@@ -1202,7 +1294,7 @@ function CourseRosterGradeWorkspace({ meta }) {
           <Select value={courseId} onChange={(event) => setCourseId(event.target.value)} options={subjects.map((subject) => ({ value: subject.id, label: `${subject.code} - ${subject.title}` }))} />
         </Field>
         <Field label="Semester">
-          <Select value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Current / all terms" options={(meta?.terms || []).map((item) => item.label)} />
+          <Select value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Current / all semesters" options={(meta?.terms || []).map((item) => item.label)} />
         </Field>
       </div>
       {selectedTerm?.grade_submission_deadline && (
@@ -1215,7 +1307,7 @@ function CourseRosterGradeWorkspace({ meta }) {
       {loading ? (
         <Spinner label="Loading class roster..." />
       ) : !courseId ? (
-        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the selected term's class list." />
+        <EmptyState icon={ClipboardCheck} title="Choose a subject" hint="Pick a subject above to load the selected semester's class list." />
       ) : (
         <>
           <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
@@ -1228,7 +1320,7 @@ function CourseRosterGradeWorkspace({ meta }) {
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
                 <p className="text-sm font-semibold text-ink">{roster.course.code} - {roster.course.title}</p>
-                <p className="text-xs text-slate-500">{term || "Current / all terms"} · {classStudents.length} student(s)</p>
+                <p className="text-xs text-slate-500">{term || "Current / all semesters"} · {classStudents.length} student(s)</p>
               </div>
               <div className="overflow-auto">
                 <table className="w-full text-sm">
@@ -1271,7 +1363,7 @@ function CourseRosterGradeWorkspace({ meta }) {
               </div>
             </div>
           ) : (
-            <EmptyState icon={ClipboardCheck} title="No students in this class" hint="Use Add student to class to build the roster for this term." />
+            <EmptyState icon={ClipboardCheck} title="No students in this class" hint="Use Add student to class to build the roster for this semester." />
           )}
           <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">{saving ? "Saving..." : "Save course audit"}</button>
         </>
@@ -1331,7 +1423,7 @@ function CourseClassWorkspace({ meta, mode }) {
   const allSelected = visibleStudents.length > 0 && visibleStudents.every((student) => selected[student.student_id]);
   const title = mode === "enrollment" ? "Course enrollment" : "Grade audit";
   const subtitle = mode === "enrollment"
-    ? "Select a term and subject, then add students to the class roster or remove mistaken entries."
+    ? "Select a semester and subject, then add students to the class roster or remove mistaken entries."
     : "Enter grades for students already in the class. Blank keeps the subject current; INC marks incomplete; 5.00 or F marks failed.";
 
   function toggle(id) {
@@ -1577,7 +1669,7 @@ function CourseAuditRosterV2({ meta }) {
         <Field label="Subject" required>
           <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))} />
         </Field>
-        <Field label="Audit term">
+        <Field label="Audit semester">
           <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 1st Semester" />
         </Field>
       </div>
@@ -1712,8 +1804,8 @@ function CourseAuditRoster({ meta }) {
   return (
     <div className="space-y-5">
       <SectionTitle
-        title="End-of-term course audit"
-        subtitle="Pick a subject, then tick the students who completed it this term"
+        title="End-of-semester course audit"
+        subtitle="Pick a subject, then tick the students who completed it this semester"
         icon={ClipboardCheck}
       />
 
@@ -1733,7 +1825,7 @@ function CourseAuditRoster({ meta }) {
             options={subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.title} (${s.completed}/${s.enrolled})` }))}
           />
         </Field>
-        <Field label="Audit term" hint="Recorded on each updated subject">
+        <Field label="Audit semester" hint="Recorded on each updated subject">
           <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="AY 2025-2026 1st Semester" />
         </Field>
       </div>
@@ -1864,7 +1956,7 @@ function CourseAuditForm({ context, studentId, submit, submitting }) {
         <Field label="Status" required>
           <Select value={form.status} onChange={set("status")} placeholder="" options={["Completed", "Current", "Missing", "Incomplete", "Dropped"]} />
         </Field>
-        <Field label="AY / Term taken">
+        <Field label="Academic year / semester taken">
           <Input value={form.term_label} onChange={set("term_label")} placeholder="AY 2025-2026 1st Semester" />
         </Field>
         <Field label="Evidence reference">
@@ -2157,7 +2249,7 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
                   <StatusBadge value={paper.extracted ? "Text extracted" : "No readable text"} dot={false} />
                 </div>
                 {paper.keywords?.length > 0 && (
-                  <p className="mt-2 text-slate-500">Analyzed terms: {paper.keywords.slice(0, 5).join(", ")}</p>
+                  <p className="mt-2 text-slate-500">Analyzed keywords: {paper.keywords.slice(0, 5).join(", ")}</p>
                 )}
                 {paper.excerpt && <p className="mt-2 leading-relaxed text-slate-500">{paper.excerpt}</p>}
               </div>
@@ -3518,7 +3610,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
           empty="No recent withdrawal requests match the filters."
           renderCard={(item) => <WithdrawalBoardCard key={item.id} item={item} onOpen={() => openCase(item)} onMessage={() => setMessageRow(item)} />}
         />
-      ) : <WorkflowTable headers={["Student", "Request date", "Effective term", "Reason", "Status", "Next owner", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
+      ) : <WorkflowTable headers={["Student", "Request date", "Effective semester", "Reason", "Status", "Next owner", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
         return (
           <tr
             key={item.id}
@@ -3570,7 +3662,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
             <WorkflowActivityList logs={selectedCurrent?.history || selectedItem.history || []} />
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Request</p>
-              <p className="mt-2 text-sm font-semibold text-ink">Effective {selectedItem.effective_term || "term pending"}</p>
+              <p className="mt-2 text-sm font-semibold text-ink">Effective {selectedItem.effective_term || "semester pending"}</p>
               <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedItem.reason || "No reason provided"}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {selectedItem.request_attachment?.file_exists && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
@@ -3915,91 +4007,6 @@ function PracticumForm({ context, studentId, submit, submitting }) {
 }
 
 // ---------------------------------------------------------------------------
-// Withdrawal
-// ---------------------------------------------------------------------------
-function WithdrawalForm({ context, studentId, submit, submitting }) {
-  const current = context.withdrawal_application;
-  const [form, setForm] = useState({
-    reason: "",
-    effective_term: "",
-    fee_status: "Pending",
-    requirement_status: "Pending",
-    dean_decision: "Pending",
-    staff_remarks: "",
-    academic_coordinator_remarks: "",
-    registrar_status: "Pending",
-    source_reference: "",
-  });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  useEffect(() => {
-    setForm({
-      reason: current?.reason || "",
-      effective_term: current?.effective_term || "",
-      fee_status: current?.fee_status || "Pending",
-      requirement_status: current?.requirement_status || "Pending",
-      dean_decision: current?.dean_decision || "Pending",
-      staff_remarks: current?.staff_remarks || "",
-      academic_coordinator_remarks: current?.academic_coordinator_remarks || "",
-      registrar_status: current?.registrar_status || "Pending",
-      source_reference: "",
-    });
-  }, [studentId, current?.id, current?.updated_at]);
-
-  function onSubmit(e) {
-    e.preventDefault();
-    submit({ student_id: studentId, ...form });
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Process withdrawal application" subtitle="Record Dean decision, coordinator follow-through, requirements, fee status, and registrar confirmation" icon={LogOut} />
-      {current && (
-        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-ink">Effective {current.effective_term || "term pending"}</p>
-              <p className="text-xs text-slate-500">Dean: {current.dean_decision} · requirements: {current.requirement_status} · fees: {current.fee_status}</p>
-            </div>
-            <StatusBadge value={current.status} dot={false} />
-          </div>
-        </div>
-      )}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Effective semester" required>
-          <Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 1st Semester" />
-        </Field>
-        <Field label="Dean decision">
-          <Select value={form.dean_decision} onChange={set("dean_decision")} placeholder="" options={["Pending", "Approved", "Denied", "Returned"]} />
-        </Field>
-        <Field label="Requirement status">
-          <Select value={form.requirement_status} onChange={set("requirement_status")} placeholder="" options={["Pending", "Complete", "Incomplete"]} />
-        </Field>
-        <Field label="Fee status">
-          <Select value={form.fee_status} onChange={set("fee_status")} placeholder="" options={["Pending", "Cleared", "Not Cleared"]} />
-        </Field>
-        <Field label="Registrar confirmation/status">
-          <Select value={form.registrar_status} onChange={set("registrar_status")} placeholder="" options={["Pending", "Confirmed", "Not Cleared", "Record Updated"]} />
-        </Field>
-        <Field label="Source reference">
-          <Input value={form.source_reference} onChange={set("source_reference")} />
-        </Field>
-      </div>
-      <Field label="Reason for withdrawal">
-        <Textarea value={form.reason} onChange={set("reason")} />
-      </Field>
-      <Field label="Academic Coordinator remarks">
-        <Textarea value={form.academic_coordinator_remarks} onChange={set("academic_coordinator_remarks")} />
-      </Field>
-      <Field label="Staff remarks">
-        <Textarea value={form.staff_remarks} onChange={set("staff_remarks")} />
-      </Field>
-      <SubmitButton submitting={submitting}>Save withdrawal action</SubmitButton>
-    </form>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Graduation Endorsement
 // ---------------------------------------------------------------------------
 function GraduationForm({ context, studentId, submit, submitting }) {
@@ -4058,7 +4065,7 @@ function GraduationForm({ context, studentId, submit, submitting }) {
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Review window / term" required>
+        <Field label="Review window / semester" required>
           <Input value={form.review_window} onChange={set("review_window")} required />
         </Field>
         <Field label="Endorsement status">
@@ -4128,6 +4135,7 @@ function timeRange(start, end) {
 // ---------------------------------------------------------------------------
 function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
   const selectedRequest = context?.selected_request;
+  const canForward = selectedRequest?.status === "Pending Review";
   const [policyReview, setPolicyReview] = useState(context?.loa_policy_review || null);
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState("");
@@ -4140,7 +4148,6 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
     reason_remarks: "",
     prior_loa_count: 0,
     eligibility_status: "Eligible",
-    dean_action: "Approve",
     staff_notes: "",
     source_reference: "",
   });
@@ -4175,10 +4182,9 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
         setForm((current) => ({
           ...current,
           eligibility_status: result.review.recommendation || current.eligibility_status,
-          dean_action: result.review.suggested_dean_action || current.dean_action,
           staff_notes: mergeReviewSummary(current.staff_notes, result.review.summary),
         }));
-        setReviewNotice("Suggestion applied to eligibility, Dean decision, and staff notes.");
+        setReviewNotice("Suggestion applied to the eligibility review and staff notes.");
       }
     } catch (err) {
       setReviewError(err.message || "Could not run the LOA policy review.");
@@ -4194,7 +4200,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Record leave of absence" subtitle="Records the request, Dean decision, status pause, and notice trail" icon={CalendarOff} />
+      <SectionTitle title="Review leave application" subtitle="Verify the submitted details, then forward the request to the Dean" icon={CalendarOff} />
       <RequestSummary request={selectedRequest} />
       <LoaPolicyReviewCard
         review={policyReview}
@@ -4206,16 +4212,16 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Application attachment / file reference">
-          <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
+          <Input value={form.application_reference} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
         <Field label="Request date" required>
-          <Input type="date" value={form.request_date} onChange={set("request_date")} required />
+          <Input type="date" value={form.request_date} readOnly aria-readonly="true" className="bg-slate-50" required />
         </Field>
         <Field label="Effective start semester">
-          <Input value={form.effective_start} onChange={set("effective_start")} placeholder="AY 2026-2027 1st Semester or YYYY-MM-DD" />
+          <Input value={form.effective_start} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
         <Field label="Effective end semester">
-          <Input value={form.effective_end} onChange={set("effective_end")} placeholder="AY 2026-2027 2nd Semester or YYYY-MM-DD" />
+          <Input value={form.effective_end} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
         <Field label="Prior LOA count">
           <Input type="number" min="0" value={form.prior_loa_count} onChange={set("prior_loa_count")} />
@@ -4230,15 +4236,8 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
         </Field>
       </div>
 
-      <Field label="Dean decision">
-        <RadioRow
-          value={form.dean_action}
-          onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))}
-          options={["Approve", "Deny", "Return for Revision"]}
-        />
-      </Field>
       <Field label="Reason / remarks">
-        <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} />
+        <Textarea value={form.reason_remarks} readOnly aria-readonly="true" className="bg-slate-50" />
       </Field>
       <Field label="Staff notes">
         <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
@@ -4246,7 +4245,13 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
       <Field label="Source / reference number">
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
-      <SubmitButton submitting={submitting}>Record LOA Decision</SubmitButton>
+      {canForward ? (
+        <SubmitButton submitting={submitting}>Forward to Dean</SubmitButton>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record, but only the Dean can record a decision.
+        </div>
+      )}
     </form>
   );
 }
@@ -4255,7 +4260,7 @@ function LoaPolicyReviewCard({ review, busy, error, notice, onReview, onApply })
   return (
     <PolicyReviewCard
       title="LOA policy review"
-      description="RAG-style check using the LOA/residency policy plus this student request. Staff still records the final decision."
+      description="RAG-style check using the LOA/residency policy plus this student request. The Dean makes the final decision."
       emptyText="Run the review after selecting a submitted LOA request."
       review={review}
       busy={busy}
@@ -4343,6 +4348,7 @@ function mergeReviewSummary(currentNotes, summary) {
 function ReadmissionForm({ context, studentId, submit, submitting }) {
   const requirements = context.readmission_requirements || [];
   const selectedRequest = context?.selected_request;
+  const canForward = selectedRequest?.status === "Pending Review";
   const [items, setItems] = useState(requirements);
   const [policyReview, setPolicyReview] = useState(context?.readmission_policy_review || null);
   const [reviewing, setReviewing] = useState(false);
@@ -4354,7 +4360,6 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
     previous_loa_period: "",
     eligibility_status: "Eligible to Return",
     missing_requirements: "",
-    dean_action: "Approve",
     staff_notes: "",
     source_reference: "",
   });
@@ -4392,11 +4397,10 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
         setForm((current) => ({
           ...current,
           eligibility_status: result.review.recommendation || current.eligibility_status,
-          dean_action: result.review.suggested_dean_action || current.dean_action,
           missing_requirements: (result.review.missing_requirements || []).join(", "),
           staff_notes: mergeReviewSummary(current.staff_notes, result.review.summary),
         }));
-        setReviewNotice("Suggestion applied to eligibility, Dean decision, missing requirements, and staff notes.");
+        setReviewNotice("Suggestion applied to eligibility, missing requirements, and staff notes.");
       }
     } catch (err) {
       setReviewError(err.message || "Could not run the readmission policy review.");
@@ -4407,11 +4411,11 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Record readmission" subtitle="Checks return eligibility, records the Dean decision, and reactivates approved students" icon={UserCheck} />
+      <SectionTitle title="Review readmission request" subtitle="Check return eligibility, then forward the request to the Dean" icon={UserCheck} />
       <RequestSummary request={selectedRequest} />
       <PolicyReviewCard
         title="Readmission policy review"
-        description="RAG-style check using the readmission policy plus this student request. Staff still records the final decision."
+        description="RAG-style check using the readmission policy plus this student request. The Dean makes the final decision."
         emptyText="Run the review after selecting a submitted readmission request."
         review={policyReview}
         busy={reviewing}
@@ -4422,13 +4426,13 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Application attachment / file reference">
-          <Input value={form.application_reference} onChange={set("application_reference")} placeholder="Email subject, uploaded PDF, or drive link" />
+          <Input value={form.application_reference} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
-        <Field label="Target return term" required>
-          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 1st Semester" />
+        <Field label="Target return semester" required>
+          <Input value={form.target_return_term} readOnly aria-readonly="true" className="bg-slate-50" required />
         </Field>
         <Field label="Previous LOA period">
-          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 2nd Semester to AY 2026-2027 1st Semester" />
+          <Input value={form.previous_loa_period} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
         <Field label="Eligibility to return status">
           <Select
@@ -4445,20 +4449,19 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
       <Field label="Missing requirements / remarks">
         <Textarea value={form.missing_requirements} onChange={set("missing_requirements")} />
       </Field>
-      <Field label="Dean decision">
-        <RadioRow
-          value={form.dean_action}
-          onChange={(v) => setForm((f) => ({ ...f, dean_action: v }))}
-          options={["Approve", "Deny", "Return for Revision"]}
-        />
-      </Field>
       <Field label="Staff notes">
         <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
       </Field>
       <Field label="Source / reference number">
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
-      <SubmitButton submitting={submitting}>Record Readmission Decision</SubmitButton>
+      {canForward ? (
+        <SubmitButton submitting={submitting}>Forward to Dean</SubmitButton>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record, but only the Dean can record a decision.
+        </div>
+      )}
     </form>
   );
 }
@@ -4483,11 +4486,11 @@ function workflowGuidance(slug) {
     "student-handoff":
       "The registrar's data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically — no manual typing.",
     "leave-of-absence":
-      "Leave of Absence is a stop/pause process. Staff record the uploaded application, check prior LOA eligibility, forward the request to the Dean, record the decision, update the student's status only when approved, and send the notice.",
+      "Leave of Absence is a stop/pause process. Staff verify the submitted application and forward it. The Dean alone approves, denies, or returns the request, and the student's status changes only after that decision.",
     readmission:
-      "Readmission is a separate return/re-entry process after the approved leave period. Staff record the request, check eligibility for the target term, route the Dean decision, reactivate approved students, and send the notice.",
+      "Readmission is a separate return/re-entry process after the approved leave period. Staff review the requested return semester and forward the request for the Dean's decision.",
     "course-audit":
-      "Run at the end of the term. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
+      "Run at the end of the semester. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":
       "Reads the student's stored PDF evidence for the selected gate. Staff can evaluate existing files and adviser revisions, but cannot manually mark an absent document as received.",
     "panel-matching":

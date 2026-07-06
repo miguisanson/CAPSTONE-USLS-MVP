@@ -14,7 +14,6 @@ import WorkflowPage from "./pages/WorkflowPage";
 import MonitoringGrid from "./pages/MonitoringGrid";
 import CurriculumPlanning from "./pages/CurriculumPlanning";
 import CourseAdjustments from "./pages/CourseAdjustments";
-import TermManagement from "./pages/TermManagement";
 import DecisionSupport from "./pages/DecisionSupport";
 import Assistant from "./pages/Assistant";
 import StudentPortal from "./pages/StudentPortal";
@@ -82,7 +81,6 @@ export default function App() {
                 <Route path="/monitoring-sheet" element={<MonitoringGrid />} />
                 <Route path="/curriculum-planning" element={<CurriculumPlanning />} />
                 <Route path="/course-adjustments" element={<CourseAdjustments />} />
-                <Route path="/admin/terms" element={<TermManagement />} />
                 <Route path="/work-queue" element={<WorkQueue />} />
                 <Route path="/activity" element={<ActivityLog />} />
                 <Route path="/decision-support" element={<DecisionSupport />} />

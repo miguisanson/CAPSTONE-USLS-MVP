@@ -20,7 +20,7 @@ export default function CourseAdjustments() {
   const selectedTermId = searchParams.get("term_id") || "";
   const [programId, setProgramId] = useState(selectedProgramId);
   const [termId, setTermId] = useState(selectedTermId);
-  const [termLabel, setTermLabel] = useState("Current Term");
+  const [termLabel, setTermLabel] = useState("Current Semester");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -39,7 +39,7 @@ export default function CourseAdjustments() {
         setData(res);
         setProgramId(String(res.program.id));
         setTermId(res.term ? String(res.term.id) : "");
-        setTermLabel(res.latest_plan?.term_label || res.term?.label || "Current Term");
+        setTermLabel(res.latest_plan?.term_label || res.term?.label || "Current Semester");
         setSel(seedSelections(res.demand));
         dirtyRef.current = false;
         setAutosave("idle");
@@ -198,8 +198,8 @@ export default function CourseAdjustments() {
                   {(data?.programs || []).map((p) => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
                 </select>
               </Field>
-              <Field label="Academic year and term">
-                <select value={termId} onChange={(e) => updateFilters({ term_id: e.target.value })} className="field-input cursor-pointer" aria-label="Academic year and term">
+              <Field label="Academic year and semester">
+                <select value={termId} onChange={(e) => updateFilters({ term_id: e.target.value })} className="field-input cursor-pointer" aria-label="Academic year and semester">
                   {(data?.terms || []).map((term) => <option key={term.id} value={term.id}>{formatTermLabel(term.label)}</option>)}
                 </select>
               </Field>
@@ -260,11 +260,11 @@ export default function CourseAdjustments() {
             <div className="border-b border-slate-100 px-5 py-3">
               <h2 className="text-lg font-semibold text-ink">Subject demand</h2>
               <p className="text-sm text-slate-500">
-                Demand comes from each enrolled student's next recommended subjects in {data.term?.label || "the selected term"}.
+                Demand comes from each enrolled student's next recommended subjects in {data.term?.label || "the selected semester"}.
               </p>
             </div>
             {data.demand.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="No next-subject demand found" hint="Enrolled students in this term have no next recommended subjects." />
+              <EmptyState icon={CheckCircle2} title="No next-subject demand found" hint="Enrolled students in this semester have no next recommended subjects." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[980px] text-sm">
@@ -368,10 +368,10 @@ function formatDate(value) {
 }
 
 function formatTermLabel(label) {
-  if (!label) return "Academic year and term";
+  if (!label) return "Academic year and semester";
   const ay = label.match(/AY\s*\d{4}\s*-\s*\d{4}/i)?.[0]?.replace(/\s+/g, " ");
-  const term = label.match(/Term\s*\d+/i)?.[0]?.replace(/\s+/g, " ");
-  if (ay && term) return `${ay.toUpperCase()} ${term.replace(/^term/i, "Term")}`;
+  const semester = label.match(/(?:\d+(?:st|nd|rd|th)\s+Semester|Term\s*\d+)/i)?.[0]?.replace(/\s+/g, " ");
+  if (ay && semester) return `${ay.toUpperCase()} ${semester.replace(/^Term\s*1$/i, "1st Semester").replace(/^Term\s*2$/i, "2nd Semester")}`;
   return label;
 }
 

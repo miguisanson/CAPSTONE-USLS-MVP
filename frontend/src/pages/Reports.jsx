@@ -238,7 +238,7 @@ function PracticumTable({ rows }) {
 }
 
 function WithdrawalTable({ rows }) {
-  return <BaseTable headers={["Student", "Effective term", "Dean", "Requirements", "Fees", "Status"]} rows={rows} render={(row) => (
+  return <BaseTable headers={["Student", "Effective semester", "Dean", "Requirements", "Fees", "Status"]} rows={rows} render={(row) => (
     <tr key={row.id} className="border-b border-slate-50">
       <StudentCell student={row.student} />
       <td className="px-4 py-2.5 text-slate-600">{row.effective_term || "—"}</td>

@@ -134,7 +134,7 @@ export default function CurriculumPlanning() {
           <div className="flex-1">
             <h1 className="font-display text-2xl font-semibold text-ink">Curriculum planning</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Official list of subjects offered per term. Choose a program and academic term, then add subjects from the monitoring sheet curriculum.
+              Official list of subjects offered per semester. Choose a program and academic semester, then add subjects from the monitoring sheet curriculum.
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
               <p>
@@ -143,7 +143,7 @@ export default function CurriculumPlanning() {
               </p>
               <p>
                 <span className="font-bold uppercase tracking-wide text-slate-400">Data captured · </span>
-                Academic term, program, offered subjects, units, category, staff entry.
+                Academic semester, program, offered subjects, units, category, staff entry.
               </p>
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function CurriculumPlanning() {
               ))}
             </select>
           </Field>
-          <Field label="Academic year and term">
+          <Field label="Academic year and semester">
             <select value={termId} onChange={(event) => setTermId(event.target.value)} className="field-input cursor-pointer" disabled={!terms.length}>
               {terms.map((term) => <option key={term.id} value={term.id}>{formatTermLabel(term.label)}{term.is_active_planning_term ? " (Active)" : ""}</option>)}
             </select>
@@ -174,8 +174,8 @@ export default function CurriculumPlanning() {
         <Card className="p-5">
           <EmptyState
             icon={BookOpenCheck}
-            title="Select an academic year and term"
-            hint="Choose a program and academic term to view the saved offering list."
+            title="Select an academic year and semester"
+            hint="Choose a program and academic semester to view the saved offering list."
           />
         </Card>
       ) : (
@@ -237,7 +237,7 @@ export default function CurriculumPlanning() {
               <EmptyState
                 icon={BookOpenCheck}
                 title={`No subjects offered yet for ${formatTermLabel(selectedTerm?.label)}.`}
-                hint="Use Add subjects to build this term's saved offering list."
+                hint="Use Add subjects to build this semester's saved offering list."
               />
             </div>
           )}
@@ -307,7 +307,7 @@ export default function CurriculumPlanning() {
                 </tbody>
               </table>
             ) : (
-              <EmptyState icon={Search} title="No subjects found" hint="Try another search term or select a program with subjects." />
+              <EmptyState icon={Search} title="No subjects found" hint="Try another search phrase or select a program with subjects." />
             )}
           </div>
         </Card>
@@ -328,15 +328,15 @@ function Field({ label, children }) {
 
 function parseTermLabel(label) {
   const ay = label.match(/AY\s*(\d{4}\s*-\s*\d{4})/i)?.[1]?.replace(/\s+/g, "") || "";
-  const term = label.match(/Term\s*\d+/i)?.[0]?.replace(/\s+/g, " ") || "";
+  const term = label.match(/(?:\d+(?:st|nd|rd|th)\s+Semester|Term\s*\d+)/i)?.[0]?.replace(/\s+/g, " ") || "";
   return {
     academicYear: ay,
-    semester: term ? term.replace(/^term/i, "Term") : "",
+    semester: term ? term.replace(/^Term\s*1$/i, "1st Semester").replace(/^Term\s*2$/i, "2nd Semester") : "",
   };
 }
 
 function formatTermLabel(label) {
-  if (!label) return "Selected academic term";
+  if (!label) return "Selected academic semester";
   const { academicYear, semester } = parseTermLabel(label);
   if (academicYear && semester) return `AY ${academicYear} ${semester}`;
   return label;

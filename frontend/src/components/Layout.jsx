@@ -44,7 +44,6 @@ const NAV_GROUPS = [
     items: [
       { to: "/students", label: "Students", icon: Users },
       { to: "/faculty", label: "Faculty", icon: UsersRound },
-      { to: "/admin/terms", label: "Semester Management", icon: CalendarCheck, roles: ["staff"] },
       { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
     ],
   },

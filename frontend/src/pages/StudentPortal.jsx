@@ -358,7 +358,7 @@ function MyCoursesPanel({ data, onSaved }) {
   const [form, setForm] = useState({ reason: "", term_label: "", attachment_id: null });
   const { busy, error, message, submit } = useSubmitRequest("course-drop", onSaved);
   const activeCourse = courses.find((course) => String(course.course_id) === String(activeCourseId));
-  const selectedTerm = activeCourse?.term_label || data.current_term?.label || "Current term";
+  const selectedTerm = activeCourse?.term_label || data.current_term?.label || "Current semester";
   const courseStatusLabel = (status) => status === "Missing" ? "Not taken" : status;
 
   useEffect(() => {
@@ -420,7 +420,7 @@ function MyCoursesPanel({ data, onSaved }) {
             {requests.slice(0, 4).map((request) => (
               <div key={request.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                 <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-ink">{request.course_code}</p><StatusBadge value={request.status} dot={false} /></div>
-                <p className="mt-1 text-xs text-slate-500">{request.term_label || "No term"} · {formatDate(request.created_at)}</p>
+                <p className="mt-1 text-xs text-slate-500">{request.term_label || "No semester recorded"} · {formatDate(request.created_at)}</p>
                 {request.reviewer_remarks && <p className="mt-2 text-xs text-slate-600">{request.reviewer_remarks}</p>}
               </div>
             ))}
@@ -635,6 +635,8 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
 
   function requestLabel(slug) {
     const labels = {
+      "leave-of-absence": "Leave of Absence",
+      readmission: "Readmission",
       practicum: "Practicum",
       withdrawal: "Withdrawal",
       graduation: "Graduation",
@@ -730,6 +732,8 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
         <label className="text-xs font-semibold text-slate-600" htmlFor="student-inbox-workflow-filter">Filter messages</label>
         <select id="student-inbox-workflow-filter" value={workflowFilter} onChange={(event) => setWorkflowFilter(event.target.value)} className="field-input w-auto min-w-44 cursor-pointer">
           <option value="all">All workflows</option>
+          <option value="leave-of-absence">Leave of Absence</option>
+          <option value="readmission">Readmission</option>
           <option value="practicum">Practicum</option>
           <option value="withdrawal">Withdrawal</option>
           <option value="graduation">Graduation</option>
@@ -1245,8 +1249,8 @@ function WithdrawalRequestForm({ data, onSaved }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current withdrawal stage</p><p className="mt-1 text-xs text-slate-500">Only the requirements due now can be edited. Earlier submissions remain available below.</p></div><StatusBadge value={status} dot={false} /></div></div>
-      <StageCard number={1} title="Withdrawal Application" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: effective term, reason, and the signed withdrawal request PDF." : "Your application details and original file are saved and read-only."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Effective semester" required><Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 1st Semester" /></Field><Field label="Reason for withdrawal" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"} /></div> : <div className="space-y-3"><p className="text-sm text-slate-600">Effective {existing?.effective_term || "term pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
+      <StageCard number={1} title="Withdrawal Application" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: effective semester, reason, and the signed withdrawal request PDF." : "Your application details and original file are saved and read-only."}>
+        {applicationEditable ? <div className="space-y-4"><Field label="Effective semester" required><Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 1st Semester" /></Field><Field label="Reason for withdrawal" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"} /></div> : <div className="space-y-3"><p className="text-sm text-slate-600">Effective {existing?.effective_term || "semester pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
       </StageCard>
       <StageCard number={2} title="Staff Intake / Dean Review" state={denied ? "rejected" : returned ? "returned" : reviewPending ? "pending" : reviewComplete ? "complete" : "locked"} helper={denied ? "The Dean denied this request. Your lifecycle standing remains active." : returned ? "Review the comments, update Step 1, and resubmit." : reviewPending ? "Graduate School staff and the Dean are reviewing the saved application." : reviewComplete ? "The Dean approved the request for follow-through." : "Available after the application is submitted."} />
       <StageCard number={3} title="Approved Request Follow-through" state={followThroughPending ? "pending" : followThroughComplete ? "complete" : "locked"} helper={followThroughPending ? "The Academic Coordinator and Graduate School staff are recording the approved request and preparing the requirements notice." : followThroughComplete ? "Follow-through is complete and the student requirements stage has opened." : "Available after Dean approval."} />
@@ -1379,7 +1383,7 @@ function GraduationRequestForm({ data, onSaved }) {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current graduation stage</p><p className="mt-1 text-xs text-slate-500">Your application stays visible while each reviewing office completes its part.</p></div><StatusBadge value={status} dot={false} /></div></div>
       <StageCard number={1} title="Application / Review Window" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: the review window and any supporting graduation PDF." : "Your submitted application is saved and read-only during review."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Review window / term" required><Input value={form.review_window} onChange={set("review_window")} required /></Field><RequestPdfUpload requestType="graduation" label="Optional graduation endorsement / supporting PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.review_window}</p><SavedWorkflowFiles files={existing?.attachments || []} /></div>}
+        {applicationEditable ? <div className="space-y-4"><Field label="Review window / semester" required><Input value={form.review_window} onChange={set("review_window")} required /></Field><RequestPdfUpload requestType="graduation" label="Optional graduation endorsement / supporting PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.review_window}</p><SavedWorkflowFiles files={existing?.attachments || []} /></div>}
       </StageCard>
       <StageCard number={2} title="Staff and Coursework Review" state={["For Review", "Coursework Review"].includes(status) ? "pending" : ["Research Review", "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar", "Registrar Received"].includes(status) ? "complete" : "locked"} helper={["For Review", "Coursework Review"].includes(status) ? "Graduate School staff and the Academic Coordinator are reviewing your coursework record." : "This stage opens after the application is submitted."} />
       <StageCard number={3} title="Requirements Validation" state={["Research Review", "Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status) ? "pending" : ["Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar", "Registrar Received"].includes(status) ? "complete" : status === "Not Eligible" ? "returned" : "locked"} helper={status === "Not Eligible" ? "Resolve the listed missing requirements before resubmitting your application." : "Coursework, research, practicum, and completion records are checked here."}>
