@@ -511,7 +511,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
         ) : (
           <>
             {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
-            {active === "loa" && <LoaRequestForm studentId={data.student.id} onSaved={onSaved} />}
+            {active === "loa" && <LoaRequestForm studentId={data.student.id} semesters={data.upcoming_semesters || []} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
             {active === "withdrawal" && <WithdrawalRequestForm data={data} onSaved={onSaved} />}
             {active === "practicum" && <PracticumRequestForm data={data} onSaved={onSaved} />}
@@ -1082,7 +1082,7 @@ function ConceptPaperCompliance({ compliance }) {
   );
 }
 
-function LoaRequestForm({ studentId, onSaved }) {
+function LoaRequestForm({ studentId, semesters = [], onSaved }) {
   const [form, setForm] = useState({
     attachment_id: null,
     effective_start: "",
@@ -1100,11 +1100,11 @@ function LoaRequestForm({ studentId, onSaved }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Effective start" required>
-          <Input value={form.effective_start} onChange={set("effective_start")} required placeholder="AY 2026-2027 1st Semester" />
+        <Field label="Leave starts (semester)" required>
+          <Select value={form.effective_start} onChange={set("effective_start")} placeholder="Select semester" options={semesters} required />
         </Field>
-        <Field label="Effective end" required>
-          <Input value={form.effective_end} onChange={set("effective_end")} required placeholder="AY 2026-2027 2nd Semester" />
+        <Field label="Leave ends (semester)" required>
+          <Select value={form.effective_end} onChange={set("effective_end")} placeholder="Select semester" options={semesters} required />
         </Field>
       </div>
       <Field label="Reason / remarks" required>
@@ -1118,7 +1118,7 @@ function LoaRequestForm({ studentId, onSaved }) {
 
 function ReadmissionRequestForm({ data, onSaved }) {
   const requirements = data.readmission_requirements || [];
-  const [items, setItems] = useState([]);
+  const semesters = data.upcoming_semesters || [];
   const [form, setForm] = useState({
     attachment_id: null,
     target_return_term: "",
@@ -1127,28 +1127,34 @@ function ReadmissionRequestForm({ data, onSaved }) {
   const { busy, error, message, submit } = useSubmitRequest("readmission", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  useEffect(() => setItems([]), [data.student.id]);
-
   function onSubmit(e) {
     e.preventDefault();
-    submit({ student_id: data.student.id, ...form, readmission_items: items });
+    // All standard return requirements are taken as included with the uploaded application.
+    submit({ student_id: data.student.id, ...form, readmission_items: requirements });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Target return term" required>
-          <Input value={form.target_return_term} onChange={set("target_return_term")} required placeholder="AY 2026-2027 1st Semester" />
+        <Field label="Return semester" required>
+          <Select value={form.target_return_term} onChange={set("target_return_term")} placeholder="Select semester" options={semesters} required />
         </Field>
-        <Field label="Previous LOA period">
-          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="AY 2025-2026 2nd Semester to AY 2026-2027 1st Semester" />
+        <Field label="Semester you went on leave">
+          <Select value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="Select semester" options={semesters} />
         </Field>
       </div>
-      <Field label="Requirements included in your application" hint="Select only the items actually included in the uploaded PDF.">
-        <CheckList items={requirements} selected={items} onToggle={(item) => setItems((x) => (x.includes(item) ? x.filter((v) => v !== item) : [...x, item]))} />
-      </Field>
+      {requirements.length > 0 && (
+        <div>
+          <p className="field-label">Your application should include</p>
+          <div className="mt-2 space-y-1.5">
+            {requirements.map((item) => (
+              <div key={item} className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> {item}</div>
+            ))}
+          </div>
+        </div>
+      )}
       <RequestPdfUpload requestType="readmission" label="Completed readmission application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || items.length !== requirements.length} disabledHint={!form.attachment_id ? "Upload the completed readmission application before submitting." : items.length !== requirements.length ? "Confirm all required items included in the application." : ""} label="Submit readmission request" />
+      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the completed readmission application before submitting." : ""} label="Submit readmission request" />
     </form>
   );
 }

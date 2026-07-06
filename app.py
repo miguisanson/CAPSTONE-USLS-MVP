@@ -3024,6 +3024,7 @@ def register_routes(app: Flask) -> None:
                 "recommendations": student_portal_recommendations(student),
                 "research_milestones": [research_milestone_payload(student, gate) for gate in RESEARCH_MILESTONES],
                 "readmission_requirements": readmission_requirements(),
+                "upcoming_semesters": upcoming_semester_labels(5),
             }
         )
 
