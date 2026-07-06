@@ -2263,7 +2263,7 @@ def loa_policy_review(student: Student, request_data: dict | None = None) -> dic
     else:
         recommendation = "Eligible"
         suggested_dean_action = "Approve"
-        summary = "The LOA request appears eligible under the retrieved LOA/residency policy. Dean approval is still required."
+        summary = "The LOA request meets the retrieved LOA/residency policy checks and can be auto-approved."
 
     return {
         "mode": "loa-policy-rag",
@@ -2328,7 +2328,7 @@ def readmission_policy_review(student: Student, request_data: dict | None = None
     else:
         recommendation = "Eligible to Return"
         suggested_dean_action = "Approve"
-        summary = "The readmission request appears ready for Dean approval and reactivation for the target return semester."
+        summary = "The readmission request meets the retrieved return policy checks and can be auto-approved for reactivation."
 
     return {
         "mode": "readmission-policy-rag",
@@ -7122,8 +7122,8 @@ def workflow_approvals_payload() -> dict:
         "readmission": latest_standing_logs("readmission", {"Readmission request forwarded to Dean"}),
     }
     standing_recent_results = {
-        "leave-of-absence": {"LOA approved by Dean", "LOA denied by Dean", "LOA returned by Dean for revision"},
-        "readmission": {"Readmission approved by Dean", "Readmission denied by Dean", "Readmission returned by Dean for revision"},
+        "leave-of-absence": {"LOA approved by Dean", "LOA auto-approved by RAG", "LOA denied by Dean", "LOA returned by Dean for revision"},
+        "readmission": {"Readmission approved by Dean", "Readmission auto-approved by RAG", "Readmission denied by Dean", "Readmission returned by Dean for revision"},
     }
     standing_recent = {
         slug: latest_standing_logs(slug, results, 12)
@@ -7885,28 +7885,27 @@ def add_log(
     previous_status: str | None = None,
     new_status: str | None = None,
     visibility: str = "student_visible",
-) -> None:
+) -> TransactionLog:
     # Every workflow records what happened, who acted, where the evidence came
     # from, and who owns the next action.
     account = current_account() if has_request_context() else None
     record = workflow_case_record(slug, student_id) if student_id and slug in {"practicum", "withdrawal", "graduation"} else None
-    db.session.add(
-        TransactionLog(
-            transaction_slug=slug,
-            student_id=student_id,
-            workflow_request_id=record.id if record else None,
-            actor_user_id=account.id if account else None,
-            action_type=workflow_transition_action(result),
-            visibility=visibility if visibility in {"student_visible", "internal"} else "student_visible",
-            actor_role=actor,
-            source_reference=source,
-            result=result,
-            next_owner=next_owner,
-            notes=notes,
-            previous_status=previous_status,
-            new_status=new_status,
-        )
+    log = TransactionLog(
+        transaction_slug=slug,
+        student_id=student_id,
+        workflow_request_id=record.id if record else None,
+        actor_user_id=account.id if account else None,
+        action_type=workflow_transition_action(result),
+        visibility=visibility if visibility in {"student_visible", "internal"} else "student_visible",
+        actor_role=actor,
+        source_reference=source,
+        result=result,
+        next_owner=next_owner,
+        notes=notes,
+        previous_status=previous_status,
+        new_status=new_status,
     )
+    db.session.add(log)
     add_student_transition_notice(
         slug,
         student_id,
@@ -7915,6 +7914,7 @@ def add_log(
         previous_status,
         new_status,
     )
+    return log
 
 
 def add_task(student_id: int, title: str, owner: str, days: int, priority: int = 20, status: str = "Pending") -> None:
@@ -8538,8 +8538,85 @@ def resolve_standing_change_tasks(student_id: int, title_fragment: str, owner: s
         task.status = "Done"
 
 
+def auto_approve_eligible_loa(student: Student, forwarded_log: TransactionLog, review: dict) -> None:
+    period = request_notes_value(forwarded_log.notes, "Requested semester period")
+    student.current_stage = "LOA"
+    student.standing = "On Leave"
+    student.enrollment_tag = "LOA"
+    student.risk_level = "Medium"
+    detail = (
+        f"Requested semester period: {period or 'Not recorded'}. "
+        "Auto-approved because the LOA RAG policy review found all required checks present."
+    )
+    resolve_standing_change_tasks(student.id, "Decide", "Dean")
+    workflow_message_record(
+        "leave-of-absence",
+        student,
+        None,
+        "Student",
+        "LOA approved automatically after policy review",
+        detail,
+        "notice",
+        "Dean Review",
+        "Approved",
+        visibility="student_visible",
+        status="Sent",
+    )
+    add_log(
+        "leave-of-absence",
+        student.id,
+        "System · LOA RAG",
+        "LOA policy review",
+        "LOA auto-approved by RAG",
+        "Graduate School Staff",
+        " ".join(part for part in [detail, review.get("summary", "")] if part),
+        previous_status="Dean Review",
+        new_status="Approved",
+    )
+
+
+def auto_approve_eligible_readmission(student: Student, forwarded_log: TransactionLog, review: dict) -> None:
+    return_semester = request_notes_value(forwarded_log.notes, "Return semester")
+    if student.current_stage == "LOA":
+        student.current_stage = "Coursework"
+    student.standing = "Active"
+    student.enrollment_tag = "Enrolled"
+    student.risk_level = "Low"
+    detail = (
+        f"Return semester: {return_semester or 'Not recorded'}. "
+        "Auto-approved because the readmission RAG policy review found all required checks present."
+    )
+    resolve_standing_change_tasks(student.id, "Decide", "Dean")
+    add_task(student.id, "Confirm return-semester study plan", "Academic Coordinator", 5, 25)
+    workflow_message_record(
+        "readmission",
+        student,
+        None,
+        "Student",
+        "Readmission approved automatically after policy review",
+        detail,
+        "notice",
+        "Dean Review",
+        "Approved",
+        visibility="student_visible",
+        status="Sent",
+    )
+    add_log(
+        "readmission",
+        student.id,
+        "System · Readmission RAG",
+        "Readmission policy review",
+        "Readmission auto-approved by RAG",
+        "Academic Coordinator",
+        " ".join(part for part in [detail, review.get("summary", "")] if part),
+        previous_status="Dean Review",
+        new_status="Approved",
+    )
+
+
 def handle_leave_of_absence(data: MultiDict) -> int:
-    # Staff verify and forward. Only the Dean approval endpoint may decide the request.
+    # Staff verify and forward. Eligible LOA requests are auto-approved by the
+    # policy review; exceptions still go to the Dean queue.
     account = require_workflow_actor("staff")
     student = Student.query.get_or_404(int(data["student_id"]))
     submission = pending_student_request_log(student.id, "leave-of-absence", "LOA application submitted")
@@ -8561,6 +8638,13 @@ def handle_leave_of_absence(data: MultiDict) -> int:
         raise ValueError("Choose a valid LOA eligibility status.")
     if not (effective_start and effective_end):
         raise ValueError("The requested leave start and end semesters are required before forwarding.")
+    review = loa_policy_review(student, {
+        "prior_loa_count": prior_loa_count,
+        "reason_remarks": reason,
+        "effective_start": effective_start,
+        "effective_end": effective_end,
+        "application_reference": application_reference or source or submission.source_reference,
+    })
     period = " to ".join([part for part in [effective_start, effective_end] if part])
     notes = [
         f"Application reference: {application_reference or source or submission.source_reference or 'uploaded application'}.",
@@ -8575,18 +8659,24 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     if staff_notes:
         notes.append(f"Staff notes: {staff_notes}")
     resolve_standing_change_tasks(student.id, "Leave of Absence", "GS Staff")
-    add_task(student.id, "Decide Leave of Absence request", "Dean", 3, 60)
-    add_log(
+    auto_approve = review.get("recommendation") == "Eligible"
+    if not auto_approve:
+        add_task(student.id, "Decide Leave of Absence request", "Dean", 3, 60)
+    forwarded_log = add_log(
         "leave-of-absence", student.id, workflow_actor_label(account),
         source or application_reference or submission.source_reference or "LOA application",
         "LOA request forwarded to Dean", "Dean", "\n".join(notes),
         previous_status="Submitted", new_status="Dean Review",
     )
+    db.session.flush()
+    if auto_approve:
+        auto_approve_eligible_loa(student, forwarded_log, review)
     return student.id
 
 
 def handle_readmission(data: MultiDict) -> int:
-    # Staff verify and forward. Only the Dean approval endpoint may reactivate the student.
+    # Staff verify and forward. Eligible readmission requests are auto-approved by
+    # the policy review; incomplete or uncertain cases still go to the Dean queue.
     account = require_workflow_actor("staff")
     student = Student.query.get_or_404(int(data["student_id"]))
     submission = pending_student_request_log(student.id, "readmission", "Readmission request submitted")
@@ -8606,6 +8696,12 @@ def handle_readmission(data: MultiDict) -> int:
     staff_notes = (data.get("staff_notes") or "").strip()
     if not target_return_term:
         raise ValueError("The requested return semester is required before forwarding.")
+    review = readmission_policy_review(student, {
+        "readmission_items": sorted(submitted),
+        "target_return_term": target_return_term,
+        "previous_loa_period": previous_loa_period,
+        "application_reference": application_reference or source or submission.source_reference,
+    })
 
     notes = [
         f"Application reference: {application_reference or source or submission.source_reference or 'uploaded application'}.",
@@ -8618,13 +8714,18 @@ def handle_readmission(data: MultiDict) -> int:
     if staff_notes:
         notes.append(f"Staff notes: {staff_notes}")
     resolve_standing_change_tasks(student.id, "readmission", "GS Staff")
-    add_task(student.id, "Decide readmission request", "Dean", 3, 60)
-    add_log(
+    auto_approve = review.get("recommendation") == "Eligible to Return"
+    if not auto_approve:
+        add_task(student.id, "Decide readmission request", "Dean", 3, 60)
+    forwarded_log = add_log(
         "readmission", student.id, workflow_actor_label(account),
         source or application_reference or submission.source_reference or "Readmission application",
         "Readmission request forwarded to Dean", "Dean", "\n".join(notes),
         previous_status="Submitted", new_status="Dean Review",
     )
+    db.session.flush()
+    if auto_approve:
+        auto_approve_eligible_readmission(student, forwarded_log, review)
     return student.id
 
 
