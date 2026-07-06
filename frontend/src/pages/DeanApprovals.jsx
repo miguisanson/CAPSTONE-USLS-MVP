@@ -13,7 +13,7 @@ const DEAN_NAV = [
   { id: "practicum", label: "Practicum Reports", icon: Briefcase },
   { id: "graduation", label: "Graduation Review", icon: GraduationCap },
   { id: "withdrawal", label: "Withdrawal Requests", icon: LogOut },
-  { id: "leave", label: "LOA / Readmission", icon: CalendarOff },
+  { id: "leave", label: "LOA / Readmission / AWOL", icon: CalendarOff },
   { id: "reports", label: "Reports / Analytics", icon: BarChart3 },
 ];
 
@@ -71,7 +71,7 @@ export default function DeanApprovals() {
   const workflowPending = data?.workflow_pending || [];
   const workflowRecent = data?.workflow_recent || [];
   const workflowOverview = data?.workflow_overview || [];
-  const isStandingChange = (item) => ["leave-of-absence", "readmission"].includes(item.type);
+  const isStandingChange = (item) => ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
   const belongsToView = (item) => view === "overview" || (view === "leave" ? isStandingChange(item) : item.type === view);
   const baseWorkflowPending = workflowPending.filter(belongsToView);
   const baseWorkflowRecent = (view === "overview" ? workflowRecent : workflowOverview).filter(belongsToView);
@@ -580,7 +580,7 @@ function DeanListFilters({ filters, setFilters, programs, statuses }) {
 function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, recipient, setRecipient, visibility, setVisibility, busy, onDecide, onMessage }) {
   const key = `${item.type}-${item.id}`;
   const isBusy = busy === key;
-  const standingChange = ["leave-of-absence", "readmission"].includes(item.type);
+  const standingChange = ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
   const approveLabel = item.type === "practicum" ? "Mark reviewed" : standingChange || item.type === "withdrawal" ? "Approve" : "Approve & send";
   const returnLabel = item.type === "withdrawal" ? "Return" : "Return for revision";
   const timeline = standingChange

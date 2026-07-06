@@ -171,6 +171,8 @@ export const api = {
     request("/leave-of-absence/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   readmissionPolicyReview: (payload) =>
     request("/readmission/policy-review", { method: "POST", body: JSON.stringify(payload) }),
+  awolPolicyReview: (payload) =>
+    request("/awol/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   studentPortalContext: () => request("/student-portal/context"),
   facultyPortalContext: () => request("/faculty-portal/context"),
   submitStudentRequest: (type, payload) =>

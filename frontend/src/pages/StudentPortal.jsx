@@ -23,6 +23,7 @@ import {
   Trash2,
   UserCheck,
   LayoutDashboard,
+  UserX,
 } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -36,6 +37,7 @@ import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } fr
 const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
 const STUDENT_REQUEST_VIEW_BY_SLUG = {
+  awol: "awol",
   practicum: "practicum",
   withdrawal: "withdrawal",
   graduation: "graduation",
@@ -49,6 +51,7 @@ const STUDENT_NAV = [
   { id: "schedule", label: "Defense Schedule", icon: CalendarCheck },
   { id: "loa", label: "Leave of Absence", icon: CalendarOff },
   { id: "readmission", label: "Readmission", icon: UserCheck },
+  { id: "awol", label: "Return from AWOL", icon: UserX },
   { id: "practicum", label: "Practicum", icon: Briefcase },
   { id: "withdrawal", label: "Withdrawal Request", icon: LogOut },
   { id: "graduation", label: "Graduation Status", icon: GraduationCap },
@@ -114,6 +117,13 @@ const REQUEST_GROUPS = [
         icon: UserCheck,
         lockedWhen: (data) => data.student.standing !== "On Leave" && data.student.current_stage !== "LOA",
         lockedReason: "Available only after an approved Leave of Absence.",
+      },
+      {
+        id: "awol",
+        label: "Return from AWOL",
+        icon: UserX,
+        lockedWhen: (data) => data.student.enrollment_tag !== "AWOL" && data.student.standing !== "AWOL",
+        lockedReason: "Available only while your student record is marked AWOL.",
       },
       { id: "withdrawal", label: "Withdrawal", icon: LogOut },
     ],
@@ -185,7 +195,7 @@ export default function StudentPortal() {
                 {view === "overview" && <div className="grid grid-cols-1 gap-5 lg:grid-cols-12"><div className="space-y-5 lg:col-span-8"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /><ActivityPanel logs={data.logs} /></div><div className="space-y-5 lg:col-span-4"><TasksPanel tasks={data.tasks} /><SchedulePanel schedules={data.schedules} /><RecommendationsPanel recommendations={data.recommendations} /></div></div>}
                 {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
                 {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
-                {["research", "schedule", "loa", "readmission", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
+                {["research", "schedule", "loa", "readmission", "awol", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
                 {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
                 {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
               </StudentPortalSectionBoundary>
@@ -317,6 +327,16 @@ function WorkflowStatusPanel({ data }) {
       ? `Dean: ${data.withdrawal_application.dean_decision} · requirements: ${data.withdrawal_application.requirement_status}`
       : "No withdrawal request is active.",
   });
+  if (data.student.enrollment_tag === "AWOL" || data.student.enrollment_tag === "Residency" || data.awol_case || data.residency_record) {
+    rows.push({
+      label: data.student.enrollment_tag === "Residency" ? "Residency" : "AWOL / Return",
+      icon: UserX,
+      status: data.residency_record?.status || data.awol_case?.status || data.student.enrollment_tag,
+      detail: data.residency_record
+        ? `${data.residency_record.term_label} · ${data.residency_record.reason}`
+        : data.awol_case?.policy_classification || "Submit written intent to enroll when ready to return.",
+    });
+  }
   rows.push({
     label: "Graduation Endorsement",
     icon: GraduationCap,
@@ -513,6 +533,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
             {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
             {active === "loa" && <LoaRequestForm studentId={data.student.id} semesters={data.upcoming_semesters || []} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
+            {active === "awol" && <AwolReturnRequestForm data={data} onSaved={onSaved} />}
             {active === "withdrawal" && <WithdrawalRequestForm data={data} onSaved={onSaved} />}
             {active === "practicum" && <PracticumRequestForm data={data} onSaved={onSaved} />}
             {active === "graduation" && <GraduationRequestForm data={data} onSaved={onSaved} />}
@@ -637,6 +658,8 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
     const labels = {
       "leave-of-absence": "Leave of Absence",
       readmission: "Readmission",
+      "course-audit": "Course Audit / Grades",
+      awol: "AWOL / Residency",
       practicum: "Practicum",
       withdrawal: "Withdrawal",
       graduation: "Graduation",
@@ -734,6 +757,8 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
           <option value="all">All workflows</option>
           <option value="leave-of-absence">Leave of Absence</option>
           <option value="readmission">Readmission</option>
+          <option value="course-audit">Course Audit / Grades</option>
+          <option value="awol">AWOL / Residency</option>
           <option value="practicum">Practicum</option>
           <option value="withdrawal">Withdrawal</option>
           <option value="graduation">Graduation</option>
@@ -1160,6 +1185,56 @@ function ReadmissionRequestForm({ data, onSaved }) {
       <RequestPdfUpload requestType="readmission" label="Completed readmission application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
       <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the completed readmission application before submitting." : ""} label="Submit readmission request" />
     </form>
+  );
+}
+
+function AwolReturnRequestForm({ data, onSaved }) {
+  const existing = data.awol_case;
+  const semesters = data.upcoming_semesters || [];
+  const [form, setForm] = useState({ attachment_id: null, target_return_term: "", last_enrolled_term: existing?.last_enrolled_term || "" });
+  const { busy, error, message, submit } = useSubmitRequest("awol-return", onSaved);
+  const locked = existing && ["Dean Review", "Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(existing.status);
+
+  function onSubmit(event) {
+    event.preventDefault();
+    submit({ student_id: data.student.id, ...form });
+  }
+
+  return (
+    <div className="space-y-4">
+      {existing && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">Current AWOL return case</p><p className="mt-1 text-xs text-slate-500">{existing.policy_classification || "Policy review pending"}</p></div><StatusBadge value={existing.status} dot={false} /></div>
+          {existing.years_in_program !== null && existing.years_in_program !== undefined && <p className="mt-3 text-sm text-slate-600">Years in program: {existing.years_in_program} · normal limit {existing.normal_residence_years} · absolute limit {existing.absolute_residence_years}</p>}
+          {existing.intent_attachment && <SavedWorkflowFiles files={[existing.intent_attachment]} />}
+        </div>
+      )}
+      {(student.standing === "AWOL" || student.enrollment_tag === "AWOL") && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          Your record is currently AWOL and registration privileges are restricted. Use Return from AWOL to submit your written intention to enroll for Dean endorsement.
+        </div>
+      )}
+      {student.enrollment_tag === "Residency" && (
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+          You are enrolled in residency without subjects for an approved academic purpose. Check the workflow status for the recorded semester and purpose.
+        </div>
+      )}
+      {locked ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Your written intent has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</div>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+            The handbook requires a written intention to enroll addressed to the University Registrar through the Graduate School Dean. Approval may include a refresher-course or full re-enrollment requirement when maximum residence is exceeded.
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Intended return semester" required><Select value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} required /></Field>
+            <Field label="Last enrolled semester"><Input value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="AY 2025-2026 2nd Semester" /></Field>
+          </div>
+          <RequestPdfUpload requestType="awol-return" label="Written intent to enroll PDF" initialAttachment={existing?.intent_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+          <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || !form.target_return_term} disabledHint={!form.attachment_id ? "Upload the written intent PDF before submitting." : !form.target_return_term ? "Choose your intended return semester." : ""} label={existing?.status === "Returned for Revision" ? "Resubmit return intent" : "Submit return intent"} />
+        </form>
+      )}
+    </div>
   );
 }
 

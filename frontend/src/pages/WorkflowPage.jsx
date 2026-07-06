@@ -6,6 +6,7 @@ import {
   UserCheck,
   ClipboardCheck,
   FileCheck,
+  FileText,
   Users,
   CalendarCheck,
   Briefcase,
@@ -33,6 +34,7 @@ import {
   MoreVertical,
   SlidersHorizontal,
   History,
+  UserX,
   Download,
   HelpCircle,
   MessageSquare,
@@ -62,6 +64,7 @@ const ICONS = {
   "student-handoff": UserPlus,
   "leave-of-absence": CalendarOff,
   readmission: UserCheck,
+  awol: UserX,
   "course-audit": ClipboardCheck,
   "research-gate": FileCheck,
   "panel-matching": Users,
@@ -76,6 +79,7 @@ const ICONS = {
 const USES_REQUEST_QUEUE = {
   "leave-of-absence": true,
   readmission: true,
+  awol: false,
 };
 
 const NEEDS_STUDENT = {
@@ -91,13 +95,21 @@ const NEEDS_STUDENT = {
   graduation: false,
 };
 
-const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation", "leave-of-absence", "readmission"]);
+const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation", "leave-of-absence", "readmission", "awol"]);
 
 const REQUEST_BOARD_COLUMNS = [
   { label: "For Review", statuses: ["Pending Review", "In Progress"] },
   { label: "Approved", statuses: ["Approved"] },
   { label: "Returned for Revision", statuses: ["Returned for Revision"] },
   { label: "Denied", statuses: ["Denied"] },
+];
+
+const AWOL_BOARD_COLUMNS = [
+  { label: "AWOL", statuses: ["AWOL Declared"] },
+  { label: "Return Review", statuses: ["Return Submitted", "Returned for Revision"] },
+  { label: "Dean Review", statuses: ["Dean Review"] },
+  { label: "Return Outcome", statuses: ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required", "Return Denied"] },
+  { label: "Residency", statuses: ["Residency", "Residency Completed"] },
 ];
 
 export default function WorkflowPage() {
@@ -197,6 +209,9 @@ export default function WorkflowPage() {
     meta,
     context,
     studentId,
+    studentLabel,
+    setStudentId,
+    setStudentLabel,
     specialization,
     setSpecialization,
     submit,
@@ -325,6 +340,7 @@ export default function WorkflowPage() {
               {slug === "practicum" && <PracticumRoster {...formProps} />}
               {slug === "withdrawal" && <WithdrawalRoster {...formProps} />}
               {slug === "graduation" && <GraduationRoster {...formProps} />}
+              {slug === "awol" && <AwolResidencyPanel {...formProps} />}
               {slug === "leave-of-absence" && <LeaveOfAbsenceForm {...formProps} />}
               {slug === "readmission" && <ReadmissionForm {...formProps} />}
             </Card>
@@ -1176,7 +1192,7 @@ function CourseRosterGradeWorkspace({ meta }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
-  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"]);
+  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Failed", "Dropped"]);
   const activeTermLabel = useMemo(() => {
     const terms = meta?.terms || [];
     return terms.find((item) => item.is_active_planning_term)?.label || terms[0]?.label || "";
@@ -1416,7 +1432,7 @@ function CourseClassWorkspace({ meta, mode }) {
     api.courseAuditRoster(courseId).then(hydrate).catch((err) => setError(err.message)).finally(() => setLoading(false));
   }, [courseId]);
 
-  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"]);
+  const classStatuses = new Set(["Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Failed", "Dropped"]);
   const allStudents = roster?.students || [];
   const visibleStudents = allStudents.filter((student) => mode === "enrollment" || classStatuses.has(edits[student.student_id]?.status || student.status));
   const selectedCount = Object.values(selected).filter(Boolean).length;
@@ -1572,7 +1588,7 @@ function CourseAuditRosterV2({ meta }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
-  const statuses = ["Missing", "Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"];
+  const statuses = ["Missing", "Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Failed", "Dropped"];
 
   useEffect(() => {
     setSubjects([]);
@@ -1687,7 +1703,7 @@ function CourseAuditRosterV2({ meta }) {
               <p className="text-xs text-slate-500">{selectedCount} of {roster.students.length} selected</p>
             </div>
             <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3">
-              {["Enrolled", "Current", "Completed", "Incomplete", "Failed", "Dropped"].map((status) => (
+              {["Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Failed", "Dropped"].map((status) => (
                 <button key={status} type="button" onClick={() => bulkStatus(status)} className={`btn-ghost cursor-pointer px-3 py-2 ${status === "Failed" ? "text-red-600" : ""}`}>Mark {status.toLowerCase()}</button>
               ))}
             </div>
@@ -4131,6 +4147,201 @@ function timeRange(start, end) {
 }
 
 // ---------------------------------------------------------------------------
+// AWOL & Residency
+// ---------------------------------------------------------------------------
+function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, result, submitError, setStudentId, setStudentLabel }) {
+  const rows = context?.roster || [];
+  const [viewMode, setViewMode] = useState("board");
+  const [filters, setFilters] = useState({ query: "", status: "" });
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState({ id: null, label: "" });
+  const [action, setAction] = useState("declare_awol");
+  const [form, setForm] = useState({
+    awol_effective_date: new Date().toISOString().slice(0, 10),
+    last_enrolled_term: "",
+    residency_reason: "",
+    term_id: "",
+    staff_notes: "",
+  });
+  const [review, setReview] = useState(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewNotice, setReviewNotice] = useState("");
+  const statuses = uniqueValues(rows.map((item) => item.status));
+  const filteredRows = rows.filter((item) => {
+    const student = item.student || {};
+    const haystack = `${student.name || ""} ${student.student_number || ""} ${student.program_code || ""} ${item.status || ""} ${item.policy_classification || ""} ${item.reason || ""}`.toLowerCase();
+    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
+      && (!filters.status || item.status === filters.status);
+  });
+  const selectedTerm = form.term_id || String(meta?.terms?.find((item) => item.is_active_planning_term)?.id || "");
+
+  function chooseStudent(id, label) {
+    setSelectedStudent({ id, label });
+    setStudentId(id);
+    setStudentLabel(label || "");
+    setReview(null);
+    setReviewNotice("");
+  }
+
+  async function runReview(reviewAction = action, row = selectedRow) {
+    const studentId = row?.student_id || selectedStudent.id;
+    if (!studentId) {
+      setReviewError("Choose a student before running the policy review.");
+      return;
+    }
+    setReviewing(true);
+    setReviewError("");
+    setReviewNotice("");
+    try {
+      const response = await api.awolPolicyReview({
+        student_id: studentId,
+        workflow_action: reviewAction === "forward_return_to_dean" ? "return_from_awol" : reviewAction,
+        residency_reason: form.residency_reason,
+        application_reference: row?.intent_attachment?.name || "",
+      });
+      setReview(response.review);
+    } catch (error) {
+      setReviewError(error.message || "Could not run the AWOL/residency policy review.");
+    } finally {
+      setReviewing(false);
+    }
+  }
+
+  async function saveNewAction(event) {
+    event.preventDefault();
+    if (!selectedStudent.id) return;
+    const saved = await submit({
+      student_id: selectedStudent.id,
+      workflow_action: action,
+      awol_effective_date: form.awol_effective_date,
+      last_enrolled_term: form.last_enrolled_term,
+      residency_reason: form.residency_reason,
+      term_id: selectedTerm,
+      staff_notes: form.staff_notes,
+    });
+    if (saved) {
+      setSelectedStudent({ id: null, label: "" });
+      setStudentId(null);
+      setStudentLabel("");
+      setReview(null);
+      setForm((current) => ({ ...current, last_enrolled_term: "", residency_reason: "", staff_notes: "" }));
+    }
+  }
+
+  async function forwardReturn() {
+    if (!selectedRow) return;
+    const saved = await submit({
+      student_id: selectedRow.student_id,
+      case_id: selectedRow.id,
+      workflow_action: "forward_return_to_dean",
+      staff_notes: form.staff_notes,
+    });
+    if (saved) {
+      setSelectedRow(null);
+      setReview(null);
+      setReviewNotice("");
+    }
+  }
+
+  async function endResidency() {
+    if (!selectedRow) return;
+    const saved = await submit({
+      student_id: selectedRow.student_id,
+      residency_id: selectedRow.id,
+      workflow_action: "end_residency",
+      staff_notes: form.staff_notes,
+    });
+    if (saved) setSelectedRow(null);
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card className="p-6">
+        <SectionTitle title="Record an AWOL or residency status" subtitle="Use the policy review before changing standing; return requests originate from the student's written intent" icon={UserX} />
+        <form onSubmit={saveNewAction} className="mt-5 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Action" required>
+              <Select
+                value={action}
+                onChange={(event) => { setAction(event.target.value); setReview(null); setReviewNotice(""); }}
+                options={[
+                  { value: "declare_awol", label: "Declare AWOL" },
+                  { value: "record_residency", label: "Record residency without subjects" },
+                ]}
+              />
+            </Field>
+            <div>
+              <p className="field-label">Student</p>
+              <StudentPicker value={selectedStudent.id} selectedLabel={selectedStudent.label} meta={meta} onChange={chooseStudent} />
+            </div>
+          </div>
+          {action === "declare_awol" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="AWOL effective date" required><Input type="date" value={form.awol_effective_date} onChange={(event) => setForm((current) => ({ ...current, awol_effective_date: event.target.value }))} required /></Field>
+              <Field label="Last enrolled semester"><Input value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="AY 2026-2027 1st Semester" /></Field>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Residency purpose" required><Select value={form.residency_reason} onChange={(event) => { setForm((current) => ({ ...current, residency_reason: event.target.value })); setReview(null); }} placeholder="Select handbook purpose" options={context?.residency_reasons || []} required /></Field>
+              <Field label="Semester" required><Select value={selectedTerm} onChange={(event) => setForm((current) => ({ ...current, term_id: event.target.value }))} placeholder="Select semester" options={(meta?.terms || []).map((term) => ({ value: String(term.id), label: term.label }))} required /></Field>
+            </div>
+          )}
+          <Field label="Staff verification notes" hint={action === "record_residency" ? "Required when the policy result needs human review." : "Record the source used to establish the AWOL status."}><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>
+          {review && <PolicyReviewCard title="AWOL / residency policy review" description="Handbook-grounded standing and maximum-residence check." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
+          {!review && reviewError && <ErrorNote message={reviewError} />}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => runReview()} disabled={reviewing || !selectedStudent.id || (action === "record_residency" && !form.residency_reason)} className="btn-ghost cursor-pointer"><Sparkles className="h-4 w-4" /> {reviewing ? "Reviewing…" : "Run policy review"}</button>
+            <button type="submit" disabled={submitting || !selectedStudent.id || !review || (action === "record_residency" && !form.residency_reason)} className="btn-primary cursor-pointer">{submitting ? "Saving…" : action === "declare_awol" ? "Record AWOL" : "Record residency"}</button>
+          </div>
+          <WorkflowSubmitFeedback result={result} error={submitError} />
+        </form>
+      </Card>
+
+      <Card className="p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle title="AWOL, return, and residency cases" subtitle="Board and table views share the same policy-derived case status" icon={UserX} />
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
+        </div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <label className="relative min-w-[220px] flex-1"><span className="sr-only">Search AWOL and residency cases</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} className="field-input pl-9" placeholder="Search student, program, status…" /></label>
+          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="field-input cursor-pointer sm:w-64" aria-label="Filter AWOL and residency cases by status"><option value="">All statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
+        </div>
+        {viewMode === "board" ? (
+          <WorkflowBoard columns={AWOL_BOARD_COLUMNS} rows={filteredRows} getStatus={(item) => item.status} empty="No AWOL or residency cases match the filters." renderCard={(item) => <AwolBoardCard key={`${item.kind}-${item.id}`} item={item} onOpen={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} />} />
+        ) : (
+          <WorkflowTable headers={["Student", "Type", "Status", "Policy classification", "Semester / date", "Action"]} rows={filteredRows} empty="No AWOL or residency cases match the filters." render={(item) => <tr key={`${item.kind}-${item.id}`} className="border-b border-slate-100"><StudentCell student={item.student} /><td className="px-3 py-3 text-sm text-slate-600">{item.kind === "residency" ? "Residency" : "AWOL / Return"}</td><td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td><td className="px-3 py-3 text-sm text-slate-600">{item.policy_classification || item.policy_status || "Not reviewed"}</td><td className="px-3 py-3 text-sm text-slate-600">{item.term_label || item.target_return_term || item.awol_effective_date || "—"}</td><td className="px-3 py-3"><button type="button" onClick={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> Open</button></td></tr>} />
+        )}
+      </Card>
+
+      {selectedRow && (
+        <WorkflowCaseModal id={`awol-residency-${selectedRow.kind}-${selectedRow.id}`} title={selectedRow.student?.name || "Standing case"} subtitle={`${selectedRow.student?.student_number || ""} · ${selectedRow.student?.program_code || ""} · ${selectedRow.kind === "residency" ? "Residency" : "AWOL / Return"}`} status={selectedRow.status} onClose={() => { setSelectedRow(null); setReview(null); }} footer={selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) ? <button type="button" disabled={submitting || !review} onClick={forwardReturn} className="btn-primary cursor-pointer">Forward to Dean</button> : selectedRow.kind === "residency" && selectedRow.record_status === "Active" ? <button type="button" disabled={submitting} onClick={endResidency} className="btn-primary cursor-pointer">Close residency</button> : null}>
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3"><Detail label="Status" value={selectedRow.status} /><Detail label="Policy classification" value={selectedRow.policy_classification || selectedRow.policy_status || "Not reviewed"} /><Detail label="Dean decision" value={selectedRow.dean_decision || "Not applicable"} /></div>
+            {selectedRow.kind === "awol" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="AWOL effective date" value={formatDate(selectedRow.awol_effective_date)} /><Detail label="Target return semester" value={selectedRow.target_return_term || "Not submitted"} /><Detail label="Years in program" value={selectedRow.years_in_program ?? "Not calculated"} /><Detail label="Residence limits" value={selectedRow.normal_residence_years ? `${selectedRow.normal_residence_years} normal / ${selectedRow.absolute_residence_years} absolute` : "Not calculated"} /></div>}
+            {selectedRow.kind === "residency" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="Semester" value={selectedRow.term_label} /><Detail label="Purpose" value={selectedRow.reason} /></div>}
+            {selectedRow.intent_attachment?.url && <a href={selectedRow.intent_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit cursor-pointer"><FileText className="h-4 w-4" /> Written return intent</a>}
+            {selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) && <><Field label="Staff review notes"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>{review && <PolicyReviewCard title="Return-from-AWOL policy review" description="Checks written intent and program-specific maximum residence before Dean routing." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview("forward_return_to_dean", selectedRow)} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}.`)} />}<button type="button" onClick={() => runReview("forward_return_to_dean", selectedRow)} disabled={reviewing} className="btn-ghost cursor-pointer"><Sparkles className="h-4 w-4" /> {reviewing ? "Reviewing…" : "Run policy review"}</button></>}
+            <WorkflowSubmitFeedback result={result} error={submitError} />
+          </div>
+        </WorkflowCaseModal>
+      )}
+    </div>
+  );
+}
+
+function AwolBoardCard({ item, onOpen }) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-brand-300 hover:bg-brand-50/30">
+      <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{item.student?.name}</p><p className="text-xs text-slate-400">{item.student?.student_number} · {item.student?.program_code}</p></div><StatusBadge value={item.status} dot={false} /></div>
+      <p className="mt-2 line-clamp-2 text-xs text-slate-600">{item.policy_classification || item.policy_status || item.reason || "Policy review not yet recorded"}</p>
+      <p className="mt-2 text-xs font-semibold text-brand-700">{item.kind === "residency" ? item.term_label : item.target_return_term || formatDate(item.awol_effective_date)}</p>
+      <button type="button" onClick={onOpen} className="btn-ghost mt-3 w-full cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> Open case</button>
+    </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Leave of Absence
 // ---------------------------------------------------------------------------
 function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
@@ -4489,6 +4700,8 @@ function workflowGuidance(slug) {
       "Leave of Absence is a stop/pause process. Staff verify the submitted application and forward it. The Dean alone approves, denies, or returns the request, and the student's status changes only after that decision.",
     readmission:
       "Readmission is a separate return/re-entry process after the approved leave period. Staff review the requested return semester and forward the request for the Dean's decision.",
+    awol:
+      "AWOL restricts registration after a student leaves without formal LOA. A return requires written intent routed through the Dean. The policy review applies the 5/7-year normal and 7/9-year absolute residence limits, while valid no-subject residency remains a separate active enrollment state.",
     "course-audit":
       "Run at the end of the semester. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":

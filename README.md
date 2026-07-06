@@ -13,17 +13,21 @@ See [CHANGELOG.md](CHANGELOG.md) for the dated development history from the init
 
 ## What It Does
 
-Seven working workflows (transactions) drive the platform. Each one performs a real action and
+Eleven working workflows (transactions) drive the platform. Each one performs a real action and
 writes SQL-backed records (students, enrollment, course evidence, document checks, panel
 assignments, schedule requests, tasks, and an activity trail):
 
 1. **Student Handoff** - creates the monitoring record and compares received onboarding evidence.
 2. **Leave of Absence** - staff review the application and eligibility, then forward it for the Dean's decision; an approval pauses the student's status and records the notice.
 3. **Readmission** - staff review return eligibility and forward the request; the Dean's approval reactivates the student and records the notice.
-4. **Course Audit** - maps completed/current/missing subjects against curriculum requirements.
-5. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
-6. **Panel Matching** - scores faculty by specialization, availability, college, and workload.
-7. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
+4. **AWOL & Residency** - records AWOL, accepts written return intent, applies program-specific maximum-residence rules, routes Dean decisions, and records valid no-subject residency.
+5. **Course Audit** - maps completed/current/missing subjects against curriculum requirements, alerts students about INC grades, and applies the one-year lapse/retake rule.
+6. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
+7. **Panel Matching** - scores faculty by specialization, availability, college, and workload.
+8. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
+9. **Practicum** - tracks eligibility, placement, hours, evidence, re-placement, and Dean review.
+10. **Withdrawal** - routes the student request through Dean, coordinator, fee, and Registrar follow-through.
+11. **Graduation Endorsement** - validates coursework, research, and practicum before Dean approval and Registrar handoff.
 
 On top of the transactions: a **Dashboard** (transaction-derived KPIs + charts), a **Students**
 directory with a full lifecycle record view, a role-filtered **Work Queue**, and an **Activity Log**.

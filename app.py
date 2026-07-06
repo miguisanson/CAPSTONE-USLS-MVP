@@ -9,6 +9,7 @@ import json
 import csv
 import io
 import html
+import threading
 from collections import Counter
 from functools import wraps
 from datetime import date, datetime, time, timedelta, timezone
@@ -86,6 +87,16 @@ TRANSACTIONS = [
         "short": "Record a return request after LOA, route the Dean decision, and reactivate approved students.",
         "actor": "Student / GS Staff / Dean",
         "data": "Application reference, target return semester, previous LOA period, return eligibility, missing requirements, Dean decision, status update, notice.",
+    },
+    {
+        "slug": "awol",
+        "priority": "P0",
+        "title": "AWOL & Residency",
+        "icon": "user-x",
+        "group": "Standing",
+        "short": "Declare AWOL, review written return intent under maximum-residence rules, and record valid residency enrollment without subjects.",
+        "actor": "Student / GS Staff / Dean / Academic Coordinator",
+        "data": "AWOL effective date, return-intent letter, years in program, residence classification, refresher or re-enrollment requirement, residency reason, Dean decision, and notices.",
     },
     {
         "slug": "course-audit",
@@ -172,6 +183,7 @@ STAGES = [
     "Writing",
     "Final Defense",
     "LOA",
+    "AWOL",
     "Withdrawal In Progress",
     "Withdrawn",
     "Completed",
@@ -408,6 +420,47 @@ class TermEnrollment(db.Model):
     source_reference = db.Column(db.String(160))
     confirmed_at = db.Column(db.DateTime, default=now_utc)
 
+    term = db.relationship("AcademicTerm")
+
+
+class AwolCase(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    status = db.Column(db.String(80), nullable=False, default="AWOL Declared")
+    awol_effective_date = db.Column(db.Date)
+    last_enrolled_term = db.Column(db.String(80))
+    return_requested_at = db.Column(db.DateTime)
+    target_return_term = db.Column(db.String(80))
+    intent_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    years_in_program = db.Column(db.Integer)
+    normal_residence_years = db.Column(db.Integer)
+    absolute_residence_years = db.Column(db.Integer)
+    policy_classification = db.Column(db.String(100))
+    refresher_required = db.Column(db.Boolean, default=False)
+    full_reenrollment_required = db.Column(db.Boolean, default=False)
+    dean_decision = db.Column(db.String(40), nullable=False, default="Not Submitted")
+    staff_notes = db.Column(db.Text)
+    decided_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
+    intent_attachment = db.relationship("StudentRequestAttachment")
+
+
+class ResidencyEnrollment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"), nullable=False)
+    reason = db.Column(db.String(100), nullable=False)
+    policy_status = db.Column(db.String(80), nullable=False)
+    status = db.Column(db.String(40), nullable=False, default="Active")
+    staff_notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=now_utc)
+    ended_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
     term = db.relationship("AcademicTerm")
 
 
@@ -1166,6 +1219,8 @@ def form1_endorsement_dict(endorsement: Form1Endorsement | None) -> dict | None:
 def student_portal_stage(student: Student, case: ResearchCase | None) -> str:
     if student.standing == "On Leave":
         return "LOA"
+    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        return "AWOL"
     if student.standing == "Withdrawn":
         return "Withdrawn"
     if student.current_stage == "Withdrawal In Progress":
@@ -1533,9 +1588,12 @@ def workflow_case_meta(slug: str, student_id: int) -> dict:
 def task_dict(task: Task) -> dict:
     action_url = None
     action_label = None
-    if task.title.startswith("Review course drop request") or task.title.startswith("Review automatic failure"):
+    if task.title.startswith("Review course drop request") or "lapsed INC" in task.title:
         action_url = "/workflow/course-audit"
         action_label = "Open Course Audit"
+    elif any(value in task.title.lower() for value in ["awol", "refresher", "re-enroll courses after maximum residence"]):
+        action_url = "/workflow/awol"
+        action_label = "Open AWOL & Residency"
     return {
         "id": task.id,
         "student_id": task.student_id,
@@ -1671,7 +1729,7 @@ BACKOFFICE_ROLES = {
 }
 
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"course-audit", "research-gate", "practicum", "graduation", "withdrawal"},
+    "academic_coordinator": {"course-audit", "research-gate", "practicum", "graduation", "withdrawal", "awol"},
     "research_coordinator": {"research-gate", "graduation"},
     "registrar": {"graduation", "withdrawal"},
 }
@@ -1679,6 +1737,7 @@ ROLE_TRANSACTION_ACCESS = {
 REQUEST_ATTACHMENT_WORKFLOWS = {
     "leave-of-absence": "leave-of-absence",
     "readmission": "readmission",
+    "awol-return": "awol",
     "practicum": "practicum",
     "withdrawal": "withdrawal",
     "graduation": "graduation",
@@ -2282,6 +2341,261 @@ def readmission_policy_review(student: Student, request_data: dict | None = None
     }
 
 
+AWOL_RESIDENCY_CITATIONS = [
+    {
+        "id": "gs-handbook-awol-return",
+        "title": "Return from LOA or AWOL",
+        "source": "Graduate Programs Student Handbook 2022-2023, p. 53",
+        "text": "A returning student declares the intention to enroll in writing to the University Registrar through the Graduate School Dean.",
+    },
+    {
+        "id": "gs-handbook-maximum-residence",
+        "title": "Maximum residence",
+        "source": "Graduate Programs Student Handbook 2022-2023, pp. 54-55",
+        "text": "Master's programs use a 5-year normal and 7-year absolute limit; doctoral programs use a 7-year normal and 9-year absolute limit. The two-year extension requires a graded 6-unit refresher course.",
+    },
+    {
+        "id": "gs-handbook-residency-enrollment",
+        "title": "Residency enrollment",
+        "source": "Graduate Programs Student Handbook 2022-2023, p. 48",
+        "text": "Residency without subjects is for specified thesis, practicum, INC, comprehensive-exam, or publication work; students with remaining course units who will not enroll should file LOA.",
+    },
+]
+
+RESIDENCY_REASONS = [
+    "Thesis / dissertation work",
+    "Practicum / internship completion",
+    "Completing an INC",
+    "Comprehensive examination",
+    "Awaiting research publication",
+]
+
+
+def latest_awol_case(student_id: int) -> AwolCase | None:
+    return (
+        AwolCase.query.filter_by(student_id=student_id)
+        .order_by(AwolCase.updated_at.desc(), AwolCase.id.desc())
+        .first()
+    )
+
+
+def latest_residency_enrollment(student_id: int, active_only: bool = False) -> ResidencyEnrollment | None:
+    query = ResidencyEnrollment.query.filter_by(student_id=student_id)
+    if active_only:
+        query = query.filter_by(status="Active")
+    return query.order_by(ResidencyEnrollment.updated_at.desc(), ResidencyEnrollment.id.desc()).first()
+
+
+def residence_limits(student: Student) -> dict:
+    program_name = (student.program.name or "").lower()
+    doctoral = "doctor" in program_name or "phd" in program_name or student.program.code.upper() in {"DBA", "EDD", "PHD"}
+    normal = 7 if doctoral else 5
+    absolute = 9 if doctoral else 7
+    years = max(0, date.today().year - int(student.entry_year or date.today().year))
+    return {
+        "program_level": "Doctorate" if doctoral else "Master's",
+        "years_in_program": years,
+        "normal_years": normal,
+        "absolute_years": absolute,
+    }
+
+
+def awol_policy_review(student: Student, request_data: dict | None = None) -> dict:
+    request_data = request_data or {}
+    action = (request_data.get("workflow_action") or request_data.get("action") or "return_from_awol").strip()
+    limits = residence_limits(student)
+    years = limits["years_in_program"]
+    current_awol = student.enrollment_tag == "AWOL" or student.standing == "AWOL" or student.current_stage == "AWOL"
+
+    if action == "record_residency":
+        reason = (request_data.get("residency_reason") or "").strip()
+        records = CourseRecord.query.filter_by(student_id=student.id).all()
+        active_subjects = [item for item in records if item.status in {"Enrolled", "Current"}]
+        incomplete_subjects = [item for item in records if item.status == "Incomplete"]
+        audit = compute_course_audit(student)
+        reason_supported = False
+        reason_detail = "Choose the work the student will continue during residency."
+        if reason == "Completing an INC":
+            reason_supported = bool(incomplete_subjects)
+            reason_detail = f"{len(incomplete_subjects)} incomplete subject(s) are recorded."
+        elif reason == "Comprehensive examination":
+            reason_supported = student.current_stage == "Comprehensive Exam"
+            reason_detail = f"Current lifecycle stage: {student.current_stage}."
+        elif reason == "Awaiting research publication":
+            reason_supported = student.current_stage in {"Writing", "Final Defense", "Completed"}
+            reason_detail = f"Current lifecycle stage: {student.current_stage}."
+        elif reason in {"Thesis / dissertation work", "Practicum / internship completion"}:
+            reason_supported = audit.get("missing_count", 0) == 0
+            reason_detail = f"Course audit has {audit.get('missing_count', 0)} missing/incomplete subject(s)."
+
+        checks = [
+            {
+                "label": "No subject enrollment",
+                "status": "Pass" if not active_subjects else "Needs Review",
+                "detail": "No current/enrolled subjects are recorded." if not active_subjects else f"{len(active_subjects)} active subject(s) are still recorded.",
+            },
+            {
+                "label": "Permitted residency purpose",
+                "status": "Pass" if reason in RESIDENCY_REASONS and reason_supported else "Needs Review",
+                "detail": reason_detail,
+            },
+            {
+                "label": "Not an LOA substitute",
+                "status": "Pass" if reason_supported else "Needs Review",
+                "detail": "The recorded work supports residency." if reason_supported else "If course units remain and the student will not enroll, use LOA instead of residency.",
+            },
+        ]
+        eligible = all(item["status"] == "Pass" for item in checks)
+        return {
+            "mode": "awol-residency-policy-rag",
+            "recommendation": "Eligible for Residency" if eligible else "Needs Human Review",
+            "suggested_action": "Record Residency" if eligible else "Review or Use LOA",
+            "summary": "The student matches the handbook conditions for residency without subjects." if eligible else "The residency request does not yet clearly match the handbook conditions; verify the record or use LOA.",
+            "checks": checks,
+            "citations": [AWOL_RESIDENCY_CITATIONS[2]],
+            "limits": limits,
+        }
+
+    if action == "declare_awol":
+        valid = student.standing not in {"Withdrawn", "Graduated"} and student.enrollment_tag not in {"LOA", "Completed", "Withdrawn"}
+        checks = [
+            {
+                "label": "No approved leave",
+                "status": "Pass" if student.enrollment_tag != "LOA" else "Needs Review",
+                "detail": f"Current enrollment status: {student.enrollment_tag}.",
+            },
+            {
+                "label": "Active graduate record",
+                "status": "Pass" if valid else "Needs Review",
+                "detail": f"Current standing: {student.standing}.",
+            },
+        ]
+        return {
+            "mode": "awol-residency-policy-rag",
+            "recommendation": "Eligible to Record AWOL" if valid else "Needs Human Review",
+            "suggested_action": "Declare AWOL" if valid else "Verify Standing",
+            "summary": "The handbook treats withdrawal without formal leave as AWOL and curtails registration privileges." if valid else "The current standing conflicts with declaring AWOL and requires manual review.",
+            "checks": checks,
+            "citations": [AWOL_RESIDENCY_CITATIONS[0]],
+            "limits": limits,
+        }
+
+    intent_reference = (request_data.get("application_reference") or request_data.get("intent_letter_reference") or "").strip()
+    if years <= limits["normal_years"]:
+        classification = "Within Maximum Residence"
+        recommendation = "Eligible for Dean Review"
+        suggested_action = "Forward to Dean"
+        residence_detail = f"{years} year(s) in program; normal {limits['program_level']} limit is {limits['normal_years']} years."
+    elif years <= limits["absolute_years"]:
+        classification = "Extension - Refresher Required"
+        recommendation = "Dean Review with 6-unit Refresher"
+        suggested_action = "Forward with Refresher Requirement"
+        residence_detail = f"{years} year(s) in program; within the extension window ending at {limits['absolute_years']} years."
+    else:
+        classification = "Full Re-enrollment Required"
+        recommendation = "Escalate for Re-enrollment"
+        suggested_action = "Forward for Re-enrollment Decision"
+        residence_detail = f"{years} year(s) in program; beyond the {limits['absolute_years']}-year absolute limit."
+    checks = [
+        {
+            "label": "Current AWOL status",
+            "status": "Pass" if current_awol else "Needs Review",
+            "detail": "Student is currently recorded AWOL." if current_awol else f"Current status is {student.standing}/{student.enrollment_tag}.",
+        },
+        {
+            "label": "Written intent to enroll",
+            "status": "Present" if intent_reference else "Needs Review",
+            "detail": intent_reference or "Upload the written return intent addressed through the Graduate School Dean.",
+        },
+        {
+            "label": "Maximum residence",
+            "status": "Pass" if years <= limits["normal_years"] else "Escalate",
+            "detail": residence_detail,
+        },
+    ]
+    return {
+        "mode": "awol-residency-policy-rag",
+        "recommendation": recommendation if current_awol and intent_reference else "Needs Human Review",
+        "suggested_action": suggested_action if current_awol and intent_reference else "Return for Missing Information",
+        "summary": f"Return classification: {classification}. The Dean must endorse the written intent before registration privileges are restored.",
+        "checks": checks,
+        "classification": classification,
+        "refresher_required": classification == "Extension - Refresher Required",
+        "full_reenrollment_required": classification == "Full Re-enrollment Required",
+        "limits": limits,
+        "citations": AWOL_RESIDENCY_CITATIONS[:2],
+    }
+
+
+def awol_case_dict(item: AwolCase, include_student: bool = True) -> dict:
+    payload = {
+        "id": item.id,
+        "kind": "awol",
+        "student_id": item.student_id,
+        "status": item.status,
+        "awol_effective_date": iso(item.awol_effective_date),
+        "last_enrolled_term": item.last_enrolled_term,
+        "return_requested_at": iso(item.return_requested_at),
+        "target_return_term": item.target_return_term,
+        "intent_attachment": attachment_dict(item.intent_attachment),
+        "years_in_program": item.years_in_program,
+        "normal_residence_years": item.normal_residence_years,
+        "absolute_residence_years": item.absolute_residence_years,
+        "policy_classification": item.policy_classification,
+        "refresher_required": bool(item.refresher_required),
+        "full_reenrollment_required": bool(item.full_reenrollment_required),
+        "dean_decision": item.dean_decision,
+        "staff_notes": item.staff_notes,
+        "decided_at": iso(item.decided_at),
+        "created_at": iso(item.created_at),
+        "updated_at": iso(item.updated_at),
+    }
+    if include_student:
+        payload["student"] = student_brief(item.student)
+    return payload
+
+
+def residency_enrollment_dict(item: ResidencyEnrollment) -> dict:
+    return {
+        "id": item.id,
+        "kind": "residency",
+        "student_id": item.student_id,
+        "student": student_brief(item.student),
+        "term_id": item.term_id,
+        "term_label": item.term.label if item.term else None,
+        "reason": item.reason,
+        "policy_status": item.policy_status,
+        "status": "Residency" if item.status == "Active" else f"Residency {item.status}",
+        "record_status": item.status,
+        "staff_notes": item.staff_notes,
+        "created_at": iso(item.created_at),
+        "ended_at": iso(item.ended_at),
+        "updated_at": iso(item.updated_at),
+    }
+
+
+def awol_residency_roster_payload() -> list[dict]:
+    rows = [awol_case_dict(item) for item in AwolCase.query.order_by(AwolCase.updated_at.desc()).limit(150).all()]
+    case_students = {item["student_id"] for item in rows}
+    for student in Student.query.filter(Student.enrollment_tag == "AWOL", ~Student.id.in_(case_students or {-1})).order_by(Student.last_name).all():
+        rows.append({
+            "id": f"legacy-{student.id}",
+            "kind": "awol",
+            "student_id": student.id,
+            "student": student_brief(student),
+            "status": "AWOL Declared",
+            "policy_classification": "Not yet reviewed",
+            "dean_decision": "Not Submitted",
+            "created_at": None,
+            "updated_at": None,
+        })
+    rows.extend(
+        residency_enrollment_dict(item)
+        for item in ResidencyEnrollment.query.order_by(ResidencyEnrollment.updated_at.desc()).limit(150).all()
+    )
+    return sorted(rows, key=lambda item: item.get("updated_at") or item.get("created_at") or "", reverse=True)
+
+
 def _status_sentence(student: Student, ind: dict) -> str:
     bits = [f"{student.name} ({student.student_number}, {student.program.code}) is at the {ind['stage']} stage"]
     bits.append(f"standing {ind['standing']}, risk {ind['risk']}")
@@ -2818,6 +3132,8 @@ def register_routes(app: Flask) -> None:
         practicum_eligibility_result = practicum_eligibility(student)
         withdrawal_application = latest_withdrawal_application(student.id)
         graduation_endorsement = latest_graduation_endorsement(student.id)
+        awol_case = latest_awol_case(student.id)
+        residency_record = latest_residency_enrollment(student.id, active_only=True)
         current_term = get_active_term()
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
@@ -2860,6 +3176,8 @@ def register_routes(app: Flask) -> None:
                 "withdrawal_application": withdrawal_application_dict(withdrawal_application, include_student=False),
                 "graduation_endorsement": graduation_endorsement_dict(graduation_endorsement, include_student=False),
                 "graduation_eligibility": graduation_eligibility(student),
+                "awol_case": awol_case_dict(awol_case, include_student=False) if awol_case else None,
+                "residency_record": residency_enrollment_dict(residency_record) if residency_record else None,
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
                 "workflow_messages": [
@@ -2963,6 +3281,8 @@ def register_routes(app: Flask) -> None:
         practicum_eligibility_result = practicum_eligibility(student)
         withdrawal_application = latest_withdrawal_application(student.id)
         graduation_endorsement = latest_graduation_endorsement(student.id)
+        awol_case = latest_awol_case(student.id)
+        residency_record = latest_residency_enrollment(student.id, active_only=True)
         current_term = get_active_term()
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
@@ -3008,6 +3328,8 @@ def register_routes(app: Flask) -> None:
                 "withdrawal_application": withdrawal_application_dict(withdrawal_application, include_student=False),
                 "graduation_endorsement": graduation_endorsement_dict(graduation_endorsement, include_student=False),
                 "graduation_eligibility": graduation_eligibility(student),
+                "awol_case": awol_case_dict(awol_case, include_student=False) if awol_case else None,
+                "residency_record": residency_enrollment_dict(residency_record) if residency_record else None,
                 "tasks": [task_dict(t) for t in tasks],
                 "logs": [log_dict(l) for l in logs],
                 "workflow_messages": [
@@ -3291,6 +3613,12 @@ def register_routes(app: Flask) -> None:
             editable_statuses = {"Returned", "Returned for Clarification", "Denied", "Requirements Pending"}
             if application and application.status not in editable_statuses:
                 return jsonify({"error": "This withdrawal stage is awaiting reviewer action. Future uploads are locked."}), 409
+        elif request_type == "awol-return":
+            if student.enrollment_tag != "AWOL" and student.standing != "AWOL":
+                return jsonify({"error": "Return-from-AWOL documents are available only while the student is recorded AWOL."}), 409
+            awol_case = latest_awol_case(student.id)
+            if awol_case and awol_case.status in {"Dean Review", "Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"}:
+                return jsonify({"error": "This AWOL return stage is awaiting or has completed Dean action. Future uploads are locked."}), 409
         elif request_type in {"graduation", "graduation-endorsement"}:
             endorsement = latest_graduation_endorsement(student.id)
             if endorsement and endorsement.endorsement_status not in {"Not Eligible", "Returned for Clarification"}:
@@ -3416,6 +3744,59 @@ def register_routes(app: Flask) -> None:
         )
         db.session.commit()
         return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your readmission request."})
+
+    @app.route("/api/student-portal/requests/awol-return", methods=["POST"])
+    @require_api_login("student")
+    def student_awol_return_request():
+        data = request_payload()
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        if student.enrollment_tag != "AWOL" and student.standing != "AWOL":
+            return jsonify({"error": "A return-from-AWOL request can be filed only while your record is marked AWOL."}), 409
+        attachment = request_attachment_from_payload(student, "awol-return", data)
+        if not attachment:
+            return jsonify({"error": "Upload your written intent to enroll before submitting."}), 400
+        target_return_term = (data.get("target_return_term") or "").strip()
+        if not target_return_term:
+            return jsonify({"error": "Choose the semester when you intend to return."}), 400
+        item = latest_awol_case(student.id)
+        if item and item.status not in {"AWOL Declared", "Return Denied", "Returned for Revision", "Return Submitted"}:
+            return jsonify({"error": "Your current AWOL return case cannot be resubmitted at this stage."}), 409
+        if not item:
+            item = AwolCase(
+                student_id=student.id,
+                status="AWOL Declared",
+                awol_effective_date=date.today(),
+                last_enrolled_term=(data.get("last_enrolled_term") or "").strip() or None,
+            )
+            db.session.add(item)
+            db.session.flush()
+        review = awol_policy_review(student, {
+            "workflow_action": "return_from_awol",
+            "application_reference": attachment.original_name,
+        })
+        item.status = "Return Submitted"
+        item.return_requested_at = now_utc()
+        item.target_return_term = target_return_term
+        item.intent_attachment_id = attachment.id
+        item.years_in_program = review["limits"]["years_in_program"]
+        item.normal_residence_years = review["limits"]["normal_years"]
+        item.absolute_residence_years = review["limits"]["absolute_years"]
+        item.policy_classification = review["classification"]
+        item.refresher_required = review["refresher_required"]
+        item.full_reenrollment_required = review["full_reenrollment_required"]
+        item.dean_decision = "Not Submitted"
+        item.updated_at = now_utc()
+        bind_workflow_attachment(attachment, item, "Return Submitted", account)
+        add_task(student.id, "Review written intent to return from AWOL", "GS Staff", 3, 65)
+        add_log(
+            "awol", student.id, "Student", attachment.original_name,
+            "AWOL return intent submitted", "GS Staff",
+            f"Target return semester: {target_return_term}. Policy classification: {item.policy_classification}.",
+            previous_status="AWOL Declared", new_status="Return Submitted",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your written return intent and route it to the Dean."})
 
     @app.route("/api/student-portal/requests/practicum", methods=["POST"])
     @require_api_login("student")
@@ -4583,6 +4964,73 @@ def register_routes(app: Flask) -> None:
                 previous_status=previous_status, new_status=new_status,
             )
 
+        elif case_type == "awol-return":
+            item = AwolCase.query.get_or_404(item_id)
+            if item.status != "Dean Review" or item.dean_decision != "Pending":
+                return jsonify({"error": "This AWOL return request is not awaiting a Dean decision."}), 400
+            student = item.student
+            previous_status = item.status
+            if decision == "approve":
+                if item.full_reenrollment_required:
+                    item.status = "Re-enrollment Required"
+                    item.dean_decision = "Approved for Re-enrollment Review"
+                    result = "AWOL return endorsed for full re-enrollment review"
+                    next_owner = "Academic Coordinator"
+                    add_task(student.id, "Re-evaluate and re-enroll courses after maximum residence", "Academic Coordinator", 7, 80)
+                elif item.refresher_required:
+                    item.status = "Extension Approved - Refresher Required"
+                    item.dean_decision = "Approved"
+                    student.standing = "Active"
+                    student.enrollment_tag = "Enrolled"
+                    student.current_stage = "Coursework"
+                    student.risk_level = "High"
+                    result = "AWOL return approved with graded 6-unit refresher requirement"
+                    next_owner = "Academic Coordinator"
+                    add_task(student.id, "Enroll graded 6-unit refresher courses", "Academic Coordinator", 7, 75)
+                else:
+                    item.status = "Return Approved"
+                    item.dean_decision = "Approved"
+                    student.standing = "Active"
+                    student.enrollment_tag = "Enrolled"
+                    student.current_stage = "Coursework"
+                    student.risk_level = "Medium"
+                    result = "AWOL return approved by Dean"
+                    next_owner = "Academic Coordinator"
+                    add_task(student.id, "Confirm AWOL return study plan", "Academic Coordinator", 5, 45)
+            elif decision == "deny":
+                item.status = "Return Denied"
+                item.dean_decision = "Denied"
+                student.standing = "AWOL"
+                student.enrollment_tag = "AWOL"
+                student.current_stage = "AWOL"
+                result = "AWOL return denied by Dean"
+                next_owner = "Graduate School Staff"
+            elif decision == "return":
+                item.status = "Returned for Revision"
+                item.dean_decision = "Returned"
+                result = "AWOL return intent returned by Dean for revision"
+                next_owner = "Student"
+                add_task(student.id, "Revise written intent to return from AWOL", "Student", 5, 55)
+            else:
+                return jsonify({"error": "AWOL return decisions must be approve, deny, or return."}), 400
+            item.decided_at = now_utc()
+            item.updated_at = now_utc()
+            if note:
+                item.staff_notes = "\n".join(part for part in [item.staff_notes, f"Dean: {note}"] if part)
+            resolve_standing_change_tasks(student.id, "AWOL", "Dean")
+            workflow_message_record(
+                "awol", student, account, "Student", result,
+                note or f"Policy classification: {item.policy_classification}. Next owner: {next_owner}.",
+                "return" if decision == "return" else "notice",
+                previous_status, item.status,
+                visibility="student_visible", status="Open" if decision == "return" else "Sent",
+            )
+            add_log(
+                "awol", student.id, f"Dean · {account.full_name}", "Approvals",
+                result, next_owner, " ".join(part for part in [item.policy_classification, note] if part),
+                previous_status=previous_status, new_status=item.status,
+            )
+
         elif case_type == "graduation":
             endorsement = GraduationEndorsement.query.get_or_404(item_id)
             previous_status = endorsement.endorsement_status
@@ -4670,7 +5118,7 @@ def register_routes(app: Flask) -> None:
         students = []
         active_term = get_active_term()
         active_term_label = active_term.label if active_term else ""
-        class_statuses = {"Enrolled", "Current", "Completed", "Incomplete", "Dropped", "Failed"}
+        class_statuses = {"Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Dropped", "Failed"}
         for rec, s in rows:
             record_term_label = rec.term_label or (active_term_label if rec.status in class_statuses else "")
             in_selected_term = not term_filter or record_term_label == term_filter
@@ -4705,7 +5153,7 @@ def register_routes(app: Flask) -> None:
         term = (data.get("term") or "").strip() or (active_term.label if active_term else "")
         account = current_account()
         actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
-        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Dropped", "Missing", "Failed"}
+        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Retake Required", "Dropped", "Missing", "Failed"}
         changed = 0
         changed_students: set[int] = set()
         status_counts: dict[str, int] = {}
@@ -4736,6 +5184,8 @@ def register_routes(app: Flask) -> None:
             previous = rec.status
             previous_grade = rec.grade_value or ""
             previous_grade_status = rec.grade_status or "No Grade"
+            previous_deadline = rec.incomplete_deadline
+            previous_remarks = rec.remarks or ""
             rec.status = new_status
             rec.updated_at = now_utc()
             rec.evidence_reference = "Course audit update"
@@ -4748,6 +5198,13 @@ def register_routes(app: Flask) -> None:
                 rec.grade_status = explicit_grade_status or "Passed"
                 rec.resolved_at = rec.resolved_at or now_utc()
                 rec.incomplete_deadline = None
+                if previous == "Incomplete":
+                    for task in Task.query.filter(
+                        Task.student_id == student.id,
+                        Task.title == f"Resolve incomplete grade for {course.code}",
+                        Task.status.in_(["Pending", "Overdue"]),
+                    ).all():
+                        task.status = "Done"
             elif new_status == "Incomplete":
                 rec.grade_status = "Incomplete"
                 deadline_value = str(deadlines.get(sid_str, deadlines.get(sid, "")) or "").strip()
@@ -4756,7 +5213,9 @@ def register_routes(app: Flask) -> None:
                         rec.incomplete_deadline = parse_date(deadline_value)
                     except ValueError:
                         return jsonify({"error": f"Invalid incomplete deadline for {student.name}. Use YYYY-MM-DD."}), 400
-                ensure_task(student.id, f"Resolve incomplete grade for {course.code}", "Academic Coordinator", date.today() + timedelta(days=14), 35)
+                if not rec.incomplete_deadline:
+                    rec.incomplete_deadline = date.today() + timedelta(days=365)
+                ensure_task(student.id, f"Resolve incomplete grade for {course.code}", "Academic Coordinator", rec.incomplete_deadline, 55)
             elif new_status == "Failed":
                 rec.grade_status = "Failed"
                 rec.resolved_at = rec.resolved_at or now_utc()
@@ -4766,8 +5225,28 @@ def register_routes(app: Flask) -> None:
                 if new_status in {"Current", "Enrolled", "Missing", "Dropped"}:
                     rec.resolved_at = None
             rec.remarks = str(remarks.get(sid_str, remarks.get(sid, rec.remarks or "")) or "").strip() or None
-            if rec.status == previous and (rec.grade_value or "") == previous_grade and (rec.grade_status or "No Grade") == previous_grade_status:
+            if (
+                rec.status == previous
+                and (rec.grade_value or "") == previous_grade
+                and (rec.grade_status or "No Grade") == previous_grade_status
+                and rec.incomplete_deadline == previous_deadline
+                and (rec.remarks or "") == previous_remarks
+            ):
                 continue
+            if new_status == "Incomplete" and (previous != "Incomplete" or rec.incomplete_deadline != previous_deadline):
+                workflow_message_record(
+                    "course-audit", student, current_account(), "Student",
+                    f"Incomplete grade recorded for {course.code}",
+                    f"Complete the remaining course requirements by {rec.incomplete_deadline.isoformat()}. Contact the Graduate School or your Academic Coordinator if you need clarification.",
+                    "notice", previous or "No Grade", "Incomplete", status="Sent",
+                )
+            elif new_status == "Completed" and previous == "Incomplete":
+                workflow_message_record(
+                    "course-audit", student, current_account(), "Student",
+                    f"Incomplete grade resolved for {course.code}",
+                    f"Your final grade is {rec.grade_value or 'recorded'} and the incomplete deadline has been cleared.",
+                    "notice", "Incomplete", "Completed", status="Sent",
+                )
             changed += 1
             changed_students.add(student.id)
             status_counts[new_status] = status_counts.get(new_status, 0) + 1
@@ -5152,6 +5631,21 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Unknown readmission checklist item: " + ", ".join(unknown_items)}), 400
         return jsonify({"ok": True, "review": readmission_policy_review(student, data)})
 
+    @app.route("/api/awol/policy-review", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator", "dean")
+    def awol_policy_review_route():
+        data = request_payload()
+        student_id = safe_int(data.get("student_id"))
+        if not student_id:
+            return jsonify({"error": "Choose a valid student before running the AWOL/residency policy review."}), 400
+        student = Student.query.get_or_404(student_id)
+        action = (data.get("workflow_action") or data.get("action") or "return_from_awol").strip()
+        if action not in {"declare_awol", "return_from_awol", "forward_return_to_dean", "record_residency"}:
+            return jsonify({"error": "Choose a valid AWOL or residency review action."}), 400
+        if action == "record_residency" and (data.get("residency_reason") or "").strip() not in RESIDENCY_REASONS:
+            return jsonify({"error": "Choose a handbook-supported residency reason."}), 400
+        return jsonify({"ok": True, "review": awol_policy_review(student, data)})
+
     # Supplies each workflow screen with student-specific context before
     # submission, such as current audit status or panel recommendations.
     @app.route("/api/transactions/<slug>/context")
@@ -5257,8 +5751,8 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/transactions/<slug>/messages", methods=["POST"])
     @require_api_login(*BACKOFFICE_ROLES, "dean", "student")
     def transaction_message(slug: str):
-        if slug not in {"practicum", "withdrawal", "graduation"}:
-            return jsonify({"error": "Messaging is available only for Practicum, Withdrawal, and Graduation."}), 404
+        if slug not in {"practicum", "withdrawal", "graduation", "awol"}:
+            return jsonify({"error": "Messaging is not available for this workflow."}), 404
         account = current_account()
         data = request_payload()
         student_id = account.student_id if account.role == "student" else safe_int(data.get("student_id"))
@@ -6148,6 +6642,8 @@ def workflow_case_record(slug: str, student_id: int):
         return latest_withdrawal_application(student_id)
     if slug == "graduation":
         return latest_graduation_endorsement(student_id)
+    if slug in {"awol", "awol-return"}:
+        return latest_awol_case(student_id)
     return None
 
 
@@ -6498,7 +6994,27 @@ def create_workflow_message(
 
 def workflow_approval_item(kind: str, item) -> dict:
     student = item.student
-    meta = workflow_case_meta(kind, student.id)
+    meta = workflow_case_meta("awol" if kind == "awol-return" else kind, student.id)
+    if kind == "awol-return":
+        return {
+            "id": item.id,
+            "type": kind,
+            "title": f"Return from AWOL · {student.name}",
+            "subtitle": f"{student.program.code} · {item.policy_classification or 'Policy review pending'}",
+            "status": item.dean_decision,
+            "workflow_status": item.status,
+            "student": student_brief(student),
+            "submitted_at": iso(item.return_requested_at or item.updated_at),
+            "details": (
+                f"Target return semester: {item.target_return_term or 'Not recorded'}. "
+                f"Years in program: {item.years_in_program if item.years_in_program is not None else 'Not calculated'}. "
+                f"Residence limits: {item.normal_residence_years or '—'} normal / {item.absolute_residence_years or '—'} absolute. "
+                f"{item.staff_notes or ''}"
+            ).strip(),
+            "record": {"attachments": [attachment_dict(item.intent_attachment)] if item.intent_attachment else []},
+            "request_id": item.id,
+            **meta,
+        }
     if kind in {"leave-of-absence", "readmission"}:
         attachment = latest_request_attachment(student.id, kind)
         if kind == "leave-of-absence":
@@ -6632,6 +7148,12 @@ def workflow_approvals_payload() -> dict:
         .all()
     )
     pending.extend(
+        workflow_approval_item("awol-return", item)
+        for item in AwolCase.query.filter_by(status="Dean Review", dean_decision="Pending")
+        .order_by(AwolCase.return_requested_at.asc())
+        .all()
+    )
+    pending.extend(
         workflow_approval_item("graduation", item)
         for item in GraduationEndorsement.query.filter(GraduationEndorsement.endorsement_status == "Ready for Dean Review")
         .order_by(GraduationEndorsement.submitted_at.asc())
@@ -6644,6 +7166,13 @@ def workflow_approvals_payload() -> dict:
         workflow_approval_item("withdrawal", item)
         for item in WithdrawalApplication.query.filter(WithdrawalApplication.dean_decision.in_(["Approved", "Denied", "Returned"]))
         .order_by(WithdrawalApplication.updated_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent.extend(
+        workflow_approval_item("awol-return", item)
+        for item in AwolCase.query.filter(AwolCase.dean_decision.in_(["Approved", "Denied", "Returned", "Approved for Re-enrollment Review"]))
+        .order_by(AwolCase.updated_at.desc())
         .limit(6)
         .all()
     )
@@ -6683,6 +7212,15 @@ def workflow_approvals_payload() -> dict:
                 WithdrawalApplication.dean_decision.in_({"Approved", "Denied", "Returned"}),
             )
         ).order_by(WithdrawalApplication.updated_at.desc()).limit(100).all()
+    )
+    overview.extend(
+        workflow_approval_item("awol-return", item)
+        for item in AwolCase.query.filter(
+            or_(
+                AwolCase.status == "Dean Review",
+                AwolCase.dean_decision.in_({"Approved", "Denied", "Returned", "Approved for Re-enrollment Review"}),
+            )
+        ).order_by(AwolCase.updated_at.desc()).limit(100).all()
     )
     overview.extend(
         workflow_approval_item("graduation", item)
@@ -6998,6 +7536,10 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         context["roster"] = withdrawal_roster_payload()
     elif slug == "graduation":
         context["roster"] = graduation_candidate_payload()
+    elif slug == "awol":
+        context["roster"] = awol_residency_roster_payload()
+        context["residency_reasons"] = RESIDENCY_REASONS
+        context["policy_citations"] = AWOL_RESIDENCY_CITATIONS
 
     if slug == "student-handoff":
         context["programs"] = [program_dict(p) for p in Program.query.order_by(Program.college, Program.name).all()]
@@ -7234,7 +7776,7 @@ def duplicate_student_groups(limit: int = 12) -> list[dict]:
 
 
 def status_rank(status: str | None) -> int:
-    ranks = {"Completed": 5, "Current": 4, "Enrolled": 4, "Incomplete": 3, "Dropped": 2, "Missing": 1}
+    ranks = {"Completed": 6, "Current": 5, "Enrolled": 5, "Incomplete": 4, "Retake Required": 3, "Failed": 3, "Dropped": 2, "Missing": 1}
     return ranks.get(status or "", 0)
 
 
@@ -7419,7 +7961,7 @@ def ensure_task(student_id: int, title: str, owner: str, due_at: date, priority:
 
 
 def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
-    """Automatically fail INC records after their completion deadline passes."""
+    """Apply the handbook INC lapse rule after the one-year completion deadline."""
     today = date.today()
     changed = 0
     records = (
@@ -7436,22 +7978,25 @@ def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
         if not record.student or not record.course:
             continue
         deadline = record.incomplete_deadline
-        review_title = f"Review automatic failure for {record.course.code}"
+        limits = residence_limits(record.student)
+        lapse_grade = "2.0" if limits["program_level"] == "Doctorate" else "3.0"
+        review_title = f"Arrange retake after lapsed INC for {record.course.code}"
         ensure_task(record.student_id, review_title, "Academic Coordinator", today, 75, "Pending")
         note = (
             f"{record.course.code} incomplete deadline passed on {deadline.isoformat()}. "
-            "The course was automatically marked Failed."
+            f"The handbook lapse grade {lapse_grade} was recorded with no graduate credit; the subject must be retaken."
         )
         if note not in (record.remarks or ""):
             record.remarks = f"{record.remarks}\n{note}".strip() if record.remarks else note
             changed += 1
-        record.status = "Failed"
-        record.grade_status = "Failed"
+        record.status = "Retake Required"
+        record.grade_value = lapse_grade
+        record.grade_status = "No Credit - Retake Required"
         record.resolved_at = record.resolved_at or now_utc()
         record.incomplete_deadline = None
         record.updated_at = now_utc()
         changed += 1
-        result = f"{record.course.code} incomplete deadline auto-failed"
+        result = f"{record.course.code} incomplete deadline lapsed to retake required"
         already_logged = TransactionLog.query.filter_by(
             transaction_slug="course-audit",
             student_id=record.student_id,
@@ -7468,12 +8013,36 @@ def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
                 "Academic Coordinator",
                 note,
                 previous_status="Incomplete",
-                new_status="Failed",
+                new_status="Retake Required",
+            )
+            workflow_message_record(
+                "course-audit", record.student, None, "Student",
+                f"Incomplete deadline passed for {record.course.code}",
+                note, "notice", "Incomplete", "Retake Required", status="Sent",
             )
             changed += 1
     if commit and changed:
         db.session.commit()
     return changed
+
+
+def start_incomplete_deadline_scheduler():
+    """Run the INC deadline sweep independently of page/API access for the local app."""
+    interval = max(30, int(os.getenv("INCOMPLETE_SWEEP_INTERVAL_SECONDS", "300")))
+    stopped = threading.Event()
+
+    def sweep_loop():
+        while not stopped.wait(interval):
+            with app.app_context():
+                try:
+                    sync_overdue_incomplete_alerts(commit=True)
+                except Exception as exc:  # noqa: BLE001 - keep the scheduler alive and roll back the failed sweep
+                    db.session.rollback()
+                    print(f"Incomplete deadline sweep failed: {exc}", file=sys.stderr)
+
+    thread = threading.Thread(target=sweep_loop, name="incomplete-deadline-scheduler", daemon=True)
+    thread.start()
+    return stopped, thread
 
 
 # ---------------------------------------------------------------------------
@@ -8718,6 +9287,140 @@ def handle_withdrawal(data: MultiDict) -> int:
     return student.id
 
 
+def handle_awol(data: MultiDict) -> int:
+    account = require_workflow_actor("staff", "academic_coordinator")
+    student = Student.query.get_or_404(int(data["student_id"]))
+    action = (data.get("workflow_action") or "").strip()
+    staff_notes = (data.get("staff_notes") or "").strip()
+
+    if action == "declare_awol":
+        if student.standing in {"Withdrawn", "Graduated"} or student.enrollment_tag in {"LOA", "Completed", "Withdrawn"}:
+            raise ValueError("The current student standing conflicts with declaring AWOL. Review the record first.")
+        if student.enrollment_tag == "AWOL" or student.standing == "AWOL":
+            raise ValueError("This student is already recorded as AWOL.")
+        effective_value = (data.get("awol_effective_date") or "").strip()
+        effective_date = parse_date(effective_value) if effective_value else date.today()
+        review = awol_policy_review(student, {"workflow_action": "declare_awol"})
+        item = AwolCase(
+            student_id=student.id,
+            status="AWOL Declared",
+            awol_effective_date=effective_date,
+            last_enrolled_term=(data.get("last_enrolled_term") or "").strip() or None,
+            years_in_program=review["limits"]["years_in_program"],
+            normal_residence_years=review["limits"]["normal_years"],
+            absolute_residence_years=review["limits"]["absolute_years"],
+            policy_classification="Awaiting return intent",
+            dean_decision="Not Submitted",
+            staff_notes=staff_notes or None,
+        )
+        db.session.add(item)
+        previous_status = student.enrollment_tag or student.standing
+        student.standing = "AWOL"
+        student.current_stage = "AWOL"
+        student.enrollment_tag = "AWOL"
+        student.risk_level = "Critical"
+        result = "Student declared AWOL"
+        note = f"Effective date: {effective_date.isoformat()}. Last enrolled semester: {item.last_enrolled_term or 'Not recorded'}. {staff_notes}".strip()
+        workflow_message_record(
+            "awol", student, account, "Student", result,
+            "Your registration privileges are restricted while the record is AWOL. Submit a written intent to enroll for Dean endorsement when you are ready to return.",
+            "notice", previous_status, "AWOL Declared", status="Sent",
+        )
+        add_log("awol", student.id, workflow_actor_label(account), "AWOL standing review", result, "Student", note, previous_status=previous_status, new_status="AWOL Declared")
+
+    elif action == "forward_return_to_dean":
+        item = AwolCase.query.get_or_404(safe_int(data.get("case_id")))
+        if item.student_id != student.id or item.status not in {"Return Submitted", "Returned for Revision"}:
+            raise ValueError("Only a submitted AWOL return intent can be forwarded to the Dean.")
+        if not item.intent_attachment:
+            raise ValueError("The student's written intent to enroll is required before Dean review.")
+        review = awol_policy_review(student, {
+            "workflow_action": "return_from_awol",
+            "application_reference": item.intent_attachment.original_name,
+        })
+        item.years_in_program = review["limits"]["years_in_program"]
+        item.normal_residence_years = review["limits"]["normal_years"]
+        item.absolute_residence_years = review["limits"]["absolute_years"]
+        item.policy_classification = review["classification"]
+        item.refresher_required = review["refresher_required"]
+        item.full_reenrollment_required = review["full_reenrollment_required"]
+        item.staff_notes = "\n".join(part for part in [item.staff_notes, staff_notes] if part)
+        item.status = "Dean Review"
+        item.dean_decision = "Pending"
+        item.updated_at = now_utc()
+        bind_workflow_attachment(item.intent_attachment, item, "Dean Review", account)
+        add_task(student.id, "Decide AWOL return intent", "Dean", 3, 70)
+        result = "AWOL return forwarded to Dean"
+        workflow_message_record(
+            "awol", student, account, "Student", result,
+            f"Policy classification: {item.policy_classification}. The Dean will decide the return endorsement.",
+            "notice", "Return Submitted", "Dean Review", status="Sent",
+        )
+        add_log("awol", student.id, workflow_actor_label(account), "AWOL return review", result, "Dean", f"{review['summary']} {staff_notes}".strip(), previous_status="Return Submitted", new_status="Dean Review")
+
+    elif action == "record_residency":
+        if student.enrollment_tag in {"AWOL", "LOA", "Withdrawn", "Completed"} or student.standing in {"AWOL", "On Leave", "Withdrawn"}:
+            raise ValueError("Residency cannot replace AWOL, LOA, withdrawal, or completed standing.")
+        reason = (data.get("residency_reason") or "").strip()
+        if reason not in RESIDENCY_REASONS:
+            raise ValueError("Choose a handbook-supported residency reason.")
+        review = awol_policy_review(student, {"workflow_action": "record_residency", "residency_reason": reason})
+        if review["recommendation"] != "Eligible for Residency" and not staff_notes:
+            raise ValueError("This residency case needs human review. Enter staff notes explaining the verified exception or use LOA.")
+        term = AcademicTerm.query.get(safe_int(data.get("term_id"))) if data.get("term_id") else get_active_term()
+        if not term:
+            raise ValueError("No active semester is available for residency enrollment.")
+        existing = ResidencyEnrollment.query.filter_by(student_id=student.id, term_id=term.id, status="Active").first()
+        if existing:
+            raise ValueError("This student already has active residency enrollment for the selected semester.")
+        item = ResidencyEnrollment(
+            student_id=student.id,
+            term_id=term.id,
+            reason=reason,
+            policy_status=review["recommendation"],
+            staff_notes=staff_notes or None,
+        )
+        db.session.add(item)
+        enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=term.id).first()
+        if not enrollment:
+            enrollment = TermEnrollment(student_id=student.id, term_id=term.id, status="Residency", source_reference="Residency policy review")
+            db.session.add(enrollment)
+        else:
+            enrollment.status = "Residency"
+            enrollment.source_reference = "Residency policy review"
+            enrollment.confirmed_at = now_utc()
+        previous_status = student.enrollment_tag
+        student.standing = "Active"
+        student.enrollment_tag = "Residency"
+        result = "Residency enrollment recorded"
+        workflow_message_record(
+            "awol", student, account, "Student", result,
+            f"Semester: {term.label}. Purpose: {reason}.", "notice", previous_status, "Residency", status="Sent",
+        )
+        add_log("awol", student.id, workflow_actor_label(account), "Residency policy review", result, "Student", f"{term.label}: {reason}. {review['summary']} {staff_notes}".strip(), previous_status=previous_status, new_status="Residency")
+
+    elif action == "end_residency":
+        item = ResidencyEnrollment.query.get_or_404(safe_int(data.get("residency_id")))
+        if item.student_id != student.id or item.status != "Active":
+            raise ValueError("Choose an active residency enrollment to close.")
+        item.status = "Completed"
+        item.ended_at = now_utc()
+        item.updated_at = now_utc()
+        enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=item.term_id).first()
+        if enrollment and enrollment.status == "Residency":
+            enrollment.status = "Completed"
+        student.enrollment_tag = "Enrolled"
+        student.standing = "Active"
+        result = "Residency enrollment closed"
+        workflow_message_record("awol", student, account, "Student", result, f"Residency for {item.term.label if item.term else 'the semester'} was closed.", "notice", "Residency", "Active", status="Sent")
+        add_log("awol", student.id, workflow_actor_label(account), "Residency record", result, "Academic Coordinator", staff_notes, previous_status="Residency", new_status="Active")
+
+    else:
+        raise ValueError("Choose an AWOL or residency workflow action.")
+
+    return student.id
+
+
 def handle_graduation(data: MultiDict) -> int:
     student = Student.query.get_or_404(int(data["student_id"]))
     endorsement = latest_graduation_endorsement(student.id)
@@ -8919,6 +9622,7 @@ TRANSACTION_HANDLERS = {
     "student-handoff": handle_student_handoff,
     "leave-of-absence": handle_leave_of_absence,
     "readmission": handle_readmission,
+    "awol": handle_awol,
     "course-audit": handle_course_audit,
     "research-gate": handle_research_gate,
     "panel-matching": handle_panel_matching,
@@ -11053,7 +11757,7 @@ def compute_course_audit(student: Student) -> dict:
             cat["completed_units"] += units
         elif status in ["Current", "Enrolled"]:
             current.append(row)
-        elif status in ["Incomplete", "Dropped", "Failed"]:
+        elif status in ["Incomplete", "Retake Required", "Dropped", "Failed"]:
             incomplete.append(row)
         else:
             missing.append(row)
@@ -12935,6 +13639,7 @@ if __name__ == "__main__":
         miguel_unlock_changes = ensure_miguel_yu_research_demo_unlock()
         healed_request_logs = ensure_demo_request_submission_logs()
         sync_result = sync_all_curricula()
+        sync_overdue_incomplete_alerts(commit=False)
         db.session.commit()
         if renamed_faculty:
             print(f"Updated {renamed_faculty} demo faculty placeholder name(s).")
@@ -12950,5 +13655,6 @@ if __name__ == "__main__":
             print("Demo staff and student accounts were created.")
 
     port = int(os.getenv("FLASK_PORT", "5000"))
+    start_incomplete_deadline_scheduler()
     print(f"USLS Graduate School platform running at http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)

@@ -25,6 +25,7 @@ import {
   UsersRound,
   LogOut,
   RotateCcw,
+  UserX,
 } from "lucide-react";
 import { useAuth } from "../auth";
 import { api } from "../api";
@@ -66,6 +67,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/workflow/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
       { to: "/workflow/readmission", label: "Readmission", icon: UserCheck },
+      { to: "/workflow/awol", label: "AWOL & Residency", icon: UserX },
       { to: "/workflow/withdrawal", label: "Withdrawal Requests", icon: LogOut },
     ],
   },
@@ -88,7 +90,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/research-gate", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
+  academic_coordinator: new Set(["/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/research-gate", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
   registrar: new Set(["/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
 };
