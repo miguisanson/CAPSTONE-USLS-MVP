@@ -4200,7 +4200,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review leave application" subtitle="Verify the submitted details, then forward the request to the Dean" icon={CalendarOff} />
+      <SectionTitle title="Review leave application" subtitle="Verify the submitted details; eligible requests auto-approve, exceptions go to the Dean" icon={CalendarOff} />
       <RequestSummary request={selectedRequest} />
       <LoaPolicyReviewCard
         review={policyReview}
@@ -4249,7 +4249,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
         <SubmitButton submitting={submitting}>Forward to Dean</SubmitButton>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record, but only the Dean can record a decision.
+          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; new eligible requests are auto-approved after review.
         </div>
       )}
     </form>
@@ -4260,7 +4260,7 @@ function LoaPolicyReviewCard({ review, busy, error, notice, onReview, onApply })
   return (
     <PolicyReviewCard
       title="LOA policy review"
-      description="RAG-style check using the LOA/residency policy plus this student request. The Dean makes the final decision."
+      description="RAG-style check using the LOA/residency policy plus this student request. Eligible requests can be auto-approved."
       emptyText="Run the review after selecting a submitted LOA request."
       review={review}
       busy={busy}
@@ -4411,11 +4411,11 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review readmission request" subtitle="Check return eligibility, then forward the request to the Dean" icon={UserCheck} />
+      <SectionTitle title="Review readmission request" subtitle="Eligible requests auto-approve after review; incomplete requests go to the Dean" icon={UserCheck} />
       <RequestSummary request={selectedRequest} />
       <PolicyReviewCard
         title="Readmission policy review"
-        description="RAG-style check using the readmission policy plus this student request. The Dean makes the final decision."
+        description="RAG-style check using the readmission policy plus this student request. Eligible requests can be auto-approved."
         emptyText="Run the review after selecting a submitted readmission request."
         review={policyReview}
         busy={reviewing}
@@ -4456,10 +4456,10 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
       {canForward ? (
-        <SubmitButton submitting={submitting}>Forward to Dean</SubmitButton>
+        <SubmitButton submitting={submitting}>Complete review</SubmitButton>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record, but only the Dean can record a decision.
+          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; new eligible requests are auto-approved after review.
         </div>
       )}
     </form>
@@ -4488,7 +4488,7 @@ function workflowGuidance(slug) {
     "leave-of-absence":
       "Leave of Absence is a stop/pause process. Staff verify the submitted application and forward it. The Dean alone approves, denies, or returns the request, and the student's status changes only after that decision.",
     readmission:
-      "Readmission is a separate return/re-entry process after the approved leave period. Staff review the requested return semester and forward the request for the Dean's decision.",
+      "Readmission is a separate return/re-entry process after the approved leave period. Eligible requests auto-approve after review; incomplete or uncertain requests go to the Dean queue.",
     "course-audit":
       "Run at the end of the semester. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":
