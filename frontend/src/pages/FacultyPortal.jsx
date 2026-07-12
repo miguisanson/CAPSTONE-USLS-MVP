@@ -1,4 +1,5 @@
-import { GraduationCap, LogOut, Users, CalendarClock, BookOpen, Clock3 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { GraduationCap, LogOut, Users, CalendarClock, BookOpen, Clock3, ClipboardCheck, AlertTriangle } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
@@ -55,6 +56,10 @@ export default function FacultyPortal() {
                   <StatusBadge value={`${panels.length} panel${panels.length === 1 ? "" : "s"}`} dot={false} />
                 </div>
               </div>
+
+              <Card className="p-6">
+                <FacultyGrades subjects={data?.subjects || []} terms={data?.terms || []} alerts={data?.grade_alerts || []} />
+              </Card>
 
               <Card className="p-6">
                 <SectionTitle title="My panel assignments" subtitle="Students whose committee you sit on" icon={Users} />
@@ -114,4 +119,53 @@ export default function FacultyPortal() {
       </main>
     </div>
   );
+}
+
+function FacultyGrades({ subjects, terms, alerts }) {
+  const activeTerm = terms.find((term) => term.is_active_planning_term) || terms[0];
+  const [term, setTerm] = useState(activeTerm?.label || "");
+  const [courseId, setCourseId] = useState(subjects[0]?.id || "");
+  const [roster, setRoster] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (!term && activeTerm) setTerm(activeTerm.label); }, [activeTerm, term]);
+  useEffect(() => { if (!courseId && subjects.length) setCourseId(subjects[0].id); }, [courseId, subjects]);
+  useEffect(() => {
+    if (!courseId || !term) return;
+    api.courseAuditRoster(courseId, term).then((res) => {
+      setRoster(res);
+      setEdits(Object.fromEntries(res.students.map((student) => [student.student_id, { grade: student.grade_value || "", remarks: student.remarks || "" }])));
+    }).catch((err) => setNotice(err.message));
+  }, [courseId, term]);
+
+  function change(id, field, value) { setEdits((current) => ({ ...current, [id]: { ...current[id], [field]: value } })); }
+  async function submit() {
+    setSaving(true); setNotice("");
+    try {
+      const statuses = {}; const grades = {}; const gradeStatuses = {}; const remarks = {};
+      roster.students.forEach((student) => {
+        const value = (edits[student.student_id]?.grade || "").trim();
+        const normalized = value.toUpperCase();
+        statuses[student.student_id] = !value ? "Current" : normalized === "INC" ? "Incomplete" : ["F", "5", "5.0", "5.00"].includes(normalized) ? "Failed" : "Completed";
+        grades[student.student_id] = value;
+        gradeStatuses[student.student_id] = statuses[student.student_id] === "Completed" ? "Passed" : statuses[student.student_id];
+        remarks[student.student_id] = edits[student.student_id]?.remarks || "";
+      });
+      const res = await api.saveCourseAudit({ course_id: Number(courseId), term, statuses, grades, grade_statuses: gradeStatuses, remarks });
+      setNotice(res.message);
+    } catch (err) { setNotice(err.message); } finally { setSaving(false); }
+  }
+
+  return <div>
+    <SectionTitle title="Submit class grades" subtitle="Choose a subject, then enter each student's final grade and optional remarks." icon={ClipboardCheck} />
+    {alerts.map((alert) => <div key={alert.term_label} className={`mt-3 flex gap-2 rounded-xl border px-3 py-2 text-sm ${alert.coordinator_escalated ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{alert.missing_grades} grade{alert.missing_grades === 1 ? "" : "s"} missing for {alert.term_label}. Deadline: {formatDate(alert.deadline)}.{alert.coordinator_escalated ? " The Academic Coordinator has been alerted." : " Please submit before the deadline."}</span></div>)}
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <label><span className="field-label">Semester</span><select className="field-input cursor-pointer" value={term} onChange={(e) => setTerm(e.target.value)}>{terms.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}</select></label>
+      <label><span className="field-label">Subject</span><select className="field-input cursor-pointer" value={courseId} onChange={(e) => setCourseId(e.target.value)}>{subjects.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select></label>
+    </div>
+    {roster?.students?.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400"><th className="py-2">Student</th><th>Grade</th><th>Remarks</th></tr></thead><tbody>{roster.students.map((student) => <tr key={student.student_id} className="border-b border-slate-100"><td className="py-3 pr-3"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-500">{student.student_number}</p></td><td className="pr-3"><input className="field-input w-28" value={edits[student.student_id]?.grade || ""} onChange={(e) => change(student.student_id, "grade", e.target.value)} placeholder="1.25 / INC" /></td><td><input className="field-input" value={edits[student.student_id]?.remarks || ""} onChange={(e) => change(student.student_id, "remarks", e.target.value)} placeholder="Optional faculty remarks" /></td></tr>)}</tbody></table><button type="button" onClick={submit} disabled={saving} className="btn-primary mt-4 cursor-pointer">{saving ? "Submitting..." : "Submit grades"}</button></div> : <EmptyState icon={ClipboardCheck} title="No students in this class" hint="The Academic Coordinator must add students to the subject roster first." />}
+    {notice && <p className="mt-3 text-sm font-semibold text-brand-700">{notice}</p>}
+  </div>;
 }

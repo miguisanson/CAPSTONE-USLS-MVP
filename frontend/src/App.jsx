@@ -21,6 +21,7 @@ import DeanApprovals from "./pages/DeanApprovals";
 import Login from "./pages/Login";
 import Form1Endorsements from "./pages/Form1Endorsements";
 import FacultyPortal from "./pages/FacultyPortal";
+import TermSettings from "./pages/TermSettings";
 
 // Where each role lands by default.
 function homeFor(user) {
@@ -81,6 +82,7 @@ export default function App() {
                 <Route path="/monitoring-sheet" element={<MonitoringGrid />} />
                 <Route path="/curriculum-planning" element={<CurriculumPlanning />} />
                 <Route path="/course-adjustments" element={<CourseAdjustments />} />
+                <Route path="/term-settings" element={<TermSettings />} />
                 <Route path="/work-queue" element={<WorkQueue />} />
                 <Route path="/activity" element={<ActivityLog />} />
                 <Route path="/decision-support" element={<DecisionSupport />} />

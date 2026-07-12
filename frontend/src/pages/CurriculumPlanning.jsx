@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpenCheck, Plus, Search, Trash2, X } from "lucide-react";
+import { BookOpenCheck, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
@@ -73,6 +73,22 @@ export default function CurriculumPlanning() {
       });
       setMessage(res.message);
       setShowAdd(false);
+      await loadOfferings();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function autoFillFromDemand() {
+    if (!ready) return;
+    setBusy("generate");
+    setError("");
+    setMessage("");
+    try {
+      const res = await api.generateCurriculum({ program_id: Number(programId), term_id: Number(termId), scope: "active" });
+      setMessage(res.message);
       await loadOfferings();
     } catch (err) {
       setError(err.message);
@@ -193,6 +209,9 @@ export default function CurriculumPlanning() {
               </span>
               <button type="button" onClick={() => setShowAdd(true)} className="btn-primary">
                 <Plus className="h-4 w-4" /> Add subjects
+              </button>
+              <button type="button" onClick={autoFillFromDemand} disabled={busy === "generate"} className="btn-ghost cursor-pointer">
+                <Sparkles className="h-4 w-4" /> {busy === "generate" ? "Checking demand..." : "Auto-fill from demand"}
               </button>
             </div>
           </div>

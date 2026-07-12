@@ -842,6 +842,36 @@ def get_active_term() -> AcademicTerm | None:
     return upcoming or AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
 
 
+def course_audit_subject_items() -> list[dict]:
+    """Subjects that currently have a class roster."""
+    counts = dict(db.session.query(CourseRecord.course_id, func.count(CourseRecord.id)).group_by(CourseRecord.course_id).all())
+    return [
+        {"id": course.id, "code": course.code, "title": course.title, "program_id": course.program_id, "enrolled": counts[course.id]}
+        for course in Course.query.order_by(Course.code).all() if counts.get(course.id)
+    ]
+
+
+def faculty_grade_alerts() -> list[dict]:
+    """Deadline reminders; after five days the same item is flagged for AC escalation."""
+    today = date.today()
+    alerts = []
+    for term in AcademicTerm.query.filter(AcademicTerm.grade_submission_deadline.isnot(None)).all():
+        missing = CourseRecord.query.filter(
+            CourseRecord.term_label == term.label,
+            CourseRecord.status.in_(["Current", "Enrolled"]),
+            or_(CourseRecord.grade_value.is_(None), CourseRecord.grade_value == ""),
+        ).count()
+        if not missing:
+            continue
+        days_late = max((today - term.grade_submission_deadline).days, 0)
+        alerts.append({
+            "term_label": term.label, "deadline": iso(term.grade_submission_deadline),
+            "missing_grades": missing, "days_late": days_late,
+            "coordinator_escalated": days_late >= 5,
+        })
+    return alerts
+
+
 # Academic calendar is semester-based: two semesters per academic year (not trimester).
 SEMESTER_NAMES = ["1st Semester", "2nd Semester"]
 
@@ -4394,6 +4424,9 @@ def register_routes(app: Flask) -> None:
             "faculty": faculty_profile_dict(faculty),
             "panels": panels,
             "panel_count": len(panels),
+            "terms": [term_dict(term) for term in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
+            "subjects": course_audit_subject_items(),
+            "grade_alerts": faculty_grade_alerts(),
             "working_hours": faculty_working_hours(faculty),
             "availability": [
                 {
@@ -4596,12 +4629,16 @@ def register_routes(app: Flask) -> None:
         data = request.get_json(silent=True) or {}
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
         scope = data.get("scope") or "active"
+        term_id = data.get("term_id")
+        term = AcademicTerm.query.get(int(term_id)) if term_id else get_active_term()
+        academic_year, semester = split_academic_term_label(term.label if term else "")
         query = Student.query.filter_by(program_id=program.id)
         if scope == "active":
             query = query.filter(Student.standing == "Active")
         students = query.order_by(Student.last_name, Student.first_name).all()
         courses = Course.query.filter_by(program_id=program.id).order_by(Course.code).all()
         created = 0
+        offerings_created = 0
         touched_students = 0
         for student in students:
             existing = {rec.course_id for rec in CourseRecord.query.filter_by(student_id=student.id).all()}
@@ -4622,6 +4659,24 @@ def register_routes(app: Flask) -> None:
             if added_for_student:
                 touched_students += 1
                 recompute_risk(student)
+        # Edit this value to change the minimum demand for automatic inclusion.
+        AUTO_OFFER_DEMAND_THRESHOLD = 2
+        if term and academic_year and semester:
+            for demand_row in course_demand_rows(program, term):
+                if demand_row["demand_count"] < AUTO_OFFER_DEMAND_THRESHOLD:
+                    continue
+                course_id = demand_row["course"]["id"]
+                exists = CurriculumOffering.query.filter_by(
+                    program_id=program.id, academic_year=academic_year,
+                    semester=semester, course_id=course_id,
+                ).first()
+                if not exists:
+                    db.session.add(CurriculumOffering(
+                        program_id=program.id, academic_year=academic_year,
+                        semester=semester, course_id=course_id,
+                        added_by="RAG demand recommendation",
+                    ))
+                    offerings_created += 1
         add_log(
             "curriculum-planning",
             None,
@@ -4634,8 +4689,9 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({
             "ok": True,
-            "message": f"Generated {created} curriculum subject row(s) for {touched_students} student(s).",
+            "message": f"Generated {created} curriculum row(s) and added {offerings_created} demand-qualified subject(s).",
             "created": created,
+            "offerings_created": offerings_created,
             "students": touched_students,
             "data": curriculum_planning_payload(program),
         })
@@ -5071,7 +5127,7 @@ def register_routes(app: Flask) -> None:
 
     # ---- Course Audit (end-of-term, per-subject roster) ------------------
     @app.route("/api/course-audit/subjects")
-    @require_api_login("staff", "academic_coordinator")
+    @require_api_login("staff", "academic_coordinator", "faculty")
     def course_audit_subjects():
         program_id = request.args.get("program_id", type=int)
         query = Course.query
@@ -5099,7 +5155,7 @@ def register_routes(app: Flask) -> None:
         return jsonify({"items": items})
 
     @app.route("/api/course-audit/roster")
-    @require_api_login("staff", "academic_coordinator")
+    @require_api_login("staff", "academic_coordinator", "faculty")
     def course_audit_roster():
         course_id = request.args.get("course_id", type=int)
         term_filter = (request.args.get("term") or "").strip()
@@ -5139,7 +5195,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/course-audit/roster", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff")
+    @require_api_login("academic_coordinator", "staff", "faculty")
     def course_audit_roster_save():
         data = request.get_json(silent=True) or {}
         course = Course.query.get_or_404(int(data.get("course_id") or 0))
@@ -5421,6 +5477,9 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "No program found."}), 404
 
         courses = monitoring_curriculum_courses(program)
+        term_id = request.args.get("term_id", type=int)
+        selected_term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
+        selected_term_label = selected_term.label if selected_term else ""
         students = (
             Student.query.filter_by(program_id=program.id)
         )
@@ -5446,12 +5505,13 @@ def register_routes(app: Flask) -> None:
         ))
         sids = [s.id for s in students]
         cids = [c.id for c in courses]
-        records: dict[tuple[int, int], str] = {}
+        records: dict[tuple[int, int], CourseRecord] = {}
         if sids and cids:
             for rec in CourseRecord.query.filter(
                 CourseRecord.student_id.in_(sids), CourseRecord.course_id.in_(cids)
             ).all():
-                records[(rec.student_id, rec.course_id)] = rec.status
+                if not selected_term_label or (rec.term_label or selected_term_label) == selected_term_label:
+                    records[(rec.student_id, rec.course_id)] = rec
 
         cat_order = ["Basic", "Major", "Cognate", "Core", "Comprehensive"]
         grouped: dict[str, list] = {}
@@ -5476,7 +5536,8 @@ def register_routes(app: Flask) -> None:
             done = 0
             done_units = 0
             for c in courses:
-                status = records.get((s.id, c.id), "Missing")
+                record = records.get((s.id, c.id))
+                status = record.status if record else "Missing"
                 cells[c.id] = status
                 if status == "Completed":
                     done += 1
@@ -5487,6 +5548,8 @@ def register_routes(app: Flask) -> None:
                 "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
                 "enrollment_tag": s.enrollment_tag,
                 "cells": cells, "completed": done, "total": len(courses),
+                "grades": {c.id: (records[(s.id, c.id)].grade_value or "") for c in courses if (s.id, c.id) in records},
+                "grade_remarks": {c.id: (records[(s.id, c.id)].remarks or "") for c in courses if (s.id, c.id) in records},
                 "rate": round(done / len(courses) * 100, 1) if courses else 0,
                 "completed_units": done_units, "total_units": total_units_all,
                 "eligible": compre["eligible"],
@@ -5508,6 +5571,8 @@ def register_routes(app: Flask) -> None:
         return jsonify({
             "program": program_dict(program),
             "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+            "terms": [term_dict(t) for t in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
+            "selected_term": term_dict(selected_term) if selected_term else None,
             "categories": categories,
             "course_count": len(courses),
             "total_units": total_units_all,
@@ -5533,7 +5598,8 @@ def register_routes(app: Flask) -> None:
             student.current_stage = "Comprehensive Exam"
         recompute_risk(student)
         account = current_account()
-        actor = f"Academic Coordinator Â· {account.full_name}" if account else "Academic Coordinator"
+        actor_role = "Faculty" if account and account.role == "faculty" else "Academic Coordinator"
+        actor = f"{actor_role} · {account.full_name}" if account else actor_role
         add_log(
             "course-audit",
             student.id,

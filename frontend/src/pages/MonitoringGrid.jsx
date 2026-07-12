@@ -55,6 +55,7 @@ export default function MonitoringGrid() {
   const selectedProgress = searchParams.get("progress") || "";
   const selectedRisk = searchParams.get("risk") || "";
   const selectedEnrollment = searchParams.get("enrollment") || "";
+  const selectedTermId = searchParams.get("term_id") || "";
   const selectedSort = searchParams.get("sort") || "name";
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
@@ -71,7 +72,7 @@ export default function MonitoringGrid() {
     setLoading(true);
     setError("");
     api
-      .monitoringGrid({ program_id: pid || undefined, progress: nextProgress, risk: nextRisk, enrollment: nextEnrollment })
+      .monitoringGrid({ program_id: pid || undefined, term_id: selectedTermId || undefined, progress: nextProgress, risk: nextRisk, enrollment: nextEnrollment })
       .then((g) => {
         setGrid(g);
         setProgramId(String(g.program.id));
@@ -87,7 +88,7 @@ export default function MonitoringGrid() {
     setSortBy(selectedSort);
     load(selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment]);
+  }, [selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment, selectedTermId]);
 
   const flatCourses = useMemo(
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
@@ -128,7 +129,7 @@ export default function MonitoringGrid() {
     });
     setSaving(true);
     try {
-      await api.saveCourseAudit({ course_id: course.id, statuses: { [studentId]: nextStatus } });
+      await api.saveCourseAudit({ course_id: course.id, term: grid?.selected_term?.label || "", statuses: { [studentId]: nextStatus } });
     } catch (e) {
       setError(e.message);
       load(programId); // revert by reloading on failure
@@ -213,6 +214,7 @@ export default function MonitoringGrid() {
       risk: next.risk ?? risk,
       enrollment: next.enrollment ?? enrollment,
       sort: next.sort ?? sortBy,
+      term_id: next.term_id ?? selectedTermId,
     };
     const params = {};
     if (merged.program_id) params.program_id = merged.program_id;
@@ -220,6 +222,7 @@ export default function MonitoringGrid() {
     if (merged.risk) params.risk = merged.risk;
     if (merged.enrollment) params.enrollment = merged.enrollment;
     if (merged.sort && merged.sort !== "name") params.sort = merged.sort;
+    if (merged.term_id) params.term_id = merged.term_id;
     setSearchParams(params, { replace: true });
   }
 
@@ -232,7 +235,7 @@ export default function MonitoringGrid() {
             The full class view — students by row, subjects by column. Click a subject cell to cycle its status.
           </p>
         </div>
-        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-6">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-7">
           <select
             value={programId}
             onChange={(e) => updateFilters({ program_id: e.target.value })}
@@ -244,6 +247,9 @@ export default function MonitoringGrid() {
                 {p.code} — {p.name}
               </option>
             ))}
+          </select>
+          <select value={selectedTermId || String(grid?.selected_term?.id || "")} onChange={(e) => updateFilters({ term_id: e.target.value })} className="field-input cursor-pointer" aria-label="Semester">
+            {(grid?.terms || meta?.terms || []).map((term) => <option key={term.id} value={term.id}>{term.label}{term.is_active_planning_term ? " (Current)" : ""}</option>)}
           </select>
           <select
             value={progress}
@@ -412,10 +418,11 @@ export default function MonitoringGrid() {
                           <button
                             type="button"
                             onClick={() => cycleCell(s.id, c, status)}
-                            title={`${c.code} — ${status}. Click to cycle to the next status.`}
-                            className={`flex h-7 w-full min-w-8 items-center justify-center text-[10px] font-bold transition-colors hover:opacity-80 cursor-pointer sm:h-8 sm:text-[11px] ${sty.cls}`}
+                            title={`${c.code} — ${status}${s.grades?.[c.id] ? ` · Grade ${s.grades[c.id]}` : ""}${s.grade_remarks?.[c.id] ? ` · ${s.grade_remarks[c.id]}` : ""}. Click to cycle to the next status.`}
+                            className={`flex h-9 w-full min-w-10 flex-col items-center justify-center text-[10px] font-bold transition-colors hover:opacity-80 cursor-pointer sm:h-10 sm:text-[11px] ${sty.cls}`}
                           >
                             {sty.mark}
+                            {s.grades?.[c.id] && <span className="text-[9px] font-semibold leading-none opacity-90">{s.grades[c.id]}</span>}
                           </button>
                         </td>
                       );

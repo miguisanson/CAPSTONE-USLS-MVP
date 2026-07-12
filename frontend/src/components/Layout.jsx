@@ -26,6 +26,7 @@ import {
   LogOut,
   RotateCcw,
   UserX,
+  CalendarRange,
 } from "lucide-react";
 import { useAuth } from "../auth";
 import { api } from "../api";
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
       { to: "/reports", label: "Reports", icon: FileText },
+      { to: "/term-settings", label: "Academic Terms", icon: CalendarRange, roles: ["staff"] },
     ],
   },
   {
