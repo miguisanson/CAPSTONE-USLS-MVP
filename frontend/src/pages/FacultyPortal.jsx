@@ -5,10 +5,11 @@ import { useApi } from "../hooks";
 import { useAuth } from "../auth";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from "../components/ui";
 import { formatDate } from "../lib/format";
+import FacultyResearchWorkspace from "../components/FacultyResearchWorkspace";
 
 export default function FacultyPortal() {
   const { user, logout } = useAuth();
-  const { data, loading, error } = useApi(() => api.facultyPortalContext(), []);
+  const { data, loading, error, refetch } = useApi(() => api.facultyPortalContext(), []);
 
   const faculty = data?.faculty;
   const panels = data?.panels || [];
@@ -60,6 +61,8 @@ export default function FacultyPortal() {
               <Card className="p-6">
                 <FacultyGrades subjects={data?.subjects || []} terms={data?.terms || []} alerts={data?.grade_alerts || []} />
               </Card>
+
+              <FacultyResearchWorkspace advisees={data?.advisees || []} panels={panels} refetch={refetch} />
 
               <Card className="p-6">
                 <SectionTitle title="My panel assignments" subtitle="Students whose committee you sit on" icon={Users} />

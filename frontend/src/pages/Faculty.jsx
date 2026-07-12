@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness, Building2, CalendarCheck2, CalendarDays, ChevronLeft,
-  ChevronRight, ExternalLink, Link2, Mail, Search, UsersRound, X,
+  ChevronRight, ExternalLink, KeyRound, Link2, Mail, Search, ShieldCheck, UsersRound, X,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
@@ -34,7 +34,7 @@ export default function Faculty() {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return faculty.filter((item) => {
-      const matchesText = !needle || [item.name, item.college, item.role, item.specialization, ...(item.matching_keywords || [])]
+      const matchesText = !needle || [item.name, item.college, item.role, item.specialization, item.email, item.account?.email, ...(item.matching_keywords || [])]
         .some((value) => value?.toLowerCase().includes(needle));
       return matchesText
         && (department === "All departments" || item.college === department)
@@ -61,7 +61,7 @@ export default function Faculty() {
     <div className="space-y-5 animate-fade-up">
       <header>
         <h1 className="font-display text-2xl font-semibold text-ink">Faculty Profiles</h1>
-        <p className="mt-1 text-sm text-slate-500">Search the faculty directory, then open a profile to review expertise, panel load, and weekly availability.</p>
+        <p className="mt-1 text-sm text-slate-500">Search the faculty directory, then open a profile to review expertise, generated login email, panel load, and weekly availability.</p>
       </header>
 
       <Card className="p-4">
@@ -85,6 +85,46 @@ export default function Faculty() {
         </div>
       </Card>
 
+      <Card className="p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-brand-700" />
+              <h2 className="text-sm font-semibold text-ink">Demo faculty credentials</h2>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Default faculty password: <span className="font-semibold text-ink">DemoPass123!</span></p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            {faculty.filter((item) => item.account).length} linked faculty accounts
+          </span>
+        </div>
+        {faculty.length ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <th className="py-2 pr-3">Faculty</th>
+                  <th className="px-3 py-2">Generated email</th>
+                  <th className="px-3 py-2">Default password</th>
+                  <th className="py-2 pl-3">Account status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {faculty.map((item) => (
+                  <tr key={`credentials-${item.id}`} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2 pr-3 font-medium text-ink">{item.name}</td>
+                    <td className="px-3 py-2 text-slate-600">{item.account?.email || item.email}</td>
+                    <td className="px-3 py-2 text-slate-500">DemoPass123!</td>
+                    <td className="py-2 pl-3"><StatusBadge value={item.account?.active ? "Active" : "No account"} dot={false} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </Card>
+
       <Card className="overflow-hidden">
         {loading ? <Spinner label="Loading faculty profiles…" /> : error ? (
           <EmptyState icon={UsersRound} title="Could not load faculty" hint={error} />
@@ -97,12 +137,14 @@ export default function Faculty() {
               <p className="text-xs text-slate-400">Select a faculty member to open their profile</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
+              <table className="w-full min-w-[1080px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                     <th className="px-5 py-3">Faculty</th>
                     <th className="px-3 py-3">Department</th>
                     <th className="px-3 py-3">Specialization</th>
+                    <th className="px-3 py-3">Generated email</th>
+                    <th className="px-3 py-3">Account</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-5 py-3 text-right">Panel load</th>
                   </tr>
@@ -121,6 +163,8 @@ export default function Faculty() {
                       </td>
                       <td className="px-3 py-3 text-slate-600">{item.college}</td>
                       <td className="max-w-sm px-3 py-3 text-slate-600"><p className="line-clamp-2">{item.specialization}</p></td>
+                      <td className="px-3 py-3 text-slate-600">{item.account?.email || item.email}</td>
+                      <td className="px-3 py-3"><StatusBadge value={item.account?.active ? "Active login" : "No account"} dot={false} /></td>
                       <td className="px-3 py-3"><StatusBadge value={item.active ? "Active" : "Inactive"} dot={false} /></td>
                       <td className="px-5 py-3 text-right"><span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{item.panel_load}</span></td>
                     </tr>
@@ -168,6 +212,11 @@ function FacultyProfileModal({ faculty, onClose }) {
             <div className="space-y-6">
               <ProfileSection icon={Mail} title="Contact">
                 <a className="text-sm font-medium text-brand-700 hover:underline" href={`mailto:${faculty.email}`}>{faculty.email}</a>
+                <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty login</p>
+                  <p className="mt-1 text-sm font-semibold text-ink">{faculty.account?.email || faculty.email}</p>
+                  <p className="mt-1 text-xs text-slate-500">Default password: DemoPass123!</p>
+                </div>
               </ProfileSection>
               <ProfileSection icon={UsersRound} title="Current assignments">
                 {(faculty.current_assignments || []).length ? <div className="space-y-2">{faculty.current_assignments.slice(0, 3).map((assignment) => (

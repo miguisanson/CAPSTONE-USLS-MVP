@@ -11,7 +11,7 @@ const DEMO = {
   registrar: { email: "registrar@gs.local", password: "DemoPass123!" },
   dean: { email: "dean@gs.local", password: "DemoPass123!" },
   student: { email: "student@gs.local", password: "DemoPass123!" },
-  faculty: { email: "faculty@gs.local", password: "DemoPass123!" },
+  faculty: { email: "liwayway.bautista@gs.local", password: "DemoPass123!" },
 };
 
 const HOME = { staff: "/", academic_coordinator: "/workflow/course-audit", research_coordinator: "/workflow/graduation", registrar: "/workflow/withdrawal", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };

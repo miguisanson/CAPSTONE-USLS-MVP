@@ -177,6 +177,10 @@ export const api = {
     request("/awol/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   studentPortalContext: () => request("/student-portal/context"),
   facultyPortalContext: () => request("/faculty-portal/context"),
+  signAdviserPaper: (evidenceId, payload) =>
+    request(`/faculty-portal/adviser-approvals/${evidenceId}`, { method: "POST", body: JSON.stringify(payload) }),
+  submitDefenseVerdict: (scheduleId, payload) =>
+    request(`/faculty-portal/defense-verdicts/${scheduleId}`, { method: "POST", body: JSON.stringify(payload) }),
   submitStudentRequest: (type, payload) =>
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
   uploadResearchEvidence: async (gate, itemName, file) => {

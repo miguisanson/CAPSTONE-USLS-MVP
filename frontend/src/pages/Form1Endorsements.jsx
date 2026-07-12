@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, SectionTitle, Spinner, StatusBadge } from "../components/ui";
 import { formatDate } from "../lib/format";
+import SignaturePad from "../components/SignaturePad";
 
 export function Form1EndorsementQueue({ embedded = false }) {
   const { data, loading, error, refetch } = useApi(() => api.form1Endorsements(), []);
@@ -188,13 +189,7 @@ export function Form1EndorsementQueue({ embedded = false }) {
               <div className="mt-4 space-y-4">
                 <section aria-labelledby="signature-canvas-label">
                   <p id="signature-canvas-label" className="field-label">Draw signature</p>
-                  <div className="overflow-hidden rounded-xl border border-slate-300 bg-white"><canvas ref={canvasRef} width="720" height="180" onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerCancel={stopDrawing} className="h-40 w-full touch-none cursor-crosshair" aria-label="Academic Coordinator signature canvas" /></div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <button type="button" onClick={clearSignature} className="btn-ghost cursor-pointer"><RotateCcw className="h-4 w-4" />Clear drawing</button>
-                    <button type="button" onClick={finalizeSignature} disabled={!hasDrawing || Boolean(finalizedSignature)} className="btn-primary cursor-pointer"><CheckCircle2 className="h-4 w-4" />{finalizedSignature ? "Signature finalized" : "Finalize signature"}</button>
-                  </div>
-                  {signatureNotice && <p className={`mt-2 text-xs font-semibold ${finalizedSignature ? "text-emerald-700" : "text-amber-700"}`}>{signatureNotice}</p>}
-                  <p className="mt-1 text-xs text-slate-400">Use a mouse, stylus, or touch input inside the box.</p>
+                  <SignaturePad resetKey={selectedId} onChange={setFinalizedSignature} ariaLabel="Academic Coordinator signature canvas" />
                 </section>
                 <button type="button" onClick={endorse} disabled={busy || !finalizedSignature} className="btn-primary w-full cursor-pointer sm:w-auto">{busy ? "Saving endorsement..." : "Endorse and sign Form 1"}</button>
               </div>
