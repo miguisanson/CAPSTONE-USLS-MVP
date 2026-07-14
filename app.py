@@ -1966,13 +1966,11 @@ BACKOFFICE_ROLES = {
     "staff",
     "academic_coordinator",
     "research_coordinator",
-    "registrar",
 }
 
 ROLE_TRANSACTION_ACCESS = {
     "academic_coordinator": {"course-audit", "research-gate", "panel-matching", "practicum", "graduation", "withdrawal", "awol"},
     "research_coordinator": {"research-gate", "graduation"},
-    "registrar": {"graduation", "withdrawal"},
 }
 
 REQUEST_ATTACHMENT_WORKFLOWS = {
@@ -1990,7 +1988,6 @@ ROLE_LABELS = {
     "staff": "Graduate School Staff",
     "academic_coordinator": "Academic Coordinator",
     "research_coordinator": "Research Coordinator",
-    "registrar": "Registrar",
     "dean": "Dean",
     "student": "Student",
     "faculty": "Faculty Member",
@@ -2025,7 +2022,6 @@ WORKFLOW_RECIPIENTS = {
     "Academic Coordinator": "academic_coordinator",
     "Research Coordinator": "research_coordinator",
     "Dean": "dean",
-    "Registrar": "registrar",
 }
 
 
@@ -4573,7 +4569,6 @@ def register_routes(app: Flask) -> None:
                 previous_status=previous_status,
                 new_status=item.endorsement_status,
             )
-            add_task(item.student_id, "Record receipt of endorsed graduation list", "Registrar", 3, 40)
             writer.writerow([
                 item.student.student_number,
                 item.student.name,
@@ -7361,7 +7356,7 @@ def workflow_backflow_status(slug: str, record, recipient_label: str, previous_s
     """Move a returned case to the recipient's real swimlane without losing data."""
     if recipient_label == "Student":
         if slug == "withdrawal" and previous_status in {
-            "Requirements Submitted", "Registrar Review", "Fee Cleared", "Withdrawal Confirmed",
+            "Requirements Submitted", "Requirements Verified",
         }:
             return "Requirements Pending"
         return "Returned for Clarification"
@@ -7381,7 +7376,6 @@ def workflow_backflow_status(slug: str, record, recipient_label: str, previous_s
             "Graduate School Staff": "Submitted to GS Staff",
             "Academic Coordinator": "Approved - Follow-through",
             "Dean": "Dean Review",
-            "Registrar": "Registrar Review",
         }.get(recipient_label, previous_status)
     return {
         "Graduate School Staff": "Endorsement Prepared" if previous_status in {
@@ -7391,7 +7385,6 @@ def workflow_backflow_status(slug: str, record, recipient_label: str, previous_s
         "Academic Coordinator": "Coursework Review",
         "Research Coordinator": "Research Review",
         "Dean": "Ready for Dean Review",
-        "Registrar": "Sent to Registrar",
     }.get(recipient_label, previous_status)
 
 
@@ -8132,6 +8125,10 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             research_case, progress = sync_research_progress(selected_student)
             assignments = active_panel_assignments(selected_student, progress["gate"])
             context["assigned_panel"] = [panel_assignment_dict(p) for p in assignments]
+            # Full defense-eligible faculty list so staff can reassign the panel from
+            # this screen (not just accept the matched panel).
+            context["faculty_directory"] = defense_faculty_directory()
+            context["panel_roles"] = panel_roles_for_student(selected_student)
             requirements = progress["milestone"]["requirements"]
             schedule_blockers = [
                 item for item in requirements
@@ -9466,6 +9463,51 @@ def handle_defense_scheduling(data: MultiDict) -> int:
     # when Research Gate, calendar, lead-time, or defense-record checks warn.
     student = Student.query.get_or_404(int(data["student_id"]))
     require_research_prerequisite(student)
+
+    # Optional panel reassignment from the Defense Scheduling screen: staff may pick
+    # faculty from the full directory (not just the matched panel). This reassigns the
+    # student's official gate panel before scheduling against it.
+    reassign_ids = []
+    for value in data.getlist("panel_faculty_ids"):
+        try:
+            fid = int(value)
+        except (TypeError, ValueError):
+            continue
+        if fid not in reassign_ids:
+            reassign_ids.append(fid)
+    if reassign_ids:
+        reassign_actor = require_workflow_actor("staff", "academic_coordinator")
+        _, reassign_progress = sync_research_progress(student)
+        reassign_gate = reassign_progress["gate"]
+        reassign_roles = panel_roles_for_student(student)
+        if len(reassign_ids) != len(reassign_roles):
+            raise ValueError(f"Select {len(reassign_roles)} different faculty members for the defense panel.")
+        prior_scores = {a.faculty_id: a.score for a in active_panel_assignments(student, reassign_gate)}
+        chosen_faculty = []
+        for fid in reassign_ids:
+            faculty = Faculty.query.filter_by(id=fid, active=True).first()
+            if not faculty:
+                raise ValueError("One of the selected faculty members is no longer active.")
+            if not UserAccount.query.filter_by(faculty_id=faculty.id, role="faculty", active=True).first():
+                raise ValueError(f"{faculty.name} does not have an active faculty login account yet.")
+            chosen_faculty.append(faculty)
+        clear_panel_for_research_gate(student, reassign_gate)
+        for index, faculty in enumerate(chosen_faculty):
+            db.session.add(PanelAssignment(
+                student_id=student.id, faculty_id=faculty.id, gate=reassign_gate,
+                panel_role=reassign_roles[index], score=prior_scores.get(faculty.id, 0),
+                eligibility_note="Reassigned via Defense Scheduling"))
+        add_log(
+            "panel-matching", student.id, workflow_actor_label(reassign_actor),
+            data.get("source_reference", ""),
+            f"Defense panel reassigned to {len(chosen_faculty)} member(s) from Defense Scheduling",
+            "Research Coordinator",
+            "; ".join(f"{reassign_roles[i]}: {f.name}" for i, f in enumerate(chosen_faculty)),
+        )
+        sync_research_progress(student)
+        if str(data.get("reassign_only", "")).lower() in {"1", "true", "yes", "on"}:
+            return student.id
+
     preferred_date = parse_date(data["preferred_date"])
     preferred_end_date = parse_date(data.get("preferred_end_date") or data["preferred_date"])
     defense_type = data.get("defense_type", "Title Defense")
@@ -9789,10 +9831,10 @@ def handle_withdrawal(data: MultiDict) -> int:
         if application.status != "Requirements Submitted" or not application.proof_attachment_id:
             raise ValueError("The student must submit the withdrawal form and proof before staff verification.")
         application.requirement_status = "Complete"
-        application.status = "Registrar Review"
-        next_owner = "Registrar"
-        result = "Withdrawal form and proof verified; Registrar fee confirmation requested"
-        add_task(student.id, "Confirm withdrawal fee status", "Registrar", 5, 45)
+        application.status = "Requirements Verified"
+        next_owner = "Graduate School Staff"
+        result = "Withdrawal form and proof verified; ready for final GS Staff confirmation"
+        add_task(student.id, "Confirm the completed withdrawal", "Graduate School Staff", 3, 45)
     elif action == "return_requirements":
         account = require_workflow_actor("staff")
         if application.status != "Requirements Submitted":
@@ -9814,35 +9856,17 @@ def handle_withdrawal(data: MultiDict) -> int:
         next_owner = "Student"
         result = "Withdrawal requirements marked incomplete and returned to the student"
         add_task(student.id, "Complete and resubmit withdrawal requirements", "Student", 5, 45)
-    elif action == "record_fee_clearance":
-        account = require_workflow_actor("registrar")
-        if application.status != "Registrar Review" or application.requirement_status != "Complete":
-            raise ValueError("Verify the withdrawal requirements before recording Registrar fee clearance.")
-        application.fee_status = "Cleared"
-        application.registrar_status = "Fee Confirmed"
-        application.status = "Fee Cleared"
-        next_owner = "Graduate School Staff"
-        result = "Registrar fee status confirmed; final GS requirements confirmation is ready"
     elif action == "confirm_withdrawal":
         account = require_workflow_actor("staff")
-        if application.status != "Fee Cleared" or application.fee_status != "Cleared" or application.requirement_status != "Complete":
-            raise ValueError("Requirements and Registrar fee clearance must be complete before confirming withdrawal.")
-        application.status = "Withdrawal Confirmed"
-        next_owner = "Registrar"
-        result = "GS Staff recorded the confirmed withdrawal and informed the student; Registrar record update requested"
-        add_task(student.id, "Update the student record for confirmed withdrawal", "Registrar", 3, 45)
-    elif action == "record_registrar_update":
-        account = require_workflow_actor("registrar")
-        if application.status != "Withdrawal Confirmed":
-            raise ValueError("GS Staff must confirm the completed withdrawal before the Registrar record update.")
-        application.registrar_status = "Record Updated"
+        if application.status != "Requirements Verified" or application.requirement_status != "Complete":
+            raise ValueError("Verify the withdrawal requirements before confirming the withdrawal.")
         application.status = "Withdrawn Confirmed"
         application.completed_at = application.completed_at or now_utc()
         student.standing = "Withdrawn"
         student.current_stage = "Withdrawn"
         student.enrollment_tag = "Withdrawn"
         next_owner = "Graduate School Staff"
-        result = "Registrar update recorded; student is now withdrawn"
+        result = "GS Staff confirmed the completed withdrawal; student is now withdrawn"
     else:
         raise ValueError("Choose the next available withdrawal workflow action.")
 
@@ -10075,16 +10099,7 @@ def handle_graduation(data: MultiDict) -> int:
         result = "Graduation endorsement list prepared for Dean review"
         add_task(student.id, "Review graduation endorsement list", "Dean", 5, 55)
     elif requested_status == "Sent to Registrar":
-        raise ValueError("Use the export action on a Dean-approved endorsement to hand it off to the Registrar.")
-    elif requested_status == "Registrar Received":
-        account = require_workflow_actor("registrar")
-        if endorsement.endorsement_status != "Sent to Registrar":
-            raise ValueError("The endorsed list must be sent to the Registrar before receipt can be recorded.")
-        endorsement.endorsement_status = "Registrar Received"
-        endorsement.registrar_status = "Received"
-        endorsement.registrar_received_at = now_utc()
-        next_owner = "Graduate School Staff"
-        result = "Registrar receipt of the endorsed graduation list recorded"
+        raise ValueError("Use the export action on a Dean-approved endorsement to hand it off externally. Export is the terminal step.")
     else:
         raise ValueError("Choose the next available graduation workflow action.")
 
@@ -11247,6 +11262,27 @@ def active_panel_assignments(student: Student, gate: str | None = None) -> list[
 def clear_panel_for_research_gate(student: Student, gate: str | None = None) -> int:
     gate = gate or current_panel_gate(student)
     return PanelAssignment.query.filter_by(student_id=student.id, gate=gate).delete()
+
+
+def defense_faculty_directory() -> list[dict]:
+    # Every defense-eligible faculty (active + has an active faculty login). Used by
+    # Defense Scheduling so staff can reassign the panel beyond the matched shortlist.
+    entries = []
+    for faculty in Faculty.query.filter_by(active=True).order_by(Faculty.name).all():
+        if not UserAccount.query.filter_by(faculty_id=faculty.id, role="faculty", active=True).first():
+            continue
+        entries.append({
+            "faculty_id": faculty.id,
+            "name": faculty.name,
+            "specialization": faculty.specialization,
+            "college": faculty.college,
+            "upcoming_windows": FacultyAvailability.query.filter(
+                FacultyAvailability.faculty_id == faculty.id,
+                FacultyAvailability.available_date >= date.today(),
+            ).count(),
+            "workload": PanelAssignment.query.filter_by(faculty_id=faculty.id).count(),
+        })
+    return entries
 
 
 def split_items(value: str) -> list[str]:
@@ -14159,7 +14195,6 @@ def ensure_demo_accounts() -> None:
         ("staff@gs.local", "Graduate School Staff Demo", "staff"),
         ("academic@gs.local", "Academic Coordinator Demo", "academic_coordinator"),
         ("research@gs.local", "Research Coordinator Demo", "research_coordinator"),
-        ("registrar@gs.local", "Registrar Demo", "registrar"),
     ]
     for email, full_name, role in backoffice_accounts:
         account = UserAccount.query.filter_by(email=email).first()

@@ -402,7 +402,7 @@ function WorkflowRecordsCard({ practicum, withdrawal, graduation, eligibility, h
     icon: GraduationCap,
     label: "Graduation",
     status: graduation?.endorsement_status || eligibility?.status || "Needs verification",
-    detail: graduation ? `${graduation.review_window} · registrar: ${graduation.registrar_status}` : eligibility?.next_action || "No endorsement record",
+    detail: graduation ? `${graduation.review_window} · ${graduation.endorsement_status}` : eligibility?.next_action || "No endorsement record",
   });
   return (
     <Card className="p-6">

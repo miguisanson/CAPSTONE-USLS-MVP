@@ -501,8 +501,8 @@ function DeanDecisionModal({ pending, busy, onClose, onConfirm }) {
 function DeanExportModal({ pending, busy, onClose, onConfirm }) {
   return (
     <DeanDialog
-      id="dean-confirm-registrar-handoff"
-      title="Confirm Registrar handoff"
+      id="dean-confirm-endorsement-export"
+      title="Confirm endorsement export"
       subtitle={`${pending.count} Dean-approved graduation candidate${pending.count === 1 ? "" : "s"}`}
       onClose={onClose}
       footer={<button type="button" disabled={busy} onClick={onConfirm} className="btn-primary cursor-pointer px-4 py-2"><Download className="h-4 w-4" /> {busy ? "Exporting…" : "Export and mark sent"}</button>}
@@ -696,8 +696,8 @@ function deanBoardGroup(item) {
   if (["Report Sent to Dean", "Ready for Dean Review", "Dean Review"].includes(workflowStatus)) return "Pending Dean Review";
   if (["Returned", "Returned for Clarification", "Returned for Revision", "Additional Certificates Requested"].includes(item.status)
     || ["Returned", "Returned for Clarification", "Returned for Revision", "Additional Certificates Requested"].includes(workflowStatus)) return "Returned for Revision";
-  if (["Dean Approved", "Dean Reviewed", "Approved", "Sent to Registrar", "Registrar Received", "Withdrawn Confirmed"].includes(item.status)
-    || ["Dean Approved", "Dean Reviewed", "Approved", "Sent to Registrar", "Registrar Received", "Withdrawn Confirmed"].includes(workflowStatus)) return "Approved / Completed";
+  if (["Dean Approved", "Dean Reviewed", "Approved", "Sent to Registrar", "Withdrawn Confirmed"].includes(item.status)
+    || ["Dean Approved", "Dean Reviewed", "Approved", "Sent to Registrar", "Withdrawn Confirmed"].includes(workflowStatus)) return "Approved / Completed";
   if (["Denied", "Rejected", "Cancelled"].includes(item.status) || ["Denied", "Rejected", "Cancelled"].includes(workflowStatus)) return "Rejected / Withdrawn";
   return "New / Submitted";
 }

@@ -6,6 +6,12 @@ The platform consolidates graduate-student records, enrollment and course monito
 
 ## Development Change List
 
+Ownership shown below is based on Git commit author metadata. A linked GitHub account identifies the account that committed the change; it does not imply sole authorship of every line in a merge or collaborative change.
+
+### Unreleased branch work
+
+- **July 14, 2026 - Workflow boundaries and interface consistency:** The current working tree removes the Registrar as an in-app actor, simplifies withdrawal completion under Graduate School Staff, makes graduation export the terminal in-app step, adds defense-panel reassignment during scheduling, gives the Faculty Portal consistent sidebar navigation, corrects demo materials, and aligns the Course Adjustments page title with its navigation label. **Owner:** Uncommitted and therefore not attributable to a GitHub account yet.
+
 - **March 2, 2026 (Monday) - Initial repository and platform foundation:** Created the first project versions, established the application and database files, imported the initial working data, and added Linux compatibility fixes.
 - **March 3, 2026 (Tuesday) - Server application reset:** Removed the sample application, replaced it with the server-derived project, and established the new application baseline and repository ignore rules.
 - **March 22, 2026 (Sunday) - MVP website update:** Expanded the early MVP, updated the website structure, and applied the first consolidated fixes to the working interface.
@@ -32,3 +38,15 @@ The platform consolidates graduate-student records, enrollment and course monito
 - **July 6, 2026 (Monday) - Semester model and student request forms:** Changed the visible academic calendar from trimester/term wording to semesters and added student LOA/readmission forms with controlled semester selection.
 - **July 6, 2026 (Monday) - Dean-owned LOA and readmission decisions:** Removed the staff-side Dean decision control, limited staff to reviewing and forwarding requests, moved approve/deny/return actions to the Dean, restored the LOA/readmission Board and Table switch, kept forwarded and decided requests visible as read-only staff history, removed the unneeded Semester Management page, and standardized visible semester wording across the application.
 - **July 6, 2026 (Monday) - Incomplete alerts, AWOL return, and residency management:** Added student Inbox alerts when an INC is recorded or resolved; added a periodic deadline scheduler and the handbook one-year lapse result (3.0 master's / 2.0 doctorate, no credit, Retake Required); added the AWOL & Residency Board/Table workflow; added student written return-intent submission; routed return decisions to the Dean; applied master's 5/7-year and doctorate 7/9-year residence classifications with refresher or full re-enrollment escalation; and added handbook-grounded policy review for valid residency without subjects.
+- **July 12, 2026 (Sunday) - Monitoring, planning, and faculty updates:** Improved the monitoring grid, curriculum planning, faculty portal behavior, and backend support; added academic-term settings and related API/navigation wiring. **Commit owner:** [@myrine215](https://github.com/myrine215), commit [`9582639`](https://github.com/miguisanson/CAPSTONE-USLS-MVP/commit/9582639fbd092d63dd4bac4016472f4e0c32cb6a).
+- **July 13, 2026 (Monday) - Research-gate workflow expansion:** Expanded research-gate backend and interface behavior, added faculty research workspace and signature-pad components, refined faculty/Form 1/workflow screens, and removed generated upload artifacts from version control. **Commit owner:** [@natamndz](https://github.com/natamndz), commit [`b68fcd5`](https://github.com/miguisanson/CAPSTONE-USLS-MVP/commit/b68fcd5666f1d95ce28cee611514fe62bee31d89).
+- **July 14, 2026 (Tuesday) - Development tooling and demo-file reorganization:** Added the Intelligence Layer skill configuration for Claude and Codex, moved simulation materials into `Documents/Demo_Files`, and removed superseded concept-paper copies. **Commit owner:** [@miguisanson](https://github.com/miguisanson), commit [`393710a`](https://github.com/miguisanson/CAPSTONE-USLS-MVP/commit/393710acf284184ca9717f7e6a4eb3f6d0f9dd84).
+
+## Contributor Ownership Reference
+
+- [@miguisanson](https://github.com/miguisanson) - Git author identity `miguisanson`; repository owner and commit owner for the July 14 checkpoint.
+- [@myrine215](https://github.com/myrine215) - Git author identity `myrine215`; commit owner for the July 12 monitoring, planning, and faculty update.
+- [@natamndz](https://github.com/natamndz) - Git author identity `natamndz`; commit owner for the July 13 research-gate update.
+- [@khloe-ose](https://github.com/khloe-ose) - Git author identity `khloe-ose`; owner of earlier authentication, student portal, LOA/readmission, dashboard, and related commits represented in the historical change list.
+- **Claude Opus 4.8** - Recorded as a co-author in several commit messages, but the metadata uses `noreply@anthropic.com` rather than a verifiable GitHub account, so no GitHub ownership link is assigned.
+- **Current uncommitted work** - No reliable Git author or GitHub owner exists until the changes are committed; these changes are intentionally not attributed here.

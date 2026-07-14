@@ -7,12 +7,11 @@ import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
 import { formatDate, relativeDays } from "../lib/format";
 import { useAuth } from "../auth";
 
-const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar", "Student", "Panel Chair", "Adviser"];
+const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student", "Panel Chair", "Adviser"];
 const ACCOUNT_OWNER = {
   staff: "Graduate School Staff",
   academic_coordinator: "Academic Coordinator",
   research_coordinator: "Research Coordinator",
-  registrar: "Registrar",
 };
 
 export default function WorkQueue() {

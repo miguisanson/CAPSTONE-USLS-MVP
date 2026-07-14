@@ -5,10 +5,7 @@ const WITHDRAWAL_STEPS = [
   "Academic Coordinator Follow-through",
   "Student Informed of Approval",
   "Requirements Submitted",
-  "GS Staff Verification",
-  "Registrar Fee Confirmation",
-  "GS Withdrawal Confirmation",
-  "Registrar Record Update",
+  "GS Staff Verification and Confirmation",
   "Withdrawn",
 ];
 
@@ -21,8 +18,7 @@ const GRADUATION_STEPS = [
   "Dean Review",
   "Endorsement List Revised and Resubmitted",
   "Dean Approval",
-  "Endorsed List Sent to Registrar",
-  "Registrar Receipt Recorded",
+  "Endorsed List Exported (external handoff)",
 ];
 
 function numberedStates(labels, activeIndex, optionalIndexes = []) {
@@ -41,10 +37,8 @@ export function withdrawalTimelineSteps(status) {
     "Coordinator Follow-through Complete": 4,
     "Requirements Pending": 4,
     "Requirements Submitted": 5,
-    "Registrar Review": 7,
-    "Fee Cleared": 8,
-    "Withdrawal Confirmed": 9,
-    "Withdrawn Confirmed": 10,
+    "Requirements Verified": 6,
+    "Withdrawn Confirmed": 7,
     Denied: 2,
     Returned: 2,
   };
@@ -73,8 +67,6 @@ export function graduationTimelineSteps(status, eligibility = {}) {
     activeIndex = 7;
   } else if (status === "Sent to Registrar") {
     activeIndex = 8;
-  } else if (status === "Registrar Received") {
-    activeIndex = 9;
   }
   return numberedStates(GRADUATION_STEPS, activeIndex, [6]);
 }

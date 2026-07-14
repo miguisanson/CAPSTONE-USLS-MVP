@@ -57,7 +57,6 @@ const WORKFLOW_ROLE_LABELS = {
   staff: "Graduate School Staff",
   academic_coordinator: "Academic Coordinator",
   research_coordinator: "Research Coordinator",
-  registrar: "Registrar",
 };
 const PANEL_MATCHING_DEFAULT_LIMIT = 15;
 const PANEL_MATCHING_RECOMMENDED_COUNT = 4;
@@ -2425,6 +2424,17 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
   const panel = context.assigned_panel || [];
   const requiredPanelCount = context.panel_roles?.length || 4;
   const panelComplete = panel.length >= requiredPanelCount;
+  const facultyDirectory = context.faculty_directory || [];
+  const panelRoleLabels = context.panel_roles || [];
+  const [editingPanel, setEditingPanel] = useState(false);
+  const [panelEditIds, setPanelEditIds] = useState([]);
+  const chosenPanelIds = panelEditIds.filter((id) => id);
+  const panelSelectionValid = chosenPanelIds.length === requiredPanelCount && new Set(chosenPanelIds).size === requiredPanelCount;
+  function updatePanel() {
+    if (!panelSelectionValid) return;
+    submit({ student_id: studentId, panel_faculty_ids: chosenPanelIds, reassign_only: true });
+    setEditingPanel(false);
+  }
   const isFailedStageRetry = schedules.some(
     (schedule) => schedule.defense_type === form.defense_type && schedule.defense_outcome === "Failed"
   );
@@ -2445,6 +2455,12 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
       override_conflicts: false,
     }));
   }, [studentId, availability.window_start, availability.window_end, readiness.stage]);
+
+  useEffect(() => {
+    setPanelEditIds(panel.map((member) => member.faculty_id));
+    setEditingPanel(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, panel.map((member) => member.faculty_id).join(",")]);
 
   const filteredSlots = useMemo(
     () =>
@@ -2543,9 +2559,50 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
 
       <section aria-labelledby="panel-members-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><p id="panel-members-heading" className="text-sm font-semibold text-ink">Panel members</p><p className="text-xs text-slate-500">Final selections from Panel Matching</p></div>
-          <StatusBadge value={panelComplete ? `${panel.length} selected` : `${panel.length}/${requiredPanelCount} selected`} />
+          <div><p id="panel-members-heading" className="text-sm font-semibold text-ink">Panel members</p><p className="text-xs text-slate-500">Matched panel is the default — you can reassign from the full faculty list</p></div>
+          <div className="flex items-center gap-2">
+            <StatusBadge value={panelComplete ? `${panel.length} selected` : `${panel.length}/${requiredPanelCount} selected`} />
+            <button type="button" onClick={() => setEditingPanel((value) => !value)} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs">{editingPanel ? "Close" : "Change panel"}</button>
+          </div>
         </div>
+        {editingPanel && (
+          <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
+            <p className="text-xs font-semibold text-brand-700">Reassign the defense panel — pick {requiredPanelCount} faculty from the full directory. This updates the student's official panel for this gate, then availability recomputes.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: requiredPanelCount }).map((_, idx) => (
+                <label key={idx} className="block">
+                  <span className="field-label">{panelRoleLabels[idx] || `Panel member ${idx + 1}`}</span>
+                  <select
+                    className="field-input cursor-pointer"
+                    value={panelEditIds[idx] || ""}
+                    onChange={(event) => {
+                      const next = [...panelEditIds];
+                      next[idx] = event.target.value ? Number(event.target.value) : "";
+                      setPanelEditIds(next);
+                    }}
+                  >
+                    <option value="">Select faculty…</option>
+                    {facultyDirectory.map((faculty) => (
+                      <option
+                        key={faculty.faculty_id}
+                        value={faculty.faculty_id}
+                        disabled={panelEditIds.includes(faculty.faculty_id) && panelEditIds[idx] !== faculty.faculty_id}
+                      >
+                        {faculty.name}{faculty.specialization ? ` — ${faculty.specialization}` : ""} · {faculty.upcoming_windows} slot{faculty.upcoming_windows === 1 ? "" : "s"} · load {faculty.workload}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            {facultyDirectory.length === 0 && <p className="text-xs text-amber-700">No faculty with an active login are available to assign yet.</p>}
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={updatePanel} disabled={submitting || !panelSelectionValid} className="btn-primary cursor-pointer px-4 py-2 text-sm">{submitting ? "Updating…" : "Update panel"}</button>
+              <button type="button" onClick={() => { setPanelEditIds(panel.map((member) => member.faculty_id)); setEditingPanel(false); }} className="btn-ghost cursor-pointer px-4 py-2 text-sm">Cancel</button>
+              {!panelSelectionValid && <span className="self-center text-xs text-slate-500">Choose {requiredPanelCount} different faculty to enable Update.</span>}
+            </div>
+          </div>
+        )}
         {panel.length ? <div className="grid gap-3 sm:grid-cols-2">
           {panel.map((member) => {
             const participant = participants.find((item) => item.faculty_id === member.faculty_id);
@@ -3031,12 +3088,12 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
 
 const WORKFLOW_GUIDES = {
   withdrawal: {
-    purpose: "Records a voluntary withdrawal request without changing the official Registrar record prematurely.",
+    purpose: "Records a voluntary withdrawal request through Graduate School review and Dean approval.",
     submitter: "The student submits the request form and supporting proof.",
-    reviewers: "Graduate School Staff records and routes it; the Dean decides; the Academic Coordinator and Registrar complete follow-through.",
-    stages: ["Submitted", "Staff review", "Dean review", "Requirements and fee confirmation", "Registrar update"],
+    reviewers: "Graduate School Staff records and routes it; the Dean decides; the Academic Coordinator and GS Staff complete follow-through.",
+    stages: ["Submitted", "Staff review", "Dean review", "Requirements verification", "GS Staff confirmation"],
     incomplete: "Any reviewer can return the case with a specific clarification message. The student remains Active until every approved follow-through step is complete.",
-    final: "Completed means the Registrar update is recorded and the monitoring record can safely show the student as Withdrawn.",
+    final: "Completed means GS Staff confirmed the withdrawal and the monitoring record shows the student as Withdrawn.",
   },
   practicum: {
     purpose: "Tracks the practicum MOA, placement, required hours, certificates, completion review, and Dean report for programs that require practicum.",
@@ -3047,12 +3104,12 @@ const WORKFLOW_GUIDES = {
     final: "Completed means required hours and documents were accepted; Dean Reviewed closes the monitoring report.",
   },
   graduation: {
-    purpose: "Prepares a Graduate School recommendation and endorsed candidate list; it does not replace the official Registrar graduation process.",
+    purpose: "Prepares a Graduate School recommendation and endorsed candidate list; it does not replace the official university graduation process.",
     submitter: "Students may request readiness review, while GS Staff compiles the review window and candidate list.",
     reviewers: "The Academic Coordinator checks coursework, the Research Coordinator validates completion evidence, and the Dean approves the endorsement list.",
-    stages: ["Candidate review", "Requirements checks", "Batch preparation", "Dean endorsement", "Registrar handoff"],
+    stages: ["Candidate review", "Requirements checks", "Batch preparation", "Dean endorsement", "Endorsement export"],
     incomplete: "A candidate can be returned individually or as part of a batch with the unresolved requirement clearly named.",
-    final: "Endorsed means the Dean-approved list was handed off to the Registrar for the official process.",
+    final: "Endorsed means the Dean-approved list was exported for the external graduation process.",
   },
 };
 
@@ -3159,7 +3216,7 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
             </select>
           </Field>
           <Field label="Recipient / next stage">
-            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal" }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar"]} />
+            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal" }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean"]} />
           </Field>
         </div>
         <Field label="Visibility">
@@ -3346,7 +3403,7 @@ const PRACTICUM_BOARD_COLUMNS = [
 
 const WITHDRAWAL_BOARD_COLUMNS = [
   { label: "Submitted", statuses: ["Submitted to GS Staff"] },
-  { label: "Staff Review", statuses: ["Coordinator Follow-through Complete", "Requirements Pending", "Requirements Submitted", "Registrar Review", "Fee Cleared", "Withdrawal Confirmed"] },
+  { label: "Staff Review", statuses: ["Coordinator Follow-through Complete", "Requirements Pending", "Requirements Submitted", "Requirements Verified"] },
   { label: "Dean Review", statuses: ["Dean Review"] },
   { label: "Returned for Clarification", statuses: ["Returned", "Returned for Clarification"] },
   { label: "Approved", statuses: ["Approved - Follow-through", "Withdrawn Confirmed"] },
@@ -3359,7 +3416,7 @@ const GRADUATION_BOARD_COLUMNS = [
   { label: "Research / Practicum Review", statuses: ["Research Review", "Research Incomplete", "Practicum Incomplete"] },
   { label: "Preparation", statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"] },
   { label: "Dean Review", statuses: ["Ready for Dean Review"] },
-  { label: "Approved / Handoff", statuses: ["Dean Approved", "Sent to Registrar", "Registrar Received"] },
+  { label: "Approved / Exported", statuses: ["Dean Approved", "Sent to Registrar"] },
   { label: "Returned / Not Eligible", statuses: ["Not Eligible", "Returned for Clarification"] },
 ];
 
@@ -3633,9 +3690,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
     if (accountRole === "academic_coordinator" && item.dean_decision === "Approved" && item.status === "Approved - Follow-through") return { label: "Record coordinator follow-through", payload: { ...base, workflow_action: "coordinator_follow_through" } };
     if (accountRole === "staff" && item.status === "Coordinator Follow-through Complete") return { label: "Inform student of approval", payload: { ...base, workflow_action: "notify_student_of_approval" } };
     if (accountRole === "staff" && item.status === "Requirements Submitted") return { label: "Verify form & proof", payload: { ...base, workflow_action: "verify_requirements" } };
-    if (accountRole === "registrar" && item.status === "Registrar Review") return { label: "Confirm Registrar fee status", payload: { ...base, workflow_action: "record_fee_clearance" } };
-    if (accountRole === "staff" && item.status === "Fee Cleared") return { label: "Confirm completed withdrawal", payload: { ...base, workflow_action: "confirm_withdrawal" } };
-    if (accountRole === "registrar" && item.status === "Withdrawal Confirmed") return { label: "Update student record", payload: { ...base, workflow_action: "record_registrar_update" } };
+    if (accountRole === "staff" && item.status === "Requirements Verified") return { label: "Confirm completed withdrawal", payload: { ...base, workflow_action: "confirm_withdrawal" } };
     return null;
   }
   const selectedCurrent = rows.find((item) => item.id === selectedCaseId) || null;
@@ -3661,7 +3716,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view Â· Withdrawn is applied only after requirements, fees, and Registrar update are confirmed`} icon={LogOut} />
+      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view Â· Withdrawn is applied only after requirements are verified and GS Staff confirms`} icon={LogOut} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
@@ -3715,11 +3770,9 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
           <div className="space-y-4">
             <WorkflowSubmitFeedback result={result} error={submitError} />
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Detail label="Dean" value={selectedCurrent?.dean_decision || selectedItem.dean_decision} />
               <Detail label="Requirements" value={selectedCurrent?.requirement_status || selectedItem.requirement_status} />
-              <Detail label="Fee status" value={selectedCurrent?.fee_status || selectedItem.fee_status} />
-              <Detail label="Registrar" value={selectedCurrent?.registrar_status || selectedItem.registrar_status} />
             </div>
             <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
             <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
@@ -3786,7 +3839,6 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
     if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return { label: "List missing requirements & mark not eligible", payload: { ...base, endorsement_status: "Not Eligible" } };
     if (accountRole === "staff" && status === "Eligibility Confirmed") return { label: "Prepare endorsement list", payload: { ...base, endorsement_status: "Endorsement Prepared" } };
     if (accountRole === "staff" && ["Endorsement Prepared", "Returned for Revision"].includes(status)) return { label: status === "Returned for Revision" ? "Resend revised list to Dean" : "Send endorsement list to Dean", payload: { ...base, endorsement_status: "Ready for Dean Review" } };
-    if (accountRole === "registrar" && status === "Sent to Registrar") return { label: "Record Registrar receipt", payload: { ...base, endorsement_status: "Registrar Received", registrar_status: "Received" } };
     return null;
   }
   const selectedRow = rows.find((row) => row.student.id === selectedStudentId) || null;
@@ -3801,7 +3853,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   }
   return (
     <div className="space-y-4">
-      <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view Â· AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns Registrar export`} icon={GraduationCap} />
+      <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view Â· AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`} icon={GraduationCap} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
@@ -4080,7 +4132,6 @@ function GraduationForm({ context, studentId, submit, submitting }) {
     review_window: "AY 2026-2027 Graduation Review",
     endorsement_status: "For Review",
     dean_remarks: "",
-    registrar_status: "Pending",
     source_reference: "",
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -4090,7 +4141,6 @@ function GraduationForm({ context, studentId, submit, submitting }) {
       review_window: current?.review_window || "AY 2026-2027 Graduation Review",
       endorsement_status: current?.endorsement_status || (eligibility.eligible ? "Ready for Dean Review" : "For Review"),
       dean_remarks: current?.dean_remarks || "",
-      registrar_status: current?.registrar_status || "Pending",
       source_reference: "",
     });
   }, [studentId, current?.id, current?.updated_at, eligibility.eligible]);
@@ -4108,7 +4158,7 @@ function GraduationForm({ context, studentId, submit, submitting }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review graduation endorsement" subtitle="Monitor endorsement readiness before the official Registrar process" icon={GraduationCap} />
+      <SectionTitle title="Review graduation endorsement" subtitle="Monitor endorsement readiness before the external graduation process" icon={GraduationCap} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         <MiniBox label="Coursework" value={eligibility.coursework_status || "Pending"} tone={eligibility.coursework_status === "Complete" ? "brand" : "amber"} />
         <MiniBox label="Research" value={eligibility.research_status || "Pending"} tone={eligibility.research_status === "Complete" ? "brand" : "amber"} />
@@ -4139,9 +4189,6 @@ function GraduationForm({ context, studentId, submit, submitting }) {
             placeholder=""
             options={["For Review", "Ready for Dean Review", "Not Eligible", "Returned for Revision", "Sent to Registrar"]}
           />
-        </Field>
-        <Field label="Registrar handoff/status">
-          <Select value={form.registrar_status} onChange={set("registrar_status")} placeholder="" options={["Pending", "Sent", "Received"]} />
         </Field>
         <Field label="Source reference">
           <Input value={form.source_reference} onChange={set("source_reference")} />
@@ -4761,9 +4808,9 @@ function workflowGuidance(slug) {
     practicum:
       "Available only for programs marked with practicum requirements. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
     withdrawal:
-      "Withdrawal is a lifecycle-exit process. A Dean denial keeps the student Active. An approval moves through coordinator follow-through, student requirements, fee/registrar confirmation, and only then marks the student Withdrawn.",
+      "Withdrawal is a lifecycle-exit process. A Dean denial keeps the student Active. An approval moves through coordinator follow-through, student requirements, and GS Staff verification and confirmation, and only then marks the student Withdrawn.",
     graduation:
-      "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and Registrar handoff.",
+      "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and export.",
   };
   return map[slug] || "";
 }

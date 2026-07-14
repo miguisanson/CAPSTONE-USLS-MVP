@@ -43,7 +43,7 @@ const STATUS_STYLES = {
   "Dean Review": "bg-amber-50 text-amber-700 ring-amber-200",
   "Approved - Follow-through": "bg-blue-50 text-blue-700 ring-blue-200",
   "Requirements Pending": "bg-amber-50 text-amber-700 ring-amber-200",
-  "Registrar Review": "bg-blue-50 text-blue-700 ring-blue-200",
+  "Requirements Verified": "bg-blue-50 text-blue-700 ring-blue-200",
   "Withdrawn Confirmed": "bg-brand-50 text-brand-700 ring-brand-200",
   Denied: "bg-red-50 text-red-700 ring-red-200",
   Cleared: "bg-brand-50 text-brand-700 ring-brand-200",

@@ -79,7 +79,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.staff = self._account("staff", "staff@example.test")
             self.academic = self._account("academic_coordinator", "academic@example.test")
             self.research = self._account("research_coordinator", "research@example.test")
-            self.registrar = self._account("registrar", "registrar@example.test")
             self.dean = self._account("dean", "dean@example.test")
             self.program_id = self.program.id
             self.course_id = self.course.id
@@ -87,7 +86,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.staff_id = self.staff.id
             self.academic_id = self.academic.id
             self.research_id = self.research.id
-            self.registrar_id = self.registrar.id
             self.dean_id = self.dean.id
             db.session.commit()
 
@@ -136,9 +134,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def _research_client(self):
         return self._role_client(self.research_id, "research_coordinator")
-
-    def _registrar_client(self):
-        return self._role_client(self.registrar_id, "registrar")
 
     def _transition(self, client, slug, payload, expected=200):
         response = client.post(f"/api/transactions/{slug}", json=payload)
@@ -220,7 +215,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             staff = self._staff_client()
             academic = self._academic_client()
-            registrar = self._registrar_client()
             self._transition(staff, "withdrawal", {"student_id": self.student.id, "workflow_action": "forward_to_dean"})
             dean_item = next(item for item in workflow_approvals_payload()["pending"] if item["id"] == application.id and item["type"] == "withdrawal")
             self.assertEqual(dean_item["workflow_status"], "Dean Review")
@@ -247,12 +241,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             application.status = "Requirements Submitted"
             db.session.commit()
             self._transition(staff, "withdrawal", {"student_id": self.student.id, "workflow_action": "verify_requirements"})
-            self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Registrar").filter(Task.title.contains("fee status")).first())
-            self._transition(staff, "withdrawal", {"student_id": self.student.id, "workflow_action": "record_fee_clearance"}, 400)
-            self._transition(registrar, "withdrawal", {"student_id": self.student.id, "workflow_action": "record_fee_clearance"})
+            self.assertEqual(application.status, "Requirements Verified")
+            self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Graduate School Staff").filter(Task.title.contains("Confirm the completed withdrawal")).first())
             self._transition(staff, "withdrawal", {"student_id": self.student.id, "workflow_action": "confirm_withdrawal"})
-            self.assertEqual(self.student.standing, "Active")
-            self._transition(registrar, "withdrawal", {"student_id": self.student.id, "workflow_action": "record_registrar_update"})
             self.assertEqual(application.status, "Withdrawn Confirmed")
             self.assertEqual(self.student.standing, "Withdrawn")
 
@@ -280,7 +271,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(denied.status, "Denied")
             self.assertEqual(denied_student.standing, "Active")
 
-    def test_graduation_return_resubmit_approve_send_and_registrar_receipt(self):
+    def test_graduation_return_resubmit_approve_and_export(self):
         with app.app_context():
             self.student = db.session.get(Student, self.student_id)
             db.session.add(CourseRecord(student_id=self.student.id, course_id=self.course_id, status="Completed"))
@@ -311,7 +302,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             staff = self._staff_client()
             academic = self._academic_client()
             research = self._research_client()
-            registrar = self._registrar_client()
             self._transition(staff, "graduation", {"student_id": self.student.id, "review_window": "AY 2026-2027", "endorsement_status": "Coursework Review"})
             self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("coursework completion")).first())
             self._transition(staff, "graduation", {"student_id": self.student.id, "endorsement_status": "Research Review"}, 400)
@@ -339,13 +329,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             response = self._dean_client().post("/api/graduation/endorsed.csv", json={"endorsement_ids": [endorsement.id]})
             self.assertEqual(response.status_code, 200)
             db.session.refresh(endorsement)
+            # Export is the terminal step: the endorsed list is handed off externally,
+            # with no in-app Registrar receipt (Registrar is not an in-system actor).
             self.assertEqual(endorsement.endorsement_status, "Sent to Registrar")
-            self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Registrar").filter(Task.title.contains("receipt of endorsed")).first())
-            self._transition(staff, "graduation", {"student_id": self.student.id, "endorsement_status": "Registrar Received"}, 400)
-            self._transition(registrar, "graduation", {"student_id": self.student.id, "endorsement_status": "Registrar Received"})
-            self.assertEqual(endorsement.endorsement_status, "Registrar Received")
-            self.assertEqual(endorsement.registrar_status, "Received")
-            self.assertIsNotNone(endorsement.registrar_received_at)
+            self.assertFalse(Task.query.filter_by(student_id=self.student_id, owner_role="Registrar").first())
 
     def test_graduation_incomplete_coursework_and_research_are_routed_to_staff(self):
         with app.app_context():
@@ -760,7 +747,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             "staff@gs.local": "staff",
             "academic@gs.local": "academic_coordinator",
             "research@gs.local": "research_coordinator",
-            "registrar@gs.local": "registrar",
         }
         for email, role in expected.items():
             response = app.test_client().post(

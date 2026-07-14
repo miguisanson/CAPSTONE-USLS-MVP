@@ -31,11 +31,10 @@ function homeFor(user) {
   if (user.role === "dean") return "/approvals";
   if (user.role === "academic_coordinator") return "/workflow/course-audit";
   if (user.role === "research_coordinator") return "/workflow/research-gate";
-  if (user.role === "registrar") return "/workflow/withdrawal";
   return "/";
 }
 
-const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coordinator", "registrar"]);
+const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coordinator"]);
 
 export default function App() {
   const { user, loading } = useAuth();

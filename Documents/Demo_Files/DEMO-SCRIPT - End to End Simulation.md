@@ -21,18 +21,18 @@ matched faculty, and Students B & C, and it removes any previously uploaded test
 |------|-------|-----|
 | Staff / Academic Coordinator | `staff@gs.local` | Runs every staff workflow |
 | Dean (approver) | `dean@gs.local` | Approves LOA / Withdrawal / Course plans |
-| Student A (created on upload) | `2099001@student.usls.edu.ph` | Andrea Villanueva — research journey |
+| Student A (created on upload) | `andrea.mae.villanueva@student.usls.edu.ph` | Andrea Villanueva — research journey |
 | Student B | `student-b@gs.local` | Bianca Robles — LOA → Readmission |
 | Student C | `student-c@gs.local` | Carlo Mendoza — Withdrawal |
 
 > Student A's account is **created automatically** when you upload her monitoring sheet
 > (the import message shows the exact login). It does not exist until the handoff.
 
-### Sample files (`Documents/USLS_Documents/Simulation/`)
-- `AC-Student-Monitoring - MAEDS (Student A - Andrea Villanueva).xlsx` — the handoff sheet
-- `Form1 - Title Defense Application (Student A - prefill sample).pdf` — auto-fills the title
-- `Student_A_Concept_Papers/` — three **real** research PDFs (learning analytics / online
-  learning / machine learning) used for keyword-based panel matching
+### Sample files (`Documents/Demo_Files/Student_A/`)
+- `1 - AC Monitoring Sheet (UPLOAD at Student Handoff).xlsx` — the handoff sheet
+- `2 - Form 1 Title Defense (UPLOAD to auto-fill title).pdf` — auto-fills the title
+- `3` / `4` / `5 - Concept Paper 1–3` — three **real** research PDFs (learning analytics /
+  online learning / machine learning) used for keyword-based panel matching
 
 ---
 
@@ -41,10 +41,10 @@ matched faculty, and Students B & C, and it removes any previously uploaded test
 ### Step 1 · Student Handoff (file upload)
 1. Sign in as **staff@gs.local**.
 2. Sidebar → **1 · Student Handoff** → **Upload AC Student Monitoring sheet**.
-3. Choose `AC-Student-Monitoring - MAEDS (...).xlsx`.
+3. Choose `Student_A/1 - AC Monitoring Sheet (...).xlsx`.
 4. The importer reads the sheet, creates **Andrea Mae Villanueva** (program **MAEDS**),
    marks her coursework complete, and **provisions her student-portal login**
-   (`2099001@student.usls.edu.ph` / `DemoPass123!`) — shown in the result message.
+   (`andrea.mae.villanueva@student.usls.edu.ph` / `DemoPass123!`) — shown in the result message.
 
 ### Step 2 · Monitoring Sheet
 - Sidebar → **Monitoring Sheet** → choose program **MAEDS**.
@@ -63,13 +63,13 @@ matched faculty, and Students B & C, and it removes any previously uploaded test
   Development**.
 
 ### Step 5 · Research Gate (Form 1) — *student side*
-1. Sign in as **Andrea** (`2099001@student.usls.edu.ph`).
+1. Sign in as **Andrea** (`andrea.mae.villanueva@student.usls.edu.ph`).
 2. Student Portal → research gate is auto-detected as **Form 1 – Title Defense**.
 3. Click **"Upload Form 1 (PDF) to auto-fill"** → choose the
-   `Form1 - Title Defense Application (...).pdf`. The **research title auto-fills**:
+   `Student_A/2 - Form 1 Title Defense (...).pdf`. The **research title auto-fills**:
    *"Learning Analytics Dashboards and Student Engagement in Online Graduate Programs."*
 4. Upload the **Form 1** PDF and the **three concept papers** (from
-   `Student_A_Concept_Papers/`).
+   `Student_A/` files 3–5).
 5. **Submit** the milestone for review.
 
 ### Step 6 · Form 1 endorsement — *staff side*

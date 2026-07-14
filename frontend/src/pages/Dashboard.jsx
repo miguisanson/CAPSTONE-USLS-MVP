@@ -77,7 +77,7 @@ const tooltipStyle = {
   fontSize: 13,
 };
 
-const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Registrar", "Student"];
+const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
 
 function DashboardFilters({ filters, meta, onChange, onClear }) {
   const active = Object.values(filters).filter(Boolean).length;

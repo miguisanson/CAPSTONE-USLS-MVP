@@ -167,7 +167,7 @@ export default function CourseAdjustments() {
             <ClipboardList className="h-6 w-6" />
           </span>
           <div className="flex-1">
-            <h1 className="font-display text-2xl font-semibold text-ink">Course demand</h1>
+            <h1 className="font-display text-2xl font-semibold text-ink">Course Adjustments</h1>
             <p className="mt-1 text-sm text-slate-600">
               Review live subject demand, adjust sections, and choose which subjects to offer next semester.
             </p>

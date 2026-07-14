@@ -88,13 +88,11 @@ const ROLE_LABELS = {
   staff: "Graduate School Staff",
   academic_coordinator: "Academic Coordinator",
   research_coordinator: "Research Coordinator",
-  registrar: "Registrar",
 };
 
 const ROLE_PATHS = {
   academic_coordinator: new Set(["/faculty", "/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
-  registrar: new Set(["/workflow/graduation", "/workflow/withdrawal", "/work-queue"]),
 };
 
 function NavItem({ to, label, icon: Icon, end, onClick }) {
