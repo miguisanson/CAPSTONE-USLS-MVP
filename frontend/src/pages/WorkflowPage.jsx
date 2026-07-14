@@ -58,6 +58,10 @@ const WORKFLOW_ROLE_LABELS = {
   academic_coordinator: "Academic Coordinator",
   research_coordinator: "Research Coordinator",
 };
+const GRADUATION_BATCH_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 const PANEL_MATCHING_DEFAULT_LIMIT = 15;
 const PANEL_MATCHING_RECOMMENDED_COUNT = 4;
 
@@ -3004,9 +3008,10 @@ function WorkflowSubmitFeedback({ result, error }) {
   );
 }
 
-function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, footer }) {
+function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, footer, size = "default" }) {
   const closeButtonRef = useRef(null);
   const onCloseRef = useRef(onClose);
+  const widthClass = size === "wide" ? "max-w-[96rem]" : "max-w-3xl";
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -3056,7 +3061,7 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
         aria-modal="true"
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-description`}
-        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className={`flex max-h-[88vh] w-full ${widthClass} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}
       >
         <header className="flex shrink-0 items-start gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
@@ -3076,7 +3081,7 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6"><div className="w-full">{children}</div></div>
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
           <button type="button" onClick={onClose} className="btn-ghost cursor-pointer px-4 py-2">Close details</button>
           <div className="flex flex-wrap justify-end gap-2">{footer}</div>
@@ -3204,6 +3209,7 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
       title="Message / return for clarification"
       subtitle={`${student.name} Â· ${student.student_number}`}
       onClose={onClose}
+      size={["practicum", "graduation"].includes(slug) ? "wide" : "default"}
       footer={<button type="submit" form={`${slug}-message-form-${student.id}`} disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><Send className="h-4 w-4" /> {busy ? "Savingâ€¦" : "Send message"}</button>}
     >
       <form id={`${slug}-message-form-${student.id}`} onSubmit={save} className="space-y-4">
@@ -3281,23 +3287,25 @@ function WorkflowFileHistory({ files = [] }) {
 }
 
 function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfirm }) {
-  const [reason, setReason] = useState(action.reason || "");
+  const [comment, setComment] = useState(action.reason || "");
   const [error, setError] = useState("");
   const requiresReason = Boolean(action.requireReason);
+  const showsTransitionComment = requiresReason || ["practicum", "graduation"].includes(slug);
 
   async function confirm(event) {
     event.preventDefault();
-    if (requiresReason && !reason.trim()) {
+    const cleanComment = comment.trim();
+    if (requiresReason && !cleanComment) {
       setError("Enter the exact reason before moving this request.");
       return;
     }
     setError("");
     const payload = {
       ...action.payload,
+      ...(cleanComment ? { workflow_comment: cleanComment } : {}),
       ...(requiresReason ? {
-        return_reason: reason.trim(),
-        staff_remarks: reason.trim(),
-        remarks: reason.trim(),
+        return_reason: cleanComment,
+        staff_remarks: cleanComment,
       } : {}),
     };
     const saved = await onConfirm(payload);
@@ -3310,6 +3318,7 @@ function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfi
       title={`Confirm: ${action.label}`}
       subtitle={`${student.name} Â· ${student.student_number} Â· ${slug}`}
       onClose={onClose}
+      size={["practicum", "graduation"].includes(slug) ? "wide" : "default"}
       footer={<button type="submit" form={`${slug}-confirm-transition-form`} disabled={busy} className={action.destructive ? "btn-ghost cursor-pointer px-4 py-2 text-red-600" : "btn-primary cursor-pointer px-4 py-2"}>{busy ? "Savingâ€¦" : action.label}</button>}
     >
       <form id={`${slug}-confirm-transition-form`} onSubmit={confirm} className="space-y-4">
@@ -3319,32 +3328,654 @@ function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfi
           <p className="mt-2 text-sm font-semibold text-ink">{action.fromStatus || "Current stage"} <span className="mx-1 text-slate-300">â†’</span> {action.toStatus || action.label}</p>
           <p className="mt-1 text-xs text-slate-500">This action is recorded against your signed-in account and preserves the submitted fields and files.</p>
         </div>
-        {requiresReason && <Field label="Required reason" required><Textarea value={reason} onChange={(event) => setReason(event.target.value)} required placeholder="Explain what must be corrected or why this request is moving backward." /></Field>}
+        {showsTransitionComment && (
+          <Field label={requiresReason ? "Message / reason" : "Comment sent with this action"} required={requiresReason}>
+            <Textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              required={requiresReason}
+              placeholder={requiresReason ? "Tell the student what to correct or upload next." : "Add instructions or context for the next reviewer. Leave blank if there is nothing to add."}
+            />
+          </Field>
+        )}
       </form>
     </WorkflowCaseModal>
   );
 }
 
-function GraduationBatchModal({ rows, context, onClose, onSaved }) {
+function defaultGraduationBatchForm(rows = []) {
+  const existingName = rows.find((row) => row.endorsement?.batch_name)?.endorsement?.batch_name || "";
+  const match = existingName.match(/^Batch(?:\s+No\.)?\s+(\d+)\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (match) {
+    return { batch_no: match[1], batch_month: match[2], batch_year: match[3] };
+  }
+  const now = new Date();
+  return {
+    batch_no: "1",
+    batch_month: GRADUATION_BATCH_MONTHS[now.getMonth()],
+    batch_year: String(now.getFullYear()),
+  };
+}
+
+function graduationBatchName(form) {
+  return `Batch ${form.batch_no || "1"} ${form.batch_month || GRADUATION_BATCH_MONTHS[new Date().getMonth()]} ${form.batch_year || new Date().getFullYear()}`;
+}
+
+const GRADUATION_STAGE_ACTIONS = {
+  compile_to_ac: {
+    id: "compile_to_ac",
+    label: "Compile graduation candidate list",
+    movement: "GS Staff → Academic Coordinator",
+    nextOwner: "Academic Coordinator",
+    batchRequired: true,
+    commentLabel: "Optional note to Academic Coordinator",
+  },
+  check_coursework: {
+    id: "check_coursework",
+    label: "Check coursework completion",
+    movement: "Academic Coordinator → Research Coordinator or GS Staff",
+    nextOwner: "Research Coordinator / Graduate School Staff",
+    commentLabel: "Optional coursework review note",
+  },
+  validate_research: {
+    id: "validate_research",
+    label: "Validate research completion requirements",
+    movement: "Research Coordinator → GS Staff",
+    nextOwner: "Graduate School Staff",
+    commentLabel: "Optional research validation note",
+  },
+  mark_not_eligible: {
+    id: "mark_not_eligible",
+    label: "List missing requirements and mark not eligible",
+    movement: "GS Staff → Student",
+    nextOwner: "Student",
+    requiresComment: true,
+    commentLabel: "Student-facing missing requirements message",
+  },
+  prepare_endorsement: {
+    id: "prepare_endorsement",
+    label: "Prepare endorsement list",
+    movement: "GS Staff preparation",
+    nextOwner: "Graduate School Staff",
+    commentLabel: "Optional endorsement preparation note",
+  },
+  send_to_dean: {
+    id: "send_to_dean",
+    label: "Send endorsement list to Dean",
+    movement: "GS Staff → Dean",
+    nextOwner: "Dean",
+    commentLabel: "Optional note to Dean",
+  },
+};
+
+function graduationStageActionForRow(row, accountRole) {
+  const status = row.endorsement?.endorsement_status || "Not Prepared";
+  if (accountRole === "staff" && ["Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"].includes(status)) return GRADUATION_STAGE_ACTIONS.compile_to_ac;
+  if (accountRole === "academic_coordinator" && status === "Coursework Review") return GRADUATION_STAGE_ACTIONS.check_coursework;
+  if (accountRole === "research_coordinator" && status === "Research Review") return GRADUATION_STAGE_ACTIONS.validate_research;
+  if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return GRADUATION_STAGE_ACTIONS.mark_not_eligible;
+  if (accountRole === "staff" && status === "Eligibility Confirmed") return GRADUATION_STAGE_ACTIONS.prepare_endorsement;
+  if (accountRole === "staff" && ["Endorsement Prepared", "Returned for Revision"].includes(status)) return GRADUATION_STAGE_ACTIONS.send_to_dean;
+  return null;
+}
+
+function graduationStageSelection(rows, accountRole) {
+  const rowActions = rows.map((row) => ({ row, action: graduationStageActionForRow(row, accountRole) }));
+  const actionIds = [...new Set(rowActions.filter((item) => item.action).map((item) => item.action.id))];
+  if (actionIds.length !== 1) {
+    return { action: null, processableRows: [], skippedRows: rows, mixed: actionIds.length > 1 };
+  }
+  const action = GRADUATION_STAGE_ACTIONS[actionIds[0]];
+  return {
+    action,
+    processableRows: rowActions.filter((item) => item.action?.id === action.id).map((item) => item.row),
+    skippedRows: rowActions.filter((item) => item.action?.id !== action.id).map((item) => item.row),
+    mixed: false,
+  };
+}
+
+function graduationActionTargetLabel(target) {
+  const label = typeof target === "string" ? target : target?.label;
+  return label && label !== GRADUATION_UNBATCHED_LABEL ? label : "selected candidates";
+}
+
+function graduationBatchActionLabel(action, target) {
+  if (!action) return "No action due";
+  return `${action.label} for ${graduationActionTargetLabel(target)}`;
+}
+
+function graduationSelectedActionLabel(action, groups) {
+  if (!action) return "Review selected candidates";
+  if (groups.length === 1) return graduationBatchActionLabel(action, groups[0]);
+  const allBatched = groups.length > 0 && groups.every((group) => group.label !== GRADUATION_UNBATCHED_LABEL);
+  return `${action.label} for ${allBatched ? `${groups.length} batches` : "selected candidates"}`;
+}
+
+const GRADUATION_UNBATCHED_LABEL = "Unbatched candidates";
+const GRADUATION_STATUS_PRIORITY = [
+  "Not Prepared",
+  "For Review",
+  "Coursework Review",
+  "Coursework Incomplete",
+  "Research Review",
+  "Research Incomplete",
+  "Practicum Incomplete",
+  "Eligibility Confirmed",
+  "Endorsement Prepared",
+  "Ready for Dean Review",
+  "Returned for Revision",
+  "Dean Approved",
+  "Sent to Registrar",
+  "Not Eligible",
+  "Returned for Clarification",
+];
+
+const GRADUATION_STAGE_AFTER_COMPILE = [
+  "Coursework Review", "Coursework Incomplete", "Research Review", "Research Incomplete",
+  "Practicum Incomplete", "Eligibility Confirmed", "Endorsement Prepared",
+  "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar", "Not Eligible",
+];
+const GRADUATION_STAGE_AFTER_COURSEWORK = [
+  "Research Review", "Research Incomplete", "Practicum Incomplete", "Eligibility Confirmed",
+  "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar",
+];
+const GRADUATION_STAGE_AFTER_RESEARCH = [
+  "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review",
+  "Returned for Revision", "Dean Approved", "Sent to Registrar",
+];
+const GRADUATION_STAGE_AFTER_PREPARATION = ["Endorsement Prepared", "Ready for Dean Review", "Dean Approved", "Sent to Registrar"];
+const GRADUATION_STAGE_AFTER_DEAN_HANDOFF = ["Ready for Dean Review", "Dean Approved", "Sent to Registrar"];
+const GRADUATION_STAGE_AFTER_DEAN_REVIEW = ["Dean Approved", "Sent to Registrar"];
+
+const GRADUATION_BATCH_STAGES = [
+  {
+    label: "Compile graduation list",
+    detail: "GS Staff creates the candidate batch.",
+    currentStatuses: ["Not Prepared", "For Review", "Returned for Clarification"],
+    completeStatuses: GRADUATION_STAGE_AFTER_COMPILE,
+  },
+  {
+    label: "Send to Academic Coordinator",
+    detail: "Batch is available for coursework review.",
+    completeStatuses: GRADUATION_STAGE_AFTER_COMPILE,
+  },
+  {
+    label: "Academic Coordinator checks course completion",
+    detail: "Coursework is reviewed for every candidate in the batch.",
+    currentStatuses: ["Coursework Review"],
+    completeStatuses: GRADUATION_STAGE_AFTER_COURSEWORK,
+    attentionStatuses: ["Coursework Incomplete", "Not Eligible"],
+  },
+  {
+    label: "Send course completion to Research Coordinator",
+    detail: "Candidates with complete coursework move to research validation.",
+    completeStatuses: GRADUATION_STAGE_AFTER_COURSEWORK,
+    attentionStatuses: ["Coursework Incomplete", "Not Eligible"],
+  },
+  {
+    label: "Research Coordinator validates research requirements",
+    detail: "Research, post-defense files, and related completion evidence are checked.",
+    currentStatuses: ["Research Review"],
+    completeStatuses: GRADUATION_STAGE_AFTER_RESEARCH,
+    attentionStatuses: ["Research Incomplete", "Practicum Incomplete", "Not Eligible"],
+  },
+  {
+    label: "Send validation back to GS Staff",
+    detail: "Validated candidates return to GS Staff for endorsement preparation.",
+    completeStatuses: GRADUATION_STAGE_AFTER_RESEARCH,
+    attentionStatuses: ["Research Incomplete", "Practicum Incomplete", "Not Eligible"],
+  },
+  {
+    label: "Prepare endorsement list",
+    detail: "GS Staff prepares the batch endorsement list.",
+    currentStatuses: ["Eligibility Confirmed", "Returned for Revision"],
+    completeStatuses: GRADUATION_STAGE_AFTER_PREPARATION,
+    attentionStatuses: ["Not Eligible"],
+  },
+  {
+    label: "Send endorsement list to Dean",
+    detail: "Prepared or revised endorsement list is sent to the Dean.",
+    currentStatuses: ["Endorsement Prepared", "Returned for Revision"],
+    completeStatuses: GRADUATION_STAGE_AFTER_DEAN_HANDOFF,
+    attentionStatuses: ["Not Eligible"],
+  },
+  {
+    label: "Dean reviews endorsement list",
+    detail: "Dean approves the batch or returns it for revision.",
+    currentStatuses: ["Ready for Dean Review"],
+    completeStatuses: GRADUATION_STAGE_AFTER_DEAN_REVIEW,
+    attentionStatuses: ["Returned for Revision", "Not Eligible"],
+  },
+  {
+    label: "Send endorsed list to Registrar",
+    detail: "Dean-approved candidates are exported for Registrar receipt.",
+    currentStatuses: ["Dean Approved"],
+    completeStatuses: ["Sent to Registrar"],
+    attentionStatuses: ["Returned for Revision", "Not Eligible"],
+  },
+];
+
+function graduationRowStatus(row) {
+  return row.endorsement?.endorsement_status || "Not Prepared";
+}
+
+function graduationRowBatchLabel(row, fallback = GRADUATION_UNBATCHED_LABEL) {
+  return row.endorsement?.batch_name || fallback;
+}
+
+function orderedGraduationStatuses(rows) {
+  const statuses = uniqueValues(rows.map(graduationRowStatus));
+  return statuses.sort((left, right) => {
+    const leftIndex = GRADUATION_STATUS_PRIORITY.indexOf(left);
+    const rightIndex = GRADUATION_STATUS_PRIORITY.indexOf(right);
+    const safeLeft = leftIndex === -1 ? GRADUATION_STATUS_PRIORITY.length : leftIndex;
+    const safeRight = rightIndex === -1 ? GRADUATION_STATUS_PRIORITY.length : rightIndex;
+    if (safeLeft !== safeRight) return safeLeft - safeRight;
+    return left.localeCompare(right);
+  });
+}
+
+function graduationBoardStatusForRows(rows) {
+  return orderedGraduationStatuses(rows)[0] || "Not Prepared";
+}
+
+function graduationLatestDate(rows) {
+  return rows.reduce((latest, row) => {
+    const value = row.last_activity_at || row.endorsement?.updated_at || row.endorsement?.created_at;
+    const timestamp = new Date(value || 0).getTime();
+    return Number.isFinite(timestamp) && timestamp > latest.timestamp ? { value, timestamp } : latest;
+  }, { value: "", timestamp: 0 }).value;
+}
+
+function graduationStatusCounts(rows, valueFor) {
+  const counts = new Map();
+  rows.forEach((row) => {
+    const value = valueFor(row) || "Pending";
+    counts.set(value, (counts.get(value) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort((left, right) => left.value.localeCompare(right.value));
+}
+
+function graduationStatusSummary(rows, valueFor) {
+  const counts = graduationStatusCounts(rows, valueFor);
+  if (!counts.length) return "No records";
+  return counts.map((item) => `${item.value}: ${item.count}`).join(" / ");
+}
+
+function graduationBatchGroups(rows, selectedIds = new Set()) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const label = graduationRowBatchLabel(row);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(row);
+  });
+  return [...groups.entries()].map(([label, groupRows]) => {
+    const sortedRows = sortSelectedWorkflowRows(
+      [...groupRows],
+      selectedIds,
+      (row) => row.student.name,
+      (row) => row.student.id,
+    );
+    const selectedCount = sortedRows.filter((row) => selectedIds.has(row.student.id)).length;
+    const statuses = orderedGraduationStatuses(sortedRows);
+    return {
+      id: label,
+      label,
+      rows: sortedRows,
+      selectedCount,
+      statuses,
+      boardStatus: graduationBoardStatusForRows(sortedRows),
+      updatedAt: graduationLatestDate(sortedRows),
+      nextOwners: uniqueValues(sortedRows.map((row) => row.next_action_owner || "Awaiting review")),
+      courseworkSummary: graduationStatusSummary(sortedRows, (row) => row.eligibility.coursework_status),
+      researchSummary: graduationStatusSummary(sortedRows, (row) => row.eligibility.research_status),
+      practicumSummary: graduationStatusSummary(sortedRows, (row) => row.eligibility.practicum_status),
+      eligibilitySummary: graduationStatusSummary(sortedRows, (row) => row.eligibility.status),
+    };
+  }).sort((left, right) => {
+    const leftSelected = left.selectedCount > 0;
+    const rightSelected = right.selectedCount > 0;
+    if (leftSelected !== rightSelected) return leftSelected ? -1 : 1;
+    if (leftSelected && rightSelected) return left.label.localeCompare(right.label);
+    const leftUnbatched = left.label === GRADUATION_UNBATCHED_LABEL;
+    const rightUnbatched = right.label === GRADUATION_UNBATCHED_LABEL;
+    if (leftUnbatched !== rightUnbatched) return leftUnbatched ? -1 : 1;
+    return left.label.localeCompare(right.label);
+  });
+}
+
+function graduationBatchSelectionState(group, selectedIds) {
+  const selectedCount = group.rows.filter((row) => selectedIds.has(row.student.id)).length;
+  return {
+    selectedCount,
+    allSelected: selectedCount > 0 && selectedCount === group.rows.length,
+    partiallySelected: selectedCount > 0 && selectedCount < group.rows.length,
+  };
+}
+
+function graduationBatchStageState(stage, group) {
+  const statuses = group.rows.map(graduationRowStatus);
+  const hasAttention = statuses.some((status) => stage.attentionStatuses?.includes(status));
+  const allComplete = statuses.length > 0 && statuses.every((status) => stage.completeStatuses?.includes(status));
+  const hasCurrent = statuses.some((status) => stage.currentStatuses?.includes(status));
+  const hasComplete = statuses.some((status) => stage.completeStatuses?.includes(status));
+  if (hasAttention) return "Needs action";
+  if (allComplete) return "Complete";
+  if (hasCurrent) return "Current";
+  if (hasComplete) return "Mixed";
+  return "Pending";
+}
+
+function graduationBatchStageChecks(group) {
+  return GRADUATION_BATCH_STAGES.map((stage, index) => ({
+    ...stage,
+    number: index + 1,
+    state: graduationBatchStageState(stage, group),
+  }));
+}
+
+function graduationBatchCurrentStage(group) {
+  const stages = graduationBatchStageChecks(group);
+  return stages.find((stage) => ["Needs action", "Current", "Mixed", "Pending"].includes(stage.state)) || stages[stages.length - 1];
+}
+
+function GraduationBatchStageCheck({ group, compact = false, onViewStage }) {
+  const stages = graduationBatchStageChecks(group);
+  const currentStage = graduationBatchCurrentStage(group);
+  const completed = stages.filter((stage) => stage.state === "Complete").length;
+  const progress = Math.round((completed / stages.length) * 100);
+  if (compact) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stage check</p>
+            <p className="mt-1 truncate text-sm font-semibold text-ink">Step {currentStage.number}: {currentStage.label}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <StatusBadge value={`${completed}/${stages.length}`} dot={false} />
+            {onViewStage && <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>}
+          </div>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+          <div className="h-full rounded-full bg-brand-500" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="w-full max-w-none rounded-xl border border-slate-200 bg-white p-3">
+      <div className="flex w-full flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-ink">Graduation stage check for {group.label}</p>
+          <p className="text-xs text-slate-500">Follow where this batch is in the graduation endorsement process.</p>
+        </div>
+        <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
+      </div>
+      <ol className="mt-3 grid w-full grid-cols-1 gap-2 2xl:grid-cols-2">
+        {stages.map((stage) => (
+          <li key={stage.label} className="flex w-full max-w-none gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${stage.state === "Complete" ? "bg-brand-600 text-white" : stage.state === "Current" ? "bg-amber-100 text-amber-800" : stage.state === "Needs action" ? "bg-red-100 text-red-700" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>{stage.number}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-800">{stage.label}</p>
+                <StatusBadge value={stage.state} dot={false} />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">{stage.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function GraduationBatchStageModal({ group, onClose }) {
+  const currentStage = graduationBatchCurrentStage(group);
+  const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
+  return (
+    <WorkflowCaseModal
+      id={modalId}
+      title={`Graduation stage check for ${group.label}`}
+      subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
+      onClose={onClose}
+      size="wide"
+    >
+      <GraduationBatchStageCheck group={group} />
+    </WorkflowCaseModal>
+  );
+}
+
+function graduationRequirementTone(item) {
+  if (item?.passed === true || item?.complete === true || item?.status === "Passed") return "complete";
+  return "missing";
+}
+
+function graduationRequirementClasses(tone) {
+  return tone === "complete"
+    ? {
+      card: "border-emerald-200 bg-emerald-50 text-emerald-900",
+      icon: "bg-emerald-600 text-white",
+      text: "text-emerald-800",
+      muted: "text-emerald-700",
+    }
+    : {
+      card: "border-red-200 bg-red-50 text-red-900",
+      icon: "bg-red-600 text-white",
+      text: "text-red-800",
+      muted: "text-red-700",
+    };
+}
+
+function graduationRequirementDetailLines(item) {
+  const actual = item.actual_value ?? item.actual ?? item.status ?? "Pending";
+  const required = item.required_value ?? item.required;
+  return [
+    String(actual),
+    required != null ? `Required: ${String(required)}` : "",
+    item.note || "",
+  ].filter(Boolean);
+}
+
+function graduationFallbackChecklist(row) {
+  const eligibility = row.eligibility || {};
+  return [
+    {
+      key: "coursework",
+      label: "Coursework",
+      actual_value: eligibility.coursework_status || "Pending",
+      status: eligibility.coursework_status === "Complete" ? "Passed" : eligibility.coursework_status || "Not met",
+      passed: eligibility.coursework_status === "Complete",
+      note: eligibility.missing_coursework?.length ? `Missing: ${eligibility.missing_coursework.slice(0, 2).join(", ")}${eligibility.missing_coursework.length > 2 ? "..." : ""}` : "",
+    },
+    {
+      key: "research",
+      label: "Thesis / research",
+      actual_value: eligibility.research_status || "Pending",
+      status: eligibility.research_status === "Complete" ? "Passed" : eligibility.research_status || "Not met",
+      passed: eligibility.research_status === "Complete",
+      note: eligibility.missing_research_requirements?.length ? `Missing: ${eligibility.missing_research_requirements.slice(0, 2).join(", ")}${eligibility.missing_research_requirements.length > 2 ? "..." : ""}` : "",
+    },
+    {
+      key: "practicum",
+      label: "Practicum",
+      actual_value: eligibility.practicum_status || "Pending",
+      status: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status) ? "Passed" : eligibility.practicum_status || "Not met",
+      passed: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status),
+      note: eligibility.missing_practicum_requirement || "",
+    },
+  ];
+}
+
+function GraduationRequirementBoxes({ row }) {
+  const [expandedKey, setExpandedKey] = useState(null);
+  const eligibility = row.eligibility || {};
+  const checklist = eligibility.checklist?.length ? eligibility.checklist : graduationFallbackChecklist(row);
+  const allComplete = checklist.length > 0 && checklist.every((item) => graduationRequirementTone(item) === "complete");
+  const overallTone = allComplete && eligibility.status !== "Not eligible" ? "complete" : "missing";
+  const overallClasses = graduationRequirementClasses(overallTone);
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+      <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 ${overallClasses.card}`}>
+        <div className="flex items-center gap-2">
+          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${overallClasses.icon}`}>
+            {overallTone === "complete" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Graduation requirements</p>
+            <p className={`text-xs ${overallClasses.muted}`}>{overallTone === "complete" ? "Eligible based on visible requirements." : "Open the red stages to see what is missing."}</p>
+          </div>
+        </div>
+        <StatusBadge value={eligibility.status || (overallTone === "complete" ? "Eligible" : "Not eligible")} dot={false} />
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        {checklist.map((item) => {
+          const key = item.key || item.label;
+          const tone = graduationRequirementTone(item);
+          const classes = graduationRequirementClasses(tone);
+          const expanded = expandedKey === key;
+          const detailLines = graduationRequirementDetailLines(item);
+          return (
+            <div key={key} className={`rounded-lg border px-2.5 py-2 ${classes.card}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${classes.icon}`}>
+                    {tone === "complete" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                  </span>
+                  <p className="truncate text-sm font-semibold">{item.label}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedKey(expanded ? null : key)}
+                  className="btn-ghost shrink-0 cursor-pointer px-2 py-1"
+                  aria-label={`${expanded ? "Hide" : "View"} ${item.label} graduation requirement details`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {expanded && (
+                <div className="mt-2 rounded-lg bg-white/75 px-3 py-2">
+                  <p className={`text-xs font-bold uppercase tracking-wide ${classes.text}`}>{item.status || (tone === "complete" ? "Passed" : "Not met")}</p>
+                  <div className="mt-1 space-y-1">
+                    {detailLines.map((line) => <p key={line} className={`break-words text-xs ${classes.muted}`}>{line}</p>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function researchStageDetailLine(stage) {
+  return `Requirements ${stage.requirements_complete}/${stage.requirements_total}; panel ${stage.panel?.assigned_count ?? 0}/${stage.panel?.required_count ?? 0}; schedule ${stage.schedule?.status || "Not scheduled"}; defense ${stage.defense?.status || "Not recorded"}`;
+}
+
+function GraduationResearchRequirementsView({ row }) {
+  const progress = row.eligibility?.research_progress || {};
+  const stages = progress.stages || [];
+  const completion = progress.completion_evidence;
+  if (!stages.length && !completion) {
+    return (
+      <div className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500">
+        No submitted research requirement details are available for this student yet.
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Research requirements submitted</p>
+      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+        {stages.map((stage) => (
+          <div key={stage.gate} className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-ink">{stage.name}</p>
+              <StatusBadge value={stage.complete ? "Complete" : "Incomplete"} dot={false} />
+            </div>
+            <p className="mt-1 text-xs text-slate-600">{researchStageDetailLine(stage)}</p>
+          </div>
+        ))}
+        {completion && (
+          <div className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-ink">Completion Evidence</p>
+              <StatusBadge value={completion.status || (completion.complete ? "Complete" : "Incomplete")} dot={false} />
+            </div>
+            <p className="mt-1 text-xs text-slate-600">Requirements {completion.requirements_complete ?? 0}/{completion.requirements_total ?? 0}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GraduationBatchModal({ rows, accountRole, onClose, onSaved }) {
+  const selection = graduationStageSelection(rows, accountRole);
+  const action = selection.action;
+  const defaultBatch = defaultGraduationBatchForm(rows);
   const [form, setForm] = useState({
-    action: "send_to_dean",
-    recipient_role: "Graduate School Staff",
-    visibility: "internal",
-    template: "This request requires additional review",
     comment: "",
     review_window: rows.find((row) => row.endorsement?.review_window)?.endorsement?.review_window || "AY 2026-2027 Graduation Review",
+    ...defaultBatch,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [expandedCourseworkIds, setExpandedCourseworkIds] = useState(() => new Set());
+  const [expandedResearchIds, setExpandedResearchIds] = useState(() => new Set());
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
-  const blocked = form.action === "send_to_dean" ? rows.filter((row) => row.eligibility.status !== "Eligible") : [];
+  const batchName = graduationBatchName(form);
+  const showBatchFields = action?.batchRequired || (action?.id === "send_to_dean" && selection.processableRows.some((row) => !row.endorsement?.batch_name));
+  const requiresComment = Boolean(action?.requiresComment);
+  const showCourseworkReviewTable = action?.id === "check_coursework";
+  const showResearchRequirementsInSummary = action?.id === "validate_research";
+  const selectedGroups = graduationBatchGroups(selection.processableRows.length ? selection.processableRows : rows);
+  const modalActionLabel = action
+    ? showBatchFields
+      ? graduationBatchActionLabel(action, batchName)
+      : graduationSelectedActionLabel(action, selectedGroups)
+    : "Review selected candidates";
+
+  function toggleCourseworkDetails(studentId) {
+    setExpandedCourseworkIds((current) => {
+      const next = new Set(current);
+      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
+      return next;
+    });
+  }
+
+  function toggleResearchDetails(studentId) {
+    setExpandedResearchIds((current) => {
+      const next = new Set(current);
+      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
+      return next;
+    });
+  }
 
   async function confirm(event) {
     event.preventDefault();
+    if (!action) {
+      setError(selection.mixed ? "Select candidates from one review stage at a time." : "No group action is currently due for this selection.");
+      return;
+    }
+    if (requiresComment && !form.comment.trim()) {
+      setError("Enter the required message before applying this action.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const result = await api.graduationBatchAction({ student_ids: rows.map((row) => row.student.id), ...form });
+      const { batch_no, batch_month, batch_year, ...baseForm } = form;
+      const payload = {
+        ...baseForm,
+        stage_action: action.id,
+        action: action.id,
+        ...(showBatchFields ? { batch_no, batch_month, batch_year, batch_name: batchName } : {}),
+      };
+      const result = await api.graduationBatchAction({ student_ids: selection.processableRows.map((row) => row.student.id), ...payload });
       await onSaved(result);
       onClose();
     } catch (err) {
@@ -3357,34 +3988,142 @@ function GraduationBatchModal({ rows, context, onClose, onSaved }) {
   return (
     <WorkflowCaseModal
       id="graduation-batch-action"
-      title="Confirm graduation group action"
-      subtitle={`${rows.length} selected candidate${rows.length === 1 ? "" : "s"}`}
+      title={modalActionLabel}
+      subtitle={action ? `${action.movement}` : "Selection needs one review stage"}
       onClose={onClose}
-      footer={<button type="submit" form="graduation-batch-form" disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applyingâ€¦" : "Confirm group action"}</button>}
+      size="wide"
+      footer={<button type="submit" form="graduation-batch-form" disabled={busy || !action} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applying..." : action ? modalActionLabel : "No action available"}</button>}
     >
       <form id="graduation-batch-form" onSubmit={confirm} className="space-y-4">
         <ErrorNote message={error} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Group action">
-            <select value={form.action} onChange={update("action")} className="field-input cursor-pointer">
-              <option value="send_to_dean">Prepare and send eligible candidates to Dean</option>
-              <option value="return">Return selected candidates for clarification</option>
-              <option value="assign">Assign reviewer</option>
-              <option value="note">Add shared note</option>
-            </select>
-          </Field>
-          <Field label="Recipient / reviewer">
-            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal" }))} placeholder="" options={context?.message_recipients || []} />
-          </Field>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Selected action</p>
+          {action ? (
+            <>
+              <p className="mt-2 text-sm font-semibold text-ink">{action.label}</p>
+              <p className="mt-1 text-sm text-slate-600">{action.movement}</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm font-semibold text-red-700">{selection.mixed ? "Selected candidates are in different review stages." : "No selected candidate has a group action due for this role."}</p>
+          )}
         </div>
-        {form.action !== "send_to_dean" && <Field label="Visibility"><select value={form.visibility} onChange={update("visibility")} disabled={form.recipient_role === "Student"} className="field-input cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100"><option value="student_visible">Visible to student</option><option value="internal">Internal reviewers only</option></select></Field>}
-        {form.action === "send_to_dean" && <Field label="Review window"><Input value={form.review_window} onChange={update("review_window")} /></Field>}
-        {form.action !== "send_to_dean" && <Field label="Message template"><Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} /></Field>}
-        <Field label="Comment" required={(form.template === "Other / Custom comment" || form.action === "return") && form.action !== "send_to_dean"}><Textarea value={form.comment} onChange={update("comment")} required={(form.template === "Other / Custom comment" || form.action === "return") && form.action !== "send_to_dean"} /></Field>
+        {showBatchFields && (
+          <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <Field label="Batch No."><Input value={form.batch_no} onChange={update("batch_no")} inputMode="numeric" required /></Field>
+              <Field label="Month"><select value={form.batch_month} onChange={update("batch_month")} className="field-input cursor-pointer">{GRADUATION_BATCH_MONTHS.map((month) => <option key={month}>{month}</option>)}</select></Field>
+              <Field label="Year"><Input value={form.batch_year} onChange={update("batch_year")} inputMode="numeric" required /></Field>
+              <Field label="Review window"><Input value={form.review_window} onChange={update("review_window")} /></Field>
+            </div>
+            <p className="text-sm font-semibold text-brand-800">Batch label: {batchName}</p>
+          </div>
+        )}
+        {action && <Field label={action.commentLabel || "Comment"} required={requiresComment}><Textarea value={form.comment} onChange={update("comment")} required={requiresComment} /></Field>}
+        {!showBatchFields && selectedGroups.length > 0 && (
+          <div className="grid w-full grid-cols-1 gap-3">
+            {selectedGroups.map((group) => <GraduationBatchStageCheck key={group.id} group={group} />)}
+          </div>
+        )}
+        {showCourseworkReviewTable && (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+              <p className="text-sm font-semibold text-ink">Coursework completion review</p>
+              <p className="mt-1 text-xs text-slate-500">Use the status and details beside each selected student before confirming the coursework check.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[780px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-white text-xs font-bold uppercase tracking-wide text-slate-400">
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-3 py-2.5">Coursework completion status</th>
+                    <th className="px-3 py-2.5">Endorsement stage</th>
+                    <th className="px-3 py-2.5">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selection.processableRows.map((row) => {
+                    const expanded = expandedCourseworkIds.has(row.student.id);
+                    const courseworkItem = row.eligibility.checklist?.find((item) => item.key === "coursework");
+                    const missingCoursework = row.eligibility.missing_coursework || [];
+                    return [
+                        <tr key={`${row.student.id}-coursework-row`} className="border-b border-slate-100 align-top">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-ink">{row.student.name}</p>
+                            <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code} · {row.endorsement?.batch_name || "No batch assigned"}</p>
+                          </td>
+                          <td className="px-3 py-3"><StatusBadge value={row.eligibility.coursework_status} dot={false} /></td>
+                          <td className="px-3 py-3"><StatusBadge value={row.endorsement?.endorsement_status || "Not Prepared"} dot={false} /></td>
+                          <td className="px-3 py-3">
+                            <button type="button" onClick={() => toggleCourseworkDetails(row.student.id)} className="btn-ghost cursor-pointer px-3 py-2">
+                              <Eye className="h-4 w-4" /> {expanded ? "Hide coursework completion details" : "View coursework completion details"}
+                            </button>
+                          </td>
+                        </tr>,
+                        expanded && (
+                          <tr key={`${row.student.id}-coursework-details`} className="border-b border-slate-100 bg-slate-50/70">
+                            <td colSpan={4} className="px-4 py-3">
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+                                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Coursework checklist</p>
+                                  <p className="mt-2 text-sm font-semibold text-ink">{courseworkItem?.label || "Course units completed"}</p>
+                                  <p className="mt-1 text-sm text-slate-600">Required: {courseworkItem?.required_value || "Encoded curriculum total"}</p>
+                                  <p className="mt-1 text-sm text-slate-600">Current: {String(courseworkItem?.actual_value ?? "No curriculum data")}</p>
+                                  {courseworkItem?.message && <p className="mt-2 text-xs font-semibold text-amber-700">{courseworkItem.message}</p>}
+                                </div>
+                                <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+                                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing coursework</p>
+                                  {missingCoursework.length ? (
+                                    <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                                      {missingCoursework.map((item) => <li key={item}>- {item}</li>)}
+                                    </ul>
+                                  ) : (
+                                    <p className="mt-2 text-sm font-semibold text-brand-700">None recorded</p>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ),
+                    ];
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-sm font-semibold text-ink">Action summary</p>
-          <p className="mt-1 text-sm text-slate-600">{rows.length} candidate(s) selected Â· {rows.length - blocked.length} can be included Â· {blocked.length} will be skipped.</p>
-          {blocked.length > 0 && <ul className="mt-2 space-y-1 text-xs text-amber-700">{blocked.slice(0, 8).map((row) => <li key={row.student.id}>{row.student.name}: {row.eligibility.status}</li>)}</ul>}
+          <p className="mt-1 text-sm text-slate-600">{rows.length} candidate(s) selected · {selection.processableRows.length} ready for this action · {selection.skippedRows.length} blocked.</p>
+          <ul className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+            {rows.map((row) => {
+              const rowAction = graduationStageActionForRow(row, accountRole);
+              const rowBlocked = !action || rowAction?.id !== action.id;
+              const researchExpanded = expandedResearchIds.has(row.student.id);
+              const canViewResearch = showResearchRequirementsInSummary && rowAction?.id === "validate_research";
+              return (
+                <li key={row.student.id} className={`rounded-lg px-3 py-2 ${rowBlocked ? "bg-amber-50 text-amber-800" : "bg-white"}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-semibold text-ink">{row.student.name}</span>
+                      <br />
+                      <span className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code} · {row.endorsement?.endorsement_status || "Not Prepared"} · {rowAction?.label || "No action due"}</span>
+                    </div>
+                    {canViewResearch && (
+                      <button
+                        type="button"
+                        onClick={() => toggleResearchDetails(row.student.id)}
+                        className="btn-ghost shrink-0 cursor-pointer px-2 py-1 text-xs"
+                        aria-label={`${researchExpanded ? "Hide" : "View"} submitted research requirements for ${row.student.name}`}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> {researchExpanded ? "Hide research" : "View research"}
+                      </button>
+                    )}
+                  </div>
+                  {canViewResearch && researchExpanded && <GraduationResearchRequirementsView row={row} />}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </form>
     </WorkflowCaseModal>
@@ -3474,21 +4213,195 @@ function WithdrawalBoardCard({ item, onOpen, onMessage }) {
   );
 }
 
-function GraduationBoardCard({ row, selected, onToggle, onOpen, onMessage }) {
-  const status = row.endorsement?.endorsement_status || "Not Prepared";
-  const researchProgress = row.eligibility.research_progress || {};
+function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, compact = false }) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
-      <div className="flex items-start gap-2">
-        <input type="checkbox" checked={selected} onChange={onToggle} className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name}`} />
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-400">{row.student.student_number} Â· {row.student.program_code}</p></div>
-        {row.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">{row.unresolved_messages}</span>}
+    <ul className="space-y-3">
+      {rows.map((row) => (
+        <li key={row.student.id} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
+              <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+            </div>
+            <StatusBadge value={graduationRowStatus(row)} dot={false} />
+          </div>
+          <GraduationRequirementBoxes row={row} />
+          {(onOpenStudent || onMessageStudent) && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {onOpenStudent && <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2 py-1 text-xs"><Eye className="h-3.5 w-3.5" /> View</button>}
+              {row.endorsement && onMessageStudent && <button type="button" onClick={() => onMessageStudent(row)} className="btn-ghost cursor-pointer px-2 py-1 text-xs"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function GraduationBatchRow({
+  group,
+  accountRole,
+  selectedIds = new Set(),
+  expanded = false,
+  selectedTone = false,
+  onToggleBatch,
+  onToggleExpanded,
+  onSelectBatch,
+  onProcessBatch,
+  onOpenStudent,
+  onMessageStudent,
+  onViewStage,
+}) {
+  const selectionState = graduationBatchSelectionState(group, selectedIds);
+  const stageSelection = graduationStageSelection(group.rows, accountRole);
+  const actionLabel = graduationBatchActionLabel(stageSelection.action, group);
+  const visibleRows = expanded ? group.rows : [];
+  const hiddenCount = group.rows.length - Math.min(group.rows.length, 4);
+  const selectionLabel = selectionState.partiallySelected ? `${selectionState.selectedCount}/${group.rows.length} selected` : selectionState.allSelected ? "Batch selected" : "Select batch";
+  const currentStage = graduationBatchCurrentStage(group);
+  const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
+  const canExpandStudents = Boolean(onToggleExpanded && onOpenStudent && onMessageStudent);
+  return (
+    <article className={`rounded-xl border px-3 py-1.5 transition-colors hover:border-brand-300 ${selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}>
+      <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-2">
+            {onToggleBatch && (
+              <input
+                type="checkbox"
+                checked={selectionState.allSelected}
+                aria-checked={selectionState.partiallySelected ? "mixed" : selectionState.allSelected}
+                onChange={() => onToggleBatch(group)}
+                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                aria-label={`Select ${group.label}`}
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-ink">{group.label}</p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                <span>{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"}</span>
+                <span>·</span>
+                <span>{selectionLabel}</span>
+                <StatusBadge value={group.boardStatus} dot={false} />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="min-w-0 text-xs text-slate-600">
+          <p className="truncate"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
+          <p className="mt-0.5 truncate"><span className="font-semibold text-slate-700">Next:</span> {group.nextOwners.join(", ")}</p>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
+          <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
+          <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>
+        </div>
+        <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
+          {canExpandStudents && <button type="button" onClick={() => onToggleExpanded(group.id)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>}
+          {onSelectBatch && <button type="button" onClick={() => onSelectBatch(group)} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>}
+          <button type="button" disabled={!stageSelection.action} onClick={() => onProcessBatch(group)} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4 shrink-0" /> {actionLabel}</button>
+        </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5"><StatusBadge value={status} dot={false} /><StatusBadge value={row.eligibility.status} dot={false} /></div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600"><span>Coursework: {row.eligibility.coursework_status}</span><span className="text-right">Research gates: {researchProgress.completed_stage_count ?? 0}/{researchProgress.stage_count ?? 3}</span><span>Completion files: {researchProgress.completion_evidence?.requirements_complete ?? 0}/{researchProgress.completion_evidence?.requirements_total ?? 5}</span><span className="text-right">Practicum: {row.eligibility.practicum_status}</span><span className="col-span-2">Updated {formatDate(row.last_activity_at || row.endorsement?.updated_at)}</span></div>
-      <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
-      <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button>{row.endorsement && <button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}</div>
+      {canExpandStudents && expanded && (
+        <div className="mt-2 border-t border-slate-100 pt-2">
+          <GraduationBatchStudentList rows={visibleRows} onOpenStudent={onOpenStudent} onMessageStudent={onMessageStudent} compact />
+        </div>
+      )}
     </article>
+  );
+}
+
+function GraduationBatchBoardSections({
+  groups,
+  accountRole,
+  selectedIds,
+  expandedBatchIds,
+  onToggleBatch,
+  onToggleExpanded,
+  onProcessBatch,
+  onOpenStudent,
+  onMessageStudent,
+  onViewStage,
+}) {
+  if (!groups.length) return <EmptyState title="No graduation candidates match the current filters." />;
+  return (
+    <div className="space-y-3">
+      {GRADUATION_BOARD_COLUMNS.map((column) => {
+        const items = groups.filter((group) => column.statuses.includes(group.boardStatus));
+        return (
+          <section key={column.label} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <header className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
+            </header>
+            <div className="space-y-2">
+              {items.length ? items.map((group) => (
+                <GraduationBatchRow
+                  key={group.id}
+                  group={group}
+                  accountRole={accountRole}
+                  selectedIds={selectedIds}
+                  expanded={expandedBatchIds.has(group.id)}
+                  onToggleBatch={onToggleBatch}
+                  onToggleExpanded={onToggleExpanded}
+                  onProcessBatch={onProcessBatch}
+                  onOpenStudent={onOpenStudent}
+                  onMessageStudent={onMessageStudent}
+                  onViewStage={onViewStage}
+                />
+              )) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-4 text-center text-xs text-slate-400">No batches</p>}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function GraduationBatchOverviewSection({ groups, accountRole, onSelectBatch, onProcessBatch, onViewStage }) {
+  if (!groups.length) return null;
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-display text-lg font-semibold text-ink">Created graduation batches</p>
+          <p className="text-xs text-slate-500">Track each batch after GS Staff compiles the candidate list, with every student still visible inside.</p>
+        </div>
+        <StatusBadge value={`${groups.length} batch${groups.length === 1 ? "" : "es"}`} dot={false} />
+      </div>
+      <div className="space-y-2">
+        {groups.map((group) => {
+          const stageSelection = graduationStageSelection(group.rows, accountRole);
+          const actionLabel = graduationBatchActionLabel(stageSelection.action, group);
+          const currentStage = graduationBatchCurrentStage(group);
+          const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
+          const hiddenCount = group.rows.length - Math.min(group.rows.length, 4);
+          return (
+            <div key={group.id} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
+              <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{group.label}</p>
+                  <p className="text-xs text-slate-500">{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"} · Updated {formatDate(group.updatedAt)}</p>
+                </div>
+                <div className="min-w-0 text-xs text-slate-600">
+                  <p className="truncate"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
+                  <p className="mt-0.5 truncate"><span className="font-semibold text-slate-700">Next:</span> {group.nextOwners.join(", ")}</p>
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
+                  <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
+                  <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>
+                </div>
+                <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
+                  <button type="button" onClick={() => onSelectBatch(group)} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>
+                  <button type="button" disabled={!stageSelection.action} onClick={() => onProcessBatch(group)} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4 shrink-0" /> {actionLabel}</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -3592,6 +4505,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
           subtitle={`${selectedRow.student.student_number} Â· ${selectedRow.student.program_code} Â· Practicum case`}
           status={selectedRow.record?.status || "Not Submitted"}
           onClose={() => setSelectedStudentId(null)}
+          size="wide"
           footer={(
             <>
               {accountRole === "staff" && selectedRow.record && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
@@ -3806,6 +4720,8 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   const [batchOpen, setBatchOpen] = useState(false);
   const [viewMode, setViewMode] = useState("board");
   const [pendingAction, setPendingAction] = useState(null);
+  const [expandedBatchIds, setExpandedBatchIds] = useState(() => new Set());
+  const [stageGroup, setStageGroup] = useState(null);
   const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
   const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
@@ -3815,7 +4731,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map((row) => row.endorsement?.endorsement_status || "Not Prepared")), [rows]);
   const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((row) => {
-    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name}`.toLowerCase();
+    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name} ${row.endorsement?.batch_name || ""}`.toLowerCase();
     const eligibility = row.eligibility.status;
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
@@ -3823,16 +4739,72 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
       && (!filters.secondary || eligibility === filters.secondary)
       && dateMatches(row.last_activity_at || row.endorsement?.updated_at || row.endorsement?.created_at, filters.dateFrom, filters.dateTo);
   }), filters.sort, (row) => row.last_activity_at || row.endorsement?.updated_at || row.endorsement?.created_at, (row) => row.student.name), [rows, filters]);
-  const selectedRows = rows.filter((row) => selectedIds.has(row.student.id));
-  function toggleSelected(studentId) {
+  const visibleRows = useMemo(
+    () => sortSelectedWorkflowRows(filteredRows, selectedIds, (row) => row.student.name, (row) => row.student.id),
+    [filteredRows, selectedIds],
+  );
+  const visibleSelectedRows = useMemo(
+    () => visibleRows.filter((row) => selectedIds.has(row.student.id)),
+    [visibleRows, selectedIds],
+  );
+  const boardRows = useMemo(
+    () => selectedIds.size ? visibleRows.filter((row) => !selectedIds.has(row.student.id)) : visibleRows,
+    [visibleRows, selectedIds],
+  );
+  const selectedRows = useMemo(
+    () => sortSelectedWorkflowRows(rows.filter((row) => selectedIds.has(row.student.id)), selectedIds, (row) => row.student.name, (row) => row.student.id),
+    [rows, selectedIds],
+  );
+  const visibleBatchGroups = useMemo(
+    () => graduationBatchGroups(visibleRows, selectedIds),
+    [visibleRows, selectedIds],
+  );
+  const visibleSelectedBatchGroups = useMemo(
+    () => graduationBatchGroups(visibleSelectedRows, selectedIds),
+    [visibleSelectedRows, selectedIds],
+  );
+  const boardBatchGroups = useMemo(
+    () => graduationBatchGroups(boardRows, selectedIds),
+    [boardRows, selectedIds],
+  );
+  const selectedBatchGroups = useMemo(
+    () => graduationBatchGroups(selectedRows, selectedIds),
+    [selectedRows, selectedIds],
+  );
+  const createdBatchGroups = useMemo(
+    () => graduationBatchGroups(rows.filter((row) => row.endorsement?.batch_name), selectedIds),
+    [rows, selectedIds],
+  );
+  const selectedStageSelection = useMemo(
+    () => graduationStageSelection(selectedRows, accountRole),
+    [selectedRows, accountRole],
+  );
+  function selectRows(predicate) {
+    setSelectedIds(new Set(filteredRows.filter(predicate).map((row) => row.student.id)));
+  }
+  function toggleBatchGroup(group) {
     setSelectedIds((current) => {
       const next = new Set(current);
-      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
+      const allSelected = group.rows.every((row) => next.has(row.student.id));
+      group.rows.forEach((row) => {
+        if (allSelected) next.delete(row.student.id); else next.add(row.student.id);
+      });
       return next;
     });
   }
-  function selectRows(predicate) {
-    setSelectedIds(new Set(filteredRows.filter(predicate).map((row) => row.student.id)));
+  function selectBatchGroup(group) {
+    setSelectedIds(new Set(group.rows.map((row) => row.student.id)));
+  }
+  function processBatchGroup(group) {
+    setSelectedIds(new Set(group.rows.map((row) => row.student.id)));
+    setBatchOpen(true);
+  }
+  function toggleExpandedBatch(groupId) {
+    setExpandedBatchIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+      return next;
+    });
   }
   function actionFor(row) {
     const status = row.endorsement?.endorsement_status;
@@ -3840,7 +4812,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
     if (accountRole === "staff" && (!status || ["For Review", "Not Eligible"].includes(status))) return { label: status === "Not Eligible" ? "Restart role-based review" : "Compile & send to Academic Coordinator", payload: { ...base, endorsement_status: "Coursework Review" } };
     if (accountRole === "academic_coordinator" && status === "Coursework Review") return { label: "Record coursework review", payload: { ...base, endorsement_status: "Research Review" } };
     if (accountRole === "research_coordinator" && status === "Research Review") return { label: "Validate research requirements", payload: { ...base, endorsement_status: "Eligibility Confirmed" } };
-    if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return { label: "List missing requirements & mark not eligible", payload: { ...base, endorsement_status: "Not Eligible" } };
+    if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return { label: "List missing requirements & mark not eligible", payload: { ...base, endorsement_status: "Not Eligible" }, requireReason: true };
     if (accountRole === "staff" && status === "Eligibility Confirmed") return { label: "Prepare endorsement list", payload: { ...base, endorsement_status: "Endorsement Prepared" } };
     if (accountRole === "staff" && ["Endorsement Prepared", "Returned for Revision"].includes(status)) return { label: status === "Returned for Revision" ? "Resend revised list to Dean" : "Send endorsement list to Dean", payload: { ...base, endorsement_status: "Ready for Dean Review" } };
     return null;
@@ -3866,36 +4838,144 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
         <button type="button" onClick={() => selectRows((row) => row.eligibility.status === "Eligible")} className="btn-ghost cursor-pointer px-3 py-2">Select all eligible</button>
         <button type="button" onClick={() => selectRows((row) => row.unresolved_messages > 0 || row.next_action_owner === WORKFLOW_ROLE_LABELS[accountRole])} className="btn-ghost cursor-pointer px-3 py-2">Select needs action</button>
         {selectedIds.size > 0 && <button type="button" onClick={() => setSelectedIds(new Set())} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
-        <button type="button" disabled={!selectedIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> Apply group action</button>
+        <button type="button" disabled={!selectedIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {graduationSelectedActionLabel(selectedStageSelection.action, selectedBatchGroups)}</button>
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </div>
+      {createdBatchGroups.length > 0 && (
+        <GraduationBatchOverviewSection groups={createdBatchGroups} accountRole={accountRole} onSelectBatch={selectBatchGroup} onProcessBatch={processBatchGroup} onViewStage={setStageGroup} />
+      )}
+      {selectedBatchGroups.length > 0 && (
+        <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Selected graduation batches</p>
+          <div className="mt-2 grid gap-2 lg:grid-cols-2">
+            {selectedBatchGroups.map((group) => (
+              <div key={group.id} className="rounded-lg bg-white px-3 py-2 text-xs text-slate-700 ring-1 ring-brand-100">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold text-ink">{group.label}</p>
+                  <span className="font-semibold text-brand-700">{group.rows.length} selected</span>
+                </div>
+                <p className="mt-1 text-slate-500">{group.rows.map((row) => row.student.name).join(", ")}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {viewMode === "board" ? (
-        <WorkflowBoard
-          columns={GRADUATION_BOARD_COLUMNS}
-          rows={filteredRows}
-          getStatus={(row) => row.endorsement?.endorsement_status || "Not Prepared"}
-          empty="No graduation candidates match the current filters."
-          renderCard={(row) => <GraduationBoardCard key={row.student.id} row={row} selected={selectedIds.has(row.student.id)} onToggle={() => toggleSelected(row.student.id)} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
-        />
-      ) : <WorkflowTable headers={["Select", "Student", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement", "Updated", "Action"]} empty="No candidates match the current filters." rows={filteredRows} render={(row) => {
-        const endorsement = row.endorsement;
-        return (
+        <>
+          {visibleSelectedBatchGroups.length > 0 && (
+            <section className="rounded-2xl border border-brand-200 bg-brand-50/50 p-3">
+              <header className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-brand-800">Selected batches</h3>
+                  <p className="text-xs text-brand-700">Selected batch cards stay on top, with students alphabetized inside each batch.</p>
+                </div>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-brand-700 ring-1 ring-brand-100">{visibleSelectedRows.length}</span>
+              </header>
+              <div className="space-y-2">
+                {visibleSelectedBatchGroups.map((group) => (
+                  <GraduationBatchRow
+                    key={group.id}
+                    group={group}
+                    accountRole={accountRole}
+                    selectedIds={selectedIds}
+                    expanded={expandedBatchIds.has(group.id)}
+                    selectedTone
+                    onToggleBatch={toggleBatchGroup}
+                    onToggleExpanded={toggleExpandedBatch}
+                    onProcessBatch={processBatchGroup}
+                    onOpenStudent={openCase}
+                    onMessageStudent={setMessageRow}
+                    onViewStage={setStageGroup}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+          {boardBatchGroups.length > 0 ? (
+            <GraduationBatchBoardSections
+              groups={boardBatchGroups}
+              accountRole={accountRole}
+              selectedIds={selectedIds}
+              expandedBatchIds={expandedBatchIds}
+              onToggleBatch={toggleBatchGroup}
+              onToggleExpanded={toggleExpandedBatch}
+              onProcessBatch={processBatchGroup}
+              onOpenStudent={openCase}
+              onMessageStudent={setMessageRow}
+              onViewStage={setStageGroup}
+            />
+          ) : visibleSelectedBatchGroups.length ? null : (
+            <EmptyState title="No graduation candidates match the current filters." />
+          )}
+        </>
+      ) : <WorkflowTable headers={["Select", "Batch / group", "Students", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement stages", "Updated", "Action"]} empty="No candidate batches match the current filters." rows={visibleBatchGroups} render={(group) => {
+        const selectionState = graduationBatchSelectionState(group, selectedIds);
+        const stageSelection = graduationStageSelection(group.rows, accountRole);
+        const actionLabel = graduationBatchActionLabel(stageSelection.action, group);
+        const currentStage = graduationBatchCurrentStage(group);
+        const expanded = expandedBatchIds.has(group.id);
+        return [
           <tr
-            key={row.student.id}
-            onClick={() => openCase(row.student.id)}
-            className="cursor-pointer border-b border-slate-100 align-top transition-colors hover:bg-brand-50/60"
+            key={group.id}
+            className="border-b border-slate-100 align-top transition-colors hover:bg-brand-50/60"
           >
-            <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(row.student.id)} onChange={() => toggleSelected(row.student.id)} onClick={(event) => event.stopPropagation()} className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name}`} /></td>
-            <StudentCell student={row.student} />
-            <td className="px-3 py-3"><StatusBadge value={row.eligibility.coursework_status} dot={false} /></td>
-            <td className="px-3 py-3"><StatusBadge value={row.eligibility.research_status} dot={false} /></td>
-            <td className="px-3 py-3"><StatusBadge value={row.eligibility.practicum_status} dot={false} /></td>
-            <td className="px-3 py-3"><StatusBadge value={row.eligibility.status} dot={false} />{row.unresolved_messages > 0 && <p className="mt-1 text-xs font-semibold text-amber-700">{row.unresolved_messages} concern(s)</p>}</td>
-            <td className="px-3 py-3"><StatusBadge value={endorsement?.endorsement_status || "Not Prepared"} dot={false} /></td>
-            <td className="px-3 py-3 text-xs text-slate-500">{formatDate(row.last_activity_at || endorsement?.updated_at)}</td>
-            <td className="px-3 py-3"><div className="flex gap-2"><button type="button" onClick={(event) => { event.stopPropagation(); openCase(row.student.id); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> View</button>{endorsement && <button type="button" onClick={(event) => { event.stopPropagation(); setMessageRow(row); }} className="btn-ghost cursor-pointer px-3 py-2"><MessageSquare className="h-4 w-4" /> Message</button>}</div></td>
-          </tr>
-        );
+            <td className="px-3 py-3">
+              <input
+                type="checkbox"
+                checked={selectionState.allSelected}
+                aria-checked={selectionState.partiallySelected ? "mixed" : selectionState.allSelected}
+                onChange={() => toggleBatchGroup(group)}
+                className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                aria-label={`Select ${group.label}`}
+              />
+              {selectionState.selectedCount > 0 && <p className="mt-1 text-[11px] font-semibold text-brand-700">{selectionState.selectedCount}/{group.rows.length}</p>}
+            </td>
+            <td className="px-3 py-3">
+              <p className="text-sm font-semibold text-ink">{group.label}</p>
+              <p className="text-xs text-slate-500">{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"} · Next: {group.nextOwners.join(", ")}</p>
+            </td>
+            <td className="px-3 py-3">
+              <div className="space-y-1">
+                {group.rows.slice(0, 4).map((row) => (
+                  <button key={row.student.id} type="button" onClick={() => openCase(row.student.id)} className="block text-left text-xs font-semibold text-slate-700 hover:text-brand-700">
+                    {row.student.name} <span className="font-normal text-slate-400">· {row.student.student_number} · {row.student.program_code}</span>
+                  </button>
+                ))}
+                {group.rows.length > 4 && <p className="text-xs font-semibold text-slate-500">+{group.rows.length - 4} more</p>}
+              </div>
+            </td>
+            <td className="px-3 py-3 text-xs text-slate-600">{group.courseworkSummary}</td>
+            <td className="px-3 py-3 text-xs text-slate-600">{group.researchSummary}</td>
+            <td className="px-3 py-3 text-xs text-slate-600">{group.practicumSummary}</td>
+            <td className="px-3 py-3 text-xs text-slate-600">{group.eligibilitySummary}</td>
+            <td className="px-3 py-3">
+              <p className="text-xs font-semibold text-slate-700">Step {currentStage.number}: {currentStage.label}</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <StatusBadge value={currentStage.state} dot={false} />
+                {group.statuses.map((status) => <StatusBadge key={status} value={status} dot={false} />)}
+              </div>
+            </td>
+            <td className="px-3 py-3 text-xs text-slate-500">{formatDate(group.updatedAt)}</td>
+            <td className="px-3 py-3">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setStageGroup(group)} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> View stage</button>
+                <button type="button" onClick={() => toggleExpandedBatch(group.id)} className="btn-ghost cursor-pointer px-3 py-2"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
+                <button type="button" onClick={() => selectBatchGroup(group)} className="btn-ghost cursor-pointer px-3 py-2">Select batch</button>
+                <button type="button" disabled={!stageSelection.action} onClick={() => processBatchGroup(group)} className="btn-primary cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> {actionLabel}</button>
+              </div>
+            </td>
+          </tr>,
+          expanded && (
+            <tr key={`${group.id}-students`} className="border-b border-slate-100 bg-slate-50/70">
+              <td colSpan={10} className="px-4 py-3">
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-ink">Students in {group.label}</p>
+                  <GraduationBatchStudentList rows={group.rows} onOpenStudent={openCase} onMessageStudent={setMessageRow} />
+                </div>
+              </td>
+            </tr>
+          ),
+        ];
       }} />}
       {selectedRow && (
         <WorkflowCaseModal
@@ -3904,6 +4984,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
           subtitle={`${selectedRow.student.student_number} Â· ${selectedRow.student.program_code} Â· Graduation endorsement`}
           status={selectedEndorsement?.endorsement_status || selectedRow.eligibility.status}
           onClose={() => setSelectedStudentId(null)}
+          size="wide"
           footer={(
             <>
               {accountRole === "staff" && selectedEndorsement && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
@@ -3923,8 +5004,9 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
           <div className="space-y-4">
             <WorkflowSubmitFeedback result={result} error={submitError} />
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
               <Detail label="Program" value={selectedRow.student.program_name} />
+              <Detail label="Batch" value={selectedEndorsement?.batch_name || "No batch assigned"} />
               <Detail label="Coursework" value={selectedRow.eligibility.coursework_status} />
               <Detail label="Research" value={selectedRow.eligibility.research_status} />
               <Detail label="Practicum" value={selectedRow.eligibility.practicum_status} />
@@ -3977,7 +5059,8 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
         </WorkflowCaseModal>
       )}
       {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
-      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} context={context} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
+      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
+      {stageGroup && <GraduationBatchStageModal group={stageGroup} onClose={() => setStageGroup(null)} />}
       {pendingAction && selectedRow && <WorkflowTransitionModal slug="graduation" student={selectedRow.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
     </div>
   );
@@ -4033,6 +5116,17 @@ function sortWorkflowRows(rows, sort, dateFor, nameFor) {
     const leftDate = new Date(dateFor(left) || 0).getTime();
     const rightDate = new Date(dateFor(right) || 0).getTime();
     return sort === "oldest" ? leftDate - rightDate : rightDate - leftDate;
+  });
+}
+
+function sortSelectedWorkflowRows(rows, selectedIds, nameFor, idFor) {
+  if (!selectedIds?.size) return rows;
+  return [...rows].sort((left, right) => {
+    const leftSelected = selectedIds.has(idFor(left));
+    const rightSelected = selectedIds.has(idFor(right));
+    if (leftSelected !== rightSelected) return leftSelected ? -1 : 1;
+    if (leftSelected && rightSelected) return nameFor(left).localeCompare(nameFor(right));
+    return 0;
   });
 }
 

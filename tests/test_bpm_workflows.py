@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from datetime import date
+from io import BytesIO
 
 from werkzeug.security import generate_password_hash
 
@@ -12,16 +13,26 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 
 from app import (  # noqa: E402
     AcademicTerm,
+    AdviserDocumentApproval,
     AwolCase,
     Course,
     CourseDropRequest,
     CourseRecord,
+    DefenseVerdict,
     DocumentCheck,
+    Faculty,
+    Form1Endorsement,
     GraduationEndorsement,
+    PanelAssignment,
     PracticumRecord,
     Program,
+    RESEARCH_DEFENSE_RESULT_ITEMS,
+    RESEARCH_DEFENSE_SCHEDULE_ITEMS,
+    RESEARCH_GATE_DEFENSE_TYPES,
     ResearchCase,
+    ResearchEvidenceFile,
     ResidencyEnrollment,
+    ScheduleRequest,
     Student,
     StudentRequestAttachment,
     Task,
@@ -33,9 +44,11 @@ from app import (  # noqa: E402
     REQUEST_UPLOAD_ROOT,
     app,
     db,
+    detected_research_progress,
     graduation_eligibility,
     graduation_candidate_payload,
     ensure_demo_accounts,
+    panel_roles_for_student,
     required_documents_for_gate,
     submitted_request_students,
     task_dict,
@@ -141,6 +154,111 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         self.assertEqual(response.status_code, expected, response.get_json())
         return response
 
+    def _complete_research_gate_defenses(self, student):
+        faculty = Faculty(
+            name=f"{student.last_name} Panel Chair",
+            college="Graduate School",
+            role="Faculty",
+            specialization="Graduate Research",
+            email=f"panel-{student.id}@example.test",
+            eligible_roles="Panel Chair,Content Specialist,Method Specialist,External Panel",
+        )
+        db.session.add(faculty)
+        db.session.flush()
+        if not Form1Endorsement.query.filter_by(student_id=student.id).first():
+            db.session.add(Form1Endorsement(
+                student_id=student.id,
+                coordinator_name="Test Academic Coordinator",
+                signature_data="data:image/png;base64,test",
+                status="Endorsed",
+            ))
+            db.session.flush()
+
+        evidence_index = 0
+
+        for gate, defense_type in RESEARCH_GATE_DEFENSE_TYPES.items():
+            system_items = {
+                "Recommended panel set",
+                RESEARCH_DEFENSE_SCHEDULE_ITEMS[gate],
+                RESEARCH_DEFENSE_RESULT_ITEMS[gate],
+            }
+            for item_name in required_documents_for_gate(gate):
+                doc = DocumentCheck(
+                    student_id=student.id,
+                    gate=gate,
+                    item_name=item_name,
+                    status="Complete",
+                    evidence_reference="Test completion fixture",
+                )
+                db.session.add(doc)
+                db.session.flush()
+                if item_name in system_items:
+                    continue
+                if item_name in {"Academic Coordinator endorsement/e-signature", "Ethics clearance status and date"}:
+                    continue
+                file_count = 3 if item_name == "Three concept papers" else 1
+                for file_number in range(file_count):
+                    evidence_index += 1
+                    evidence = ResearchEvidenceFile(
+                        student_id=student.id,
+                        document_check_id=doc.id,
+                        original_name=f"{item_name} {file_number + 1}.pdf",
+                        stored_name=f"test-research-{student.id}-{evidence_index}.pdf",
+                        mime_type="application/pdf",
+                    )
+                    db.session.add(evidence)
+                    db.session.flush()
+                    db.session.add(AdviserDocumentApproval(
+                        student_id=student.id,
+                        evidence_file_id=evidence.id,
+                        faculty_id=faculty.id,
+                        adviser_name=faculty.name,
+                        student_name=student.name,
+                        document_name=item_name,
+                        signature_data="data:image/png;base64,test",
+                        status="Signed",
+                    ))
+
+            chair_assignment = None
+            for panel_role in panel_roles_for_student(student):
+                assignment = PanelAssignment(
+                    student_id=student.id,
+                    faculty_id=faculty.id,
+                    gate=gate,
+                    panel_role=panel_role,
+                    score=100,
+                    eligibility_note="Test panel assignment",
+                )
+                db.session.add(assignment)
+                db.session.flush()
+                if panel_role == "Panel Chair":
+                    chair_assignment = assignment
+
+            schedule = ScheduleRequest(
+                student_id=student.id,
+                preferred_date=date(2026, 8, 1),
+                defense_type=defense_type,
+                mode="In person",
+                venue="Graduate School Conference Room",
+                status="Confirmed",
+                matched_count=len(panel_roles_for_student(student)),
+                required_forms_status="Complete",
+            )
+            db.session.add(schedule)
+            db.session.flush()
+            db.session.add(DefenseVerdict(
+                student_id=student.id,
+                schedule_request_id=schedule.id,
+                panel_assignment_id=chair_assignment.id,
+                faculty_id=faculty.id,
+                gate=gate,
+                defense_type=defense_type,
+                research_title="Completed research gate test",
+                chair_name=faculty.name,
+                result="Passed",
+                defense_date=schedule.preferred_date,
+            ))
+
     def test_practicum_complete_and_incomplete_certificate_loop(self):
         with app.app_context():
             self.student = db.session.get(Student, self.student_id)
@@ -164,8 +282,28 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             staff = self._staff_client()
             academic = self._academic_client()
-            self._transition(staff, "practicum", {"student_id": self.student.id, "status": "MOA Under Review"})
+            self._transition(staff, "practicum", {
+                "student_id": self.student.id,
+                "status": "MOA Under Review",
+                "workflow_comment": "Please review the signed MOA with the Academic Coordinator.",
+            })
             self.assertEqual(record.status, "MOA Under Review")
+            forward_message = WorkflowMessage.query.filter_by(
+                transaction_slug="practicum",
+                student_id=self.student_id,
+                recipient_role="Academic Coordinator",
+                action_type="forward",
+                new_status="MOA Under Review",
+            ).order_by(WorkflowMessage.id.desc()).first()
+            self.assertIsNotNone(forward_message)
+            self.assertEqual(forward_message.visibility, "internal")
+            self.assertIn("Please review the signed MOA", forward_message.comment)
+            audit = TransactionLog.query.filter_by(
+                transaction_slug="practicum",
+                student_id=self.student_id,
+                new_status="MOA Under Review",
+            ).order_by(TransactionLog.id.desc()).first()
+            self.assertIn("Reviewer comment: Please review the signed MOA", audit.notes)
             self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("practicum MOA")).first())
             self._transition(staff, "practicum", {"student_id": self.student.id, "status": "Practicum In Progress"}, 400)
             self._transition(academic, "practicum", {"student_id": self.student.id, "status": "Practicum In Progress"})
@@ -303,7 +441,22 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             staff = self._staff_client()
             academic = self._academic_client()
             research = self._research_client()
-            self._transition(staff, "graduation", {"student_id": self.student.id, "review_window": "AY 2026-2027", "endorsement_status": "Coursework Review"})
+            self._transition(staff, "graduation", {
+                "student_id": self.student.id,
+                "review_window": "AY 2026-2027",
+                "endorsement_status": "Coursework Review",
+                "workflow_comment": "AC, please validate this candidate's completed coursework.",
+            })
+            coursework_message = WorkflowMessage.query.filter_by(
+                transaction_slug="graduation",
+                student_id=self.student_id,
+                recipient_role="Academic Coordinator",
+                action_type="forward",
+                new_status="Coursework Review",
+            ).order_by(WorkflowMessage.id.desc()).first()
+            self.assertIsNotNone(coursework_message)
+            self.assertEqual(coursework_message.visibility, "internal")
+            self.assertIn("validate this candidate", coursework_message.comment)
             self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("coursework completion")).first())
             self._transition(staff, "graduation", {"student_id": self.student.id, "endorsement_status": "Research Review"}, 400)
             self._transition(academic, "graduation", {"student_id": self.student.id, "endorsement_status": "Research Review"})
@@ -330,8 +483,21 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             response = self._dean_client().post("/api/graduation/endorsed.csv", json={"endorsement_ids": [endorsement.id]})
             self.assertEqual(response.status_code, 200)
             db.session.refresh(endorsement)
-            # Export is the terminal step: the endorsed list is handed off externally,
-            # with no in-app Registrar receipt (Registrar is not an in-system actor).
+            self.assertEqual(endorsement.endorsement_status, "Dean Approved")
+            self.assertEqual(endorsement.registrar_status, "Exported - Ready to Send")
+            response = self._dean_client().post(
+                "/api/graduation/registrar-handoff",
+                data={
+                    "endorsement_ids": str(endorsement.id),
+                    "recipient_email": "registrar@gs.local",
+                    "file": (BytesIO(response.data), "graduate-school-endorsed-list.csv"),
+                },
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(endorsement)
+            # The send action is the terminal handoff. The Registrar remains external to the project.
+            self.assertEqual(endorsement.registrar_status, "Sent - Awaiting Receipt")
             self.assertEqual(endorsement.endorsement_status, "Sent to Registrar")
             self.assertFalse(Task.query.filter_by(student_id=self.student_id, owner_role="Registrar").first())
 
@@ -347,7 +513,22 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(endorsement.endorsement_status, "Coursework Incomplete")
             self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Graduate School Staff").filter(Task.title.contains("missing graduation coursework")).first())
             self._transition(research, "graduation", {"student_id": self.student_id, "endorsement_status": "Eligibility Confirmed"}, 400)
-            self._transition(staff, "graduation", {"student_id": self.student_id, "endorsement_status": "Not Eligible"})
+            self._transition(staff, "graduation", {"student_id": self.student_id, "endorsement_status": "Not Eligible"}, 400)
+            self._transition(staff, "graduation", {
+                "student_id": self.student_id,
+                "endorsement_status": "Not Eligible",
+                "workflow_comment": "Complete the missing coursework before resubmitting your graduation application.",
+            })
+            not_eligible_notice = WorkflowMessage.query.filter_by(
+                transaction_slug="graduation",
+                student_id=self.student_id,
+                recipient_role="Student",
+                action_type="return",
+                new_status="Not Eligible",
+            ).order_by(WorkflowMessage.id.desc()).first()
+            self.assertIsNotNone(not_eligible_notice)
+            self.assertEqual(not_eligible_notice.visibility, "student_visible")
+            self.assertIn("missing coursework", not_eligible_notice.comment)
 
             db.session.add(CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Completed"))
             db.session.commit()
@@ -356,7 +537,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self._transition(research, "graduation", {"student_id": self.student_id, "endorsement_status": "Eligibility Confirmed"})
             self.assertEqual(endorsement.endorsement_status, "Research Incomplete")
             self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Graduate School Staff").filter(Task.title.contains("missing graduation research")).first())
-            self._transition(staff, "graduation", {"student_id": self.student_id, "endorsement_status": "Not Eligible"})
+            self._transition(staff, "graduation", {
+                "student_id": self.student_id,
+                "endorsement_status": "Not Eligible",
+                "workflow_comment": "Finish the research gate requirements before resubmitting.",
+            })
             self.assertEqual(endorsement.endorsement_status, "Not Eligible")
 
     def test_graduation_projects_research_workflow_progress_and_uses_it_for_roster_discovery(self):
@@ -383,8 +568,76 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertIn("defense", final_stage)
             self.assertFalse(eligibility["research_progress"]["research_gates_complete"])
 
+            self._complete_research_gate_defenses(student)
+            db.session.commit()
+            eligibility = graduation_eligibility(student)
+            self.assertTrue(eligibility["research_progress"]["research_gates_complete"])
+            self.assertFalse(eligibility["research_progress"]["completion_evidence"]["complete"])
+            self.assertEqual(eligibility["research_status"], "Complete")
+            self.assertFalse(eligibility["eligible"])
+
             roster_ids = {row["student"]["id"] for row in graduation_candidate_payload()}
             self.assertIn(student.id, roster_ids)
+
+    def test_student_completion_evidence_uploads_feed_graduation_checklist(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.comprehensive_exam_status = "Passed"
+            db.session.add(CourseRecord(student_id=student.id, course_id=self.course_id, status="Completed"))
+            db.session.add(ResearchCase(
+                student_id=student.id,
+                case_type="Thesis",
+                title="Post-defense completion evidence test",
+                current_gate="Final Defense",
+                status="Complete",
+            ))
+            self._complete_research_gate_defenses(student)
+            student_account = self._account("student", "student-completion-evidence@example.test")
+            student_account.student_id = student.id
+            db.session.commit()
+
+            progress = detected_research_progress(student)
+            self.assertEqual(progress["stage"], "Completion")
+            self.assertEqual(progress["gate"], "Completion Evidence")
+            self.assertEqual(progress["milestone"]["student_missing_count"], 5)
+
+            student_client = self._role_client(student_account.id, "student")
+            for item_name in required_documents_for_gate("Completion Evidence"):
+                response = student_client.post(
+                    "/api/student-portal/research-evidence/upload",
+                    data={
+                        "gate": "Completion Evidence",
+                        "item_name": item_name,
+                        "file": (BytesIO(b"%PDF-1.4\ncompletion evidence\n%%EOF\n"), f"{item_name}.pdf"),
+                    },
+                    content_type="multipart/form-data",
+                )
+                self.assertEqual(response.status_code, 200, response.get_json())
+                stored_name = ResearchEvidenceFile.query.order_by(ResearchEvidenceFile.id.desc()).first().stored_name
+                self.created_files.append(REQUEST_UPLOAD_ROOT / stored_name)
+
+            progress = detected_research_progress(student)
+            self.assertEqual(progress["stage"], "Completion")
+            self.assertTrue(progress["milestone"]["student_uploads_ready"])
+            self.assertEqual(progress["milestone"]["student_missing_count"], 0)
+            self.assertFalse(graduation_eligibility(student)["research_progress"]["completion_evidence"]["complete"])
+
+            response = student_client.post("/api/student-portal/requests/research-gate", json={
+                "student_id": student.id,
+                "submitted_package": "Final post-defense completion package uploaded.",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            research_case = ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+            self.assertEqual(research_case.current_gate, "Completion Evidence")
+            self.assertEqual(research_case.status, "Awaiting Review")
+
+            self._transition(self._research_client(), "research-gate", {"student_id": student.id})
+            db.session.refresh(research_case)
+            eligibility = graduation_eligibility(student)
+            self.assertEqual(research_case.current_gate, "Completion Evidence")
+            self.assertEqual(research_case.status, "Verified Complete")
+            self.assertTrue(eligibility["research_progress"]["completion_evidence"]["complete"])
+            self.assertEqual(eligibility["research_progress"]["completion_evidence"]["requirements_complete"], 5)
 
     def test_course_audit_bulk_grades_and_overdue_incomplete_requires_retake(self):
         with app.app_context():
@@ -889,6 +1142,69 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 409, response.get_json())
             self.assertIsNone(PracticumRecord.query.filter_by(student_id=self.student_id).first())
 
+    def test_student_can_upload_additional_practicum_pdf_without_replacing_history(self):
+        with app.app_context():
+            old_certificate = self._attachment("practicum", "initial-certificate")
+            record = PracticumRecord(
+                student_id=self.student_id,
+                required_hours=200,
+                completed_hours=120,
+                certificate_attachment_id=old_certificate.id,
+                document_status="Pending Review",
+                status="Additional Certificates Requested",
+            )
+            db.session.add(record)
+            db.session.flush()
+            old_certificate.workflow_request_id = record.id
+            old_certificate.workflow_stage = "Practicum Document Submission"
+            student_account = self._account("student", "student-practicum-additional@example.test")
+            student_account.student_id = self.student_id
+            db.session.commit()
+
+            student_client = self._role_client(student_account.id, "student")
+            response = student_client.post("/api/student-portal/requests/practicum", json={
+                "certificate_attachment_id": old_certificate.id,
+                "completed_hours": 200,
+                "certificate_count": 2,
+            })
+            self.assertEqual(response.status_code, 400, response.get_json())
+            self.assertIn("additional practicum PDF", response.get_json()["error"])
+
+            response = student_client.post(
+                "/api/student-portal/request-attachments/upload",
+                data={
+                    "request_type": "practicum",
+                    "file": (BytesIO(b"%PDF-1.4\nadditional certificate\n%%EOF\n"), "additional-certificate.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            new_attachment_id = response.get_json()["attachment"]["id"]
+            new_attachment = db.session.get(StudentRequestAttachment, new_attachment_id)
+            self.created_files.append(REQUEST_UPLOAD_ROOT / new_attachment.stored_name)
+
+            response = student_client.post("/api/student-portal/requests/practicum", json={
+                "certificate_attachment_id": new_attachment_id,
+                "completed_hours": 200,
+                "certificate_count": 2,
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(record)
+            db.session.refresh(old_certificate)
+            db.session.refresh(new_attachment)
+            self.assertEqual(record.status, "Documents Submitted")
+            self.assertEqual(record.certificate_attachment_id, new_attachment_id)
+            self.assertEqual(old_certificate.workflow_request_id, record.id)
+            self.assertEqual(new_attachment.workflow_request_id, record.id)
+            self.assertEqual(
+                StudentRequestAttachment.query.filter_by(
+                    student_id=self.student_id,
+                    request_type="practicum",
+                    workflow_request_id=record.id,
+                ).count(),
+                2,
+            )
+
     def test_request_files_are_scoped_to_student_and_workflow_role(self):
         with app.app_context():
             attachment = self._attachment("withdrawal", "private-request")
@@ -1095,13 +1411,57 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             response = self._staff_client().post("/api/graduation/batch-actions", json={
                 "student_ids": [student.id],
-                "action": "send_to_dean",
+                "bpm_action": "compile_to_ac",
                 "review_window": "AY 2026-2027",
+                "batch_no": "2",
+                "batch_month": "July",
+                "batch_year": "2026",
             })
             self.assertEqual(response.status_code, 200, response.get_json())
             self.assertEqual(len(response.get_json()["updated"]), 1)
+            self.assertEqual(response.get_json()["batch_name"], "Batch 2 July 2026")
             endorsement = GraduationEndorsement.query.filter_by(student_id=student.id).first()
+            self.assertEqual(endorsement.endorsement_status, "Coursework Review")
+            self.assertEqual(endorsement.batch_name, "Batch 2 July 2026")
+
+            response = self._academic_client().post("/api/graduation/batch-actions", json={
+                "student_ids": [student.id],
+                "bpm_action": "check_coursework",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(endorsement)
+            self.assertEqual(endorsement.endorsement_status, "Research Review")
+
+            response = self._research_client().post("/api/graduation/batch-actions", json={
+                "student_ids": [student.id],
+                "bpm_action": "validate_research",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(endorsement)
+            self.assertEqual(endorsement.endorsement_status, "Eligibility Confirmed")
+
+            response = self._staff_client().post("/api/graduation/batch-actions", json={
+                "student_ids": [student.id],
+                "bpm_action": "prepare_endorsement",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(endorsement)
+            self.assertEqual(endorsement.endorsement_status, "Endorsement Prepared")
+
+            response = self._staff_client().post("/api/graduation/batch-actions", json={
+                "student_ids": [student.id],
+                "bpm_action": "send_to_dean",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(endorsement)
             self.assertEqual(endorsement.endorsement_status, "Ready for Dean Review")
+            dean_payload = workflow_approvals_payload()
+            dean_item = next(
+                item for item in dean_payload["pending"]
+                if item["type"] == "graduation" and item["student"]["id"] == student.id
+            )
+            self.assertEqual(dean_item["batch_name"], "Batch 2 July 2026")
+            self.assertEqual(dean_item["record"]["batch_name"], "Batch 2 July 2026")
 
             blocked_student = Student(
                 student_number="GS-2026-BATCH-BLOCKED",
@@ -1134,13 +1494,20 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.refresh(endorsement)
             self.assertEqual(endorsement.endorsement_status, "Dean Approved")
             self.assertEqual(blocked.endorsement_status, "For Review")
+            export = self._dean_client().post("/api/graduation/endorsed.csv", json={"endorsement_ids": [endorsement.id]})
+            self.assertEqual(export.status_code, 200, export.data.decode())
+            self.assertIn("Batch,Student ID,Student Name", export.data.decode())
+            self.assertIn("Batch 2 July 2026", export.data.decode())
+            db.session.refresh(endorsement)
+            self.assertEqual(endorsement.endorsement_status, "Dean Approved")
+            self.assertEqual(endorsement.registrar_status, "Exported - Ready to Send")
 
             endorsement.endorsement_status = "Ready for Dean Review"
+            endorsement.registrar_status = "Pending"
             db.session.commit()
             response = self._dean_client().post("/api/graduation/batch-actions", json={
                 "student_ids": [student.id],
                 "action": "return",
-                "recipient_role": "Graduate School Staff",
                 "comment": "",
             })
             self.assertEqual(response.status_code, 400, response.get_json())
@@ -1161,6 +1528,13 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.add(PracticumRecord(student_id=self.student.id, moa_attachment_id=moa.id, status="Dean Reviewed"))
             db.session.add(WithdrawalApplication(student_id=self.student.id, status="Withdrawn Confirmed", dean_decision="Approved"))
             db.session.add(GraduationEndorsement(student_id=self.student.id, endorsement_status="Sent to Registrar"))
+            db.session.add(StudentRequestAttachment(
+                student_id=self.student.id,
+                request_type="graduation-registrar-handoff",
+                original_name="endorsed-list.csv",
+                stored_name="reset-demo-graduation-registrar-handoff.csv",
+                mime_type="text/csv",
+            ))
             self.student.standing = "Withdrawn"
             self.student.current_stage = "Withdrawn"
             self.student.enrollment_tag = "Withdrawn"
@@ -1180,6 +1554,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertIsNone(PracticumRecord.query.filter_by(student_id=self.student.id).first())
             self.assertIsNone(WithdrawalApplication.query.filter_by(student_id=self.student.id).first())
             self.assertIsNone(GraduationEndorsement.query.filter_by(student_id=self.student.id).first())
+            self.assertIsNone(StudentRequestAttachment.query.filter_by(student_id=self.student.id, request_type="graduation-registrar-handoff").first())
             self.assertIsNotNone(CourseRecord.query.filter_by(student_id=self.student.id).first())
             self.assertIsNotNone(ResearchCase.query.filter_by(student_id=self.student.id).first())
             db.session.refresh(self.student)

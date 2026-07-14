@@ -658,6 +658,7 @@ class GraduationEndorsement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
     review_window = db.Column(db.String(80), nullable=False, default="Current review window")
+    batch_name = db.Column(db.String(120))
     coursework_status = db.Column(db.String(60), nullable=False, default="Pending")
     research_status = db.Column(db.String(60), nullable=False, default="Pending")
     practicum_status = db.Column(db.String(60), nullable=False, default="Not Required")
@@ -1697,6 +1698,7 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
         "id": endorsement.id,
         "student_id": endorsement.student_id,
         "review_window": endorsement.review_window,
+        "batch_name": endorsement.batch_name,
         "coursework_status": endorsement.coursework_status,
         "research_status": endorsement.research_status,
         "practicum_status": endorsement.practicum_status,
@@ -2071,7 +2073,7 @@ def require_api_login(*roles):
 
 
 def require_workflow_actor(*roles) -> UserAccount:
-    """Enforce the BPM swimlane for a workflow transition."""
+    """Enforce the configured owner for a workflow transition."""
     account = current_account()
     if not account or account.role not in roles:
         expected = " or ".join(ROLE_LABELS[role] for role in roles)
@@ -4070,6 +4072,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "This practicum stage is awaiting reviewer action. Your submitted information remains saved and read-only."}), 400
 
         previous_status = record.status if record else "Not Submitted"
+        previous_certificate_attachment_id = record.certificate_attachment_id if record else None
         if stage == "moa":
             moa_attachment = request_attachment_from_payload(student, "practicum", data)
             if not moa_attachment:
@@ -4103,6 +4106,12 @@ def register_routes(app: Flask) -> None:
             ).first()
             if not certificate:
                 return jsonify({"error": "Upload the practicum completion documents PDF before submitting this stage."}), 400
+            if (
+                previous_status in {"Hours Incomplete", "Additional Certificates Requested"}
+                and previous_certificate_attachment_id
+                and certificate.id == previous_certificate_attachment_id
+            ):
+                return jsonify({"error": "Upload the requested additional practicum PDF before resubmitting this stage."}), 400
             record.certificate_attachment_id = certificate.id
             record.completed_hours = max(safe_int(data.get("completed_hours"), record.completed_hours or 0), 0)
             record.certificate_count = max(safe_int(data.get("certificate_count"), record.certificate_count or 0), 0)
@@ -4231,7 +4240,7 @@ def register_routes(app: Flask) -> None:
         apply_graduation_eligibility(endorsement, eligibility)
         endorsement.review_window = (data.get("review_window") or data.get("term") or "Current review window").strip()
         endorsement.request_attachment_id = attachment.id if attachment else endorsement.request_attachment_id
-        # Eligibility is displayed as monitoring context, but the BPM decision
+        # Eligibility is displayed as monitoring context, but the workflow decision
         # is recorded only after the AC and Research Coordinator reviews.
         endorsement.endorsement_status = "For Review"
         endorsement.submitted_at = now_utc()
@@ -4550,26 +4559,27 @@ def register_routes(app: Flask) -> None:
         writer = csv.writer(stream)
         writer.writerow(["Graduate School Endorsed List for Registrar Handoff"])
         writer.writerow([
-            "Student ID", "Student Name", "Program", "Coursework Status", "Research Status",
+            "Batch", "Student ID", "Student Name", "Program", "Coursework Status", "Research Status",
             "Endorsement Status", "Dean Approval Date", "Dean Remarks", "Registrar Handoff Status",
         ])
         for item in rows:
             previous_status = item.endorsement_status
-            item.endorsement_status = "Sent to Registrar"
-            item.registrar_status = "Sent - Awaiting Receipt"
+            previous_registrar_status = item.registrar_status
+            item.registrar_status = "Exported - Ready to Send"
             item.updated_at = now_utc()
             add_log(
                 "graduation",
                 item.student_id,
                 f"Dean · {account.full_name}",
                 "Approved endorsement CSV",
-                "Endorsed graduation list exported and handed off to Registrar",
-                "Registrar",
-                item.dean_remarks or "Dean-approved Registrar handoff.",
+                "Endorsed graduation list exported for Registrar handoff",
+                "Dean",
+                f"CSV exported and ready to attach for Registrar handoff. Previous Registrar status: {previous_registrar_status}.",
                 previous_status=previous_status,
                 new_status=item.endorsement_status,
             )
             writer.writerow([
+                item.batch_name or "",
                 item.student.student_number,
                 item.student.name,
                 f"{item.student.program.code} - {item.student.program.name}",
@@ -4590,6 +4600,96 @@ def register_routes(app: Flask) -> None:
                 "X-Exported-Count": str(len(rows)),
             },
         )
+
+    @app.route("/api/graduation/registrar-handoff", methods=["POST"])
+    @require_api_login("dean")
+    def graduation_registrar_handoff():
+        account = current_account()
+        recipient_email = (request.form.get("recipient_email") or "registrar@gs.local").strip()
+        comment = (request.form.get("comment") or "").strip()
+        if "@" not in recipient_email or recipient_email.startswith("@"):
+            return jsonify({"error": "Enter a valid Registrar email address."}), 400
+        endorsement_ids = [safe_int(value) for value in request.form.getlist("endorsement_ids") if safe_int(value)]
+        if not endorsement_ids:
+            raw_ids = request.form.get("endorsement_ids") or ""
+            try:
+                parsed_ids = json.loads(raw_ids) if raw_ids else []
+            except json.JSONDecodeError:
+                parsed_ids = []
+            endorsement_ids = [safe_int(value) for value in parsed_ids if safe_int(value)]
+        uploaded = request.files.get("file")
+        if not uploaded or not uploaded.filename:
+            return jsonify({"error": "Attach the exported endorsed list before sending it to the Registrar."}), 400
+        original_name = secure_filename(uploaded.filename) or "graduate-school-endorsed-list.csv"
+        if not original_name.lower().endswith((".csv", ".pdf", ".xlsx", ".xls")):
+            return jsonify({"error": "Attach the exported CSV or a PDF/Excel copy of the endorsed list."}), 400
+        file_bytes = uploaded.read()
+        if not file_bytes or len(file_bytes) > 25 * 1024 * 1024:
+            return jsonify({"error": "The attached endorsed list must be between 1 byte and 25 MB."}), 400
+        rows = (
+            GraduationEndorsement.query.filter(
+                GraduationEndorsement.id.in_(endorsement_ids),
+                GraduationEndorsement.endorsement_status == "Dean Approved",
+            )
+            .order_by(GraduationEndorsement.dean_decision_at.asc())
+            .all()
+        )
+        if not rows:
+            return jsonify({"error": "No Dean-approved graduation endorsements are ready for Registrar handoff."}), 400
+        not_exported = [item.student.name for item in rows if item.registrar_status != "Exported - Ready to Send"]
+        if not_exported:
+            return jsonify({"error": "Export the approved list before sending it to the Registrar: " + ", ".join(not_exported)}), 400
+
+        REQUEST_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+        suffix = Path(original_name).suffix or ".csv"
+        for item in rows:
+            previous_status = item.endorsement_status
+            previous_registrar_status = item.registrar_status
+            stored_name = f"{item.student_id}-graduation-registrar-handoff-{uuid4().hex}{suffix}"
+            (REQUEST_UPLOAD_ROOT / stored_name).write_bytes(file_bytes)
+            attachment = StudentRequestAttachment(
+                student_id=item.student_id,
+                request_type="graduation-registrar-handoff",
+                workflow_request_id=item.id,
+                workflow_stage="Registrar Handoff",
+                uploaded_by_user_id=account.id,
+                uploaded_by_name=account.full_name,
+                uploaded_by_role=ROLE_LABELS.get(account.role, account.role),
+                original_name=original_name,
+                stored_name=stored_name,
+                mime_type=uploaded.mimetype or "application/octet-stream",
+            )
+            db.session.add(attachment)
+            item.endorsement_status = "Sent to Registrar"
+            item.registrar_status = "Sent - Awaiting Receipt"
+            item.updated_at = now_utc()
+            add_log(
+                "graduation",
+                item.student_id,
+                f"Dean · {account.full_name}",
+                "Registrar handoff email",
+                "Endorsed graduation list sent to Registrar",
+                "External Registrar",
+                " ".join(
+                    part
+                    for part in [
+                        f"Sent to: {recipient_email}.",
+                        f"Attached file: {original_name}.",
+                        comment,
+                        f"Previous Registrar status: {previous_registrar_status}.",
+                    ]
+                    if part
+                ),
+                previous_status=previous_status,
+                new_status=item.endorsement_status,
+            )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "count": len(rows),
+            "recipient_email": recipient_email,
+            "message": f"Sent the endorsed graduation list to {recipient_email} and recorded the Registrar handoff for {len(rows)} candidate(s).",
+        })
 
     # Faculty reference endpoint for panels and scheduling.
     @app.route("/api/faculty")
@@ -6297,32 +6397,45 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/graduation/batch-actions", methods=["POST"])
-    @require_api_login("staff", "dean")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def graduation_batch_actions():
         account = current_account()
         data = request_payload()
         student_ids = sorted({safe_int(value) for value in data.getlist("student_ids") if safe_int(value)})
-        action = (data.get("action") or "").strip()
+        action = (data.get("stage_action") or data.get("bpm_action") or data.get("action") or "").strip()
         if not student_ids:
             return jsonify({"error": "Select at least one graduation candidate."}), 400
-        if action not in {"send_to_dean", "approve", "return", "assign", "note"}:
-            return jsonify({"error": "Choose a valid graduation group action."}), 400
-        if action == "approve" and account.role != "dean":
-            return jsonify({"error": "Only the Dean may approve an endorsement batch."}), 403
-        if action in {"send_to_dean", "assign"} and account.role != "staff":
-            return jsonify({"error": "Only Graduate School staff may prepare or assign a candidate batch."}), 403
+
+        allowed_actions = {
+            "staff": {"compile_to_ac", "mark_not_eligible", "prepare_endorsement", "send_to_dean"},
+            "academic_coordinator": {"check_coursework"},
+            "research_coordinator": {"validate_research"},
+            "dean": {"approve", "return"},
+        }
+        if action not in allowed_actions.get(account.role, set()):
+            return jsonify({"error": "Choose a valid graduation group action for your role and selected stage."}), 403
 
         updated = []
         skipped = []
-        recipient = (data.get("recipient_role") or "Graduate School Staff").strip()
-        template = (data.get("template") or "This request requires additional review").strip()
         comment = (data.get("comment") or "").strip()
-        visibility = (data.get("visibility") or (
-            "student_visible" if recipient == "Student" else "internal"
-        )).strip()
         review_window = (data.get("review_window") or "Current review window").strip()
-        if action == "return" and not comment:
-            return jsonify({"error": "Enter one reason before returning the selected candidates."}), 400
+        try:
+            batch_name = graduation_batch_name_from_payload(data, required=action == "compile_to_ac")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if action in {"mark_not_eligible", "return"} and not comment:
+            return jsonify({"error": "Enter the required reason before applying this action."}), 400
+
+        action_labels = {
+            "compile_to_ac": "Compile graduation candidate list and send to Academic Coordinator",
+            "check_coursework": "Check coursework completion",
+            "validate_research": "Validate research completion requirements",
+            "mark_not_eligible": "List missing requirements and mark not eligible",
+            "prepare_endorsement": "Prepare endorsement list",
+            "send_to_dean": "Send endorsement list to Dean",
+            "approve": "Approve endorsement list",
+            "return": "Return endorsement list for revision",
+        }
 
         for student_id in student_ids:
             student = db.session.get(Student, student_id)
@@ -6332,54 +6445,125 @@ def register_routes(app: Flask) -> None:
             endorsement = latest_graduation_endorsement(student.id)
             eligibility = graduation_eligibility(student)
             try:
-                if action == "send_to_dean":
-                    if eligibility["status"] != "Eligible":
-                        raise ValueError(f"Eligibility is {eligibility['status'].lower()}")
+                current_status = endorsement.endorsement_status if endorsement else "Not Prepared"
+                previous = current_status
+                next_owner = "Graduate School Staff"
+                result = action_labels[action]
+
+                if action == "compile_to_ac":
+                    if current_status not in {"Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"}:
+                        raise ValueError(f"Current stage is {current_status}")
                     if not endorsement:
                         endorsement = GraduationEndorsement(student_id=student.id, review_window=review_window)
                         db.session.add(endorsement)
-                    previous = endorsement.endorsement_status
                     apply_graduation_eligibility(endorsement, eligibility)
                     endorsement.review_window = review_window
+                    endorsement.batch_name = batch_name
+                    endorsement.endorsement_status = "Coursework Review"
+                    next_owner = "Academic Coordinator"
+                    result = "Graduation candidate list compiled and sent for coursework review"
+                    add_task(student.id, "Check graduation coursework completion", "Academic Coordinator", 5, 45)
+                elif action == "check_coursework":
+                    if not endorsement or current_status != "Coursework Review":
+                        raise ValueError("Candidate is not awaiting Academic Coordinator coursework review")
+                    apply_graduation_eligibility(endorsement, eligibility)
+                    if eligibility["coursework_status"] != "Complete":
+                        endorsement.endorsement_status = "Coursework Incomplete"
+                        next_owner = "Graduate School Staff"
+                        result = "Coursework reviewed as incomplete; missing coursework sent to GS Staff"
+                        add_task(student.id, "List missing graduation coursework and inform the student", "Graduate School Staff", 5, 35)
+                    else:
+                        endorsement.endorsement_status = "Research Review"
+                        next_owner = "Research Coordinator"
+                        result = "Coursework completion verified and candidate sent for research validation"
+                        add_task(student.id, "Validate graduation research completion evidence", "Research Coordinator", 5, 45)
+                elif action == "validate_research":
+                    if not endorsement or current_status != "Research Review":
+                        raise ValueError("Candidate is not awaiting Research Coordinator validation")
+                    apply_graduation_eligibility(endorsement, eligibility)
+                    if eligibility["research_status"] != "Complete":
+                        endorsement.endorsement_status = "Research Incomplete"
+                        next_owner = "Graduate School Staff"
+                        result = "Research requirements reviewed as incomplete; missing evidence sent to GS Staff"
+                        add_task(student.id, "List missing graduation research requirements and inform the student", "Graduate School Staff", 5, 35)
+                    elif eligibility["practicum_status"] not in {"Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"}:
+                        endorsement.endorsement_status = "Practicum Incomplete"
+                        next_owner = eligibility["next_owner"]
+                        result = "Practicum completion is incomplete or needs verification before endorsement"
+                        add_task(student.id, eligibility["next_action"], eligibility["next_owner"], 5, 35)
+                    else:
+                        endorsement.endorsement_status = "Eligibility Confirmed"
+                        next_owner = "Graduate School Staff"
+                        result = "Coursework and research requirements validated for endorsement preparation"
+                        add_task(student.id, "Prepare graduation endorsement list", "Graduate School Staff", 5, 45)
+                elif action == "mark_not_eligible":
+                    if not endorsement or current_status not in {"Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"}:
+                        raise ValueError("A coordinator review must identify missing requirements first")
+                    endorsement.endorsement_status = "Not Eligible"
+                    next_owner = "Student"
+                    result = "Missing graduation requirements listed; student recorded as not eligible"
+                    add_transition_comment_message(
+                        "graduation", student, account, next_owner, result, comment,
+                        previous, endorsement.endorsement_status,
+                    )
+                elif action == "prepare_endorsement":
+                    if not endorsement or current_status != "Eligibility Confirmed":
+                        raise ValueError("Coursework and research reviews must be complete before preparing the endorsement list")
+                    endorsement.endorsement_status = "Endorsement Prepared"
+                    next_owner = "Graduate School Staff"
+                    result = "Graduation endorsement list prepared"
+                elif action == "send_to_dean":
+                    if not endorsement or current_status not in {"Endorsement Prepared", "Returned for Revision"}:
+                        raise ValueError("Prepare or revise the endorsement list before sending it to the Dean")
+                    if batch_name:
+                        endorsement.batch_name = batch_name
+                    elif not endorsement.batch_name:
+                        endorsement.batch_name = default_graduation_batch_name()
                     endorsement.endorsement_status = "Ready for Dean Review"
                     endorsement.submitted_at = now_utc()
+                    next_owner = "Dean"
+                    result = "Graduation endorsement list prepared for Dean review"
                     add_task(student.id, "Review graduation endorsement list", "Dean", 5, 55)
-                    add_log(
-                        "graduation", student.id, workflow_actor_label(account), "Graduation batch",
-                        "Candidate included in batch sent for Dean review", "Dean", comment or "Batch preparation",
-                        previous_status=previous, new_status=endorsement.endorsement_status,
-                    )
                 elif action == "approve":
                     if not endorsement or endorsement.endorsement_status != "Ready for Dean Review":
                         raise ValueError("Candidate is not ready for Dean review")
-                    previous = endorsement.endorsement_status
                     endorsement.endorsement_status = "Dean Approved"
                     endorsement.dean_remarks = comment or endorsement.dean_remarks
                     endorsement.dean_decision_at = now_utc()
                     endorsement.registrar_status = "Pending Handoff"
+                    next_owner = "Dean"
+                    result = "Graduation candidate approved in Dean batch"
                     add_task(student.id, "Export and hand off endorsed list to Registrar", "Dean", 3, 40)
-                    add_log(
-                        "graduation", student.id, workflow_actor_label(account), "Graduation batch",
-                        "Graduation candidate approved in Dean batch", "Dean", comment or "Approved for Registrar handoff",
-                        previous_status=previous, new_status=endorsement.endorsement_status,
-                    )
                 elif action == "return":
                     if account.role == "dean" and (
                         not endorsement or endorsement.endorsement_status != "Ready for Dean Review"
                     ):
                         raise ValueError("Candidate is no longer awaiting Dean review")
-                    create_workflow_message(
-                        "graduation", student, account, recipient, template, comment,
-                        "return", visibility,
+                    endorsement.endorsement_status = "Returned for Revision"
+                    endorsement.dean_remarks = comment
+                    endorsement.dean_decision_at = now_utc()
+                    next_owner = "Graduate School Staff"
+                    result = "Graduation endorsement returned by Dean for revision"
+                    add_task(student.id, "Revise graduation endorsement list", "Graduate School Staff", 4, 35)
+                    workflow_message_record(
+                        "graduation", student, account, "Graduate School Staff",
+                        comment or "This request requires revision", comment, "return",
+                        previous, endorsement.endorsement_status, visibility="internal",
                     )
-                elif action == "assign":
-                    add_task(student.id, "Review assigned graduation candidate", recipient, 5, 40)
-                    add_log("graduation", student.id, workflow_actor_label(account), "Graduation batch", "Reviewer assigned", recipient, comment or "Batch reviewer assignment")
-                else:
-                    create_workflow_message(
-                        "graduation", student, account, recipient, template, comment,
-                        "note", visibility,
+
+                if action not in {"mark_not_eligible", "return"} and comment:
+                    add_transition_comment_message(
+                        "graduation", student, account, next_owner, result, comment,
+                        previous, endorsement.endorsement_status,
                     )
+                endorsement.updated_at = now_utc()
+                add_log(
+                    "graduation", student.id, workflow_actor_label(account), "Graduation batch",
+                    result, next_owner,
+                    workflow_notes_with_comment(graduation_notes(endorsement), comment),
+                    previous_status=previous, new_status=endorsement.endorsement_status,
+                    visibility="internal" if next_owner != "Student" else "student_visible",
+                )
                 updated.append({"student_id": student.id, "student_name": student.name})
             except ValueError as exc:
                 skipped.append({"student_id": student.id, "student_name": student.name, "reason": str(exc)})
@@ -6389,7 +6573,9 @@ def register_routes(app: Flask) -> None:
             "ok": True,
             "updated": updated,
             "skipped": skipped,
-            "message": f"Applied the group action to {len(updated)} candidate(s); {len(skipped)} skipped.",
+            "batch_name": batch_name,
+            "action": action,
+            "message": f"{action_labels[action]} applied to {len(updated)} candidate(s){f' in {batch_name}' if batch_name else ''}; {len(skipped)} skipped.",
         })
 
     @app.route("/api/transactions/<slug>/demo-reset", methods=["POST"])
@@ -7163,28 +7349,9 @@ def graduation_eligibility(student: Student) -> dict:
         if not stage["defense"]["complete"]:
             research_missing.append(f"{stage['name']} passing defense result")
 
-    completion_documents = {
-        document.item_name: document
-        for document in DocumentCheck.query.filter_by(
-            student_id=student.id,
-            gate="Completion Evidence",
-        ).all()
-    }
-    research_missing.extend(
-        item
-        for item in required_documents_for_gate("Completion Evidence")
-        if (
-            not research_progress["legacy_verified"]
-            and (
-                item not in completion_documents
-                or completion_documents[item].status not in {"Complete", "Verified Complete"}
-            )
-        )
-    )
     research_complete = bool(
         research_known
         and research_progress["research_gates_complete"]
-        and research_progress["completion_evidence"]["complete"]
     )
 
     practicum_required = bool(student.program.has_practicum)
@@ -7317,12 +7484,82 @@ def apply_graduation_eligibility(endorsement: GraduationEndorsement, eligibility
     endorsement.updated_at = now_utc()
 
 
+GRADUATION_BATCH_MONTHS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+GRADUATION_BATCH_NAME_RE = re.compile(
+    r"^Batch(?:\s+No\.)?\s+([1-9]\d*)\s+("
+    + "|".join(GRADUATION_BATCH_MONTHS)
+    + r")\s+(\d{4})$",
+    re.IGNORECASE,
+)
+
+
+def normalize_graduation_batch_name(value: str) -> str:
+    raw = re.sub(r"\s+", " ", (value or "").strip())
+    match = GRADUATION_BATCH_NAME_RE.match(raw)
+    if not match:
+        raise ValueError("Use the batch format: Batch 1 July 2026.")
+    batch_no, month, year = match.groups()
+    month = next(item for item in GRADUATION_BATCH_MONTHS if item.lower() == month.lower())
+    return f"Batch {int(batch_no)} {month} {year}"
+
+
+def default_graduation_batch_name() -> str:
+    today = now_utc()
+    month = today.strftime("%B")
+    year = today.year
+    suffix = f"{month} {year}"
+    names = [
+        name for (name,) in GraduationEndorsement.query
+        .filter(GraduationEndorsement.batch_name.like(f"Batch % {suffix}"))
+        .with_entities(GraduationEndorsement.batch_name)
+        .distinct()
+        .all()
+        if name
+    ]
+    numbers = []
+    for name in names:
+        try:
+            normalized = normalize_graduation_batch_name(name)
+        except ValueError:
+            continue
+        match = GRADUATION_BATCH_NAME_RE.match(normalized)
+        if match and match.group(2) == month and int(match.group(3)) == year:
+            numbers.append(int(match.group(1)))
+    return f"Batch {(max(numbers) + 1) if numbers else 1} {suffix}"
+
+
+def graduation_batch_name_from_payload(data: MultiDict, required: bool = False) -> str:
+    batch_name = (data.get("batch_name") or "").strip()
+    batch_no = (data.get("batch_no") or "").strip()
+    batch_month = (data.get("batch_month") or "").strip()
+    batch_year = (data.get("batch_year") or "").strip()
+    if batch_name:
+        return normalize_graduation_batch_name(batch_name)
+    if any([batch_no, batch_month, batch_year]):
+        if not all([batch_no, batch_month, batch_year]):
+            raise ValueError("Enter the batch number, month, and year.")
+        if not batch_no.isdigit() or int(batch_no) <= 0:
+            raise ValueError("Batch number must be a positive whole number.")
+        if batch_month not in GRADUATION_BATCH_MONTHS:
+            raise ValueError("Choose a valid batch month.")
+        if not batch_year.isdigit() or len(batch_year) != 4:
+            raise ValueError("Batch year must use four digits.")
+        return f"Batch {int(batch_no)} {batch_month} {batch_year}"
+    if required:
+        return default_graduation_batch_name()
+    return ""
+
+
 def graduation_notes(endorsement: GraduationEndorsement) -> str:
     coursework = endorsement.missing_coursework or "None"
     research = endorsement.missing_research_requirements or "None"
     practicum = endorsement.missing_practicum_requirement or "None"
+    batch = endorsement.batch_name or "No batch assigned"
     return (
-        f"Review window: {endorsement.review_window}; status: {endorsement.endorsement_status}; "
+        f"Batch: {batch}; review window: {endorsement.review_window}; status: {endorsement.endorsement_status}; "
         f"coursework: {endorsement.coursework_status}; research: {endorsement.research_status}; "
         f"practicum: {endorsement.practicum_status}; missing coursework: {coursework}; "
         f"missing research: {research}; missing practicum: {practicum}; registrar: {endorsement.registrar_status}."
@@ -7428,6 +7665,65 @@ def workflow_message_record(
     )
     db.session.add(message)
     return message
+
+
+def workflow_transition_comment(data: MultiDict) -> str:
+    return (
+        data.get("workflow_comment")
+        or data.get("transition_comment")
+        or data.get("action_comment")
+        or ""
+    ).strip()
+
+
+def transition_comment_action_type(next_owner: str, new_status: str) -> str:
+    student_return_statuses = {
+        "Additional Certificates Requested",
+        "Not Accepted - New Organization Required",
+        "Not Eligible",
+        "Returned for Clarification",
+    }
+    if next_owner == "Student" and new_status in student_return_statuses:
+        return "return"
+    if next_owner == "Student":
+        return "notice"
+    return "forward"
+
+
+def workflow_notes_with_comment(notes: str, comment: str) -> str:
+    clean_comment = (comment or "").strip()
+    if not clean_comment:
+        return notes
+    return f"{notes}\nReviewer comment: {clean_comment}"
+
+
+def add_transition_comment_message(
+    slug: str,
+    student: Student,
+    account: UserAccount,
+    next_owner: str,
+    template: str,
+    comment: str,
+    previous_status: str,
+    new_status: str,
+) -> WorkflowMessage | None:
+    clean_comment = (comment or "").strip()
+    if not clean_comment or next_owner not in WORKFLOW_RECIPIENTS:
+        return None
+    action_type = transition_comment_action_type(next_owner, new_status)
+    return workflow_message_record(
+        slug,
+        student,
+        account,
+        next_owner,
+        template,
+        clean_comment,
+        action_type,
+        previous_status,
+        new_status,
+        visibility="student_visible" if next_owner == "Student" else "internal",
+        status="Open" if action_type in {"return", "forward"} else "Sent",
+    )
 
 
 def workflow_transition_action(result: str) -> str:
@@ -7763,11 +8059,12 @@ def workflow_approval_item(kind: str, item) -> dict:
         "id": item.id,
         "type": kind,
         "title": f"Graduation endorsement · {student.name}",
-        "subtitle": f"{student.program.code} · {item.review_window}",
+        "subtitle": f"{student.program.code} · {item.batch_name or 'No batch assigned'} · {item.review_window}",
         "status": item.endorsement_status,
         "student": student_brief(student),
         "submitted_at": iso(item.submitted_at or item.updated_at),
         "review_window": item.review_window,
+        "batch_name": item.batch_name,
         "details": graduation_notes(item),
         "record": graduation_endorsement_dict(item, include_student=False),
         "eligibility": {
@@ -9914,6 +10211,8 @@ def handle_practicum(data: MultiDict) -> int:
     apply_practicum_payload(record, data, student)
     requested_status = (data.get("status") or "").strip()
     previous_status = record.status
+    transition_comment = workflow_transition_comment(data)
+    transition_message_added = False
 
     if requested_status == "MOA Under Review":
         account = require_workflow_actor("staff")
@@ -9944,7 +10243,7 @@ def handle_practicum(data: MultiDict) -> int:
         account = require_workflow_actor("academic_coordinator")
         if record.status != "Documents Under Review":
             raise ValueError("GS Staff must forward the practicum documents before certificates can be reviewed.")
-        return_reason = (data.get("return_reason") or data.get("remarks") or "").strip()
+        return_reason = (data.get("return_reason") or transition_comment or data.get("remarks") or "").strip()
         if not return_reason:
             raise ValueError("Enter a reason before requesting additional practicum evidence.")
         record.status = "Additional Certificates Requested"
@@ -9954,6 +10253,7 @@ def handle_practicum(data: MultiDict) -> int:
             "Please upload the correct document.", return_reason, "return",
             previous_status, record.status, visibility="student_visible",
         )
+        transition_message_added = True
         add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
         student.risk_level = "Medium"
         next_owner = "Student"
@@ -9975,6 +10275,7 @@ def handle_practicum(data: MultiDict) -> int:
             return_reason, "return", previous_status, record.status,
             visibility="student_visible",
         )
+        transition_message_added = True
         add_task(student.id, "Arrange another practicum organization and submit an updated MOA", "Student", 10, 55)
         student.risk_level = "Medium"
         next_owner = "Student"
@@ -10007,14 +10308,27 @@ def handle_practicum(data: MultiDict) -> int:
     else:
         raise ValueError("Choose the next available practicum workflow action.")
 
+    result = f"Practicum status updated: {record.status}"
+    if transition_comment and not transition_message_added:
+        add_transition_comment_message(
+            "practicum",
+            student,
+            account,
+            next_owner,
+            result,
+            transition_comment,
+            previous_status,
+            record.status,
+        )
+
     add_log(
         "practicum",
         student.id,
         workflow_actor_label(account),
         data.get("source_reference", "") or (record.moa_attachment.original_name if record.moa_attachment else "Practicum workflow"),
-        f"Practicum status updated: {record.status}",
+        result,
         next_owner,
-        practicum_notes(record),
+        workflow_notes_with_comment(practicum_notes(record), transition_comment),
         previous_status=previous_status,
         new_status=record.status,
     )
@@ -10262,6 +10576,7 @@ def handle_graduation(data: MultiDict) -> int:
         endorsement.dean_remarks = data.get("dean_remarks")
     if data.get("registrar_status"):
         endorsement.registrar_status = data.get("registrar_status")
+    transition_comment = workflow_transition_comment(data)
 
     if requested_status == "Coursework Review":
         account = require_workflow_actor("staff")
@@ -10308,6 +10623,8 @@ def handle_graduation(data: MultiDict) -> int:
         account = require_workflow_actor("staff")
         if endorsement.endorsement_status not in {"Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"}:
             raise ValueError("A coordinator review must identify missing requirements before GS Staff records ineligibility.")
+        if not transition_comment:
+            raise ValueError("Enter the student-facing message before marking the graduation application not eligible.")
         endorsement.endorsement_status = "Not Eligible"
         next_owner = "Student"
         result = "Missing graduation requirements listed; student recorded as not eligible"
@@ -10332,6 +10649,18 @@ def handle_graduation(data: MultiDict) -> int:
     else:
         raise ValueError("Choose the next available graduation workflow action.")
 
+    if transition_comment:
+        add_transition_comment_message(
+            "graduation",
+            student,
+            account,
+            next_owner,
+            result,
+            transition_comment,
+            previous_status,
+            endorsement.endorsement_status,
+        )
+
     add_log(
         "graduation",
         student.id,
@@ -10339,7 +10668,7 @@ def handle_graduation(data: MultiDict) -> int:
         data.get("source_reference", "") or "Graduation endorsement workflow",
         result,
         next_owner,
-        graduation_notes(endorsement),
+        workflow_notes_with_comment(graduation_notes(endorsement), transition_comment),
         previous_status=previous_status,
         new_status=endorsement.endorsement_status,
     )
@@ -10351,7 +10680,7 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
     request_types = {
         "practicum": {"practicum"},
         "withdrawal": {"withdrawal"},
-        "graduation": {"graduation", "graduation-endorsement"},
+        "graduation": {"graduation", "graduation-endorsement", "graduation-registrar-handoff"},
     }[slug]
     task_terms = {
         "practicum": ("practicum",),
@@ -11948,12 +12277,17 @@ RESEARCH_DEFENSE_SCHEDULE_ITEMS = {
 }
 
 # The first incomplete milestone is the student's detected Research Gate stage.
-# Completion Evidence remains available to graduation checks, but it does not
-# create a fifth student-facing research stage.
+# Graduation still treats Title/Proposal/Final as the formal research gates;
+# the student portal adds Completion Evidence as the post-defense submission
+# step that Graduation reads separately.
 RESEARCH_STAGE_SEQUENCE = [
     ("Title Defense", "Form 1 - Title Defense"),
     ("Proposal Defense", "Form 4 - Proposal Defense Readiness"),
     ("Final Defense", "Final Defense"),
+]
+RESEARCH_PORTAL_STAGE_SEQUENCE = [
+    *RESEARCH_STAGE_SEQUENCE,
+    ("Completion", "Completion Evidence"),
 ]
 
 # Uploaded manuscript items that must be approved by the student's assigned
@@ -12325,8 +12659,8 @@ def research_stage_status(milestone: dict) -> str:
 
 def detected_research_progress(student: Student) -> dict:
     stages = []
-    detected_index = len(RESEARCH_STAGE_SEQUENCE) - 1
-    for index, (stage_name, gate) in enumerate(RESEARCH_STAGE_SEQUENCE):
+    detected_index = len(RESEARCH_PORTAL_STAGE_SEQUENCE) - 1
+    for index, (stage_name, gate) in enumerate(RESEARCH_PORTAL_STAGE_SEQUENCE):
         ensure_research_document_checks(student.id, gate)
         milestone = research_milestone_payload(student, gate)
         stage = {
@@ -12340,7 +12674,7 @@ def detected_research_progress(student: Student) -> dict:
             detected_index = index
             break
     # Include later stages in the progress rail without treating them as active.
-    for stage_name, gate in RESEARCH_STAGE_SEQUENCE[len(stages):]:
+    for stage_name, gate in RESEARCH_PORTAL_STAGE_SEQUENCE[len(stages):]:
         stages.append({"name": stage_name, "gate": gate, "complete": False, "status": "Locked"})
     detected = stages[detected_index]
     milestone = research_milestone_payload(student, detected["gate"])
@@ -12377,7 +12711,7 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
             "stage_index": 0,
             "stages": [
                 {"name": name, "gate": gate, "complete": False, "status": "Locked"}
-                for name, gate in RESEARCH_STAGE_SEQUENCE
+                for name, gate in RESEARCH_PORTAL_STAGE_SEQUENCE
             ],
             "milestone": locked_milestone,
             "prerequisite": prerequisite,
@@ -12395,7 +12729,11 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
             case_type=research_case_type(student),
             title=clean_title or "Research title pending Form 1 submission",
             current_gate=progress["gate"],
-            status=progress["status"],
+            status=(
+                "Verified Complete"
+                if progress["gate"] == "Completion Evidence" and progress["status"] == "Complete"
+                else progress["status"]
+            ),
             adviser_name=student.adviser_name,
         )
         db.session.add(research_case)
@@ -12404,13 +12742,18 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
         if clean_title:
             research_case.title = clean_title
         research_case.current_gate = progress["gate"]
-        research_case.status = progress["status"]
+        research_case.status = (
+            "Verified Complete"
+            if progress["gate"] == "Completion Evidence" and progress["status"] == "Complete"
+            else progress["status"]
+        )
         research_case.adviser_name = student.adviser_name
 
     lifecycle_stage = {
         "Title Defense": "Proposal Development",
         "Proposal Defense": "Proposal Defense",
         "Final Defense": "Final Defense",
+        "Completion": "Completed" if progress["status"] == "Complete" else "Final Defense",
     }[progress["stage"]]
     if student.standing == "Active" and student.current_stage != "Completed":
         student.current_stage = lifecycle_stage
@@ -13315,6 +13658,14 @@ def ensure_workflow_activity_schema() -> None:
         for name, sql_type in practicum_additions.items():
             if name not in practicum_existing:
                 db.session.execute(text(f"ALTER TABLE practicum_record ADD COLUMN {name} {sql_type}"))
+    if "graduation_endorsement" in tables:
+        graduation_existing = {column["name"] for column in inspector.get_columns("graduation_endorsement")}
+        graduation_additions = {
+            "batch_name": "VARCHAR(120)",
+        }
+        for name, sql_type in graduation_additions.items():
+            if name not in graduation_existing:
+                db.session.execute(text(f"ALTER TABLE graduation_endorsement ADD COLUMN {name} {sql_type}"))
     db.session.commit()
 
     student_accounts = {
@@ -14272,8 +14623,7 @@ def seed_simulation_demo() -> None:
                     start_time=time(13, 0), end_time=time(16, 0)))
 
     # Seat the prepared faculty on one existing research-stage student's panel so the
-    # Faculty portal has live panels out of the box, before the Student A walkthrough
-    # assigns them Andrea's panel too.
+    # Faculty portal has live panels out of the box.
     if len(sim_faculty_objs) >= 4:
         panel_student = (
             Student.query.filter(Student.current_stage.in_(["Final Defense", "Writing", "Data Collection"]))

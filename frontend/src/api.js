@@ -80,7 +80,22 @@ export const api = {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
-    return { count: Number(res.headers.get("X-Exported-Count") || 0) };
+    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
+  },
+  sendGraduationRegistrarHandoff: async ({ endorsementIds = [], recipientEmail, file, comment = "" }) => {
+    const form = new FormData();
+    endorsementIds.forEach((id) => form.append("endorsement_ids", id));
+    form.append("recipient_email", recipientEmail);
+    form.append("comment", comment);
+    if (file) form.append("file", file);
+    const res = await fetch(`${BASE}/graduation/registrar-handoff`, {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Registrar handoff failed (${res.status})`);
+    return body;
   },
   transactionContext: (slug, params = {}) => {
     const qs = queryString(params);

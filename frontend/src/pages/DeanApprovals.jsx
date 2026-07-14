@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare } from "lucide-react";
+import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Send, Upload, Mail } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
@@ -29,6 +29,8 @@ const CLARIFICATION_TEMPLATES = [
   "Other / Custom comment",
 ];
 
+const REGISTRAR_HANDOFF_EMAIL = "registrar@gs.local";
+
 function deanItemDate(item) {
   return item.last_activity_at || item.submitted_at || item.record?.updated_at || "";
 }
@@ -51,6 +53,258 @@ function sortDeanItems(items, sort) {
   });
 }
 
+function graduationBatchLabel(item, fallback = "No batch assigned") {
+  return item.batch_name || item.record?.batch_name || fallback;
+}
+
+function groupGraduationItemsByBatch(items) {
+  const groups = new Map();
+  items.forEach((item) => {
+    const label = graduationBatchLabel(item);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  });
+  return [...groups.entries()].map(([label, rows]) => ({ label, rows }));
+}
+
+function graduationBatchExportPayload(batch) {
+  return {
+    batchLabel: batch.label,
+    reviewWindow: "",
+    endorsementIds: batch.rows.map((item) => item.id),
+    count: batch.rows.length,
+    rows: batch.rows,
+  };
+}
+
+function graduationRegistrarStatus(item) {
+  return item.record?.registrar_status || item.registrar_status || "";
+}
+
+function graduationBatchReadyToSend(batch, exportedBatchLabels) {
+  return exportedBatchLabels.has(batch.label) || batch.rows.every((item) => graduationRegistrarStatus(item) === "Exported - Ready to Send");
+}
+
+const DEAN_GRADUATION_BATCH_STAGES = [
+  {
+    label: "Compile graduation list",
+    detail: "GS Staff created the candidate batch.",
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+  },
+  {
+    label: "Academic Coordinator checks course completion",
+    detail: "Coursework completion was checked before Dean review.",
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+  },
+  {
+    label: "Research Coordinator validates research requirements",
+    detail: "Research completion evidence was validated before endorsement.",
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+  },
+  {
+    label: "GS Staff prepares endorsement list",
+    detail: "The endorsement list was prepared or revised for Dean action.",
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+  },
+  {
+    label: "Dean reviews endorsement list",
+    detail: "Dean approves the batch or returns it for revision.",
+    currentStatuses: ["Ready for Dean Review"],
+    completeStatuses: ["Dean Approved", "Sent to Registrar"],
+    attentionStatuses: ["Returned for Revision"],
+  },
+  {
+    label: "Send endorsed list to Registrar",
+    detail: "Dean-approved candidates are exported for Registrar receipt.",
+    currentStatuses: ["Dean Approved"],
+    completeStatuses: ["Sent to Registrar"],
+    attentionStatuses: ["Returned for Revision"],
+  },
+];
+
+function deanGraduationStageState(stage, batch) {
+  const statuses = batch.rows.map((item) => item.status);
+  const hasAttention = statuses.some((status) => stage.attentionStatuses?.includes(status));
+  const allComplete = statuses.length > 0 && statuses.every((status) => stage.completeStatuses?.includes(status));
+  const hasCurrent = statuses.some((status) => stage.currentStatuses?.includes(status));
+  if (hasAttention) return "Needs action";
+  if (allComplete) return "Complete";
+  if (hasCurrent) return "Current";
+  return "Pending";
+}
+
+function deanGraduationStageChecks(batch) {
+  return DEAN_GRADUATION_BATCH_STAGES.map((stage, index) => ({
+    ...stage,
+    number: index + 1,
+    state: deanGraduationStageState(stage, batch),
+  }));
+}
+
+function deanGraduationCurrentStage(batch) {
+  const stages = deanGraduationStageChecks(batch);
+  return stages.find((stage) => ["Needs action", "Current", "Pending"].includes(stage.state)) || stages[stages.length - 1];
+}
+
+function deanGraduationBatchActionLabel(action, batchLabels) {
+  const base = action === "return" ? "Return endorsement list for revision" : "Approve endorsement list";
+  if (batchLabels.length === 1) return `${base} for ${batchLabels[0]}`;
+  return `${base} for ${batchLabels.length} batches`;
+}
+
+function deanGraduationRequirementTone(item) {
+  if (item?.passed === true || item?.complete === true || item?.status === "Passed") return "complete";
+  return "missing";
+}
+
+function deanGraduationRequirementClasses(tone) {
+  return tone === "complete"
+    ? {
+      card: "border-emerald-200 bg-emerald-50 text-emerald-900",
+      icon: "bg-emerald-600 text-white",
+      text: "text-emerald-800",
+      muted: "text-emerald-700",
+    }
+    : {
+      card: "border-red-200 bg-red-50 text-red-900",
+      icon: "bg-red-600 text-white",
+      text: "text-red-800",
+      muted: "text-red-700",
+    };
+}
+
+function deanGraduationRequirementDetailLines(item) {
+  const actual = item.actual_value ?? item.actual ?? item.status ?? "Pending";
+  const required = item.required_value ?? item.required;
+  return [
+    String(actual),
+    required != null ? `Required: ${String(required)}` : "",
+    item.note || "",
+  ].filter(Boolean);
+}
+
+function deanGraduationFallbackChecklist(item) {
+  const eligibility = item.eligibility || {};
+  return [
+    {
+      key: "coursework",
+      label: "Coursework",
+      actual_value: eligibility.coursework_status || "Pending",
+      status: eligibility.coursework_status === "Complete" ? "Passed" : eligibility.coursework_status || "Not met",
+      passed: eligibility.coursework_status === "Complete",
+      note: eligibility.missing_coursework?.length ? `Missing: ${eligibility.missing_coursework.slice(0, 2).join(", ")}${eligibility.missing_coursework.length > 2 ? "..." : ""}` : "",
+    },
+    {
+      key: "research",
+      label: "Thesis / research",
+      actual_value: eligibility.research_status || "Pending",
+      status: eligibility.research_status === "Complete" ? "Passed" : eligibility.research_status || "Not met",
+      passed: eligibility.research_status === "Complete",
+      note: eligibility.missing_research_requirements?.length ? `Missing: ${eligibility.missing_research_requirements.slice(0, 2).join(", ")}${eligibility.missing_research_requirements.length > 2 ? "..." : ""}` : "",
+    },
+    {
+      key: "practicum",
+      label: "Practicum",
+      actual_value: eligibility.practicum_status || "Pending",
+      status: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status) ? "Passed" : eligibility.practicum_status || "Not met",
+      passed: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status),
+      note: eligibility.missing_practicum_requirement || "",
+    },
+  ];
+}
+
+function DeanGraduationRequirementBoxes({ item }) {
+  const [expandedKey, setExpandedKey] = useState(null);
+  const eligibility = item.eligibility || {};
+  const checklist = eligibility.checklist?.length ? eligibility.checklist : deanGraduationFallbackChecklist(item);
+  const allComplete = checklist.length > 0 && checklist.every((entry) => deanGraduationRequirementTone(entry) === "complete");
+  const overallTone = allComplete && eligibility.status !== "Not eligible" ? "complete" : "missing";
+  const overallClasses = deanGraduationRequirementClasses(overallTone);
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+      <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 ${overallClasses.card}`}>
+        <div className="flex items-center gap-2">
+          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${overallClasses.icon}`}>
+            {overallTone === "complete" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Graduation requirements</p>
+            <p className={`text-xs ${overallClasses.muted}`}>{overallTone === "complete" ? "Eligible based on visible requirements." : "Open the red stages to see what is missing."}</p>
+          </div>
+        </div>
+        <StatusBadge value={eligibility.status || (overallTone === "complete" ? "Eligible" : "Not eligible")} dot={false} />
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        {checklist.map((entry) => {
+          const key = entry.key || entry.label;
+          const tone = deanGraduationRequirementTone(entry);
+          const classes = deanGraduationRequirementClasses(tone);
+          const expanded = expandedKey === key;
+          const detailLines = deanGraduationRequirementDetailLines(entry);
+          return (
+            <div key={key} className={`rounded-lg border px-2.5 py-2 ${classes.card}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${classes.icon}`}>
+                    {tone === "complete" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                  </span>
+                  <p className="truncate text-sm font-semibold">{entry.label}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedKey(expanded ? null : key)}
+                  className="btn-ghost shrink-0 cursor-pointer px-2 py-1"
+                  aria-label={`${expanded ? "Hide" : "View"} ${entry.label} graduation requirement details`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {expanded && (
+                <div className="mt-2 rounded-lg bg-white/75 px-3 py-2">
+                  <p className={`text-xs font-bold uppercase tracking-wide ${classes.text}`}>{entry.status || (tone === "complete" ? "Passed" : "Not met")}</p>
+                  <div className="mt-1 space-y-1">
+                    {detailLines.map((line) => <p key={line} className={`break-words text-xs ${classes.muted}`}>{line}</p>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DeanGraduationBatchStudentList({ rows }) {
+  return (
+    <ul className="space-y-3">
+      {rows.map((item) => (
+        <li key={item.student.id} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">{item.student.name}</p>
+              <p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p>
+            </div>
+            <StatusBadge value={item.status || item.workflow_status} dot={false} />
+          </div>
+          <DeanGraduationRequirementBoxes item={item} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function sortSelectedDeanItems(items, selectedIds) {
+  if (!selectedIds?.size) return items;
+  return [...items].sort((left, right) => {
+    const leftSelected = selectedIds.has(left.student?.id);
+    const rightSelected = selectedIds.has(right.student?.id);
+    if (leftSelected !== rightSelected) return leftSelected ? -1 : 1;
+    if (leftSelected && rightSelected) return (left.student?.name || left.title || "").localeCompare(right.student?.name || right.title || "");
+    return 0;
+  });
+}
+
 export default function DeanApprovals() {
   const { user, logout } = useAuth();
   const { data, loading, error, refetch } = useApi(() => api.approvals(), []);
@@ -64,9 +318,12 @@ export default function DeanApprovals() {
   const [view, setView] = useState("overview");
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
   const [pendingDecision, setPendingDecision] = useState(null);
-  const [pendingExport, setPendingExport] = useState(null);
+  const [pendingRegistrarHandoff, setPendingRegistrarHandoff] = useState(null);
+  const [exportedGraduationBatches, setExportedGraduationBatches] = useState(() => new Set());
   const [selectedGraduationIds, setSelectedGraduationIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
+  const [stageBatch, setStageBatch] = useState(null);
+  const [expandedGraduationBatches, setExpandedGraduationBatches] = useState(() => new Set());
   const [filters, setFilters] = useState({ query: "", program: "", status: "", dateFrom: "", dateTo: "", sort: "newest" });
   const workflowPending = data?.workflow_pending || [];
   const workflowRecent = data?.workflow_recent || [];
@@ -77,7 +334,7 @@ export default function DeanApprovals() {
   const baseWorkflowRecent = (view === "overview" ? workflowRecent : workflowOverview).filter(belongsToView);
   const matchesFilters = (item) => {
     const program = item.student?.program_code || item.program_code || "";
-    const text = `${item.title || ""} ${item.subtitle || ""} ${item.student?.name || ""} ${item.student?.student_number || ""} ${program}`.toLowerCase();
+    const text = `${item.title || ""} ${item.subtitle || ""} ${item.student?.name || ""} ${item.student?.student_number || ""} ${program} ${graduationBatchLabel(item, "")}`.toLowerCase();
     return (!filters.query || text.includes(filters.query.toLowerCase()))
       && (!filters.program || program === filters.program)
       && (!filters.status || item.status === filters.status || item.workflow_status === filters.status)
@@ -86,7 +343,7 @@ export default function DeanApprovals() {
   const visibleWorkflowPending = sortDeanItems(baseWorkflowPending.filter(matchesFilters), filters.sort);
   const visibleWorkflowRecent = sortDeanItems(baseWorkflowRecent.filter(matchesFilters), filters.sort);
   const visibleWorkflowOverview = sortDeanItems(workflowOverview.filter(belongsToView).filter(matchesFilters), filters.sort);
-  const boardWorkflowRows = visibleWorkflowOverview.filter((item) => !isStandingChange(item));
+  const boardWorkflowRows = sortSelectedDeanItems(visibleWorkflowOverview.filter((item) => !isStandingChange(item)), selectedGraduationIds);
   const pendingPlans = (data?.pending || []).filter(matchesFilters);
   const recentPlans = (data?.recent || []).filter(matchesFilters);
   const programs = useMemo(() => [...new Set([
@@ -99,12 +356,24 @@ export default function DeanApprovals() {
   ].filter(Boolean))].sort(), [data, workflowOverview, view]);
   const approvedGraduation = workflowOverview.filter((item) => item.type === "graduation" && item.status === "Dean Approved" && matchesFilters(item));
   const readyGraduation = visibleWorkflowOverview.filter((item) => item.type === "graduation" && item.status === "Ready for Dean Review");
-  const selectedGraduation = workflowOverview.filter((item) => selectedGraduationIds.has(item.student?.id));
+  const selectedGraduation = sortSelectedDeanItems(workflowOverview.filter((item) => selectedGraduationIds.has(item.student?.id)), selectedGraduationIds);
+  const readyGraduationBatches = groupGraduationItemsByBatch(readyGraduation);
+  const approvedGraduationBatches = groupGraduationItemsByBatch(approvedGraduation);
 
   useEffect(() => {
     setFilters((current) => ({ ...current, status: "" }));
     setSelectedGraduationIds(new Set());
+    setExpandedGraduationBatches(new Set());
   }, [view]);
+
+  function toggleGraduationBatchStudents(label) {
+    setExpandedGraduationBatches((current) => {
+      const next = new Set(current);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }
 
   async function decide(plan, decision) {
     setBusy(plan.id);
@@ -185,18 +454,45 @@ export default function DeanApprovals() {
     }
   }
 
-  async function exportApproved(reviewWindow = "", endorsementIds = []) {
-    const key = `export-${reviewWindow || "all"}`;
+  async function exportApproved({ reviewWindow = "", endorsementIds = [], batchLabel = "Selected approved candidates" }) {
+    const key = `export-${batchLabel || reviewWindow || "all"}`;
     setBusy(key);
     setMsg("");
     setActErr("");
     try {
       const result = await api.exportGraduationCsv(reviewWindow, endorsementIds);
-      setMsg(`${result.count} Dean-approved candidate${result.count === 1 ? "" : "s"} exported and marked sent to the Registrar.`);
+      setExportedGraduationBatches((current) => new Set(current).add(batchLabel));
+      setMsg(`${batchLabel} exported as ${result.filename}. Attach the exported file when you send it to the Registrar.`);
       await refetch();
-      setPendingExport(null);
     } catch (error) {
       setActErr(error.message || "Could not export the endorsed list.");
+    } finally {
+      setBusy(0);
+    }
+  }
+
+  async function sendRegistrarHandoff(payload) {
+    const key = `registrar-${payload.batchLabel}`;
+    setBusy(key);
+    setMsg("");
+    setActErr("");
+    try {
+      const result = await api.sendGraduationRegistrarHandoff({
+        endorsementIds: payload.endorsementIds,
+        recipientEmail: payload.recipientEmail,
+        file: payload.file,
+        comment: payload.comment,
+      });
+      setMsg(result.message);
+      setPendingRegistrarHandoff(null);
+      setExportedGraduationBatches((current) => {
+        const next = new Set(current);
+        next.delete(payload.batchLabel);
+        return next;
+      });
+      await refetch();
+    } catch (error) {
+      setActErr(error.message || "Could not send the endorsed list to the Registrar.");
     } finally {
       setBusy(0);
     }
@@ -252,13 +548,120 @@ export default function DeanApprovals() {
             <button type="button" disabled={!selectedGraduationIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> Apply Dean group action</button>
           </div>
         )}
+        {(view === "overview" || view === "graduation") && selectedGraduation.length > 0 && (
+          <div className="mb-4 rounded-xl border border-brand-100 bg-brand-50/40 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Selected graduation candidates</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedGraduation.map((item) => (
+                <span key={item.student.id} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-brand-100">
+                  {item.student.name} · {item.student.student_number} · {graduationBatchLabel(item)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {(view === "overview" || view === "graduation") && readyGraduationBatches.length > 0 && (
+          <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-display text-lg font-semibold text-ink">Ready graduation batches</p>
+                <p className="text-xs text-slate-500">Select or process a whole batch while still seeing every student in it.</p>
+              </div>
+              <StatusBadge value={`${readyGraduationBatches.length} batch${readyGraduationBatches.length === 1 ? "" : "es"}`} dot={false} />
+            </div>
+            <div className="space-y-2">
+              {readyGraduationBatches.map((batch) => {
+                const currentStage = deanGraduationCurrentStage(batch);
+                const names = batch.rows.map((item) => item.student.name).slice(0, 4).join(", ");
+                const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
+                const expanded = expandedGraduationBatches.has(batch.label);
+                return (
+                  <div key={batch.label} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-1.5">
+                    <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
+                        <p className="text-xs text-slate-500">{batch.rows.length} candidate{batch.rows.length === 1 ? "" : "s"}</p>
+                      </div>
+                      <p className="truncate text-xs text-slate-600"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
+                        <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
+                        <button type="button" onClick={() => setStageBatch(batch)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${batch.label}`}><Eye className="h-4 w-4" /></button>
+                      </div>
+                      <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
+                        <button type="button" onClick={() => toggleGraduationBatchStudents(batch.label)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
+                        <button type="button" onClick={() => setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id)))} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>
+                        <button type="button" onClick={() => { setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id))); setBatchOpen(true); }} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left"><CheckSquare className="h-4 w-4 shrink-0" /> Review endorsement list for {batch.label}</button>
+                      </div>
+                    </div>
+                    {expanded && (
+                      <div className="mt-2 border-t border-slate-100 pt-2">
+                        <DeanGraduationBatchStudentList rows={batch.rows} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {boardWorkflowRows.length > 0 && (
           <DeanWorkflowBoard rows={boardWorkflowRows} onOpen={setSelectedWorkflow} selectedIds={selectedGraduationIds} onToggle={toggleGraduation} />
         )}
-        {approvedGraduation.length > 0 && (view === "overview" || view === "graduation") && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
-            <p className="text-sm font-medium text-brand-800">{approvedGraduation.length} approved candidate{approvedGraduation.length === 1 ? " is" : "s are"} ready for Dean export and Registrar handoff.</p>
-            <button type="button" disabled={String(busy).startsWith("export-")} onClick={() => setPendingExport({ reviewWindow: "", endorsementIds: approvedGraduation.map((item) => item.id), count: approvedGraduation.length })} className="btn-primary"><Download className="h-4 w-4" /> Export filtered approved list</button>
+        {approvedGraduationBatches.length > 0 && (view === "overview" || view === "graduation") && (
+          <div className="mb-5 rounded-xl border border-emerald-200 bg-white p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-display text-lg font-semibold text-ink">Approved graduation batches</p>
+                <p className="text-xs text-slate-500">Export the endorsed list, then attach that file for the Registrar handoff.</p>
+              </div>
+              <StatusBadge value={`${approvedGraduation.length} approved`} dot={false} />
+            </div>
+            <div className="space-y-2">
+              {approvedGraduationBatches.map((batch) => {
+                const payload = graduationBatchExportPayload(batch);
+                const currentStage = deanGraduationCurrentStage(batch);
+                const names = batch.rows.map((item) => item.student.name).slice(0, 4).join(", ");
+                const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
+                const expanded = expandedGraduationBatches.has(batch.label);
+                const readyToSend = graduationBatchReadyToSend(batch, exportedGraduationBatches);
+                const exportBusy = busy === `export-${batch.label}`;
+                const sendBusy = busy === `registrar-${batch.label}`;
+                return (
+                  <div key={`approved-${batch.label}`} className="rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-1.5">
+                    <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(320px,1.25fr)] lg:items-center">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
+                        <p className="text-xs text-slate-500">{batch.rows.length} approved candidate{batch.rows.length === 1 ? "" : "s"}</p>
+                      </div>
+                      <p className="truncate text-xs text-slate-600"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
+                        <StatusBadge value={readyToSend ? "Exported" : `Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
+                        <button type="button" onClick={() => setStageBatch(batch)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${batch.label}`}><Eye className="h-4 w-4" /></button>
+                      </div>
+                      <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
+                        <button type="button" onClick={() => toggleGraduationBatchStudents(batch.label)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
+                        <button type="button" disabled={exportBusy || sendBusy} onClick={() => exportApproved(payload)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700"><Download className="h-4 w-4 shrink-0" /> {exportBusy ? "Exporting..." : `Export filtered approved list for ${batch.label}`}</button>
+                        <button
+                          type="button"
+                          disabled={!readyToSend || exportBusy || sendBusy}
+                          onClick={() => setPendingRegistrarHandoff(payload)}
+                          className={readyToSend ? "btn cursor-pointer bg-emerald-600 px-2.5 py-1 text-white hover:bg-emerald-700" : "btn border border-slate-200 bg-slate-100 px-2.5 py-1 text-slate-400"}
+                        >
+                          <Send className="h-4 w-4" /> {sendBusy ? "Sending..." : "Send to Registrar"}
+                        </button>
+                      </div>
+                    </div>
+                    {expanded && (
+                      <div className="mt-2 border-t border-emerald-100 pt-2">
+                        <DeanGraduationBatchStudentList rows={batch.rows} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -390,7 +793,7 @@ export default function DeanApprovals() {
                   {visibleWorkflowRecent.map((item) => (
                     <li key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-3 py-2 text-sm">
                       <span className="min-w-0 truncate text-slate-700">{item.title}</span>
-                      <span className="flex items-center gap-2"><StatusBadge value={item.status} dot={false} />{item.type === "graduation" && item.status === "Dean Approved" && <button type="button" disabled={busy === `export-${item.review_window}`} onClick={() => setPendingExport({ reviewWindow: item.review_window, endorsementIds: [item.id], count: 1 })} className="btn-ghost px-3 py-1.5"><Download className="h-3.5 w-3.5" /> Export</button>}</span>
+                      <span className="flex items-center gap-2"><StatusBadge value={item.status} dot={false} /></span>
                     </li>
                   ))}
                 </ul>
@@ -418,16 +821,18 @@ export default function DeanApprovals() {
         </DeanDialog>
       )}
       {pendingDecision && <DeanDecisionModal pending={pendingDecision} busy={busy === `${pendingDecision.item.type}-${pendingDecision.item.id}`} onClose={() => setPendingDecision(null)} onConfirm={confirmWorkflowDecision} />}
-      {pendingExport && <DeanExportModal pending={pendingExport} busy={String(busy).startsWith("export-")} onClose={() => setPendingExport(null)} onConfirm={() => exportApproved(pendingExport.reviewWindow, pendingExport.endorsementIds)} />}
-      {batchOpen && selectedGraduation.length > 0 && <DeanGraduationBatchModal rows={selectedGraduation} templates={CLARIFICATION_TEMPLATES} onClose={() => setBatchOpen(false)} onSaved={batchSaved} />}
+      {pendingRegistrarHandoff && <DeanRegistrarHandoffModal pending={pendingRegistrarHandoff} busy={busy === `registrar-${pendingRegistrarHandoff.batchLabel}`} onClose={() => setPendingRegistrarHandoff(null)} onConfirm={sendRegistrarHandoff} />}
+      {batchOpen && selectedGraduation.length > 0 && <DeanGraduationBatchModal rows={selectedGraduation} onClose={() => setBatchOpen(false)} onSaved={batchSaved} />}
+      {stageBatch && <DeanGraduationStageModal batch={stageBatch} onClose={() => setStageBatch(null)} />}
       </div>
     </div>
   );
 }
 
-function DeanDialog({ id, title, subtitle, onClose, children, footer = null }) {
+function DeanDialog({ id, title, subtitle, onClose, children, footer = null, size = "default" }) {
   const closeRef = useRef(null);
   const onCloseRef = useRef(onClose);
+  const widthClass = size === "wide" ? "max-w-[96rem]" : "max-w-4xl";
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
@@ -467,15 +872,54 @@ function DeanDialog({ id, title, subtitle, onClose, children, footer = null }) {
   }, [id]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6">
-      <section role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <section role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} className={`flex max-h-[90vh] w-full ${widthClass} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}>
         <header className="flex items-start gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1"><h2 id={`${id}-title`} className="font-display text-xl font-semibold text-ink">{title}</h2><p id={`${id}-description`} className="mt-1 text-sm text-slate-500">{subtitle}</p></div>
           <button ref={closeRef} type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 focus:ring-2 focus:ring-brand-500" aria-label="Close dialog"><X className="h-4 w-4" /></button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6"><div className="w-full">{children}</div></div>
         {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">{footer}</footer>}
       </section>
     </div>
+  );
+}
+
+function DeanGraduationStageModal({ batch, onClose }) {
+  const stages = deanGraduationStageChecks(batch);
+  const currentStage = deanGraduationCurrentStage(batch);
+  const modalId = `dean-graduation-stage-${String(batch.label).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
+  return (
+    <DeanDialog
+      id={modalId}
+      title={`Graduation stage check for ${batch.label}`}
+      subtitle={`${batch.rows.length} candidate${batch.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
+      onClose={onClose}
+      size="wide"
+    >
+      <div className="w-full max-w-none rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-ink">Stage check</p>
+            <p className="text-xs text-slate-500">Follow where this batch is in the graduation endorsement process.</p>
+          </div>
+          <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
+        </div>
+        <ol className="mt-3 grid w-full grid-cols-1 gap-2 2xl:grid-cols-2">
+          {stages.map((stage) => (
+            <li key={stage.label} className="flex w-full max-w-none gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${stage.state === "Complete" ? "bg-brand-600 text-white" : stage.state === "Current" ? "bg-amber-100 text-amber-800" : stage.state === "Needs action" ? "bg-red-100 text-red-700" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>{stage.number}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-800">{stage.label}</p>
+                  <StatusBadge value={stage.state} dot={false} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{stage.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </DeanDialog>
   );
 }
 
@@ -498,26 +942,65 @@ function DeanDecisionModal({ pending, busy, onClose, onConfirm }) {
   );
 }
 
-function DeanExportModal({ pending, busy, onClose, onConfirm }) {
+function DeanRegistrarHandoffModal({ pending, busy, onClose, onConfirm }) {
+  const [recipientEmail, setRecipientEmail] = useState(REGISTRAR_HANDOFF_EMAIL);
+  const [file, setFile] = useState(null);
+  const [comment, setComment] = useState("");
+  const [error, setError] = useState("");
+  function submit(event) {
+    event.preventDefault();
+    if (!file) {
+      setError("Attach the exported endorsed list before sending it to the Registrar.");
+      return;
+    }
+    setError("");
+    onConfirm({ ...pending, recipientEmail, file, comment });
+  }
   return (
     <DeanDialog
-      id="dean-confirm-endorsement-export"
-      title="Confirm endorsement export"
-      subtitle={`${pending.count} Dean-approved graduation candidate${pending.count === 1 ? "" : "s"}`}
+      id="dean-registrar-handoff"
+      title={`Send endorsement list to Registrar for ${pending.batchLabel}`}
+      subtitle={`${pending.count} approved candidate${pending.count === 1 ? "" : "s"} · attach the exported endorsed list`}
       onClose={onClose}
-      footer={<button type="button" disabled={busy} onClick={onConfirm} className="btn-primary cursor-pointer px-4 py-2"><Download className="h-4 w-4" /> {busy ? "Exporting…" : "Export and mark sent"}</button>}
+      size="wide"
+      footer={<button type="submit" form="dean-registrar-handoff-form" disabled={busy || !file} className="btn cursor-pointer bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"><Send className="h-4 w-4" /> {busy ? "Sending..." : "Send to Registrar email"}</button>}
     >
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        This downloads the endorsed CSV and moves the selected records to Sent to Registrar. The handoff is recorded in workflow history.
-      </div>
+      <form id="dean-registrar-handoff-form" onSubmit={submit} className="space-y-4">
+        {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
+        <label className="block">
+          <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600"><Mail className="h-3.5 w-3.5" /> Send to</span>
+          <input value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} required type="email" className="field-input" />
+        </label>
+        <label className="block rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <span className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-600"><Upload className="h-3.5 w-3.5" /> Attach exported file</span>
+          <input type="file" accept=".csv,.pdf,.xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] || null)} className="field-input cursor-pointer bg-white" />
+          {file && <p className="mt-2 text-xs font-semibold text-emerald-700">{file.name}</p>}
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-slate-600">Optional email note</span>
+          <textarea value={comment} onChange={(event) => setComment(event.target.value)} className="field-input min-h-24" />
+        </label>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-ink">Selected candidates</p>
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+            {pending.rows.map((item) => (
+              <li key={item.student.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                <p className="font-semibold text-ink">{item.student.name}</p>
+                <p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </form>
     </DeanDialog>
   );
 }
 
-function DeanGraduationBatchModal({ rows, templates, onClose, onSaved }) {
-  const [form, setForm] = useState({ action: "approve", recipient_role: "Graduate School Staff", visibility: "internal", template: "Returned for revision. Please review the comments and resubmit.", comment: "" });
+function DeanGraduationBatchModal({ rows, onClose, onSaved }) {
+  const [form, setForm] = useState({ action: "approve", comment: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const batchLabels = [...new Set(rows.map((item) => graduationBatchLabel(item)))];
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   async function submit(event) {
     event.preventDefault();
@@ -536,20 +1019,37 @@ function DeanGraduationBatchModal({ rows, templates, onClose, onSaved }) {
       setBusy(false);
     }
   }
+  const submitLabel = deanGraduationBatchActionLabel(form.action, batchLabels);
   return (
     <DeanDialog
       id="dean-graduation-batch"
       title="Confirm Dean graduation group action"
-      subtitle={`${rows.length} selected candidate${rows.length === 1 ? "" : "s"} · backend stage checks apply to every record`}
+      subtitle={`${rows.length} selected candidate${rows.length === 1 ? "" : "s"} · ${batchLabels.join(", ")} · stage checks apply to every record`}
       onClose={onClose}
-      footer={<button type="submit" form="dean-graduation-batch-form" disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applying…" : "Apply group action"}</button>}
+      size="wide"
+      footer={<button type="submit" form="dean-graduation-batch-form" disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applying…" : submitLabel}</button>}
     >
       <form id="dean-graduation-batch-form" onSubmit={submit} className="space-y-4">
         {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
-        <label className="block"><span className="mb-1 block text-xs font-semibold text-slate-600">Action</span><select value={form.action} onChange={update("action")} className="field-input cursor-pointer"><option value="approve">Approve selected candidates</option><option value="return">Return selected candidates to Graduate School staff</option><option value="note">Add an internal shared note</option></select></label>
-        {form.action !== "approve" && <label className="block"><span className="mb-1 block text-xs font-semibold text-slate-600">Message template</span><select value={form.template} onChange={update("template")} className="field-input cursor-pointer">{templates.map((item) => <option key={item}>{item}</option>)}</select></label>}
-        <label className="block"><span className="mb-1 block text-xs font-semibold text-slate-600">{form.action === "return" ? "Required reason" : "Optional Dean comment"}</span><textarea value={form.comment} onChange={update("comment")} required={form.action === "return" || (form.action === "note" && form.template === "Other / Custom comment")} className="field-input min-h-28" /></label>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm font-semibold text-ink">Selected candidates</p><ul className="mt-2 grid gap-1 text-sm text-slate-600 sm:grid-cols-2">{rows.map((item) => <li key={item.student.id}>{item.student.name} · {item.student.student_number}</li>)}</ul></div>
+        <label className="block"><span className="mb-1 block text-xs font-semibold text-slate-600">Dean decision</span><select value={form.action} onChange={update("action")} className="field-input cursor-pointer"><option value="approve">Approve endorsement list</option><option value="return">Return endorsement list for revision</option></select></label>
+        <label className="block"><span className="mb-1 block text-xs font-semibold text-slate-600">{form.action === "return" ? "Required revision reason" : "Optional Dean comment"}</span><textarea value={form.comment} onChange={update("comment")} required={form.action === "return"} className="field-input min-h-28" /></label>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-ink">Selected candidates</p>
+          <ul className="mt-2 space-y-3 text-sm text-slate-600">
+            {rows.map((item) => (
+              <li key={item.student.id} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-ink">{item.student.name}</p>
+                    <p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code} · {graduationBatchLabel(item)}</p>
+                  </div>
+                  <StatusBadge value={item.status || item.workflow_status} dot={false} />
+                </div>
+                <DeanGraduationRequirementBoxes item={item} />
+              </li>
+            ))}
+          </ul>
+        </div>
       </form>
     </DeanDialog>
   );
@@ -604,12 +1104,14 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
     || (item.type === "graduation" && item.status === "Ready for Dean Review")
     || (standingChange && item.workflow_status === "Dean Review")
   );
+  const batchName = item.type === "graduation" ? graduationBatchLabel(item) : "";
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-display text-lg font-semibold text-ink">{item.title}</h2>
           <p className="text-sm text-slate-500">{item.subtitle} · submitted {formatDate(item.submitted_at)}</p>
+          {batchName && <p className="mt-1 text-xs font-semibold text-brand-700">{batchName}</p>}
         </div>
         <StatusBadge value={item.status} dot={false} />
       </div>
@@ -703,20 +1205,54 @@ function deanBoardGroup(item) {
 }
 
 function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
+  const selectedRows = rows.filter((item) => item.type === "graduation" && selectedIds.has(item.student?.id));
+  const boardRows = selectedRows.length ? rows.filter((item) => !(item.type === "graduation" && selectedIds.has(item.student?.id))) : rows;
+  const renderCard = (item) => {
+    const selectable = item.type === "graduation" && item.status === "Ready for Dean Review";
+    return (
+      <article key={`${item.type}-${item.id}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40">
+        <div className="flex items-start gap-2">
+          {selectable && <input type="checkbox" checked={selectedIds.has(item.student.id)} onChange={() => onToggle(item.student.id)} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${item.student.name} for Dean group action`} />}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-ink">{item.student?.name || item.title}</p>
+            <p className="text-xs text-slate-400">{item.student?.student_number} · {item.student?.program_code}</p>
+            {item.type === "graduation" && <p className="mt-1 truncate text-xs font-semibold text-brand-700">{graduationBatchLabel(item)}</p>}
+          </div>
+          {item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">{item.unresolved_messages}</span>}
+        </div>
+        <div className="mt-3"><StatusBadge value={item.workflow_status || item.status} dot={false} /></div>
+        <p className="mt-2 text-xs text-slate-500">{item.type} · updated {formatDate(item.last_activity_at || item.submitted_at)}</p>
+        <button type="button" onClick={() => onOpen(item)} className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:ring-2 focus:ring-brand-500">View full request <Eye className="h-3.5 w-3.5" /></button>
+      </article>
+    );
+  };
   return (
     <div className="mb-5">
       <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-display text-lg font-semibold text-ink">Grouped workflow board</p><p className="text-xs text-slate-500">Open a card to review files, history, messages, and role-appropriate actions.</p></div><StatusBadge value={`${rows.length} requests`} dot={false} /></div>
+      {selectedRows.length > 0 && (
+        <section className="mb-4 rounded-2xl border border-brand-200 bg-brand-50/50 p-3">
+          <header className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-brand-800">Selected graduation candidates</h2>
+              <p className="text-xs text-brand-700">Alphabetized selected cards ready for Dean group action.</p>
+            </div>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-brand-700 ring-1 ring-brand-100">{selectedRows.length}</span>
+          </header>
+          <div className="max-w-full overflow-x-auto pb-1">
+            <div className="flex w-max gap-3">
+              {selectedRows.map((item) => <div key={`${item.type}-${item.id}`} className="w-[285px] shrink-0">{renderCard(item)}</div>)}
+            </div>
+          </div>
+        </section>
+      )}
       <div className="max-w-full overflow-x-auto pb-3">
         <div className="flex w-max snap-x gap-4">
         {DEAN_BOARD_COLUMNS.map((column) => {
-          const items = rows.filter((item) => deanBoardGroup(item) === column);
+          const items = boardRows.filter((item) => deanBoardGroup(item) === column);
           return (
             <section key={column} className="w-[285px] shrink-0 snap-start rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
               <header className="mb-3 flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-slate-700">{column}</h2><span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span></header>
-              <div className="space-y-3">{items.length ? items.map((item) => {
-                const selectable = item.type === "graduation" && item.status === "Ready for Dean Review";
-                return <article key={`${item.type}-${item.id}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40"><div className="flex items-start gap-2">{selectable && <input type="checkbox" checked={selectedIds.has(item.student.id)} onChange={() => onToggle(item.student.id)} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${item.student.name} for Dean group action`} />}<div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{item.student?.name || item.title}</p><p className="text-xs text-slate-400">{item.student?.student_number} · {item.student?.program_code}</p></div>{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">{item.unresolved_messages}</span>}</div><div className="mt-3"><StatusBadge value={item.workflow_status || item.status} dot={false} /></div><p className="mt-2 text-xs text-slate-500">{item.type} · updated {formatDate(item.last_activity_at || item.submitted_at)}</p><button type="button" onClick={() => onOpen(item)} className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:ring-2 focus:ring-brand-500">View full request <Eye className="h-3.5 w-3.5" /></button></article>;
-              }) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
+              <div className="space-y-3">{items.length ? items.map(renderCard) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
             </section>
           );
         })}
