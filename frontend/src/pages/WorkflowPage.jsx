@@ -3476,6 +3476,7 @@ function WithdrawalBoardCard({ item, onOpen, onMessage }) {
 
 function GraduationBoardCard({ row, selected, onToggle, onOpen, onMessage }) {
   const status = row.endorsement?.endorsement_status || "Not Prepared";
+  const researchProgress = row.eligibility.research_progress || {};
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
       <div className="flex items-start gap-2">
@@ -3484,7 +3485,7 @@ function GraduationBoardCard({ row, selected, onToggle, onOpen, onMessage }) {
         {row.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">{row.unresolved_messages}</span>}
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5"><StatusBadge value={status} dot={false} /><StatusBadge value={row.eligibility.status} dot={false} /></div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Coursework: {row.eligibility.coursework_status}</span><span className="text-right">Research: {row.eligibility.research_status}</span><span className="col-span-2">Updated {formatDate(row.last_activity_at || row.endorsement?.updated_at)}</span></div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600"><span>Coursework: {row.eligibility.coursework_status}</span><span className="text-right">Research gates: {researchProgress.completed_stage_count ?? 0}/{researchProgress.stage_count ?? 3}</span><span>Completion files: {researchProgress.completion_evidence?.requirements_complete ?? 0}/{researchProgress.completion_evidence?.requirements_total ?? 5}</span><span className="text-right">Practicum: {row.eligibility.practicum_status}</span><span className="col-span-2">Updated {formatDate(row.last_activity_at || row.endorsement?.updated_at)}</span></div>
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
       <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button>{row.endorsement && <button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}</div>
     </article>
@@ -3808,6 +3809,9 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
   const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
+  useEffect(() => {
+    if (filters.query.trim()) setViewMode("table");
+  }, [filters.query]);
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map((row) => row.endorsement?.endorsement_status || "Not Prepared")), [rows]);
   const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((row) => {
@@ -3925,6 +3929,31 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
               <Detail label="Research" value={selectedRow.eligibility.research_status} />
               <Detail label="Practicum" value={selectedRow.eligibility.practicum_status} />
               <Detail label="Eligibility" value={selectedRow.eligibility.status} />
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="text-sm font-semibold text-ink">Integrated research-to-graduation progress</p><p className="mt-0.5 text-xs text-slate-600">Live from Research Gate, Panel Matching, Defense Scheduling, and recorded defense results.</p></div>
+                <StatusBadge value={selectedRow.eligibility.research_status} dot={false} />
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-4">
+                {selectedRow.eligibility.research_progress?.stages?.map((stage) => (
+                  <div key={stage.gate} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{stage.name}</p><StatusBadge value={stage.complete ? "Complete" : "Incomplete"} dot={false} /></div>
+                    <dl className="mt-3 space-y-1.5 text-xs text-slate-600">
+                      <div className="flex justify-between gap-2"><dt>Requirements</dt><dd className="font-semibold text-slate-700">{stage.requirements_complete}/{stage.requirements_total}</dd></div>
+                      <div className="flex justify-between gap-2"><dt>Matched panel</dt><dd className="font-semibold text-slate-700">{stage.panel.assigned_count}/{stage.panel.required_count}</dd></div>
+                      <div className="flex justify-between gap-2"><dt>Schedule</dt><dd className="truncate font-semibold text-slate-700">{stage.schedule.status}</dd></div>
+                      <div className="flex justify-between gap-2"><dt>Defense result</dt><dd className="font-semibold text-slate-700">{stage.defense.status}</dd></div>
+                    </dl>
+                  </div>
+                ))}
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-slate-800">Completion Evidence</p><StatusBadge value={selectedRow.eligibility.research_progress?.completion_evidence?.status || "Incomplete"} dot={false} /></div>
+                  <p className="mt-3 text-xs text-slate-600">Post-defense graduation files</p>
+                  <p className="mt-1 text-lg font-bold text-slate-800">{selectedRow.eligibility.research_progress?.completion_evidence?.requirements_complete ?? 0}/{selectedRow.eligibility.research_progress?.completion_evidence?.requirements_total ?? 5}</p>
+                  <p className="mt-1 text-xs text-slate-600">requirements complete</p>
+                </div>
+              </div>
             </div>
             <div className="overflow-hidden rounded-xl border border-slate-200">
               {selectedRow.eligibility.checklist?.map((item) => <div key={item.key} className="grid gap-2 border-b border-slate-100 px-4 py-3 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div><p className="text-sm font-semibold text-slate-700">{item.label}</p><p className="text-xs text-slate-400">Source: {item.source_field}</p></div><p className="text-xs font-semibold text-slate-500">{String(item.actual_value)}</p><StatusBadge value={item.status} dot={false} /></div>)}

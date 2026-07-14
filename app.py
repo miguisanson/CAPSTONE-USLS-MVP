@@ -6974,6 +6974,160 @@ def withdrawal_notes(application: WithdrawalApplication) -> str:
     )
 
 
+def graduation_research_progress(student: Student, research_case: ResearchCase | None = None) -> dict:
+    """Summarize the upstream research workflow used by Graduation readiness.
+
+    Research Gate remains the source of truth.  This payload only projects its
+    stage requirements, matched panels, confirmed schedules, and verdicts into
+    the Graduation screen so staff can see what is complete and what still
+    blocks endorsement.
+    """
+    if research_case is None:
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id)
+            .order_by(ResearchCase.opened_at.desc())
+            .first()
+        )
+
+    gates = [gate for _stage_name, gate in RESEARCH_STAGE_SEQUENCE]
+    all_gates = [*gates, "Completion Evidence"]
+    documents_by_gate = {gate: {} for gate in all_gates}
+    for document in DocumentCheck.query.filter(
+        DocumentCheck.student_id == student.id,
+        DocumentCheck.gate.in_(all_gates),
+    ).all():
+        documents_by_gate.setdefault(document.gate, {})[document.item_name] = document
+
+    panels_by_gate = Counter(
+        assignment.gate
+        for assignment in PanelAssignment.query.filter(
+            PanelAssignment.student_id == student.id,
+            PanelAssignment.gate.in_(gates),
+        ).all()
+    )
+    schedules_by_type = {}
+    for schedule in ScheduleRequest.query.filter(
+        ScheduleRequest.student_id == student.id,
+        ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+        ScheduleRequest.defense_type.in_(RESEARCH_GATE_DEFENSE_TYPES.values()),
+    ).order_by(ScheduleRequest.confirmed_at.desc(), ScheduleRequest.created_at.desc()).all():
+        schedules_by_type.setdefault(schedule.defense_type, schedule)
+
+    outcomes_by_gate = {}
+    for verdict in DefenseVerdict.query.filter(
+        DefenseVerdict.student_id == student.id,
+        DefenseVerdict.gate.in_(gates),
+    ).order_by(DefenseVerdict.submitted_at.desc()).all():
+        outcomes_by_gate.setdefault(verdict.gate, {
+            "result": verdict.result,
+            "recorded_at": iso(verdict.submitted_at),
+        })
+    if len(outcomes_by_gate) < len(gates):
+        legacy_results = [
+            f"{defense_type}: {result}"
+            for defense_type in RESEARCH_GATE_DEFENSE_TYPES.values()
+            for result in ("Passed", "Failed")
+        ]
+        for log in TransactionLog.query.filter(
+            TransactionLog.transaction_slug == "research-gate",
+            TransactionLog.student_id == student.id,
+            TransactionLog.source_reference.in_(gates),
+            TransactionLog.result.in_(legacy_results),
+        ).order_by(TransactionLog.created_at.desc()).all():
+            outcomes_by_gate.setdefault(log.source_reference, {
+                "result": "Passed" if log.result.endswith(": Passed") else "Failed",
+                "recorded_at": iso(log.created_at),
+            })
+
+    required_panel_count = len(panel_roles_for_student(student))
+    legacy_verified = bool(
+        research_case
+        and research_case.current_gate == "Completion Evidence"
+        and research_case.status == "Verified Complete"
+    )
+    stages = []
+    for stage_name, gate in RESEARCH_STAGE_SEQUENCE:
+        required_items = required_documents_for_gate(gate)
+        panel_count = panels_by_gate.get(gate, 0)
+        schedule = schedules_by_type.get(RESEARCH_GATE_DEFENSE_TYPES[gate])
+        outcome = outcomes_by_gate.get(gate)
+        requirement_count = len(required_items)
+        panel_complete = panel_count >= required_panel_count
+        schedule_complete = schedule is not None
+        defense_complete = bool(outcome and outcome["result"] == "Passed")
+        schedule_item = RESEARCH_DEFENSE_SCHEDULE_ITEMS[gate]
+        result_item = RESEARCH_DEFENSE_RESULT_ITEMS[gate]
+
+        def requirement_complete(item_name: str) -> bool:
+            if item_name == "Recommended panel set":
+                return panel_complete
+            if item_name == schedule_item:
+                return schedule_complete
+            if item_name == result_item:
+                return defense_complete
+            document = documents_by_gate.get(gate, {}).get(item_name)
+            return bool(document and document.status in {"Complete", "Verified Complete"})
+
+        complete_requirement_count = sum(requirement_complete(item) for item in required_items)
+        requirements_complete = complete_requirement_count == requirement_count
+        stage_complete = legacy_verified or (
+            requirements_complete
+            and panel_complete
+            and schedule_complete
+            and defense_complete
+        )
+        stages.append({
+            "name": stage_name,
+            "gate": gate,
+            "status": "Complete" if stage_complete else f"{requirement_count - complete_requirement_count} requirement(s) pending",
+            "complete": stage_complete,
+            "requirements_complete": complete_requirement_count,
+            "requirements_total": requirement_count,
+            "panel": {
+                "status": "Complete" if panel_complete or legacy_verified else "Incomplete",
+                "assigned_count": panel_count,
+                "required_count": required_panel_count,
+            },
+            "schedule": {
+                "status": schedule.status if schedule else "Not scheduled",
+                "complete": schedule_complete or legacy_verified,
+                "date": schedule.preferred_date.isoformat() if schedule and schedule.preferred_date else None,
+                "start_time": schedule.start_time.strftime("%H:%M") if schedule and schedule.start_time else None,
+                "end_time": schedule.end_time.strftime("%H:%M") if schedule and schedule.end_time else None,
+                "venue": schedule.venue if schedule else None,
+            },
+            "defense": {
+                "status": outcome["result"] if outcome else "Not recorded",
+                "complete": defense_complete or legacy_verified,
+                "recorded_at": outcome["recorded_at"] if outcome else None,
+            },
+        })
+
+    completion_items = required_documents_for_gate("Completion Evidence")
+    completion_count = sum(
+        bool(
+            documents_by_gate.get("Completion Evidence", {}).get(item)
+            and documents_by_gate["Completion Evidence"][item].status in {"Complete", "Verified Complete"}
+        )
+        for item in completion_items
+    )
+    completion_complete = legacy_verified or completion_count == len(completion_items)
+    completed_stage_count = sum(stage["complete"] for stage in stages)
+    return {
+        "stages": stages,
+        "completed_stage_count": completed_stage_count,
+        "stage_count": len(stages),
+        "research_gates_complete": legacy_verified or completed_stage_count == len(stages),
+        "completion_evidence": {
+            "status": "Complete" if completion_complete else "Incomplete",
+            "complete": completion_complete,
+            "requirements_complete": completion_count,
+            "requirements_total": len(completion_items),
+        },
+        "legacy_verified": legacy_verified,
+    }
+
+
 def graduation_eligibility(student: Student) -> dict:
     audit = compute_course_audit(student)
     missing_coursework = [
@@ -6988,19 +7142,50 @@ def graduation_eligibility(student: Student) -> dict:
         .order_by(ResearchCase.opened_at.desc())
         .first()
     )
-    research_missing = []
-    research_complete = False
+    research_progress = graduation_research_progress(student, research_case)
     research_known = research_case is not None
-    if research_case:
-        completion_payload = research_milestone_payload(student, "Completion Evidence")
-        research_missing = [
-            f"{item['label']} ({item['status_label']})"
-            for item in completion_payload["requirements"]
-            if item["status"] != "Complete"
-        ]
-        research_complete = research_case.status == "Verified Complete" or completion_payload["overall_complete"]
-    else:
-        research_missing = required_documents_for_gate("Completion Evidence")
+    research_missing = []
+    for stage in research_progress["stages"]:
+        if stage["complete"]:
+            continue
+        if stage["requirements_complete"] < stage["requirements_total"]:
+            research_missing.append(
+                f"{stage['name']} requirements "
+                f"({stage['requirements_complete']}/{stage['requirements_total']} complete)"
+            )
+        if stage["panel"]["status"] != "Complete":
+            research_missing.append(
+                f"{stage['name']} panel matching "
+                f"({stage['panel']['assigned_count']}/{stage['panel']['required_count']} assigned)"
+            )
+        if not stage["schedule"]["complete"]:
+            research_missing.append(f"{stage['name']} confirmed defense schedule")
+        if not stage["defense"]["complete"]:
+            research_missing.append(f"{stage['name']} passing defense result")
+
+    completion_documents = {
+        document.item_name: document
+        for document in DocumentCheck.query.filter_by(
+            student_id=student.id,
+            gate="Completion Evidence",
+        ).all()
+    }
+    research_missing.extend(
+        item
+        for item in required_documents_for_gate("Completion Evidence")
+        if (
+            not research_progress["legacy_verified"]
+            and (
+                item not in completion_documents
+                or completion_documents[item].status not in {"Complete", "Verified Complete"}
+            )
+        )
+    )
+    research_complete = bool(
+        research_known
+        and research_progress["research_gates_complete"]
+        and research_progress["completion_evidence"]["complete"]
+    )
 
     practicum_required = bool(student.program.has_practicum)
     practicum_record = latest_practicum_record(student.id)
@@ -7037,15 +7222,22 @@ def graduation_eligibility(student: Student) -> dict:
             "course_audit.completed_units",
             "Coursework source data needs verification." if not coursework_known else "",
         ),
-        eligibility_item(
-            "thesis",
-            "Thesis / research completion",
-            "Verified completion evidence",
-            research_case.status if research_case else "No research case",
-            research_complete if research_known else None,
-            "research_case + completion document checks",
-            "Research completion source data needs verification." if not research_known else "",
-        ),
+        *[
+            eligibility_item(
+                f"research_{stage['gate'].lower().replace(' ', '_').replace('-', '_')}",
+                f"{stage['name']} workflow",
+                "Requirements, panel, schedule, and passing result complete",
+                (
+                    f"Requirements {stage['requirements_complete']}/{stage['requirements_total']}; "
+                    f"panel {stage['panel']['assigned_count']}/{stage['panel']['required_count']}; "
+                    f"schedule {stage['schedule']['status']}; defense {stage['defense']['status']}"
+                ),
+                stage["complete"] if research_known else None,
+                "research_gate + panel_assignment + schedule_request + defense_verdict",
+                "Research Gate source data needs verification." if not research_known else "",
+            )
+            for stage in research_progress["stages"]
+        ],
         eligibility_item(
             "practicum",
             "Practicum completed",
@@ -7057,10 +7249,17 @@ def graduation_eligibility(student: Student) -> dict:
         ),
         eligibility_item(
             "documents",
-            "Required completion documents",
+            "Post-defense completion documents",
             "Complete",
-            "Complete" if research_complete else f"{len(research_missing)} item(s) unresolved",
-            research_complete if research_known else None,
+            (
+                "Complete"
+                if research_progress["completion_evidence"]["complete"]
+                else (
+                    f"{research_progress['completion_evidence']['requirements_complete']}/"
+                    f"{research_progress['completion_evidence']['requirements_total']} complete"
+                )
+            ),
+            research_progress["completion_evidence"]["complete"] if research_known else None,
             "document_check.Completion Evidence",
             "Exact certificate requirements remain subject to GS office confirmation.",
         ),
@@ -7101,6 +7300,7 @@ def graduation_eligibility(student: Student) -> dict:
         "missing_research_requirements": research_missing,
         "missing_practicum_requirement": missing_practicum,
         "checklist": checklist,
+        "research_progress": research_progress,
         "pending_tasks": [task_dict(task) for task in open_tasks],
         "next_owner": next_owner,
         "next_action": next_action,
@@ -7963,9 +8163,36 @@ def withdrawal_roster_payload() -> list[dict]:
 
 
 def graduation_candidate_payload() -> list[dict]:
+    candidate_ids = {
+        student_id
+        for (student_id,) in Student.query.filter(
+            Student.current_stage.in_(["Writing", "Final Defense", "Completed"]),
+            Student.standing != "Withdrawn",
+        ).with_entities(Student.id).all()
+    }
+    candidate_ids.update(
+        student_id
+        for (student_id,) in GraduationEndorsement.query.with_entities(
+            GraduationEndorsement.student_id
+        ).distinct().all()
+    )
+    candidate_ids.update(
+        student_id
+        for (student_id,) in ResearchCase.query.filter(
+            ResearchCase.current_gate.in_(["Final Defense", "Completion Evidence"]),
+            ResearchCase.status.in_(["Complete", "Verified Complete"]),
+        ).with_entities(ResearchCase.student_id).distinct().all()
+    )
+    candidate_ids.update(
+        student_id
+        for (student_id,) in DefenseVerdict.query.filter_by(
+            gate="Final Defense",
+            result="Passed",
+        ).with_entities(DefenseVerdict.student_id).distinct().all()
+    )
     students = (
         Student.query.filter(
-            Student.current_stage.in_(["Writing", "Final Defense", "Completed"]),
+            Student.id.in_(candidate_ids),
             Student.standing != "Withdrawn",
         )
         .order_by(Student.last_name.asc(), Student.first_name.asc())
@@ -7975,11 +8202,13 @@ def graduation_candidate_payload() -> list[dict]:
     for student in students:
         eligibility = graduation_eligibility(student)
         endorsement = latest_graduation_endorsement(student.id)
+        case_meta = workflow_case_meta("graduation", student.id)
         rows.append({
             "student": student_brief(student),
             "eligibility": eligibility,
             "endorsement": graduation_endorsement_dict(endorsement) if endorsement else None,
-            **workflow_case_meta("graduation", student.id),
+            **case_meta,
+            "next_action_owner": case_meta["next_action_owner"] or eligibility["next_owner"],
         })
     return sorted(rows, key=lambda item: item["last_activity_at"] or "", reverse=True)
 
@@ -10967,12 +11196,41 @@ def extract_research_phrases(text: str, limit: int = 14) -> list[str]:
     return (recognized + frequent_terms)[:limit]
 
 
+def faculty_specialization_token_stats() -> tuple[Counter, int]:
+    """Token document-frequency across active faculty specializations.
+
+    This keeps matching field-neutral: terms that appear in many faculty
+    profiles are treated as broad context, while distinctive specialization
+    terms carry more ranking weight for every discipline.
+    """
+    document_frequency = Counter()
+    total_profiles = 0
+    for faculty in Faculty.query.filter_by(active=True).all():
+        tokens = set(matching_tokens(faculty.specialization or ""))
+        if not tokens:
+            continue
+        total_profiles += 1
+        document_frequency.update(tokens)
+    return document_frequency, total_profiles
+
+
+def specialization_token_weight(token: str, document_frequency: Counter, total_profiles: int) -> float:
+    if not total_profiles:
+        return 1.0
+    frequency_ratio = document_frequency.get(token, 0) / total_profiles
+    if frequency_ratio <= 0.08:
+        return 2.0
+    if frequency_ratio <= 0.18:
+        return 1.5
+    if frequency_ratio <= 0.35:
+        return 1.0
+    return 0.45
+
+
 def faculty_matching_profiles() -> list[dict]:
     rows = []
     for faculty in Faculty.query.filter_by(active=True).all():
-        profile_text = " ".join(
-            part for part in [faculty.name, faculty.specialization, faculty.role, faculty.college] if part
-        )
+        profile_text = faculty.specialization or ""
         rows.append({
             "id": faculty.id,
             "name": faculty.name,
@@ -10986,6 +11244,7 @@ def faculty_matching_profiles() -> list[dict]:
 
 def retrieve_faculty_for_panel_matching(paper_text: str, faculty_profiles: list[dict], limit: int = 8) -> list[dict]:
     paper_counts = Counter(matching_tokens(paper_text))
+    token_frequency, total_profiles = faculty_specialization_token_stats()
     ranked = []
     for profile in faculty_profiles:
         overlap = [token for token, _count in paper_counts.most_common() if token in profile["tokens"]]
@@ -10993,7 +11252,10 @@ def retrieve_faculty_for_panel_matching(paper_text: str, faculty_profiles: list[
             phrase for phrase in RESEARCH_KEY_PHRASES
             if phrase in (paper_text or "").lower() and set(matching_tokens(phrase)).intersection(profile["tokens"])
         ]
-        score = sum(min(paper_counts[token], 3) for token in overlap[:10]) + len(phrase_hits) * 2
+        score = (
+            sum(min(paper_counts[token], 3) * specialization_token_weight(token, token_frequency, total_profiles) for token in overlap[:10])
+            + len(phrase_hits) * 4
+        )
         if score:
             ranked.append({**profile, "retrieval_score": score, "matched_terms": (phrase_hits + overlap)[:8]})
     return sorted(ranked, key=lambda item: item["retrieval_score"], reverse=True)[:limit]
@@ -11041,7 +11303,7 @@ def generate_local_panel_matching_rag(paper_text: str, retrieved_faculty: list[d
             "matched_terms": terms,
         })
     keywords = []
-    for term in base_keywords + faculty_terms:
+    for term in base_keywords:
         cleaned = re.sub(r"\s+", " ", term).strip().lower()
         if cleaned and cleaned not in keywords:
             keywords.append(cleaned)
@@ -12757,6 +13019,7 @@ def recommend_panel(student: Student) -> list[dict]:
     # and retrieved faculty profiles; the final rubric stays explainable.
     profile = research_matching_profile(student)
     query_counts = Counter(matching_tokens(profile["query_text"] + " " + " ".join(profile.get("keywords", []))))
+    token_frequency, total_profiles = faculty_specialization_token_stats()
     analyzed_phrases = profile.get("keywords", [])
     rag_match_by_id = {
         item.get("faculty_id"): item
@@ -12788,10 +13051,10 @@ def recommend_panel(student: Student) -> list[dict]:
                 block_cache,
             )
         )
-        faculty_profile_text = f"{faculty.specialization} {faculty.role} {faculty.college}"
+        faculty_profile_text = faculty.specialization or ""
         faculty_tokens = set(matching_tokens(faculty_profile_text))
         faculty_phrase_text = faculty_profile_text.lower()
-        matched_keywords = [token for token, _count in query_counts.most_common() if token in faculty_tokens][:6]
+        matched_keywords = [token for token, _count in query_counts.most_common() if token in faculty_tokens][:8]
         rag_match = rag_match_by_id.get(faculty.id)
         rag_terms = [
             term for term in (rag_match or {}).get("matched_terms", [])
@@ -12808,16 +13071,31 @@ def recommend_panel(student: Student) -> list[dict]:
         ][:6]
         # Keyword frequency is capped so repeated boilerplate in a PDF cannot
         # dominate a faculty specialization match.
-        keyword_points = sum(min(query_counts[token], 3) for token in matched_keywords)
-        specialization_score = min(50, keyword_points * 7 + len(matched_phrases) * 4 + len(rag_terms) * 3 + (8 if rag_match else 0))
+        weighted_keyword_points = sum(
+            min(query_counts[token], 3) * specialization_token_weight(token, token_frequency, total_profiles)
+            for token in matched_keywords
+        )
+        distinctive_matches = [
+            token for token in matched_keywords
+            if specialization_token_weight(token, token_frequency, total_profiles) >= 1
+        ]
+        specialization_score = min(
+            50,
+            weighted_keyword_points * 3
+            + len(matched_phrases) * 6
+            + len(rag_terms) * 4
+            + (6 if rag_match else 0),
+        )
+        if not distinctive_matches and not matched_phrases and not rag_terms:
+            specialization_score = min(specialization_score, 18)
         recurring_days = sum(1 for item in faculty_working_hours(faculty) if item["enabled"])
         availability_score = min(30, availability_count * 6)
         if not availability_count and recurring_days:
             availability_score = 12
-        college_fit = 6 if student.program.college == faculty.college else 0
         workload_fit = max(0, 10 - min(workload, 5) * 2)
         active_profile_fit = 4
-        suitability_score = min(20, college_fit + workload_fit + active_profile_fit)
+        specialization_fit = 6 if specialization_score >= 25 else 0
+        suitability_score = min(20, workload_fit + active_profile_fit + specialization_fit)
         score = specialization_score + availability_score + suitability_score
         availability_status = (
             "Available" if availability_count >= 3 else
@@ -12831,8 +13109,6 @@ def recommend_panel(student: Student) -> list[dict]:
             reasons.append(f"matches {', '.join(matched_phrases[:2])}")
         elif matched_keywords:
             reasons.append(f"matches {', '.join(matched_keywords[:3])}")
-        if student.program.college == faculty.college:
-            reasons.append("same college")
         reasons.append(availability_status.lower())
         reasons.append(f"{workload} active panel assignment{'s' if workload != 1 else ''}")
         note = "; ".join(reasons)

@@ -34,6 +34,7 @@ from app import (  # noqa: E402
     app,
     db,
     graduation_eligibility,
+    graduation_candidate_payload,
     ensure_demo_accounts,
     required_documents_for_gate,
     submitted_request_students,
@@ -357,6 +358,33 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertTrue(Task.query.filter_by(student_id=self.student_id, owner_role="Graduate School Staff").filter(Task.title.contains("missing graduation research")).first())
             self._transition(staff, "graduation", {"student_id": self.student_id, "endorsement_status": "Not Eligible"})
             self.assertEqual(endorsement.endorsement_status, "Not Eligible")
+
+    def test_graduation_projects_research_workflow_progress_and_uses_it_for_roster_discovery(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.current_stage = "Proposal Defense"
+            db.session.add(ResearchCase(
+                student_id=student.id,
+                case_type="Thesis",
+                title="Final-stage research evidence",
+                current_gate="Final Defense",
+                status="Complete",
+            ))
+            db.session.commit()
+
+            eligibility = graduation_eligibility(student)
+            self.assertEqual(
+                [stage["name"] for stage in eligibility["research_progress"]["stages"]],
+                ["Title Defense", "Proposal Defense", "Final Defense"],
+            )
+            final_stage = eligibility["research_progress"]["stages"][-1]
+            self.assertIn("panel", final_stage)
+            self.assertIn("schedule", final_stage)
+            self.assertIn("defense", final_stage)
+            self.assertFalse(eligibility["research_progress"]["research_gates_complete"])
+
+            roster_ids = {row["student"]["id"] for row in graduation_candidate_payload()}
+            self.assertIn(student.id, roster_ids)
 
     def test_course_audit_bulk_grades_and_overdue_incomplete_requires_retake(self):
         with app.app_context():
