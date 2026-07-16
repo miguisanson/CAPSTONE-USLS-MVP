@@ -16,13 +16,18 @@ from app import (  # noqa: E402
     AdviserDocumentApproval,
     AwolCase,
     Course,
+    CourseAttempt,
     CourseDropRequest,
     CourseRecord,
+    CurriculumVersion,
+    CurriculumVersionSubject,
     DefenseVerdict,
     DocumentCheck,
     Faculty,
     Form1Endorsement,
     GraduationEndorsement,
+    OnboardingBatch,
+    OnboardingCase,
     PanelAssignment,
     PracticumRecord,
     Program,
@@ -35,6 +40,10 @@ from app import (  # noqa: E402
     ScheduleRequest,
     Student,
     StudentRequestAttachment,
+    SubjectRecommendation,
+    SemesterPlanningCase,
+    StudentCurriculumAssignment,
+    StudyPlanDraft,
     Task,
     TermEnrollment,
     TransactionLog,
@@ -48,6 +57,7 @@ from app import (  # noqa: E402
     graduation_eligibility,
     graduation_candidate_payload,
     ensure_demo_accounts,
+    onboarding_requirements,
     panel_roles_for_student,
     required_documents_for_gate,
     submitted_request_students,
@@ -682,8 +692,18 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def test_course_drop_request_requires_academic_coordinator_approval(self):
         with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 Term 1",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 20),
+                is_active_planning_term=True,
+                status="Active",
+            )
+            db.session.add(term)
+            db.session.flush()
             record = CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Enrolled", term_label="AY 2026-2027 Term 1")
-            db.session.add(record)
+            attempt = CourseAttempt(student_id=self.student_id, course_id=self.course_id, term_id=term.id, status="Enrolled")
+            db.session.add_all([record, attempt])
             student_account = UserAccount(
                 email="drop-student@example.test",
                 full_name="Drop Request Student",
@@ -718,6 +738,12 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.refresh(drop)
             self.assertEqual(record.status, "Dropped")
             self.assertEqual(drop.status, "Approved")
+            db.session.refresh(attempt)
+            self.assertEqual(attempt.status, "Dropped")
+            grid = self._academic_client().get(f"/api/monitoring/grid?program_id={self.program_id}&term_id={term.id}")
+            self.assertEqual(grid.status_code, 200, grid.get_json())
+            monitoring_row = next(item for item in grid.get_json()["students"] if item["id"] == self.student_id)
+            self.assertEqual(monitoring_row["cells"][str(self.course_id)], "Dropped")
             db.session.refresh(task)
             self.assertEqual(task.status, "Done")
 
@@ -1560,6 +1586,245 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.refresh(self.student)
             self.assertEqual(self.student.standing, "Active")
             self.assertEqual(self.student.current_stage, "Final Defense")
+
+    def test_manual_onboarding_requires_role_reviews_before_coursework(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 20),
+                is_active_planning_term=True,
+                status="Active",
+            )
+            db.session.add(term)
+            db.session.commit()
+            response = self._staff_client().post("/api/transactions/student-handoff", json={
+                "program_id": self.program_id,
+                "term_id": term.id,
+                "admission_signal": "Admission Confirmed",
+                "first_name": "New",
+                "last_name": "Handoff",
+                "student_number": "HANDOFF-2026-001",
+                "email": "new.handoff@example.test",
+                "entry_year": 2026,
+                "onboarding_items": onboarding_requirements(),
+                "source_reference": "Complete manual handoff test",
+                "manual_reason": "Registrar email arrived before the monitoring sheet.",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            student = db.session.get(Student, response.get_json()["student_id"])
+            case = OnboardingCase.query.filter_by(student_id=student.id).first()
+            account = UserAccount.query.filter_by(student_id=student.id, role="student").first()
+            self.assertEqual(student.current_stage, "Onboarding")
+            self.assertEqual(case.status, "Program Verification")
+            self.assertIsNotNone(account)
+            self.assertEqual(case.batch.source_type, "Manual")
+            student_client = self._role_client(account.id, "student")
+            portal = student_client.get("/api/student-portal/context")
+            self.assertEqual(portal.status_code, 200, portal.get_json())
+            self.assertTrue(portal.get_json()["onboarding_in_progress"])
+            locked_request = student_client.post("/api/student-portal/requests/course-drop", json={"course_id": self.course_id})
+            self.assertEqual(locked_request.status_code, 403)
+
+            response = self._academic_client().post(
+                f"/api/onboarding/cases/{case.id}/action",
+                json={"action": "confirm_program"},
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(case)
+            self.assertEqual(case.status, "Profile and Checklist")
+
+            response = self._staff_client().post(
+                f"/api/onboarding/cases/{case.id}/action",
+                json={
+                    "action": "confirm_profile",
+                    "email": "new.handoff.real@example.test",
+                    "checklist_items": onboarding_requirements(),
+                },
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(case)
+            db.session.refresh(case.batch)
+            self.assertEqual(case.status, "Awaiting Dean Approval")
+            self.assertEqual(case.batch.status, "Awaiting Dean Approval")
+
+            response = self._dean_client().post(f"/api/onboarding/batches/{case.batch_id}/approve", json={})
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(case)
+            self.assertEqual(case.status, "Dean Approved")
+
+            response = self._staff_client().post(
+                f"/api/onboarding/cases/{case.id}/action",
+                json={"action": "complete_onboarding"},
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(student)
+            db.session.refresh(case)
+            self.assertEqual(case.status, "Onboarded")
+            self.assertEqual(student.current_stage, "Coursework")
+            portal = student_client.get("/api/student-portal/context")
+            self.assertFalse(portal.get_json()["onboarding_in_progress"])
+
+    def test_manual_daily_batch_waits_for_every_student(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 Manual Batch",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 20),
+                is_active_planning_term=True,
+                status="Active",
+            )
+            db.session.add(term)
+            db.session.commit()
+            case_ids = []
+            for index in (1, 2):
+                response = self._staff_client().post("/api/transactions/student-handoff", json={
+                    "program_id": self.program_id,
+                    "term_id": term.id,
+                    "admission_signal": "Admission Confirmed",
+                    "first_name": f"Manual{index}",
+                    "last_name": "Batch",
+                    "student_number": f"MANUAL-BATCH-{index}",
+                    "email": f"manual.batch{index}@generated.test",
+                    "entry_year": 2026,
+                    "onboarding_items": onboarding_requirements(),
+                    "source_reference": f"Registrar manual reference {index}",
+                    "manual_reason": "Student was omitted from the monitoring sheet.",
+                })
+                self.assertEqual(response.status_code, 200, response.get_json())
+                case_ids.append(OnboardingCase.query.filter_by(student_id=response.get_json()["student_id"]).first().id)
+            cases = [db.session.get(OnboardingCase, case_id) for case_id in case_ids]
+            self.assertEqual(cases[0].batch_id, cases[1].batch_id)
+            for case in cases:
+                response = self._academic_client().post(f"/api/onboarding/cases/{case.id}/action", json={"action": "confirm_program"})
+                self.assertEqual(response.status_code, 200, response.get_json())
+
+            first = self._staff_client().post(f"/api/onboarding/cases/{cases[0].id}/action", json={
+                "action": "confirm_profile",
+                "email": "manual.batch1@real.test",
+                "checklist_items": onboarding_requirements(),
+            })
+            self.assertEqual(first.status_code, 200, first.get_json())
+            db.session.refresh(cases[0])
+            db.session.refresh(cases[0].batch)
+            self.assertEqual(cases[0].status, "Ready for Dean Report")
+            self.assertEqual(cases[0].batch.status, "Building")
+            early = self._dean_client().post(f"/api/onboarding/batches/{cases[0].batch_id}/approve", json={})
+            self.assertEqual(early.status_code, 409)
+
+            second = self._staff_client().post(f"/api/onboarding/cases/{cases[1].id}/action", json={
+                "action": "confirm_profile",
+                "email": "manual.batch2@real.test",
+                "checklist_items": onboarding_requirements(),
+            })
+            self.assertEqual(second.status_code, 200, second.get_json())
+            db.session.refresh(cases[0])
+            db.session.refresh(cases[1])
+            self.assertEqual(cases[0].status, "Awaiting Dean Approval")
+            self.assertEqual(cases[1].status, "Awaiting Dean Approval")
+
+    def test_monitoring_keeps_semester_history_and_manual_next_subjects(self):
+        with app.app_context():
+            current = AcademicTerm(
+                label="AY 2025-2026 Term 1",
+                start_date=date(2025, 8, 1),
+                end_date=date(2025, 12, 20),
+                is_active_planning_term=True,
+                status="Active",
+            )
+            next_term = AcademicTerm(
+                label="AY 2025-2026 Term 2",
+                start_date=date(2026, 1, 5),
+                end_date=date(2026, 5, 30),
+                is_active_planning_term=False,
+                status="Planned",
+            )
+            next_course = Course(program_id=self.program_id, code="BPM-502", title="Next Course", units=3, category="Major", recommended_term="Year 1 Term 2")
+            db.session.add_all([current, next_term, next_course])
+            db.session.commit()
+
+            audit = self._academic_client().post("/api/course-audit/roster", json={
+                "course_id": self.course_id,
+                "term": current.label,
+                "statuses": {str(self.student_id): "Completed"},
+            })
+            self.assertEqual(audit.status_code, 200, audit.get_json())
+            attempt = CourseAttempt.query.filter_by(student_id=self.student_id, course_id=self.course_id, term_id=current.id).first()
+            self.assertIsNotNone(attempt)
+            self.assertEqual(attempt.status, "Completed")
+
+            grid = self._staff_client().get(f"/api/monitoring/grid?program_id={self.program_id}&term_id={current.id}")
+            self.assertEqual(grid.status_code, 200, grid.get_json())
+            row = grid.get_json()["students"][0]
+            self.assertEqual(row["cells"][str(self.course_id)], "CompletedThisTerm")
+
+            recommendation = self._staff_client().post("/api/monitoring/recommendations", json={
+                "student_id": self.student_id,
+                "source_term_id": current.id,
+                "course_ids": [next_course.id],
+                "note": "Recommended after successful completion of BPM-501.",
+            })
+            self.assertEqual(recommendation.status_code, 200, recommendation.get_json())
+            saved = SubjectRecommendation.query.filter_by(student_id=self.student_id, target_term_id=next_term.id).first()
+            self.assertIsNotNone(saved)
+            self.assertEqual(saved.course_id, next_course.id)
+
+    def test_semester_planning_auto_assigns_single_version_and_blocks_until_onboarded(self):
+        with app.app_context():
+            source = AcademicTerm(label="AY 2026-2027 1st Semester", start_date=date(2026, 8, 1), end_date=date(2026, 12, 20), is_active_planning_term=True)
+            target = AcademicTerm(label="AY 2026-2027 2nd Semester", start_date=date(2027, 1, 5), end_date=date(2027, 5, 30))
+            db.session.add_all([source, target]); db.session.flush()
+            version = CurriculumVersion(program_id=self.program_id, name="BPM 2026", normal_load_units=9)
+            db.session.add(version); db.session.flush()
+            db.session.add(CurriculumVersionSubject(version_id=version.id, course_id=self.course_id, category="Major", required=True, recommended_term="Term 1", sequence_no=1))
+            db.session.add(TermEnrollment(student_id=self.student_id, term_id=source.id, status="Enrolled"))
+            db.session.commit()
+
+            overview = self._academic_client().get(f"/api/semester-planning?program_id={self.program_id}&term_id={source.id}")
+            self.assertEqual(overview.status_code, 200, overview.get_json())
+            payload = overview.get_json()
+            self.assertEqual(payload["students"][0]["curriculum"]["name"], "BPM 2026")
+            self.assertEqual(payload["students"][0]["recommendations"][0]["code"], "BPM-501")
+            assignment = StudentCurriculumAssignment.query.filter_by(student_id=self.student_id).first()
+            self.assertEqual(assignment.version_id, version.id)
+
+            blocked = self._academic_client().post(f"/api/semester-planning/students/{self.student_id}/action", json={"case_id": payload["id"], "action": "confirm_plan"})
+            self.assertEqual(blocked.status_code, 409)
+            batch = OnboardingBatch(batch_key="semester-test", label="Semester test", source_type="Test", status="Completed")
+            db.session.add(batch); db.session.flush()
+            db.session.add(OnboardingCase(student_id=self.student_id, batch_id=batch.id, status="Onboarded"))
+            db.session.commit()
+            confirmed = self._academic_client().post(f"/api/semester-planning/students/{self.student_id}/action", json={"case_id": payload["id"], "action": "confirm_plan"})
+            self.assertEqual(confirmed.status_code, 200, confirmed.get_json())
+            self.assertEqual(StudyPlanDraft.query.filter_by(student_id=self.student_id).first().status, "Course Ready")
+
+    def test_academic_coordinator_records_taken_without_grade_import(self):
+        with app.app_context():
+            term = AcademicTerm(label="AY 2026-2027 1st Semester", start_date=date(2026, 8, 1), end_date=date(2026, 12, 20), is_active_planning_term=True)
+            db.session.add(term); db.session.commit()
+            response = self._academic_client().post("/api/semester-planning/completion", json={
+                "student_id": self.student_id, "course_id": self.course_id, "term_id": term.id, "taken": True,
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            record = CourseRecord.query.filter_by(student_id=self.student_id, course_id=self.course_id).first()
+            attempt = CourseAttempt.query.filter_by(student_id=self.student_id, course_id=self.course_id, term_id=term.id).first()
+            self.assertEqual(record.status, "Completed")
+            self.assertEqual(record.term_label, term.label)
+            self.assertIsNone(record.grade_value)
+            self.assertEqual(record.evidence_reference, "Academic Coordinator completion checkbox")
+            self.assertEqual(attempt.status, "Completed")
+
+    def test_dean_acknowledges_coursework_report_without_approval_decision(self):
+        with app.app_context():
+            term = AcademicTerm(label="AY 2026-2027 1st Semester", start_date=date(2026, 8, 1), end_date=date(2026, 12, 20), is_active_planning_term=True)
+            db.session.add(term); db.session.flush()
+            case = SemesterPlanningCase(program_id=self.program_id, term_id=term.id, status="Awaiting Dean Acknowledgment")
+            db.session.add(case); db.session.commit()
+            response = self._dean_client().post(f"/api/semester-planning/case/{case.id}/acknowledge", json={})
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(case)
+            self.assertEqual(case.status, "Complete")
+            self.assertIsNotNone(case.dean_acknowledged_at)
 
 
 if __name__ == "__main__":

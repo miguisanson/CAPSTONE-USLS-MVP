@@ -61,11 +61,11 @@ TRANSACTIONS = [
     {
         "slug": "student-handoff",
         "priority": "P0",
-        "title": "Student Handoff",
+        "title": "Admission Onboarding",
         "icon": "user-plus",
         "group": "Intake",
-        "short": "Create the Graduate School monitoring record from an admission or enrollment signal.",
-        "actor": "GS Staff",
+        "short": "Create, verify, review, and complete student onboarding from the external Registrar handoff.",
+        "actor": "GS Staff / Academic Coordinator / Dean",
         "data": "Student profile, admission/enrollment signal, program, semester, source reference, timestamp, initial status.",
     },
     {
@@ -174,7 +174,7 @@ TRANSACTION_BY_SLUG = {item["slug"]: item for item in TRANSACTIONS}
 
 # Ordered lifecycle labels used by the student detail timeline and dashboard.
 STAGES = [
-    "Admission",
+    "Onboarding",
     "Coursework",
     "Comprehensive Exam",
     "Proposal Development",
@@ -300,7 +300,7 @@ class Student(db.Model):
     email = db.Column(db.String(160), nullable=False)
     program_id = db.Column(db.Integer, db.ForeignKey("program.id"), nullable=False)
     entry_year = db.Column(db.Integer, nullable=False)
-    current_stage = db.Column(db.String(60), nullable=False, default="Admission")
+    current_stage = db.Column(db.String(60), nullable=False, default="Onboarding")
     standing = db.Column(db.String(60), nullable=False, default="Active")
     # Current-term enrollment tag (per AC notes): Enrolled / LOA / AWOL / Completed.
     enrollment_tag = db.Column(db.String(20), nullable=False, default="Enrolled")
@@ -377,10 +377,14 @@ class CourseOfferingPlan(db.Model):
     published_at = db.Column(db.DateTime)
     target_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
     reference_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
+    semester_case_id = db.Column(db.Integer, db.ForeignKey("semester_planning_case.id"))
+    prepared_by_role = db.Column(db.String(60))
+    planning_scope = db.Column(db.Text)
 
     program = db.relationship("Program")
     target_term = db.relationship("AcademicTerm", foreign_keys=[target_term_id])
     reference_term = db.relationship("AcademicTerm", foreign_keys=[reference_term_id])
+    semester_case = db.relationship("SemesterPlanningCase")
     offerings = db.relationship("CourseOffering", backref="plan", lazy=True, cascade="all, delete-orphan")
 
 
@@ -393,8 +397,12 @@ class CourseOffering(db.Model):
     availability_count = db.Column(db.Integer, default=0)
     status = db.Column(db.String(40), nullable=False, default="Suggested")
     notes = db.Column(db.String(220))
+    faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"))
+    adjustment_rationale = db.Column(db.Text)
+    schedule_label = db.Column(db.String(120))
 
     course = db.relationship("Course")
+    faculty = db.relationship("Faculty")
 
 
 class CurriculumOffering(db.Model):
@@ -403,12 +411,14 @@ class CurriculumOffering(db.Model):
     academic_year = db.Column(db.String(20), nullable=False)
     semester = db.Column(db.String(20), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"))
     added_by = db.Column(db.String(160))
     created_at = db.Column(db.DateTime, default=now_utc)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
 
     program = db.relationship("Program")
     course = db.relationship("Course")
+    faculty = db.relationship("Faculty")
 
 
 # Term-level enrollment signal copied from an institutional source such as AIMS.
@@ -482,6 +492,125 @@ class CourseRecord(db.Model):
     course = db.relationship("Course")
 
 
+class CourseAttempt(db.Model):
+    """Semester-specific history for one student's subject status."""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"), nullable=False)
+    status = db.Column(db.String(40), nullable=False, default="Missing")
+    grade_value = db.Column(db.String(40))
+    grade_status = db.Column(db.String(40), nullable=False, default="No Grade")
+    remarks = db.Column(db.Text)
+    evidence_reference = db.Column(db.String(160))
+    updated_by = db.Column(db.String(160))
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
+    course = db.relationship("Course")
+    term = db.relationship("AcademicTerm")
+    __table_args__ = (db.UniqueConstraint("student_id", "course_id", "term_id", name="uq_course_attempt_student_course_term"),)
+
+
+class SubjectRecommendation(db.Model):
+    """Editable next-term study-plan recommendation, separate from enrollment."""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    source_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"), nullable=False)
+    target_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"), nullable=False)
+    rank = db.Column(db.Integer, nullable=False, default=1)
+    source = db.Column(db.String(30), nullable=False, default="System")
+    note = db.Column(db.Text)
+    updated_by = db.Column(db.String(160))
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
+    course = db.relationship("Course")
+    source_term = db.relationship("AcademicTerm", foreign_keys=[source_term_id])
+    target_term = db.relationship("AcademicTerm", foreign_keys=[target_term_id])
+    __table_args__ = (db.UniqueConstraint("student_id", "course_id", "target_term_id", name="uq_subject_recommendation_student_course_term"),)
+
+
+class CurriculumVersion(db.Model):
+    """Imported curriculum rules that can be assigned to a student."""
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey("program.id"), nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    normal_load_units = db.Column(db.Integer, nullable=False, default=9)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    uploaded_by = db.Column(db.String(160))
+    created_at = db.Column(db.DateTime, default=now_utc)
+
+    program = db.relationship("Program")
+    subjects = db.relationship("CurriculumVersionSubject", backref="version", lazy=True, cascade="all, delete-orphan")
+    __table_args__ = (db.UniqueConstraint("program_id", "name", name="uq_curriculum_version_program_name"),)
+
+
+class CurriculumVersionSubject(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    version_id = db.Column(db.Integer, db.ForeignKey("curriculum_version.id"), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    category = db.Column(db.String(40), nullable=False, default="Core")
+    required = db.Column(db.Boolean, nullable=False, default=True)
+    recommended_term = db.Column(db.String(40), nullable=False, default="Term 1")
+    sequence_no = db.Column(db.Integer, nullable=False, default=1)
+    category_required_units = db.Column(db.Integer)
+
+    course = db.relationship("Course")
+    __table_args__ = (db.UniqueConstraint("version_id", "course_id", name="uq_curriculum_version_subject"),)
+
+
+class StudentCurriculumAssignment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, unique=True)
+    version_id = db.Column(db.Integer, db.ForeignKey("curriculum_version.id"), nullable=False)
+    rationale = db.Column(db.Text)
+    assigned_by = db.Column(db.String(160))
+    assigned_at = db.Column(db.DateTime, default=now_utc)
+
+    student = db.relationship("Student")
+    version = db.relationship("CurriculumVersion")
+
+
+class SemesterPlanningCase(db.Model):
+    """One linked planning, offering, completion, and reporting case per program/term."""
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey("program.id"), nullable=False)
+    term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"), nullable=False)
+    status = db.Column(db.String(80), nullable=False, default="Study Plan Review")
+    enrolled_import_name = db.Column(db.String(220))
+    enrolled_snapshot_json = db.Column(db.Text)
+    planning_scope_reference = db.Column(db.String(220))
+    readiness_sent_at = db.Column(db.DateTime)
+    proposal_sent_at = db.Column(db.DateTime)
+    demand_summary_sent_at = db.Column(db.DateTime)
+    final_report_sent_at = db.Column(db.DateTime)
+    dean_acknowledged_at = db.Column(db.DateTime)
+    dean_acknowledged_by = db.Column(db.String(160))
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    program = db.relationship("Program")
+    term = db.relationship("AcademicTerm")
+    study_plans = db.relationship("StudyPlanDraft", backref="case", lazy=True, cascade="all, delete-orphan")
+    __table_args__ = (db.UniqueConstraint("program_id", "term_id", name="uq_semester_planning_program_term"),)
+
+
+class StudyPlanDraft(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    case_id = db.Column(db.Integer, db.ForeignKey("semester_planning_case.id"), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    status = db.Column(db.String(60), nullable=False, default="Draft Study Plan")
+    student_submitted_at = db.Column(db.DateTime)
+    confirmed_at = db.Column(db.DateTime)
+    confirmed_by = db.Column(db.String(160))
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
+    __table_args__ = (db.UniqueConstraint("case_id", "student_id", name="uq_study_plan_case_student"),)
+
+
 class MonitoringSheetUpload(db.Model):
     """Immutable backup and comparison result for every monitoring-sheet upload."""
     id = db.Column(db.Integer, primary_key=True)
@@ -493,6 +622,50 @@ class MonitoringSheetUpload(db.Model):
     snapshot_json = db.Column(db.Text, nullable=False)
     result_json = db.Column(db.Text, nullable=False)
     uploaded_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+
+class OnboardingBatch(db.Model):
+    """One Dean review report created from a sheet upload or one manual-entry day."""
+    id = db.Column(db.Integer, primary_key=True)
+    batch_key = db.Column(db.String(120), nullable=False, unique=True)
+    label = db.Column(db.String(180), nullable=False)
+    source_type = db.Column(db.String(30), nullable=False, default="Monitoring Sheet")
+    source_upload_id = db.Column(db.Integer, db.ForeignKey("monitoring_sheet_upload.id"))
+    source_reference = db.Column(db.String(220))
+    status = db.Column(db.String(60), nullable=False, default="Building")
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+    ready_at = db.Column(db.DateTime)
+    approved_at = db.Column(db.DateTime)
+    approved_by = db.Column(db.String(160))
+    completed_at = db.Column(db.DateTime)
+
+    source_upload = db.relationship("MonitoringSheetUpload")
+    cases = db.relationship("OnboardingCase", backref="batch", lazy=True)
+
+
+class OnboardingCase(db.Model):
+    """Role-routed admission handoff that ends when the student is onboarded."""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, unique=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey("onboarding_batch.id"), nullable=False)
+    status = db.Column(db.String(60), nullable=False, default="Program Verification")
+    source_type = db.Column(db.String(30), nullable=False, default="Monitoring Sheet")
+    source_reference = db.Column(db.String(220))
+    manual_reason = db.Column(db.Text)
+    generated_email = db.Column(db.String(160))
+    account_notice_at = db.Column(db.DateTime)
+    program_verified_at = db.Column(db.DateTime)
+    program_verified_by = db.Column(db.String(160))
+    correction_reason = db.Column(db.Text)
+    profile_confirmed_at = db.Column(db.DateTime)
+    profile_confirmed_by = db.Column(db.String(160))
+    dean_approved_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    completed_by = db.Column(db.String(160))
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
 
 
 # Research milestone container for thesis, dissertation, or project-paper cases.
@@ -712,6 +885,9 @@ class Faculty(db.Model):
     email = db.Column(db.String(160), unique=True)
     eligible_roles = db.Column(db.Text)
     active = db.Column(db.Boolean, default=True)
+    phd_holder = db.Column(db.Boolean, nullable=False, default=False)
+    max_teaching_units = db.Column(db.Integer, nullable=False, default=24)
+    preferred_subjects = db.Column(db.Text)
 
     availabilities = db.relationship("FacultyAvailability", backref="faculty", lazy=True, cascade="all, delete-orphan")
     working_hours = db.relationship("FacultyWorkingHour", backref="faculty", lazy=True, cascade="all, delete-orphan")
@@ -982,6 +1158,9 @@ def faculty_dict(faculty: Faculty) -> dict:
         "active": faculty.active,
         "availability_status": "Available" if any(day["enabled"] for day in working_hours) else "Unavailable",
         "panel_load": workload,
+        "phd_holder": bool(faculty.phd_holder),
+        "max_teaching_units": faculty.max_teaching_units or 24,
+        "preferred_subjects": [item.strip() for item in (faculty.preferred_subjects or "").split(",") if item.strip()],
         "working_hours": working_hours,
         "calendar": {
             "provider": "Google Calendar",
@@ -1044,6 +1223,31 @@ MONITORING_CURRICULUM_TEMPLATE = [
     ("229", "Cognate 229", "Cognate", 3, "Year 2"),
 ]
 
+MAPSY_MONITORING_CURRICULUM_TEMPLATE = [
+    ("201-RESMETH", "Advanced Psychological Research Methods", "Basic", 3, "Year 1 Term 1"),
+    ("202-STAT", "Advanced Statistics for Psychology", "Basic", 3, "Year 1 Term 1"),
+    ("203-PERSON", "Advanced Theories of Personality", "Major", 3, "Year 1 Term 1"),
+    ("204-COGPSY", "Cognitive Psychology", "Major", 3, "Year 1 Term 1"),
+    ("205-LIFESPAN", "Advanced Lifespan Development", "Major", 3, "Year 1 Term 1"),
+    ("211-ASSESS", "Advanced Psychological Assessment", "Major", 3, "Year 1 Term 2"),
+    ("212-ABNPSY", "Advanced Psychopathology", "Major", 3, "Year 1 Term 2"),
+    ("213-COUNSEL", "Counseling and Psychotherapy", "Major", 3, "Year 1 Term 2"),
+    ("214-SOCPSY", "Advanced Social Psychology", "Cognate", 3, "Year 1 Term 2"),
+    ("215-IOPSY", "Industrial and Organizational Psychology", "Cognate", 3, "Year 1 Term 2"),
+    ("221-ETHICS", "Ethics and Professional Issues in Psychology", "Major", 3, "Year 2 Term 1"),
+    ("222-GROUP", "Group Process and Facilitation", "Cognate", 3, "Year 2 Term 1"),
+    ("223-PROGDEV", "Psychological Program Development", "Cognate", 3, "Year 2 Term 1"),
+    ("224-SEMINAR", "Graduate Seminar in Psychology", "Cognate", 3, "Year 2 Term 1"),
+    ("225-PRAC1", "Psychology Practicum I", "Major", 3, "Year 2 Term 2"),
+    ("226-PRAC2", "Psychology Practicum II", "Major", 3, "Year 2 Term 2"),
+    ("227-THESIS1", "Thesis Writing I", "Major", 3, "Year 2 Term 2"),
+    ("228-THESIS2", "Thesis Writing II", "Major", 3, "Year 2 Term 2"),
+]
+
+
+def monitoring_curriculum_template(program_code: str) -> list[tuple]:
+    return MAPSY_MONITORING_CURRICULUM_TEMPLATE if program_code == "MAPSY" else MONITORING_CURRICULUM_TEMPLATE
+
 
 def monitoring_course_code(program_code: str, suffix: str) -> str:
     return f"{program_code}{suffix}" if suffix[:1].isdigit() else f"{program_code}-{suffix}"
@@ -1056,7 +1260,7 @@ def monitoring_course_title(program_code: str, suffix: str, title: str) -> str:
 
 
 def monitoring_template_codes(program_code: str) -> list[str]:
-    return [monitoring_course_code(program_code, suffix) for suffix, *_ in MONITORING_CURRICULUM_TEMPLATE]
+    return [monitoring_course_code(program_code, suffix) for suffix, *_ in monitoring_curriculum_template(program_code)]
 
 
 def monitoring_curriculum_courses(program: Program) -> list[Course]:
@@ -1072,7 +1276,7 @@ def ensure_monitoring_template_courses() -> int:
     """Add the AC monitoring-template subject columns to existing programs."""
     changed = 0
     for program in Program.query.all():
-        for suffix, title, category, units, recommended_term in MONITORING_CURRICULUM_TEMPLATE:
+        for suffix, title, category, units, recommended_term in monitoring_curriculum_template(program.code):
             code = monitoring_course_code(program.code, suffix)
             expected_title = monitoring_course_title(program.code, suffix, title)
             course = Course.query.filter_by(program_id=program.id, code=code).first()
@@ -1863,6 +2067,10 @@ def course_offering_dict(offering: CourseOffering) -> dict:
         "availability_count": offering.availability_count,
         "status": offering.status,
         "notes": offering.notes,
+        "faculty_id": offering.faculty_id,
+        "faculty_name": offering.faculty.name if offering.faculty else None,
+        "adjustment_rationale": offering.adjustment_rationale or "",
+        "schedule_label": offering.schedule_label or "",
     }
 
 
@@ -1878,10 +2086,34 @@ def curriculum_offering_dict(offering: CurriculumOffering) -> dict:
         "course_title": offering.course.title if offering.course else None,
         "course_units": offering.course.units if offering.course else None,
         "course_category": offering.course.category if offering.course else None,
+        "faculty_id": offering.faculty_id,
+        "faculty_name": offering.faculty.name if offering.faculty else None,
         "added_by": offering.added_by,
         "created_at": iso(offering.created_at),
         "updated_at": iso(offering.updated_at),
     }
+
+
+def recommended_teaching_faculty(program: Program, course: Course) -> Faculty | None:
+    """Return a stable, database-backed teaching recommendation for an offering."""
+    faculty = Faculty.query.filter_by(active=True).order_by(Faculty.name).all()
+    if not faculty:
+        return None
+    course_tokens = set(matching_tokens(f"{course.code} {course.title} {course.category or ''}"))
+    loads = {
+        member.id: CurriculumOffering.query.filter_by(faculty_id=member.id).count()
+        for member in faculty
+    }
+    ranked = sorted(
+        faculty,
+        key=lambda member: (
+            0 if (member.college or "").strip().lower() == (program.college or "").strip().lower() else 1,
+            -len(course_tokens & set(matching_tokens(f"{member.specialization} {member.role}"))),
+            loads.get(member.id, 0),
+            member.name.lower(),
+        ),
+    )
+    return ranked[0]
 
 
 def default_academic_year_options() -> list[str]:
@@ -1907,6 +2139,9 @@ def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
         "published_at": iso(plan.published_at),
         "target_term_id": plan.target_term_id,
         "reference_term_id": plan.reference_term_id,
+        "semester_case_id": plan.semester_case_id,
+        "prepared_by_role": plan.prepared_by_role,
+        "planning_scope": plan.planning_scope or "",
         "target_term": term_dict(plan.target_term) if plan.target_term else None,
         "reference_term": term_dict(plan.reference_term) if plan.reference_term else None,
         "offerings": [course_offering_dict(o) for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
@@ -1971,7 +2206,7 @@ BACKOFFICE_ROLES = {
 }
 
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"course-audit", "research-gate", "panel-matching", "practicum", "graduation", "withdrawal", "awol"},
+    "academic_coordinator": {"student-handoff", "course-audit", "research-gate", "panel-matching", "practicum", "graduation", "withdrawal", "awol"},
     "research_coordinator": {"research-gate", "graduation"},
 }
 
@@ -2065,6 +2300,15 @@ def require_api_login(*roles):
                 return jsonify({"error": "Please sign in to continue."}), 401
             if allowed and account.role not in allowed:
                 return jsonify({"error": "This account cannot access that area."}), 403
+            if (
+                account.role == "student"
+                and account.student
+                and account.student.current_stage == "Onboarding"
+                and request.method not in {"GET", "HEAD", "OPTIONS"}
+                and request.path not in {"/api/student-portal/messages/read"}
+                and not request.path.endswith("/messages")
+            ):
+                return jsonify({"error": "Student requests unlock after onboarding is complete."}), 403
             return fn(*args, **kwargs)
 
         return wrapper
@@ -2185,7 +2429,7 @@ def student_recommendations(student: Student) -> dict:
             "evidence", 42, f"{n} required document(s) missing at {ind['research_gate']}",
             f"Return to the student to submit the {n} missing item(s) for {ind['research_gate']}.",
             "Student", bonus=min(n * 4, 24)))
-    if ind["missing_subjects"] > 0 and ind["stage"] not in ("Admission", "LOA", "Completed"):
+    if ind["missing_subjects"] > 0 and ind["stage"] not in ("Admission", "Onboarding", "LOA", "Completed"):
         n = ind["missing_subjects"]
         recs.append(_make_rec(
             "coursework", 36, f"{n} subject(s) missing or incomplete in the course audit",
@@ -3013,7 +3257,7 @@ def local_grounded_answer(question: str, student: Student | None, payload: dict 
         if ind["missing_subjects"] == 0:
             out.append(
                 "Course-audit eligibility: cleared. All required subjects are marked completed, so the backend rule "
-                "can advance an Admission or Coursework student to Proposal Development."
+                "can advance a Coursework student to Proposal Development after onboarding is complete."
             )
         else:
             out.append(
@@ -3554,10 +3798,13 @@ def register_routes(app: Flask) -> None:
 
         portal_student = student_brief(student)
         portal_student["current_stage"] = student_portal_stage(student, research_case)
+        onboarding_case = OnboardingCase.query.filter_by(student_id=student.id).first()
 
         return jsonify(
             {
                 "student": portal_student,
+                "onboarding": onboarding_case_dict(onboarding_case, include_internal=False) if onboarding_case else None,
+                "onboarding_in_progress": bool(onboarding_case and onboarding_case.status != "Onboarded"),
                 "stages": STAGES,
                 "stage_index": STAGES.index(portal_student["current_stage"]) if portal_student["current_stage"] in STAGES else 0,
                 "course_audit": course_audit_dict(audit),
@@ -3598,6 +3845,7 @@ def register_routes(app: Flask) -> None:
                 ],
                 "message_templates": WORKFLOW_MESSAGE_TEMPLATES,
                 "recommendations": student_portal_recommendations(student),
+                "study_plan": student_portal_study_plan(student),
                 "research_milestones": [research_milestone_payload(student, gate) for gate in RESEARCH_MILESTONES],
                 "readmission_requirements": readmission_requirements(),
                 "upcoming_semesters": upcoming_semester_labels(5),
@@ -4735,6 +4983,9 @@ def register_routes(app: Flask) -> None:
             email=email,
             eligible_roles=json.dumps(eligible_roles),
             active=status == "Active",
+            phd_holder=str(data.get("phd_holder") or "").lower() in {"true", "1", "yes", "on"},
+            max_teaching_units=24,
+            preferred_subjects=(data.get("preferred_subjects") or "").strip(),
         )
         db.session.add(faculty)
         db.session.flush()
@@ -4751,6 +5002,20 @@ def register_routes(app: Flask) -> None:
             "faculty": faculty_profile_dict(faculty),
             "account": account_dict(account),
         }), 201
+
+    @app.route("/api/faculty/<int:faculty_id>/teaching-profile", methods=["PATCH"])
+    @require_api_login("staff", "academic_coordinator")
+    def faculty_teaching_profile_update(faculty_id: int):
+        faculty = Faculty.query.get_or_404(faculty_id)
+        data = request.get_json(silent=True) or {}
+        faculty.phd_holder = bool(data.get("phd_holder"))
+        faculty.max_teaching_units = 24
+        values = data.get("preferred_subjects") or []
+        if isinstance(values, str):
+            values = [item.strip() for item in values.split(",") if item.strip()]
+        faculty.preferred_subjects = ",".join(dict.fromkeys(str(item).strip() for item in values if str(item).strip()))
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Teaching qualification profile updated.", "faculty": faculty_profile_dict(faculty)})
 
     @app.route("/api/faculty-portal/context")
     @require_api_login("faculty")
@@ -4974,6 +5239,307 @@ def register_routes(app: Flask) -> None:
             headers={"Content-Disposition": f'inline; filename="faculty-{faculty_id}-availability.ics"'},
         )
 
+    @app.route("/api/semester-planning")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def semester_planning_overview():
+        program_id = request.args.get("program_id", type=int)
+        term_id = request.args.get("term_id", type=int)
+        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
+        if not program or not term:
+            return jsonify({"error": "Choose a valid program and academic semester."}), 404
+        case = semester_planning_case(program, term, create=True)
+        db.session.flush()
+        payload = semester_case_dict(case)
+        payload.update({
+            "programs": [program_dict(item) for item in Program.query.order_by(Program.code).all()],
+            "terms": [term_dict(item) for item in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
+            "versions": [curriculum_version_dict(item) for item in CurriculumVersion.query.filter_by(program_id=program.id, active=True).order_by(CurriculumVersion.name).all()],
+        })
+        db.session.commit()
+        return jsonify(payload)
+
+    @app.route("/api/semester-planning/curriculum/import", methods=["POST"])
+    @require_api_login("staff")
+    def semester_curriculum_import():
+        uploaded = request.files.get("file")
+        if not uploaded or not uploaded.filename or not uploaded.filename.lower().endswith((".xlsx", ".xlsm")):
+            return jsonify({"error": "Choose the curriculum Excel template (.xlsx)."}), 400
+        try:
+            rows = parse_simple_workbook(uploaded.read())
+            required = {"program_code", "curriculum_version", "subject_code", "subject_title", "units", "category", "required_optional", "recommended_term", "normal_load_units"}
+            missing = sorted(required - set(rows[0].keys())) if rows else sorted(required)
+            if missing:
+                return jsonify({"error": f"Missing curriculum column(s): {', '.join(missing)}."}), 400
+            account = current_account()
+            touched = set()
+            created_courses = 0
+            for sequence, row in enumerate(rows, start=1):
+                program = Program.query.filter(func.lower(Program.code) == str(row.get("program_code") or "").strip().lower()).first()
+                if not program:
+                    raise ValueError(f"Unknown program code: {row.get('program_code')}.")
+                version_name = str(row.get("curriculum_version") or "").strip()
+                version = CurriculumVersion.query.filter_by(program_id=program.id, name=version_name).first()
+                if not version:
+                    version = CurriculumVersion(program_id=program.id, name=version_name, uploaded_by=account.full_name)
+                    db.session.add(version)
+                    db.session.flush()
+                version.normal_load_units = max(1, int(row.get("normal_load_units") or 9))
+                code = str(row.get("subject_code") or "").strip()
+                course = Course.query.filter_by(code=code).first()
+                if not course:
+                    course = Course(program_id=program.id, code=code, title=str(row.get("subject_title") or code).strip(), units=int(row.get("units") or 3))
+                    db.session.add(course)
+                    db.session.flush()
+                    created_courses += 1
+                if course.program_id != program.id:
+                    raise ValueError(f"Subject code {code} already belongs to another program.")
+                course.title = str(row.get("subject_title") or course.title).strip()
+                course.units = int(row.get("units") or course.units or 3)
+                course.category = str(row.get("category") or "Core").strip().title()
+                course.recommended_term = str(row.get("recommended_term") or "Term 1").strip()
+                link = CurriculumVersionSubject.query.filter_by(version_id=version.id, course_id=course.id).first()
+                if not link:
+                    link = CurriculumVersionSubject(version_id=version.id, course_id=course.id)
+                    db.session.add(link)
+                marker = str(row.get("required_optional") or "Required").strip().lower()
+                link.required = marker in {"required", "yes", "true", "1"}
+                link.category = course.category
+                link.recommended_term = course.recommended_term
+                link.sequence_no = int(row.get("sequence_no") or sequence)
+                category_units = row.get("category_required_units")
+                link.category_required_units = int(category_units) if category_units not in (None, "") else None
+                touched.add(version.id)
+            db.session.commit()
+            return jsonify({"ok": True, "message": f"Imported {len(rows)} curriculum subject row(s) into {len(touched)} version(s).", "created_courses": created_courses})
+        except Exception as exc:
+            db.session.rollback()
+            return jsonify({"error": f"Could not import curriculum: {exc}"}), 400
+
+    @app.route("/api/semester-planning/enrollment/preview", methods=["POST"])
+    @require_api_login("staff")
+    def semester_enrollment_preview():
+        uploaded = request.files.get("file")
+        kind = (request.form.get("kind") or "students").strip()
+        if not uploaded or not uploaded.filename or not uploaded.filename.lower().endswith((".xlsx", ".xlsm")):
+            return jsonify({"error": "Choose a Registrar Excel file (.xlsx)."}), 400
+        rows = parse_simple_workbook(uploaded.read())
+        needed = {"student_number", "first_name", "last_name", "program_code", "term", "enrollment_status"}
+        if kind == "subjects":
+            needed |= {"subject_code"}
+        missing = sorted(needed - set(rows[0].keys())) if rows else sorted(needed)
+        if missing:
+            return jsonify({"error": f"Missing enrollment column(s): {', '.join(missing)}."}), 400
+        normalized = [{key: "" if value is None else str(value).strip() for key, value in row.items()} for row in rows]
+        existing_numbers = set()
+        changed_numbers = set()
+        for row in normalized:
+            student = Student.query.filter_by(student_number=row["student_number"]).first()
+            if student:
+                existing_numbers.add(row["student_number"])
+                if student.first_name != row["first_name"] or student.last_name != row["last_name"] or student.program.code.lower() != row["program_code"].lower():
+                    changed_numbers.add(row["student_number"])
+        incoming_numbers = {row["student_number"] for row in normalized}
+        return jsonify({
+            "ok": True, "filename": uploaded.filename, "kind": kind, "rows": normalized,
+            "summary": {"rows": len(normalized), "new_students": len(incoming_numbers - existing_numbers), "existing_students": len(existing_numbers), "changed_students": len(changed_numbers)},
+        })
+
+    @app.route("/api/semester-planning/enrollment/apply", methods=["POST"])
+    @require_api_login("staff")
+    def semester_enrollment_apply():
+        data = request.get_json(silent=True) or {}
+        rows = data.get("rows") or []
+        kind = data.get("kind") or "students"
+        if not rows:
+            return jsonify({"error": "Preview a Registrar file before applying it."}), 400
+        try:
+            program = Program.query.filter(func.lower(Program.code) == str(rows[0].get("program_code") or "").lower()).first()
+            term = AcademicTerm.query.filter(func.lower(AcademicTerm.label) == str(rows[0].get("term") or "").lower()).first()
+            if not program or not term:
+                raise ValueError("The program code or academic term does not match a configured record.")
+            if any(str(row.get("program_code") or "").lower() != program.code.lower() or str(row.get("term") or "").lower() != term.label.lower() for row in rows):
+                raise ValueError("One import may contain only one program and academic term.")
+            case = semester_planning_case(program, term, create=True)
+            account = current_account()
+            provisional = 0
+            if kind == "students":
+                incoming_numbers = {str(row.get("student_number") or "").strip() for row in rows}
+                existing_enrollments = TermEnrollment.query.filter_by(term_id=term.id).join(Student).filter(Student.program_id == program.id).all()
+                for enrollment in existing_enrollments:
+                    db.session.delete(enrollment)
+                for row in rows:
+                    number = str(row.get("student_number") or "").strip()
+                    student = Student.query.filter_by(student_number=number).first()
+                    if not student:
+                        email = unique_student_email(str(row.get("first_name") or "Student"), str(row.get("last_name") or number), number)
+                        student = Student(
+                            student_number=number, first_name=str(row.get("first_name") or "Student").strip(),
+                            last_name=str(row.get("last_name") or number).strip(), email=email,
+                            program_id=program.id, entry_year=term.start_date.year, current_stage="Onboarding",
+                        )
+                        db.session.add(student)
+                        db.session.flush()
+                        ensure_student_account(student, email)
+                        batch = manual_onboarding_batch()
+                        create_onboarding_case(student, batch, source_type="Registrar Enrollment", source_reference=data.get("filename") or "Enrolled student list", generated_email=email)
+                        provisional += 1
+                    else:
+                        student.first_name = str(row.get("first_name") or student.first_name).strip()
+                        student.last_name = str(row.get("last_name") or student.last_name).strip()
+                        student.program_id = program.id
+                    db.session.add(TermEnrollment(student_id=student.id, term_id=term.id, status=str(row.get("enrollment_status") or "Enrolled").title(), source_reference=data.get("filename") or "Registrar enrolled list"))
+                case.enrolled_import_name = data.get("filename") or "Registrar enrolled list"
+                case.enrolled_snapshot_json = json.dumps(rows, ensure_ascii=False)
+                case.status = "Study Plan Review"
+                db.session.flush()
+                for row in TermEnrollment.query.filter_by(term_id=term.id).join(Student).filter(Student.program_id == program.id).all():
+                    ensure_study_plan(case, row.student)
+            else:
+                for row in rows:
+                    student = Student.query.filter_by(student_number=str(row.get("student_number") or "").strip()).first()
+                    course = Course.query.filter_by(code=str(row.get("subject_code") or "").strip()).first()
+                    if not student or not course or student.program_id != program.id or course.program_id != program.id:
+                        raise ValueError(f"Unknown student or subject in row for {row.get('student_number')} / {row.get('subject_code')}.")
+                    attempt = CourseAttempt.query.filter_by(student_id=student.id, course_id=course.id, term_id=term.id).first()
+                    if not attempt:
+                        attempt = CourseAttempt(student_id=student.id, course_id=course.id, term_id=term.id)
+                        db.session.add(attempt)
+                    attempt.status = str(row.get("enrollment_status") or "Enrolled").title()
+                    attempt.updated_by = account.full_name
+                    record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+                    if not record:
+                        record = CourseRecord(student_id=student.id, course_id=course.id, status="Enrolled")
+                        db.session.add(record)
+                    record.status = attempt.status
+                    record.term_label = term.label
+                    record.evidence_reference = data.get("filename") or "Registrar subject enrollment"
+                case.status = "Coursework Monitoring"
+            add_log("curriculum-planning", None, workflow_actor_label(account), data.get("filename") or "Registrar import", f"Applied {len(rows)} {kind} enrollment row(s)", "Academic Coordinator", f"{program.code} · {term.label}; provisional students: {provisional}.", visibility="internal")
+            db.session.commit()
+            return jsonify({"ok": True, "message": f"Applied {len(rows)} row(s); {provisional} provisional onboarding case(s) created.", "case": semester_case_dict(case)})
+        except Exception as exc:
+            db.session.rollback()
+            return jsonify({"error": f"Could not apply enrollment import: {exc}"}), 400
+
+    @app.route("/api/semester-planning/students/<int:student_id>/action", methods=["POST"])
+    @require_api_login("academic_coordinator")
+    def semester_student_action(student_id: int):
+        data = request.get_json(silent=True) or {}
+        case = SemesterPlanningCase.query.get_or_404(int(data.get("case_id") or 0))
+        student = Student.query.get_or_404(student_id)
+        draft = ensure_study_plan(case, student)
+        action = data.get("action")
+        if action == "assign_curriculum":
+            version = CurriculumVersion.query.get_or_404(int(data.get("version_id") or 0))
+            if version.program_id != student.program_id:
+                return jsonify({"error": "That curriculum version belongs to another program."}), 400
+            versions = CurriculumVersion.query.filter_by(program_id=student.program_id, active=True).count()
+            rationale = str(data.get("rationale") or "").strip()
+            if versions > 1 and not rationale:
+                return jsonify({"error": "Record the curriculum rationale when multiple versions exist."}), 400
+            assignment = StudentCurriculumAssignment.query.filter_by(student_id=student.id).first()
+            if not assignment:
+                assignment = StudentCurriculumAssignment(student_id=student.id, version_id=version.id)
+                db.session.add(assignment)
+            assignment.version_id = version.id
+            assignment.rationale = rationale or "Only active curriculum version."
+            assignment.assigned_by = current_account().full_name
+            sync_student_version_courses(student, version)
+            draft.status = "Draft Study Plan"
+            ensure_study_plan(case, student)
+            message = "Curriculum version assigned and study-plan draft generated."
+        elif action == "confirm_plan":
+            onboarding = OnboardingCase.query.filter_by(student_id=student.id).first()
+            if not onboarding or onboarding.status != "Onboarded":
+                return jsonify({"error": "Finish this student's onboarding before confirming the study plan."}), 409
+            if not student_curriculum_assignment(student):
+                return jsonify({"error": "Assign a curriculum version first."}), 409
+            draft.status = "Course Ready"
+            draft.confirmed_at = now_utc()
+            draft.confirmed_by = current_account().full_name
+            message = "Study plan confirmed as course ready."
+        else:
+            return jsonify({"error": "Choose a valid study-plan action."}), 400
+        db.session.commit()
+        return jsonify({"ok": True, "message": message, "plan": semester_student_plan_dict(case, student)})
+
+    @app.route("/api/semester-planning/case/<int:case_id>/action", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def semester_case_action(case_id: int):
+        case = SemesterPlanningCase.query.get_or_404(case_id)
+        data = request.get_json(silent=True) or {}
+        action = data.get("action")
+        account = current_account()
+        plans = [ensure_study_plan(case, row.student) for row in TermEnrollment.query.filter_by(term_id=case.term_id).join(Student).filter(Student.program_id == case.program_id).all()]
+        if action == "send_readiness" and account.role == "academic_coordinator":
+            if not plans or any(item.status != "Course Ready" for item in plans):
+                return jsonify({"error": "Every student in the cohort must be course ready."}), 409
+            case.status = "Course Ready"
+            case.readiness_sent_at = now_utc()
+            message = "Course-readiness signal sent to the Research Coordinator."
+        elif action == "send_demand_summary" and account.role == "staff":
+            case.status = "Demand Summary Sent"
+            case.demand_summary_sent_at = now_utc()
+            case.planning_scope_reference = str(data.get("planning_scope_reference") or "").strip() or case.planning_scope_reference
+            message = "Demand summary added to the existing proposal and sent to the Academic Coordinator."
+        elif action == "send_coursework_report" and account.role == "academic_coordinator":
+            case.status = "Awaiting Dean Acknowledgment"
+            case.final_report_sent_at = now_utc()
+            message = "Coursework report sent to the Dean for acknowledgment."
+        elif action == "record_scope_sent" and account.role == "academic_coordinator":
+            case.planning_scope_reference = str(data.get("planning_scope_reference") or "Planning scope CSV sent to external Registrar").strip()
+            message = "External Registrar planning-scope handoff recorded."
+        else:
+            return jsonify({"error": "This action is not available for your role or workflow state."}), 403
+        add_log("curriculum-planning", None, workflow_actor_label(account), f"{case.program.code} {case.term.label}", message, "External Registrar" if action == "record_scope_sent" else "Dean" if action == "send_coursework_report" else "Academic Coordinator" if action == "send_demand_summary" else "Research Coordinator", visibility="internal")
+        db.session.commit()
+        return jsonify({"ok": True, "message": message, "case": semester_case_dict(case)})
+
+    @app.route("/api/semester-planning/case/<int:case_id>/planning-scope.csv")
+    @require_api_login("staff", "academic_coordinator")
+    def semester_planning_scope_export(case_id: int):
+        case = SemesterPlanningCase.query.get_or_404(case_id)
+        payload = semester_case_dict(case)
+        stream = io.StringIO()
+        writer = csv.writer(stream)
+        writer.writerow(["Program", "Source Semester", "Target Semester", "Student Number", "Student Name", "Curriculum Version", "Recommended Subject", "Units", "Plan Status"])
+        for plan in payload["students"]:
+            if not plan["recommendations"]:
+                writer.writerow([case.program.code, case.term.label, payload["target_term"]["label"] if payload["target_term"] else "", plan["student"]["student_number"], plan["student"]["name"], plan["curriculum"]["name"] if plan["curriculum"] else "", "", "", plan["status"]])
+            for subject in plan["recommendations"]:
+                writer.writerow([case.program.code, case.term.label, payload["target_term"]["label"] if payload["target_term"] else "", plan["student"]["student_number"], plan["student"]["name"], plan["curriculum"]["name"] if plan["curriculum"] else "", f"{subject['code']} - {subject['title']}", subject["units"], plan["status"]])
+        filename = f"{case.program.code}-{case.term.label}-planning-scope.csv".replace(" ", "-")
+        return Response(stream.getvalue(), mimetype="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+    @app.route("/api/semester-planning/completion", methods=["POST"])
+    @require_api_login("academic_coordinator")
+    def semester_completion_save():
+        data = request.get_json(silent=True) or {}
+        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        course = Course.query.get_or_404(int(data.get("course_id") or 0))
+        term = AcademicTerm.query.get_or_404(int(data.get("term_id") or 0))
+        taken = bool(data.get("taken"))
+        record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+        if not record:
+            record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+            db.session.add(record)
+        record.status = "Completed" if taken else "Missing"
+        record.term_label = term.label if taken else None
+        record.grade_value = None
+        record.grade_status = "Passed" if taken else "No Grade"
+        record.evidence_reference = "Academic Coordinator completion checkbox"
+        attempt = CourseAttempt.query.filter_by(student_id=student.id, course_id=course.id, term_id=term.id).first()
+        if not attempt:
+            attempt = CourseAttempt(student_id=student.id, course_id=course.id, term_id=term.id)
+            db.session.add(attempt)
+        attempt.status = record.status
+        attempt.grade_status = record.grade_status
+        attempt.evidence_reference = record.evidence_reference
+        attempt.updated_by = current_account().full_name
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"{course.code} marked {'Taken' if taken else 'Not Taken'} for {term.label}."})
+
     @app.route("/api/curriculum-planning")
     @require_api_login("staff", "academic_coordinator")
     def curriculum_planning():
@@ -5000,6 +5566,10 @@ def register_routes(app: Flask) -> None:
         query = CurriculumOffering.query
         if program_id:
             query = query.filter_by(program_id=program_id)
+            filter_program = Program.query.get(program_id)
+            curriculum_course_ids = [course.id for course in monitoring_curriculum_courses(filter_program)] if filter_program else []
+            if curriculum_course_ids:
+                query = query.filter(CurriculumOffering.course_id.in_(curriculum_course_ids))
         if academic_year:
             query = query.filter_by(academic_year=academic_year)
         if semester:
@@ -5022,10 +5592,9 @@ def register_routes(app: Flask) -> None:
         all_sem = list(SEMESTER_NAMES)
         terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
         programs = Program.query.order_by(Program.code).all()
-        courses = (
-            Course.query.filter_by(program_id=program_id).order_by(Course.code).all()
-            if program_id else []
-        )
+        selected_program = Program.query.get(program_id) if program_id else None
+        courses = monitoring_curriculum_courses(selected_program) if selected_program else []
+        faculty = Faculty.query.filter_by(active=True).order_by(Faculty.name).all()
         return jsonify({
             "items": [curriculum_offering_dict(o) for o in items],
             "academic_years": all_ay,
@@ -5037,6 +5606,10 @@ def register_routes(app: Flask) -> None:
             "courses": [
                 {"id": c.id, "code": c.code, "title": c.title, "category": c.category, "units": c.units}
                 for c in courses
+            ],
+            "faculty": [
+                {"id": member.id, "name": member.name, "college": member.college, "specialization": member.specialization}
+                for member in faculty
             ],
         })
 
@@ -5054,6 +5627,8 @@ def register_routes(app: Flask) -> None:
             academic_year = parsed_ay or academic_year
             semester = parsed_semester or semester
         course_ids = [int(c) for c in (data.get("course_ids") or []) if c]
+        faculty_id = int(data.get("faculty_id") or 0) or None
+        selected_faculty = Faculty.query.get(faculty_id) if faculty_id else None
         account = current_account()
         if not academic_year or not semester:
             return jsonify({"error": "Academic year and semester are required."}), 400
@@ -5072,11 +5647,13 @@ def register_routes(app: Flask) -> None:
             ).first()
             if exists:
                 continue
+            assigned_faculty = selected_faculty or recommended_teaching_faculty(program, course)
             db.session.add(CurriculumOffering(
                 program_id=program.id,
                 academic_year=academic_year,
                 semester=semester,
                 course_id=course_id,
+                faculty_id=assigned_faculty.id if assigned_faculty else None,
                 added_by=account.full_name if account else None,
             ))
             added += 1
@@ -5086,6 +5663,83 @@ def register_routes(app: Flask) -> None:
             "added": added,
             "message": f"Added {added} subject(s) to the {semester} offering list.",
         })
+
+    @app.route("/api/curriculum-planning/offerings/<int:offering_id>/faculty", methods=["PATCH"])
+    @require_api_login("academic_coordinator")
+    def curriculum_offering_update_faculty(offering_id: int):
+        offering = CurriculumOffering.query.get_or_404(offering_id)
+        data = request.get_json(silent=True) or {}
+        faculty = Faculty.query.get_or_404(int(data.get("faculty_id") or 0))
+        reason = str(data.get("reason") or "").strip()
+        if not faculty.active:
+            return jsonify({"error": "Choose an active faculty member."}), 400
+        if not reason:
+            return jsonify({"error": "Enter a reason for changing the teaching faculty."}), 400
+        previous_name = offering.faculty.name if offering.faculty else "Unassigned"
+        offering.faculty_id = faculty.id
+        add_log(
+            "curriculum-planning",
+            None,
+            "Academic Coordinator",
+            f"{offering.course.code if offering.course else 'Subject'} faculty assignment",
+            f"Teaching faculty changed from {previous_name} to {faculty.name}",
+            "Academic Coordinator",
+            f"{offering.academic_year} {offering.semester}; offering #{offering.id}. Reason: {reason}",
+            previous_status=previous_name,
+            new_status=faculty.name,
+            visibility="internal",
+        )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": f"Assigned {faculty.name} to {offering.course.code if offering.course else 'the subject'}.",
+            "offering": curriculum_offering_dict(offering),
+        })
+
+    @app.route("/api/student-portal/study-plan/cognates", methods=["POST"])
+    @require_api_login("student")
+    def student_study_plan_cognates():
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        data = request.get_json(silent=True) or {}
+        case = SemesterPlanningCase.query.get_or_404(int(data.get("case_id") or 0))
+        if case.program_id != student.program_id:
+            return jsonify({"error": "This study plan does not belong to your program."}), 403
+        assignment = student_curriculum_assignment(student)
+        if not assignment:
+            return jsonify({"error": "Your curriculum version is still being reviewed."}), 409
+        draft = ensure_study_plan(case, student)
+        if draft.status == "Course Ready":
+            return jsonify({"error": "This study plan has already been confirmed."}), 409
+        selected_ids = list(dict.fromkeys(int(value) for value in (data.get("course_ids") or []) if value))
+        optional_by_id = {item.course_id: item for item in assignment.version.subjects if not item.required}
+        if not selected_ids or any(course_id not in optional_by_id for course_id in selected_ids):
+            return jsonify({"error": "Choose one or more optional cognates from your curriculum."}), 400
+        target_term = next_academic_term(case.term)
+        if not target_term:
+            return jsonify({"error": "The upcoming academic semester has not been configured."}), 409
+        existing = SubjectRecommendation.query.filter_by(student_id=student.id, source_term_id=case.term_id, target_term_id=target_term.id).all()
+        required_units = sum((item.course.units or 3) for item in existing if item.source != "Student Choice")
+        selected_units = sum(optional_by_id[course_id].course.units or 3 for course_id in selected_ids)
+        if required_units + selected_units > (assignment.version.normal_load_units or 9):
+            return jsonify({"error": f"These choices exceed the {assignment.version.normal_load_units or 9}-unit normal semester load."}), 400
+        for item in existing:
+            if item.source == "Student Choice":
+                db.session.delete(item)
+        rank = max([item.rank for item in existing if item.source != "Student Choice"] or [0])
+        for course_id in selected_ids:
+            rank += 1
+            db.session.add(SubjectRecommendation(
+                student_id=student.id, course_id=course_id,
+                source_term_id=case.term_id, target_term_id=target_term.id,
+                rank=rank, source="Student Choice",
+                note="Optional cognate selected by the student for Academic Coordinator review.",
+                updated_by=account.full_name,
+            ))
+        draft.status = "Student Choices Submitted"
+        draft.student_submitted_at = now_utc()
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Your cognate choices were submitted for Academic Coordinator review.", "study_plan": student_portal_study_plan(student)})
 
     @app.route("/api/curriculum-planning/offerings/<int:offering_id>", methods=["DELETE"])
     @require_api_login("staff", "academic_coordinator")
@@ -5198,9 +5852,12 @@ def register_routes(app: Flask) -> None:
                     semester=semester, course_id=course_id,
                 ).first()
                 if not exists:
+                    course = Course.query.get(course_id)
+                    faculty = recommended_teaching_faculty(program, course) if course else None
                     db.session.add(CurriculumOffering(
                         program_id=program.id, academic_year=academic_year,
                         semester=semester, course_id=course_id,
+                        faculty_id=faculty.id if faculty else None,
                         added_by="RAG demand recommendation",
                     ))
                     offerings_created += 1
@@ -5224,6 +5881,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/course-adjustments")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def course_adjustments():
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
@@ -5234,33 +5892,40 @@ def register_routes(app: Flask) -> None:
         return jsonify(course_adjustments_payload(program, term))
 
     @app.route("/api/course-adjustments/plan", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def course_adjustments_plan():
         data = request.get_json(silent=True) or {}
+        account = current_account()
         program = Program.query.get_or_404(int(data.get("program_id") or 0))
         action = data.get("action") or "draft"
         latest_term = get_active_term()
-        reference_term = AcademicTerm.query.filter(AcademicTerm.id != latest_term.id).order_by(AcademicTerm.start_date.desc()).first() if latest_term else None
         term_label = (data.get("term_label") or "").strip() or (latest_term.label if latest_term else "Current Semester")
+        selected_term = AcademicTerm.query.filter_by(label=term_label).first() or latest_term
+        reference_term = AcademicTerm.query.filter(AcademicTerm.start_date < selected_term.start_date).order_by(AcademicTerm.start_date.desc()).first() if selected_term else None
         plan = (
             CourseOfferingPlan.query.filter_by(program_id=program.id, term_label=term_label)
             .order_by(CourseOfferingPlan.created_at.desc())
             .first()
         )
         if plan:
-            if latest_term:
-                plan.target_term_id = latest_term.id
+            if selected_term:
+                plan.target_term_id = selected_term.id
             if reference_term:
                 plan.reference_term_id = reference_term.id
-        if action == "draft":
+        if action in {"draft", "proposal"}:
+            if action == "proposal" and account.role != "research_coordinator":
+                return jsonify({"error": "Only the Research Coordinator can send the initial course-offering proposal."}), 403
             if not plan:
                 plan = CourseOfferingPlan(program_id=program.id, term_label=term_label, status="Draft")
                 db.session.add(plan)
                 db.session.flush()
-            if latest_term:
-                plan.target_term_id = latest_term.id
+            if selected_term:
+                plan.target_term_id = selected_term.id
             if reference_term:
                 plan.reference_term_id = reference_term.id
-            plan.status = "Draft"
+            plan.status = "Proposed" if action == "proposal" else "Draft"
+            plan.prepared_by_role = ROLE_LABELS.get(account.role, account.role)
+            plan.planning_scope = str(data.get("planning_scope") or plan.planning_scope or "").strip()
             CourseOffering.query.filter_by(plan_id=plan.id).delete()
             # If the Academic Coordinator edited the offer list, honour their choices;
             # otherwise fall back to the demand-suggested offerings.
@@ -5278,12 +5943,15 @@ def register_routes(app: Flask) -> None:
                             availability_count=0,
                             status="Offered" if sel.get("offer", True) else "Not Offered",
                             notes=sel.get("notes") or "Selected by Academic Coordinator",
+                            faculty_id=safe_int(sel.get("faculty_id")),
+                            adjustment_rationale=str(sel.get("rationale") or "").strip() or None,
+                            schedule_label=str(sel.get("schedule_label") or "").strip() or None,
                         )
                     )
-                result = "Draft offering plan saved from the coordinator's selections"
+                result = "Course-offering proposal sent to the Academic Coordinator" if action == "proposal" else "Draft offering plan saved from the coordinator's selections"
             else:
                 plan.notes = data.get("notes") or "Draft generated from current missing-subject demand."
-                for row in course_demand_rows(program, latest_term):
+                for row in course_demand_rows(program, selected_term):
                     db.session.add(
                         CourseOffering(
                             plan_id=plan.id,
@@ -5296,12 +5964,20 @@ def register_routes(app: Flask) -> None:
                         )
                     )
                 result = "Draft offering plan generated from demand"
+            case = semester_planning_case(program, selected_term, create=True) if selected_term else None
+            if case:
+                plan.semester_case_id = case.id
+                if action == "proposal":
+                    case.status = "Proposal Prepared"
+                    case.proposal_sent_at = now_utc()
         elif action == "submit":
+            if account.role != "academic_coordinator":
+                return jsonify({"error": "Only the Academic Coordinator can submit the final offering plan to the Dean."}), 403
             if not plan:
                 return jsonify({"error": "Save a draft offering plan first."}), 400
-            if plan.status not in ("Draft", "Returned"):
+            if plan.status not in ("Draft", "Proposed", "Returned"):
                 return jsonify({"error": "Only a draft can be submitted for approval."}), 400
-            live_demand = {row["course"]["id"]: row for row in course_demand_rows(program, latest_term)}
+            live_demand = {row["course"]["id"]: row for row in course_demand_rows(program, selected_term)}
             existing = {offering.course_id: offering for offering in plan.offerings}
             for course_id, row in live_demand.items():
                 offering = existing.get(course_id)
@@ -5316,11 +5992,41 @@ def register_routes(app: Flask) -> None:
                 offering.demand_count = row["demand_count"]
                 offering.availability_count = row["availability_count"]
                 offering.notes = offering.notes or row["recommendation"]
+            db.session.flush()
+            all_offerings = CourseOffering.query.filter_by(plan_id=plan.id).all()
+            for offering in all_offerings:
+                suggested = live_demand.get(offering.course_id, {}).get("suggested_sections", 1)
+                changed_sections = offering.status in {"Offered", "Suggested"} and offering.section_count != suggested
+                held_with_demand = offering.status == "Not Offered" and offering.demand_count >= 1
+                if (changed_sections or held_with_demand) and not (offering.adjustment_rationale or "").strip():
+                    return jsonify({"error": f"Record an adjustment rationale for {offering.course.code}."}), 400
+            offered = CourseOffering.query.filter(
+                CourseOffering.plan_id == plan.id,
+                CourseOffering.status.in_(["Offered", "Suggested"]),
+            ).all()
+            for offering in offered:
+                if offering.demand_count < 1:
+                    return jsonify({"error": f"{offering.course.code} does not meet the minimum demand of 1."}), 400
+                if not offering.faculty_id:
+                    return jsonify({"error": f"Assign a qualified faculty member to {offering.course.code}."}), 400
+                eligible_ids = {item["id"] for item in qualified_faculty_for_course(program, offering.course, selected_term)}
+                if offering.faculty_id not in eligible_ids:
+                    return jsonify({"error": f"The assigned faculty for {offering.course.code} must be a PhD holder, available, and within the 24-unit load."}), 400
+                if not offering.schedule_label:
+                    return jsonify({"error": f"Record a schedule for {offering.course.code} so conflicts can be checked."}), 400
+            conflicts = {}
+            for offering in offered:
+                key = (offering.faculty_id, offering.schedule_label.strip().lower())
+                if key in conflicts:
+                    return jsonify({"error": f"Schedule conflict: {offering.course.code} and {conflicts[key]} use the same faculty and schedule."}), 400
+                conflicts[key] = offering.course.code
             plan.status = "Submitted"
             plan.submitted_at = now_utc()
             plan.notes = data.get("notes") or plan.notes
             result = "Offering plan submitted for Dean approval"
         elif action == "publish":
+            if account.role != "staff":
+                return jsonify({"error": "Only GS Staff can record and publish the Dean-approved offerings."}), 403
             if not plan:
                 return jsonify({"error": "Save a draft offering plan first."}), 400
             if plan.status != "Approved":
@@ -5328,6 +6034,8 @@ def register_routes(app: Flask) -> None:
             plan.status = "Published"
             plan.published_at = now_utc()
             plan.notes = data.get("notes") or plan.notes
+            if plan.semester_case:
+                plan.semester_case.status = "Published"
             result = "Final course offerings published"
         else:
             return jsonify({"error": "Unknown course adjustment action."}), 400
@@ -5335,7 +6043,7 @@ def register_routes(app: Flask) -> None:
         add_log(
             "course-adjustments",
             None,
-            "Academic Coordinator",
+            workflow_actor_label(account),
             "Course Adjustments",
             f"{result}: {program.code} {term_label}",
             "Graduate School Staff" if action == "publish" else "Dean",
@@ -5345,7 +6053,7 @@ def register_routes(app: Flask) -> None:
         return jsonify({
             "ok": True,
             "message": f"{result} for {program.code} ({term_label}).",
-            "data": course_adjustments_payload(program),
+            "data": course_adjustments_payload(program, selected_term),
         })
 
     # ---- Approvals inbox (Dean acts here from their own account) ----------
@@ -5370,7 +6078,33 @@ def register_routes(app: Flask) -> None:
             "workflow_pending": workflow_payload["pending"],
             "workflow_recent": workflow_payload["recent"],
             "workflow_overview": workflow_payload["overview"],
+            "onboarding_batches": [
+                onboarding_batch_dict(batch)
+                for batch in OnboardingBatch.query.filter(
+                    OnboardingBatch.status.in_(["Awaiting Dean Approval", "Dean Approved", "Completed"])
+                ).order_by(OnboardingBatch.created_at.desc()).limit(30).all()
+            ],
+            "coursework_reports": [
+                semester_case_dict(case)
+                for case in SemesterPlanningCase.query.filter(
+                    SemesterPlanningCase.status.in_(["Awaiting Dean Acknowledgment", "Complete"])
+                ).order_by(SemesterPlanningCase.updated_at.desc()).limit(30).all()
+            ],
         })
+
+    @app.route("/api/semester-planning/case/<int:case_id>/acknowledge", methods=["POST"])
+    @require_api_login("dean")
+    def semester_case_acknowledge(case_id: int):
+        case = SemesterPlanningCase.query.get_or_404(case_id)
+        if case.status != "Awaiting Dean Acknowledgment":
+            return jsonify({"error": "This coursework report is not awaiting acknowledgment."}), 409
+        account = current_account()
+        case.status = "Complete"
+        case.dean_acknowledged_at = now_utc()
+        case.dean_acknowledged_by = account.full_name
+        add_log("curriculum-planning", None, workflow_actor_label(account), f"{case.program.code} {case.term.label}", "Coursework report acknowledged", "Complete", "Review only; no approval decision was required.", visibility="internal")
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Coursework report acknowledged."})
 
     @app.route("/api/approvals/<int:plan_id>/decide", methods=["POST"])
     @require_api_login("dean")
@@ -5388,10 +6122,14 @@ def register_routes(app: Flask) -> None:
             plan.approved_by = account.full_name
             result = "Offering plan approved by Dean"
             next_owner = "Graduate School Staff"
+            if plan.semester_case:
+                plan.semester_case.status = "Approved"
         elif decision in ("return", "reject"):
             plan.status = "Returned"
             result = "Offering plan returned by Dean for revision"
             next_owner = "Academic Coordinator"
+            if plan.semester_case:
+                plan.semester_case.status = "Plan Revision Requested"
         else:
             return jsonify({"error": "Decision must be 'approve' or 'return'."}), 400
         if note:
@@ -5808,12 +6546,36 @@ def register_routes(app: Flask) -> None:
                 if new_status in {"Current", "Enrolled", "Missing", "Dropped"}:
                     rec.resolved_at = None
             rec.remarks = str(remarks.get(sid_str, remarks.get(sid, rec.remarks or "")) or "").strip() or None
+            term_record = AcademicTerm.query.filter_by(label=term).first() if term else None
+            attempt_changed = False
+            if term_record:
+                attempt = CourseAttempt.query.filter_by(student_id=sid, course_id=course.id, term_id=term_record.id).first()
+                if not attempt:
+                    attempt = CourseAttempt(student_id=sid, course_id=course.id, term_id=term_record.id)
+                    db.session.add(attempt)
+                    attempt_changed = True
+                attempt_values = (
+                    attempt.status,
+                    attempt.grade_value or "",
+                    attempt.grade_status or "No Grade",
+                    attempt.remarks or "",
+                )
+                new_attempt_values = (rec.status, rec.grade_value or "", rec.grade_status or "No Grade", rec.remarks or "")
+                attempt_changed = attempt_changed or attempt_values != new_attempt_values
+                attempt.status = rec.status
+                attempt.grade_value = rec.grade_value
+                attempt.grade_status = rec.grade_status or "No Grade"
+                attempt.remarks = rec.remarks
+                attempt.evidence_reference = rec.evidence_reference
+                attempt.updated_by = account.full_name if account else actor
+                attempt.updated_at = now_utc()
             if (
                 rec.status == previous
                 and (rec.grade_value or "") == previous_grade
                 and (rec.grade_status or "No Grade") == previous_grade_status
                 and rec.incomplete_deadline == previous_deadline
                 and (rec.remarks or "") == previous_remarks
+                and not attempt_changed
             ):
                 continue
             if new_status == "Incomplete" and (previous != "Incomplete" or rec.incomplete_deadline != previous_deadline):
@@ -5835,7 +6597,7 @@ def register_routes(app: Flask) -> None:
             status_counts[new_status] = status_counts.get(new_status, 0) + 1
             audit = compute_course_audit(student)
             compre = comprehensive_exam_eligibility(student)
-            if compre["eligible"] and student.current_stage in ("Admission", "Coursework"):
+            if compre["eligible"] and student.current_stage == "Coursework":
                 student.current_stage = "Comprehensive Exam"
             recompute_risk(student)
             add_log("course-audit", sid, actor, f"Course audit {term}".strip(),
@@ -5895,6 +6657,28 @@ def register_routes(app: Flask) -> None:
             record.resolved_at = None
             record.remarks = remarks or record.remarks
             record.updated_at = now_utc()
+            drop_term = AcademicTerm.query.filter_by(label=request_item.term_label).first() if request_item.term_label else get_active_term()
+            if drop_term:
+                record.term_label = drop_term.label
+                attempt = CourseAttempt.query.filter_by(
+                    student_id=request_item.student_id,
+                    course_id=request_item.course_id,
+                    term_id=drop_term.id,
+                ).first()
+                if not attempt:
+                    attempt = CourseAttempt(
+                        student_id=request_item.student_id,
+                        course_id=request_item.course_id,
+                        term_id=drop_term.id,
+                    )
+                    db.session.add(attempt)
+                attempt.status = "Dropped"
+                attempt.grade_value = None
+                attempt.grade_status = "No Grade"
+                attempt.remarks = remarks or request_item.reason
+                attempt.evidence_reference = "Approved student course drop request"
+                attempt.updated_by = account.full_name if account else "Academic Coordinator"
+                attempt.updated_at = now_utc()
             request_item.status = "Approved"
             result = f"Drop request approved for {request_item.course.code}"
             add_log(
@@ -5949,11 +6733,17 @@ def register_routes(app: Flask) -> None:
         imported = Student.query.filter(~Student.student_number.like("GS-2026-%")).all()
         ids = [s.id for s in imported]
         if ids:
+            OnboardingCase.query.filter(OnboardingCase.student_id.in_(ids)).delete(synchronize_session=False)
+            UserAccount.query.filter(UserAccount.student_id.in_(ids)).delete(synchronize_session=False)
             PanelAssignment.query.filter(PanelAssignment.student_id.in_(ids)).delete(synchronize_session=False)
             ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(ids)).delete(synchronize_session=False)
             CourseDropRequest.query.filter(CourseDropRequest.student_id.in_(ids)).delete(synchronize_session=False)
             for student in imported:
                 db.session.delete(student)  # cascades course records, docs, tasks, logs
+            db.session.flush()
+            for batch in OnboardingBatch.query.filter_by(source_type="Monitoring Sheet").all():
+                if not OnboardingCase.query.filter_by(batch_id=batch.id).first():
+                    db.session.delete(batch)
         removed_courses = 0
         for course in Course.query.filter(Course.category.in_(["Basic", "Major", "Cognate", "Comprehensive"])).all():
             if CourseRecord.query.filter_by(course_id=course.id).count() == 0:
@@ -5987,6 +6777,7 @@ def register_routes(app: Flask) -> None:
             ensure_faculty_account_schema()
             ensure_demo_request_submission_logs()
             sync_all_curricula()
+            ensure_mapsy_term1_demand_demo()
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
@@ -6034,12 +6825,34 @@ def register_routes(app: Flask) -> None:
         sids = [s.id for s in students]
         cids = [c.id for c in courses]
         records: dict[tuple[int, int], CourseRecord] = {}
+        attempts: dict[tuple[int, int, int], CourseAttempt] = {}
         if sids and cids:
             for rec in CourseRecord.query.filter(
                 CourseRecord.student_id.in_(sids), CourseRecord.course_id.in_(cids)
             ).all():
-                if not selected_term_label or (rec.term_label or selected_term_label) == selected_term_label:
-                    records[(rec.student_id, rec.course_id)] = rec
+                records[(rec.student_id, rec.course_id)] = rec
+            for attempt in CourseAttempt.query.filter(
+                CourseAttempt.student_id.in_(sids), CourseAttempt.course_id.in_(cids)
+            ).all():
+                attempts[(attempt.student_id, attempt.course_id, attempt.term_id)] = attempt
+
+        term_sequence = ordered_academic_terms()
+        term_position = {term.id: index for index, term in enumerate(term_sequence)}
+        selected_position = term_position.get(selected_term.id, len(term_sequence) - 1) if selected_term else len(term_sequence) - 1
+        target_term = next_academic_term(selected_term)
+        completed_before = {
+            (attempt.student_id, attempt.course_id)
+            for attempt in attempts.values()
+            if attempt.status == "Completed" and term_position.get(attempt.term_id, 999) < selected_position
+        }
+        saved_recommendations: dict[int, list[SubjectRecommendation]] = {}
+        if target_term and sids:
+            for recommendation in SubjectRecommendation.query.filter(
+                SubjectRecommendation.student_id.in_(sids),
+                SubjectRecommendation.source_term_id == selected_term.id,
+                SubjectRecommendation.target_term_id == target_term.id,
+            ).order_by(SubjectRecommendation.student_id, SubjectRecommendation.rank).all():
+                saved_recommendations.setdefault(recommendation.student_id, []).append(recommendation)
 
         cat_order = ["Basic", "Major", "Cognate", "Core", "Comprehensive"]
         grouped: dict[str, list] = {}
@@ -6065,19 +6878,38 @@ def register_routes(app: Flask) -> None:
             done_units = 0
             for c in courses:
                 record = records.get((s.id, c.id))
-                status = record.status if record else "Missing"
+                selected_attempt = attempts.get((s.id, c.id, selected_term.id)) if selected_term else None
+                previous_completed = (s.id, c.id) in completed_before
+                if record and record.status == "Dropped" and record.term_label == selected_term_label:
+                    status = "Dropped"
+                elif selected_attempt and selected_attempt.status == "Completed":
+                    status = "CompletedThisTerm"
+                elif previous_completed:
+                    status = "CompletedBefore"
+                elif selected_attempt:
+                    status = "Enrolled" if selected_attempt.status in {"Current", "Enrolled"} else selected_attempt.status
+                elif record and record.status == "Completed" and not record.term_label:
+                    status = "CompletedBefore"
+                else:
+                    status = "Missing"
                 cells[c.id] = status
-                if status == "Completed":
+                if status in {"Completed", "CompletedBefore", "CompletedThisTerm"}:
                     done += 1
                     done_units += course_units[c.id]
+            saved = saved_recommendations.get(s.id, [])
+            recommended_ids = [item.course_id for item in saved] if saved else (system_next_subject_ids(s, selected_term, 3) if selected_term and target_term else [])
             compre = comprehensive_exam_eligibility(s)
             rows.append({
                 "id": s.id, "name": s.name, "first_name": s.first_name, "last_name": s.last_name, "student_number": s.student_number,
                 "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
                 "enrollment_tag": s.enrollment_tag,
                 "cells": cells, "completed": done, "total": len(courses),
-                "grades": {c.id: (records[(s.id, c.id)].grade_value or "") for c in courses if (s.id, c.id) in records},
-                "grade_remarks": {c.id: (records[(s.id, c.id)].remarks or "") for c in courses if (s.id, c.id) in records},
+                "grades": {c.id: ((attempts.get((s.id, c.id, selected_term.id)).grade_value if attempts.get((s.id, c.id, selected_term.id)) else None) or "") for c in courses} if selected_term else {},
+                "grade_remarks": {c.id: ((attempts.get((s.id, c.id, selected_term.id)).remarks if attempts.get((s.id, c.id, selected_term.id)) else None) or "") for c in courses} if selected_term else {},
+                "recommended_course_ids": recommended_ids,
+                "recommendation_source": "Manual" if saved else "System",
+                "recommendation_note": saved[0].note if saved else "Based on the earliest remaining curriculum subjects.",
+                "recommendation_target_term": term_dict(target_term) if target_term else None,
                 "rate": round(done / len(courses) * 100, 1) if courses else 0,
                 "completed_units": done_units, "total_units": total_units_all,
                 "eligible": compre["eligible"],
@@ -6101,10 +6933,87 @@ def register_routes(app: Flask) -> None:
             "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
             "terms": [term_dict(t) for t in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
             "selected_term": term_dict(selected_term) if selected_term else None,
+            "selected_term_editable": bool(selected_term and selected_term.is_active_planning_term),
+            "next_term": term_dict(target_term) if target_term else None,
             "categories": categories,
             "course_count": len(courses),
             "total_units": total_units_all,
             "students": rows,
+        })
+
+    @app.route("/api/monitoring/recommendations", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_recommendations_save():
+        data = request.get_json(silent=True) or {}
+        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        source_term = AcademicTerm.query.get_or_404(int(data.get("source_term_id") or 0))
+        if not source_term.is_active_planning_term:
+            return jsonify({"error": "Historical semester plans are read only."}), 400
+        target_term = next_academic_term(source_term)
+        if not target_term:
+            return jsonify({"error": "Add the next academic semester before saving recommendations."}), 400
+        course_ids = list(dict.fromkeys(int(value) for value in (data.get("course_ids") or []) if value))[:3]
+        note = str(data.get("note") or "").strip()
+        if not course_ids:
+            return jsonify({"error": "Choose at least one next-term subject."}), 400
+        if not note:
+            return jsonify({"error": "Enter a short planning note for the manual recommendation."}), 400
+        courses = Course.query.filter(Course.id.in_(course_ids), Course.program_id == student.program_id).all()
+        course_by_id = {course.id: course for course in courses}
+        if len(course_by_id) != len(course_ids):
+            return jsonify({"error": "Every recommended subject must belong to the student's program."}), 400
+        completed_ids = {
+            attempt.course_id
+            for attempt in CourseAttempt.query.join(AcademicTerm, AcademicTerm.id == CourseAttempt.term_id).filter(
+                CourseAttempt.student_id == student.id,
+                CourseAttempt.status == "Completed",
+                AcademicTerm.start_date <= source_term.end_date,
+            ).all()
+        }
+        completed_ids.update(
+            record.course_id
+            for record in CourseRecord.query.filter_by(student_id=student.id, status="Completed").all()
+            if not record.term_label
+        )
+        if completed_ids.intersection(course_ids):
+            return jsonify({"error": "A completed subject cannot be recommended again."}), 400
+        SubjectRecommendation.query.filter_by(
+            student_id=student.id,
+            source_term_id=source_term.id,
+            target_term_id=target_term.id,
+        ).delete(synchronize_session=False)
+        account = current_account()
+        for rank, course_id in enumerate(course_ids, start=1):
+            db.session.add(SubjectRecommendation(
+                student_id=student.id,
+                course_id=course_id,
+                source_term_id=source_term.id,
+                target_term_id=target_term.id,
+                rank=rank,
+                source="Manual",
+                note=note,
+                updated_by=account.full_name if account else "GS Staff",
+            ))
+        codes = [course_by_id[course_id].code for course_id in course_ids]
+        add_log(
+            "curriculum-planning", student.id,
+            "Academic Coordinator" if account and account.role == "academic_coordinator" else "GS Staff",
+            f"Next-term plan for {target_term.label}",
+            f"Recommended {', '.join(codes)}",
+            "GS Staff",
+            note,
+            previous_status="System recommendation",
+            new_status="Manual recommendation",
+            visibility="internal",
+        )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": f"Saved {len(course_ids)} subject recommendation(s) for {target_term.label}.",
+            "course_ids": course_ids,
+            "target_term": term_dict(target_term),
+            "source": "Manual",
+            "note": note,
         })
 
     @app.route("/api/monitoring/compre-exam", methods=["POST"])
@@ -6122,7 +7031,7 @@ def register_routes(app: Flask) -> None:
 
         previous_status = student.comprehensive_exam_status or "Not Taken"
         student.comprehensive_exam_status = requested_status
-        if eligibility["eligible"] and student.current_stage in ("Admission", "Coursework"):
+        if eligibility["eligible"] and student.current_stage == "Coursework":
             student.current_stage = "Comprehensive Exam"
         recompute_risk(student)
         account = current_account()
@@ -6270,7 +7179,6 @@ def register_routes(app: Flask) -> None:
             parsed = parse_ac_monitoring(io.BytesIO(file_bytes))
             if not parsed["rows"]:
                 return jsonify({"error": "No student rows found. Check that the sheet matches the AC Monitoring template."}), 400
-            result = import_ac_monitoring(parsed)
             MONITORING_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
             safe_name = secure_filename(file.filename) or "monitoring-sheet.xlsx"
             stored_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:10]}-{safe_name}"
@@ -6282,11 +7190,24 @@ def register_routes(app: Flask) -> None:
                 row_count=len(parsed["rows"]),
                 subject_count=len(parsed["subjects"]),
                 snapshot_json=json.dumps(parsed, ensure_ascii=False),
-                result_json=json.dumps(result, ensure_ascii=False),
+                result_json="{}",
             )
             db.session.add(upload)
             db.session.flush()
+            batch = OnboardingBatch(
+                batch_key=f"upload-{upload.id}",
+                label=f"{file.filename} · Onboarding batch",
+                source_type="Monitoring Sheet",
+                source_upload_id=upload.id,
+                source_reference=file.filename,
+            )
+            db.session.add(batch)
+            db.session.flush()
+            result = import_ac_monitoring(parsed, onboarding_batch=batch)
+            refresh_onboarding_batch(batch)
+            upload.result_json = json.dumps(result, ensure_ascii=False)
             result["upload_id"] = upload.id
+            result["batch_id"] = batch.id
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
@@ -6304,6 +7225,208 @@ def register_routes(app: Flask) -> None:
     def monitoring_upload_download(upload_id: int):
         upload = MonitoringSheetUpload.query.get_or_404(upload_id)
         return send_from_directory(MONITORING_UPLOAD_ROOT, upload.stored_name, as_attachment=True, download_name=upload.original_name)
+
+    @app.route("/api/onboarding/cases/<int:case_id>/action", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def onboarding_case_action(case_id: int):
+        account = current_account()
+        case = OnboardingCase.query.get_or_404(case_id)
+        student = case.student
+        data = request.get_json(silent=True) or {}
+        action = (data.get("action") or "").strip()
+        previous = case.status
+
+        if account.role == "academic_coordinator":
+            if case.status != "Program Verification":
+                return jsonify({"error": "This program is not awaiting Academic Coordinator verification."}), 409
+            if action == "confirm_program":
+                case.status = "Profile and Checklist"
+                case.program_verified_at = now_utc()
+                case.program_verified_by = account.full_name
+                case.correction_reason = None
+                result = "Program assignment verified"
+                next_owner = "GS Staff"
+                notes = f"Verified program: {student.program.code} — {student.program.name}."
+            elif action == "request_correction":
+                reason = (data.get("reason") or "").strip()
+                if not reason:
+                    return jsonify({"error": "Enter the correction needed before returning this case."}), 400
+                case.status = "Correction Required"
+                case.correction_reason = reason
+                case.program_verified_at = None
+                case.program_verified_by = None
+                result = "Program correction requested"
+                next_owner = "GS Staff"
+                notes = reason
+            else:
+                return jsonify({"error": "Choose confirm program or request correction."}), 400
+        else:
+            if action == "correct_program":
+                if case.status != "Correction Required":
+                    return jsonify({"error": "This case is not awaiting a program correction."}), 409
+                program = Program.query.get_or_404(safe_int(data.get("program_id")))
+                reason = (data.get("reason") or "").strip()
+                if not reason:
+                    return jsonify({"error": "Record the Registrar-provided correction reference or note."}), 400
+                old_program = student.program.code
+                student.program_id = program.id
+                sync_student_curriculum(student)
+                case.status = "Program Verification"
+                case.program_verified_at = None
+                case.program_verified_by = None
+                case.correction_reason = reason
+                result = f"Program corrected from {old_program} to {program.code}"
+                next_owner = "Academic Coordinator"
+                notes = reason
+            elif action == "confirm_profile":
+                if case.status != "Profile and Checklist":
+                    return jsonify({"error": "Program verification must finish before profile confirmation."}), 409
+                email = (data.get("email") or "").strip().lower()
+                if "@" not in email:
+                    return jsonify({"error": "Enter the student's real email address."}), 400
+                duplicate = UserAccount.query.filter(
+                    func.lower(UserAccount.email) == email,
+                    UserAccount.student_id != student.id,
+                ).first()
+                if duplicate:
+                    return jsonify({"error": "That email already belongs to another account."}), 409
+                checked = set(data.get("checklist_items") or [])
+                required = set(onboarding_requirements())
+                if checked != required:
+                    return jsonify({"error": "Confirm all five onboarding checklist items."}), 400
+                old_email = student.email
+                student.email = email
+                student_account = UserAccount.query.filter_by(student_id=student.id, role="student").first()
+                if student_account:
+                    student_account.email = email
+                for check in onboarding_checks(student.id):
+                    check.status = "Complete"
+                    check.evidence_reference = case.source_reference or "GS Staff onboarding review"
+                case.status = "Ready for Dean Report"
+                case.profile_confirmed_at = now_utc()
+                case.profile_confirmed_by = account.full_name
+                result = "Student profile and onboarding checklist confirmed"
+                next_owner = "System"
+                notes = f"Profile email updated from {old_email} to {email}; all five checklist items confirmed."
+                db.session.flush()
+                refresh_onboarding_batch(case.batch)
+                next_owner = onboarding_owner(case.status)
+            elif action == "complete_onboarding":
+                if case.status != "Dean Approved":
+                    return jsonify({"error": "Dean approval is required before onboarding can be completed."}), 409
+                case.status = "Onboarded"
+                case.completed_at = now_utc()
+                case.completed_by = account.full_name
+                student.current_stage = "Coursework"
+                result = "Onboarding completed"
+                next_owner = "Complete"
+                notes = "The full student portal is now unlocked and the lifecycle stage is Coursework."
+                db.session.flush()
+                refresh_onboarding_batch(case.batch)
+            else:
+                return jsonify({"error": "Choose a valid onboarding action."}), 400
+
+        add_log(
+            "student-handoff", student.id, workflow_actor_label(account),
+            case.source_reference or "Onboarding case", result, next_owner, notes,
+            previous_status=previous, new_status=case.status,
+            visibility="internal",
+        )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": result,
+            "case": onboarding_case_dict(case),
+            "batch": onboarding_batch_dict(case.batch, include_cases=False),
+        })
+
+    @app.route("/api/monitoring/uploads/<int:upload_id>/overwrite-student", methods=["POST"])
+    @require_api_login("staff")
+    def onboarding_overwrite_from_upload(upload_id: int):
+        account = current_account()
+        upload = MonitoringSheetUpload.query.get_or_404(upload_id)
+        data = request.get_json(silent=True) or {}
+        student = Student.query.get_or_404(safe_int(data.get("student_id")))
+        incoming_number = (data.get("incoming_student_number") or "").strip()
+        parsed = json.loads(upload.snapshot_json or "{}")
+        row = next((item for item in parsed.get("rows", []) if item.get("idno") == incoming_number), None)
+        if not row:
+            return jsonify({"error": "The selected incoming student was not found in this upload."}), 404
+        case = OnboardingCase.query.filter_by(student_id=student.id).first()
+        if not case or case.status == "Onboarded":
+            return jsonify({"error": "Only active onboarding cases can be overwritten."}), 409
+        number_conflict = Student.query.filter(Student.student_number == incoming_number, Student.id != student.id).first()
+        if number_conflict:
+            return jsonify({"error": "The incoming student number already belongs to another student."}), 409
+        program = Program.query.filter_by(code=parsed.get("program_code")).first_or_404()
+        previous_summary = f"{student.student_number}; {student.name}; {student.program.code}; entry {student.entry_year}"
+        student.student_number = incoming_number
+        student.first_name = row.get("first_name") or student.first_name
+        student.last_name = row.get("last_name") or student.last_name
+        student.program_id = program.id
+        student.entry_year = _entry_year_from_ay(row.get("ay_entry"))
+        for code, done in (row.get("subjects") or {}).items():
+            course = Course.query.filter_by(program_id=program.id, code=code).first()
+            if not course:
+                course = Course(
+                    program_id=program.id,
+                    code=code,
+                    title=(parsed.get("subject_titles") or {}).get(code) or code,
+                    category=(parsed.get("subject_categories") or {}).get(code) or "Core",
+                    units=3,
+                )
+                db.session.add(course)
+                db.session.flush()
+            record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+            if not record:
+                record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+                db.session.add(record)
+            record.status = "Completed" if done else "Missing"
+            record.term_label = row.get("ay_entry")
+            record.evidence_reference = f"Overwrite from monitoring upload #{upload.id}"
+            record.updated_at = now_utc()
+        sync_student_curriculum(student)
+        case.status = "Program Verification"
+        case.program_verified_at = None
+        case.program_verified_by = None
+        case.correction_reason = f"Full record overwritten from {upload.original_name}."
+        refresh_onboarding_batch(case.batch)
+        add_log(
+            "student-handoff", student.id, workflow_actor_label(account), upload.original_name,
+            "Student onboarding record overwritten from monitoring sheet",
+            workflow_actor_label(account),
+            f"Previous: {previous_summary}. Incoming: {student.student_number}; {student.name}; {program.code}; entry {student.entry_year}.",
+            previous_status="Correction Required", new_status="Program Verification",
+            visibility="internal",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "The full student record was overwritten and returned for program verification."})
+
+    @app.route("/api/onboarding/batches/<int:batch_id>/approve", methods=["POST"])
+    @require_api_login("dean")
+    def onboarding_batch_approve(batch_id: int):
+        account = current_account()
+        batch = OnboardingBatch.query.get_or_404(batch_id)
+        if batch.status != "Awaiting Dean Approval" or not batch.cases:
+            return jsonify({"error": "This complete onboarding batch is not awaiting Dean approval."}), 409
+        approved_at = now_utc()
+        batch.status = "Dean Approved"
+        batch.approved_at = approved_at
+        batch.approved_by = account.full_name
+        for case in batch.cases:
+            if case.status != "Awaiting Dean Approval":
+                return jsonify({"error": "Every student in the batch must be ready before approval."}), 409
+            case.status = "Dean Approved"
+            case.dean_approved_at = approved_at
+            add_log(
+                "student-handoff", case.student_id, workflow_actor_label(account), batch.label,
+                "Onboarding batch approved by Dean", "GS Staff",
+                f"Dean reviewed the on-screen summary for {len(batch.cases)} student(s).",
+                previous_status="Awaiting Dean Approval", new_status="Dean Approved",
+                visibility="internal",
+            )
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"Approved onboarding batch for {len(batch.cases)} student(s)."})
 
     # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
@@ -8562,6 +9685,20 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
     if slug == "student-handoff":
         context["programs"] = [program_dict(p) for p in Program.query.order_by(Program.college, Program.name).all()]
         context["terms"] = [term_dict(t) for t in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()]
+        cases_query = OnboardingCase.query.join(Student).order_by(OnboardingCase.updated_at.desc(), Student.last_name)
+        account = current_account()
+        if account and account.role == "academic_coordinator":
+            cases_query = cases_query.filter(OnboardingCase.status == "Program Verification")
+        context["onboarding_cases"] = [onboarding_case_dict(case) for case in cases_query.all()]
+        context["onboarding_statuses"] = [
+            "New Onboarding", "Program Verification", "Correction Required",
+            "Profile and Checklist", "Ready for Dean Report",
+            "Awaiting Dean Approval", "Dean Approved", "Onboarded",
+        ]
+        context["onboarding_batches"] = [
+            onboarding_batch_dict(batch, include_cases=False)
+            for batch in OnboardingBatch.query.order_by(OnboardingBatch.created_at.desc()).limit(30).all()
+        ]
 
     # LOA/Readmission are student-initiated: staff only see students who submitted.
     if slug in ("leave-of-absence", "readmission"):
@@ -9267,7 +10404,7 @@ def _sheet_student_comparison(student: Student, row: dict, course_by_code: dict[
     }
 
 
-def import_ac_monitoring(parsed: dict) -> dict:
+def import_ac_monitoring(parsed: dict, onboarding_batch: OnboardingBatch | None = None) -> dict:
     program = Program.query.filter_by(code=parsed["program_code"]).first()
     if not program:
         program = Program(code=parsed["program_code"], name=f"{parsed['program_code']} (imported)", college="Imported")
@@ -9351,9 +10488,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
         if is_new or not student.email:
             student.email = unique_student_email(row["first_name"], row["last_name"], row["idno"], student.id if not is_new else None)
         completed = sum(1 for v in row["subjects"].values() if v)
-        student.current_stage = _stage_from_sheet(
-            row["milestones"], completed, row.get("comprehensive_exam_passed", False)
-        )
+        student.current_stage = "Onboarding"
         db.session.flush()
 
         # per-subject course records (real subjects from the sheet)
@@ -9375,21 +10510,25 @@ def import_ac_monitoring(parsed: dict) -> dict:
         if row_subject_changes:
             students_changed += 1
 
-        # onboarding evidence treated as complete (record came from the official sheet)
+        # The official roster starts onboarding; GS Staff still confirms every item.
         if is_new and term:
             db.session.add(TermEnrollment(
                 student_id=student.id, term_id=term.id, status="Confirmed",
                 source_reference="AC Student Monitoring import"))
-            for item in onboarding_requirements():
-                db.session.add(DocumentCheck(
-                    student_id=student.id, gate="Admission Handoff", item_name=item,
-                    status="Complete", evidence_reference="AC Student Monitoring import"))
 
         if is_new:
             # Provision a student-portal account so the handed-off student can sign in
             # (upload concept papers, file LOA / withdrawal) — realistic and demo-ready.
             ensure_student_account(student, student.email)
             created_accounts.append({"name": student.name, "email": student.email, "password": SIM_STUDENT_PASSWORD})
+            if onboarding_batch:
+                create_onboarding_case(
+                    student,
+                    onboarding_batch,
+                    source_type="Monitoring Sheet",
+                    source_reference="AC Student Monitoring import",
+                    generated_email=student.email,
+                )
 
         recompute_risk(student)
 
@@ -9465,6 +10604,7 @@ def monitoring_upload_dict(upload: MonitoringSheetUpload) -> dict:
 def handle_student_handoff(data: MultiDict) -> int:
     # Intake transaction: create the monitoring record, mirror the enrollment
     # signal, compare onboarding evidence, and open a follow-up if anything is missing.
+    require_workflow_actor("staff")
     program = Program.query.get(int(data["program_id"]))
     count = Student.query.count() + 1
     student_number = (data.get("student_number") or "").strip() or f"2026-{count:04d}"
@@ -9473,6 +10613,13 @@ def handle_student_handoff(data: MultiDict) -> int:
     submitted_onboarding = set(data.getlist("onboarding_items"))
     missing_items = [item for item in onboarding_requirements() if item not in submitted_onboarding]
     missing_items.extend(split_items(data.get("additional_missing_items", "")))
+    admission_signal = (data.get("admission_signal") or "Admission Confirmed").strip()
+    source_reference = (data.get("source_reference") or "").strip()
+    manual_reason = (data.get("manual_reason") or "").strip()
+    if not source_reference:
+        raise ValueError("Enter the Registrar source or reference for this manual onboarding case.")
+    if not manual_reason:
+        raise ValueError("Enter the reason this student is being added manually.")
     student = Student(
         student_number=student_number,
         first_name=first_name,
@@ -9480,7 +10627,7 @@ def handle_student_handoff(data: MultiDict) -> int:
         email=(data.get("email") or "").strip().lower() or unique_student_email(first_name, last_name, student_number),
         program_id=program.id,
         entry_year=int(data.get("entry_year") or date.today().year),
-        current_stage="Admission",
+        current_stage="Onboarding",
         standing="Active",
         risk_level="Medium" if missing_items else "Low",
     )
@@ -9488,27 +10635,29 @@ def handle_student_handoff(data: MultiDict) -> int:
     db.session.flush()
     account = ensure_student_account(student, student.email)
     sync_student_curriculum(student)
+    batch = manual_onboarding_batch()
+    create_onboarding_case(
+        student,
+        batch,
+        source_type="Manual",
+        source_reference=source_reference,
+        generated_email=account.email,
+        manual_reason=manual_reason,
+    )
 
     term = AcademicTerm.query.get(int(data["term_id"]))
     db.session.add(
         TermEnrollment(
             student_id=student.id,
             term_id=term.id,
-            status=data["admission_signal"],
+            status=admission_signal,
             source_reference=data.get("source_reference", ""),
         )
     )
 
-    for item in onboarding_requirements():
-        db.session.add(
-            DocumentCheck(
-                student_id=student.id,
-                gate="Admission Handoff",
-                item_name=item,
-                status="Missing" if item in missing_items else "Complete",
-                evidence_reference=data.get("source_reference", ""),
-            )
-        )
+    for check in onboarding_checks(student.id):
+        check.status = "Pending Review"
+        check.evidence_reference = source_reference
 
     if missing_items:
         for item in split_items(data.get("additional_missing_items", "")):
@@ -9518,7 +10667,7 @@ def handle_student_handoff(data: MultiDict) -> int:
                     gate="Admission Handoff",
                     item_name=item,
                     status="Missing",
-                    evidence_reference=data.get("source_reference", ""),
+                    evidence_reference=source_reference,
                 )
             )
         add_task(student.id, "Complete admission handoff missing items", "GS Staff", 3, 40)
@@ -9527,13 +10676,16 @@ def handle_student_handoff(data: MultiDict) -> int:
         "student-handoff",
         student.id,
         "GS Staff",
-        data.get("source_reference", ""),
-        f"Monitoring record created from {data['admission_signal']}; {len(missing_items)} onboarding item(s) missing",
-        "GS Staff",
+        source_reference,
+        f"Monitoring record created from {admission_signal}; {len(missing_items)} onboarding item(s) missing",
+        "Academic Coordinator",
         f"Program: {program.code}; Compared {len(submitted_onboarding)} received item(s) against "
         f"{len(onboarding_requirements())} required item(s). Missing: "
         f"{', '.join(missing_items) if missing_items else 'None'}. "
-        f"Student portal account: {account.email}.",
+        f"Student portal account: {account.email}. Manual reason: {manual_reason}. Lifecycle stage: Onboarding.",
+        previous_status="New Onboarding",
+        new_status="Program Verification",
+        visibility="internal",
     )
     return student.id
 
@@ -9770,7 +10922,7 @@ def handle_course_audit(data: MultiDict) -> int:
     if audit["missing_count"] > 0:
         add_task(student.id, "Resolve missing curriculum subjects", "Academic Coordinator", 7, 25)
         student.risk_level = "Medium" if audit["missing_count"] >= 3 else student.risk_level
-    if comprehensive_exam_eligibility(student)["eligible"] and student.current_stage in ("Admission", "Coursework"):
+    if comprehensive_exam_eligibility(student)["eligible"] and student.current_stage == "Coursework":
         student.current_stage = "Comprehensive Exam"
 
     add_log(
@@ -12976,6 +14128,236 @@ def onboarding_requirements() -> list[str]:
     ]
 
 
+ONBOARDING_ACTIVE_STATUSES = {
+    "New Onboarding",
+    "Program Verification",
+    "Correction Required",
+    "Profile and Checklist",
+    "Ready for Dean Report",
+    "Awaiting Dean Approval",
+    "Dean Approved",
+}
+
+
+def onboarding_owner(status: str) -> str:
+    if status == "Program Verification":
+        return "Academic Coordinator"
+    if status == "Awaiting Dean Approval":
+        return "Dean"
+    if status == "Onboarded":
+        return "Complete"
+    return "GS Staff"
+
+
+def onboarding_checks(student_id: int) -> list[DocumentCheck]:
+    existing = {
+        item.item_name: item
+        for item in DocumentCheck.query.filter_by(student_id=student_id, gate="Admission Handoff").all()
+    }
+    rows = []
+    for name in onboarding_requirements():
+        item = existing.get(name)
+        if not item:
+            item = DocumentCheck(
+                student_id=student_id,
+                gate="Admission Handoff",
+                item_name=name,
+                status="Pending Review",
+                evidence_reference="Onboarding case",
+            )
+            db.session.add(item)
+        rows.append(item)
+    return rows
+
+
+def onboarding_case_dict(case: OnboardingCase, include_internal: bool = True) -> dict:
+    student = case.student
+    checks = onboarding_checks(student.id)
+    payload = {
+        "id": case.id,
+        "status": case.status,
+        "current_owner": onboarding_owner(case.status),
+        "source_type": case.source_type,
+        "source_reference": case.source_reference,
+        "student": student_brief(student),
+        "student_email": student.email,
+        "generated_email": case.generated_email,
+        "account_notice_at": iso(case.account_notice_at),
+        "program_verified_at": iso(case.program_verified_at),
+        "profile_confirmed_at": iso(case.profile_confirmed_at),
+        "dean_approved_at": iso(case.dean_approved_at),
+        "completed_at": iso(case.completed_at),
+        "created_at": iso(case.created_at),
+        "updated_at": iso(case.updated_at),
+        "batch": {
+            "id": case.batch.id,
+            "label": case.batch.label,
+            "status": case.batch.status,
+        } if case.batch else None,
+        "checklist": [
+            {"id": item.id, "label": item.item_name, "status": item.status}
+            for item in checks
+        ],
+    }
+    if include_internal:
+        payload.update({
+            "manual_reason": case.manual_reason,
+            "correction_reason": case.correction_reason,
+            "program_verified_by": case.program_verified_by,
+            "profile_confirmed_by": case.profile_confirmed_by,
+            "history": [
+                log_dict(log)
+                for log in TransactionLog.query.filter_by(
+                    transaction_slug="student-handoff", student_id=student.id
+                ).order_by(TransactionLog.created_at.desc()).limit(40).all()
+            ],
+        })
+    return payload
+
+
+def onboarding_batch_dict(batch: OnboardingBatch, include_cases: bool = True) -> dict:
+    cases = sorted(batch.cases, key=lambda item: item.student.name.lower())
+    counts = {}
+    for case in cases:
+        counts[case.status] = counts.get(case.status, 0) + 1
+    payload = {
+        "id": batch.id,
+        "label": batch.label,
+        "source_type": batch.source_type,
+        "source_reference": batch.source_reference,
+        "status": batch.status,
+        "student_count": len(cases),
+        "status_counts": counts,
+        "created_at": iso(batch.created_at),
+        "ready_at": iso(batch.ready_at),
+        "approved_at": iso(batch.approved_at),
+        "approved_by": batch.approved_by,
+        "completed_at": iso(batch.completed_at),
+    }
+    if include_cases:
+        payload["cases"] = [onboarding_case_dict(case, include_internal=False) for case in cases]
+    return payload
+
+
+def refresh_onboarding_batch(batch: OnboardingBatch) -> None:
+    cases = list(batch.cases)
+    if not cases:
+        batch.status = "Building"
+        return
+    if all(case.status == "Onboarded" for case in cases):
+        batch.status = "Completed"
+        batch.completed_at = batch.completed_at or now_utc()
+        return
+    if batch.approved_at:
+        batch.status = "Dean Approved"
+        return
+    if any(case.status not in {"Ready for Dean Report", "Awaiting Dean Approval"} for case in cases):
+        for case in cases:
+            if case.status == "Awaiting Dean Approval":
+                case.status = "Ready for Dean Report"
+    if all(case.status in {"Ready for Dean Report", "Awaiting Dean Approval"} for case in cases):
+        batch.status = "Awaiting Dean Approval"
+        batch.ready_at = batch.ready_at or now_utc()
+        for case in cases:
+            case.status = "Awaiting Dean Approval"
+        return
+    batch.status = "Building"
+
+
+def manual_onboarding_batch() -> OnboardingBatch:
+    day = date.today().isoformat()
+    key = f"manual-{day}"
+    batch = OnboardingBatch.query.filter_by(batch_key=key).first()
+    if not batch:
+        batch = OnboardingBatch(
+            batch_key=key,
+            label=f"Manual onboarding · {day}",
+            source_type="Manual",
+            source_reference=f"Manual entries for {day}",
+        )
+        db.session.add(batch)
+        db.session.flush()
+    if batch.approved_at or batch.completed_at:
+        raise ValueError("Today's manual onboarding batch has already been approved and cannot accept another case.")
+    return batch
+
+
+def create_onboarding_case(
+    student: Student,
+    batch: OnboardingBatch,
+    *,
+    source_type: str,
+    source_reference: str,
+    generated_email: str,
+    manual_reason: str | None = None,
+) -> OnboardingCase:
+    case = OnboardingCase.query.filter_by(student_id=student.id).first()
+    if case:
+        return case
+    case = OnboardingCase(
+        student_id=student.id,
+        batch=batch,
+        status="Program Verification",
+        source_type=source_type,
+        source_reference=source_reference,
+        manual_reason=manual_reason,
+        generated_email=generated_email,
+        account_notice_at=now_utc(),
+    )
+    student.current_stage = "Onboarding"
+    db.session.add(case)
+    onboarding_checks(student.id)
+    add_log(
+        "student-handoff", student.id, "System", source_reference,
+        "Onboarding case and student account created",
+        "Academic Coordinator",
+        "Account-details notification recorded for the simulated MVP email flow. Program verification is required.",
+        previous_status="New Onboarding", new_status="Program Verification",
+        visibility="internal",
+    )
+    db.session.flush()
+    refresh_onboarding_batch(batch)
+    return case
+
+
+def advance_completed_manual_handoffs() -> int:
+    """Repair legacy manual handoffs that were incorrectly left in Admission."""
+    advanced = 0
+    for student in Student.query.filter_by(current_stage="Admission", standing="Active").all():
+        handoff_log = TransactionLog.query.filter_by(
+            transaction_slug="student-handoff",
+            student_id=student.id,
+            actor_role="GS Staff",
+        ).order_by(TransactionLog.created_at.desc()).first()
+        if not handoff_log:
+            continue
+        checks = DocumentCheck.query.filter_by(student_id=student.id, gate="Admission Handoff").all()
+        required = set(onboarding_requirements())
+        complete = {check.item_name for check in checks if check.status == "Complete"}
+        has_missing = any(check.status != "Complete" for check in checks)
+        enrollment = TermEnrollment.query.filter_by(student_id=student.id).order_by(TermEnrollment.confirmed_at.desc()).first()
+        confirmed = enrollment and enrollment.status in {"Admission Confirmed", "Enrollment Confirmed", "Confirmed", "Enrolled", "Active"}
+        if has_missing or not required.issubset(complete) or not confirmed:
+            continue
+        student.current_stage = "Coursework"
+        add_log(
+            "student-handoff",
+            student.id,
+            "System",
+            "Completed manual student handoff",
+            "Student advanced from Admission to Coursework",
+            "Academic Coordinator",
+            "All required onboarding items and the admission/enrollment signal were already complete.",
+            previous_status="Admission",
+            new_status="Coursework",
+            visibility="internal",
+        )
+        advanced += 1
+    if advanced:
+        db.session.commit()
+    return advanced
+
+
 def readmission_requirements() -> list[str]:
     # Return checklist for moving a student from LOA back to active monitoring.
     return [
@@ -13102,6 +14484,47 @@ def recommended_term_rank(value: str | None) -> tuple[int, int, str]:
     )
 
 
+def ordered_academic_terms() -> list[AcademicTerm]:
+    return AcademicTerm.query.order_by(AcademicTerm.start_date.asc(), AcademicTerm.id.asc()).all()
+
+
+def next_academic_term(term: AcademicTerm | None) -> AcademicTerm | None:
+    if not term:
+        return None
+    terms = ordered_academic_terms()
+    for index, item in enumerate(terms):
+        if item.id == term.id:
+            return terms[index + 1] if index + 1 < len(terms) else None
+    return None
+
+
+def system_next_subject_ids(student: Student, source_term: AcademicTerm, limit: int = 3) -> list[int]:
+    attempts = (
+        CourseAttempt.query.join(AcademicTerm, AcademicTerm.id == CourseAttempt.term_id)
+        .filter(
+            CourseAttempt.student_id == student.id,
+            AcademicTerm.start_date <= source_term.end_date,
+        )
+        .all()
+    )
+    completed_ids = {attempt.course_id for attempt in attempts if attempt.status == "Completed"}
+    completed_ids.update(
+        record.course_id
+        for record in CourseRecord.query.filter_by(student_id=student.id, status="Completed").all()
+        if not record.term_label
+    )
+    active_ids = {
+        attempt.course_id for attempt in attempts
+        if attempt.term_id == source_term.id and attempt.status in {"Current", "Enrolled"}
+    }
+    remaining = [
+        course for course in monitoring_curriculum_courses(student.program)
+        if course.id not in completed_ids and course.id not in active_ids
+    ]
+    remaining.sort(key=lambda course: (recommended_term_rank(course.recommended_term), course.code))
+    return [course.id for course in remaining[:limit]]
+
+
 def student_semester_subjects(student: Student, term: AcademicTerm | None) -> dict:
     """One source of truth for current enrollment and the student's next subject group."""
     audit = compute_course_audit(student)
@@ -13145,7 +14568,8 @@ def student_semester_subjects(student: Student, term: AcademicTerm | None) -> di
 
 def curriculum_planning_payload(program: Program, term: AcademicTerm | None = None) -> dict:
     term = term or get_active_term()
-    courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
+    courses = monitoring_curriculum_courses(program)
+    curriculum_course_ids = [course.id for course in courses]
     student_query = Student.query.filter_by(program_id=program.id)
     if term:
         student_query = student_query.join(TermEnrollment).filter(
@@ -13165,7 +14589,10 @@ def curriculum_planning_payload(program: Program, term: AcademicTerm | None = No
             loa_count += 1
         if student.risk_level in ("Medium", "High") or student.current_stage == "LOA":
             delayed_count += 1
-        record_count = CourseRecord.query.filter_by(student_id=student.id).count()
+        record_count = CourseRecord.query.filter(
+            CourseRecord.student_id == student.id,
+            CourseRecord.course_id.in_(curriculum_course_ids),
+        ).count() if curriculum_course_ids else 0
         missing_rows = max(len(courses) - record_count, 0)
         semester = student_semester_subjects(student, term)
         audit = semester["audit"]
@@ -13237,6 +14664,42 @@ def curriculum_planning_payload(program: Program, term: AcademicTerm | None = No
     }
 
 
+def faculty_term_teaching_units(faculty: Faculty, term: AcademicTerm | None) -> int:
+    if not term:
+        return 0
+    academic_year, semester = split_academic_term_label(term.label)
+    rows = CurriculumOffering.query.filter_by(
+        faculty_id=faculty.id,
+        academic_year=academic_year,
+        semester=semester,
+    ).all()
+    return sum((row.course.units or 3) for row in rows if row.course)
+
+
+def qualified_faculty_for_course(program: Program, course: Course, term: AcademicTerm | None) -> list[dict]:
+    rows = []
+    for faculty in Faculty.query.filter_by(active=True, phd_holder=True).order_by(Faculty.name).all():
+        working = faculty_working_hours(faculty)
+        available = any(item["enabled"] for item in working) or FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id == faculty.id,
+            FacultyAvailability.available_date >= date.today(),
+        ).count() > 0
+        load = faculty_term_teaching_units(faculty, term)
+        preferred = {item.strip().lower() for item in (faculty.preferred_subjects or "").split(",") if item.strip()}
+        preference_match = not preferred or course.code.lower() in preferred or course.title.lower() in preferred
+        if available and load + (course.units or 3) <= (faculty.max_teaching_units or 24):
+            rows.append({
+                "id": faculty.id,
+                "name": faculty.name,
+                "current_units": load,
+                "remaining_units": (faculty.max_teaching_units or 24) - load,
+                "preference_match": preference_match,
+                "qualification": "PhD · Available · Within 24-unit load",
+            })
+    rows.sort(key=lambda item: (not item["preference_match"], item["current_units"], item["name"]))
+    return rows
+
+
 def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> list[dict]:
     # Subject demand counts only currently ENROLLED students who have not yet taken
     # the subject (LOA / AWOL / Completed are excluded), per the AC's process.
@@ -13248,15 +14711,6 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
             TermEnrollment.status.in_(["Confirmed", "Enrolled", "Active"]),
         )
     students = student_query.distinct().order_by(Student.last_name).all()
-    available_faculty = Faculty.query.filter_by(college=program.college, active=True).count()
-    future_slots = (
-        db.session.query(FacultyAvailability.faculty_id)
-        .join(Faculty, Faculty.id == FacultyAvailability.faculty_id)
-        .filter(Faculty.college == program.college, FacultyAvailability.available_date >= date.today())
-        .distinct()
-        .count()
-    )
-    availability_count = max(available_faculty, future_slots)
     for student in students:
         semester = student_semester_subjects(student, term)
         for next_subject in semester["next_subjects"]:
@@ -13268,16 +14722,14 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
     rows = []
     for item in demand.values():
         count = len(item["students"])
-        suggested_sections = max(1, (count + 24) // 25)
-        if count >= 15:
+        suggested_sections = 1
+        if count >= 1:
             recommendation = "Offer this semester"
             priority = "High"
-        elif count >= 5:
-            recommendation = "Review section feasibility"
-            priority = "Medium"
         else:
             recommendation = "Monitor demand"
             priority = "Low"
+        qualified = qualified_faculty_for_course(program, item["course"], term)
         rows.append({
             "course": {
                 "id": item["course"].id,
@@ -13287,8 +14739,10 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
             },
             "demand_count": count,
             "student_sample": [student_brief(s) for s in item["students"][:5]],
+            "students": [student_brief(s) for s in item["students"]],
             "suggested_sections": suggested_sections,
-            "availability_count": availability_count,
+            "availability_count": len(qualified),
+            "qualified_faculty": qualified,
             "priority": priority,
             "recommendation": recommendation,
         })
@@ -13299,8 +14753,8 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
 def course_adjustments_payload(program: Program, term: AcademicTerm | None = None) -> dict:
     term = term or get_active_term()
     demand = course_demand_rows(program, term)
-    min_threshold = 5
-    high_threshold = 15
+    min_threshold = 1
+    high_threshold = 1
 
     def demand_status(count: int) -> str:
         if count >= high_threshold:
@@ -13323,6 +14777,9 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
         row["offering_status"] = saved.status if saved else ("Suggested" if row["demand_count"] > 0 else None)
         row["section_count"] = saved.section_count if saved else row["suggested_sections"]
         row["offering_notes"] = saved.notes if saved else row["recommendation"]
+        row["faculty_id"] = saved.faculty_id if saved else None
+        row["schedule_label"] = saved.schedule_label if saved else ""
+        row["adjustment_rationale"] = saved.adjustment_rationale if saved else ""
     return {
         "program": program_dict(program),
         "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
@@ -13511,6 +14968,383 @@ def ensure_schedule_request_schema() -> None:
 def ensure_monitoring_upload_schema() -> None:
     """Create the additive upload-history table for existing MVP databases."""
     MonitoringSheetUpload.__table__.create(bind=db.engine, checkfirst=True)
+
+
+def ensure_onboarding_schema() -> None:
+    """Create onboarding tables and convert legacy lifecycle records without reopening completed students."""
+    OnboardingBatch.__table__.create(bind=db.engine, checkfirst=True)
+    OnboardingCase.__table__.create(bind=db.engine, checkfirst=True)
+    missing = Student.query.filter(~Student.id.in_(db.session.query(OnboardingCase.student_id))).all()
+    if not missing:
+        return
+    active_students = [student for student in missing if student.current_stage in {"Admission", "Onboarding"}]
+    historical_students = [student for student in missing if student not in active_students]
+    active_batch = None
+    historical_batch = None
+    if active_students:
+        active_batch = OnboardingBatch.query.filter_by(batch_key="migration-active-onboarding").first()
+        if not active_batch:
+            active_batch = OnboardingBatch(
+                batch_key="migration-active-onboarding",
+                label="Migrated active onboarding cases",
+                source_type="Migration",
+                source_reference="Existing Admission records",
+                status="Building",
+            )
+            db.session.add(active_batch)
+            db.session.flush()
+    if historical_students:
+        historical_batch = OnboardingBatch.query.filter_by(batch_key="migration-historical-onboarded").first()
+        if not historical_batch:
+            historical_batch = OnboardingBatch(
+                batch_key="migration-historical-onboarded",
+                label="Historical onboarded students",
+                source_type="Migration",
+                source_reference="Existing Coursework or later records",
+                status="Completed",
+                completed_at=now_utc(),
+            )
+            db.session.add(historical_batch)
+            db.session.flush()
+    for student in active_students:
+        student.current_stage = "Onboarding"
+        case = OnboardingCase(
+            student_id=student.id,
+            batch_id=active_batch.id,
+            status="Program Verification",
+            source_type="Migration",
+            source_reference="Existing Admission record",
+            generated_email=student.email,
+            account_notice_at=student.created_at,
+            created_at=student.created_at or now_utc(),
+        )
+        db.session.add(case)
+        onboarding_checks(student.id)
+    for student in historical_students:
+        completed_at = student.updated_at or student.created_at or now_utc()
+        case = OnboardingCase(
+            student_id=student.id,
+            batch_id=historical_batch.id,
+            status="Onboarded",
+            source_type="Migration",
+            source_reference="Historical lifecycle record",
+            generated_email=student.email,
+            account_notice_at=student.created_at,
+            program_verified_at=completed_at,
+            program_verified_by="Historical migration",
+            profile_confirmed_at=completed_at,
+            profile_confirmed_by="Historical migration",
+            dean_approved_at=completed_at,
+            completed_at=completed_at,
+            completed_by="Historical migration",
+            created_at=student.created_at or completed_at,
+        )
+        db.session.add(case)
+        for check in onboarding_checks(student.id):
+            check.status = "Complete"
+            check.evidence_reference = "Historical onboarding migration"
+    db.session.commit()
+
+
+def ensure_semester_monitoring_schema() -> None:
+    """Create semester history and copy legacy term-tagged course records once."""
+    CourseAttempt.__table__.create(bind=db.engine, checkfirst=True)
+    SubjectRecommendation.__table__.create(bind=db.engine, checkfirst=True)
+    term_ids = {term.label: term.id for term in AcademicTerm.query.all()}
+    existing = {(row.student_id, row.course_id, row.term_id) for row in CourseAttempt.query.all()}
+    created = 0
+    for record in CourseRecord.query.filter(CourseRecord.term_label.isnot(None), CourseRecord.term_label != "").all():
+        term_id = term_ids.get(record.term_label)
+        key = (record.student_id, record.course_id, term_id)
+        if not term_id or key in existing:
+            continue
+        db.session.add(CourseAttempt(
+            student_id=record.student_id,
+            course_id=record.course_id,
+            term_id=term_id,
+            status=record.status,
+            grade_value=record.grade_value,
+            grade_status=record.grade_status or "No Grade",
+            remarks=record.remarks,
+            evidence_reference=record.evidence_reference or "Legacy monitoring record",
+            updated_by="System migration",
+            updated_at=record.updated_at or now_utc(),
+        ))
+        existing.add(key)
+        created += 1
+    if created:
+        db.session.commit()
+
+
+def ensure_semester_planning_schema() -> None:
+    """Add the linked semester-planning workflow without replacing monitoring history."""
+    db.create_all()
+    inspector = inspect(db.engine)
+    tables = set(inspector.get_table_names())
+    additions_by_table = {
+        "faculty": {
+            "phd_holder": "BOOLEAN NOT NULL DEFAULT 0",
+            "max_teaching_units": "INTEGER NOT NULL DEFAULT 24",
+            "preferred_subjects": "TEXT",
+        },
+        "course_offering_plan": {
+            "semester_case_id": "INTEGER",
+            "prepared_by_role": "VARCHAR(60)",
+            "planning_scope": "TEXT",
+        },
+        "course_offering": {
+            "faculty_id": "INTEGER",
+            "adjustment_rationale": "TEXT",
+            "schedule_label": "VARCHAR(120)",
+        },
+        "curriculum_version_subject": {
+            "category_required_units": "INTEGER",
+        },
+    }
+    for table_name, additions in additions_by_table.items():
+        if table_name not in tables:
+            continue
+        existing = {column["name"] for column in inspector.get_columns(table_name)}
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+    for faculty in Faculty.query.all():
+        if not faculty.phd_holder and (faculty.name or "").strip().lower().startswith("dr."):
+            faculty.phd_holder = True
+        faculty.max_teaching_units = faculty.max_teaching_units or 24
+    db.session.commit()
+
+
+def curriculum_version_dict(version: CurriculumVersion) -> dict:
+    return {
+        "id": version.id,
+        "program_id": version.program_id,
+        "name": version.name,
+        "normal_load_units": version.normal_load_units,
+        "active": bool(version.active),
+        "subject_count": len(version.subjects),
+        "subjects": [{
+            "id": item.course_id,
+            "code": item.course.code,
+            "title": item.course.title,
+            "units": item.course.units,
+            "category": item.category,
+            "required": bool(item.required),
+            "recommended_term": item.recommended_term,
+            "sequence_no": item.sequence_no,
+            "category_required_units": item.category_required_units,
+        } for item in sorted(version.subjects, key=lambda row: (row.sequence_no, row.course.code))],
+    }
+
+
+def semester_planning_case(program: Program, term: AcademicTerm, create: bool = False) -> SemesterPlanningCase | None:
+    item = SemesterPlanningCase.query.filter_by(program_id=program.id, term_id=term.id).first()
+    if not item and create:
+        item = SemesterPlanningCase(program_id=program.id, term_id=term.id)
+        db.session.add(item)
+        db.session.flush()
+    return item
+
+
+def student_curriculum_assignment(student: Student) -> StudentCurriculumAssignment | None:
+    assignment = StudentCurriculumAssignment.query.filter_by(student_id=student.id).first()
+    if assignment:
+        return assignment
+    versions = CurriculumVersion.query.filter_by(program_id=student.program_id, active=True).all()
+    if len(versions) != 1:
+        return None
+    assignment = StudentCurriculumAssignment(
+        student_id=student.id,
+        version_id=versions[0].id,
+        rationale="Automatically assigned because this is the only active curriculum version.",
+        assigned_by="System",
+    )
+    db.session.add(assignment)
+    db.session.flush()
+    sync_student_version_courses(student, versions[0])
+    return assignment
+
+
+def sync_student_version_courses(student: Student, version: CurriculumVersion) -> int:
+    existing = {row.course_id for row in CourseRecord.query.filter_by(student_id=student.id).all()}
+    created = 0
+    for item in version.subjects:
+        if item.course_id in existing:
+            continue
+        db.session.add(CourseRecord(
+            student_id=student.id,
+            course_id=item.course_id,
+            status="Missing",
+            evidence_reference=f"Curriculum {version.name}",
+        ))
+        created += 1
+    return created
+
+
+def ensure_study_plan(case: SemesterPlanningCase, student: Student) -> StudyPlanDraft:
+    draft = StudyPlanDraft.query.filter_by(case_id=case.id, student_id=student.id).first()
+    if not draft:
+        draft = StudyPlanDraft(case_id=case.id, student_id=student.id)
+        db.session.add(draft)
+        db.session.flush()
+    assignment = student_curriculum_assignment(student)
+    if not assignment:
+        draft.status = "Needs Curriculum Version"
+        return draft
+    target_term = next_academic_term(case.term)
+    if not target_term:
+        return draft
+    saved = SubjectRecommendation.query.filter_by(
+        student_id=student.id,
+        source_term_id=case.term_id,
+        target_term_id=target_term.id,
+    ).count()
+    if saved:
+        if draft.status == "Draft Study Plan":
+            draft.status = "Ready for Review"
+        return draft
+    completed_ids = {row.course_id for row in CourseRecord.query.filter_by(student_id=student.id, status="Completed").all()}
+    load = assignment.version.normal_load_units or 9
+    used = 0
+    rank = 1
+    for item in sorted(assignment.version.subjects, key=lambda row: (row.sequence_no, row.course.code)):
+        if item.course_id in completed_ids or not item.required or used + (item.course.units or 3) > load:
+            continue
+        db.session.add(SubjectRecommendation(
+            student_id=student.id,
+            course_id=item.course_id,
+            source_term_id=case.term_id,
+            target_term_id=target_term.id,
+            rank=rank,
+            source="System Draft",
+            note=f"Generated from {assignment.version.name} for {target_term.label}.",
+            updated_by="System",
+        ))
+        used += item.course.units or 3
+        rank += 1
+    draft.status = "Ready for Review"
+    return draft
+
+
+def semester_student_plan_dict(case: SemesterPlanningCase, student: Student) -> dict:
+    assignment = student_curriculum_assignment(student)
+    draft = ensure_study_plan(case, student)
+    target_term = next_academic_term(case.term)
+    recommendations = []
+    if target_term:
+        recommendations = SubjectRecommendation.query.filter_by(
+            student_id=student.id,
+            source_term_id=case.term_id,
+            target_term_id=target_term.id,
+        ).order_by(SubjectRecommendation.rank).all()
+    onboarding = OnboardingCase.query.filter_by(student_id=student.id).first()
+    records = {item.course_id: item for item in CourseRecord.query.filter_by(student_id=student.id).all()}
+    subjects = []
+    if assignment:
+        for item in sorted(assignment.version.subjects, key=lambda row: (row.sequence_no, row.course.code)):
+            record = records.get(item.course_id)
+            subjects.append({
+                "course_id": item.course_id, "code": item.course.code, "title": item.course.title,
+                "units": item.course.units, "category": item.category,
+                "taken": bool(record and record.status == "Completed"),
+                "taken_term": record.term_label if record and record.status == "Completed" else None,
+            })
+    return {
+        "student": student_brief(student),
+        "study_plan_id": draft.id,
+        "status": draft.status,
+        "onboarding_complete": bool(onboarding and onboarding.status == "Onboarded"),
+        "curriculum": curriculum_version_dict(assignment.version) if assignment else None,
+        "curriculum_rationale": assignment.rationale if assignment else "",
+        "recommendations": [{
+            "id": item.id, "course_id": item.course_id, "code": item.course.code,
+            "title": item.course.title, "units": item.course.units,
+            "source": item.source, "note": item.note or "",
+        } for item in recommendations],
+        "target_term": term_dict(target_term) if target_term else None,
+        "subjects": subjects,
+    }
+
+
+def semester_case_dict(case: SemesterPlanningCase) -> dict:
+    enrollments = TermEnrollment.query.filter_by(term_id=case.term_id).join(Student).filter(
+        Student.program_id == case.program_id,
+        TermEnrollment.status.in_(["Confirmed", "Enrolled", "Active"]),
+    ).all()
+    students = sorted({row.student for row in enrollments}, key=lambda item: (item.last_name, item.first_name))
+    plans = [semester_student_plan_dict(case, student) for student in students]
+    return {
+        "id": case.id,
+        "status": case.status,
+        "program": program_dict(case.program),
+        "term": term_dict(case.term),
+        "target_term": term_dict(next_academic_term(case.term)) if next_academic_term(case.term) else None,
+        "enrolled_import_name": case.enrolled_import_name,
+        "planning_scope_reference": case.planning_scope_reference,
+        "readiness_sent_at": iso(case.readiness_sent_at),
+        "proposal_sent_at": iso(case.proposal_sent_at),
+        "demand_summary_sent_at": iso(case.demand_summary_sent_at),
+        "final_report_sent_at": iso(case.final_report_sent_at),
+        "dean_acknowledged_at": iso(case.dean_acknowledged_at),
+        "students": plans,
+        "summary": {
+            "students": len(plans),
+            "confirmed": sum(item["status"] == "Course Ready" for item in plans),
+            "needs_version": sum(item["status"] == "Needs Curriculum Version" for item in plans),
+            "blocked_onboarding": sum(not item["onboarding_complete"] for item in plans),
+        },
+    }
+
+
+def student_portal_study_plan(student: Student) -> dict | None:
+    enrollment = TermEnrollment.query.filter_by(student_id=student.id).order_by(TermEnrollment.confirmed_at.desc()).first()
+    if not enrollment:
+        return None
+    case = SemesterPlanningCase.query.filter_by(program_id=student.program_id, term_id=enrollment.term_id).first()
+    if not case:
+        return None
+    plan = semester_student_plan_dict(case, student)
+    assignment = student_curriculum_assignment(student)
+    completed_ids = {row.course_id for row in CourseRecord.query.filter_by(student_id=student.id, status="Completed").all()}
+    optional = []
+    if assignment:
+        for item in sorted(assignment.version.subjects, key=lambda row: (row.sequence_no, row.course.code)):
+            if item.required or item.course_id in completed_ids:
+                continue
+            optional.append({
+                "course_id": item.course_id, "code": item.course.code, "title": item.course.title,
+                "units": item.course.units, "category": item.category,
+                "category_required_units": item.category_required_units,
+            })
+    plan.update({
+        "case_id": case.id,
+        "case_status": case.status,
+        "optional_choices": optional,
+        "can_choose_cognates": bool(optional and plan["status"] != "Course Ready"),
+    })
+    return plan
+
+
+def normalized_header(value) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
+
+
+def parse_simple_workbook(file_bytes: bytes) -> list[dict]:
+    import openpyxl
+    workbook = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+    sheet = workbook.active
+    values = list(sheet.iter_rows(values_only=True))
+    header_index = next((index for index, row in enumerate(values) if sum(value not in (None, "") for value in row) >= 2), None)
+    if header_index is None:
+        return []
+    headers = [normalized_header(value) for value in values[header_index]]
+    rows = []
+    for raw in values[header_index + 1:]:
+        row = {headers[index]: raw[index] for index in range(min(len(headers), len(raw))) if headers[index]}
+        if any(value not in (None, "") for value in row.values()):
+            rows.append(row)
+    return rows
 
 
 def ensure_student_comprehensive_exam_schema() -> None:
@@ -13882,6 +15716,15 @@ def ensure_curriculum_offering_schema() -> None:
         for name, sql_type in additions.items():
             if name not in existing:
                 db.session.execute(text(f"ALTER TABLE course_offering_plan ADD COLUMN {name} {sql_type}"))
+    if "curriculum_offering" in tables:
+        existing = {column["name"] for column in inspector.get_columns("curriculum_offering")}
+        if "faculty_id" not in existing:
+            db.session.execute(text("ALTER TABLE curriculum_offering ADD COLUMN faculty_id INTEGER"))
+    db.session.commit()
+    for offering in CurriculumOffering.query.filter_by(faculty_id=None).all():
+        if offering.program and offering.course:
+            faculty = recommended_teaching_faculty(offering.program, offering.course)
+            offering.faculty_id = faculty.id if faculty else None
     db.session.commit()
 
 
@@ -14001,7 +15844,7 @@ def seed_database(count: int = 350) -> None:
             f"Seed count {count} exceeds the {len(name_pairs)} unique generated student names available."
         )
     stage_weights = [
-        "Admission",
+        "Onboarding",
         "Coursework",
         "Coursework",
         "Comprehensive Exam",
@@ -14067,7 +15910,7 @@ def seed_database(count: int = 350) -> None:
         program_courses = courses_by_program[program.id]
         complete_cutoff = random.randint(2, len(program_courses))
         for course_index, course in enumerate(program_courses):
-            if stage in ["Admission", "LOA"] and course_index > 2:
+            if stage in ["Admission", "Onboarding", "LOA"] and course_index > 2:
                 continue
             status = (
                 "Completed"
@@ -14513,7 +16356,7 @@ def ensure_miguel_yu_research_demo_unlock() -> int:
     if student.comprehensive_exam_status != "Passed":
         student.comprehensive_exam_status = "Passed"
         changed += 1
-    if student.standing == "Active" and student.current_stage in {"Admission", "Coursework", "Comprehensive Exam"}:
+    if student.standing == "Active" and student.current_stage in {"Coursework", "Comprehensive Exam"}:
         student.current_stage = "Proposal Development"
         changed += 1
 
@@ -14816,6 +16659,154 @@ def ensure_faculty_account_schema() -> None:
     db.session.commit()
 
 
+def ensure_mapsy_term1_demand_demo() -> dict:
+    """Create repeatable MAPSY cohorts that produce varied AY 2026-2027 Term 1 demand."""
+    program = Program.query.filter_by(code="MAPSY").first()
+    if not program:
+        return {"students": 0, "enrollments": 0, "records": 0, "term": None}
+    terms = AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
+    target_term = next((
+        term for term in terms
+        if "2026-2027" in (term.label or "")
+        and any(marker in (term.label or "").lower() for marker in ("term 1", "1st semester", "first semester"))
+    ), None)
+    if not target_term:
+        target_term = AcademicTerm(
+            label="AY 2026-2027 1st Semester",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 12, 20),
+            planning_window_open=date(2026, 6, 1),
+            planning_window_close=date(2026, 7, 31),
+            grade_submission_deadline=date(2026, 12, 27),
+            status="Planning",
+            is_active_planning_term=not any(term.is_active_planning_term for term in terms),
+        )
+        db.session.add(target_term)
+        db.session.flush()
+        terms.append(target_term)
+    previous_term = next((term for term in reversed(terms) if term.start_date < target_term.start_date), None)
+    courses = sorted(
+        monitoring_curriculum_courses(program),
+        key=lambda course: (recommended_term_rank(course.recommended_term), course.code),
+    )
+    if not courses:
+        return {"students": 0, "enrollments": 0, "records": 0, "term": target_term.label}
+    sync_program_curriculum(program, courses=courses)
+
+    names = [
+        ("Alyssa", "Abad"), ("Bianca", "Alcantara"), ("Carlo", "Alvarez"), ("Dianne", "Aquino"),
+        ("Elijah", "Bautista"), ("Frances", "Beltran"), ("Gabriel", "Caballero"), ("Hannah", "Castillo"),
+        ("Isabel", "Cruz"), ("Joaquin", "Dela Pena"), ("Katrina", "Domingo"), ("Lorenzo", "Evangelista"),
+        ("Mariel", "Flores"), ("Nathan", "Garcia"), ("Olivia", "Gonzales"), ("Paolo", "Hernandez"),
+        ("Queenie", "Ignacio"), ("Rafael", "Jimenez"), ("Sofia", "Lim"), ("Tristan", "Mendoza"),
+        ("Una", "Navarro"), ("Vince", "Ocampo"), ("Wynona", "Pascual"), ("Xavier", "Reyes"),
+        ("Yasmin", "Santos"), ("Zachary", "Torres"), ("Angela", "Valdez"), ("Bryan", "Villanueva"),
+        ("Clarisse", "Yap"), ("Diego", "Zamora"),
+    ]
+    created_students = 0
+    created_enrollments = 0
+    updated_records = 0
+    created_offerings = 0
+    course_count = len(courses)
+    completion_levels = [0, max(1, course_count // 3), max(2, (course_count * 2) // 3)]
+    for index, (first_name, last_name) in enumerate(names, start=1):
+        student_number = f"MAPSY-DEMO-{index:03d}"
+        student = Student.query.filter_by(student_number=student_number).first()
+        if not student:
+            student = Student(
+                student_number=student_number,
+                first_name=first_name,
+                last_name=last_name,
+                email=f"{first_name}.{last_name}".lower().replace(" ", ".") + "@mapsy-demo.usls.edu.ph",
+                program_id=program.id,
+                entry_year=2025 if index <= 20 else 2026,
+                current_stage="Coursework",
+                standing="Active",
+                enrollment_tag="Enrolled",
+                risk_level="Low" if index % 5 else "Medium",
+            )
+            db.session.add(student)
+            db.session.flush()
+            created_students += 1
+        else:
+            student.program_id = program.id
+            student.standing = "Active"
+            student.enrollment_tag = "Enrolled"
+            student.current_stage = "Coursework"
+        enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=target_term.id).first()
+        if not enrollment:
+            db.session.add(TermEnrollment(
+                student_id=student.id,
+                term_id=target_term.id,
+                status="Confirmed",
+                source_reference="MAPSY AY 2026-2027 Term 1 demo cohort",
+            ))
+            created_enrollments += 1
+        else:
+            enrollment.status = "Confirmed"
+            enrollment.source_reference = "MAPSY AY 2026-2027 Term 1 demo cohort"
+
+        cohort = 0 if index <= 12 else 1 if index <= 22 else 2
+        completed_count = min(completion_levels[cohort], max(course_count - 1, 0))
+        for course_index, course in enumerate(courses):
+            record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+            if not record:
+                record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+                db.session.add(record)
+            expected_status = "Completed" if course_index < completed_count else "Missing"
+            if record.status != expected_status or (expected_status == "Completed" and previous_term and record.term_label != previous_term.label):
+                updated_records += 1
+            record.status = expected_status
+            record.grade_status = "Passed" if expected_status == "Completed" else "No Grade"
+            record.grade_value = "1.50" if expected_status == "Completed" else None
+            record.term_label = previous_term.label if expected_status == "Completed" and previous_term else None
+            record.evidence_reference = "MAPSY demo completion history" if expected_status == "Completed" else "MAPSY demo curriculum demand"
+            record.updated_at = now_utc()
+            if expected_status == "Completed" and previous_term:
+                attempt = CourseAttempt.query.filter_by(student_id=student.id, course_id=course.id, term_id=previous_term.id).first()
+                if not attempt:
+                    db.session.add(CourseAttempt(
+                        student_id=student.id,
+                        course_id=course.id,
+                        term_id=previous_term.id,
+                        status="Completed",
+                        grade_value="1.50",
+                        grade_status="Passed",
+                        evidence_reference="MAPSY demo completion history",
+                        updated_by="System demo setup",
+                    ))
+        recompute_risk(student)
+    academic_year, semester = split_academic_term_label(target_term.label)
+    for course in courses[:3]:
+        offering = CurriculumOffering.query.filter_by(
+            program_id=program.id,
+            academic_year=academic_year,
+            semester=semester,
+            course_id=course.id,
+        ).first()
+        if offering:
+            continue
+        faculty = recommended_teaching_faculty(program, course)
+        db.session.add(CurriculumOffering(
+            program_id=program.id,
+            academic_year=academic_year,
+            semester=semester,
+            course_id=course.id,
+            faculty_id=faculty.id if faculty else None,
+            added_by="MAPSY demo demand seed",
+        ))
+        created_offerings += 1
+    db.session.commit()
+    return {
+        "students": len(names),
+        "students_created": created_students,
+        "enrollments_created": created_enrollments,
+        "records_updated": updated_records,
+        "offerings_created": created_offerings,
+        "term": target_term.label,
+    }
+
+
 def ensure_demo_accounts() -> None:
     backoffice_accounts = [
         ("staff@gs.local", "Graduate School Staff Demo", "staff"),
@@ -14923,15 +16914,19 @@ with app.app_context():
     ensure_student_comprehensive_exam_schema()
     ensure_panel_assignment_schema()
     ensure_workflow_activity_schema()
+    ensure_onboarding_schema()
     ensure_course_workflow_schema()
     ensure_research_evidence_schema()
     ensure_research_role_workflow_schema()
     ensure_curriculum_offering_schema()
+    ensure_semester_monitoring_schema()
+    ensure_semester_planning_schema()
     ensure_user_account_schema()
     ensure_faculty_account_schema()
     # Data repair runs last, after every column-adding migration above, because it
     # queries CourseRecord/Student which now include the newly added columns.
     ensure_monitoring_template_courses()
+    ensure_mapsy_term1_demand_demo()
     ensure_demo_comprehensive_exam_consistency()
 
 
@@ -14948,6 +16943,7 @@ if __name__ == "__main__":
             ensure_faculty_account_schema()
             ensure_workflow_activity_schema()
             ensure_monitoring_template_courses()
+            ensure_mapsy_term1_demand_demo()
             ensure_miguel_yu_research_demo_unlock()
             ensure_demo_request_submission_logs()
             db.session.commit()
@@ -14964,6 +16960,7 @@ if __name__ == "__main__":
         ensure_faculty_account_schema()
         ensure_workflow_activity_schema()
         ensure_monitoring_template_courses()
+        mapsy_demo = ensure_mapsy_term1_demand_demo()
         miguel_unlock_changes = ensure_miguel_yu_research_demo_unlock()
         healed_request_logs = ensure_demo_request_submission_logs()
         sync_result = sync_all_curricula()
@@ -14977,6 +16974,8 @@ if __name__ == "__main__":
             print("Prepared Miguel Yu for Research Gate demo testing.")
         if healed_request_logs:
             print(f"Added {healed_request_logs} missing demo request submission log(s).")
+        if mapsy_demo.get("students"):
+            print(f"Prepared {mapsy_demo['students']} MAPSY demand-demo students for {mapsy_demo['term']}.")
         if sync_result["created"]:
             print(f"Automatically added {sync_result['created']} missing curriculum row(s) for {sync_result['students']} student(s).")
         if accounts_before == 0:
