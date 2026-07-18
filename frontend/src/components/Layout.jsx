@@ -24,7 +24,6 @@ import {
   SlidersHorizontal,
   UsersRound,
   LogOut,
-  RotateCcw,
   UserX,
   CalendarRange,
 } from "lucide-react";
@@ -39,7 +38,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
       { to: "/reports", label: "Reports", icon: FileText },
-      { to: "/term-settings", label: "Academic Terms", icon: CalendarRange, roles: ["staff"] },
+      { to: "/term-settings", label: "Academic Semesters", icon: CalendarRange, roles: ["staff", "admin"] },
     ],
   },
   {
@@ -56,12 +55,11 @@ const NAV_GROUPS = [
       { to: "/workflow/student-handoff", label: "1 · Student Handoff", icon: UserPlus },
       { to: "/curriculum-planning", label: "2 · Curriculum planning", icon: BookOpenCheck },
       { to: "/course-adjustments", label: "3 · Course Adjustments", icon: SlidersHorizontal },
-      { to: "/workflow/course-audit", label: "4 · Course Audit", icon: ClipboardCheck },
-      { to: "/workflow/research-gate", label: "5 - Research Gate", icon: FileCheck },
-      { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
-      { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
-      { to: "/workflow/practicum", label: "8 · Practicum", icon: Briefcase },
-      { to: "/workflow/graduation", label: "9 · Graduation", icon: GraduationCap },
+      { to: "/workflow/research-gate", label: "4 - Research Gate", icon: FileCheck },
+      { to: "/workflow/panel-matching", label: "5 · Panel Matching", icon: UsersRound },
+      { to: "/workflow/defense-scheduling", label: "6 · Defense Scheduling", icon: CalendarCheck },
+      { to: "/workflow/practicum", label: "7 · Practicum", icon: Briefcase },
+      { to: "/workflow/graduation", label: "8 · Graduation", icon: GraduationCap },
     ],
   },
   {
@@ -88,10 +86,11 @@ const ROLE_LABELS = {
   staff: "Graduate School Staff",
   academic_coordinator: "Academic Coordinator",
   research_coordinator: "Research Coordinator",
+  admin: "Administrator",
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/faculty", "/monitoring-sheet", "/curriculum-planning", "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
+  academic_coordinator: new Set(["/faculty", "/monitoring-sheet", "/curriculum-planning", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
 };
 
@@ -115,7 +114,7 @@ function NavItem({ to, label, icon: Icon, end, onClick }) {
   );
 }
 
-function SidebarContent({ onNavigate, user, onResetDemo, resettingDemo }) {
+function SidebarContent({ onNavigate, user }) {
   const allowedPaths = ROLE_PATHS[user?.role];
   const roleAllowed = (item) => !item.roles || item.roles.includes(user?.role);
   const groups = NAV_GROUPS
@@ -152,17 +151,8 @@ function SidebarContent({ onNavigate, user, onResetDemo, resettingDemo }) {
       <div className="border-t border-slate-200 px-5 py-4">
         <p className="mb-1 text-xs font-bold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
         <p className="text-[11px] leading-relaxed text-slate-400">
-          Demo dataset · figures are computed live from recorded transactions.
+          Figures are computed live from recorded transactions.
         </p>
-        <button
-          type="button"
-          onClick={onResetDemo}
-          disabled={resettingDemo}
-          className="mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RotateCcw className={`h-3.5 w-3.5 ${resettingDemo ? "animate-spin" : ""}`} />
-          {resettingDemo ? "Resetting demo..." : "Reset demo data"}
-        </button>
       </div>
     </div>
   );
@@ -170,28 +160,15 @@ function SidebarContent({ onNavigate, user, onResetDemo, resettingDemo }) {
 
 export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [resettingDemo, setResettingDemo] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
-
-  async function resetDemo() {
-    if (!window.confirm("Reset the demo database and delete generated uploads? The Demo_Files folder will not be touched.")) return;
-    setResettingDemo(true);
-    try {
-      await api.resetDemoData();
-      window.location.assign("/");
-    } catch (err) {
-      window.alert(err.message || "Could not reset demo data.");
-      setResettingDemo(false);
-    }
-  }
 
   return (
     <div className="min-h-screen lg:flex">
       {/* Desktop sidebar */}
       <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:block">
         <div className="sticky top-0 h-screen">
-          <SidebarContent user={user} onResetDemo={resetDemo} resettingDemo={resettingDemo} />
+          <SidebarContent user={user} />
         </div>
       </aside>
 
@@ -208,7 +185,7 @@ export default function Layout({ children }) {
             >
               <X className="h-5 w-5" />
             </button>
-            <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} onResetDemo={resetDemo} resettingDemo={resettingDemo} />
+            <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}

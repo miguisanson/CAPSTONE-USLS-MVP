@@ -29,12 +29,12 @@ function homeFor(user) {
   if (user.role === "student") return "/student";
   if (user.role === "faculty") return "/faculty-portal";
   if (user.role === "dean") return "/approvals";
-  if (user.role === "academic_coordinator") return "/workflow/course-audit";
+  if (user.role === "academic_coordinator") return "/monitoring-sheet";
   if (user.role === "research_coordinator") return "/workflow/research-gate";
   return "/";
 }
 
-const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coordinator"]);
+const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coordinator", "admin"]);
 
 export default function App() {
   const { user, loading } = useAuth();

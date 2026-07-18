@@ -8,17 +8,19 @@ const DEMO = {
   staff: { email: "staff@gs.local", password: "DemoPass123!" },
   academic_coordinator: { email: "academic@gs.local", password: "DemoPass123!" },
   research_coordinator: { email: "research@gs.local", password: "DemoPass123!" },
+  admin: { email: "admin@gs.local", password: "DemoPass123!" },
   dean: { email: "dean@gs.local", password: "DemoPass123!" },
   student: { email: "student@gs.local", password: "DemoPass123!" },
   faculty: { email: "liwayway.bautista@gs.local", password: "DemoPass123!" },
 };
 
-const HOME = { staff: "/", academic_coordinator: "/workflow/course-audit", research_coordinator: "/workflow/graduation", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
+const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
 const LABEL = { staff: "Staff", dean: "Dean", student: "Student" };
 const STAFF_ACCOUNTS = [
   { role: "staff", label: "GS Staff", detail: "Intake and records" },
   { role: "academic_coordinator", label: "Academic Coordinator", detail: "Coursework and practicum" },
   { role: "research_coordinator", label: "Research Coordinator", detail: "Research completion" },
+  { role: "admin", label: "Administrator", detail: "All staff screens (review)" },
 ];
 
 export default function Login() {
@@ -61,7 +63,7 @@ export default function Login() {
               Graduate School Lifecycle Portal
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-600">
-              Sign in with a role-specific demo account to access the correct workflow steps.
+              Sign in with your role account to access the correct workflow steps.
             </p>
           </div>
 

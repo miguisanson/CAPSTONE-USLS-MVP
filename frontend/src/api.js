@@ -162,7 +162,6 @@ export const api = {
     return request(`/course-adjustments${qs ? `?${qs}` : ""}`);
   },
   resetUploadedData: () => request("/admin/reset-uploaded-data", { method: "POST", body: JSON.stringify({}) }),
-  resetDemoData: () => request("/admin/reset-demo", { method: "POST", body: JSON.stringify({}) }),
   approvals: () => request("/approvals"),
   decideApproval: (planId, payload) =>
     request(`/approvals/${planId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
@@ -180,6 +179,8 @@ export const api = {
     request(`/course-drop/requests${status ? `?status=${encodeURIComponent(status)}` : ""}`),
   decideCourseDrop: (requestId, payload) =>
     request(`/course-drop/requests/${requestId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
+  removeStudent: (studentId, payload = {}) =>
+    request(`/students/${studentId}/remove`, { method: "POST", body: JSON.stringify(payload) }),
   decisionSupport: () => request("/decision-support"),
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),

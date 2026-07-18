@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Table2, Download, AlertTriangle, Check } from "lucide-react";
+import { Table2, Download, AlertTriangle, Check, Pencil, Lock, Trash2, Inbox } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
@@ -67,6 +67,10 @@ export default function MonitoringGrid() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // View-only by default so a stray click can't change a student's status.
+  const [editMode, setEditMode] = useState(false);
+  // "grid" is the class monitoring sheet; "drops" is the drop-request queue.
+  const [view, setView] = useState("grid");
 
   function load(pid, nextProgress = progress, nextRisk = risk, nextEnrollment = enrollment) {
     setLoading(true);
@@ -111,8 +115,19 @@ export default function MonitoringGrid() {
   }, [grid?.students, sortBy]);
 
   async function cycleCell(studentId, course, current) {
+    if (!editMode) return; // sheet is locked; enable Edit mode to make changes
     const index = STATUS_CYCLE.indexOf(current);
     const nextStatus = STATUS_CYCLE[(index + 1) % STATUS_CYCLE.length];
+    // Confirm changes that pull a subject backwards (e.g. Completed → Incomplete)
+    // or mark it Failed/Dropped, so an accidental click can't quietly downgrade.
+    const isDowngrade = current === "Completed" && nextStatus !== "Completed";
+    const isNegative = nextStatus === "Failed" || nextStatus === "Dropped";
+    if (isDowngrade || isNegative) {
+      const ok = window.confirm(
+        `Change ${course.code} from "${current}" to "${nextStatus}"?\n\nThis affects the student's progress and comprehensive-exam eligibility.`
+      );
+      if (!ok) return;
+    }
     // optimistic update
     setGrid((g) => {
       if (!g) return g;
@@ -139,6 +154,7 @@ export default function MonitoringGrid() {
   }
 
   async function toggleCompreExam(student) {
+    if (!editMode) return; // locked unless Edit mode is on
     const nextStatus = nextCompreExamStatus(student);
     if (!nextStatus) {
       setError("The student must complete all curriculum subjects before the comprehensive exam can be marked Passed or Failed.");
@@ -181,6 +197,24 @@ export default function MonitoringGrid() {
     } catch (e) {
       setError(e.message);
       load(programId);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeStudent(student) {
+    if (!editMode) return;
+    const ok = window.confirm(
+      `Remove ${displayStudentName(student)} from active monitoring?\n\nThe student is marked Withdrawn (kept in records with full history), not deleted.`
+    );
+    if (!ok) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.removeStudent(student.id, { reason: "Removed via the monitoring sheet." });
+      load(programId);
+    } catch (e) {
+      setError(e.message);
     } finally {
       setSaving(false);
     }
@@ -232,7 +266,9 @@ export default function MonitoringGrid() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
           <p className="mt-1 text-sm text-slate-500">
-            The full class view — students by row, subjects by column. Click a subject cell to cycle its status.
+            {view === "drops"
+              ? "Course drop requests submitted by students. Approve to mark the subject Dropped, or reject to leave it unchanged."
+              : "The full class view — students by row, subjects by column. Locked by default; turn on Editing to change a status."}
           </p>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-7">
@@ -301,13 +337,49 @@ export default function MonitoringGrid() {
             <option value="units-desc">Sort: Completed units most</option>
             <option value="risk">Sort: Highest risk</option>
           </select>
-          <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}>
+          <button
+            type="button"
+            onClick={() => setView((v) => (v === "drops" ? "grid" : "drops"))}
+            className={view === "drops" ? "btn-primary" : "btn-ghost"}
+          >
+            <Inbox className="h-4 w-4" /> {view === "drops" ? "Back to sheet" : "Drop Requests"}
+          </button>
+          <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid || view === "drops"}>
             <Download className="h-4 w-4" /> Export CSV
           </button>
         </div>
       </div>
 
+      {view === "grid" && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              if (editMode) {
+                setEditMode(false);
+                return;
+              }
+              const ok = window.confirm(
+                "Turn on editing?\n\nYou will be able to change student statuses, comprehensive-exam results, and remove students. Are you sure?"
+              );
+              if (ok) setEditMode(true);
+            }}
+            className={editMode ? "btn-primary" : "btn-ghost"}
+          >
+            {editMode ? <Pencil className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+            {editMode ? "Editing on" : "View only"}
+          </button>
+          <span className="text-slate-500">
+            {editMode
+              ? "Cells are editable. Click a subject to cycle its status; downgrades and removals ask to confirm."
+              : "The sheet is locked to prevent accidental edits. Turn on editing to make changes."}
+          </span>
+          {saving && <span className="text-brand-600">Saving…</span>}
+        </div>
+      )}
+
       {/* Legend */}
+      {view === "grid" && (
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Completed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Current</span>
@@ -316,10 +388,12 @@ export default function MonitoringGrid() {
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-200 ring-1 ring-slate-300" /> Dropped</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>
         <span className="text-slate-400">Cycle: Not taken - Current - Completed - Incomplete - Failed - Dropped</span>
-        {saving && <span className="text-brand-600">Saving…</span>}
       </div>
+      )}
 
-      {loading ? (
+      {view === "drops" ? (
+        <DropRequestsPanel programName={grid?.program ? `${grid.program.code} — ${grid.program.name}` : ""} />
+      ) : loading ? (
         <Spinner label="Loading monitoring sheet…" />
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Could not load the sheet" hint={error} />
@@ -393,22 +467,35 @@ export default function MonitoringGrid() {
                 {sortedStudents.map((s) => (
                   <tr key={s.id} className="hover:bg-brand-50/30">
                     <td className="sticky left-0 z-10 max-w-[170px] border-b border-r border-slate-200 bg-white px-2 py-1.5 sm:max-w-[240px] sm:px-3">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/students/${s.id}`)}
-                        className="flex w-full items-center justify-between gap-2 text-left cursor-pointer"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs font-semibold text-ink sm:text-sm">{displayStudentName(s)}</span>
-                          <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                            <span className="text-[10px] text-slate-400">{s.student_number} · Y{s.entry_year}</span>
-                            {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
-                              <StatusBadge value={s.enrollment_tag} dot={false} />
-                            )}
+                      <div className="flex items-center gap-1.5">
+                        {editMode && s.enrollment_tag !== "Withdrawn" && (
+                          <button
+                            type="button"
+                            onClick={() => removeStudent(s)}
+                            title={`Remove ${displayStudentName(s)} (mark Withdrawn)`}
+                            aria-label={`Remove ${displayStudentName(s)}`}
+                            className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/students/${s.id}`)}
+                          className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left cursor-pointer"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-semibold text-ink sm:text-sm">{displayStudentName(s)}</span>
+                            <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] text-slate-400">{s.student_number} · Y{s.entry_year}</span>
+                              {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
+                                <StatusBadge value={s.enrollment_tag} dot={false} />
+                              )}
+                            </span>
                           </span>
-                        </span>
-                        <StatusBadge value={s.risk} dot={false} />
-                      </button>
+                          <StatusBadge value={s.risk} dot={false} />
+                        </button>
+                      </div>
                     </td>
                     {flatCourses.map((c) => {
                       const status = s.cells[c.id] || "Missing";
@@ -418,8 +505,9 @@ export default function MonitoringGrid() {
                           <button
                             type="button"
                             onClick={() => cycleCell(s.id, c, status)}
-                            title={`${c.code} — ${status}${s.grades?.[c.id] ? ` · Grade ${s.grades[c.id]}` : ""}${s.grade_remarks?.[c.id] ? ` · ${s.grade_remarks[c.id]}` : ""}. Click to cycle to the next status.`}
-                            className={`flex h-9 w-full min-w-10 flex-col items-center justify-center text-[10px] font-bold transition-colors hover:opacity-80 cursor-pointer sm:h-10 sm:text-[11px] ${sty.cls}`}
+                            disabled={!editMode}
+                            title={`${c.code} — ${status}${s.grades?.[c.id] ? ` · Grade ${s.grades[c.id]}` : ""}${s.grade_remarks?.[c.id] ? ` · ${s.grade_remarks[c.id]}` : ""}.${editMode ? " Click to cycle to the next status." : " Turn on Editing to change."}`}
+                            className={`flex h-9 w-full min-w-10 flex-col items-center justify-center text-[10px] font-bold transition-colors sm:h-10 sm:text-[11px] ${sty.cls} ${editMode ? "hover:opacity-80 cursor-pointer" : "cursor-default"}`}
                           >
                             {sty.mark}
                             {s.grades?.[c.id] && <span className="text-[9px] font-semibold leading-none opacity-90">{s.grades[c.id]}</span>}
@@ -428,7 +516,7 @@ export default function MonitoringGrid() {
                       );
                     })}
                     <td className="border-b border-r border-slate-200 px-2 py-1.5 text-center">
-                      <CompreExamBadge student={s} onToggle={() => toggleCompreExam(s)} saving={saving} />
+                      <CompreExamBadge student={s} onToggle={() => toggleCompreExam(s)} saving={saving} editMode={editMode} />
                     </td>
                     {MILES.map(([key]) => (
                       <td key={key} className="border-b border-r border-slate-100 text-center">
@@ -450,6 +538,137 @@ export default function MonitoringGrid() {
   );
 }
 
+const DROP_STATUSES = ["Submitted", "Approved", "Rejected"];
+
+function DropRequestsPanel({ programName }) {
+  const navigate = useNavigate();
+  const [status, setStatus] = useState("All");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState(null);
+
+  function load(nextStatus = status) {
+    setLoading(true);
+    setError("");
+    api
+      .courseDropRequests(nextStatus === "All" ? "" : nextStatus)
+      .then((res) => setItems(res.items || []))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load(status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  async function decide(item, decision) {
+    const verb = decision === "approve" ? "Approve" : "Reject";
+    if (!window.confirm(`${verb} the drop request for ${item.course_code}?`)) return;
+    setBusyId(item.id);
+    setError("");
+    try {
+      await api.decideCourseDrop(item.id, { decision });
+      load(status);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {["All", "Submitted", "Approved", "Rejected"].map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatus(s)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${status === s ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+          >
+            {s}
+          </button>
+        ))}
+        {programName && <span className="ml-auto text-xs text-slate-400">Across all programs</span>}
+      </div>
+
+      {loading ? (
+        <Spinner label="Loading drop requests…" />
+      ) : error ? (
+        <EmptyState icon={AlertTriangle} title="Could not load drop requests" hint={error} />
+      ) : items.length === 0 ? (
+        <EmptyState icon={Inbox} title={`No ${status === "All" ? "" : status.toLowerCase() + " "}drop requests`} hint="Student course drop requests will appear here." />
+      ) : (
+        <Card className="overflow-hidden p-0">
+          <div className="overflow-auto">
+            <table className="min-w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2">Student</th>
+                  <th className="px-3 py-2">Subject</th>
+                  <th className="px-3 py-2">Semester</th>
+                  <th className="px-3 py-2">Reason</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} className="border-t border-slate-100 hover:bg-brand-50/30">
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => item.student_id && navigate(`/students/${item.student_id}`)}
+                        className="text-left font-semibold text-ink hover:text-brand-700 cursor-pointer"
+                      >
+                        {item.student?.name || item.student?.last_name || `Student #${item.student_id}`}
+                      </button>
+                      <div className="text-[11px] text-slate-400">{item.student?.student_number || ""}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-ink">{item.course_code}</div>
+                      <div className="text-[11px] text-slate-400">{item.course_title}</div>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">{item.term_label || "—"}</td>
+                    <td className="max-w-[280px] px-3 py-2 text-slate-600">{item.reason || "—"}</td>
+                    <td className="px-3 py-2"><StatusBadge value={item.status} dot={false} /></td>
+                    <td className="px-3 py-2 text-right">
+                      {item.status === "Submitted" ? (
+                        <span className="inline-flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => decide(item, "approve")}
+                            disabled={busyId === item.id}
+                            className="rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60 cursor-pointer"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => decide(item, "reject")}
+                            disabled={busyId === item.id}
+                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
+                          >
+                            Reject
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">{item.decided_by ? `by ${item.decided_by}` : "Reviewed"}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function compreTitle(student) {
   if (student.compre_eligibility?.passed) return "Comprehensive exam passed";
   if (student.compre_eligibility?.eligible) return "Eligible to take the comprehensive exam";
@@ -458,14 +677,14 @@ function compreTitle(student) {
   return `Not eligible: ${student.compre_eligibility?.completed_units || 0}/21 units completed`;
 }
 
-function CompreExamBadge({ student, onToggle, saving }) {
+function CompreExamBadge({ student, onToggle, saving, editMode }) {
   const label = compreExamLabel(student);
   return (
     <button
       type="button"
       onClick={onToggle}
-      disabled={saving || !student.compre_eligibility?.eligible}
-      title={compreTitle(student)}
+      disabled={saving || !editMode || !student.compre_eligibility?.eligible}
+      title={editMode ? compreTitle(student) : `${compreTitle(student)} · Turn on Editing to change.`}
       className="inline-flex cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
     >
       <StatusBadge value={label} dot={false} className="min-w-[76px] justify-center" />

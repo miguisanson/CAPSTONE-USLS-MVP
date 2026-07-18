@@ -62,6 +62,14 @@ export default function CurriculumPlanning() {
 
   async function addSelected() {
     if (!ready) return;
+    const count = selectedCourseIds.length;
+    if (!count) return;
+    const programLabel = selectedProgram ? `${selectedProgram.code} — ${selectedProgram.name}` : "this program";
+    const ok = window.confirm(
+      `Add ${count} subject${count === 1 ? "" : "s"} to ${programLabel} for this semester?\n\n` +
+      `They become part of the official offering list and appear on the monitoring sheet for every student in the program.`
+    );
+    if (!ok) return;
     setBusy("add");
     setError("");
     setMessage("");
