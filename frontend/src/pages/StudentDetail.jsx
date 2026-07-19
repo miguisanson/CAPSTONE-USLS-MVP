@@ -15,6 +15,7 @@ import {
   Lightbulb,
   Bot,
   LogOut,
+  BookPlus,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -44,6 +45,7 @@ export default function StudentDetail() {
     withdrawal_application,
     graduation_endorsement,
     graduation_eligibility,
+    subject_enrollments = [],
   } = data;
   const auditAssistantParams = new URLSearchParams({
     student_id: String(student.id),
@@ -121,9 +123,17 @@ export default function StudentDetail() {
               subtitle="Completed, current, and missing subjects vs curriculum"
               icon={ClipboardCheck}
               action={
-                <Link to={`/assistant?${auditAssistantParams.toString()}`} className="btn-ghost shrink-0">
-                  <Bot className="h-4 w-4" /> Ask eligibility
-                </Link>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Link
+                    to={`/enrollment?program_id=${student.program_id}&student_id=${student.id}${data.current_term?.id ? `&term_id=${data.current_term.id}` : ""}`}
+                    className="btn-ghost shrink-0"
+                  >
+                    <BookPlus className="h-4 w-4" /> Manage enrollment
+                  </Link>
+                  <Link to={`/assistant?${auditAssistantParams.toString()}`} className="btn-ghost shrink-0">
+                    <Bot className="h-4 w-4" /> Ask eligibility
+                  </Link>
+                </div>
               }
             />
             <div className="mb-4 flex items-center gap-4">
@@ -201,6 +211,41 @@ export default function StudentDetail() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {subject_enrollments.length > 0 && (
+              <div className="mt-4 rounded-xl border border-slate-100">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-3 py-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Semester enrollment history
+                  </p>
+                  <span className="text-xs text-slate-400">{subject_enrollments.length} records</span>
+                </div>
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase text-slate-400">
+                        <th className="px-3 py-2">Subject</th>
+                        <th className="px-3 py-2">Semester</th>
+                        <th className="px-3 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subject_enrollments.map((item) => (
+                        <tr key={item.id} className="border-b border-slate-50">
+                          <td className="px-3 py-2">
+                            <p className="font-semibold text-ink">{item.course_code}</p>
+                            <p className="text-xs text-slate-500">{item.course_title}</p>
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">{item.term_label}</td>
+                          <td className="px-3 py-2">
+                            <StatusBadge value={item.status} dot={false} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </Card>

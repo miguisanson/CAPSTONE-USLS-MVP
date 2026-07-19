@@ -33,6 +33,8 @@ export const api = {
   meta: () => request("/meta"),
   adminTerms: () => request("/admin/terms"),
   updateTerm: (id, payload) => request(`/admin/terms/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteTerm: (id, payload) => request(`/admin/terms/${id}`, { method: "DELETE", body: JSON.stringify(payload) }),
+  addNextTerm: () => request("/admin/terms/add-next", { method: "POST", body: JSON.stringify({}) }),
   dashboard: (params = {}) => {
     const qs = queryString(params);
     return request(`/dashboard${qs ? `?${qs}` : ""}`);
@@ -156,12 +158,19 @@ export const api = {
     request("/curriculum-planning/generate", { method: "POST", body: JSON.stringify(payload) }),
   createCurriculumSubject: (payload) =>
     request("/curriculum-planning/subjects", { method: "POST", body: JSON.stringify(payload) }),
+  enrollment: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/enrollment${qs ? `?${qs}` : ""}`);
+  },
+  previewEnrollment: (payload) =>
+    request("/enrollment/preview", { method: "POST", body: JSON.stringify(payload) }),
+  saveEnrollment: (payload) =>
+    request("/enrollment", { method: "POST", body: JSON.stringify(payload) }),
   courseAdjustments: (params = {}) => {
     const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
     const qs = queryString(actual);
     return request(`/course-adjustments${qs ? `?${qs}` : ""}`);
   },
-  resetUploadedData: () => request("/admin/reset-uploaded-data", { method: "POST", body: JSON.stringify({}) }),
   approvals: () => request("/approvals"),
   decideApproval: (planId, payload) =>
     request(`/approvals/${planId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
@@ -175,8 +184,13 @@ export const api = {
     request(`/course-audit/roster?course_id=${courseId}${term ? `&term=${encodeURIComponent(term)}` : ""}`),
   saveCourseAudit: (payload) =>
     request("/course-audit/roster", { method: "POST", body: JSON.stringify(payload) }),
-  courseDropRequests: (status = "Submitted") =>
-    request(`/course-drop/requests${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  courseDropRequests: (status = "Submitted", programId = "") => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (programId) params.set("program_id", programId);
+    const query = params.toString();
+    return request(`/course-drop/requests${query ? `?${query}` : ""}`);
+  },
   decideCourseDrop: (requestId, payload) =>
     request(`/course-drop/requests/${requestId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
   removeStudent: (studentId, payload = {}) =>

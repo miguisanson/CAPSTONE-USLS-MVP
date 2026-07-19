@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, ChevronLeft, ChevronRight, Users, SlidersHorizontal, GitMerge, AlertTriangle, GraduationCap } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, SlidersHorizontal, GitMerge, AlertTriangle, GraduationCap, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
@@ -127,6 +127,38 @@ export default function Students() {
           </button>
         )}
       </Card>
+
+      {data?.integrity && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+            data.integrity.issue_count
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-brand-200 bg-brand-50 text-brand-800"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {data.integrity.issue_count ? (
+              <AlertTriangle className="h-4 w-4" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
+            <span className="font-semibold">
+              {data.integrity.issue_count
+                ? `${data.integrity.issue_count} enrollment/profile inconsistency item(s) require review.`
+                : "Students, enrollment, and monitoring records are synchronized."}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/enrollment${programId ? `?program_id=${programId}` : ""}`)
+            }
+            className="btn-ghost px-3 py-2"
+          >
+            Review enrollment
+          </button>
+        </div>
+      )}
 
       <DuplicateReview
         groups={duplicateData?.groups || []}

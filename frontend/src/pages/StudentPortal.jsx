@@ -24,11 +24,13 @@ import {
   UserCheck,
   LayoutDashboard,
   UserX,
+  BookOpenCheck,
 } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, ProgressBar, SectionTitle, Spinner, StatusBadge } from "../components/ui";
+import { useConfirm } from "../components/confirm";
 import { CheckList, Field, Input, Select, Textarea } from "../components/forms";
 import { formatDate, initials, relativeDays } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
@@ -371,6 +373,7 @@ function WorkflowStatusPanel({ data }) {
 
 function MyCoursesPanel({ data, onSaved }) {
   const courses = data.course_records || [];
+  const offeredSubjects = data.offered_subjects || [];
   const requests = data.course_drop_requests || [];
   const currentCourses = courses.filter((course) => ["Enrolled", "Current", "Incomplete"].includes(course.status) && !course.drop_request);
   const droppable = currentCourses;
@@ -403,6 +406,39 @@ function MyCoursesPanel({ data, onSaved }) {
     <div className="space-y-5">
       <Card className="p-6">
         <SectionTitle title="My Courses" subtitle="Your current coursework status, grades, and pending drop requests" icon={ClipboardCheck} />
+        <div className="mb-5 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <BookOpenCheck className="h-4 w-4 text-brand-700" />
+                Offered subjects · {data.current_term?.label || "Current semester"}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Published by the Graduate School curriculum-planning process.
+              </p>
+            </div>
+            <StatusBadge value={`${offeredSubjects.length} offered`} dot={false} />
+          </div>
+          {offeredSubjects.length ? (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {offeredSubjects.map((subject) => (
+                <div key={subject.id} className="rounded-lg border border-brand-100 bg-white px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{subject.course_code}</p>
+                      <p className="text-xs text-slate-500">{subject.course_title}</p>
+                    </div>
+                    <StatusBadge value={subject.enrollment_status} dot={false} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-slate-500">
+              The official offering list has not been published for this semester.
+            </p>
+          )}
+        </div>
         {courses.length ? (
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-sm">
@@ -957,6 +993,7 @@ function ResearchRequestForm({ data, onSaved }) {
 }
 
 function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [removingId, setRemovingId] = useState(null);
   const [checkingId, setCheckingId] = useState(null);
@@ -991,7 +1028,12 @@ function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
 
   async function removeResearchFile(file) {
     if (titlePackageLocked) return;
-    const confirmed = window.confirm(`Remove "${file.name}"? This will clear the current Panel Matching result for this stage.`);
+    const confirmed = await confirm({
+      title: "Remove file?",
+      message: `Remove "${file.name}"? This will clear the current Panel Matching result for this stage.`,
+      confirmLabel: "Remove file",
+      tone: "danger",
+    });
     if (!confirmed) return;
     setRemovingId(file.id);
     setError("");

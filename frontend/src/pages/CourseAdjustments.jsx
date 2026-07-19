@@ -61,7 +61,10 @@ export default function CourseAdjustments() {
 
   const status = data?.latest_plan?.status || null;
   const stepIndex = status ? STEPS.indexOf(status) : -1;
-  const canEdit = (status === null || status === "Draft" || status === "Returned") && data?.planning_window_open !== false;
+  const canManage = data?.permissions?.can_manage === true;
+  const canEdit = canManage
+    && (status === null || status === "Draft" || status === "Returned")
+    && data?.planning_window_open !== false;
 
   async function saveDraft(showMessage = true) {
     if (!programId) return;
@@ -71,6 +74,7 @@ export default function CourseAdjustments() {
     try {
       const payload = {
         program_id: programId,
+        term_id: termId,
         term_label: termLabel,
         action: "draft",
         selections: (data?.demand || []).map((row) => ({
@@ -107,7 +111,12 @@ export default function CourseAdjustments() {
       if (action === "submit" && dirtyRef.current && canEdit) {
         await saveDraft(false);
       }
-      const res = await api.saveCourseAdjustmentPlan({ program_id: programId, term_label: termLabel, action });
+      const res = await api.saveCourseAdjustmentPlan({
+        program_id: programId,
+        term_id: termId,
+        term_label: termLabel,
+        action,
+      });
       setMessage(res.message);
       setData(res.data);
       setSel(seedSelections(res.data.demand));
@@ -169,7 +178,7 @@ export default function CourseAdjustments() {
           <div className="flex-1">
             <h1 className="font-display text-2xl font-semibold text-ink">Course Adjustments</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Review live subject demand, adjust sections, and choose which subjects to offer next semester.
+              Use live demand as guidance, manually add any curriculum subject, and publish the approved list to Curriculum Planning.
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
               <p>
@@ -225,7 +234,7 @@ export default function CourseAdjustments() {
             <p className="mb-4 text-sm text-slate-600">{planStatusNote(data.latest_plan)}</p>
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50/70 p-4">
               <p className="text-sm text-slate-600">
-                Demand numbers are live. Draft saves only offer decisions and sections.
+                Demand numbers are guidance. Every curriculum subject remains available for a manual offering decision.
               </p>
               <div className="flex flex-wrap gap-2">
                 <ActionButton busy={busy === "draft"} onClick={() => planAction("draft")} icon={Settings2} disabled={!canEdit} primary={canEdit}>
@@ -234,11 +243,16 @@ export default function CourseAdjustments() {
                 <ActionButton busy={busy === "submit"} onClick={() => planAction("submit")} icon={Send} disabled={!canEdit} primary={canEdit}>
                   Submit for approval
                 </ActionButton>
-                <ActionButton busy={busy === "publish"} onClick={() => planAction("publish")} icon={CheckCircle2} disabled={status !== "Approved"} primary={status === "Approved"}>
+                <ActionButton busy={busy === "publish"} onClick={() => planAction("publish")} icon={CheckCircle2} disabled={!canManage || status !== "Approved"} primary={canManage && status === "Approved"}>
                   Publish
                 </ActionButton>
               </div>
             </div>
+            {!canManage && (
+              <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                Graduate School Staff have read-only access. An Academic Coordinator can change, submit, and publish the offering plan.
+              </p>
+            )}
             {message && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{message}</p>}
             {autosave !== "idle" && <p className="mt-3 text-xs font-semibold text-slate-500">{autosave === "pending" ? "Draft changes pending..." : autosave === "saving" ? "Saving..." : "Saved"}</p>}
             {data.latest_plan && (
@@ -250,7 +264,7 @@ export default function CourseAdjustments() {
           </Card>
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Metric icon={ClipboardList} label="Demand subjects" value={data.summary.demand_subjects} tone="brand" />
+            <Metric icon={ClipboardList} label="Curriculum subjects" value={data.summary.curriculum_subjects ?? data.demand.length} tone="brand" />
             <Metric icon={Users} label="Total demand (enrolled)" value={data.summary.total_demand} tone="blue" />
             <Metric icon={AlertTriangle} label="High priority" value={data.summary.high_priority} tone="amber" />
             <Metric icon={Settings2} label="Selected to offer" value={offeredCount} tone="brand" />
@@ -258,19 +272,20 @@ export default function CourseAdjustments() {
 
           <Card className="overflow-hidden">
             <div className="border-b border-slate-100 px-5 py-3">
-              <h2 className="text-lg font-semibold text-ink">Subject demand</h2>
+              <h2 className="text-lg font-semibold text-ink">Course offering decisions</h2>
               <p className="text-sm text-slate-500">
-                Demand comes from each enrolled student's next recommended subjects in {data.term?.label || "the selected semester"}.
+                Demand comes from each enrolled student's next recommended subjects. Rows marked Manual can still be offered even with zero demand.
               </p>
             </div>
             {data.demand.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="No next-subject demand found" hint="Enrolled students in this semester have no next recommended subjects." />
+              <EmptyState icon={CheckCircle2} title="No curriculum subjects found" hint="Add subjects in Curriculum Planning before creating an offering plan." />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-sm">
+                <table className="w-full min-w-[1080px] text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                       <th className="px-5 py-3">Subject</th>
+                      <th className="px-3 py-3">Basis</th>
                       <th className="px-3 py-3">Demand</th>
                       <th className="px-3 py-3">Status</th>
                       <th className="px-3 py-3">Sections</th>
@@ -286,6 +301,15 @@ export default function CourseAdjustments() {
                           <td className="px-5 py-3">
                             <p className="font-semibold text-ink">{row.course.code}</p>
                             <p className="text-xs text-slate-500">{row.course.title}</p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                              row.selection_source === "Demand"
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {row.selection_source || (row.demand_count > 0 ? "Demand" : "Manual")}
+                            </span>
                           </td>
                           <td className="px-3 py-3">
                             <div className="flex min-w-40 items-center gap-3">

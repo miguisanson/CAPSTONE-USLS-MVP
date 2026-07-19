@@ -264,10 +264,10 @@ function AssistantModeBadge({ mode }) {
 function OfflineBadge() {
   return (
     <span
-      title="Offline demo mode — answers are grounded on live records + policy. Connect Google AI Studio for full natural-language generation."
+      title="Offline mode — answers are grounded on live records + policy. Connect Google AI Studio for full natural-language generation."
       className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Offline demo
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Offline mode
     </span>
   );
 }

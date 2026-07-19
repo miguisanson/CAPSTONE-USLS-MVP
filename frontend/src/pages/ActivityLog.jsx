@@ -8,6 +8,7 @@ import { formatDate } from "../lib/format";
 
 const SLUG_LABEL = {
   "student-handoff": "Student Handoff",
+  enrollment: "Enrollment",
   "curriculum-planning": "Curriculum Planning",
   "course-adjustments": "Course Adjustments",
   "loa-decision": "LOA / Readmission",

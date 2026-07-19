@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Table2, Download, AlertTriangle, Check, Pencil, Lock, Trash2, Inbox } from "lucide-react";
+import { Table2, Download, AlertTriangle, Check, Pencil, Lock, Trash2, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
+import { useConfirm } from "../components/confirm";
 
 // Cell styling per course status.
 const CELL = {
@@ -50,6 +51,7 @@ const RESEARCH_STAGE_ORDER = [
 
 export default function MonitoringGrid() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
   const selectedProgress = searchParams.get("progress") || "";
@@ -69,9 +71,6 @@ export default function MonitoringGrid() {
   const [saving, setSaving] = useState(false);
   // View-only by default so a stray click can't change a student's status.
   const [editMode, setEditMode] = useState(false);
-  // "grid" is the class monitoring sheet; "drops" is the drop-request queue.
-  const [view, setView] = useState("grid");
-
   function load(pid, nextProgress = progress, nextRisk = risk, nextEnrollment = enrollment) {
     setLoading(true);
     setError("");
@@ -123,9 +122,12 @@ export default function MonitoringGrid() {
     const isDowngrade = current === "Completed" && nextStatus !== "Completed";
     const isNegative = nextStatus === "Failed" || nextStatus === "Dropped";
     if (isDowngrade || isNegative) {
-      const ok = window.confirm(
-        `Change ${course.code} from "${current}" to "${nextStatus}"?\n\nThis affects the student's progress and comprehensive-exam eligibility.`
-      );
+      const ok = await confirm({
+        title: "Change subject status?",
+        message: `Change ${course.code} from "${current}" to "${nextStatus}"?\n\nThis affects the student's progress and comprehensive-exam eligibility.`,
+        confirmLabel: "Change status",
+        tone: "danger",
+      });
       if (!ok) return;
     }
     // optimistic update
@@ -204,9 +206,12 @@ export default function MonitoringGrid() {
 
   async function removeStudent(student) {
     if (!editMode) return;
-    const ok = window.confirm(
-      `Remove ${displayStudentName(student)} from active monitoring?\n\nThe student is marked Withdrawn (kept in records with full history), not deleted.`
-    );
+    const ok = await confirm({
+      title: "Remove student from monitoring?",
+      message: `Remove ${displayStudentName(student)} from active monitoring?\n\nThe student is marked Withdrawn (kept in records with full history), not deleted.`,
+      confirmLabel: "Remove student",
+      tone: "danger",
+    });
     if (!ok) return;
     setSaving(true);
     setError("");
@@ -266,9 +271,7 @@ export default function MonitoringGrid() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {view === "drops"
-              ? "Course drop requests submitted by students. Approve to mark the subject Dropped, or reject to leave it unchanged."
-              : "The full class view — students by row, subjects by column. Locked by default; turn on Editing to change a status."}
+            The full class view — students by row, subjects by column. Locked by default; turn on Editing to change a status.
           </p>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-7">
@@ -337,31 +340,25 @@ export default function MonitoringGrid() {
             <option value="units-desc">Sort: Completed units most</option>
             <option value="risk">Sort: Highest risk</option>
           </select>
-          <button
-            type="button"
-            onClick={() => setView((v) => (v === "drops" ? "grid" : "drops"))}
-            className={view === "drops" ? "btn-primary" : "btn-ghost"}
-          >
-            <Inbox className="h-4 w-4" /> {view === "drops" ? "Back to sheet" : "Drop Requests"}
-          </button>
-          <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid || view === "drops"}>
+          <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}>
             <Download className="h-4 w-4" /> Export CSV
           </button>
         </div>
       </div>
 
-      {view === "grid" && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (editMode) {
                 setEditMode(false);
                 return;
               }
-              const ok = window.confirm(
-                "Turn on editing?\n\nYou will be able to change student statuses, comprehensive-exam results, and remove students. Are you sure?"
-              );
+              const ok = await confirm({
+                title: "Turn on editing?",
+                message: "You will be able to change student statuses, comprehensive-exam results, and remove students. Are you sure?",
+                confirmLabel: "Turn on editing",
+              });
               if (ok) setEditMode(true);
             }}
             className={editMode ? "btn-primary" : "btn-ghost"}
@@ -375,11 +372,43 @@ export default function MonitoringGrid() {
               : "The sheet is locked to prevent accidental edits. Turn on editing to make changes."}
           </span>
           {saving && <span className="text-brand-600">Saving…</span>}
+      </div>
+
+      {grid?.integrity && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+            grid.integrity.issue_count
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-brand-200 bg-brand-50 text-brand-800"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {grid.integrity.issue_count ? (
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+            ) : (
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+            )}
+            <span className="font-semibold">
+              {grid.integrity.issue_count
+                ? `${grid.integrity.issue_count} enrollment/profile inconsistency item(s) found`
+                : `Enrollment and student profiles are synchronized (${grid.integrity.checked_enrollments} rows checked)`}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                `/enrollment?program_id=${grid.program.id}&term_id=${grid.selected_term?.id || ""}`
+              )
+            }
+            className="btn-ghost px-3 py-2"
+          >
+            Review enrollment
+          </button>
         </div>
       )}
 
       {/* Legend */}
-      {view === "grid" && (
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Completed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Current</span>
@@ -389,11 +418,8 @@ export default function MonitoringGrid() {
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>
         <span className="text-slate-400">Cycle: Not taken - Current - Completed - Incomplete - Failed - Dropped</span>
       </div>
-      )}
 
-      {view === "drops" ? (
-        <DropRequestsPanel programName={grid?.program ? `${grid.program.code} — ${grid.program.name}` : ""} />
-      ) : loading ? (
+      {loading ? (
         <Spinner label="Loading monitoring sheet…" />
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Could not load the sheet" hint={error} />
@@ -527,137 +553,6 @@ export default function MonitoringGrid() {
                         )}
                       </td>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-const DROP_STATUSES = ["Submitted", "Approved", "Rejected"];
-
-function DropRequestsPanel({ programName }) {
-  const navigate = useNavigate();
-  const [status, setStatus] = useState("All");
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [busyId, setBusyId] = useState(null);
-
-  function load(nextStatus = status) {
-    setLoading(true);
-    setError("");
-    api
-      .courseDropRequests(nextStatus === "All" ? "" : nextStatus)
-      .then((res) => setItems(res.items || []))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load(status);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  async function decide(item, decision) {
-    const verb = decision === "approve" ? "Approve" : "Reject";
-    if (!window.confirm(`${verb} the drop request for ${item.course_code}?`)) return;
-    setBusyId(item.id);
-    setError("");
-    try {
-      await api.decideCourseDrop(item.id, { decision });
-      load(status);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {["All", "Submitted", "Approved", "Rejected"].map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setStatus(s)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${status === s ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-          >
-            {s}
-          </button>
-        ))}
-        {programName && <span className="ml-auto text-xs text-slate-400">Across all programs</span>}
-      </div>
-
-      {loading ? (
-        <Spinner label="Loading drop requests…" />
-      ) : error ? (
-        <EmptyState icon={AlertTriangle} title="Could not load drop requests" hint={error} />
-      ) : items.length === 0 ? (
-        <EmptyState icon={Inbox} title={`No ${status === "All" ? "" : status.toLowerCase() + " "}drop requests`} hint="Student course drop requests will appear here." />
-      ) : (
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <th className="px-3 py-2">Student</th>
-                  <th className="px-3 py-2">Subject</th>
-                  <th className="px-3 py-2">Semester</th>
-                  <th className="px-3 py-2">Reason</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-100 hover:bg-brand-50/30">
-                    <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => item.student_id && navigate(`/students/${item.student_id}`)}
-                        className="text-left font-semibold text-ink hover:text-brand-700 cursor-pointer"
-                      >
-                        {item.student?.name || item.student?.last_name || `Student #${item.student_id}`}
-                      </button>
-                      <div className="text-[11px] text-slate-400">{item.student?.student_number || ""}</div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="font-medium text-ink">{item.course_code}</div>
-                      <div className="text-[11px] text-slate-400">{item.course_title}</div>
-                    </td>
-                    <td className="px-3 py-2 text-slate-600">{item.term_label || "—"}</td>
-                    <td className="max-w-[280px] px-3 py-2 text-slate-600">{item.reason || "—"}</td>
-                    <td className="px-3 py-2"><StatusBadge value={item.status} dot={false} /></td>
-                    <td className="px-3 py-2 text-right">
-                      {item.status === "Submitted" ? (
-                        <span className="inline-flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => decide(item, "approve")}
-                            disabled={busyId === item.id}
-                            className="rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60 cursor-pointer"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => decide(item, "reject")}
-                            disabled={busyId === item.id}
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
-                          >
-                            Reject
-                          </button>
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">{item.decided_by ? `by ${item.decided_by}` : "Reviewed"}</span>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -4,9 +4,6 @@ import unittest
 from datetime import date
 from io import BytesIO
 
-from werkzeug.security import generate_password_hash
-
-
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
@@ -17,6 +14,7 @@ from app import (  # noqa: E402
     AwolCase,
     Course,
     CourseDropRequest,
+    CurriculumOffering,
     CourseRecord,
     DefenseVerdict,
     DocumentCheck,
@@ -34,6 +32,7 @@ from app import (  # noqa: E402
     ResidencyEnrollment,
     ScheduleRequest,
     Student,
+    SubjectEnrollment,
     StudentRequestAttachment,
     Task,
     TermEnrollment,
@@ -53,6 +52,7 @@ from app import (  # noqa: E402
     submitted_request_students,
     task_dict,
     workflow_approvals_payload,
+    generate_password_hash,
 )
 
 
@@ -680,6 +680,247 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student = db.session.get(Student, self.student_id)
             self.assertFalse(graduation_eligibility(student)["eligible"])
 
+    def test_course_adjustments_manual_selection_publishes_to_curriculum_planning(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+                is_active_planning_term=True,
+            )
+            db.session.add(term)
+            db.session.commit()
+
+            academic = self._academic_client()
+            payload = academic.get(
+                f"/api/course-adjustments?program_id={self.program_id}&term_id={term.id}"
+            )
+            self.assertEqual(payload.status_code, 200, payload.get_json())
+            self.assertTrue(payload.get_json()["permissions"]["can_manage"])
+            manual_row = next(
+                row
+                for row in payload.get_json()["demand"]
+                if row["course"]["id"] == self.course_id
+            )
+            self.assertEqual(manual_row["demand_count"], 0)
+            self.assertEqual(manual_row["selection_source"], "Manual")
+
+            staff_payload = self._staff_client().get(
+                f"/api/course-adjustments?program_id={self.program_id}&term_id={term.id}"
+            )
+            self.assertFalse(staff_payload.get_json()["permissions"]["can_manage"])
+
+            draft = academic.post("/api/course-adjustments/plan", json={
+                "program_id": self.program_id,
+                "term_id": term.id,
+                "action": "draft",
+                "selections": [{
+                    "course_id": self.course_id,
+                    "offer": True,
+                    "section_count": 1,
+                    "notes": "Manual coordinator decision",
+                }],
+            })
+            self.assertEqual(draft.status_code, 200, draft.get_json())
+            plan_id = draft.get_json()["data"]["latest_plan"]["id"]
+
+            submitted = academic.post("/api/course-adjustments/plan", json={
+                "program_id": self.program_id,
+                "term_id": term.id,
+                "action": "submit",
+            })
+            self.assertEqual(submitted.status_code, 200, submitted.get_json())
+
+            approved = self._dean_client().post(
+                f"/api/approvals/{plan_id}/decide",
+                json={"decision": "approve", "note": "Approved for publication"},
+            )
+            self.assertEqual(approved.status_code, 200, approved.get_json())
+
+            published = academic.post("/api/course-adjustments/plan", json={
+                "program_id": self.program_id,
+                "term_id": term.id,
+                "action": "publish",
+            })
+            self.assertEqual(published.status_code, 200, published.get_json())
+            self.assertIn("Curriculum Planning", published.get_json()["message"])
+            offering = CurriculumOffering.query.filter_by(
+                program_id=self.program_id,
+                academic_year="2026-2027",
+                semester="1st Semester",
+                course_id=self.course_id,
+            ).first()
+            self.assertIsNotNone(offering)
+            self.assertIn("Course Adjustments plan", offering.added_by)
+
+    def test_enrollment_syncs_ledger_monitoring_profile_and_course_audit(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+            )
+            db.session.add(term)
+            db.session.flush()
+            db.session.add(CurriculumOffering(
+                program_id=self.program_id,
+                academic_year="2026-2027",
+                semester="1st Semester",
+                course_id=self.course_id,
+                added_by="Test",
+            ))
+            db.session.commit()
+
+            academic = self._academic_client()
+            preview = academic.post("/api/enrollment/preview", json={
+                "student_id": self.student_id,
+                "term_id": term.id,
+                "course_ids": [self.course_id],
+            })
+            self.assertEqual(preview.status_code, 200, preview.get_json())
+            self.assertEqual(preview.get_json()["conflict_count"], 0)
+            self.assertEqual(len(preview.get_json()["additions"]), 1)
+
+            response = academic.post("/api/enrollment", json={
+                "student_id": self.student_id,
+                "term_id": term.id,
+                "course_ids": [self.course_id],
+                "resolutions": {},
+                "source_reference": "Enrollment test",
+                "confirmed": True,
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            self.assertEqual(response.get_json()["integrity"]["issue_count"], 0)
+            enrollment = SubjectEnrollment.query.filter_by(
+                student_id=self.student_id,
+                course_id=self.course_id,
+                term_id=term.id,
+            ).first()
+            self.assertIsNotNone(enrollment)
+            self.assertEqual(enrollment.status, "Enrolled")
+            record = CourseRecord.query.filter_by(
+                student_id=self.student_id,
+                course_id=self.course_id,
+            ).first()
+            self.assertEqual(record.status, "Enrolled")
+            self.assertEqual(record.term_label, term.label)
+            semester = TermEnrollment.query.filter_by(
+                student_id=self.student_id,
+                term_id=term.id,
+            ).first()
+            self.assertEqual(semester.status, "Enrolled")
+
+            profile = academic.get(f"/api/students/{self.student_id}")
+            self.assertEqual(profile.status_code, 200, profile.get_json())
+            self.assertEqual(
+                profile.get_json()["subject_enrollments"][0]["course_code"],
+                "BPM-501",
+            )
+            monitoring = academic.get(
+                f"/api/monitoring/grid?program_id={self.program_id}&term_id={term.id}"
+            )
+            self.assertEqual(monitoring.status_code, 200, monitoring.get_json())
+            student_row = next(
+                row for row in monitoring.get_json()["students"]
+                if row["id"] == self.student_id
+            )
+            self.assertEqual(student_row["cells"][str(self.course_id)], "Enrolled")
+
+            response = academic.post("/api/course-audit/roster", json={
+                "course_id": self.course_id,
+                "term": term.label,
+                "statuses": {str(self.student_id): "Completed"},
+                "grades": {str(self.student_id): "1.25"},
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(enrollment)
+            self.assertEqual(enrollment.status, "Completed")
+
+    def test_enrollment_requires_resolution_for_non_offered_subject(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 2nd Semester",
+                start_date=date(2027, 1, 10),
+                end_date=date(2027, 5, 20),
+            )
+            db.session.add(term)
+            db.session.commit()
+            academic = self._academic_client()
+
+            preview = academic.post("/api/enrollment/preview", json={
+                "student_id": self.student_id,
+                "term_id": term.id,
+                "course_ids": [self.course_id],
+            })
+            self.assertEqual(preview.status_code, 200, preview.get_json())
+            conflict = next(
+                item for item in preview.get_json()["conflicts"]
+                if item["kind"] == "not_offered"
+            )
+
+            blocked = academic.post("/api/enrollment", json={
+                "student_id": self.student_id,
+                "term_id": term.id,
+                "course_ids": [self.course_id],
+                "resolutions": {},
+                "confirmed": True,
+            })
+            self.assertEqual(blocked.status_code, 409, blocked.get_json())
+
+            saved = academic.post("/api/enrollment", json={
+                "student_id": self.student_id,
+                "term_id": term.id,
+                "course_ids": [self.course_id],
+                "resolutions": {conflict["id"]: "enroll_override"},
+                "source_reference": "Approved exception test",
+                "confirmed": True,
+            })
+            self.assertEqual(saved.status_code, 200, saved.get_json())
+            enrollment = SubjectEnrollment.query.filter_by(
+                student_id=self.student_id,
+                course_id=self.course_id,
+                term_id=term.id,
+            ).first()
+            self.assertIn("enroll_override", enrollment.conflict_override)
+            self.assertEqual(saved.get_json()["integrity"]["issue_count"], 0)
+
+    def test_academic_semester_removal_keeps_referenced_history(self):
+        with app.app_context():
+            unused = AcademicTerm(
+                label="AY 2030-2031 1st Semester",
+                start_date=date(2030, 8, 1),
+                end_date=date(2030, 12, 15),
+            )
+            referenced = AcademicTerm(
+                label="AY 2030-2031 2nd Semester",
+                start_date=date(2031, 1, 10),
+                end_date=date(2031, 5, 20),
+            )
+            db.session.add_all([unused, referenced])
+            db.session.flush()
+            db.session.add(TermEnrollment(
+                student_id=self.student_id,
+                term_id=referenced.id,
+                status="Confirmed",
+                source_reference="History test",
+            ))
+            db.session.commit()
+            staff = self._staff_client()
+
+            removed = staff.delete(
+                f"/api/admin/terms/{unused.id}",
+                json={"confirmed_label": unused.label},
+            )
+            self.assertEqual(removed.status_code, 200, removed.get_json())
+            self.assertIsNone(db.session.get(AcademicTerm, unused.id))
+
+            blocked = staff.delete(
+                f"/api/admin/terms/{referenced.id}",
+                json={"confirmed_label": referenced.label},
+            )
+            self.assertEqual(blocked.status_code, 409, blocked.get_json())
+            self.assertIsNotNone(db.session.get(AcademicTerm, referenced.id))
+
     def test_course_drop_request_requires_academic_coordinator_approval(self):
         with app.app_context():
             record = CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Enrolled", term_label="AY 2026-2027 Term 1")
@@ -1025,9 +1266,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             ensure_demo_accounts()
             db.session.commit()
         expected = {
-            "staff@gs.local": "staff",
-            "academic@gs.local": "academic_coordinator",
-            "research@gs.local": "research_coordinator",
+            "staff@usls.edu.ph": "staff",
+            "academic@usls.edu.ph": "academic_coordinator",
+            "research@usls.edu.ph": "research_coordinator",
         }
         for email, role in expected.items():
             response = app.test_client().post(

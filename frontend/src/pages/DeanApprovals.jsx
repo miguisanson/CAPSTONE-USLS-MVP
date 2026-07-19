@@ -29,7 +29,7 @@ const CLARIFICATION_TEMPLATES = [
   "Other / Custom comment",
 ];
 
-const REGISTRAR_HANDOFF_EMAIL = "registrar@gs.local";
+const REGISTRAR_HANDOFF_EMAIL = "registrar@usls.edu.ph";
 
 function deanItemDate(item) {
   return item.last_activity_at || item.submitted_at || item.record?.updated_at || "";

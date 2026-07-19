@@ -5,13 +5,13 @@ import { useAuth } from "../auth";
 import { ErrorNote } from "../components/ui";
 
 const DEMO = {
-  staff: { email: "staff@gs.local", password: "DemoPass123!" },
-  academic_coordinator: { email: "academic@gs.local", password: "DemoPass123!" },
-  research_coordinator: { email: "research@gs.local", password: "DemoPass123!" },
-  admin: { email: "admin@gs.local", password: "DemoPass123!" },
-  dean: { email: "dean@gs.local", password: "DemoPass123!" },
-  student: { email: "student@gs.local", password: "DemoPass123!" },
-  faculty: { email: "liwayway.bautista@gs.local", password: "DemoPass123!" },
+  staff: { email: "staff@usls.edu.ph", password: "DemoPass123!" },
+  academic_coordinator: { email: "academic@usls.edu.ph", password: "DemoPass123!" },
+  research_coordinator: { email: "research@usls.edu.ph", password: "DemoPass123!" },
+  admin: { email: "admin@usls.edu.ph", password: "DemoPass123!" },
+  dean: { email: "dean@usls.edu.ph", password: "DemoPass123!" },
+  student: { email: "student@usls.edu.ph", password: "DemoPass123!" },
+  faculty: { email: "liwayway.bautista@usls.edu.ph", password: "DemoPass123!" },
 };
 
 const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };

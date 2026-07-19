@@ -26,6 +26,7 @@ import {
   LogOut,
   UserX,
   CalendarRange,
+  BookPlus,
 } from "lucide-react";
 import { useAuth } from "../auth";
 import { api } from "../api";
@@ -55,11 +56,12 @@ const NAV_GROUPS = [
       { to: "/workflow/student-handoff", label: "1 · Student Handoff", icon: UserPlus },
       { to: "/curriculum-planning", label: "2 · Curriculum planning", icon: BookOpenCheck },
       { to: "/course-adjustments", label: "3 · Course Adjustments", icon: SlidersHorizontal },
-      { to: "/workflow/research-gate", label: "4 - Research Gate", icon: FileCheck },
-      { to: "/workflow/panel-matching", label: "5 · Panel Matching", icon: UsersRound },
-      { to: "/workflow/defense-scheduling", label: "6 · Defense Scheduling", icon: CalendarCheck },
-      { to: "/workflow/practicum", label: "7 · Practicum", icon: Briefcase },
-      { to: "/workflow/graduation", label: "8 · Graduation", icon: GraduationCap },
+      { to: "/enrollment", label: "4 · Enrollment", icon: BookPlus },
+      { to: "/workflow/research-gate", label: "5 · Research Gate", icon: FileCheck },
+      { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
+      { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
+      { to: "/workflow/practicum", label: "8 · Practicum", icon: Briefcase },
+      { to: "/workflow/graduation", label: "9 · Graduation", icon: GraduationCap },
     ],
   },
   {
@@ -90,7 +92,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/faculty", "/monitoring-sheet", "/curriculum-planning", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
+  academic_coordinator: new Set(["/students", "/faculty", "/monitoring-sheet", "/curriculum-planning", "/course-adjustments", "/enrollment", "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
 };
 
@@ -226,9 +228,14 @@ export default function Layout({ children }) {
   );
 }
 
+const BREADCRUMB_LABELS = {
+  "term-settings": "Academic Semesters",
+  enrollment: "Enrollment",
+};
+
 function Breadcrumb({ path }) {
   const parts = path.split("/").filter(Boolean);
-  const label = parts.length === 0 ? "Dashboard" : parts[0].replace(/-/g, " ");
+  const label = parts.length === 0 ? "Dashboard" : BREADCRUMB_LABELS[parts[0]] || parts[0].replace(/-/g, " ");
   return (
     <div className="flex items-center gap-1.5 text-sm">
       <span className="font-semibold text-slate-400">Platform</span>

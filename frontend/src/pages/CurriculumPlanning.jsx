@@ -3,8 +3,10 @@ import { BookOpenCheck, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
+import { useConfirm } from "../components/confirm";
 
 export default function CurriculumPlanning() {
+  const confirm = useConfirm();
   const { data: meta, loading: metaLoading, error: metaError } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
   const [termId, setTermId] = useState("");
@@ -65,10 +67,13 @@ export default function CurriculumPlanning() {
     const count = selectedCourseIds.length;
     if (!count) return;
     const programLabel = selectedProgram ? `${selectedProgram.code} — ${selectedProgram.name}` : "this program";
-    const ok = window.confirm(
-      `Add ${count} subject${count === 1 ? "" : "s"} to ${programLabel} for this semester?\n\n` +
-      `They become part of the official offering list and appear on the monitoring sheet for every student in the program.`
-    );
+    const ok = await confirm({
+      title: "Add subjects to this program?",
+      message:
+        `Add ${count} subject${count === 1 ? "" : "s"} to ${programLabel} for this semester?\n\n` +
+        `They become part of the official offering list and appear on the monitoring sheet for every student in the program.`,
+      confirmLabel: "Add subjects",
+    });
     if (!ok) return;
     setBusy("add");
     setError("");
