@@ -1018,6 +1018,158 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.refresh(enrollment)
             self.assertEqual(enrollment.status, "Completed")
 
+    def test_enrollment_workspace_uses_monitoring_status_for_subject_eligibility(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+            )
+            enrolled_course = Course(
+                program_id=self.program_id,
+                code="BPM-502",
+                title="Already Enrolled Course",
+                units=3,
+                category="Major",
+            )
+            missing_course = Course(
+                program_id=self.program_id,
+                code="BPM-503",
+                title="Not Taken Course",
+                units=3,
+                category="Major",
+            )
+            db.session.add_all([term, enrolled_course, missing_course])
+            db.session.flush()
+            term_id = term.id
+            completed_course_id = self.course_id
+            enrolled_course_id = enrolled_course.id
+            missing_course_id = missing_course.id
+            db.session.add_all([
+                CourseRecord(
+                    student_id=self.student_id,
+                    course_id=completed_course_id,
+                    status="Completed",
+                    evidence_reference="Monitoring import",
+                ),
+                CourseRecord(
+                    student_id=self.student_id,
+                    course_id=enrolled_course_id,
+                    status="Enrolled",
+                    evidence_reference="Monitoring import",
+                ),
+                CourseRecord(
+                    student_id=self.student_id,
+                    course_id=missing_course_id,
+                    status="Missing",
+                    evidence_reference="Monitoring import",
+                ),
+            ])
+            for course_id in [
+                completed_course_id,
+                enrolled_course_id,
+                missing_course_id,
+            ]:
+                db.session.add(CurriculumOffering(
+                    program_id=self.program_id,
+                    academic_year="2026-2027",
+                    semester="1st Semester",
+                    course_id=course_id,
+                    added_by="Test",
+                ))
+            db.session.commit()
+
+            academic = self._academic_client()
+            workspace = academic.get(
+                f"/api/enrollment?program_id={self.program_id}"
+                f"&term_id={term_id}&student_id={self.student_id}"
+            )
+            self.assertEqual(workspace.status_code, 200, workspace.get_json())
+            payload = workspace.get_json()
+            subjects = {
+                item["code"]: item for item in payload["curriculum_subjects"]
+            }
+            self.assertEqual(subjects["BPM-501"]["enrollment_state"], "completed")
+            self.assertFalse(subjects["BPM-501"]["selectable"])
+            self.assertEqual(
+                subjects["BPM-502"]["enrollment_state"],
+                "enrolled_current",
+            )
+            self.assertFalse(subjects["BPM-502"]["selectable"])
+            self.assertIn(enrolled_course_id, payload["current_course_ids"])
+            self.assertEqual(subjects["BPM-503"]["enrollment_state"], "available")
+            self.assertTrue(subjects["BPM-503"]["selectable"])
+            self.assertEqual(payload["subject_status_summary"], {
+                "available": 1,
+                "completed": 1,
+                "enrolled": 1,
+                "enrolled_other_term": 0,
+                "requires_resolution": 0,
+            })
+
+            completed_preview = academic.post("/api/enrollment/preview", json={
+                "student_id": self.student_id,
+                "term_id": term_id,
+                "course_ids": [completed_course_id],
+            })
+            self.assertEqual(completed_preview.status_code, 200)
+            self.assertTrue(completed_preview.get_json()["has_blocking_conflicts"])
+            self.assertEqual(
+                completed_preview.get_json()["conflicts"][0]["kind"],
+                "already_completed",
+            )
+
+            valid_ids = [enrolled_course_id, missing_course_id]
+            preview = academic.post("/api/enrollment/preview", json={
+                "student_id": self.student_id,
+                "term_id": term_id,
+                "course_ids": valid_ids,
+            })
+            self.assertEqual(preview.status_code, 200, preview.get_json())
+            self.assertEqual(preview.get_json()["conflict_count"], 0)
+            self.assertEqual(
+                [item["course_id"] for item in preview.get_json()["additions"]],
+                [missing_course_id],
+            )
+            self.assertEqual(preview.get_json()["unchanged_count"], 1)
+
+            saved = academic.post("/api/enrollment", json={
+                "student_id": self.student_id,
+                "term_id": term_id,
+                "course_ids": valid_ids,
+                "resolutions": {},
+                "source_reference": "Monitoring synchronization test",
+                "confirmed": True,
+            })
+            self.assertEqual(saved.status_code, 200, saved.get_json())
+            self.assertEqual(saved.get_json()["added"], 1)
+            completed_record = CourseRecord.query.filter_by(
+                student_id=self.student_id,
+                course_id=completed_course_id,
+            ).one()
+            self.assertEqual(completed_record.status, "Completed")
+            self.assertEqual(
+                CourseRecord.query.filter_by(
+                    student_id=self.student_id,
+                    course_id=enrolled_course_id,
+                ).one().status,
+                "Enrolled",
+            )
+            self.assertEqual(
+                CourseRecord.query.filter_by(
+                    student_id=self.student_id,
+                    course_id=missing_course_id,
+                ).one().status,
+                "Enrolled",
+            )
+            self.assertEqual(
+                SubjectEnrollment.query.filter_by(
+                    student_id=self.student_id,
+                    term_id=term_id,
+                ).count(),
+                2,
+            )
+
     def test_enrollment_requires_resolution_for_non_offered_subject(self):
         with app.app_context():
             term = AcademicTerm(

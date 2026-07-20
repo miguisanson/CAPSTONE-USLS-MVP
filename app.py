@@ -2169,6 +2169,7 @@ RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Retake Required",
     "Dropped",
 }
+NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken"}
 
 
 def subject_enrollment_dict(item: SubjectEnrollment) -> dict:
@@ -2191,6 +2192,134 @@ def subject_enrollment_dict(item: SubjectEnrollment) -> dict:
         "cancelled_at": iso(item.cancelled_at),
         "updated_at": iso(item.updated_at),
     }
+
+
+def enrollment_subject_states(
+    student: Student,
+    term: AcademicTerm,
+    courses: list[Course],
+) -> dict[int, dict]:
+    """Resolve one enrollment state from monitoring and semester history.
+
+    The monitoring CourseRecord is the cumulative profile shown on the monitoring
+    sheet. SubjectEnrollment is the semester ledger. Completed coursework is never
+    selectable, active coursework is shown as already enrolled, and only genuinely
+    not-taken subjects are available for a new enrollment.
+    """
+    course_ids = {course.id for course in courses}
+    records = {
+        item.course_id: item
+        for item in CourseRecord.query.filter(
+            CourseRecord.student_id == student.id,
+            CourseRecord.course_id.in_(course_ids or {-1}),
+        ).all()
+    }
+    enrollment_rows: dict[int, list[SubjectEnrollment]] = {}
+    for item in (
+        SubjectEnrollment.query.filter(
+            SubjectEnrollment.student_id == student.id,
+            SubjectEnrollment.course_id.in_(course_ids or {-1}),
+        )
+        .join(AcademicTerm, AcademicTerm.id == SubjectEnrollment.term_id)
+        .order_by(AcademicTerm.start_date.desc(), SubjectEnrollment.updated_at.desc())
+        .all()
+    ):
+        enrollment_rows.setdefault(item.course_id, []).append(item)
+
+    states: dict[int, dict] = {}
+    for course in courses:
+        record = records.get(course.id)
+        monitoring_status = (record.status if record else "Missing") or "Missing"
+        rows = enrollment_rows.get(course.id, [])
+        current_active = next(
+            (
+                item for item in rows
+                if item.term_id == term.id
+                and item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+            ),
+            None,
+        )
+        other_active = next(
+            (
+                item for item in rows
+                if item.term_id != term.id
+                and item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+            ),
+            None,
+        )
+        completed_history = next(
+            (item for item in rows if item.status == "Completed"),
+            None,
+        )
+
+        if monitoring_status == "Completed" or completed_history:
+            state = "completed"
+            status_label = "Completed"
+            status_reason = (
+                "Already completed in the monitoring sheet; it cannot be enrolled again."
+            )
+            selectable = False
+        elif current_active:
+            state = "enrolled_current"
+            status_label = "Enrolled"
+            status_reason = f"Already enrolled for {term.label}."
+            selectable = False
+        elif other_active:
+            state = "enrolled_other_term"
+            status_label = other_active.status
+            status_reason = (
+                f"Already {other_active.status.lower()} in {other_active.term.label}."
+            )
+            selectable = False
+        elif monitoring_status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
+            if record and record.term_label and record.term_label != term.label:
+                state = "enrolled_other_term"
+                status_label = monitoring_status
+                status_reason = (
+                    f"The monitoring sheet records this as {monitoring_status} for "
+                    f"{record.term_label}."
+                )
+            else:
+                state = "enrolled_current"
+                status_label = "Enrolled"
+                status_reason = (
+                    "Already enrolled according to the monitoring sheet."
+                )
+            selectable = False
+        elif monitoring_status in NOT_TAKEN_SUBJECT_STATUSES:
+            state = "available"
+            status_label = "Not taken"
+            status_reason = (
+                "Not yet taken in the monitoring sheet; it may be added when offered."
+            )
+            selectable = True
+        else:
+            state = "requires_resolution"
+            status_label = monitoring_status
+            status_reason = (
+                f"The monitoring sheet status is {monitoring_status}; resolve that "
+                "status before a new enrollment."
+            )
+            selectable = False
+
+        states[course.id] = {
+            "monitoring_status": monitoring_status,
+            "enrollment_state": state,
+            "status_label": status_label,
+            "status_reason": status_reason,
+            "selectable": selectable,
+            "is_current": state == "enrolled_current",
+            "current_enrollment_id": current_active.id if current_active else None,
+            "other_enrollment_id": other_active.id if other_active else None,
+            "other_term_label": (
+                other_active.term.label
+                if other_active and other_active.term
+                else record.term_label
+                if state == "enrolled_other_term" and record
+                else None
+            ),
+        }
+    return states
 
 
 def curriculum_offerings_for_term(program: Program, term: AcademicTerm) -> list[CurriculumOffering]:
@@ -2382,10 +2511,7 @@ def enrollment_conflict_options(kind: str) -> list[dict]:
             {"value": "exclude", "label": "Do not enroll (recommended)"},
             {"value": "enroll_override", "label": "Enroll with documented exception"},
         ],
-        "already_completed": [
-            {"value": "exclude", "label": "Keep completed record (recommended)"},
-            {"value": "enroll_as_retake", "label": "Enroll again as an approved retake"},
-        ],
+        "already_completed": [],
         "active_other_term": [
             {"value": "keep_other", "label": "Keep the existing semester (recommended)"},
             {"value": "move_to_selected", "label": "Move enrollment to this semester"},
@@ -2411,17 +2537,16 @@ def enrollment_preview_payload(
     offered_ids = {
         item.course_id for item in curriculum_offerings_for_term(student.program, term)
     }
+    program_courses = monitoring_curriculum_courses(student.program)
+    states = enrollment_subject_states(student, term, program_courses)
     current_rows = SubjectEnrollment.query.filter_by(
         student_id=student.id,
         term_id=term.id,
     ).all()
     current_active_ids = {
-        item.course_id for item in current_rows
-        if item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
-    }
-    records = {
-        item.course_id: item
-        for item in CourseRecord.query.filter_by(student_id=student.id).all()
+        course_id
+        for course_id, state in states.items()
+        if state["is_current"]
     }
     conflicts = []
     if student.standing in {"Withdrawn", "Graduated", "Completed"} or student.enrollment_tag in {
@@ -2466,7 +2591,8 @@ def enrollment_preview_payload(
                 "options": enrollment_conflict_options("program_mismatch"),
             })
             continue
-        if course.id not in offered_ids:
+        state = states.get(course.id)
+        if course.id not in offered_ids and not (state and state["is_current"]):
             conflicts.append({
                 "id": f"offering-{course.id}",
                 "kind": "not_offered",
@@ -2476,43 +2602,38 @@ def enrollment_preview_payload(
                 "course_id": course.id,
                 "options": enrollment_conflict_options("not_offered"),
             })
-        record = records.get(course.id)
-        if record and record.status == "Completed":
+        if state and state["enrollment_state"] == "completed":
             conflicts.append({
                 "id": f"completed-{course.id}",
                 "kind": "already_completed",
-                "severity": "warning",
+                "severity": "blocking",
                 "line": f"Subject {course.code} · Student monitoring row",
                 "message": (
                     f"{course.code} is already Completed in the student profile and "
-                    "monitoring sheet."
+                    "monitoring sheet and cannot be enrolled again."
                 ),
                 "course_id": course.id,
                 "options": enrollment_conflict_options("already_completed"),
             })
-        other_active = (
-            SubjectEnrollment.query.filter(
-                SubjectEnrollment.student_id == student.id,
-                SubjectEnrollment.course_id == course.id,
-                SubjectEnrollment.term_id != term.id,
-                SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES),
-            )
-            .join(AcademicTerm, AcademicTerm.id == SubjectEnrollment.term_id)
-            .order_by(AcademicTerm.start_date.desc())
-            .first()
-        )
-        if other_active:
+        elif state and state["enrollment_state"] == "requires_resolution":
+            conflicts.append({
+                "id": f"status-{course.id}",
+                "kind": "status_not_eligible",
+                "severity": "blocking",
+                "line": f"Subject {course.code} · Student monitoring row",
+                "message": state["status_reason"],
+                "course_id": course.id,
+                "options": [],
+            })
+        if state and state["enrollment_state"] == "enrolled_other_term":
             conflicts.append({
                 "id": f"active-term-{course.id}",
                 "kind": "active_other_term",
                 "severity": "warning",
                 "line": f"Subject {course.code} · Semester",
-                "message": (
-                    f"{course.code} is still {other_active.status} in "
-                    f"{other_active.term.label}."
-                ),
+                "message": state["status_reason"],
                 "course_id": course.id,
-                "other_enrollment_id": other_active.id,
+                "other_enrollment_id": state["other_enrollment_id"],
                 "options": enrollment_conflict_options("active_other_term"),
             })
     additions = sorted(requested_course_ids - current_active_ids)
@@ -6477,6 +6598,11 @@ def register_routes(app: Flask) -> None:
         offerings = curriculum_offerings_for_term(program, term)
         offered_ids = {item.course_id for item in offerings}
         courses = monitoring_curriculum_courses(program)
+        subject_states = (
+            enrollment_subject_states(selected_student, term, courses)
+            if selected_student
+            else {}
+        )
         demand_by_course = {
             row["course"]["id"]: row["demand_count"]
             for row in course_demand_rows(program, term)
@@ -6496,10 +6622,13 @@ def register_routes(app: Flask) -> None:
                 .all()
             )
         current_active_ids = sorted({
-            item.course_id
-            for item in selected_rows
-            if item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+            course_id
+            for course_id, state in subject_states.items()
+            if state["is_current"]
         })
+        subject_summary = Counter(
+            state["enrollment_state"] for state in subject_states.values()
+        )
         return jsonify({
             "program": program_dict(program),
             "term": term_dict(term),
@@ -6517,6 +6646,7 @@ def register_routes(app: Flask) -> None:
                 {
                     **curriculum_offering_dict(item),
                     "demand_count": demand_by_course.get(item.course_id, 0),
+                    **subject_states.get(item.course_id, {}),
                 }
                 for item in offerings
             ],
@@ -6530,9 +6660,17 @@ def register_routes(app: Flask) -> None:
                     "recommended_term": course.recommended_term,
                     "is_offered": course.id in offered_ids,
                     "demand_count": demand_by_course.get(course.id, 0),
+                    **subject_states.get(course.id, {}),
                 }
                 for course in courses
             ],
+            "subject_status_summary": {
+                "completed": subject_summary.get("completed", 0),
+                "enrolled": subject_summary.get("enrolled_current", 0),
+                "enrolled_other_term": subject_summary.get("enrolled_other_term", 0),
+                "available": subject_summary.get("available", 0),
+                "requires_resolution": subject_summary.get("requires_resolution", 0),
+            },
             "current_course_ids": current_active_ids,
             "current_enrollments": [
                 subject_enrollment_dict(item) for item in selected_rows
@@ -6612,7 +6750,7 @@ def register_routes(app: Flask) -> None:
             course_id = conflict.get("course_id")
             if resolution in {"exclude", "keep_other"} and course_id:
                 final_ids.discard(course_id)
-            elif resolution in {"enroll_override", "enroll_as_retake"} and course_id:
+            elif resolution == "enroll_override" and course_id:
                 override_by_course.setdefault(course_id, []).append(
                     f"{conflict['line']}: {resolution}"
                 )
@@ -6644,6 +6782,7 @@ def register_routes(app: Flask) -> None:
             for item in existing_rows
             if item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
         }
+        existing_monitoring_ids = set(preview["current_course_ids"])
         added = 0
         cancelled = 0
 
@@ -6693,7 +6832,8 @@ def register_routes(app: Flask) -> None:
                 term_id=term.id,
             ).first()
             was_active = bool(
-                item and item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+                course_id in existing_monitoring_ids
+                or (item and item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES)
             )
             override_notes = override_by_course.get(course_id, [])
             if not item:
