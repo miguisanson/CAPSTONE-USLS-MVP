@@ -270,8 +270,8 @@ export default function CourseAdjustments() {
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Metric icon={ClipboardList} label="Curriculum subjects" value={data.summary.curriculum_subjects ?? data.demand.length} tone="brand" />
-            <Metric icon={Users} label="Total demand (enrolled)" value={data.summary.total_demand} tone="blue" />
-            <Metric icon={AlertTriangle} label="High priority" value={data.summary.high_priority} tone="amber" />
+            <Metric icon={Users} label="Affected students" value={data.summary.affected_students ?? 0} tone="blue" />
+            <Metric icon={AlertTriangle} label="Delayed if withheld" value={data.summary.students_delayed_if_not_offered ?? 0} tone="amber" />
             <Metric icon={Settings2} label="Selected to offer" value={offeredCount} tone="brand" />
           </div>
 
@@ -279,22 +279,23 @@ export default function CourseAdjustments() {
             <div className="border-b border-slate-100 px-5 py-3">
               <h2 className="text-lg font-semibold text-ink">Course offering decisions</h2>
               <p className="text-sm text-slate-500">
-                Demand comes from each enrolled student's next recommended subjects. Rows marked Manual can still be offered even with zero demand.
+                One affected student is sufficient demand. Each row names every student who would be affected and whether withholding the subject would delay progress.
               </p>
             </div>
             {data.demand.length === 0 ? (
               <EmptyState icon={CheckCircle2} title="No curriculum subjects found" hint="This program has no curriculum subjects yet. Import the program's monitoring sheet in Student Handoff first." />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1080px] text-sm">
+                <table className="w-full min-w-[1380px] text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                       <th className="px-5 py-3">Subject</th>
                       <th className="px-3 py-3">Basis</th>
                       <th className="px-3 py-3">Demand</th>
+                      <th className="px-3 py-3">Affected students / delay impact</th>
                       <th className="px-3 py-3">Status</th>
                       <th className="px-3 py-3">Sections</th>
-                      <th className="px-3 py-3">Faculty availability</th>
+                      <th className="px-3 py-3">Automated faculty assignment</th>
                       <th className="px-5 py-3 text-right">Offer?</th>
                     </tr>
                   </thead>
@@ -324,6 +325,18 @@ export default function CourseAdjustments() {
                               <span className="font-bold text-slate-700">{row.demand_count}</span>
                             </div>
                           </td>
+                          <td className="max-w-md px-3 py-3 align-top">
+                            {row.affected_students?.length ? (
+                              <div className="max-h-32 space-y-1 overflow-y-auto pr-1">
+                                {row.affected_students.map((student) => (
+                                  <div key={student.id} className={`rounded-lg border px-2.5 py-2 text-xs ${student.will_be_delayed ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                                    <p className="font-semibold text-ink">{student.name} <span className="font-normal text-slate-500">({student.student_number})</span></p>
+                                    <p className={student.will_be_delayed ? "text-amber-800" : "text-slate-600"}>{student.impact_basis} · {student.will_be_delayed ? "Will be delayed if not offered" : "Affected, no confirmed delay"}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : <span className="text-xs text-slate-400">No students affected</span>}
+                          </td>
                           <td className="px-3 py-3"><OfferingStatusBadge status={s.status} /></td>
                           <td className="px-3 py-3">
                             <input
@@ -336,7 +349,11 @@ export default function CourseAdjustments() {
                               aria-label={`Sections for ${row.course.code}`}
                             />
                           </td>
-                          <td className="px-3 py-3 text-slate-600">{row.availability_count}</td>
+                          <td className="px-3 py-3 align-top">
+                            <p className="font-semibold text-ink">{row.assigned_faculty_name || "No eligible faculty"}</p>
+                            <p className="mt-1 text-xs text-slate-500">{row.assignment_status || "Unassigned"} · {row.availability_count} eligible</p>
+                            {!row.assigned_faculty_name && row.faculty_candidates?.[0] && <p className="mt-1 text-xs text-brand-700">Best match: {row.faculty_candidates[0].name} · projected {row.faculty_candidates[0].projected_load}/24 units</p>}
+                          </td>
                           <td className="px-5 py-3 text-right">
                             <button
                               type="button"

@@ -404,8 +404,11 @@ class CourseOffering(db.Model):
     availability_count = db.Column(db.Integer, default=0)
     status = db.Column(db.String(40), nullable=False, default="Suggested")
     notes = db.Column(db.String(220))
+    assigned_faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"))
+    assignment_status = db.Column(db.String(40), nullable=False, default="Unassigned")
 
     course = db.relationship("Course")
+    assigned_faculty = db.relationship("Faculty", foreign_keys=[assigned_faculty_id])
 
 
 class CurriculumOffering(db.Model):
@@ -759,6 +762,21 @@ class Faculty(db.Model):
 
     availabilities = db.relationship("FacultyAvailability", backref="faculty", lazy=True, cascade="all, delete-orphan")
     working_hours = db.relationship("FacultyWorkingHour", backref="faculty", lazy=True, cascade="all, delete-orphan")
+    course_preferences = db.relationship("FacultyCoursePreference", backref="faculty", lazy=True, cascade="all, delete-orphan")
+
+
+class FacultyCoursePreference(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    priority = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime, default=now_utc)
+
+    course = db.relationship("Course")
+
+    __table_args__ = (
+        db.UniqueConstraint("faculty_id", "course_id", name="uq_faculty_course_preference"),
+    )
 
 
 # Date/time windows that make defense scheduling checkable in the demo.
@@ -1068,6 +1086,13 @@ def split_academic_term_label(label: str) -> tuple[str, str]:
 
 def faculty_dict(faculty: Faculty) -> dict:
     workload = PanelAssignment.query.filter_by(faculty_id=faculty.id).count()
+    term = get_active_term()
+    teaching_load = faculty_teaching_load_units(faculty, term)
+    preferred = (
+        FacultyCoursePreference.query.filter_by(faculty_id=faculty.id)
+        .order_by(FacultyCoursePreference.priority, FacultyCoursePreference.id)
+        .all()
+    )
     working_hours = faculty_working_hours(faculty)
     calendar_id = faculty_calendar_id(faculty)
     calendar_ready = google_calendar_configured(faculty)
@@ -1086,6 +1111,19 @@ def faculty_dict(faculty: Faculty) -> dict:
         "active": faculty.active,
         "availability_status": "Available" if any(day["enabled"] for day in working_hours) else "Unavailable",
         "panel_load": workload,
+        "teaching_load_units": teaching_load,
+        "teaching_load_limit": FACULTY_TEACHING_LOAD_LIMIT,
+        "teaching_load_remaining": max(FACULTY_TEACHING_LOAD_LIMIT - teaching_load, 0),
+        "preferred_subjects": [
+            {
+                "id": item.course.id,
+                "code": item.course.code,
+                "title": item.course.title,
+                "units": item.course.units or 3,
+                "priority": item.priority,
+            }
+            for item in preferred if item.course
+        ],
         "working_hours": working_hours,
         "calendar": {
             "provider": "Google Calendar",
@@ -1101,6 +1139,7 @@ def faculty_dict(faculty: Faculty) -> dict:
 
 
 def student_brief(student: Student) -> dict:
+    course_year = student_current_course_year(student)
     return {
         "id": student.id,
         "student_number": student.student_number,
@@ -1115,7 +1154,8 @@ def student_brief(student: Student) -> dict:
         "college": student.program.college,
         "entry_year": student.entry_year,
         "academic_year_entry": student_academic_year_entry(student),
-        "year_level": student.year_level or "",
+        "year_level": str(course_year) if course_year else (student.year_level or ""),
+        "course_year_label": f"Year {course_year}" if course_year else "Not available",
         "current_stage": student.current_stage,
         "standing": student.standing,
         "enrollment_tag": student.enrollment_tag,
@@ -1126,8 +1166,57 @@ def student_brief(student: Student) -> dict:
     }
 
 
-COMPRE_UNIT_REQUIREMENTS = {"Basic": 6, "Major": 9, "Cognate": 6}
-COMPRE_TOTAL_UNITS_REQUIRED = 21
+DEFAULT_COMPRE_UNIT_REQUIREMENTS = {"Basic": 6, "Major": 9, "Cognate": 6}
+
+# The two curricula supplied with the July 2026 review are authoritative for
+# their programs. They intentionally contain no subject-to-subject prerequisite
+# links; comprehensive-exam and research readiness remain separate milestones.
+AUTHORITATIVE_CURRICULA = {
+    "MBA": {
+        "program": ("Master of Business Administration", "Business", False),
+        "requirements": {"Basic": 9, "Major": 15, "Cognate": 9},
+        "courses": [
+            ("MBA201", "Statistical Methods", "Basic", 3, "Year 1 - 2nd Semester"),
+            ("MBA202", "Methods of Research", "Basic", 3, "Year 1 - 2nd Semester"),
+            ("MBA203", "Organizational Development", "Basic", 3, "Year 1 - 1st Semester"),
+            ("MBA204", "Compensation Management", "Major", 3, "Year 1 - 2nd Semester"),
+            ("MBA205", "Economics for Decision-Making", "Major", 3, "Year 1 - 1st Semester"),
+            ("MBA206", "Managing and Developing Human Resources", "Major", 3, "Year 1 - 1st Semester"),
+            ("MBA207", "Labor Relations and Conflict Resolution", "Major", 3, "Year 2 - 1st Semester"),
+            ("MBA208", "Group Process/Human Dynamics", "Major", 3, "Year 2 - 1st Semester"),
+            ("MBA209", "Advanced Operations Management", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA210", "Management of Human Behavior in Organization", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA211", "Entrepreneurship", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA212", "Philippine Business Environment", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA213", "Management Decision Models", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA214", "Business Ethics and Corporate Social Responsibility", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA215", "E-Commerce and Internet Marketing", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA216", "Consumer Behavior and Marketing Research", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA217", "Seminar in Project/Event Management", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA218", "Strategic Management (Required)", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA219", "Managerial Psychology", "Cognate", 3, "Year 2 - 2nd Semester"),
+            ("MBA220", "Project Paper", "Project", 3, "Year 2 - 1st Semester"),
+        ],
+    },
+    "DPSY": {
+        "program": ("Doctor of Philosophy in Psychology", "Arts and Sciences", True),
+        "requirements": {"Basic": 6, "Major": 12, "Cognate": 9},
+        "courses": [
+            ("DPSY300", "Advanced Statistics II", "Basic", 3, "Year 1 - 2nd Semester"),
+            ("DPSY301", "Advanced Research Methods II: Quantitative/Qualitative", "Basic", 3, "Year 1 - 1st Semester"),
+            ("DPSY310", "Advanced Theories of Personality (in Contemporary Society)", "Major", 3, "Year 1 - 2nd Semester"),
+            ("DPSY311", "Advanced Psychological Assessment with Projective Techniques (with Laboratory)", "Major", 5, "Year 2 - 1st Semester"),
+            ("DPSY312", "Advanced Psychological Counseling and Individual/Group Psychotherapy", "Major", 3, "Year 1 - 1st Semester"),
+            ("DPSY313", "Advanced Abnormal Psychology (with Treatment and Intervention)", "Major", 3, "Year 2 - 1st Semester"),
+            ("DPSY321", "Addiction Psychology", "Cognate", 3, "Year 1/2 - Cognate"),
+            ("DPSY322", "Gender Psychology", "Cognate", 3, "Year 1/2 - Cognate"),
+            ("DPSY323", "Gero-Psychology", "Cognate", 3, "Year 1/2 - Cognate"),
+            ("DPSY324", "Occupational/Organizational Psychology", "Cognate", 3, "Year 1/2 - Cognate"),
+            ("DPSY330", "Internship", "Internship", 6, "Year 2 - 2nd Semester"),
+            ("DPSY400", "Dissertation", "Dissertation", 12, "Year 3 - 1st Semester"),
+        ],
+    },
+}
 
 MONITORING_CURRICULUM_TEMPLATE = [
     ("200-STAT", "Statistics", "Basic", 3, "Year 1"),
@@ -1167,11 +1256,68 @@ def monitoring_template_codes(program_code: str) -> list[str]:
 
 def monitoring_curriculum_courses(program: Program) -> list[Course]:
     """Prefer the AC template columns for monitoring when the program has them."""
+    authoritative = AUTHORITATIVE_CURRICULA.get(program.code)
+    if authoritative:
+        codes = [row[0] for row in authoritative["courses"]]
+        by_code = {
+            course.code: course
+            for course in Course.query.filter_by(program_id=program.id).filter(Course.code.in_(codes)).all()
+        }
+        return [by_code[code] for code in codes if code in by_code]
     template_codes = monitoring_template_codes(program.code)
     courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
     by_code = {course.code: course for course in courses}
     template_courses = [by_code[code] for code in template_codes if code in by_code]
     return template_courses if template_courses else courses
+
+
+def ensure_authoritative_curricula() -> int:
+    """Upsert the two user-supplied curricula without deleting historical rows."""
+    changed = 0
+    for program_code, spec in AUTHORITATIVE_CURRICULA.items():
+        name, college, has_practicum = spec["program"]
+        program = Program.query.filter_by(code=program_code).first()
+        if not program:
+            program = Program(code=program_code, name=name, college=college, has_practicum=has_practicum)
+            db.session.add(program)
+            db.session.flush()
+            changed += 1
+        else:
+            for field, value in (("name", name), ("college", college), ("has_practicum", has_practicum)):
+                if getattr(program, field) != value:
+                    setattr(program, field, value)
+                    changed += 1
+        for code, title, category, units, recommended_term in spec["courses"]:
+            course = Course.query.filter_by(program_id=program.id, code=code).first()
+            if not course:
+                db.session.add(Course(
+                    program_id=program.id,
+                    code=code,
+                    title=title,
+                    category=category,
+                    units=units,
+                    recommended_term=recommended_term,
+                ))
+                changed += 1
+                continue
+            for field, value in (
+                ("title", title), ("category", category), ("units", units),
+                ("recommended_term", recommended_term),
+            ):
+                if getattr(course, field) != value:
+                    setattr(course, field, value)
+                    changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+
+def comprehensive_unit_requirements(program: Program) -> dict[str, int]:
+    return dict(
+        AUTHORITATIVE_CURRICULA.get(program.code, {}).get(
+            "requirements", DEFAULT_COMPRE_UNIT_REQUIREMENTS
+        )
+    )
 
 
 def ensure_monitoring_template_courses() -> int:
@@ -1211,22 +1357,48 @@ def ensure_monitoring_template_courses() -> int:
 
 
 def comprehensive_exam_eligibility(student: Student) -> dict:
-    """Require all curriculum subjects to be completed before comprehensive exam eligibility."""
+    """Apply program unit requirements without treating subjects as prerequisites."""
     audit = compute_course_audit(student)
     completed = {row["category"]: row["completed_units"] for row in audit.get("by_category", [])}
-    categories = [
-        {
-            "category": category,
-            "completed": completed.get(category, 0),
-            "required": required,
-            "complete": completed.get(category, 0) >= required,
-        }
-        for category, required in COMPRE_UNIT_REQUIREMENTS.items()
-    ]
-    qualifying_total = sum(item["completed"] for item in categories)
-    missing_count = len(audit.get("missing", [])) + len(audit.get("current", [])) + len(audit.get("incomplete", []))
     failed_count = sum(1 for row in audit.get("incomplete", []) if row.get("status") == "Failed")
-    eligible = missing_count == 0 and failed_count == 0 and bool(audit.get("completed"))
+    if student.program.code in AUTHORITATIVE_CURRICULA:
+        requirements = comprehensive_unit_requirements(student.program)
+        categories = [
+            {
+                "category": category,
+                "completed": completed.get(category, 0),
+                "required": required,
+                "complete": completed.get(category, 0) >= required,
+            }
+            for category, required in requirements.items()
+        ]
+        qualifying_total = sum(item["completed"] for item in categories)
+        missing_count = sum(
+            max(0, (item["required"] - item["completed"] + 2) // 3)
+            for item in categories
+        )
+        required_units = sum(requirements.values())
+        eligible = all(item["complete"] for item in categories) and failed_count == 0
+    else:
+        # Preserve the existing all-subject completion rule for programs whose
+        # official category thresholds were not part of the supplied curricula.
+        categories = [
+            {
+                "category": row["category"],
+                "completed": row["completed_units"],
+                "required": row["total_units"],
+                "complete": row["completed_units"] >= row["total_units"],
+            }
+            for row in audit.get("by_category", [])
+        ]
+        qualifying_total = audit.get("completed_units", 0)
+        required_units = audit.get("total_units", 0)
+        missing_count = (
+            len(audit.get("missing", []))
+            + len(audit.get("current", []))
+            + len(audit.get("incomplete", []))
+        )
+        eligible = missing_count == 0 and failed_count == 0 and bool(audit.get("completed"))
     return {
         "eligible": eligible,
         "status": "Eligible for Comprehensive Exam" if eligible else "Not Eligible",
@@ -1235,7 +1407,7 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         "research_allowed": eligible and (student.comprehensive_exam_status or "").lower() == "passed",
         "categories": categories,
         "completed_units": qualifying_total,
-        "required_units": COMPRE_TOTAL_UNITS_REQUIRED,
+        "required_units": required_units,
         "missing_subjects": missing_count,
         "failed_subjects": failed_count,
         "required_subjects": len(audit.get("completed", [])) + missing_count,
@@ -1965,6 +2137,10 @@ def course_offering_dict(offering: CourseOffering) -> dict:
         "availability_count": offering.availability_count,
         "status": offering.status,
         "notes": offering.notes,
+        "assigned_faculty_id": offering.assigned_faculty_id,
+        "assigned_faculty_name": offering.assigned_faculty.name if offering.assigned_faculty else None,
+        "assignment_status": offering.assignment_status,
+        "assigned_units": (offering.course.units or 3) * max(offering.section_count or 1, 1) if offering.course else 0,
     }
 
 
@@ -2143,6 +2319,61 @@ def sync_subject_enrollment_from_course_record(
     if status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
         ensure_term_enrollment(student, term, "Enrolled", source_reference)
     return item
+
+
+def record_student_drop(
+    student: Student,
+    course: Course,
+    term_label: str | None = None,
+    actor: str = "Student",
+) -> CourseDropRequest:
+    """Record a student's drop immediately and synchronize every dependent view."""
+    record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+    if not record or record.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {"Incomplete"}:
+        raise ValueError("Only a currently enrolled subject can be dropped.")
+    effective_term = (term_label or record.term_label or "").strip()
+    previous = record.status
+    record.status = "Dropped"
+    record.grade_value = None
+    record.grade_status = "No Grade"
+    record.incomplete_deadline = None
+    record.resolved_at = None
+    record.remarks = "Dropped directly by the student; no approval or supporting document required."
+    record.evidence_reference = "Student self-service enrollment"
+    record.updated_at = now_utc()
+    sync_subject_enrollment_from_course_record(
+        student, course, effective_term, "Dropped", "Immediate student drop"
+    )
+    existing = (
+        CourseDropRequest.query.filter_by(student_id=student.id, course_id=course.id)
+        .order_by(CourseDropRequest.created_at.desc())
+        .first()
+    )
+    request_item = existing or CourseDropRequest(student_id=student.id, course_id=course.id)
+    if not existing:
+        db.session.add(request_item)
+    request_item.term_label = effective_term
+    request_item.reason = None
+    request_item.attachment_id = None
+    request_item.status = "Recorded"
+    request_item.reviewer_remarks = "Automatically recorded from the student curriculum checklist."
+    request_item.decided_by = actor
+    request_item.decided_at = now_utc()
+    request_item.updated_at = now_utc()
+    add_log(
+        "enrollment",
+        student.id,
+        actor,
+        "Student curriculum checklist",
+        f"{course.code} dropped and enrollment synchronized",
+        "Student",
+        "The enrollment ledger, monitoring record, demand summary, student profile, and activity history were updated immediately.",
+        previous_status=previous,
+        new_status="Dropped",
+    )
+    student.updated_at = now_utc()
+    recompute_risk(student)
+    return request_item
 
 
 def enrollment_conflict_options(kind: str) -> list[dict]:
@@ -2435,7 +2666,7 @@ def student_enrollment_snapshot(
 ) -> dict:
     term = term or get_active_term()
     if not term:
-        return {"term": None, "offered_subjects": [], "enrollments": []}
+        return {"term": None, "offered_subjects": [], "enrollments": [], "curriculum_subjects": []}
     offerings = curriculum_offerings_for_term(student.program, term)
     rows = (
         SubjectEnrollment.query.filter_by(student_id=student.id)
@@ -2448,6 +2679,11 @@ def student_enrollment_snapshot(
         item.course_id: item
         for item in rows
         if item.term_id == term.id
+    }
+    offered_ids = {item.course_id for item in offerings}
+    records = {
+        item.course_id: item
+        for item in CourseRecord.query.filter_by(student_id=student.id).all()
     }
     return {
         "term": term_dict(term),
@@ -2463,6 +2699,23 @@ def student_enrollment_snapshot(
             for offering in offerings
         ],
         "enrollments": [subject_enrollment_dict(item) for item in rows],
+        "curriculum_subjects": [
+            {
+                "id": course.id,
+                "code": course.code,
+                "title": course.title,
+                "units": course.units or 3,
+                "category": course.category,
+                "recommended_term": course.recommended_term,
+                "is_offered": course.id in offered_ids,
+                "is_enrolled": bool(
+                    course.id in current_by_course
+                    and current_by_course[course.id].status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+                ),
+                "status": records[course.id].status if course.id in records else "Missing",
+            }
+            for course in monitoring_curriculum_courses(student.program)
+        ],
     }
 
 
@@ -2818,6 +3071,73 @@ def student_portal_recommendations(student: Student) -> list[dict]:
     return rows
 
 
+def student_delay_assessment(student: Student) -> dict:
+    """Return a progress status; every alert must explain a possible delay."""
+    term = get_active_term()
+    indicators = student_indicators(student)
+    delayed: list[str] = []
+    at_risk: list[str] = []
+    current_year = student_current_course_year(student, term) or 1
+    records = {
+        record.course_id: record
+        for record in CourseRecord.query.filter_by(student_id=student.id).all()
+    }
+
+    for course in monitoring_curriculum_courses(student.program):
+        record = records.get(course.id)
+        status = record.status if record else "Missing"
+        if status == "Failed":
+            delayed.append(f"{course.code} has a failing mark")
+        elif status == "Retake Required" or (
+            status == "Incomplete" and record and record.incomplete_deadline
+            and record.incomplete_deadline < date.today()
+        ):
+            delayed.append(f"{course.code} must be re-enrolled after a lapsed incomplete mark")
+        year_match = re.search(r"year\s*(\d+)", course.recommended_term or "", re.IGNORECASE)
+        required_for_sequence = course.category != "Cognate" or course.code == "MBA218"
+        if (
+            year_match and int(year_match.group(1)) < current_year
+            and required_for_sequence and status not in {"Completed", "Current", "Enrolled"}
+        ):
+            delayed.append(f"{course.code} remains unfinished past its suggested course year")
+
+    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        delayed.append("AWOL status has interrupted enrollment")
+    if indicators["days_in_stage"] >= STALL_HIGH_DAYS and student.current_stage != "Completed":
+        delayed.append(f"no progress update has been recorded for {indicators['days_in_stage']} days")
+    elif indicators["days_in_stage"] >= STALL_WARN_DAYS and student.current_stage != "Completed":
+        at_risk.append(f"no progress update has been recorded for {indicators['days_in_stage']} days")
+    if indicators["overdue_tasks"]:
+        at_risk.append(f"{indicators['overdue_tasks']} overdue action(s) may delay progress")
+    if indicators["missing_documents"]:
+        at_risk.append(f"{indicators['missing_documents']} required document(s) may delay the current milestone")
+    if student.standing == "On Leave" or student.enrollment_tag == "LOA":
+        at_risk.append("leave status pauses the normal study sequence")
+
+    if term:
+        next_ids = {row["id"] for row in student_semester_subjects(student, term)["next_subjects"]}
+        plan = (
+            CourseOfferingPlan.query.filter_by(program_id=student.program_id, term_label=term.label)
+            .filter(CourseOfferingPlan.status.in_(["Approved", "Published"]))
+            .order_by(CourseOfferingPlan.updated_at.desc())
+            .first()
+        )
+        if plan:
+            unavailable = {item.course_id for item in plan.offerings if item.status == "Not Offered"}
+            for course_id in sorted(next_ids & unavailable):
+                course = db.session.get(Course, course_id)
+                if course:
+                    at_risk.append(f"{course.code} is needed next but is not offered for {term.label}")
+
+    delayed = list(dict.fromkeys(delayed))
+    at_risk = list(dict.fromkeys(at_risk))
+    if delayed:
+        return {"level": "Delayed", "score": 80, "reason": delayed[0], "causes": delayed + at_risk}
+    if at_risk:
+        return {"level": "At Risk of Delay", "score": 50, "reason": at_risk[0], "causes": at_risk}
+    return {"level": "On Track", "score": 0, "reason": "No recorded delay indicators", "causes": []}
+
+
 def student_priority(student: Student) -> dict:
     """A student's overall priority = the highest-scoring recommendation. Keeps the
     student record consistent with the Decision Support queue."""
@@ -2830,6 +3150,8 @@ def student_priority(student: Student) -> dict:
     ).first()
     if student.current_stage == "Admission" and not has_coursework:
         return {"level": "Not Yet Assessed", "score": 0, "reason": "Newly admitted — not yet assessed for risk (insufficient data)"}
+    return student_delay_assessment(student)
+
     recs = student_recommendations(student)["recommendations"]
     if not recs:
         return {"level": "Low", "score": 0, "reason": "On track — no flagged actions"}
@@ -2844,6 +3166,18 @@ def student_priority(student: Student) -> dict:
 def recompute_risk(student: Student) -> None:
     """Persist the derived priority into risk_level so every view agrees."""
     student.risk_level = student_priority(student)["level"]
+
+
+def ensure_delay_status_consistency() -> int:
+    changed = 0
+    for student in Student.query.all():
+        expected = student_priority(student)["level"]
+        if student.risk_level != expected:
+            student.risk_level = expected
+            changed += 1
+    if changed:
+        db.session.commit()
+    return changed
 
 
 def _portfolio_row(rec, student):
@@ -3453,7 +3787,7 @@ def awol_residency_roster_payload() -> list[dict]:
 
 def _status_sentence(student: Student, ind: dict) -> str:
     bits = [f"{student.name} ({student.student_number}, {student.program.code}) is at the {ind['stage']} stage"]
-    bits.append(f"standing {ind['standing']}, risk {ind['risk']}")
+    bits.append(f"standing {ind['standing']}, progress status {student_priority(student)['level']}")
     if ind["research_gate"]:
         bits.append(f"research gate {ind['research_gate']} — {ind['research_status']}")
     bits.append(f"coursework {ind['completion_rate']}% complete")
@@ -3697,6 +4031,42 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
         "grounded": payload["indicators"] if payload else None,
         "recommendations": payload["recommendations"] if payload else [],
         "student": student_brief(student) if student else None,
+    }
+
+
+def generate_student_answer(question: str, student: Student) -> dict:
+    """Handbook and own-record assistant with no staff or cross-student access."""
+    lowered = (question or "").lower()
+    restricted_terms = {
+        "which students", "other student", "faculty load", "faculty assignment",
+        "dean queue", "approval queue", "staff notes", "internal", "all students",
+        "panel ranking", "admin", "database", "course adjustment rationale",
+    }
+    if any(term in lowered for term in restricted_terms):
+        return {
+            "answer": (
+                "I can help with the Graduate School handbook, student procedures, and your own record. "
+                "I cannot access other students, staff-only notes, faculty selection data, or approval queues."
+            ),
+            "mode": "student-scoped",
+            "citations": [],
+            "grounded": student_indicators(student),
+            "recommendations": student_portal_recommendations(student),
+            "student": student_brief(student),
+        }
+    payload = student_recommendations(student)
+    snippets = retrieve_policy(question, k=3)
+    answer = local_grounded_answer(question, student, payload, snippets)
+    return {
+        "answer": answer,
+        "mode": "student-scoped",
+        "citations": [
+            {"id": item["id"], "title": item["title"], "source": item["source"], "text": item["text"]}
+            for item in snippets
+        ],
+        "grounded": {**payload["indicators"], "progress_status": student_priority(student)},
+        "recommendations": student_portal_recommendations(student),
+        "student": student_brief(student),
     }
 
 
@@ -4108,6 +4478,8 @@ def register_routes(app: Flask) -> None:
                 "current_term": term_dict(current_term) if current_term else None,
                 "offered_subjects": subject_enrollment["offered_subjects"],
                 "subject_enrollments": subject_enrollment["enrollments"],
+                "curriculum_subjects": subject_enrollment["curriculum_subjects"],
+                "progress_status": student_priority(student),
                 "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
                 "course_drop_requests": [
                     course_drop_request_dict(item, include_student=False)
@@ -4263,6 +4635,8 @@ def register_routes(app: Flask) -> None:
                 "current_term": term_dict(current_term) if current_term else None,
                 "offered_subjects": subject_enrollment["offered_subjects"],
                 "subject_enrollments": subject_enrollment["enrollments"],
+                "curriculum_subjects": subject_enrollment["curriculum_subjects"],
+                "progress_status": student_priority(student),
                 "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
                 "course_drop_requests": [
                     course_drop_request_dict(item, include_student=False)
@@ -4600,37 +4974,126 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         course = Course.query.get_or_404(safe_int(data.get("course_id")))
-        record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
-        if not record or record.status not in {"Enrolled", "Current", "Incomplete"}:
-            return jsonify({"error": "Only current, enrolled, or incomplete subjects can be requested for dropping."}), 400
-        active = CourseDropRequest.query.filter_by(student_id=student.id, course_id=course.id, status="Submitted").first()
-        if active:
-            return jsonify({"error": "You already submitted a drop request for this subject."}), 400
-        reason = (data.get("reason") or "").strip()
-        if not reason:
-            return jsonify({"error": "Enter the reason for dropping this subject."}), 400
-        attachment = request_attachment_from_payload(student, "course-drop", data)
-        request_item = CourseDropRequest(
-            student_id=student.id,
-            course_id=course.id,
-            term_label=(data.get("term_label") or record.term_label or "").strip(),
-            reason=reason,
-            attachment_id=attachment.id if attachment else None,
-            status="Submitted",
-        )
-        db.session.add(request_item)
-        add_task(student.id, f"Review course drop request for {course.code}", "Academic Coordinator", 3, 45)
-        add_log(
-            "course-audit",
-            student.id,
-            "Student",
-            attachment.original_name if attachment else "Student portal",
-            f"Drop request submitted for {course.code}",
-            "Academic Coordinator",
-            f"Reason: {reason}. Semester: {request_item.term_label or record.term_label or 'Not specified'}.",
-        )
+        try:
+            request_item = record_student_drop(
+                student,
+                course,
+                (data.get("term_label") or "").strip(),
+                actor=f"Student - {account.full_name}",
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         db.session.commit()
-        return jsonify({"ok": True, "message": "Drop request submitted. The Academic Coordinator will review it before your record changes."})
+        return jsonify({
+            "ok": True,
+            "message": f"{course.code} was dropped immediately and all enrollment records were updated.",
+            "request": course_drop_request_dict(request_item, include_student=False),
+        })
+
+    @app.route("/api/student-portal/enrollment", methods=["POST"])
+    @require_api_login("student")
+    def student_portal_enrollment_save():
+        data = request.get_json(silent=True) or {}
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        term = (
+            AcademicTerm.query.get(safe_int(data.get("term_id")))
+            if data.get("term_id") else get_active_term()
+        )
+        if not term:
+            return jsonify({"error": "No active academic semester is available."}), 400
+        try:
+            requested_ids = {int(value) for value in (data.get("course_ids") or [])}
+        except (TypeError, ValueError):
+            return jsonify({"error": "Subject IDs must be whole numbers."}), 400
+
+        curriculum = monitoring_curriculum_courses(student.program)
+        curriculum_by_id = {course.id: course for course in curriculum}
+        invalid = requested_ids - set(curriculum_by_id)
+        if invalid:
+            return jsonify({"error": "Every selected subject must belong to your curriculum."}), 409
+        offered_ids = {
+            item.course_id for item in curriculum_offerings_for_term(student.program, term)
+        }
+        existing_rows = SubjectEnrollment.query.filter_by(
+            student_id=student.id, term_id=term.id
+        ).all()
+        active_by_course = {
+            item.course_id: item
+            for item in existing_rows
+            if item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+        }
+        unavailable = requested_ids - offered_ids - set(active_by_course)
+        if unavailable:
+            labels = ", ".join(curriculum_by_id[item].code for item in sorted(unavailable))
+            return jsonify({"error": f"These subjects are not in the published offering list: {labels}."}), 409
+        for course_id in requested_ids - set(active_by_course):
+            completed_record = CourseRecord.query.filter_by(
+                student_id=student.id, course_id=course_id, status="Completed"
+            ).first()
+            if completed_record:
+                return jsonify({
+                    "error": f"{curriculum_by_id[course_id].code} is already completed and cannot be checked as current."
+                }), 409
+
+        dropped = []
+        for course_id in sorted(set(active_by_course) - requested_ids):
+            course = curriculum_by_id.get(course_id) or db.session.get(Course, course_id)
+            if course:
+                record_student_drop(student, course, term.label, actor=f"Student - {account.full_name}")
+                dropped.append(course.code)
+
+        added = []
+        for course_id in sorted(requested_ids - set(active_by_course)):
+            course = curriculum_by_id[course_id]
+            record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+            item = SubjectEnrollment.query.filter_by(
+                student_id=student.id, course_id=course.id, term_id=term.id
+            ).first()
+            if not item:
+                item = SubjectEnrollment(student_id=student.id, course_id=course.id, term_id=term.id)
+                db.session.add(item)
+            item.status = "Enrolled"
+            item.source_reference = "Student curriculum checklist"
+            item.cancelled_at = None
+            item.updated_at = now_utc()
+            if not record:
+                record = CourseRecord(student_id=student.id, course_id=course.id)
+                db.session.add(record)
+            record.status = "Enrolled"
+            record.term_label = term.label
+            record.grade_value = None
+            record.grade_status = "No Grade"
+            record.incomplete_deadline = None
+            record.evidence_reference = "Student self-service enrollment"
+            record.remarks = "Checked as currently enrolled by the student."
+            record.updated_at = now_utc()
+            added.append(course.code)
+
+        if requested_ids:
+            ensure_term_enrollment(student, term, "Enrolled", "Student curriculum checklist")
+            if student.current_stage == "Admission":
+                student.current_stage = "Coursework"
+            if student.enrollment_tag not in {"LOA", "AWOL", "Withdrawn", "Completed"}:
+                student.enrollment_tag = "Enrolled"
+        if added:
+            add_log(
+                "enrollment", student.id, f"Student - {account.full_name}",
+                "Student curriculum checklist", f"Enrolled in {', '.join(added)}",
+                "Graduate School Staff",
+                "Enrollment, monitoring, demand, and profile records were synchronized.",
+            )
+        student.updated_at = now_utc()
+        recompute_risk(student)
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": f"Current subjects saved: {len(requested_ids)} checked, {len(added)} added, {len(dropped)} dropped.",
+            "added": added,
+            "dropped": dropped,
+            "data": student_enrollment_snapshot(student, term),
+            "integrity": enrollment_integrity_payload(student.program, term),
+        })
 
     @app.route("/api/student-portal/requests/leave-of-absence", methods=["POST"])
     @require_api_login("student")
@@ -5397,7 +5860,22 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator")
     def faculty_list():
         faculty = Faculty.query.order_by(Faculty.name).all()
-        return jsonify({"items": [faculty_profile_dict(f) for f in faculty]})
+        return jsonify({
+            "items": [faculty_profile_dict(f) for f in faculty],
+            "courses": [
+                {
+                    "id": course.id,
+                    "code": course.code,
+                    "title": course.title,
+                    "units": course.units or 3,
+                    "program_code": course.program.code,
+                    "college": course.program.college,
+                }
+                for course in Course.query.join(Program).order_by(Program.code, Course.code).all()
+                if course in monitoring_curriculum_courses(course.program)
+            ],
+            "teaching_load_limit": FACULTY_TEACHING_LOAD_LIMIT,
+        })
 
     @app.route("/api/faculty", methods=["POST"])
     @require_api_login("staff", "academic_coordinator")
@@ -5452,6 +5930,37 @@ def register_routes(app: Flask) -> None:
             "faculty": faculty_profile_dict(faculty),
             "account": account_dict(account),
         }), 201
+
+    @app.route("/api/faculty/<int:faculty_id>/preferences", methods=["PUT"])
+    @require_api_login("staff", "academic_coordinator", "faculty")
+    def faculty_course_preferences_save(faculty_id: int):
+        account = current_account()
+        faculty = Faculty.query.get_or_404(faculty_id)
+        if account.role == "faculty" and account.faculty_id != faculty.id:
+            return jsonify({"error": "Faculty may update only their own preferred subjects."}), 403
+        data = request.get_json(silent=True) or {}
+        try:
+            course_ids = [int(value) for value in (data.get("course_ids") or [])]
+        except (TypeError, ValueError):
+            return jsonify({"error": "Subject IDs must be whole numbers."}), 400
+        course_ids = list(dict.fromkeys(course_ids))
+        courses = Course.query.filter(Course.id.in_(course_ids or {-1})).all()
+        courses_by_id = {course.id: course for course in courses}
+        if set(course_ids) != set(courses_by_id):
+            return jsonify({"error": "One or more preferred subjects no longer exist."}), 400
+        if any(course.program.college != faculty.college for course in courses):
+            return jsonify({"error": "Preferred subjects must belong to the faculty member's college."}), 409
+        FacultyCoursePreference.query.filter_by(faculty_id=faculty.id).delete()
+        for priority, course_id in enumerate(course_ids, start=1):
+            db.session.add(FacultyCoursePreference(
+                faculty_id=faculty.id, course_id=course_id, priority=priority
+            ))
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": f"Saved {len(course_ids)} preferred subject(s) for {faculty.name}.",
+            "faculty": faculty_profile_dict(faculty),
+        })
 
     @app.route("/api/faculty-portal/context")
     @require_api_login("faculty")
@@ -5888,7 +6397,7 @@ def register_routes(app: Flask) -> None:
                 touched_students += 1
                 recompute_risk(student)
         # Edit this value to change the minimum demand for automatic inclusion.
-        AUTO_OFFER_DEMAND_THRESHOLD = 2
+        AUTO_OFFER_DEMAND_THRESHOLD = 1
         if term and academic_year and semester:
             for demand_row in course_demand_rows(program, term):
                 if demand_row["demand_count"] < AUTO_OFFER_DEMAND_THRESHOLD:
@@ -6391,6 +6900,7 @@ def register_routes(app: Flask) -> None:
             # If the Academic Coordinator edited the offer list, honour their choices;
             # otherwise fall back to the demand-suggested offerings.
             selections = data.get("selections")
+            provisional_loads: dict[int, int] = {}
             if selections:
                 plan.notes = data.get("notes") or "Draft set by the Academic Coordinator from the suggested demand."
                 live_demand = {
@@ -6415,6 +6925,9 @@ def register_routes(app: Flask) -> None:
                         section_count = 0
                     if offered and section_count == 0:
                         section_count = 1
+                    assigned = automatic_faculty_assignment(
+                        course, target_term, section_count, plan.id, provisional_loads
+                    ) if offered else None
                     db.session.add(
                         CourseOffering(
                             plan_id=plan.id,
@@ -6424,21 +6937,29 @@ def register_routes(app: Flask) -> None:
                             availability_count=demand_row.get("availability_count", 0),
                             status="Offered" if offered else "Not Offered",
                             notes=sel.get("notes") or "Selected by Academic Coordinator",
+                            assigned_faculty_id=assigned.id if assigned else None,
+                            assignment_status="Proposed" if assigned else "Unassigned",
                         )
                     )
                 result = "Draft offering plan saved from the coordinator's selections"
             else:
                 plan.notes = data.get("notes") or "Draft generated from current missing-subject demand."
                 for row in course_demand_rows(program, target_term):
+                    course = Course.query.get(row["course"]["id"])
+                    assigned = automatic_faculty_assignment(
+                        course, target_term, row["suggested_sections"], plan.id, provisional_loads
+                    ) if row["demand_count"] > 0 else None
                     db.session.add(
                         CourseOffering(
                             plan_id=plan.id,
                             course_id=row["course"]["id"],
-                            demand_count=0,
+                            demand_count=row["demand_count"],
                             section_count=row["suggested_sections"],
-                            availability_count=0,
+                            availability_count=row["availability_count"],
                             status="Suggested" if row["demand_count"] > 0 else "Not Offered",
                             notes=row["recommendation"],
+                            assigned_faculty_id=assigned.id if assigned else None,
+                            assignment_status="Proposed" if assigned else "Unassigned",
                         )
                     )
                 result = "Draft offering plan generated from demand"
@@ -6452,6 +6973,7 @@ def register_routes(app: Flask) -> None:
                 for row in course_demand_rows(program, target_term)
             }
             existing = {offering.course_id: offering for offering in plan.offerings}
+            provisional_loads: dict[int, int] = {}
             for course_id, row in live_demand.items():
                 offering = existing.get(course_id)
                 if not offering:
@@ -6462,9 +6984,21 @@ def register_routes(app: Flask) -> None:
                         section_count=row["suggested_sections"],
                     )
                     db.session.add(offering)
+                if offering.status != "Not Offered" and not offering.assigned_faculty_id:
+                    course = Course.query.get(course_id)
+                    assigned = automatic_faculty_assignment(
+                        course, target_term, offering.section_count or 1, plan.id, provisional_loads
+                    )
+                    offering.assigned_faculty_id = assigned.id if assigned else None
+                offering.assignment_status = (
+                    "Pending Approval" if offering.assigned_faculty_id else "Unassigned"
+                )
                 offering.demand_count = row["demand_count"]
                 offering.availability_count = row["availability_count"]
                 offering.notes = offering.notes or row["recommendation"]
+            for offering in plan.offerings:
+                if offering.assigned_faculty_id and offering.status != "Not Offered":
+                    offering.assignment_status = "Pending Approval"
             plan.status = "Submitted"
             plan.submitted_at = now_utc()
             plan.notes = data.get("notes") or plan.notes
@@ -6482,6 +7016,18 @@ def register_routes(app: Flask) -> None:
                         "Use a label such as AY 2026-2027 1st Semester."
                     )
                 }), 400
+            offered_course_ids = {
+                offering.course_id for offering in plan.offerings if offering.status == "Offered"
+            }
+            removed_count = 0
+            for existing_offering in CurriculumOffering.query.filter_by(
+                program_id=program.id,
+                academic_year=academic_year,
+                semester=semester,
+            ).all():
+                if existing_offering.course_id not in offered_course_ids:
+                    db.session.delete(existing_offering)
+                    removed_count += 1
             published_count = 0
             for offering in plan.offerings:
                 if offering.status != "Offered":
@@ -6505,9 +7051,11 @@ def register_routes(app: Flask) -> None:
             plan.status = "Published"
             plan.published_at = now_utc()
             plan.notes = data.get("notes") or plan.notes
+            for student in Student.query.filter_by(program_id=program.id).all():
+                recompute_risk(student)
             result = (
                 "Final course offerings published to Curriculum Planning "
-                f"({published_count} new)"
+                f"({published_count} new, {removed_count} removed)"
             )
         elif action == "reopen":
             # Start a new draft from an already Submitted/Approved/Published plan so the
@@ -6571,12 +7119,18 @@ def register_routes(app: Flask) -> None:
         note = (data.get("note") or "").strip()
         if decision == "approve":
             plan.status = "Approved"
+            for offering in plan.offerings:
+                if offering.assigned_faculty_id and offering.status != "Not Offered":
+                    offering.assignment_status = "Approved"
             plan.approved_at = now_utc()
             plan.approved_by = account.full_name
             result = "Offering plan approved by Dean"
             next_owner = "Graduate School Staff"
         elif decision in ("return", "reject"):
             plan.status = "Returned"
+            for offering in plan.offerings:
+                if offering.assigned_faculty_id:
+                    offering.assignment_status = "Proposed"
             result = "Offering plan returned by Dean for revision"
             next_owner = "Academic Coordinator"
         else:
@@ -7399,6 +7953,30 @@ def register_routes(app: Flask) -> None:
             ]
         })
 
+    @app.route("/api/student-portal/assistant", methods=["POST"])
+    @require_api_login("student")
+    def student_portal_assistant():
+        data = request_payload()
+        question = (data.get("question") or "").strip()
+        if not question:
+            return jsonify({"error": "Ask a question to get started."}), 400
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        return jsonify(generate_student_answer(question, student))
+
+    @app.route("/api/student-portal/assistant/suggestions")
+    @require_api_login("student")
+    def student_portal_assistant_suggestions():
+        return jsonify({
+            "items": [
+                "What should I do next based on my record?",
+                "Which subjects am I currently enrolled in?",
+                "Explain the incomplete-grade re-enrollment rule.",
+                "What do I need before a research defense?",
+                "Explain the leave, AWOL, and residency rules for students.",
+            ]
+        })
+
     @app.route("/api/leave-of-absence/policy-review", methods=["POST"])
     @require_api_login("staff", "academic_coordinator", "dean")
     def leave_of_absence_policy_review():
@@ -7934,8 +8512,8 @@ def dashboard_stats(filters=None) -> dict:
     active_students = students_scope().filter(Student.standing == "Active").count()
     on_leave = students_scope().filter(Student.standing == "On Leave").count()
     completed = students_scope().filter(Student.current_stage == "Completed").count()
-    at_risk = students_scope().filter(Student.risk_level.in_(["Medium", "High", "Critical"])).count()
-    high_risk = students_scope().filter(Student.risk_level.in_(["High", "Critical"])).count()
+    at_risk = students_scope().filter(Student.risk_level.in_(["At Risk of Delay", "Delayed"])).count()
+    high_risk = students_scope().filter(Student.risk_level == "Delayed").count()
     withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
     pending_tasks = task_query.count()
     overdue_tasks = task_query.filter(Task.due_at < date.today(), Task.status != "Done").count()
@@ -7959,7 +8537,10 @@ def dashboard_stats(filters=None) -> dict:
         .group_by(Student.risk_level)
         .all()
     )
-    risk_distribution = [{"risk": level, "count": risk_counts.get(level, 0)} for level in ["Low", "Medium", "High", "Critical"]]
+    risk_distribution = [
+        {"risk": level, "count": risk_counts.get(level, 0)}
+        for level in ["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed"]
+    ]
 
     college_rows = (
         db.session.query(Program.college, func.count(Student.id))
@@ -8047,10 +8628,10 @@ def dashboard_stats(filters=None) -> dict:
 
 
 RISK_DEFINITIONS = {
-    "Low": "Student is progressing normally with no immediate intervention needed.",
-    "Medium": "Student may need monitoring due to early signs of delay or pending requirements.",
-    "High": "Student is delayed or has multiple pending items requiring staff follow-up.",
-    "Critical": "Student is significantly delayed, inactive, AWOL, or needs urgent intervention.",
+    "On Track": "No recorded condition currently indicates a delay.",
+    "At Risk of Delay": "A recorded condition may delay progress if it is not resolved.",
+    "Delayed": "A recorded academic or enrollment condition has already delayed progress.",
+    "Not Yet Assessed": "The student does not yet have enough coursework activity for a progress assessment.",
 }
 
 
@@ -9524,7 +10105,7 @@ def reports_payload(filters=None) -> dict:
         .all()
     ]
     at_risk_rows = []
-    for student in filtered_students_query(filters).filter(Student.risk_level.in_(["Medium", "High"])).limit(120).all():
+    for student in filtered_students_query(filters).filter(Student.risk_level.in_(["At Risk of Delay", "Delayed"])).limit(120).all():
         recs = student_recommendations(student)["recommendations"]
         at_risk_rows.append({
             "student": student_brief(student),
@@ -10375,6 +10956,22 @@ def _entry_year_from_ay(ay: str) -> int:
     return n if n >= 1900 else 2000 + n
 
 
+def academic_year_start(term: AcademicTerm | None = None) -> int:
+    term = term or get_active_term()
+    match = re.search(r"(\d{4})\s*-\s*\d{4}", term.label if term else "")
+    if match:
+        return int(match.group(1))
+    today = date.today()
+    return today.year if today.month >= 6 else today.year - 1
+
+
+def student_current_course_year(student: Student, term: AcademicTerm | None = None) -> int | None:
+    entry_year = int(student.entry_year or _entry_year_from_ay(student.academic_year_entry or "") or 0)
+    if not entry_year:
+        return None
+    return max(1, academic_year_start(term) - entry_year + 1)
+
+
 def student_academic_year_entry(student: Student) -> str:
     """Return the source AY Entry label, with a legacy-safe derived fallback."""
     if (student.academic_year_entry or "").strip():
@@ -10472,6 +11069,7 @@ def parse_ac_monitoring(stream) -> dict:
             subject_titles[code] = title
 
     rows = []
+    issues = []
     last_ay = None
     for r in range(sub + 1, len(grid) + 1):
         idno = cell(r, idno_c) if idno_c else ""
@@ -10479,6 +11077,15 @@ def parse_ac_monitoring(stream) -> dict:
         if ay_here:
             last_ay = ay_here
         if not idno:
+            last = cell(r, sn_c) if sn_c else ""
+            first = cell(r, fn_c) if fn_c else ""
+            if last or first:
+                issues.append({
+                    "row": r,
+                    "type": "Missing official student ID",
+                    "student_name": f"{first} {last}".strip(),
+                    "message": "This student was not imported because IDNO is blank.",
+                })
             continue
         last = cell(r, sn_c) if sn_c else ""
         first = cell(r, fn_c) if fn_c else ""
@@ -10507,6 +11114,7 @@ def parse_ac_monitoring(stream) -> dict:
         "subject_categories": subject_categories,
         "subject_titles": subject_titles,
         "rows": rows,
+        "issues": issues,
     }
 
 
@@ -10630,12 +11238,13 @@ def import_ac_monitoring(parsed: dict) -> dict:
                     "differences": comparison["differences"],
                 })
             else:
+                derived_year = str(student_current_course_year(student, term) or row["year"] or "")
                 metadata_changed = (
                     student.academic_year_entry != row["ay_entry"]
-                    or student.year_level != row["year"]
+                    or student.year_level != derived_year
                 )
                 student.academic_year_entry = row["ay_entry"]
-                student.year_level = row["year"]
+                student.year_level = derived_year
                 if metadata_changed:
                     updated += 1
                 duplicates.append({
@@ -10669,7 +11278,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
         student.program_id = program.id
         student.entry_year = entry_year
         student.academic_year_entry = row["ay_entry"]
-        student.year_level = row["year"]
+        student.year_level = str(student_current_course_year(student, term) or row["year"] or "")
         if row.get("comprehensive_exam_passed"):
             student.comprehensive_exam_status = "Passed"
         if is_new or not student.email:
@@ -10751,6 +11360,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
         "duplicates": duplicates,
         "duplicate_count": len(duplicates),
         "subject_changes": subject_changes,
+        "issues": parsed.get("issues", []),
         "students_changed": students_changed,
         "conflicts": conflicts,
         "conflict_count": len(conflicts),
@@ -10783,6 +11393,7 @@ def monitoring_upload_dict(upload: MonitoringSheetUpload) -> dict:
         "skipped": result.get("skipped", 0),
         "conflict_count": result.get("conflict_count", 0),
         "conflicts": result.get("conflicts", []),
+        "issues": result.get("issues", []),
         "download_url": f"/api/monitoring/uploads/{upload.id}/download",
     }
 
@@ -12353,6 +12964,24 @@ def faculty_profile_dict(faculty: Faculty) -> dict:
                 "assigned_at": iso(assignment.assigned_at),
             }
         )
+    payload["teaching_assignments"] = [
+        {
+            "id": offering.id,
+            "course_code": offering.course.code,
+            "course_title": offering.course.title,
+            "term_label": offering.plan.term_label,
+            "units": (offering.course.units or 3) * max(offering.section_count or 1, 1),
+            "status": offering.assignment_status,
+        }
+        for offering in (
+            CourseOffering.query.filter_by(assigned_faculty_id=faculty.id)
+            .join(CourseOfferingPlan)
+            .order_by(CourseOfferingPlan.updated_at.desc())
+            .limit(12)
+            .all()
+        )
+        if offering.course and offering.plan
+    ]
     window_end = date.today() + timedelta(days=35)
     payload["calendar_events"] = faculty_calendar_blocks(faculty, date.today(), window_end)
     return payload
@@ -14522,7 +15151,7 @@ def curriculum_planning_payload(program: Program, term: AcademicTerm | None = No
             active_count += 1
         if student.standing == "On Leave":
             loa_count += 1
-        if student.risk_level in ("Medium", "High") or student.current_stage == "LOA":
+        if student.risk_level in ("At Risk of Delay", "Delayed") or student.current_stage == "LOA":
             delayed_count += 1
         record_count = CourseRecord.query.filter_by(student_id=student.id).count()
         missing_rows = max(len(courses) - record_count, 0)
@@ -14596,6 +15225,92 @@ def curriculum_planning_payload(program: Program, term: AcademicTerm | None = No
     }
 
 
+FACULTY_TEACHING_LOAD_LIMIT = 24
+
+
+def faculty_preferred_course_ids(faculty: Faculty) -> list[int]:
+    return [
+        item.course_id
+        for item in FacultyCoursePreference.query.filter_by(faculty_id=faculty.id)
+        .order_by(FacultyCoursePreference.priority, FacultyCoursePreference.id)
+        .all()
+    ]
+
+
+def faculty_teaching_load_units(
+    faculty: Faculty,
+    term: AcademicTerm | None = None,
+    exclude_plan_id: int | None = None,
+) -> int:
+    query = CourseOffering.query.join(CourseOfferingPlan).filter(
+        CourseOffering.assigned_faculty_id == faculty.id,
+        CourseOffering.status.in_(["Suggested", "Offered"]),
+        CourseOffering.assignment_status.in_(["Proposed", "Pending Approval", "Approved"]),
+    )
+    if term:
+        query = query.filter(CourseOfferingPlan.term_label == term.label)
+    if exclude_plan_id:
+        query = query.filter(CourseOfferingPlan.id != exclude_plan_id)
+    return sum((item.course.units or 3) * max(item.section_count or 1, 1) for item in query.all())
+
+
+def faculty_candidates_for_course(
+    course: Course,
+    term: AcademicTerm | None,
+    sections: int = 1,
+    exclude_plan_id: int | None = None,
+) -> list[dict]:
+    required_units = (course.units or 3) * max(sections, 1)
+    candidates = []
+    for faculty in Faculty.query.filter_by(college=course.program.college, active=True).all():
+        load = faculty_teaching_load_units(faculty, term, exclude_plan_id)
+        has_availability = any(row["enabled"] for row in faculty_working_hours(faculty))
+        if not has_availability or load + required_units > FACULTY_TEACHING_LOAD_LIMIT:
+            continue
+        preferred_ids = faculty_preferred_course_ids(faculty)
+        candidates.append({
+            "faculty": faculty,
+            "preferred": course.id in preferred_ids,
+            "preference_rank": preferred_ids.index(course.id) if course.id in preferred_ids else 999,
+            "current_load": load,
+            "projected_load": load + required_units,
+        })
+    return sorted(
+        candidates,
+        key=lambda row: (not row["preferred"], row["preference_rank"], row["current_load"], row["faculty"].name),
+    )
+
+
+def automatic_faculty_assignment(
+    course: Course,
+    term: AcademicTerm | None,
+    sections: int,
+    plan_id: int | None,
+    provisional_loads: dict[int, int],
+) -> Faculty | None:
+    units = (course.units or 3) * max(sections, 1)
+    candidates = faculty_candidates_for_course(course, term, sections, exclude_plan_id=plan_id)
+    eligible = [
+        row for row in candidates
+        if row["current_load"] + provisional_loads.get(row["faculty"].id, 0) + units
+        <= FACULTY_TEACHING_LOAD_LIMIT
+    ]
+    if not eligible:
+        return None
+    selected = min(
+        eligible,
+        key=lambda row: (
+            not row["preferred"],
+            row["preference_rank"],
+            row["current_load"] + provisional_loads.get(row["faculty"].id, 0),
+            row["faculty"].name,
+        ),
+    )
+    faculty = selected["faculty"]
+    provisional_loads[faculty.id] = provisional_loads.get(faculty.id, 0) + units
+    return faculty
+
+
 def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> list[dict]:
     # Subject demand counts only currently ENROLLED students who have not yet taken
     # the subject (LOA / AWOL / Completed are excluded), per the AC's process.
@@ -14607,36 +15322,31 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
             TermEnrollment.status.in_(["Confirmed", "Enrolled", "Active"]),
         )
     students = student_query.distinct().order_by(Student.last_name).all()
-    available_faculty = Faculty.query.filter_by(college=program.college, active=True).count()
-    future_slots = (
-        db.session.query(FacultyAvailability.faculty_id)
-        .join(Faculty, Faculty.id == FacultyAvailability.faculty_id)
-        .filter(Faculty.college == program.college, FacultyAvailability.available_date >= date.today())
-        .distinct()
-        .count()
-    )
-    availability_count = max(available_faculty, future_slots)
     for student in students:
         semester = student_semester_subjects(student, term)
-        for next_subject in semester["next_subjects"]:
-            course = Course.query.get(next_subject["id"])
+        student_courses = [
+            (row, "Currently enrolled", True) for row in semester["current_subjects"]
+        ] + [
+            (row, "Needed next", True) for row in semester["next_subjects"]
+        ]
+        for subject, basis, will_delay in student_courses:
+            course = Course.query.get(subject["id"])
             if course.id not in demand:
-                demand[course.id] = {"course": course, "students": []}
-            demand[course.id]["students"].append(student)
+                demand[course.id] = {"course": course, "students": {}}
+            demand[course.id]["students"][student.id] = {
+                "student": student,
+                "basis": basis,
+                "will_delay": will_delay,
+            }
 
     rows = []
     for item in demand.values():
-        count = len(item["students"])
+        affected = list(item["students"].values())
+        count = len(affected)
         suggested_sections = max(1, (count + 24) // 25)
-        if count >= 15:
-            recommendation = "Offer this semester"
-            priority = "High"
-        elif count >= 5:
-            recommendation = "Review section feasibility"
-            priority = "Medium"
-        else:
-            recommendation = "Monitor demand"
-            priority = "Low"
+        recommendation = "Offer this semester - one student is sufficient demand"
+        priority = "High"
+        candidates = faculty_candidates_for_course(item["course"], term, suggested_sections)
         rows.append({
             "course": {
                 "id": item["course"].id,
@@ -14645,21 +15355,41 @@ def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> li
                 "category": item["course"].category,
             },
             "demand_count": count,
-            "student_sample": [student_brief(s) for s in item["students"][:5]],
+            "student_sample": [student_brief(row["student"]) for row in affected[:5]],
+            "affected_students": [
+                {
+                    **student_brief(row["student"]),
+                    "impact_basis": row["basis"],
+                    "will_be_delayed": row["will_delay"],
+                }
+                for row in affected
+            ],
+            "affected_count": count,
+            "delayed_count": sum(1 for row in affected if row["will_delay"]),
             "suggested_sections": suggested_sections,
-            "availability_count": availability_count,
+            "availability_count": len(candidates),
+            "faculty_candidates": [
+                {
+                    "id": row["faculty"].id,
+                    "name": row["faculty"].name,
+                    "preferred": row["preferred"],
+                    "current_load": row["current_load"],
+                    "projected_load": row["projected_load"],
+                }
+                for row in candidates[:8]
+            ],
             "priority": priority,
             "recommendation": recommendation,
         })
     rows.sort(key=lambda row: (-row["demand_count"], row["course"]["code"]))
-    return rows[:20]
+    return rows
 
 
 def course_adjustments_payload(program: Program, term: AcademicTerm | None = None) -> dict:
     term = term or get_active_term()
     live_demand = course_demand_rows(program, term)
     demand_by_course = {row["course"]["id"]: row for row in live_demand}
-    min_threshold = 5
+    min_threshold = 1
     high_threshold = 15
 
     def demand_status(count: int) -> str:
@@ -14677,10 +15407,6 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
         .first()
     )
     saved_by_course = {offering.course_id: offering for offering in latest_plan.offerings} if latest_plan else {}
-    availability_count = max(
-        (row["availability_count"] for row in live_demand),
-        default=Faculty.query.filter_by(college=program.college, active=True).count(),
-    )
     demand = []
     for course in Course.query.filter_by(program_id=program.id).order_by(Course.code).all():
         row = demand_by_course.get(course.id)
@@ -14694,8 +15420,21 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
                 },
                 "demand_count": 0,
                 "student_sample": [],
+                "affected_students": [],
+                "affected_count": 0,
+                "delayed_count": 0,
                 "suggested_sections": 1,
-                "availability_count": availability_count,
+                "availability_count": len(faculty_candidates_for_course(course, term, 1)),
+                "faculty_candidates": [
+                    {
+                        "id": candidate["faculty"].id,
+                        "name": candidate["faculty"].name,
+                        "preferred": candidate["preferred"],
+                        "current_load": candidate["current_load"],
+                        "projected_load": candidate["projected_load"],
+                    }
+                    for candidate in faculty_candidates_for_course(course, term, 1)[:8]
+                ],
                 "priority": "Manual",
                 "recommendation": "No automatic demand; available for manual offering.",
             }
@@ -14704,6 +15443,9 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
         row["offering_status"] = saved.status if saved else ("Suggested" if row["demand_count"] > 0 else None)
         row["section_count"] = saved.section_count if saved else row["suggested_sections"]
         row["offering_notes"] = saved.notes if saved else row["recommendation"]
+        row["assigned_faculty_id"] = saved.assigned_faculty_id if saved else None
+        row["assigned_faculty_name"] = saved.assigned_faculty.name if saved and saved.assigned_faculty else None
+        row["assignment_status"] = saved.assignment_status if saved else "Unassigned"
         row["selection_source"] = "Demand" if row["demand_count"] > 0 else "Manual"
         demand.append(row)
     demand.sort(key=lambda row: (-row["demand_count"], row["course"]["code"]))
@@ -14724,6 +15466,13 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
             "total_demand": sum(row["demand_count"] for row in demand),
             "high_priority": sum(1 for row in demand if row["priority"] == "High"),
             "suggested_sections": sum(row["suggested_sections"] for row in demand),
+            "affected_students": len({
+                student["id"] for row in demand for student in row.get("affected_students", [])
+            }),
+            "students_delayed_if_not_offered": len({
+                student["id"] for row in demand for student in row.get("affected_students", [])
+                if student.get("will_be_delayed")
+            }),
         },
         "demand": demand,
         "latest_plan": course_offering_plan_dict(latest_plan),
@@ -14932,6 +15681,20 @@ def ensure_student_monitoring_columns_schema() -> None:
         db.session.commit()
 
 
+def ensure_course_year_consistency() -> int:
+    """Derive stored YR from AY Entry and the active academic semester."""
+    changed = 0
+    term = get_active_term()
+    for student in Student.query.all():
+        expected = str(student_current_course_year(student, term) or "")
+        if expected and student.year_level != expected:
+            student.year_level = expected
+            changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+
 def ensure_demo_comprehensive_exam_consistency() -> int:
     """Repair legacy generated rows so research never precedes a passed exam."""
     inspector = inspect(db.engine)
@@ -14968,7 +15731,7 @@ def ensure_demo_comprehensive_exam_consistency() -> int:
             CourseRecord.query.join(Course)
             .filter(
                 CourseRecord.student_id.in_(research_ids),
-                Course.category.in_(COMPRE_UNIT_REQUIREMENTS),
+                Course.category.in_(DEFAULT_COMPRE_UNIT_REQUIREMENTS),
                 CourseRecord.status != "Completed",
             )
             .all()
@@ -15363,6 +16126,16 @@ def ensure_curriculum_offering_schema() -> None:
         for name, sql_type in additions.items():
             if name not in existing:
                 db.session.execute(text(f"ALTER TABLE course_offering_plan ADD COLUMN {name} {sql_type}"))
+    FacultyCoursePreference.__table__.create(bind=db.engine, checkfirst=True)
+    if "course_offering" in tables:
+        existing = {column["name"] for column in inspector.get_columns("course_offering")}
+        additions = {
+            "assigned_faculty_id": "INTEGER",
+            "assignment_status": "VARCHAR(40) NOT NULL DEFAULT 'Unassigned'",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE course_offering ADD COLUMN {name} {sql_type}"))
     db.session.commit()
 
 
@@ -16343,6 +17116,7 @@ def seed_database(count: int = 350) -> None:
         ("MSN", "Master of Science in Nursing", "Nursing", True),
         ("MAN", "Master of Arts in Nursing", "Nursing", True),
         ("MAPSY", "Master of Arts in Psychology", "Arts and Sciences", True),
+        ("DPSY", "Doctor of Philosophy in Psychology", "Arts and Sciences", True),
         ("MAGC", "Master of Arts in Guidance and Counseling", "Education", True),
         ("MASS", "Master of Arts in Social Sciences", "Arts and Sciences", False),
     ]
@@ -16352,6 +17126,7 @@ def seed_database(count: int = 350) -> None:
         db.session.add(program)
         programs.append(program)
     db.session.flush()
+    ensure_authoritative_curricula()
 
     terms = []
     for label, start in generate_semester_calendar(2023, 2030):
@@ -16376,6 +17151,7 @@ def seed_database(count: int = 350) -> None:
     db.session.commit()
 
     sync_all_curricula()
+    ensure_course_year_consistency()
     for student in Student.query.all():
         recompute_risk(student)
     ensure_demo_accounts()
@@ -16732,6 +17508,9 @@ with app.app_context():
     ensure_curriculum_offering_schema()
     ensure_user_account_schema()
     ensure_faculty_account_schema()
+    ensure_authoritative_curricula()
+    ensure_course_year_consistency()
+    ensure_delay_status_consistency()
 
 
 if __name__ == "__main__":

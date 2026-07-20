@@ -25,6 +25,7 @@ import {
   LayoutDashboard,
   UserX,
   BookOpenCheck,
+  Bot,
 } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -49,6 +50,7 @@ const STUDENT_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
   { id: "lifecycle", label: "Lifecycle Status", icon: Activity },
   { id: "courses", label: "My Courses", icon: ClipboardCheck },
+  { id: "assistant", label: "Policy Assistant", icon: Bot },
   { id: "research", label: "Research Submission", icon: FileCheck },
   { id: "schedule", label: "Defense Schedule", icon: CalendarCheck },
   { id: "loa", label: "Leave of Absence", icon: CalendarOff },
@@ -197,6 +199,7 @@ export default function StudentPortal() {
                 {view === "overview" && <div className="grid grid-cols-1 gap-5 lg:grid-cols-12"><div className="space-y-5 lg:col-span-8"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /><ActivityPanel logs={data.logs} /></div><div className="space-y-5 lg:col-span-4"><TasksPanel tasks={data.tasks} /><SchedulePanel schedules={data.schedules} /><RecommendationsPanel recommendations={data.recommendations} /></div></div>}
                 {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
                 {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
+                {view === "assistant" && <StudentPolicyAssistant />}
                 {["research", "schedule", "loa", "readmission", "awol", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
                 {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
                 {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
@@ -224,6 +227,7 @@ function StudentHero({ data }) {
             <p className="text-sm text-slate-500">
               {student.student_number} - {student.program_name}
             </p>
+            <p className="mt-1 text-xs font-semibold text-brand-700">AY Entry {student.academic_year_entry || "Not recorded"} · {student.course_year_label || "Course year unavailable"}</p>
             <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500">
               <Mail className="h-4 w-4" /> {student.email}
             </p>
@@ -231,7 +235,7 @@ function StudentHero({ data }) {
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[520px]">
           <MiniStat label="Stage" value={student.current_stage} />
-          <MiniStat label="Standing" value={student.standing} badge />
+          <MiniStat label="Progress" value={data.progress_status?.level || "Not yet assessed"} badge />
           <MiniStat label="Coursework" value={`${course_audit.completion_rate}%`} />
           <MiniStat label="Research" value={research_case?.status || "Not started"} badge />
         </div>
@@ -372,6 +376,83 @@ function WorkflowStatusPanel({ data }) {
 }
 
 function MyCoursesPanel({ data, onSaved }) {
+  const subjects = data.curriculum_subjects || [];
+  const [selected, setSelected] = useState(() => new Set(subjects.filter((item) => item.is_enrolled).map((item) => item.id)));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const grouped = useMemo(() => subjects.reduce((groups, subject) => {
+    const category = subject.category || "Other";
+    if (!groups[category]) groups[category] = [];
+    groups[category].push(subject);
+    return groups;
+  }, {}), [subjects]);
+
+  useEffect(() => {
+    setSelected(new Set(subjects.filter((item) => item.is_enrolled).map((item) => item.id)));
+  }, [data.student.id, subjects.filter((item) => item.is_enrolled).map((item) => item.id).join(",")]);
+
+  function toggle(subject) {
+    if (subject.status === "Completed" || (!subject.is_offered && !subject.is_enrolled)) return;
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(subject.id)) next.delete(subject.id); else next.add(subject.id);
+      return next;
+    });
+    setMessage("");
+  }
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api.saveStudentEnrollment([...selected], data.current_term?.id);
+      setMessage(result.message);
+      await onSaved();
+    } catch (err) {
+      setError(err.message || "Could not save your current subjects.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-6">
+      <SectionTitle title="My suggested curriculum" subtitle="Check the published subjects you are currently taking. Unchecking a current subject drops it immediately and updates every connected record." icon={BookOpenCheck} />
+      <div className="mb-5 rounded-xl border border-brand-100 bg-brand-50/50 p-4 text-sm text-slate-700">
+        <p className="font-semibold text-ink">{data.current_term?.label || "Current semester"}</p>
+        <p className="mt-1 text-xs">There is no separate drop request, approval, reason, or supporting document. Completed subjects stay locked as part of your academic history.</p>
+      </div>
+      {subjects.length ? <div className="space-y-5">
+        {Object.entries(grouped).map(([category, rows]) => (
+          <section key={category}>
+            <div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-semibold text-ink">{category}</h3><span className="text-xs text-slate-500">{rows.length} subject{rows.length === 1 ? "" : "s"}</span></div>
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              {rows.map((subject) => {
+                const checked = selected.has(subject.id);
+                const disabled = subject.status === "Completed" || (!subject.is_offered && !subject.is_enrolled);
+                return <label key={subject.id} className={`flex items-start gap-3 border-b border-slate-100 p-3 last:border-b-0 ${disabled ? "cursor-not-allowed bg-slate-50/70" : "cursor-pointer transition-colors hover:bg-brand-50/40"}`}>
+                  <input type="checkbox" checked={subject.status === "Completed" || checked} onChange={() => toggle(subject)} disabled={disabled} className="mt-1 h-4 w-4 accent-brand-600" aria-label={`Currently enrolled in ${subject.code}`} />
+                  <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{subject.code} · {subject.title}</span><span className="mt-0.5 block text-xs text-slate-500">{subject.units} units · {subject.recommended_term || "No suggested semester"}</span></span>
+                  <span className="flex flex-wrap justify-end gap-1.5"><StatusBadge value={subject.status === "Missing" ? "Not taken" : subject.status} dot={false} /><StatusBadge value={subject.is_offered ? "Offered" : "Not offered"} dot={false} /></span>
+                </label>;
+              })}
+            </div>
+          </section>
+        ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={save} disabled={busy} className="btn-primary cursor-pointer">{busy ? "Saving…" : "Save current subjects"}</button>
+          <p className="text-xs text-slate-500">{selected.size} subject{selected.size === 1 ? "" : "s"} checked for this semester.</p>
+        </div>
+        {message && <p className="rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{message}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
+      </div> : <EmptyState icon={BookOpenCheck} title="No curriculum is available" hint="Ask the Academic Coordinator to confirm your curriculum version." />}
+    </Card>
+  );
+}
+
+function LegacyMyCoursesPanel({ data, onSaved }) {
   const courses = data.course_records || [];
   const offeredSubjects = data.offered_subjects || [];
   const requests = data.course_drop_requests || [];
@@ -503,6 +584,51 @@ function MyCoursesPanel({ data, onSaved }) {
         ) : (
           <EmptyState icon={LogOut} title="No currently enrolled subjects" hint="Only enrolled or current subjects can be requested for dropping." />
         )}
+      </Card>
+    </div>
+  );
+}
+
+function StudentPolicyAssistant() {
+  const [question, setQuestion] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.studentAssistantSuggestions().then((response) => setSuggestions(response.items || [])).catch(() => setSuggestions([]));
+  }, []);
+
+  async function ask(event) {
+    event?.preventDefault();
+    if (!question.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      setResult(await api.studentAssistant(question.trim()));
+    } catch (err) {
+      setError(err.message || "The policy assistant could not answer right now.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-12">
+      <Card className="p-6 lg:col-span-8">
+        <SectionTitle title="Student Policy Assistant" subtitle="Ask about the Graduate School manual, student procedures, or your own academic record" icon={Bot} />
+        <div className="mb-4 rounded-xl border border-brand-100 bg-brand-50/50 p-4 text-xs leading-relaxed text-slate-600">This assistant cannot access other students, staff-only notes, faculty rankings, internal approval queues, or administrative records.</div>
+        <form onSubmit={ask} className="space-y-3">
+          <Field label="Your question"><Textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What should I do next based on my record?" /></Field>
+          <button type="submit" disabled={busy || !question.trim()} className="btn-primary cursor-pointer"><Send className="h-4 w-4" />{busy ? "Checking…" : "Ask assistant"}</button>
+        </form>
+        {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
+        {result && <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4"><p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{result.answer}</p>{result.citations?.length > 0 && <div className="mt-4 border-t border-slate-100 pt-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Manual references</p><ul className="mt-2 space-y-2">{result.citations.map((item) => <li key={item.id} className="text-xs text-slate-600"><span className="font-semibold text-ink">{item.title}</span> · {item.source}</li>)}</ul></div>}</div>}
+      </Card>
+      <Card className="p-5 lg:col-span-4">
+        <h3 className="text-sm font-semibold text-ink">Suggested questions</h3>
+        <div className="mt-3 space-y-2">{suggestions.map((item) => <button key={item} type="button" onClick={() => setQuestion(item)} className="w-full cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-left text-xs font-medium text-slate-600 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">{item}</button>)}</div>
       </Card>
     </div>
   );

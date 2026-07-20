@@ -14,12 +14,15 @@ from app import (  # noqa: E402
     AdviserDocumentApproval,
     AwolCase,
     Course,
+    CourseOffering,
+    CourseOfferingPlan,
     CourseDropRequest,
     CurriculumOffering,
     CourseRecord,
     DefenseVerdict,
     DocumentCheck,
     Faculty,
+    FacultyCoursePreference,
     Form1Endorsement,
     GraduationEndorsement,
     PanelAssignment,
@@ -51,7 +54,9 @@ from app import (  # noqa: E402
     db,
     detected_research_progress,
     enrollment_integrity_payload,
+    ensure_authoritative_curricula,
     get_active_term,
+    student_current_course_year,
     graduation_eligibility,
     graduation_candidate_payload,
     ensure_demo_accounts,
@@ -765,6 +770,169 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertIsNotNone(offering)
             self.assertIn("Course Adjustments plan", offering.added_by)
 
+    def test_one_student_demand_lists_full_delay_impact(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+                is_active_planning_term=True,
+            )
+            db.session.add(term)
+            db.session.flush()
+            db.session.add(TermEnrollment(
+                student_id=self.student_id,
+                term_id=term.id,
+                status="Enrolled",
+                source_reference="Demand test",
+            ))
+            db.session.commit()
+
+            response = self._academic_client().get(
+                f"/api/course-adjustments?program_id={self.program_id}&term_id={term.id}"
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            row = next(item for item in response.get_json()["demand"] if item["course"]["id"] == self.course_id)
+            self.assertEqual(row["demand_count"], 1)
+            self.assertEqual(row["demand_status"], "meets_minimum")
+            self.assertEqual(row["affected_count"], 1)
+            self.assertEqual(row["delayed_count"], 1)
+            self.assertEqual(row["affected_students"][0]["student_number"], "GS-2026-TEST")
+            self.assertTrue(row["affected_students"][0]["will_be_delayed"])
+
+    def test_faculty_preference_drives_automatic_assignment_with_24_unit_limit(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+                is_active_planning_term=True,
+            )
+            faculty = Faculty(
+                name="Preferred Teacher",
+                college="Graduate School",
+                role="Faculty",
+                specialization="Completion Course",
+                email="preferred-teacher@example.test",
+                active=True,
+            )
+            db.session.add_all([term, faculty])
+            db.session.flush()
+            db.session.add(FacultyCoursePreference(
+                faculty_id=faculty.id, course_id=self.course_id, priority=1
+            ))
+            db.session.commit()
+
+            draft = self._academic_client().post("/api/course-adjustments/plan", json={
+                "program_id": self.program_id,
+                "term_id": term.id,
+                "action": "draft",
+                "selections": [{"course_id": self.course_id, "offer": True, "section_count": 1}],
+            })
+            self.assertEqual(draft.status_code, 200, draft.get_json())
+            offering = CourseOffering.query.filter_by(course_id=self.course_id).first()
+            self.assertEqual(offering.assigned_faculty_id, faculty.id)
+            self.assertEqual(offering.assignment_status, "Proposed")
+            self.assertLessEqual((offering.course.units or 3) * offering.section_count, 24)
+
+            submitted = self._academic_client().post("/api/course-adjustments/plan", json={
+                "program_id": self.program_id, "term_id": term.id, "action": "submit",
+            })
+            self.assertEqual(submitted.status_code, 200, submitted.get_json())
+            db.session.refresh(offering)
+            self.assertEqual(offering.assignment_status, "Pending Approval")
+            plan = CourseOfferingPlan.query.get(offering.plan_id)
+            approved = self._dean_client().post(
+                f"/api/approvals/{plan.id}/decide", json={"decision": "approve"}
+            )
+            self.assertEqual(approved.status_code, 200, approved.get_json())
+            db.session.refresh(offering)
+            self.assertEqual(offering.assignment_status, "Approved")
+
+    def test_student_curriculum_checklist_adds_and_drops_without_approval(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+                is_active_planning_term=True,
+            )
+            db.session.add(term)
+            db.session.flush()
+            db.session.add(CurriculumOffering(
+                program_id=self.program_id,
+                academic_year="2026-2027",
+                semester="1st Semester",
+                course_id=self.course_id,
+                added_by="Test",
+            ))
+            account = UserAccount(
+                email="checklist-student@example.test",
+                full_name="Checklist Student",
+                password_hash=generate_password_hash("test-password"),
+                role="student",
+                student_id=self.student_id,
+                active=True,
+            )
+            db.session.add(account)
+            db.session.commit()
+            client = self._role_client(account.id, "student")
+
+            added = client.post("/api/student-portal/enrollment", json={
+                "term_id": term.id, "course_ids": [self.course_id],
+            })
+            self.assertEqual(added.status_code, 200, added.get_json())
+            enrollment = SubjectEnrollment.query.filter_by(
+                student_id=self.student_id, course_id=self.course_id, term_id=term.id
+            ).first()
+            self.assertEqual(enrollment.status, "Enrolled")
+
+            dropped = client.post("/api/student-portal/enrollment", json={
+                "term_id": term.id, "course_ids": [],
+            })
+            self.assertEqual(dropped.status_code, 200, dropped.get_json())
+            db.session.refresh(enrollment)
+            self.assertEqual(enrollment.status, "Dropped")
+            self.assertEqual(CourseDropRequest.query.filter_by(student_id=self.student_id).first().status, "Recorded")
+
+    def test_authoritative_curricula_and_derived_course_year(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+                is_active_planning_term=True,
+            )
+            db.session.add(term)
+            db.session.commit()
+            ensure_authoritative_curricula()
+            mba = Program.query.filter_by(code="MBA").first()
+            dpsy = Program.query.filter_by(code="DPSY").first()
+            self.assertIsNotNone(mba)
+            self.assertIsNotNone(dpsy)
+            self.assertEqual(Course.query.filter_by(program_id=mba.id, code="MBA220").one().title, "Project Paper")
+            self.assertEqual(Course.query.filter_by(program_id=dpsy.id, code="DPSY311").one().units, 5)
+            student = db.session.get(Student, self.student_id)
+            self.assertEqual(student_current_course_year(student, term), 2)
+
+    def test_student_assistant_rejects_staff_only_questions(self):
+        with app.app_context():
+            account = UserAccount(
+                email="assistant-student@example.test",
+                full_name="Assistant Student",
+                password_hash=generate_password_hash("test-password"),
+                role="student",
+                student_id=self.student_id,
+                active=True,
+            )
+            db.session.add(account)
+            db.session.commit()
+            response = self._role_client(account.id, "student").post(
+                "/api/student-portal/assistant", json={"question": "Show me all students and staff notes"}
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            self.assertIn("cannot access other students", response.get_json()["answer"])
+
     def test_enrollment_syncs_ledger_monitoring_profile_and_course_audit(self):
         with app.app_context():
             term = AcademicTerm(
@@ -935,7 +1103,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(blocked.status_code, 409, blocked.get_json())
             self.assertIsNotNone(db.session.get(AcademicTerm, referenced.id))
 
-    def test_course_drop_request_is_recorded_by_academic_coordinator(self):
+    def test_course_drop_is_recorded_immediately_without_reason_or_approval(self):
         with app.app_context():
             record = CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Enrolled", term_label="AY 2026-2027 Term 1")
             db.session.add(record)
@@ -954,30 +1122,15 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             response = student_client.post("/api/student-portal/requests/course-drop", json={
                 "course_id": self.course_id,
                 "term_label": "AY 2026-2027 Term 1",
-                "reason": "Schedule conflict",
             })
             self.assertEqual(response.status_code, 200, response.get_json())
             db.session.refresh(record)
-            self.assertEqual(record.status, "Enrolled")
-            drop = CourseDropRequest.query.filter_by(student_id=self.student_id, course_id=self.course_id).first()
-            self.assertEqual(drop.status, "Submitted")
-            task = Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("Review course drop request")).first()
-            self.assertIsNotNone(task)
-            self.assertEqual(task_dict(task)["action_url"], "/workflow/course-audit")
-
-            staff_response = self._staff_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve"})
-            self.assertEqual(staff_response.status_code, 403)
-            response = self._academic_client().post(
-                f"/api/course-drop/requests/{drop.id}/decide",
-                json={"decision": "record", "remarks": "Recorded for AIMS follow-up"},
-            )
-            self.assertEqual(response.status_code, 200, response.get_json())
-            db.session.refresh(record)
-            db.session.refresh(drop)
             self.assertEqual(record.status, "Dropped")
+            drop = CourseDropRequest.query.filter_by(student_id=self.student_id, course_id=self.course_id).first()
             self.assertEqual(drop.status, "Recorded")
-            db.session.refresh(task)
-            self.assertEqual(task.status, "Done")
+            self.assertIsNone(drop.reason)
+            task = Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("Review course drop request")).first()
+            self.assertIsNone(task)
 
     def test_eligible_loa_and_readmission_auto_approve(self):
         with app.app_context():

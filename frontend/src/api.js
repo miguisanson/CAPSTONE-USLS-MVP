@@ -48,6 +48,11 @@ export const api = {
     return request(`/students${qs ? `?${qs}` : ""}`);
   },
   faculty: () => request("/faculty"),
+  saveFacultyPreferences: (facultyId, courseIds) =>
+    request(`/faculty/${facultyId}/preferences`, {
+      method: "PUT",
+      body: JSON.stringify({ course_ids: courseIds }),
+    }),
   student: (id) => request(`/students/${id}`),
   duplicateStudents: () => request("/students/duplicates"),
   mergeStudents: (payload) =>
@@ -208,6 +213,14 @@ export const api = {
   awolPolicyReview: (payload) =>
     request("/awol/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   studentPortalContext: () => request("/student-portal/context"),
+  saveStudentEnrollment: (courseIds, termId) =>
+    request("/student-portal/enrollment", {
+      method: "POST",
+      body: JSON.stringify({ course_ids: courseIds, term_id: termId || null }),
+    }),
+  studentAssistant: (question) =>
+    request("/student-portal/assistant", { method: "POST", body: JSON.stringify({ question }) }),
+  studentAssistantSuggestions: () => request("/student-portal/assistant/suggestions"),
   facultyPortalContext: () => request("/faculty-portal/context"),
   signAdviserPaper: (evidenceId, payload) =>
     request(`/faculty-portal/adviser-approvals/${evidenceId}`, { method: "POST", body: JSON.stringify(payload) }),

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness, Building2, CalendarCheck2, CalendarDays, ChevronLeft,
-  ChevronRight, ExternalLink, Link2, Mail, Search, UsersRound, X,
+  ChevronRight, ExternalLink, Link2, Mail, Search, UsersRound, X, BookOpenCheck, Save,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
@@ -10,7 +10,7 @@ import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
 import { initials } from "../lib/format";
 
 export default function Faculty() {
-  const { data, loading, error } = useApi(() => api.faculty(), []);
+  const { data, loading, error, refetch } = useApi(() => api.faculty(), []);
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("All departments");
@@ -136,12 +136,12 @@ export default function Faculty() {
         )}
       </Card>
 
-      {selected && <FacultyProfileModal faculty={selected} onClose={closeFaculty} />}
+      {selected && <FacultyProfileModal faculty={selected} courses={data?.courses || []} onSaved={refetch} onClose={closeFaculty} />}
     </div>
   );
 }
 
-function FacultyProfileModal({ faculty, onClose }) {
+function FacultyProfileModal({ faculty, courses, onSaved, onClose }) {
   const calendar = faculty.calendar || {};
   const feedUrl = calendar.feed_url || `/api/faculty/${faculty.id}/calendar.ics`;
   return (
@@ -169,6 +169,10 @@ function FacultyProfileModal({ faculty, onClose }) {
               <p className="mt-2 text-xs text-slate-500">Used to explain recommendations in Panel Matching.</p>
             </ProfileSection>
 
+            <ProfileSection icon={BookOpenCheck} title="Preferred teaching subjects">
+              <PreferenceEditor faculty={faculty} courses={courses} onSaved={onSaved} />
+            </ProfileSection>
+
             <div className="space-y-6">
               <ProfileSection icon={Mail} title="Contact">
                 <a className="text-sm font-medium text-brand-700 hover:underline" href={`mailto:${faculty.email}`}>{faculty.email}</a>
@@ -178,6 +182,11 @@ function FacultyProfileModal({ faculty, onClose }) {
                 </div>
               </ProfileSection>
               <ProfileSection icon={UsersRound} title="Current assignments">
+                <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-slate-600">Teaching load</span><span className="text-sm font-bold text-ink">{faculty.teaching_load_units || 0}/{faculty.teaching_load_limit || 24} units</span></div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><span className="block h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, ((faculty.teaching_load_units || 0) / (faculty.teaching_load_limit || 24)) * 100)}%` }} /></div>
+                </div>
+                {(faculty.teaching_assignments || []).length ? <div className="mb-3 space-y-2">{faculty.teaching_assignments.slice(0, 4).map((assignment) => <div key={assignment.id} className="rounded-lg border border-slate-100 p-3"><p className="text-sm font-semibold text-ink">{assignment.course_code} · {assignment.units} units</p><p className="mt-1 text-xs text-slate-500">{assignment.term_label} · {assignment.status}</p></div>)}</div> : null}
                 {(faculty.current_assignments || []).length ? <div className="space-y-2">{faculty.current_assignments.slice(0, 3).map((assignment) => (
                   <div key={assignment.id} className="rounded-lg border border-slate-100 p-3"><div className="flex justify-between gap-2"><p className="text-sm font-semibold text-ink">{assignment.student_name}</p><span className="text-[11px] font-bold text-brand-700">{assignment.panel_role}</span></div><p className="mt-1 line-clamp-2 text-xs text-slate-500">{assignment.research_title}</p></div>
                 ))}</div> : <p className="text-sm text-slate-500">No current panel assignments.</p>}
@@ -195,6 +204,61 @@ function FacultyProfileModal({ faculty, onClose }) {
           <WeeklyCalendar faculty={faculty} />
         </div>
       </Card>
+    </div>
+  );
+}
+
+function PreferenceEditor({ faculty, courses, onSaved }) {
+  const available = courses.filter((course) => course.college === faculty.college);
+  const [selected, setSelected] = useState(() => new Set((faculty.preferred_subjects || []).map((item) => item.id)));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setSelected(new Set((faculty.preferred_subjects || []).map((item) => item.id)));
+    setMessage("");
+    setError("");
+  }, [faculty.id, faculty.preferred_subjects?.map((item) => item.id).join(",")]);
+
+  function toggle(id) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api.saveFacultyPreferences(faculty.id, [...selected]);
+      setMessage(result.message);
+      await onSaved?.();
+    } catch (err) {
+      setError(err.message || "Could not save preferred subjects.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs text-slate-500">These choices are ranked first when course assignments are generated. Availability and the 24-unit ceiling are still enforced.</p>
+      <div className="mt-3 max-h-52 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
+        {available.map((course) => (
+          <label key={course.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-brand-50">
+            <input type="checkbox" checked={selected.has(course.id)} onChange={() => toggle(course.id)} className="mt-0.5 h-4 w-4 accent-brand-600" />
+            <span><span className="block text-xs font-semibold text-ink">{course.code}</span><span className="block text-[11px] text-slate-500">{course.title} · {course.units} units</span></span>
+          </label>
+        ))}
+        {!available.length && <p className="p-2 text-xs text-slate-500">No curriculum subjects are available for this college.</p>}
+      </div>
+      <button type="button" onClick={save} disabled={busy} className="btn-primary mt-3 cursor-pointer px-3 py-2 text-xs"><Save className="h-4 w-4" />{busy ? "Saving…" : "Save preferences"}</button>
+      {message && <p className="mt-2 text-xs font-semibold text-brand-700">{message}</p>}
+      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   );
 }

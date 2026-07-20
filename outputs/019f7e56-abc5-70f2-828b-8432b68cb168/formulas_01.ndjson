@@ -1,0 +1,13 @@
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"AG4","formula":"=SUM(M4,T4,AE4)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"M5","formula":"=SUM(H5:L5)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"T5","formula":"=SUM(N5:S5)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"AE5","formula":"=SUM(U5:AD5)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"M16","formula":"=SUM(H16:L16)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"T16","formula":"=SUM(N16:S16)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"AE16","formula":"=SUM(U16:AD16)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"AG16","formula":"=SUM(M16,T16,AE16)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"M28","formula":"=SUM(H28:L28)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"T28","formula":"=SUM(N28:S28)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"AE28","formula":"=SUM(U28:AD28)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"AG28","formula":"=SUM(M28,T28,AE28)"}
+{"kind":"formula","sheet":"CUR 2021-2022<Template>","address":"B29","formula":"=B28+1"}
