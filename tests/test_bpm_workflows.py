@@ -42,13 +42,18 @@ from app import (  # noqa: E402
     WithdrawalApplication,
     REQUEST_UPLOAD_ROOT,
     app,
+    compute_course_audit,
+    curriculum_offerings_for_term,
     db,
     detected_research_progress,
+    enrollment_integrity_payload,
+    get_active_term,
     graduation_eligibility,
     graduation_candidate_payload,
     ensure_demo_accounts,
     panel_roles_for_student,
     required_documents_for_gate,
+    seed_database,
     submitted_request_students,
     task_dict,
     workflow_approvals_payload,
@@ -1277,6 +1282,147 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200, response.get_json())
             self.assertEqual(response.get_json()["user"]["role"], role)
+
+    def test_maed_monitoring_sheet_seeds_all_policy_valid_demo_personas(self):
+        with app.app_context():
+            seed_database()
+
+            program = Program.query.filter_by(code="MAED").one()
+            active_term = get_active_term()
+            students = {
+                student.student_number: student
+                for student in Student.query.filter_by(program_id=program.id).all()
+            }
+            self.assertEqual(len(students), 11)
+            self.assertTrue(active_term.is_active_planning_term)
+            self.assertEqual(
+                enrollment_integrity_payload(program, active_term)["issue_count"],
+                0,
+            )
+            self.assertEqual(SubjectEnrollment.query.count(), 0)
+
+            expected_completed = {
+                "GS-2026-0001": 0,
+                "GS-2026-0002": 3,
+                "GS-2026-0003": 9,
+                "GS-2026-0004": 18,
+                "GS-2026-0005": 6,
+                "GS-2026-0006": 12,
+                "GS-2026-0007": 18,
+                "GS-2026-0008": 18,
+                "GS-2026-0009": 9,
+                "GS-2026-0010": 6,
+                "GS-2026-0011": 18,
+            }
+            for student_number, completed_count in expected_completed.items():
+                audit = compute_course_audit(students[student_number])
+                self.assertEqual(
+                    len(audit["completed"]),
+                    completed_count,
+                    student_number,
+                )
+                self.assertEqual(audit["required_count"], 18, student_number)
+
+            daniel = students["GS-2026-0001"]
+            self.assertEqual(daniel.current_stage, "Admission")
+            self.assertEqual(
+                TermEnrollment.query.filter_by(
+                    student_id=daniel.id,
+                    term_id=active_term.id,
+                ).one().status,
+                "Pending Enrollment",
+            )
+
+            grace = students["GS-2026-0002"]
+            self.assertEqual(grace.current_stage, "Coursework")
+            self.assertEqual(
+                {item.course.code for item in curriculum_offerings_for_term(program, active_term)},
+                {"MAED-MAJ1", "MAED-MAJ2", "MAED-MAJ3"},
+            )
+
+            benjamin = students["GS-2026-0003"]
+            self.assertIsNotNone(TransactionLog.query.filter_by(
+                student_id=benjamin.id,
+                transaction_slug="leave-of-absence",
+                result="LOA application submitted",
+            ).first())
+            self.assertEqual(
+                submitted_request_students("leave-of-absence")[0]["student_number"],
+                benjamin.student_number,
+            )
+
+            miguel = students["GS-2026-0004"]
+            miguel_progress = graduation_eligibility(miguel)["research_progress"]
+            self.assertTrue(miguel_progress["stages"][0]["complete"])
+            self.assertTrue(miguel_progress["stages"][1]["complete"])
+            self.assertFalse(miguel_progress["stages"][2]["complete"])
+            self.assertEqual(PanelAssignment.query.filter_by(
+                student_id=miguel.id,
+                gate="Final Defense",
+            ).count(), 4)
+
+            clarisse = students["GS-2026-0005"]
+            clarisse_case = AwolCase.query.filter_by(student_id=clarisse.id).one()
+            self.assertEqual(clarisse_case.status, "Return Submitted")
+            self.assertIsNotNone(clarisse_case.intent_attachment_id)
+
+            adrian = students["GS-2026-0006"]
+            self.assertEqual(
+                WithdrawalApplication.query.filter_by(student_id=adrian.id).one().status,
+                "Submitted to GS Staff",
+            )
+
+            isabel = students["GS-2026-0007"]
+            isabel_eligibility = graduation_eligibility(isabel)
+            self.assertTrue(isabel_eligibility["eligible"])
+            self.assertEqual(isabel_eligibility["coursework_status"], "Complete")
+            self.assertEqual(isabel_eligibility["research_status"], "Complete")
+            self.assertEqual(isabel_eligibility["practicum_status"], "Dean Reviewed")
+            self.assertEqual(
+                GraduationEndorsement.query.filter_by(
+                    student_id=isabel.id,
+                ).one().endorsement_status,
+                "For Review",
+            )
+
+            hector = students["GS-2026-0008"]
+            hector_eligibility = graduation_eligibility(hector)
+            self.assertFalse(hector_eligibility["eligible"])
+            self.assertEqual(hector_eligibility["missing_coursework"], [])
+            self.assertEqual(hector_eligibility["missing_research_requirements"], [])
+            self.assertIn("120/200", hector_eligibility["missing_practicum_requirement"])
+            self.assertTrue(
+                hector_eligibility["research_progress"]["research_gates_complete"]
+            )
+            self.assertTrue(
+                hector_eligibility["research_progress"]["completion_evidence"]["complete"]
+            )
+
+            maria = students["GS-2026-0009"]
+            self.assertEqual(maria.standing, "On Leave")
+            self.assertEqual(
+                submitted_request_students("readmission")[0]["student_number"],
+                maria.student_number,
+            )
+
+            paulo = students["GS-2026-0010"]
+            self.assertEqual(paulo.enrollment_tag, "AWOL")
+            self.assertEqual(
+                AwolCase.query.filter_by(student_id=paulo.id).one().status,
+                "AWOL Declared",
+            )
+
+            elena = students["GS-2026-0011"]
+            elena_audit = compute_course_audit(elena)
+            self.assertEqual(elena_audit["completed_units"], 54)
+            self.assertEqual(elena.enrollment_tag, "Residency")
+            residency = ResidencyEnrollment.query.filter_by(
+                student_id=elena.id,
+                term_id=active_term.id,
+                status="Active",
+            ).one()
+            self.assertEqual(residency.reason, "Thesis / dissertation work")
+            self.assertEqual(residency.policy_status, "Eligible for Residency")
 
     def test_workflow_clarification_can_be_returned_and_answered(self):
         with app.app_context():

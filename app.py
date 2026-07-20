@@ -15309,103 +15309,658 @@ def import_faculty_sheets() -> int:
 
 
 def seed_maed_personas() -> None:
-    """Set up one MAED student per lifecycle stage so every workflow screen is
-    testable out of the box (curated demo personas, not random). Keyed by student
-    number from Documents/Monitoring_Sheets/MAED_Monitoring_Sheet.xlsx."""
-    def by_num(num):
-        return Student.query.filter_by(student_number=num).first()
+    """Create the policy-valid MAED workflow cohort from the monitoring sheet.
 
-    def attach(student, request_type, filename):
-        att = StudentRequestAttachment(
-            student_id=student.id, request_type=request_type,
-            original_name=filename, stored_name=f"persona-{request_type}-{student.id}.pdf",
-            mime_type="application/pdf", uploaded_by_name=student.name,
-            uploaded_by_role="student", uploaded_at=now_utc() - timedelta(days=2),
+    The workbook owns student identity and cumulative subject completion. This
+    fixture adds only the workflow state needed to exercise each transaction.
+    Every persona is keyed by the stable student number from
+    Documents/Monitoring_Sheets/MAED_Monitoring_Sheet.xlsx.
+    """
+
+    def by_num(number: str) -> Student | None:
+        return Student.query.filter_by(student_number=number).first()
+
+    def attachment(
+        student: Student,
+        request_type: str,
+        filename: str,
+        suffix: str,
+        workflow_stage: str | None = None,
+    ) -> StudentRequestAttachment:
+        stored_name = f"persona-{student.student_number.lower()}-{suffix}.pdf"
+        existing = StudentRequestAttachment.query.filter_by(stored_name=stored_name).first()
+        if existing:
+            return existing
+        item = StudentRequestAttachment(
+            student_id=student.id,
+            request_type=request_type,
+            workflow_stage=workflow_stage,
+            original_name=filename,
+            stored_name=stored_name,
+            mime_type="application/pdf",
+            uploaded_by_name=student.name,
+            uploaded_by_role="Student",
+            uploaded_at=now_utc() - timedelta(days=2),
         )
-        db.session.add(att); db.session.flush()
-        return att
+        db.session.add(item)
+        db.session.flush()
+        return item
+
+    def set_term_status(student: Student, status: str) -> None:
+        if not active_term:
+            return
+        enrollment = TermEnrollment.query.filter_by(
+            student_id=student.id,
+            term_id=active_term.id,
+        ).first()
+        if not enrollment:
+            enrollment = TermEnrollment(
+                student_id=student.id,
+                term_id=active_term.id,
+            )
+            db.session.add(enrollment)
+        enrollment.status = status
+        enrollment.source_reference = "MAED persona fixture"
+        enrollment.confirmed_at = now_utc()
+
+    panel_spec = [
+        ("Dr. Marlon Geronimo", "Panel Chair"),
+        ("Dr. Liwayway Bautista", "Content Specialist"),
+        ("Dr. Patricia Salvador", "Method Specialist"),
+        ("Dr. Teodoro Ramos", "External Panel"),
+    ]
+
+    def seed_research_gate(
+        student: Student,
+        gate: str,
+        title: str,
+        completed: bool,
+        days_ago: int,
+    ) -> None:
+        defense_type = RESEARCH_GATE_DEFENSE_TYPES[gate]
+        schedule_item = RESEARCH_DEFENSE_SCHEDULE_ITEMS[gate]
+        result_item = RESEARCH_DEFENSE_RESULT_ITEMS[gate]
+        for item_name in required_documents_for_gate(gate):
+            is_system_result = item_name in {schedule_item, result_item}
+            status = "Complete" if completed or not is_system_result else "Missing"
+            document = DocumentCheck.query.filter_by(
+                student_id=student.id,
+                gate=gate,
+                item_name=item_name,
+            ).first()
+            if not document:
+                document = DocumentCheck(
+                    student_id=student.id,
+                    gate=gate,
+                    item_name=item_name,
+                )
+                db.session.add(document)
+            document.status = status
+            document.evidence_reference = (
+                "Official MAED research completion archive"
+                if status == "Complete"
+                else None
+            )
+            document.updated_at = now_utc()
+
+        assignments = []
+        for faculty_name, role in panel_spec:
+            faculty = Faculty.query.filter_by(name=faculty_name).first()
+            if not faculty:
+                continue
+            assignment = PanelAssignment.query.filter_by(
+                student_id=student.id,
+                faculty_id=faculty.id,
+                gate=gate,
+                panel_role=role,
+            ).first()
+            if not assignment:
+                assignment = PanelAssignment(
+                    student_id=student.id,
+                    faculty_id=faculty.id,
+                    gate=gate,
+                    panel_role=role,
+                    score=95,
+                    eligibility_note="MAED topic-matched panel",
+                )
+                db.session.add(assignment)
+                db.session.flush()
+            assignments.append(assignment)
+
+        if not completed or not assignments:
+            return
+        defense_date = date.today() - timedelta(days=days_ago)
+        schedule = ScheduleRequest.query.filter_by(
+            student_id=student.id,
+            defense_type=defense_type,
+        ).first()
+        if not schedule:
+            schedule = ScheduleRequest(
+                student_id=student.id,
+                preferred_date=defense_date,
+                preferred_end_date=defense_date,
+                start_time=time(9, 0),
+                end_time=time(10, 30),
+                defense_type=defense_type,
+                mode="In person",
+                venue="Graduate School Conference Room",
+                status="Confirmed",
+                matched_count=len(assignments),
+                panel_snapshot=json.dumps([
+                    {
+                        "faculty_id": assignment.faculty_id,
+                        "name": assignment.faculty.name,
+                        "role": assignment.panel_role,
+                    }
+                    for assignment in assignments
+                ]),
+                required_forms_status="Complete",
+                notes="Verified historical MAED defense record",
+                confirmed_at=now_utc() - timedelta(days=days_ago),
+            )
+            db.session.add(schedule)
+            db.session.flush()
+        chair = next(
+            (assignment for assignment in assignments if assignment.panel_role == "Panel Chair"),
+            assignments[0],
+        )
+        if not DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first():
+            db.session.add(DefenseVerdict(
+                student_id=student.id,
+                schedule_request_id=schedule.id,
+                panel_assignment_id=chair.id,
+                faculty_id=chair.faculty_id,
+                gate=gate,
+                defense_type=defense_type,
+                research_title=title,
+                chair_name=chair.faculty.name,
+                result="Passed",
+                remarks="Passed; verified from the official MAED research completion archive.",
+                defense_date=defense_date,
+                submitted_at=now_utc() - timedelta(days=days_ago),
+            ))
+
+    def seed_completed_research(student: Student, title: str) -> None:
+        student.comprehensive_exam_status = "Passed"
+        student.adviser_name = "Dr. Liwayway Bautista"
+        if not Form1Endorsement.query.filter_by(student_id=student.id).first():
+            db.session.add(Form1Endorsement(
+                student_id=student.id,
+                coordinator_name="Academic Coordinator",
+                signature_data="MAED archived endorsement",
+                status="Endorsed",
+                endorsed_at=now_utc() - timedelta(days=210),
+            ))
+        for index, (stage_name, gate) in enumerate(RESEARCH_STAGE_SEQUENCE):
+            seed_research_gate(
+                student,
+                gate,
+                title,
+                completed=True,
+                days_ago=180 - (index * 45),
+            )
+        for item_name in required_documents_for_gate("Completion Evidence"):
+            document = DocumentCheck.query.filter_by(
+                student_id=student.id,
+                gate="Completion Evidence",
+                item_name=item_name,
+            ).first()
+            if not document:
+                document = DocumentCheck(
+                    student_id=student.id,
+                    gate="Completion Evidence",
+                    item_name=item_name,
+                )
+                db.session.add(document)
+            document.status = "Verified Complete"
+            document.evidence_reference = "Official MAED post-defense completion archive"
+            document.updated_at = now_utc()
+        research_case = ResearchCase.query.filter_by(student_id=student.id).first()
+        if not research_case:
+            research_case = ResearchCase(
+                student_id=student.id,
+                case_type=research_case_type(student),
+                opened_at=now_utc() - timedelta(days=270),
+            )
+            db.session.add(research_case)
+        research_case.title = title
+        research_case.current_gate = "Completion Evidence"
+        research_case.status = "Verified Complete"
+        research_case.adviser_name = student.adviser_name
 
     active_term = get_active_term()
     term_label = active_term.label if active_term else ""
 
-    loa = by_num("GS-2026-0003")
-    if loa and not StudentRequestAttachment.query.filter_by(student_id=loa.id, request_type="leave-of-absence").first():
-        name = f"LOA_Application_{loa.student_number}.pdf"
-        attach(loa, "leave-of-absence", name)
-        add_log("leave-of-absence", loa.id, "Student", name, "LOA application submitted", "GS Staff",
-                "Student submitted a Leave of Absence application for staff eligibility review.\n"
-                f"Requested period: {term_label}.\nReason/remarks: Family and health reasons.")
+    # 0001: newly handed-off admission record, intentionally without subjects.
+    daniel = by_num("GS-2026-0001")
+    if daniel:
+        daniel.current_stage = "Admission"
+        daniel.standing = "Active"
+        daniel.enrollment_tag = "Enrolled"
+        daniel.comprehensive_exam_status = "Not Taken"
+        daniel.risk_level = "Low"
+        set_term_status(daniel, "Pending Enrollment")
 
-    awol = by_num("GS-2026-0005")
-    if awol:
-        awol.enrollment_tag = "AWOL"
-        if not AwolCase.query.filter_by(student_id=awol.id).first():
-            db.session.add(AwolCase(
-                student_id=awol.id, status="Return Requested",
+    # 0002: early coursework is complete, but the next subjects remain unassigned.
+    grace = by_num("GS-2026-0002")
+    if grace:
+        grace.current_stage = "Coursework"
+        grace.standing = "Active"
+        grace.enrollment_tag = "Enrolled"
+        grace.comprehensive_exam_status = "Not Taken"
+        grace.risk_level = "Low"
+        set_term_status(grace, "Confirmed")
+        if active_term:
+            academic_year, semester = split_academic_term_label(active_term.label)
+            for code in ("MAED-MAJ1", "MAED-MAJ2", "MAED-MAJ3"):
+                course = Course.query.filter_by(program_id=grace.program_id, code=code).first()
+                if course and not CurriculumOffering.query.filter_by(
+                    program_id=grace.program_id,
+                    academic_year=academic_year,
+                    semester=semester,
+                    course_id=course.id,
+                ).first():
+                    db.session.add(CurriculumOffering(
+                        program_id=grace.program_id,
+                        academic_year=academic_year,
+                        semester=semester,
+                        course_id=course.id,
+                        added_by="MAED persona fixture · Grace Reyes enrollment test",
+                    ))
+
+    # 0003: submitted LOA application awaiting the first GS Staff review.
+    loa = by_num("GS-2026-0003")
+    if loa:
+        loa.current_stage = "Coursework"
+        loa.standing = "Active"
+        loa.enrollment_tag = "Enrolled"
+        loa.risk_level = "Medium"
+        set_term_status(loa, "LOA Pending")
+        if not StudentRequestAttachment.query.filter_by(
+            student_id=loa.id,
+            request_type="leave-of-absence",
+        ).first():
+            filename = f"LOA_Application_{loa.student_number}.pdf"
+            item = attachment(loa, "leave-of-absence", filename, "loa", "Submitted")
+            add_task(loa.id, "Review student Leave of Absence application", "GS Staff", 3, 55)
+            add_log(
+                "leave-of-absence",
+                loa.id,
+                "Student",
+                item.original_name,
+                "LOA application submitted",
+                "GS Staff",
+                "Student submitted a Leave of Absence application for staff eligibility review.\n"
+                f"Requested period: {term_label}.\n"
+                "Reason/remarks: Family and health reasons.",
+                previous_status="Active",
+                new_status="Submitted",
+            )
+
+    # 0004: completed Title and Proposal defenses, with the four-member panel
+    # ready for the still-pending Final Defense.
+    miguel = by_num("GS-2026-0004")
+    if miguel:
+        miguel.current_stage = "Final Defense"
+        miguel.standing = "Active"
+        miguel.enrollment_tag = "Enrolled"
+        miguel.comprehensive_exam_status = "Passed"
+        miguel.risk_level = "Low"
+        miguel.adviser_name = "Dr. Liwayway Bautista"
+        set_term_status(miguel, "Confirmed")
+        title = "Learning Analytics for Graduate Student Engagement"
+        if not Form1Endorsement.query.filter_by(student_id=miguel.id).first():
+            db.session.add(Form1Endorsement(
+                student_id=miguel.id,
+                coordinator_name="Academic Coordinator",
+                signature_data="MAED archived endorsement",
+                status="Endorsed",
+                endorsed_at=now_utc() - timedelta(days=150),
+            ))
+        seed_research_gate(
+            miguel,
+            "Form 1 - Title Defense",
+            title,
+            completed=True,
+            days_ago=135,
+        )
+        seed_research_gate(
+            miguel,
+            "Form 4 - Proposal Defense Readiness",
+            title,
+            completed=True,
+            days_ago=75,
+        )
+        seed_research_gate(
+            miguel,
+            "Final Defense",
+            title,
+            completed=False,
+            days_ago=0,
+        )
+        research_case = ResearchCase.query.filter_by(student_id=miguel.id).first()
+        if not research_case:
+            research_case = ResearchCase(
+                student_id=miguel.id,
+                case_type=research_case_type(miguel),
+                opened_at=now_utc() - timedelta(days=180),
+            )
+            db.session.add(research_case)
+        research_case.title = title
+        research_case.current_gate = "Final Defense"
+        research_case.status = "Ready"
+        research_case.adviser_name = miguel.adviser_name
+
+    # 0005: AWOL student with a written return intent awaiting GS Staff routing.
+    returning = by_num("GS-2026-0005")
+    if returning:
+        returning.current_stage = "AWOL"
+        returning.standing = "AWOL"
+        returning.enrollment_tag = "AWOL"
+        returning.risk_level = "Critical"
+        set_term_status(returning, "AWOL")
+        case = AwolCase.query.filter_by(student_id=returning.id).first()
+        if not case:
+            case = AwolCase(
+                student_id=returning.id,
+                status="Return Submitted",
                 awol_effective_date=date.today() - timedelta(days=200),
                 last_enrolled_term="AY 2025-2026 1st Semester",
                 return_requested_at=now_utc() - timedelta(days=3),
-                target_return_term=term_label, years_in_program=2))
-            name = f"AWOL_Return_Intent_{awol.student_number}.pdf"
-            attach(awol, "awol-return", name)
-            add_log("awol", awol.id, "Student", name, "Return intent submitted", "GS Staff",
-                    "Student declared AWOL submitted a written return intent for review.\n"
-                    f"Target return semester: {term_label}.")
+                target_return_term=term_label,
+                years_in_program=2,
+                normal_residence_years=5,
+                absolute_residence_years=7,
+                policy_classification="Within Maximum Residence",
+                dean_decision="Not Submitted",
+            )
+            db.session.add(case)
+            db.session.flush()
+        intent = attachment(
+            returning,
+            "awol-return",
+            f"AWOL_Return_Intent_{returning.student_number}.pdf",
+            "awol-return",
+            "Return Submitted",
+        )
+        case.status = "Return Submitted"
+        case.intent_attachment_id = intent.id
+        case.return_requested_at = case.return_requested_at or now_utc() - timedelta(days=3)
+        case.target_return_term = term_label
+        intent.workflow_request_id = case.id
+        if not TransactionLog.query.filter_by(
+            transaction_slug="awol",
+            student_id=returning.id,
+            result="AWOL return intent submitted",
+        ).first():
+            add_task(returning.id, "Review written intent to return from AWOL", "GS Staff", 3, 65)
+            add_log(
+                "awol",
+                returning.id,
+                "Student",
+                intent.original_name,
+                "AWOL return intent submitted",
+                "GS Staff",
+                f"Target return semester: {term_label}. "
+                "Policy classification: Within Maximum Residence.",
+                previous_status="AWOL Declared",
+                new_status="Return Submitted",
+            )
 
-    wd = by_num("GS-2026-0006")
-    if wd and not WithdrawalApplication.query.filter_by(student_id=wd.id).first():
-        name = f"Withdrawal_Request_{wd.student_number}.pdf"
-        att = attach(wd, "withdrawal", name)
-        db.session.add(WithdrawalApplication(
-            student_id=wd.id, reason="Transferring to another institution.",
-            effective_term=term_label, request_attachment_id=att.id,
-            status="Dean Review", dean_decision="Pending"))
-        add_log("withdrawal", wd.id, "Student", name, "Withdrawal request submitted", "GS Staff",
-                "Student submitted a withdrawal request for Dean review.\n"
-                f"Effective semester: {term_label}.")
+    # 0006: newly submitted withdrawal, ready for GS Staff to forward to the Dean.
+    withdrawal_student = by_num("GS-2026-0006")
+    if withdrawal_student:
+        withdrawal_student.current_stage = "Coursework"
+        withdrawal_student.standing = "Active"
+        withdrawal_student.enrollment_tag = "Enrolled"
+        withdrawal_student.risk_level = "Medium"
+        set_term_status(withdrawal_student, "Withdrawal Pending")
+        application = WithdrawalApplication.query.filter_by(
+            student_id=withdrawal_student.id,
+        ).first()
+        if not application:
+            request_file = attachment(
+                withdrawal_student,
+                "withdrawal",
+                f"Withdrawal_Request_{withdrawal_student.student_number}.pdf",
+                "withdrawal",
+                "Submitted to GS Staff",
+            )
+            application = WithdrawalApplication(
+                student_id=withdrawal_student.id,
+                reason="Transferring to another institution.",
+                effective_term=term_label,
+                request_attachment_id=request_file.id,
+                status="Submitted to GS Staff",
+                dean_decision="Pending",
+                fee_status="Pending",
+                requirement_status="Pending",
+            )
+            db.session.add(application)
+            db.session.flush()
+            request_file.workflow_request_id = application.id
+            add_task(withdrawal_student.id, "Review student withdrawal request", "GS Staff", 3, 55)
+            add_log(
+                "withdrawal",
+                withdrawal_student.id,
+                "Student",
+                request_file.original_name,
+                "Withdrawal request submitted",
+                "GS Staff",
+                f"Student submitted a withdrawal request. Effective semester: {term_label}.",
+                previous_status="Active",
+                new_status="Submitted to GS Staff",
+            )
 
-    prac = by_num("GS-2026-0008")
-    if prac and not PracticumRecord.query.filter_by(student_id=prac.id).first():
-        db.session.add(PracticumRecord(
-            student_id=prac.id, moa_status="Uploaded", moa_uploaded=True,
-            practicum_site="USLS Center for Educational Practice", supervisor_name="Dr. Ana Reyes",
-            required_hours=200, completed_hours=120, document_status="Pending Review",
-            certificate_count=1, completion_status="Pending", status="Documents Under Review"))
-        add_log("practicum", prac.id, "Academic Coordinator", "Practicum documents",
-                "Practicum documents under review", "Academic Coordinator",
-                "Practicum MOA received; hours in progress (120/200).")
+    # 0007: source-complete graduation candidate. Dynamic eligibility is backed
+    # by coursework, research, completion-evidence, and practicum records.
+    isabel = by_num("GS-2026-0007")
+    if isabel:
+        isabel.current_stage = "Final Defense"
+        isabel.standing = "Active"
+        isabel.enrollment_tag = "Completed"
+        isabel.risk_level = "Low"
+        set_term_status(isabel, "Completed")
+        seed_completed_research(
+            isabel,
+            "Inclusive Learning Strategies for Graduate Education",
+        )
+        if not PracticumRecord.query.filter_by(student_id=isabel.id).first():
+            db.session.add(PracticumRecord(
+                student_id=isabel.id,
+                moa_status="Verified",
+                moa_uploaded=True,
+                practicum_site="USLS Center for Educational Practice",
+                supervisor_name="Dr. Ana Reyes",
+                required_hours=200,
+                completed_hours=200,
+                document_status="Verified",
+                certificate_count=2,
+                completion_status="Completed and accepted",
+                status="Dean Reviewed",
+                report_sent_at=now_utc() - timedelta(days=20),
+                dean_reviewed_at=now_utc() - timedelta(days=15),
+                remarks="Official practicum completion verified for graduation.",
+            ))
+        endorsement = GraduationEndorsement.query.filter_by(student_id=isabel.id).first()
+        if not endorsement:
+            endorsement = GraduationEndorsement(
+                student_id=isabel.id,
+                batch_name=default_graduation_batch_name(),
+                endorsement_status="For Review",
+                registrar_status="Pending",
+            )
+            db.session.add(endorsement)
+            db.session.flush()
+        apply_graduation_eligibility(endorsement, graduation_eligibility(isabel))
+        if not TransactionLog.query.filter_by(
+            transaction_slug="graduation",
+            student_id=isabel.id,
+            result="Included in graduation candidate list",
+        ).first():
+            add_log(
+                "graduation",
+                isabel.id,
+                "Graduate School Staff",
+                "MAED monitoring and completion records",
+                "Included in graduation candidate list",
+                "Graduate School Staff",
+                "Coursework, research, post-defense evidence, and practicum are complete. "
+                "Candidate is ready to begin graduation endorsement review.",
+                previous_status="Not Listed",
+                new_status="For Review",
+            )
 
-    grad = by_num("GS-2026-0007")
-    if grad and not GraduationEndorsement.query.filter_by(student_id=grad.id).first():
-        db.session.add(GraduationEndorsement(
-            student_id=grad.id, batch_name="Graduation Batch (Current Review)",
-            coursework_status="Complete", research_status="Complete",
-            practicum_status="Complete", endorsement_status="For Review"))
-        add_log("graduation", grad.id, "Academic Coordinator", "Graduation candidate list",
-                "Included in graduation candidate list", "Research Coordinator",
-                "Coursework and research complete; forwarded for research validation.")
+    # 0008: thesis complete; practicum is intentionally the only remaining
+    # graduation blocker at 120 of 200 hours.
+    hector = by_num("GS-2026-0008")
+    if hector:
+        hector.current_stage = "Final Defense"
+        hector.standing = "Active"
+        hector.enrollment_tag = "Enrolled"
+        hector.risk_level = "Low"
+        set_term_status(hector, "Practicum In Progress")
+        seed_completed_research(
+            hector,
+            "Reflective Practice Models for Graduate Educators",
+        )
+        record = PracticumRecord.query.filter_by(student_id=hector.id).first()
+        if not record:
+            record = PracticumRecord(
+                student_id=hector.id,
+                moa_status="Uploaded",
+                moa_uploaded=True,
+                practicum_site="USLS Center for Educational Practice",
+                supervisor_name="Dr. Ana Reyes",
+                required_hours=200,
+                completed_hours=120,
+                document_status="Pending Review",
+                certificate_count=1,
+                completion_status="Pending",
+                status="Documents Under Review",
+                remarks="Thesis is complete; practicum hours and evidence remain in progress.",
+            )
+            db.session.add(record)
+        if not TransactionLog.query.filter_by(
+            transaction_slug="practicum",
+            student_id=hector.id,
+            result="Practicum documents under review",
+        ).first():
+            add_log(
+                "practicum",
+                hector.id,
+                "Academic Coordinator",
+                "Practicum documents",
+                "Practicum documents under review",
+                "Academic Coordinator",
+                "Research completion verified; practicum remains in progress (120/200 hours).",
+                previous_status="Practicum In Progress",
+                new_status="Documents Under Review",
+            )
 
-    miguel = by_num("GS-2026-0004")
-    if miguel and not ResearchCase.query.filter_by(student_id=miguel.id).first():
-        db.session.add(ResearchCase(
-            student_id=miguel.id, case_type=research_case_type(miguel),
-            title="Learning Analytics for Graduate Student Engagement",
-            current_gate="Final Defense", status="Ready",
-            adviser_name="Dr. Liwayway Bautista", opened_at=now_utc() - timedelta(days=120)))
-        miguel.adviser_name = "Dr. Liwayway Bautista"
-        panel = [("Dr. Marlon Geronimo", "Panel Chair"), ("Dr. Liwayway Bautista", "Content Specialist"),
-                 ("Dr. Patricia Salvador", "Method Specialist"), ("Dr. Teodoro Ramos", "External Panel")]
-        for fname, role in panel:
-            fac = Faculty.query.filter_by(name=fname).first()
-            if fac and not PanelAssignment.query.filter_by(student_id=miguel.id, faculty_id=fac.id, gate="Final Defense").first():
-                db.session.add(PanelAssignment(
-                    student_id=miguel.id, faculty_id=fac.id, gate="Final Defense",
-                    panel_role=role, score=95, eligibility_note="Topic-matched panel"))
-        for gate in ["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness"]:
-            for item in required_documents_for_gate(gate):
-                if not DocumentCheck.query.filter_by(student_id=miguel.id, gate=gate, item_name=item).first():
-                    db.session.add(DocumentCheck(student_id=miguel.id, gate=gate, item_name=item,
-                                                 status="Complete", evidence_reference="Research monitoring"))
+    # 0009: readmission after an approved LOA, awaiting GS Staff review.
+    readmission = by_num("GS-2026-0009")
+    if readmission:
+        readmission.current_stage = "LOA"
+        readmission.standing = "On Leave"
+        readmission.enrollment_tag = "LOA"
+        readmission.risk_level = "Medium"
+        set_term_status(readmission, "LOA")
+        if not StudentRequestAttachment.query.filter_by(
+            student_id=readmission.id,
+            request_type="readmission",
+        ).first():
+            request_file = attachment(
+                readmission,
+                "readmission",
+                f"Readmission_Application_{readmission.student_number}.pdf",
+                "readmission",
+                "Submitted",
+            )
+            add_task(readmission.id, "Review student readmission request", "GS Staff", 3, 55)
+            add_log(
+                "readmission",
+                readmission.id,
+                "Student",
+                request_file.original_name,
+                "Readmission request submitted",
+                "GS Staff",
+                "Student submitted a readmission request for staff review.\n"
+                f"Target return semester: {term_label}.\n"
+                "Checklist submitted: 4 item(s); missing/not marked: None.\n"
+                "Previous LOA period: AY 2025-2026 2nd Semester.",
+                previous_status="LOA",
+                new_status="Submitted",
+            )
+
+    # 0010: declared AWOL, before any return intent has been filed.
+    declared_awol = by_num("GS-2026-0010")
+    if declared_awol:
+        declared_awol.current_stage = "AWOL"
+        declared_awol.standing = "AWOL"
+        declared_awol.enrollment_tag = "AWOL"
+        declared_awol.risk_level = "Critical"
+        set_term_status(declared_awol, "AWOL")
+        if not AwolCase.query.filter_by(student_id=declared_awol.id).first():
+            db.session.add(AwolCase(
+                student_id=declared_awol.id,
+                status="AWOL Declared",
+                awol_effective_date=date.today() - timedelta(days=60),
+                last_enrolled_term="AY 2025-2026 2nd Semester",
+                years_in_program=3,
+                normal_residence_years=5,
+                absolute_residence_years=7,
+                policy_classification="Awaiting return intent",
+                dean_decision="Not Submitted",
+            ))
+            add_log(
+                "awol",
+                declared_awol.id,
+                "Graduate School Staff",
+                "Enrollment standing review",
+                "Student declared AWOL",
+                "Student",
+                "No formal leave or enrollment was recorded. The student may submit a "
+                "written return intent when ready.",
+                previous_status="Enrolled",
+                new_status="AWOL Declared",
+            )
+
+    # 0011: policy-valid no-subject residency for continuing thesis work.
+    residency_student = by_num("GS-2026-0011")
+    if residency_student and active_term:
+        residency_student.current_stage = "Proposal Development"
+        residency_student.standing = "Active"
+        residency_student.enrollment_tag = "Residency"
+        residency_student.comprehensive_exam_status = "Passed"
+        residency_student.risk_level = "Low"
+        set_term_status(residency_student, "Residency")
+        if not ResidencyEnrollment.query.filter_by(
+            student_id=residency_student.id,
+            term_id=active_term.id,
+            status="Active",
+        ).first():
+            db.session.add(ResidencyEnrollment(
+                student_id=residency_student.id,
+                term_id=active_term.id,
+                reason="Thesis / dissertation work",
+                policy_status="Eligible for Residency",
+                status="Active",
+                staff_notes="All 54 coursework units are complete; enrolled without subjects "
+                "while continuing thesis work.",
+            ))
+            add_log(
+                "awol",
+                residency_student.id,
+                "Graduate School Staff",
+                "Residency policy review",
+                "Residency enrollment recorded",
+                "Student",
+                f"{active_term.label}: Thesis / dissertation work. "
+                "Coursework completion and no-subject status verified.",
+                previous_status="Enrolled",
+                new_status="Residency",
+            )
 
 
 def seed_database(count: int = 350) -> None:
@@ -15439,6 +15994,11 @@ def seed_database(count: int = 350) -> None:
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
         db.session.add(term)
         terms.append(term)
+    db.session.flush()
+    active_term = get_active_term()
+    if active_term:
+        active_term.is_active_planning_term = True
+        active_term.status = active_term.status or "Active"
 
     # Curriculum, faculty, and students all come from imported source sheets — nothing
     # is randomly generated. Program curriculum arrives with each monitoring sheet, the
