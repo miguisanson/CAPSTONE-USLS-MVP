@@ -3409,7 +3409,13 @@ def residency_enrollment_dict(item: ResidencyEnrollment) -> dict:
 
 
 def awol_residency_roster_payload() -> list[dict]:
-    rows = [awol_case_dict(item) for item in AwolCase.query.order_by(AwolCase.updated_at.desc()).limit(150).all()]
+    rows = [
+        {
+            **awol_case_dict(item),
+            **workflow_case_meta("awol", item.student_id),
+        }
+        for item in AwolCase.query.order_by(AwolCase.updated_at.desc()).limit(150).all()
+    ]
     case_students = {item["student_id"] for item in rows}
     for student in Student.query.filter(Student.enrollment_tag == "AWOL", ~Student.id.in_(case_students or {-1})).order_by(Student.last_name).all():
         rows.append({
@@ -7132,6 +7138,29 @@ def register_routes(app: Flask) -> None:
         return jsonify({"ok": True, "message": result, "request": course_drop_request_dict(request_item)})
 
     # ---- Soft-remove a student from the monitoring sheet -------------------
+    @app.route("/api/students/<int:student_id>/flag-issue", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def flag_student_data_issue(student_id: int):
+        # Exception reporting (checklist items 8, 72): official AIMS-derived values are
+        # read-only. Staff report a discrepancy which is recorded in the activity trail
+        # for the proper office to correct in AIMS; the official value is not changed.
+        data = request.get_json(silent=True) or {}
+        student = Student.query.get_or_404(student_id)
+        note = (data.get("note") or "").strip() or "Data discrepancy flagged from the monitoring sheet."
+        account = current_account()
+        actor = workflow_actor_label(account) if account else "Graduate School Staff"
+        add_log(
+            "aims-discrepancy",
+            student.id,
+            actor,
+            "AIMS data discrepancy",
+            f"Discrepancy flagged for {student.name} ({student.student_number}).",
+            "Graduate School Staff",
+            note + "\nOfficial AIMS value unchanged; forward to the proper office for correction in AIMS.",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Discrepancy recorded for follow-up."})
+
     @app.route("/api/students/<int:student_id>/remove", methods=["POST"])
     @require_api_login("staff", "academic_coordinator")
     def monitoring_remove_student(student_id: int):
@@ -7522,7 +7551,14 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/transactions/<slug>/messages", methods=["POST"])
     @require_api_login(*BACKOFFICE_ROLES, "dean", "student")
     def transaction_message(slug: str):
-        if slug not in {"practicum", "withdrawal", "graduation", "awol"}:
+        if slug not in {
+            "practicum",
+            "withdrawal",
+            "graduation",
+            "awol",
+            "leave-of-absence",
+            "readmission",
+        }:
             return jsonify({"error": "Messaging is not available for this workflow."}), 404
         account = current_account()
         data = request_payload()
@@ -8752,17 +8788,36 @@ def workflow_case_record(slug: str, student_id: int):
         return latest_graduation_endorsement(student_id)
     if slug in {"awol", "awol-return"}:
         return latest_awol_case(student_id)
+    if slug in {"leave-of-absence", "readmission"}:
+        submitted_result = {
+            "leave-of-absence": "LOA application submitted",
+            "readmission": "Readmission request submitted",
+        }[slug]
+        return (
+            TransactionLog.query.filter_by(
+                transaction_slug=slug,
+                student_id=student_id,
+                actor_role="Student",
+                result=submitted_result,
+            )
+            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+            .first()
+        )
     return None
 
 
 def workflow_record_status(slug: str, record) -> str:
     if not record:
         return "Not Submitted"
+    if isinstance(record, TransactionLog):
+        return record.new_status or record.result
     return record.endorsement_status if slug == "graduation" else record.status
 
 
 def set_workflow_record_status(slug: str, record, status: str) -> None:
-    if slug == "graduation":
+    if isinstance(record, TransactionLog):
+        record.new_status = status
+    elif slug == "graduation":
         record.endorsement_status = status
     else:
         record.status = status
@@ -9048,6 +9103,11 @@ def workflow_backflow_status(slug: str, record, recipient_label: str, previous_s
         return {
             "Graduate School Staff": "Submitted to GS Staff",
             "Academic Coordinator": "Approved - Follow-through",
+            "Dean": "Dean Review",
+        }.get(recipient_label, previous_status)
+    if slug in {"leave-of-absence", "readmission"}:
+        return {
+            "Graduate School Staff": "Submitted",
             "Dean": "Dean Review",
         }.get(recipient_label, previous_status)
     return {
@@ -9547,14 +9607,19 @@ def submitted_request_students(request_type: str) -> list[dict]:
         if not student:
             continue
         decided = bool(latest_log and latest_log.id != log.id)
+        status_text = (
+            (latest_log.new_status or latest_log.result or "")
+            if latest_log else (log.new_status or log.result or "")
+        ).lower()
         if decided:
-            result_text = (latest_log.result or "").lower()
-            if "approved" in result_text:
+            if "approved" in status_text:
                 status = "Approved"
-            elif "denied" in result_text or "deny" in result_text:
+            elif "denied" in status_text or "deny" in status_text:
                 status = "Denied"
-            elif "return" in result_text:
+            elif "return" in status_text:
                 status = "Returned for Revision"
+            elif "submitted" in status_text:
+                status = "Pending Review"
             else:
                 status = "In Progress"
         else:
@@ -9562,6 +9627,7 @@ def submitted_request_students(request_type: str) -> list[dict]:
         attachment = latest_request_attachment(student.id, request_type)
         row = {
             **student_brief(student),
+            "student": student_brief(student),
             "request_log_id": log.id,
             "submitted_at": iso(log.created_at),
             "source_reference": log.source_reference,
@@ -9572,6 +9638,7 @@ def submitted_request_students(request_type: str) -> list[dict]:
             "attachment": attachment.original_name if attachment else log.source_reference,
             "attachment_detail": attachment_dict(attachment),
             "status": status,
+            **workflow_case_meta(request_type, student.id),
         }
         if request_type == "leave-of-absence":
             period = request_notes_value(log.notes, "Requested period")
@@ -10111,7 +10178,18 @@ def add_log(
     # Every workflow records what happened, who acted, where the evidence came
     # from, and who owns the next action.
     account = current_account() if has_request_context() else None
-    record = workflow_case_record(slug, student_id) if student_id and slug in {"practicum", "withdrawal", "graduation"} else None
+    record = (
+        workflow_case_record(slug, student_id)
+        if student_id and slug in {
+            "practicum",
+            "withdrawal",
+            "graduation",
+            "awol",
+            "leave-of-absence",
+            "readmission",
+        }
+        else None
+    )
     log = TransactionLog(
         transaction_slug=slug,
         student_id=student_id,
@@ -15320,6 +15398,73 @@ def seed_maed_personas() -> None:
     def by_num(number: str) -> Student | None:
         return Student.query.filter_by(student_number=number).first()
 
+    def write_demo_pdf(root: Path, stored_name: str, title: str, details: str) -> None:
+        """Write a small, valid PDF so every seeded evidence row is downloadable."""
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / stored_name
+
+        def clean(value: str) -> str:
+            return (
+                value.encode("latin-1", "replace")
+                .decode("latin-1")
+                .replace("\\", "\\\\")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+            )
+
+        words = re.sub(r"\s+", " ", details).strip().split()
+        lines: list[str] = []
+        current: list[str] = []
+        for word in words:
+            if len(" ".join([*current, word])) > 84 and current:
+                lines.append(" ".join(current))
+                current = [word]
+            else:
+                current.append(word)
+        if current:
+            lines.append(" ".join(current))
+        lines = lines[:24]
+
+        commands = [
+            "BT",
+            "/F1 16 Tf",
+            "72 744 Td",
+            f"({clean(title)}) Tj",
+            "/F1 10 Tf",
+            "0 -28 Td",
+        ]
+        for index, line in enumerate(lines):
+            if index:
+                commands.append("0 -15 Td")
+            commands.append(f"({clean(line)}) Tj")
+        commands.append("ET")
+        stream = "\n".join(commands).encode("latin-1")
+        objects = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            f"<< /Length {len(stream)} >>\nstream\n".encode("ascii") + stream + b"\nendstream",
+        ]
+        payload = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+        offsets = [0]
+        for index, obj in enumerate(objects, start=1):
+            offsets.append(len(payload))
+            payload.extend(f"{index} 0 obj\n".encode("ascii"))
+            payload.extend(obj)
+            payload.extend(b"\nendobj\n")
+        xref_offset = len(payload)
+        payload.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+        payload.extend(b"0000000000 65535 f \n")
+        for offset in offsets[1:]:
+            payload.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+        payload.extend(
+            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+        )
+        path.write_bytes(bytes(payload))
+
     def attachment(
         student: Student,
         request_type: str,
@@ -15328,6 +15473,15 @@ def seed_maed_personas() -> None:
         workflow_stage: str | None = None,
     ) -> StudentRequestAttachment:
         stored_name = f"persona-{student.student_number.lower()}-{suffix}.pdf"
+        write_demo_pdf(
+            REQUEST_UPLOAD_ROOT,
+            stored_name,
+            filename.removesuffix(".pdf").replace("_", " "),
+            f"Official demo submission for {student.name}, student number "
+            f"{student.student_number}, under the {request_type} workflow. "
+            f"Submitted for the MAED workflow validation cohort. "
+            f"Workflow stage: {workflow_stage or 'Student submission'}.",
+        )
         existing = StudentRequestAttachment.query.filter_by(stored_name=stored_name).first()
         if existing:
             return existing
@@ -15370,6 +15524,83 @@ def seed_maed_personas() -> None:
         ("Dr. Teodoro Ramos", "External Panel"),
     ]
 
+    def seed_research_evidence(
+        student: Student,
+        document: DocumentCheck,
+        title: str,
+    ) -> None:
+        presentation = research_requirement_presentation(document.gate, document.item_name)
+        if not presentation or presentation["source_type"] != "student_upload":
+            return
+        required_count = presentation["required_file_count"]
+        adviser = Faculty.query.filter_by(name=student.adviser_name or "Dr. Liwayway Bautista").first()
+        gate_slug = re.sub(r"[^a-z0-9]+", "-", document.gate.lower()).strip("-")[:28]
+        item_slug = re.sub(r"[^a-z0-9]+", "-", document.item_name.lower()).strip("-")[:42]
+        for file_number in range(1, required_count + 1):
+            stored_name = (
+                f"persona-{student.student_number.lower()}-research-"
+                f"{gate_slug}-{item_slug}-{file_number}.pdf"
+            )
+            original_name = (
+                f"{presentation['label']} {file_number}.pdf"
+                if required_count > 1
+                else f"{presentation['label']}.pdf"
+            )
+            extracted_text = (
+                f"{title}. This verified MAED research document belongs to {student.name}. "
+                "The study examines graduate education, student engagement, inclusive "
+                "learning, reflective practice, curriculum design, evidence based teaching, "
+                "assessment, faculty support, research methods, data analysis, ethical "
+                "practice, academic progress, and meaningful learning outcomes. "
+                f"This is evidence item {file_number} for {document.item_name}."
+            )
+            write_demo_pdf(
+                UPLOAD_ROOT,
+                stored_name,
+                presentation["label"],
+                extracted_text,
+            )
+            evidence = ResearchEvidenceFile.query.filter_by(stored_name=stored_name).first()
+            if not evidence:
+                evidence = ResearchEvidenceFile(
+                    student_id=student.id,
+                    document_check_id=document.id,
+                    original_name=original_name,
+                    stored_name=stored_name,
+                    mime_type="application/pdf",
+                )
+                db.session.add(evidence)
+                db.session.flush()
+            evidence.student_id = student.id
+            evidence.document_check_id = document.id
+            evidence.original_name = original_name
+            evidence.extracted_text = extracted_text
+            evidence.compliance_status = "Compliant"
+            evidence.compliance_score = 95
+            evidence.compliance_summary = "Verified MAED archive fixture with readable PDF evidence."
+            evidence.compliance_result_json = json.dumps({
+                "status": "Compliant",
+                "score": 95,
+                "summary": evidence.compliance_summary,
+            })
+            if document.item_name in ADVISER_APPROVAL_DOCUMENTS and adviser:
+                approval = AdviserDocumentApproval.query.filter_by(
+                    evidence_file_id=evidence.id,
+                ).first()
+                if not approval:
+                    approval = AdviserDocumentApproval(
+                        student_id=student.id,
+                        evidence_file_id=evidence.id,
+                        faculty_id=adviser.id,
+                        adviser_name=adviser.name,
+                        student_name=student.name,
+                        document_name=document.item_name,
+                        signature_data="MAED archived adviser e-signature",
+                        status="Signed",
+                        signed_at=now_utc() - timedelta(days=7),
+                    )
+                    db.session.add(approval)
+
     def seed_research_gate(
         student: Student,
         gate: str,
@@ -15393,8 +15624,10 @@ def seed_maed_personas() -> None:
                     student_id=student.id,
                     gate=gate,
                     item_name=item_name,
+                    status=status,
                 )
                 db.session.add(document)
+                db.session.flush()
             document.status = status
             document.evidence_reference = (
                 "Official MAED research completion archive"
@@ -15402,6 +15635,7 @@ def seed_maed_personas() -> None:
                 else None
             )
             document.updated_at = now_utc()
+            seed_research_evidence(student, document, title)
 
         assignments = []
         for faculty_name, role in panel_spec:
@@ -15510,11 +15744,14 @@ def seed_maed_personas() -> None:
                     student_id=student.id,
                     gate="Completion Evidence",
                     item_name=item_name,
+                    status="Complete",
                 )
                 db.session.add(document)
-            document.status = "Verified Complete"
+                db.session.flush()
+            document.status = "Complete"
             document.evidence_reference = "Official MAED post-defense completion archive"
             document.updated_at = now_utc()
+            seed_research_evidence(student, document, title)
         research_case = ResearchCase.query.filter_by(student_id=student.id).first()
         if not research_case:
             research_case = ResearchCase(
@@ -15718,19 +15955,27 @@ def seed_maed_personas() -> None:
         application = WithdrawalApplication.query.filter_by(
             student_id=withdrawal_student.id,
         ).first()
+        request_file = attachment(
+            withdrawal_student,
+            "withdrawal",
+            f"Withdrawal_Request_{withdrawal_student.student_number}.pdf",
+            "withdrawal",
+            "Submitted to GS Staff",
+        )
+        proof_file = attachment(
+            withdrawal_student,
+            "withdrawal",
+            f"Withdrawal_Supporting_Proof_{withdrawal_student.student_number}.pdf",
+            "withdrawal-proof",
+            "Submitted to GS Staff",
+        )
         if not application:
-            request_file = attachment(
-                withdrawal_student,
-                "withdrawal",
-                f"Withdrawal_Request_{withdrawal_student.student_number}.pdf",
-                "withdrawal",
-                "Submitted to GS Staff",
-            )
             application = WithdrawalApplication(
                 student_id=withdrawal_student.id,
                 reason="Transferring to another institution.",
                 effective_term=term_label,
                 request_attachment_id=request_file.id,
+                proof_attachment_id=proof_file.id,
                 status="Submitted to GS Staff",
                 dean_decision="Pending",
                 fee_status="Pending",
@@ -15738,7 +15983,6 @@ def seed_maed_personas() -> None:
             )
             db.session.add(application)
             db.session.flush()
-            request_file.workflow_request_id = application.id
             add_task(withdrawal_student.id, "Review student withdrawal request", "GS Staff", 3, 55)
             add_log(
                 "withdrawal",
@@ -15751,6 +15995,10 @@ def seed_maed_personas() -> None:
                 previous_status="Active",
                 new_status="Submitted to GS Staff",
             )
+        application.request_attachment_id = request_file.id
+        application.proof_attachment_id = proof_file.id
+        request_file.workflow_request_id = application.id
+        proof_file.workflow_request_id = application.id
 
     # 0007: source-complete graduation candidate. Dynamic eligibility is backed
     # by coursework, research, completion-evidence, and practicum records.
@@ -15765,8 +16013,23 @@ def seed_maed_personas() -> None:
             isabel,
             "Inclusive Learning Strategies for Graduate Education",
         )
-        if not PracticumRecord.query.filter_by(student_id=isabel.id).first():
-            db.session.add(PracticumRecord(
+        isabel_moa = attachment(
+            isabel,
+            "practicum",
+            f"Practicum_MOA_{isabel.student_number}.pdf",
+            "practicum-moa",
+            "MOA Verified",
+        )
+        isabel_completion = attachment(
+            isabel,
+            "practicum",
+            f"Practicum_Completion_Evidence_{isabel.student_number}.pdf",
+            "practicum-completion",
+            "Documents Verified",
+        )
+        isabel_practicum = PracticumRecord.query.filter_by(student_id=isabel.id).first()
+        if not isabel_practicum:
+            isabel_practicum = PracticumRecord(
                 student_id=isabel.id,
                 moa_status="Verified",
                 moa_uploaded=True,
@@ -15778,20 +16041,38 @@ def seed_maed_personas() -> None:
                 certificate_count=2,
                 completion_status="Completed and accepted",
                 status="Dean Reviewed",
+                moa_attachment_id=isabel_moa.id,
+                certificate_attachment_id=isabel_completion.id,
                 report_sent_at=now_utc() - timedelta(days=20),
                 dean_reviewed_at=now_utc() - timedelta(days=15),
                 remarks="Official practicum completion verified for graduation.",
-            ))
+            )
+            db.session.add(isabel_practicum)
+            db.session.flush()
+        isabel_practicum.moa_attachment_id = isabel_moa.id
+        isabel_practicum.certificate_attachment_id = isabel_completion.id
+        isabel_moa.workflow_request_id = isabel_practicum.id
+        isabel_completion.workflow_request_id = isabel_practicum.id
         endorsement = GraduationEndorsement.query.filter_by(student_id=isabel.id).first()
+        graduation_request = attachment(
+            isabel,
+            "graduation",
+            f"Graduation_Readiness_Application_{isabel.student_number}.pdf",
+            "graduation-readiness",
+            "For Review",
+        )
         if not endorsement:
             endorsement = GraduationEndorsement(
                 student_id=isabel.id,
                 batch_name=default_graduation_batch_name(),
                 endorsement_status="For Review",
                 registrar_status="Pending",
+                request_attachment_id=graduation_request.id,
             )
             db.session.add(endorsement)
             db.session.flush()
+        endorsement.request_attachment_id = graduation_request.id
+        graduation_request.workflow_request_id = endorsement.id
         apply_graduation_eligibility(endorsement, graduation_eligibility(isabel))
         if not TransactionLog.query.filter_by(
             transaction_slug="graduation",
@@ -15824,6 +16105,20 @@ def seed_maed_personas() -> None:
             hector,
             "Reflective Practice Models for Graduate Educators",
         )
+        hector_moa = attachment(
+            hector,
+            "practicum",
+            f"Practicum_MOA_{hector.student_number}.pdf",
+            "practicum-moa",
+            "MOA Uploaded",
+        )
+        hector_progress = attachment(
+            hector,
+            "practicum",
+            f"Practicum_Progress_Certificate_{hector.student_number}.pdf",
+            "practicum-progress",
+            "Documents Under Review",
+        )
         record = PracticumRecord.query.filter_by(student_id=hector.id).first()
         if not record:
             record = PracticumRecord(
@@ -15838,9 +16133,16 @@ def seed_maed_personas() -> None:
                 certificate_count=1,
                 completion_status="Pending",
                 status="Documents Under Review",
+                moa_attachment_id=hector_moa.id,
+                certificate_attachment_id=hector_progress.id,
                 remarks="Thesis is complete; practicum hours and evidence remain in progress.",
             )
             db.session.add(record)
+            db.session.flush()
+        record.moa_attachment_id = hector_moa.id
+        record.certificate_attachment_id = hector_progress.id
+        hector_moa.workflow_request_id = record.id
+        hector_progress.workflow_request_id = record.id
         if not TransactionLog.query.filter_by(
             transaction_slug="practicum",
             student_id=hector.id,

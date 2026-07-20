@@ -27,6 +27,8 @@ server/.env.*
 # Runtime data
 server/uploads/*
 !server/uploads/.gitkeep
+uploads/research_evidence/*
+uploads/student_requests/*
 *.sqlite3
 usls_gs_demo.sqlite3
 

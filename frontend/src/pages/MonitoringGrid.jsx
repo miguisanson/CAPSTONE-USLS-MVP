@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Table2, Download, AlertTriangle, Check, Pencil, Lock, Trash2, ShieldCheck } from "lucide-react";
+import { Table2, Download, AlertTriangle, Check, Lock, Flag, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
@@ -70,7 +70,9 @@ export default function MonitoringGrid() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   // View-only by default so a stray click can't change a student's status.
-  const [editMode, setEditMode] = useState(false);
+  // Official AIMS enrollment data is read-only in this application (checklist items
+  // 7, 29, 71): staff view/filter/flag, but never edit the official values here.
+  const editMode = false;
   function load(pid, nextProgress = progress, nextRisk = risk, nextEnrollment = enrollment) {
     setLoading(true);
     setError("");
@@ -204,20 +206,22 @@ export default function MonitoringGrid() {
     }
   }
 
-  async function removeStudent(student) {
-    if (!editMode) return;
+  async function flagIssue(student) {
+    // Exception reporting (checklist item 72): official AIMS values are never edited
+    // here. Staff report a discrepancy that is recorded for the proper office to
+    // correct in AIMS; the official value stays unchanged.
     const ok = await confirm({
-      title: "Remove student from monitoring?",
-      message: `Remove ${displayStudentName(student)} from active monitoring?\n\nThe student is marked Withdrawn (kept in records with full history), not deleted.`,
-      confirmLabel: "Remove student",
-      tone: "danger",
+      title: "Flag a data discrepancy?",
+      message: `Record a discrepancy for ${displayStudentName(student)} (${student.student_number}).\n\nThis logs an issue for the proper office to correct in AIMS. The official value is not changed here.`,
+      confirmLabel: "Flag issue",
     });
     if (!ok) return;
     setSaving(true);
     setError("");
     try {
-      await api.removeStudent(student.id, { reason: "Removed via the monitoring sheet." });
-      load(programId);
+      await api.flagMonitoringIssue(student.id, {
+        note: `Discrepancy flagged from the monitoring sheet for ${student.student_number}.`,
+      });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -271,7 +275,7 @@ export default function MonitoringGrid() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
           <p className="mt-1 text-sm text-slate-500">
-            The full class view — students by row, subjects by column. Locked by default; turn on Editing to change a status.
+            The full class view — students by row, subjects by column. Official AIMS enrollment data is read-only; use “Flag issue” to report a discrepancy.
           </p>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-7">
@@ -346,32 +350,15 @@ export default function MonitoringGrid() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
-          <button
-            type="button"
-            onClick={async () => {
-              if (editMode) {
-                setEditMode(false);
-                return;
-              }
-              const ok = await confirm({
-                title: "Turn on editing?",
-                message: "You will be able to change student statuses, comprehensive-exam results, and remove students. Are you sure?",
-                confirmLabel: "Turn on editing",
-              });
-              if (ok) setEditMode(true);
-            }}
-            className={editMode ? "btn-primary" : "btn-ghost"}
-          >
-            {editMode ? <Pencil className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-            {editMode ? "Editing on" : "View only"}
-          </button>
-          <span className="text-slate-500">
-            {editMode
-              ? "Cells are editable. Click a subject to cycle its status; downgrades and removals ask to confirm."
-              : "The sheet is locked to prevent accidental edits. Turn on editing to make changes."}
-          </span>
-          {saving && <span className="text-brand-600">Saving…</span>}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <Lock className="h-4 w-4 shrink-0 text-slate-400" />
+        <span className="font-semibold text-slate-700">Read-only</span>
+        <span>
+          Official enrollment and subject status comes from the AIMS export
+          {grid?.selected_term?.label ? ` · ${grid.selected_term.label}` : ""}. These values cannot be edited here — use
+          {" "}<span className="font-semibold">Flag issue</span> on a student row to report a discrepancy for the proper office to correct in AIMS.
+        </span>
+        {saving && <span className="text-brand-600">Working…</span>}
       </div>
 
       {grid?.integrity && (
@@ -494,17 +481,15 @@ export default function MonitoringGrid() {
                   <tr key={s.id} className="hover:bg-brand-50/30">
                     <td className="sticky left-0 z-10 max-w-[170px] border-b border-r border-slate-200 bg-white px-2 py-1.5 sm:max-w-[240px] sm:px-3">
                       <div className="flex items-center gap-1.5">
-                        {editMode && s.enrollment_tag !== "Withdrawn" && (
-                          <button
-                            type="button"
-                            onClick={() => removeStudent(s)}
-                            title={`Remove ${displayStudentName(s)} (mark Withdrawn)`}
-                            aria-label={`Remove ${displayStudentName(s)}`}
-                            className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => flagIssue(s)}
+                          title={`Flag a data discrepancy for ${displayStudentName(s)}`}
+                          aria-label={`Flag issue for ${displayStudentName(s)}`}
+                          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-amber-50 hover:text-amber-600 cursor-pointer"
+                        >
+                          <Flag className="h-3.5 w-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => navigate(`/students/${s.id}`)}

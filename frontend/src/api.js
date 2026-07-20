@@ -195,6 +195,8 @@ export const api = {
     request(`/course-drop/requests/${requestId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
   removeStudent: (studentId, payload = {}) =>
     request(`/students/${studentId}/remove`, { method: "POST", body: JSON.stringify(payload) }),
+  flagMonitoringIssue: (studentId, payload = {}) =>
+    request(`/students/${studentId}/flag-issue`, { method: "POST", body: JSON.stringify(payload) }),
   decisionSupport: () => request("/decision-support"),
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),

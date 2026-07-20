@@ -300,6 +300,9 @@ export default function WorkflowPage() {
 
           {usesQueue && (
             <RequestQueue
+              slug={slug}
+              context={context}
+              formProps={formProps}
               requests={context?.submitted_requests}
               selectedId={studentId}
               onPick={(r) => {
@@ -332,7 +335,7 @@ export default function WorkflowPage() {
             <Card className="p-6">
               <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
             </Card>
-          ) : usesQueue && !context?.selected_request ? (
+          ) : usesQueue ? (
             null
           ) : slug === "research-gate" ? (
             <ResearchGateForm {...formProps} />
@@ -392,11 +395,16 @@ export default function WorkflowPage() {
 }
 
 // Submitted-request queue for student-initiated workflows (LOA / Readmission).
-function RequestQueue({ requests, selectedId, onPick, onClear }) {
+function RequestQueue({ slug, context, formProps, requests, selectedId, onPick, onClear }) {
   const list = requests || [];
   const [viewMode, setViewMode] = useState("board");
   const [filters, setFilters] = useState({ query: "", status: "" });
+  const [messageRow, setMessageRow] = useState(null);
+  const [messageNotice, setMessageNotice] = useState("");
   const selected = list.find((r) => r.id === selectedId);
+  const selectedContextReady = Boolean(
+    selected && context?.selected_request?.id === selected.id
+  );
   const reviewCount = list.filter((r) => ["Pending Review", "In Progress"].includes(r.status)).length;
   const statuses = uniqueValues(list.map((r) => r.status));
   const filtered = list.filter((r) => {
@@ -405,87 +413,116 @@ function RequestQueue({ requests, selectedId, onPick, onClear }) {
       && (!filters.status || r.status === filters.status);
   });
 
-  if (selected) {
-    return (
-      <Card className="p-6">
-        <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-ink">{selected.name}</p>
-                <StatusBadge value={selected.status} dot={false} />
-              </div>
-              <p className="text-xs text-slate-500">
-                {selected.student_number} · {selected.program_code} · submitted {formatDate(selected.submitted_at)}
-              </p>
-            </div>
-            <button type="button" onClick={onClear} className="btn-ghost shrink-0 cursor-pointer">
-              <ArrowUpRight className="h-4 w-4 rotate-180" /> Back to requests
-            </button>
-          </div>
-          <RequestSummary request={selected} compact />
-        </div>
-      </Card>
-    );
-  }
-
   return (
-    <Card className="p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle title="Submitted requests" subtitle="Student-filed applications grouped by current status" icon={Inbox} />
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
-            <Users className="h-4 w-4" /> {reviewCount} for review
-          </span>
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
+    <div className="space-y-4">
+      {messageNotice && (
+        <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
+          {messageNotice}
         </div>
-      </div>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <label className="relative min-w-[220px] flex-1">
-          <span className="sr-only">Search submitted requests</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            value={filters.query}
-            onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
-            placeholder="Search name, student ID, or program…"
-            className="field-input pl-9"
-          />
-        </label>
-        <select
-          value={filters.status}
-          onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-          className="field-input cursor-pointer sm:w-56"
-          aria-label="Filter submitted requests by status"
-        >
-          <option value="">All statuses</option>
-          {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
-        </select>
-      </div>
-      {!list.length ? (
-        <EmptyState
-          icon={Inbox}
-          title="No submitted requests yet"
-          hint="Student-filed LOA or readmission requests will appear here."
-        />
-      ) : viewMode === "board" ? (
-        <WorkflowBoard
-          columns={REQUEST_BOARD_COLUMNS}
-          rows={filtered}
-          getStatus={(request) => request.status}
-          renderCard={(request) => (
-            <RequestBoardCard key={request.request_log_id || request.id} item={request} onOpen={() => onPick(request)} />
-          )}
-          empty="No requests match the current filters."
-        />
-      ) : (
-        <RequestTable rows={filtered} onOpen={onPick} />
       )}
-    </Card>
+      <Card className="p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle title="Submitted requests" subtitle="Student-filed applications grouped by current status" icon={Inbox} />
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
+              <Users className="h-4 w-4" /> {reviewCount} for review
+            </span>
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+          </div>
+        </div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <label className="relative min-w-[220px] flex-1">
+            <span className="sr-only">Search submitted requests</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={filters.query}
+              onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
+              placeholder="Search name, student ID, or program…"
+              className="field-input pl-9"
+            />
+          </label>
+          <select
+            value={filters.status}
+            onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+            className="field-input cursor-pointer sm:w-56"
+            aria-label="Filter submitted requests by status"
+          >
+            <option value="">All statuses</option>
+            {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </div>
+        {!list.length ? (
+          <EmptyState
+            icon={Inbox}
+            title="No submitted requests yet"
+            hint="Student-filed LOA or readmission requests will appear here."
+          />
+        ) : viewMode === "board" ? (
+          <WorkflowBoard
+            columns={REQUEST_BOARD_COLUMNS}
+            rows={filtered}
+            getStatus={(request) => request.status}
+            renderCard={(request) => (
+              <RequestBoardCard
+                key={request.request_log_id || request.id}
+                item={request}
+                onOpen={() => onPick(request)}
+                onMessage={() => setMessageRow(request)}
+              />
+            )}
+            empty="No requests match the current filters."
+          />
+        ) : (
+          <RequestTable rows={filtered} onOpen={onPick} onMessage={setMessageRow} />
+        )}
+      </Card>
+      {selected && (
+        <WorkflowCaseModal
+          id={`${slug}-request-${selected.request_log_id || selected.id}`}
+          title={selected.name}
+          subtitle={`${selected.student_number} · ${selected.program_code} · ${slug === "leave-of-absence" ? "Leave of Absence" : "Readmission"} request`}
+          status={selected.status}
+          onClose={onClear}
+          footer={(
+            <button type="button" onClick={() => setMessageRow(selected)} className="btn-ghost cursor-pointer px-4 py-2">
+              <MessageSquare className="h-4 w-4" /> Message / Return
+            </button>
+          )}
+        >
+          <div className="space-y-5">
+            <WorkflowSubmitFeedback result={formProps.result} error={formProps.submitError} />
+            <RequestSummary request={selected} />
+            <CaseMessageHistory messages={selected.messages || []} />
+            <WorkflowActivityList logs={selected.history || []} />
+            <WorkflowFileHistory files={[selected.attachment_detail].filter(Boolean)} />
+            {selectedContextReady ? (
+              slug === "leave-of-absence"
+                ? <LeaveOfAbsenceForm {...formProps} embedded />
+                : <ReadmissionForm {...formProps} embedded />
+            ) : (
+              <Spinner label="Loading request details…" />
+            )}
+          </div>
+        </WorkflowCaseModal>
+      )}
+      {messageRow && (
+        <WorkflowMessageModal
+          slug={slug}
+          row={messageRow}
+          context={context}
+          onClose={() => setMessageRow(null)}
+          onSaved={async (message) => {
+            setMessageNotice(message);
+            await formProps.refetch();
+          }}
+        />
+      )}
+    </div>
   );
 }
 
-function RequestBoardCard({ item, onOpen }) {
+function RequestBoardCard({ item, onOpen, onMessage }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
       <div className="flex items-start justify-between gap-2">
@@ -500,14 +537,20 @@ function RequestBoardCard({ item, onOpen }) {
       <p className="mt-2 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">
         Next: {item.next_action_owner || "GS Staff"}
       </p>
-      <button type="button" onClick={onOpen} className="btn-ghost mt-3 w-full cursor-pointer px-2 py-1.5">
-        <Eye className="h-3.5 w-3.5" /> {item.status === "Pending Review" ? "Review" : "View"}
-      </button>
+      {item.unresolved_messages > 0 && <p className="mt-2 text-xs font-semibold text-amber-700">{item.unresolved_messages} concern(s)</p>}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={onOpen} className="btn-ghost cursor-pointer px-2 py-1.5">
+          <Eye className="h-3.5 w-3.5" /> {item.status === "Pending Review" ? "Review" : "View"}
+        </button>
+        <button type="button" onClick={onMessage} className="btn-ghost cursor-pointer px-2 py-1.5">
+          <MessageSquare className="h-3.5 w-3.5" /> Message
+        </button>
+      </div>
     </article>
   );
 }
 
-function RequestTable({ rows, onOpen }) {
+function RequestTable({ rows, onOpen, onMessage }) {
   if (!rows.length) {
     return <EmptyState icon={Inbox} title="No requests match the filters" hint="Clear the search or status filter and try again." />;
   }
@@ -536,9 +579,14 @@ function RequestTable({ rows, onOpen }) {
               <td className="px-3 py-3 text-slate-500">{formatDate(request.submitted_at)}</td>
               <td className="px-3 py-3 text-xs font-semibold text-slate-600">{request.next_action_owner || "—"}</td>
               <td className="px-3 py-3 text-right">
-                <button type="button" onClick={() => onOpen(request)} className="btn-ghost cursor-pointer px-3 py-1.5">
-                  <Eye className="h-3.5 w-3.5" /> {request.status === "Pending Review" ? "Review" : "View"}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => onOpen(request)} className="btn-ghost cursor-pointer px-3 py-1.5">
+                    <Eye className="h-3.5 w-3.5" /> {request.status === "Pending Review" ? "Review" : "View"}
+                  </button>
+                  <button type="button" onClick={() => onMessage(request)} className="btn-ghost cursor-pointer px-3 py-1.5">
+                    <MessageSquare className="h-3.5 w-3.5" /> Message
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -3121,6 +3169,30 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
 }
 
 const WORKFLOW_GUIDES = {
+  "leave-of-absence": {
+    purpose: "Reviews a student-filed Leave of Absence application without changing standing before an authorized decision.",
+    submitter: "The student submits the completed application PDF and requested leave period.",
+    reviewers: "Graduate School Staff verifies eligibility and routes exceptions; the Dean reviews cases requiring a decision.",
+    stages: ["Student submission", "Staff policy review", "Dean review when required", "Standing update", "Student notice"],
+    incomplete: "Staff can return the request with a specific message while preserving its uploaded file and activity history.",
+    final: "Approved means the authorized leave period is recorded and the monitoring profile shows the student On Leave.",
+  },
+  readmission: {
+    purpose: "Reviews a student-filed request to return after an approved leave period.",
+    submitter: "The student submits the readmission PDF, target return semester, and prior leave details.",
+    reviewers: "Graduate School Staff checks return eligibility and missing requirements; the Dean reviews exceptions.",
+    stages: ["Student submission", "Eligibility review", "Dean review when required", "Reactivation", "Student notice"],
+    incomplete: "The case can be returned with a message naming the exact requirement that must be corrected or uploaded.",
+    final: "Approved means the student is reactivated for the approved return semester and the monitoring profile is synchronized.",
+  },
+  awol: {
+    purpose: "Tracks AWOL standing, written intent to return, maximum-residence review, and valid no-subject residency.",
+    submitter: "A returning AWOL student submits a written intent PDF; staff records standing or residency actions.",
+    reviewers: "Graduate School Staff performs the policy review and routes return cases to the Dean.",
+    stages: ["AWOL declaration", "Written return intent", "Policy review", "Dean review", "Return or residency update"],
+    incomplete: "Reviewers can message or return an AWOL case while its written intent and complete audit trail remain visible.",
+    final: "A decided return updates the student standing; residency remains a separate active, no-subject enrollment record.",
+  },
   withdrawal: {
     purpose: "Records a voluntary withdrawal request through Graduate School review and Dean approval.",
     submitter: "The student submits the request form and supporting proof.",
@@ -5396,7 +5468,7 @@ function timeRange(start, end) {
 // ---------------------------------------------------------------------------
 // AWOL & Residency
 // ---------------------------------------------------------------------------
-function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, result, submitError, setStudentId, setStudentLabel }) {
+function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, result, submitError, setStudentId, setStudentLabel, refetch }) {
   const rows = context?.roster || [];
   const [viewMode, setViewMode] = useState("board");
   const [filters, setFilters] = useState({ query: "", status: "" });
@@ -5414,6 +5486,8 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [reviewNotice, setReviewNotice] = useState("");
+  const [messageRow, setMessageRow] = useState(null);
+  const [messageNotice, setMessageNotice] = useState("");
   const statuses = uniqueValues(rows.map((item) => item.status));
   const filteredRows = rows.filter((item) => {
     const student = item.student || {};
@@ -5422,6 +5496,12 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
       && (!filters.status || item.status === filters.status);
   });
   const selectedTerm = form.term_id || String(meta?.terms?.find((item) => item.is_active_planning_term)?.id || "");
+
+  useEffect(() => {
+    if (!selectedRow) return;
+    const current = rows.find((item) => item.kind === selectedRow.kind && item.id === selectedRow.id);
+    if (current && current !== selectedRow) setSelectedRow(current);
+  }, [rows, selectedRow?.kind, selectedRow?.id]);
 
   function chooseStudent(id, label) {
     setSelectedStudent({ id, label });
@@ -5504,6 +5584,11 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
 
   return (
     <div className="space-y-5">
+      {messageNotice && (
+        <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
+          {messageNotice}
+        </div>
+      )}
       <Card className="p-6">
         <SectionTitle title="Record an AWOL or residency status" subtitle="Use the policy review before changing standing; return requests originate from the student's written intent" icon={UserX} />
         <form onSubmit={saveNewAction} className="mt-5 space-y-4">
@@ -5555,35 +5640,44 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
           <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="field-input cursor-pointer sm:w-64" aria-label="Filter AWOL and residency cases by status"><option value="">All statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
         </div>
         {viewMode === "board" ? (
-          <WorkflowBoard columns={AWOL_BOARD_COLUMNS} rows={filteredRows} getStatus={(item) => item.status} empty="No AWOL or residency cases match the filters." renderCard={(item) => <AwolBoardCard key={`${item.kind}-${item.id}`} item={item} onOpen={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} />} />
+          <WorkflowBoard columns={AWOL_BOARD_COLUMNS} rows={filteredRows} getStatus={(item) => item.status} empty="No AWOL or residency cases match the filters." renderCard={(item) => <AwolBoardCard key={`${item.kind}-${item.id}`} item={item} onOpen={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} onMessage={item.kind === "awol" && item.request_id ? () => setMessageRow(item) : null} />} />
         ) : (
-          <WorkflowTable headers={["Student", "Type", "Status", "Policy classification", "Semester / date", "Action"]} rows={filteredRows} empty="No AWOL or residency cases match the filters." render={(item) => <tr key={`${item.kind}-${item.id}`} className="border-b border-slate-100"><StudentCell student={item.student} /><td className="px-3 py-3 text-sm text-slate-600">{item.kind === "residency" ? "Residency" : "AWOL / Return"}</td><td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td><td className="px-3 py-3 text-sm text-slate-600">{item.policy_classification || item.policy_status || "Not reviewed"}</td><td className="px-3 py-3 text-sm text-slate-600">{item.term_label || item.target_return_term || item.awol_effective_date || "—"}</td><td className="px-3 py-3"><button type="button" onClick={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> Open</button></td></tr>} />
+          <WorkflowTable headers={["Student", "Type", "Status", "Policy classification", "Semester / date", "Action"]} rows={filteredRows} empty="No AWOL or residency cases match the filters." render={(item) => <tr key={`${item.kind}-${item.id}`} className="border-b border-slate-100"><StudentCell student={item.student} /><td className="px-3 py-3 text-sm text-slate-600">{item.kind === "residency" ? "Residency" : "AWOL / Return"}</td><td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td><td className="px-3 py-3 text-sm text-slate-600">{item.policy_classification || item.policy_status || "Not reviewed"}</td><td className="px-3 py-3 text-sm text-slate-600">{item.term_label || item.target_return_term || item.awol_effective_date || "—"}</td><td className="px-3 py-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> View</button>{item.kind === "awol" && item.request_id && <button type="button" onClick={() => setMessageRow(item)} className="btn-ghost cursor-pointer px-3 py-2"><MessageSquare className="h-4 w-4" /> Message</button>}</div></td></tr>} />
         )}
       </Card>
 
       {selectedRow && (
-        <WorkflowCaseModal id={`awol-residency-${selectedRow.kind}-${selectedRow.id}`} title={selectedRow.student?.name || "Standing case"} subtitle={`${selectedRow.student?.student_number || ""} · ${selectedRow.student?.program_code || ""} · ${selectedRow.kind === "residency" ? "Residency" : "AWOL / Return"}`} status={selectedRow.status} onClose={() => { setSelectedRow(null); setReview(null); }} footer={selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) ? <button type="button" disabled={submitting || !review} onClick={forwardReturn} className="btn-primary cursor-pointer">Forward to Dean</button> : selectedRow.kind === "residency" && selectedRow.record_status === "Active" ? <button type="button" disabled={submitting} onClick={endResidency} className="btn-primary cursor-pointer">Close residency</button> : null}>
+        <WorkflowCaseModal id={`awol-residency-${selectedRow.kind}-${selectedRow.id}`} title={selectedRow.student?.name || "Standing case"} subtitle={`${selectedRow.student?.student_number || ""} · ${selectedRow.student?.program_code || ""} · ${selectedRow.kind === "residency" ? "Residency" : "AWOL / Return"}`} status={selectedRow.status} onClose={() => { setSelectedRow(null); setReview(null); }} footer={<>{selectedRow.kind === "awol" && selectedRow.request_id && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}{selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) ? <button type="button" disabled={submitting || !review} onClick={forwardReturn} className="btn-primary cursor-pointer">Forward to Dean</button> : selectedRow.kind === "residency" && selectedRow.record_status === "Active" ? <button type="button" disabled={submitting} onClick={endResidency} className="btn-primary cursor-pointer">Close residency</button> : null}</>}>
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3"><Detail label="Status" value={selectedRow.status} /><Detail label="Policy classification" value={selectedRow.policy_classification || selectedRow.policy_status || "Not reviewed"} /><Detail label="Dean decision" value={selectedRow.dean_decision || "Not applicable"} /></div>
             {selectedRow.kind === "awol" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="AWOL effective date" value={formatDate(selectedRow.awol_effective_date)} /><Detail label="Target return semester" value={selectedRow.target_return_term || "Not submitted"} /><Detail label="Years in program" value={selectedRow.years_in_program ?? "Not calculated"} /><Detail label="Residence limits" value={selectedRow.normal_residence_years ? `${selectedRow.normal_residence_years} normal / ${selectedRow.absolute_residence_years} absolute` : "Not calculated"} /></div>}
             {selectedRow.kind === "residency" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="Semester" value={selectedRow.term_label} /><Detail label="Purpose" value={selectedRow.reason} /></div>}
-            {selectedRow.intent_attachment?.url && <a href={selectedRow.intent_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit cursor-pointer"><FileText className="h-4 w-4" /> Written return intent</a>}
+            {selectedRow.intent_attachment?.file_exists && <a href={selectedRow.intent_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit cursor-pointer"><FileText className="h-4 w-4" /> Written return intent</a>}
+            {selectedRow.intent_attachment?.file_exists === false && <span className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">The saved written return intent is unavailable.</span>}
             {selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) && <><Field label="Staff review notes"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>{review && <PolicyReviewCard title="Return-from-AWOL policy review" description="Checks written intent and program-specific maximum residence before Dean routing." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview("forward_return_to_dean", selectedRow)} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}.`)} />}<button type="button" onClick={() => runReview("forward_return_to_dean", selectedRow)} disabled={reviewing} className="btn-ghost cursor-pointer"><Sparkles className="h-4 w-4" /> {reviewing ? "Reviewing…" : "Run policy review"}</button></>}
+            {selectedRow.kind === "awol" && <CaseMessageHistory messages={selectedRow.messages || []} />}
+            {selectedRow.kind === "awol" && <WorkflowActivityList logs={selectedRow.history || []} />}
+            {selectedRow.kind === "awol" && <WorkflowFileHistory files={[selectedRow.intent_attachment].filter(Boolean)} />}
             <WorkflowSubmitFeedback result={result} error={submitError} />
           </div>
         </WorkflowCaseModal>
       )}
+      {messageRow && <WorkflowMessageModal slug="awol" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
     </div>
   );
 }
 
-function AwolBoardCard({ item, onOpen }) {
+function AwolBoardCard({ item, onOpen, onMessage }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-brand-300 hover:bg-brand-50/30">
       <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{item.student?.name}</p><p className="text-xs text-slate-400">{item.student?.student_number} · {item.student?.program_code}</p></div><StatusBadge value={item.status} dot={false} /></div>
       <p className="mt-2 line-clamp-2 text-xs text-slate-600">{item.policy_classification || item.policy_status || item.reason || "Policy review not yet recorded"}</p>
       <p className="mt-2 text-xs font-semibold text-brand-700">{item.kind === "residency" ? item.term_label : item.target_return_term || formatDate(item.awol_effective_date)}</p>
-      <button type="button" onClick={onOpen} className="btn-ghost mt-3 w-full cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> Open case</button>
+      {item.unresolved_messages > 0 && <p className="mt-2 text-xs font-semibold text-amber-700">{item.unresolved_messages} concern(s)</p>}
+      <div className={`mt-3 grid gap-2 ${onMessage ? "grid-cols-2" : "grid-cols-1"}`}>
+        <button type="button" onClick={onOpen} className="btn-ghost cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button>
+        {onMessage && <button type="button" onClick={onMessage} className="btn-ghost cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}
+      </div>
     </article>
   );
 }
@@ -5591,7 +5685,7 @@ function AwolBoardCard({ item, onOpen }) {
 // ---------------------------------------------------------------------------
 // Leave of Absence
 // ---------------------------------------------------------------------------
-function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
+function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded = false }) {
   const selectedRequest = context?.selected_request;
   const canForward = selectedRequest?.status === "Pending Review";
   const [policyReview, setPolicyReview] = useState(context?.loa_policy_review || null);
@@ -5659,7 +5753,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting }) {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle title="Review leave application" subtitle="Verify the submitted details; eligible requests auto-approve, exceptions go to the Dean" icon={CalendarOff} />
-      <RequestSummary request={selectedRequest} />
+      {!embedded && <RequestSummary request={selectedRequest} />}
       <LoaPolicyReviewCard
         review={policyReview}
         busy={reviewing}
@@ -5803,7 +5897,7 @@ function mergeReviewSummary(currentNotes, summary) {
 // ---------------------------------------------------------------------------
 // Readmission
 // ---------------------------------------------------------------------------
-function ReadmissionForm({ context, studentId, submit, submitting }) {
+function ReadmissionForm({ context, studentId, submit, submitting, embedded = false }) {
   const requirements = context.readmission_requirements || [];
   const selectedRequest = context?.selected_request;
   const canForward = selectedRequest?.status === "Pending Review";
@@ -5870,7 +5964,7 @@ function ReadmissionForm({ context, studentId, submit, submitting }) {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle title="Review readmission request" subtitle="Eligible requests auto-approve after review; incomplete requests go to the Dean" icon={UserCheck} />
-      <RequestSummary request={selectedRequest} />
+      {!embedded && <RequestSummary request={selectedRequest} />}
       <PolicyReviewCard
         title="Readmission policy review"
         description="RAG-style check using the readmission policy plus this student request. Eligible requests can be auto-approved."

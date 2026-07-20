@@ -24,6 +24,7 @@ from app import (  # noqa: E402
     PanelAssignment,
     PracticumRecord,
     Program,
+    ADVISER_APPROVAL_DOCUMENTS,
     RESEARCH_DEFENSE_RESULT_ITEMS,
     RESEARCH_DEFENSE_SCHEDULE_ITEMS,
     RESEARCH_GATE_DEFENSE_TYPES,
@@ -41,7 +42,9 @@ from app import (  # noqa: E402
     WorkflowMessage,
     WithdrawalApplication,
     REQUEST_UPLOAD_ROOT,
+    UPLOAD_ROOT,
     app,
+    awol_residency_roster_payload,
     compute_course_audit,
     curriculum_offerings_for_term,
     db,
@@ -53,6 +56,7 @@ from app import (  # noqa: E402
     ensure_demo_accounts,
     panel_roles_for_student,
     required_documents_for_gate,
+    research_requirement_presentation,
     seed_database,
     submitted_request_students,
     task_dict,
@@ -1423,6 +1427,77 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             ).one()
             self.assertEqual(residency.reason, "Thesis / dissertation work")
             self.assertEqual(residency.policy_status, "Eligible for Residency")
+
+            # Seeded request claims must be backed by a physical, downloadable
+            # PDF rather than a database-only filename.
+            attachments = StudentRequestAttachment.query.order_by(
+                StudentRequestAttachment.id,
+            ).all()
+            self.assertEqual(len(attachments), 10)
+            for item in attachments:
+                path = REQUEST_UPLOAD_ROOT / item.stored_name
+                self.assertTrue(path.is_file(), item.original_name)
+                self.assertTrue(path.read_bytes().startswith(b"%PDF-"), item.original_name)
+
+            # Completed research gates must have the required number of exact
+            # file rows, physical PDFs, and adviser approvals where applicable.
+            for student in (miguel, isabel, hector):
+                documents = DocumentCheck.query.filter_by(student_id=student.id).all()
+                for document in documents:
+                    presentation = research_requirement_presentation(
+                        document.gate,
+                        document.item_name,
+                    )
+                    if not presentation or presentation["source_type"] != "student_upload":
+                        continue
+                    self.assertEqual(
+                        len(document.evidence_files),
+                        presentation["required_file_count"],
+                        f"{student.student_number}: {document.item_name}",
+                    )
+                    for evidence in document.evidence_files:
+                        path = UPLOAD_ROOT / evidence.stored_name
+                        self.assertTrue(path.is_file(), evidence.original_name)
+                        self.assertTrue(path.read_bytes().startswith(b"%PDF-"), evidence.original_name)
+                        if document.item_name in ADVISER_APPROVAL_DOCUMENTS:
+                            self.assertIsNotNone(
+                                AdviserDocumentApproval.query.filter_by(
+                                    evidence_file_id=evidence.id,
+                                    status="Signed",
+                                ).first(),
+                                evidence.original_name,
+                            )
+
+            staff = UserAccount.query.filter_by(
+                email="staff@usls.edu.ph",
+                role="staff",
+            ).one()
+            staff_client = self._role_client(staff.id, "staff")
+            for slug, student in (
+                ("leave-of-absence", benjamin),
+                ("readmission", maria),
+                ("awol", clarisse),
+            ):
+                response = staff_client.post(f"/api/transactions/{slug}/messages", json={
+                    "student_id": student.id,
+                    "action_type": "note",
+                    "recipient_role": "Student",
+                    "template": "Please clarify request details",
+                    "comment": f"Test message for {slug}.",
+                })
+                self.assertEqual(response.status_code, 200, response.get_json())
+
+            loa_row = submitted_request_students("leave-of-absence")[0]
+            readmission_row = submitted_request_students("readmission")[0]
+            awol_row = next(
+                row for row in awol_residency_roster_payload()
+                if row["student_id"] == clarisse.id
+            )
+            self.assertEqual(loa_row["student"]["id"], benjamin.id)
+            self.assertEqual(readmission_row["student"]["id"], maria.id)
+            self.assertTrue(loa_row["messages"])
+            self.assertTrue(readmission_row["messages"])
+            self.assertTrue(awol_row["messages"])
 
     def test_workflow_clarification_can_be_returned_and_answered(self):
         with app.app_context():
