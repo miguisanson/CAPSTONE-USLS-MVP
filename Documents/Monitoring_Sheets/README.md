@@ -12,6 +12,9 @@ The folder ships **empty** — the app has no students until a real sheet is imp
 - `A1` = `PROGRAM: <CODE>`
 - Header row: `IDNO`, `COURSE`, `YR`, group labels `BASIC` / `MAJOR` / `COGNATE`, `TOTAL`, `COMPRE`, `NOTE`
 - Sub-header row: `AY ENTRY`, `SN` (surname), `FN` (first name), the subject codes, milestone labels `TITLE` / `PROPOSAL` / `ETHICS` / `FINAL`
+- `IDNO`: seven-digit numeric student identifier, matching the supplied AC sample workbook (for example, `1860101`)
+- `AY ENTRY`: repeated on every student row so imports never depend on visually grouped blank cells
+- `YR`: the student's year-level value from the source workbook; it is imported and displayed separately from AY Entry
 - One student per row, grouped by entry academic year.
 - A subject cell holds the **unit value** (e.g. `3`) when completed, blank when not taken.
 - Research progress: `COMPRE` = `PASSED` plus cumulative milestone marks map to a lifecycle stage.

@@ -627,15 +627,13 @@ function SubmitButton({ submitting, children }) {
 }
 
 // ---------------------------------------------------------------------------
-// Student Handoff — file upload (primary) with a manual fallback
+// Student Handoff — AIMS export import & reconciliation (no manual student creation).
+// Students come from the official AIMS export only (checklist items 2, 5, 66).
 // ---------------------------------------------------------------------------
-function HandoffPanel(props) {
+function HandoffPanel() {
   return (
     <div className="space-y-6">
       <HandoffImport />
-      <div className="border-t border-slate-200 pt-6">
-        <HandoffForm {...props} />
-      </div>
     </div>
   );
 }
@@ -766,9 +764,10 @@ function HandoffImport({ context }) {
           <div className="flex items-center gap-2 text-sm font-semibold text-brand-800">
             <CheckCircle2 className="h-5 w-5" /> {result.message}
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
             <ResultStat label="New" value={result.created} />
-            <ResultStat label="Skipped" value={result.skipped ?? result.updated ?? 0} />
+            <ResultStat label="AY/YR refreshed" value={result.updated ?? 0} />
+            <ResultStat label="Existing / skipped" value={result.skipped ?? 0} />
             <ResultStat label="Cell changes" value={result.subject_changes ?? 0} />
             <ResultStat label="Conflicts" value={result.conflict_count ?? 0} />
             <ResultStat label="Subjects" value={result.subjects} />

@@ -14,7 +14,12 @@ Phase 1 progress:
 - Item **72** (exception reporting): **Done (initial)** — per-row "Flag issue" records a discrepancy to the activity log (`aims-discrepancy`) without changing the official value.
 - Items **13, 14** (duplicate detection / integrity): **Partial** — an enrollment↔profile sync/integrity banner exists on the monitoring sheet.
 
-Next in Phase 1: items 2/5/66 (remove manual student creation → "AIMS Export Import & Reconciliation"), 3/67 (no app-generated/editable student numbers), 4 (admission external), 9 (full value-change audit trail), 11/74 (risk: "Not Yet Assessed / Insufficient Data", no default Medium).
+- Items **2, 5, 66** (manual student creation): **Done** — removed the manual "add a student" form from Student Handoff; students come only from the AIMS export import. (Full nav/title rename to "AIMS Export Import" still pending.)
+- Items **11, 74** (risk): **Done** — newly admitted students (Admission stage, no coursework) are **"Not Yet Assessed"** instead of a default Low/Medium.
+- Items **17, 78** (optional drop PDF): **Done** — removed the "Optional drop form/supporting PDF" upload from the student drop request.
+- Items **19, 79, 227** (drop has no Deny): **Done** — removed the Reject/Deny option; a drop is now **"Record drop" → status "Recorded" (awaiting AIMS update)**, not "Approved/Rejected".
+
+Still open in Phase 1: 3/67 (student-number generation/edit lockdown — numbers already come from the import; verify no edit path), 4 (admission external reference), 9 (fuller value-change audit trail beyond existing prev/new status). Phase 2 remaining: 16/75 (verify no generic course-readiness/prerequisites), 20/82 (fully separate enrollment vs grading), 21/80/81 (AIMS-only grade source, no manual grade entry), 25 (no invented grade deadlines).
 
 ## Scope and authority
 

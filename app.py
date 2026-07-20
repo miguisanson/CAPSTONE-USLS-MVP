@@ -307,6 +307,10 @@ class Student(db.Model):
     email = db.Column(db.String(160), nullable=False)
     program_id = db.Column(db.Integer, db.ForeignKey("program.id"), nullable=False)
     entry_year = db.Column(db.Integer, nullable=False)
+    # Preserve the two distinct source columns from the AC monitoring workbook.
+    # entry_year remains the numeric value used by residency calculations.
+    academic_year_entry = db.Column(db.String(20), nullable=False, default="")
+    year_level = db.Column(db.String(20), nullable=False, default="")
     current_stage = db.Column(db.String(60), nullable=False, default="Admission")
     standing = db.Column(db.String(60), nullable=False, default="Active")
     # Current-term enrollment tag (per AC notes): Enrolled / LOA / AWOL / Completed.
@@ -1110,6 +1114,8 @@ def student_brief(student: Student) -> dict:
         "program_has_practicum": bool(student.program.has_practicum),
         "college": student.program.college,
         "entry_year": student.entry_year,
+        "academic_year_entry": student_academic_year_entry(student),
+        "year_level": student.year_level or "",
         "current_stage": student.current_stage,
         "standing": student.standing,
         "enrollment_tag": student.enrollment_tag,
@@ -2815,6 +2821,15 @@ def student_portal_recommendations(student: Student) -> list[dict]:
 def student_priority(student: Student) -> dict:
     """A student's overall priority = the highest-scoring recommendation. Keeps the
     student record consistent with the Decision Support queue."""
+    # Checklist items 11/74: a newly admitted student has not accumulated the signals
+    # the risk model needs, so it must NOT default to Medium/Low. It is "Not Yet
+    # Assessed" until verified indicators exist.
+    has_coursework = CourseRecord.query.filter(
+        CourseRecord.student_id == student.id,
+        CourseRecord.status.in_(["Completed", "Failed", "Incomplete", "Current", "Enrolled"]),
+    ).first()
+    if student.current_stage == "Admission" and not has_coursework:
+        return {"level": "Not Yet Assessed", "score": 0, "reason": "Newly admitted — not yet assessed for risk (insufficient data)"}
     recs = student_recommendations(student)["recommendations"]
     if not recs:
         return {"level": "Low", "score": 0, "reason": "On track — no flagged actions"}
@@ -7075,7 +7090,10 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
         record = CourseRecord.query.filter_by(student_id=request_item.student_id, course_id=request_item.course_id).first()
-        if decision == "approve":
+        # Checklist items 19/79: dropping is not a discretionary decision — there is no
+        # Deny. A submitted drop is RECORDED (the app is registering the student's
+        # decision), and the official AIMS subject status follows in a later sync.
+        if decision in ("approve", "record"):
             if not record:
                 record = CourseRecord(student_id=request_item.student_id, course_id=request_item.course_id, status="Missing")
                 db.session.add(record)
@@ -7090,10 +7108,10 @@ def register_routes(app: Flask) -> None:
                 request_item.course,
                 request_item.term_label or record.term_label,
                 "Dropped",
-                "Approved student course drop request",
+                "Recorded student course drop request",
             )
-            request_item.status = "Approved"
-            result = f"Drop request approved for {request_item.course.code}"
+            request_item.status = "Recorded"
+            result = f"Drop request recorded for {request_item.course.code}"
             add_log(
                 "course-audit",
                 request_item.student_id,
@@ -7101,26 +7119,12 @@ def register_routes(app: Flask) -> None:
                 "Student course drop request",
                 result,
                 "Student",
-                remarks or f"Course status changed from {previous or 'Missing'} to Dropped.",
+                remarks or f"Course status changed from {previous or 'Missing'} to Dropped (awaiting AIMS update).",
                 previous_status=previous,
                 new_status="Dropped",
             )
-        elif decision == "reject":
-            request_item.status = "Rejected"
-            result = f"Drop request rejected for {request_item.course.code}"
-            add_log(
-                "course-audit",
-                request_item.student_id,
-                actor,
-                "Student course drop request",
-                result,
-                "Student",
-                remarks or "Course status unchanged.",
-                previous_status=record.status if record else None,
-                new_status=record.status if record else None,
-            )
         else:
-            return jsonify({"error": "Choose approve or reject."}), 400
+            return jsonify({"error": "A drop request can only be recorded; there is no deny option."}), 400
         request_item.reviewer_remarks = remarks
         request_item.decided_by = account.full_name if account else "Academic Coordinator"
         request_item.decided_at = now_utc()
@@ -7278,7 +7282,10 @@ def register_routes(app: Flask) -> None:
             compre = comprehensive_exam_eligibility(s)
             rows.append({
                 "id": s.id, "name": s.name, "first_name": s.first_name, "last_name": s.last_name, "student_number": s.student_number,
-                "entry_year": s.entry_year, "stage": s.current_stage, "risk": s.risk_level,
+                "entry_year": s.entry_year,
+                "academic_year_entry": student_academic_year_entry(s),
+                "year_level": s.year_level or "",
+                "stage": s.current_stage, "risk": s.risk_level,
                 "enrollment_tag": s.enrollment_tag,
                 "cells": cells, "completed": done, "total": len(courses),
                 "grades": {c.id: (records[(s.id, c.id)].grade_value or "") for c in courses if (s.id, c.id) in records},
@@ -10368,6 +10375,16 @@ def _entry_year_from_ay(ay: str) -> int:
     return n if n >= 1900 else 2000 + n
 
 
+def student_academic_year_entry(student: Student) -> str:
+    """Return the source AY Entry label, with a legacy-safe derived fallback."""
+    if (student.academic_year_entry or "").strip():
+        return student.academic_year_entry.strip()
+    year = int(student.entry_year or 0)
+    if not year:
+        return ""
+    return f"{year % 100:02d}-{(year + 1) % 100:02d}"
+
+
 def clean_person_name(value: str) -> str:
     """Registrar sheets often store names in ALL CAPS (e.g. 'YU', 'MA. LORIANNE').
     Normalize to a clean display case so 'MIGUEL YU' becomes 'Miguel Yu'."""
@@ -10587,7 +10604,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
 
     term = get_active_term()
 
-    created, skipped, sample, conflicts, duplicates = 0, 0, [], [], []
+    created, updated, skipped, sample, conflicts, duplicates = 0, 0, 0, [], [], []
     created_accounts = []
     subject_changes = 0
     students_changed = 0
@@ -10613,9 +10630,22 @@ def import_ac_monitoring(parsed: dict) -> dict:
                     "differences": comparison["differences"],
                 })
             else:
+                metadata_changed = (
+                    student.academic_year_entry != row["ay_entry"]
+                    or student.year_level != row["year"]
+                )
+                student.academic_year_entry = row["ay_entry"]
+                student.year_level = row["year"]
+                if metadata_changed:
+                    updated += 1
                 duplicates.append({
                     **item,
-                    "reason": "Student is already in the system with the same monitoring data.",
+                    "reason": (
+                        "Student is already in the system with the same monitoring data; "
+                        "AY Entry and YR were refreshed from the workbook."
+                        if metadata_changed
+                        else "Student is already in the system with the same monitoring data."
+                    ),
                 })
             skipped += 1
             continue
@@ -10638,6 +10668,8 @@ def import_ac_monitoring(parsed: dict) -> dict:
         student.last_name = clean_person_name(row["last_name"]) or student.last_name or "—"
         student.program_id = program.id
         student.entry_year = entry_year
+        student.academic_year_entry = row["ay_entry"]
+        student.year_level = row["year"]
         if row.get("comprehensive_exam_passed"):
             student.comprehensive_exam_status = "Passed"
         if is_new or not student.email:
@@ -10702,7 +10734,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
         None,
         "GS Staff",
         "AC Student Monitoring import",
-        f"Monitoring sheet imported: {len(parsed['rows'])} rows, {created} new, {skipped} skipped, {len(conflicts)} conflict(s)",
+        f"Monitoring sheet imported: {len(parsed['rows'])} rows, {created} new, {updated} refreshed, {skipped} skipped, {len(conflicts)} conflict(s)",
         "Academic Coordinator",
         f"Program {program.code}; {len(parsed['subjects'])} subjects; {subject_changes} subject status change(s) across {students_changed} student(s).",
     )
@@ -10714,7 +10746,7 @@ def import_ac_monitoring(parsed: dict) -> dict:
         "subjects": len(parsed["subjects"]),
         "rows": len(parsed["rows"]),
         "created": created,
-        "updated": 0,
+        "updated": updated,
         "skipped": skipped,
         "duplicates": duplicates,
         "duplicate_count": len(duplicates),
@@ -10724,8 +10756,9 @@ def import_ac_monitoring(parsed: dict) -> dict:
         "conflict_count": len(conflicts),
         "sample": sample,
         "accounts": created_accounts,
-        "message": f"Imported {created} new student(s) from the {program.code} monitoring sheet "
-                   f"({skipped} already in system or needing verification, {len(conflicts)} conflict(s))."
+        "message": f"Imported {created} new student(s) and refreshed AY/YR for {updated} student(s) "
+                   f"from the {program.code} monitoring sheet ({skipped} already in system or "
+                   f"needing verification, {len(conflicts)} conflict(s))."
                    + (
                        f" Portal login for {created_accounts[0]['name']}: {created_accounts[0]['email']} / {SIM_STUDENT_PASSWORD}."
                        if len(created_accounts) == 1
@@ -10746,6 +10779,7 @@ def monitoring_upload_dict(upload: MonitoringSheetUpload) -> dict:
         "subjects": upload.subject_count,
         "uploaded_at": iso(upload.uploaded_at),
         "created": result.get("created", 0),
+        "updated": result.get("updated", 0),
         "skipped": result.get("skipped", 0),
         "conflict_count": result.get("conflict_count", 0),
         "conflicts": result.get("conflicts", []),
@@ -14879,6 +14913,25 @@ def ensure_student_comprehensive_exam_schema() -> None:
         db.session.commit()
 
 
+def ensure_student_monitoring_columns_schema() -> None:
+    """Preserve AY ENTRY and YR separately on existing databases."""
+    inspector = inspect(db.engine)
+    if "student" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("student")}
+    additions = {
+        "academic_year_entry": "VARCHAR(20) NOT NULL DEFAULT ''",
+        "year_level": "VARCHAR(20) NOT NULL DEFAULT ''",
+    }
+    changed = False
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE student ADD COLUMN {name} {sql_type}"))
+            changed = True
+    if changed:
+        db.session.commit()
+
+
 def ensure_demo_comprehensive_exam_consistency() -> int:
     """Repair legacy generated rows so research never precedes a passed exam."""
     inspector = inspect(db.engine)
@@ -14888,7 +14941,11 @@ def ensure_demo_comprehensive_exam_consistency() -> int:
     if "comprehensive_exam_status" not in existing:
         return 0
     research_stages = {"Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense", "Completed"}
-    generated = Student.query.filter(Student.student_number.like("GS-2026-%")).all()
+    generated = [
+        student
+        for student in Student.query.all()
+        if re.fullmatch(r"(?:GS-2026-\d{4}|\d{7})", student.student_number or "")
+    ]
     generated_ids = {student.id for student in generated}
     case_ids = {
         student_id for (student_id,) in db.session.query(ResearchCase.student_id)
@@ -15319,10 +15376,15 @@ def import_program_monitoring_sheets() -> int:
     if not os.path.isdir(MONITORING_SHEET_DIR):
         return 0
     created = 0
-    for name in sorted(os.listdir(MONITORING_SHEET_DIR)):
-        if not name.lower().endswith((".xlsx", ".xlsm")) or name.startswith("~$"):
-            continue
-        with open(os.path.join(MONITORING_SHEET_DIR, name), "rb") as fh:
+    workbook_paths = sorted(
+        path
+        for path in Path(MONITORING_SHEET_DIR).rglob("*")
+        if path.is_file()
+        and path.suffix.lower() in {".xlsx", ".xlsm"}
+        and not path.name.startswith("~$")
+    )
+    for workbook_path in workbook_paths:
+        with workbook_path.open("rb") as fh:
             parsed = parse_ac_monitoring(fh)
         result = import_ac_monitoring(parsed)
         created += result.get("created", 0)
@@ -15769,7 +15831,7 @@ def seed_maed_personas() -> None:
     term_label = active_term.label if active_term else ""
 
     # 0001: newly handed-off admission record, intentionally without subjects.
-    daniel = by_num("GS-2026-0001")
+    daniel = by_num("2560001")
     if daniel:
         daniel.current_stage = "Admission"
         daniel.standing = "Active"
@@ -15779,7 +15841,7 @@ def seed_maed_personas() -> None:
         set_term_status(daniel, "Pending Enrollment")
 
     # 0002: early coursework is complete, but the next subjects remain unassigned.
-    grace = by_num("GS-2026-0002")
+    grace = by_num("2560002")
     if grace:
         grace.current_stage = "Coursework"
         grace.standing = "Active"
@@ -15806,7 +15868,7 @@ def seed_maed_personas() -> None:
                     ))
 
     # 0003: submitted LOA application awaiting the first GS Staff review.
-    loa = by_num("GS-2026-0003")
+    loa = by_num("2460003")
     if loa:
         loa.current_stage = "Coursework"
         loa.standing = "Active"
@@ -15836,7 +15898,7 @@ def seed_maed_personas() -> None:
 
     # 0004: completed Title and Proposal defenses, with the four-member panel
     # ready for the still-pending Final Defense.
-    miguel = by_num("GS-2026-0004")
+    miguel = by_num("2260004")
     if miguel:
         miguel.current_stage = "Final Defense"
         miguel.standing = "Active"
@@ -15889,7 +15951,7 @@ def seed_maed_personas() -> None:
         research_case.adviser_name = miguel.adviser_name
 
     # 0005: AWOL student with a written return intent awaiting GS Staff routing.
-    returning = by_num("GS-2026-0005")
+    returning = by_num("2460005")
     if returning:
         returning.current_stage = "AWOL"
         returning.standing = "AWOL"
@@ -15945,7 +16007,7 @@ def seed_maed_personas() -> None:
             )
 
     # 0006: newly submitted withdrawal, ready for GS Staff to forward to the Dean.
-    withdrawal_student = by_num("GS-2026-0006")
+    withdrawal_student = by_num("2360006")
     if withdrawal_student:
         withdrawal_student.current_stage = "Coursework"
         withdrawal_student.standing = "Active"
@@ -16002,7 +16064,7 @@ def seed_maed_personas() -> None:
 
     # 0007: source-complete graduation candidate. Dynamic eligibility is backed
     # by coursework, research, completion-evidence, and practicum records.
-    isabel = by_num("GS-2026-0007")
+    isabel = by_num("2260007")
     if isabel:
         isabel.current_stage = "Final Defense"
         isabel.standing = "Active"
@@ -16094,7 +16156,7 @@ def seed_maed_personas() -> None:
 
     # 0008: thesis complete; practicum is intentionally the only remaining
     # graduation blocker at 120 of 200 hours.
-    hector = by_num("GS-2026-0008")
+    hector = by_num("2360008")
     if hector:
         hector.current_stage = "Final Defense"
         hector.standing = "Active"
@@ -16161,7 +16223,7 @@ def seed_maed_personas() -> None:
             )
 
     # 0009: readmission after an approved LOA, awaiting GS Staff review.
-    readmission = by_num("GS-2026-0009")
+    readmission = by_num("2460009")
     if readmission:
         readmission.current_stage = "LOA"
         readmission.standing = "On Leave"
@@ -16196,7 +16258,7 @@ def seed_maed_personas() -> None:
             )
 
     # 0010: declared AWOL, before any return intent has been filed.
-    declared_awol = by_num("GS-2026-0010")
+    declared_awol = by_num("2360010")
     if declared_awol:
         declared_awol.current_stage = "AWOL"
         declared_awol.standing = "AWOL"
@@ -16229,7 +16291,7 @@ def seed_maed_personas() -> None:
             )
 
     # 0011: policy-valid no-subject residency for continuing thesis work.
-    residency_student = by_num("GS-2026-0011")
+    residency_student = by_num("2260011")
     if residency_student and active_term:
         residency_student.current_stage = "Proposal Development"
         residency_student.standing = "Active"
@@ -16660,6 +16722,7 @@ with app.app_context():
     ensure_schedule_request_schema()
     ensure_monitoring_upload_schema()
     ensure_student_comprehensive_exam_schema()
+    ensure_student_monitoring_columns_schema()
     ensure_panel_assignment_schema()
     ensure_workflow_activity_schema()
     ensure_course_workflow_schema()

@@ -498,7 +498,6 @@ function MyCoursesPanel({ data, onSaved }) {
             <Field label="Reason for dropping" required>
               <Textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} required />
             </Field>
-            <RequestPdfUpload requestType="course-drop" label="Optional drop form/supporting PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
             <SubmitState busy={busy} error={error} message={message} disabled={!form.reason.trim()} disabledHint={!form.reason.trim() ? "Enter your reason before submitting." : ""} label="Submit drop request" />
           </form>
         ) : (

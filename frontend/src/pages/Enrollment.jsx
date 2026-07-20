@@ -582,24 +582,20 @@ function DropRequestsPanel({ program, onEnrollmentChanged }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, program?.id]);
 
-  async function decide(item, decision) {
-    const verb = decision === "approve" ? "Approve" : "Reject";
+  async function decide(item) {
     const ok = await confirm({
-      title: `${verb} drop request?`,
+      title: "Record drop request?",
       message:
-        `${verb} ${item.course_code} for ${item.student?.name || `student #${item.student_id}`}?\n\n` +
-        (decision === "approve"
-          ? "The enrollment ledger, monitoring sheet, student profile, and course audit will mark the subject Dropped."
-          : "The enrollment and subject status will remain unchanged."),
-      confirmLabel: verb,
-      tone: decision === "reject" ? "danger" : "default",
+        `Record the drop of ${item.course_code} for ${item.student?.name || `student #${item.student_id}`}?\n\n` +
+        "Dropping is not a discretionary decision — this registers the student's request. The subject is marked Dropped here and follows in the next AIMS sync.",
+      confirmLabel: "Record drop",
     });
     if (!ok) return;
     setBusyId(item.id);
     setError("");
     setNotice("");
     try {
-      const response = await api.decideCourseDrop(item.id, { decision });
+      const response = await api.decideCourseDrop(item.id, { decision: "record" });
       setNotice(response.message);
       await load(status);
       onEnrollmentChanged?.();
@@ -617,14 +613,14 @@ function DropRequestsPanel({ program, onEnrollmentChanged }) {
           <div>
             <h2 className="font-display text-xl font-semibold text-ink">Course drop requests</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Review student requests where enrollment is managed. Approved drops synchronize
-              the enrollment ledger, monitoring sheet, profile, and course audit.
+              Dropping has no deny option — the app records the student's request. Recorded drops
+              mark the subject Dropped here and follow in the next AIMS sync.
             </p>
           </div>
           <StatusBadge value={program?.code || "All programs"} dot={false} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {["Submitted", "Approved", "Rejected", "All"].map((itemStatus) => (
+          {["Submitted", "Recorded", "All"].map((itemStatus) => (
             <button
               key={itemStatus}
               type="button"
@@ -641,8 +637,7 @@ function DropRequestsPanel({ program, onEnrollmentChanged }) {
         </div>
         {!permissions.can_decide && !loading && (
           <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
-            Graduate School Staff have read-only access. An Academic Coordinator must approve or
-            reject a drop request.
+            Graduate School Staff have read-only access. An Academic Coordinator records a drop request.
           </p>
         )}
       </Card>
@@ -705,27 +700,17 @@ function DropRequestsPanel({ program, onEnrollmentChanged }) {
                     </td>
                     <td className="px-5 py-3 text-right">
                       {item.status === "Submitted" && permissions.can_decide ? (
-                        <span className="inline-flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => decide(item, "approve")}
-                            disabled={busyId === item.id}
-                            className="btn-primary px-3 py-2"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => decide(item, "reject")}
-                            disabled={busyId === item.id}
-                            className="btn-ghost px-3 py-2 text-red-600"
-                          >
-                            Reject
-                          </button>
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => decide(item)}
+                          disabled={busyId === item.id}
+                          className="btn-primary px-3 py-2"
+                        >
+                          Record drop
+                        </button>
                       ) : (
                         <span className="text-xs text-slate-400">
-                          {item.decided_by ? `Reviewed by ${item.decided_by}` : "Awaiting coordinator"}
+                          {item.decided_by ? `Recorded by ${item.decided_by}` : "Awaiting coordinator"}
                         </span>
                       )}
                     </td>

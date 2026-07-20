@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import unittest
 from datetime import date
@@ -94,6 +95,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 email="workflow@example.test",
                 program_id=self.program.id,
                 entry_year=2025,
+                academic_year_entry="25-26",
+                year_level="1",
                 current_stage="Final Defense",
                 standing="Active",
             )
@@ -834,6 +837,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 if row["id"] == self.student_id
             )
             self.assertEqual(student_row["cells"][str(self.course_id)], "Enrolled")
+            self.assertEqual(student_row["academic_year_entry"], "25-26")
+            self.assertEqual(student_row["year_level"], "1")
 
             response = academic.post("/api/course-audit/roster", json={
                 "course_id": self.course_id,
@@ -930,7 +935,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(blocked.status_code, 409, blocked.get_json())
             self.assertIsNotNone(db.session.get(AcademicTerm, referenced.id))
 
-    def test_course_drop_request_requires_academic_coordinator_approval(self):
+    def test_course_drop_request_is_recorded_by_academic_coordinator(self):
         with app.app_context():
             record = CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Enrolled", term_label="AY 2026-2027 Term 1")
             db.session.add(record)
@@ -962,12 +967,15 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             staff_response = self._staff_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve"})
             self.assertEqual(staff_response.status_code, 403)
-            response = self._academic_client().post(f"/api/course-drop/requests/{drop.id}/decide", json={"decision": "approve", "remarks": "Approved for demo"})
+            response = self._academic_client().post(
+                f"/api/course-drop/requests/{drop.id}/decide",
+                json={"decision": "record", "remarks": "Recorded for AIMS follow-up"},
+            )
             self.assertEqual(response.status_code, 200, response.get_json())
             db.session.refresh(record)
             db.session.refresh(drop)
             self.assertEqual(record.status, "Dropped")
-            self.assertEqual(drop.status, "Approved")
+            self.assertEqual(drop.status, "Recorded")
             db.session.refresh(task)
             self.assertEqual(task.status, "Done")
 
@@ -1298,6 +1306,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 for student in Student.query.filter_by(program_id=program.id).all()
             }
             self.assertEqual(len(students), 11)
+            self.assertTrue(all(
+                re.fullmatch(r"\d{7}", student.student_number)
+                for student in students.values()
+            ))
+            self.assertTrue(all(
+                student.academic_year_entry and student.year_level
+                for student in students.values()
+            ))
             self.assertTrue(active_term.is_active_planning_term)
             self.assertEqual(
                 enrollment_integrity_payload(program, active_term)["issue_count"],
@@ -1306,17 +1322,17 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(SubjectEnrollment.query.count(), 0)
 
             expected_completed = {
-                "GS-2026-0001": 0,
-                "GS-2026-0002": 3,
-                "GS-2026-0003": 9,
-                "GS-2026-0004": 18,
-                "GS-2026-0005": 6,
-                "GS-2026-0006": 12,
-                "GS-2026-0007": 18,
-                "GS-2026-0008": 18,
-                "GS-2026-0009": 9,
-                "GS-2026-0010": 6,
-                "GS-2026-0011": 18,
+                "2560001": 0,
+                "2560002": 3,
+                "2460003": 9,
+                "2260004": 18,
+                "2460005": 6,
+                "2360006": 12,
+                "2260007": 18,
+                "2360008": 18,
+                "2460009": 9,
+                "2360010": 6,
+                "2260011": 18,
             }
             for student_number, completed_count in expected_completed.items():
                 audit = compute_course_audit(students[student_number])
@@ -1327,7 +1343,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 )
                 self.assertEqual(audit["required_count"], 18, student_number)
 
-            daniel = students["GS-2026-0001"]
+            daniel = students["2560001"]
             self.assertEqual(daniel.current_stage, "Admission")
             self.assertEqual(
                 TermEnrollment.query.filter_by(
@@ -1337,14 +1353,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "Pending Enrollment",
             )
 
-            grace = students["GS-2026-0002"]
+            grace = students["2560002"]
             self.assertEqual(grace.current_stage, "Coursework")
             self.assertEqual(
                 {item.course.code for item in curriculum_offerings_for_term(program, active_term)},
                 {"MAED-MAJ1", "MAED-MAJ2", "MAED-MAJ3"},
             )
 
-            benjamin = students["GS-2026-0003"]
+            benjamin = students["2460003"]
             self.assertIsNotNone(TransactionLog.query.filter_by(
                 student_id=benjamin.id,
                 transaction_slug="leave-of-absence",
@@ -1355,7 +1371,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 benjamin.student_number,
             )
 
-            miguel = students["GS-2026-0004"]
+            miguel = students["2260004"]
             miguel_progress = graduation_eligibility(miguel)["research_progress"]
             self.assertTrue(miguel_progress["stages"][0]["complete"])
             self.assertTrue(miguel_progress["stages"][1]["complete"])
@@ -1365,18 +1381,18 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 gate="Final Defense",
             ).count(), 4)
 
-            clarisse = students["GS-2026-0005"]
+            clarisse = students["2460005"]
             clarisse_case = AwolCase.query.filter_by(student_id=clarisse.id).one()
             self.assertEqual(clarisse_case.status, "Return Submitted")
             self.assertIsNotNone(clarisse_case.intent_attachment_id)
 
-            adrian = students["GS-2026-0006"]
+            adrian = students["2360006"]
             self.assertEqual(
                 WithdrawalApplication.query.filter_by(student_id=adrian.id).one().status,
                 "Submitted to GS Staff",
             )
 
-            isabel = students["GS-2026-0007"]
+            isabel = students["2260007"]
             isabel_eligibility = graduation_eligibility(isabel)
             self.assertTrue(isabel_eligibility["eligible"])
             self.assertEqual(isabel_eligibility["coursework_status"], "Complete")
@@ -1389,7 +1405,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "For Review",
             )
 
-            hector = students["GS-2026-0008"]
+            hector = students["2360008"]
             hector_eligibility = graduation_eligibility(hector)
             self.assertFalse(hector_eligibility["eligible"])
             self.assertEqual(hector_eligibility["missing_coursework"], [])
@@ -1402,21 +1418,21 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 hector_eligibility["research_progress"]["completion_evidence"]["complete"]
             )
 
-            maria = students["GS-2026-0009"]
+            maria = students["2460009"]
             self.assertEqual(maria.standing, "On Leave")
             self.assertEqual(
                 submitted_request_students("readmission")[0]["student_number"],
                 maria.student_number,
             )
 
-            paulo = students["GS-2026-0010"]
+            paulo = students["2360010"]
             self.assertEqual(paulo.enrollment_tag, "AWOL")
             self.assertEqual(
                 AwolCase.query.filter_by(student_id=paulo.id).one().status,
                 "AWOL Declared",
             )
 
-            elena = students["GS-2026-0011"]
+            elena = students["2260011"]
             elena_audit = compute_course_audit(elena)
             self.assertEqual(elena_audit["completed_units"], 54)
             self.assertEqual(elena.enrollment_tag, "Residency")
