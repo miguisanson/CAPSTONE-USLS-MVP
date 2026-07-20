@@ -178,7 +178,7 @@ export default function CourseAdjustments() {
           <div className="flex-1">
             <h1 className="font-display text-2xl font-semibold text-ink">Course Adjustments</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Use live demand as guidance, manually add any curriculum subject, and publish the approved list to Curriculum Planning.
+              Use live demand as guidance, manually add any curriculum subject, and publish the approved list as the official semester offerings.
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
               <p>
@@ -209,7 +209,7 @@ export default function CourseAdjustments() {
               </Field>
               <Field label="Academic year and semester">
                 <select value={termId} onChange={(e) => updateFilters({ term_id: e.target.value })} className="field-input cursor-pointer" aria-label="Academic year and semester">
-                  {(data?.terms || []).map((term) => <option key={term.id} value={term.id}>{formatTermLabel(term.label)}</option>)}
+                  {(data?.terms || []).map((term) => <option key={term.id} value={term.id}>{formatTermLabel(term.label)}{term.relative_label ? ` (${term.relative_label})` : ""}</option>)}
                 </select>
               </Field>
             </div>
@@ -246,6 +246,11 @@ export default function CourseAdjustments() {
                 <ActionButton busy={busy === "publish"} onClick={() => planAction("publish")} icon={CheckCircle2} disabled={!canManage || status !== "Approved"} primary={canManage && status === "Approved"}>
                   Publish
                 </ActionButton>
+                {canManage && (status === "Submitted" || status === "Approved" || status === "Published") && (
+                  <ActionButton busy={busy === "reopen"} onClick={() => planAction("reopen")} icon={Settings2} disabled={false} primary={false}>
+                    Start new draft
+                  </ActionButton>
+                )}
               </div>
             </div>
             {!canManage && (
@@ -278,7 +283,7 @@ export default function CourseAdjustments() {
               </p>
             </div>
             {data.demand.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="No curriculum subjects found" hint="Add subjects in Curriculum Planning before creating an offering plan." />
+              <EmptyState icon={CheckCircle2} title="No curriculum subjects found" hint="This program has no curriculum subjects yet. Import the program's monitoring sheet in Student Handoff first." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1080px] text-sm">

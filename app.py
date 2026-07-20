@@ -903,7 +903,38 @@ def program_dict(program: Program) -> dict:
     }
 
 
-def term_dict(term: AcademicTerm) -> dict:
+def term_ordinal(term: AcademicTerm) -> int | None:
+    """A sortable integer for a semester (start-year*2 + semester index) so we can
+    tell how far a term is from the active one."""
+    ay, sem = split_academic_term_label(term.label)
+    if not ay:
+        return None
+    try:
+        start_year = int(ay.split("-")[0])
+    except (ValueError, IndexError):
+        return None
+    return start_year * 2 + (1 if ("2nd" in sem or "Second" in sem) else 0)
+
+
+def term_relative_label(term: AcademicTerm, active: AcademicTerm | None) -> str:
+    """'Current' / 'Next' / 'Previous' / '+2' / '-3' relative to the active semester."""
+    if not active:
+        return ""
+    if term.id == active.id:
+        return "Current"
+    a, b = term_ordinal(term), term_ordinal(active)
+    if a is None or b is None:
+        return ""
+    diff = a - b
+    if diff == 1:
+        return "Next"
+    if diff == -1:
+        return "Previous"
+    return f"+{diff}" if diff > 0 else f"{diff}"
+
+
+def term_dict(term: AcademicTerm, active: AcademicTerm | None = None) -> dict:
+    active = active if active is not None else get_active_term()
     return {
         "id": term.id,
         "label": term.label,
@@ -914,6 +945,7 @@ def term_dict(term: AcademicTerm) -> dict:
         "grade_submission_deadline": iso(term.grade_submission_deadline),
         "status": term.status,
         "is_active_planning_term": bool(term.is_active_planning_term),
+        "relative_label": term_relative_label(term, active),
     }
 
 
@@ -6456,6 +6488,13 @@ def register_routes(app: Flask) -> None:
                 "Final course offerings published to Curriculum Planning "
                 f"({published_count} new)"
             )
+        elif action == "reopen":
+            # Start a new draft from an already Submitted/Approved/Published plan so the
+            # coordinator can fix a mistake or add follow-up offerings, then resubmit.
+            if not plan:
+                return jsonify({"error": "There is no offering plan to revise yet."}), 400
+            plan.status = "Draft"
+            result = "Offering plan reopened as a new draft for revision"
         else:
             return jsonify({"error": "Unknown course adjustment action."}), 400
         plan.updated_at = now_utc()
@@ -14565,7 +14604,7 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
         "active_term": term_dict(get_active_term()) if get_active_term() else None,
         "planning_window_open": True,
         "permissions": {
-            "can_manage": bool(account and account.role == "academic_coordinator"),
+            "can_manage": bool(account and account.role in ("academic_coordinator", "admin")),
         },
         "summary": {
             "curriculum_subjects": len(demand),
@@ -15269,6 +15308,106 @@ def import_faculty_sheets() -> int:
     return created
 
 
+def seed_maed_personas() -> None:
+    """Set up one MAED student per lifecycle stage so every workflow screen is
+    testable out of the box (curated demo personas, not random). Keyed by student
+    number from Documents/Monitoring_Sheets/MAED_Monitoring_Sheet.xlsx."""
+    def by_num(num):
+        return Student.query.filter_by(student_number=num).first()
+
+    def attach(student, request_type, filename):
+        att = StudentRequestAttachment(
+            student_id=student.id, request_type=request_type,
+            original_name=filename, stored_name=f"persona-{request_type}-{student.id}.pdf",
+            mime_type="application/pdf", uploaded_by_name=student.name,
+            uploaded_by_role="student", uploaded_at=now_utc() - timedelta(days=2),
+        )
+        db.session.add(att); db.session.flush()
+        return att
+
+    active_term = get_active_term()
+    term_label = active_term.label if active_term else ""
+
+    loa = by_num("GS-2026-0003")
+    if loa and not StudentRequestAttachment.query.filter_by(student_id=loa.id, request_type="leave-of-absence").first():
+        name = f"LOA_Application_{loa.student_number}.pdf"
+        attach(loa, "leave-of-absence", name)
+        add_log("leave-of-absence", loa.id, "Student", name, "LOA application submitted", "GS Staff",
+                "Student submitted a Leave of Absence application for staff eligibility review.\n"
+                f"Requested period: {term_label}.\nReason/remarks: Family and health reasons.")
+
+    awol = by_num("GS-2026-0005")
+    if awol:
+        awol.enrollment_tag = "AWOL"
+        if not AwolCase.query.filter_by(student_id=awol.id).first():
+            db.session.add(AwolCase(
+                student_id=awol.id, status="Return Requested",
+                awol_effective_date=date.today() - timedelta(days=200),
+                last_enrolled_term="AY 2025-2026 1st Semester",
+                return_requested_at=now_utc() - timedelta(days=3),
+                target_return_term=term_label, years_in_program=2))
+            name = f"AWOL_Return_Intent_{awol.student_number}.pdf"
+            attach(awol, "awol-return", name)
+            add_log("awol", awol.id, "Student", name, "Return intent submitted", "GS Staff",
+                    "Student declared AWOL submitted a written return intent for review.\n"
+                    f"Target return semester: {term_label}.")
+
+    wd = by_num("GS-2026-0006")
+    if wd and not WithdrawalApplication.query.filter_by(student_id=wd.id).first():
+        name = f"Withdrawal_Request_{wd.student_number}.pdf"
+        att = attach(wd, "withdrawal", name)
+        db.session.add(WithdrawalApplication(
+            student_id=wd.id, reason="Transferring to another institution.",
+            effective_term=term_label, request_attachment_id=att.id,
+            status="Dean Review", dean_decision="Pending"))
+        add_log("withdrawal", wd.id, "Student", name, "Withdrawal request submitted", "GS Staff",
+                "Student submitted a withdrawal request for Dean review.\n"
+                f"Effective semester: {term_label}.")
+
+    prac = by_num("GS-2026-0008")
+    if prac and not PracticumRecord.query.filter_by(student_id=prac.id).first():
+        db.session.add(PracticumRecord(
+            student_id=prac.id, moa_status="Uploaded", moa_uploaded=True,
+            practicum_site="USLS Center for Educational Practice", supervisor_name="Dr. Ana Reyes",
+            required_hours=200, completed_hours=120, document_status="Pending Review",
+            certificate_count=1, completion_status="Pending", status="Documents Under Review"))
+        add_log("practicum", prac.id, "Academic Coordinator", "Practicum documents",
+                "Practicum documents under review", "Academic Coordinator",
+                "Practicum MOA received; hours in progress (120/200).")
+
+    grad = by_num("GS-2026-0007")
+    if grad and not GraduationEndorsement.query.filter_by(student_id=grad.id).first():
+        db.session.add(GraduationEndorsement(
+            student_id=grad.id, batch_name="Graduation Batch (Current Review)",
+            coursework_status="Complete", research_status="Complete",
+            practicum_status="Complete", endorsement_status="For Review"))
+        add_log("graduation", grad.id, "Academic Coordinator", "Graduation candidate list",
+                "Included in graduation candidate list", "Research Coordinator",
+                "Coursework and research complete; forwarded for research validation.")
+
+    miguel = by_num("GS-2026-0004")
+    if miguel and not ResearchCase.query.filter_by(student_id=miguel.id).first():
+        db.session.add(ResearchCase(
+            student_id=miguel.id, case_type=research_case_type(miguel),
+            title="Learning Analytics for Graduate Student Engagement",
+            current_gate="Final Defense", status="Ready",
+            adviser_name="Dr. Liwayway Bautista", opened_at=now_utc() - timedelta(days=120)))
+        miguel.adviser_name = "Dr. Liwayway Bautista"
+        panel = [("Dr. Marlon Geronimo", "Panel Chair"), ("Dr. Liwayway Bautista", "Content Specialist"),
+                 ("Dr. Patricia Salvador", "Method Specialist"), ("Dr. Teodoro Ramos", "External Panel")]
+        for fname, role in panel:
+            fac = Faculty.query.filter_by(name=fname).first()
+            if fac and not PanelAssignment.query.filter_by(student_id=miguel.id, faculty_id=fac.id, gate="Final Defense").first():
+                db.session.add(PanelAssignment(
+                    student_id=miguel.id, faculty_id=fac.id, gate="Final Defense",
+                    panel_role=role, score=95, eligibility_note="Topic-matched panel"))
+        for gate in ["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness"]:
+            for item in required_documents_for_gate(gate):
+                if not DocumentCheck.query.filter_by(student_id=miguel.id, gate=gate, item_name=item).first():
+                    db.session.add(DocumentCheck(student_id=miguel.id, gate=gate, item_name=item,
+                                                 status="Complete", evidence_reference="Research monitoring"))
+
+
 def seed_database(count: int = 350) -> None:
     # Deterministic seed data keeps demos repeatable while still showing varied
     # stages, risks, documents, panels, schedules, and activity history.
@@ -15307,6 +15446,9 @@ def seed_database(count: int = 350) -> None:
     import_faculty_sheets()
     db.session.flush()
     import_program_monitoring_sheets()
+    db.session.commit()
+
+    seed_maed_personas()
     db.session.commit()
 
     sync_all_curricula()

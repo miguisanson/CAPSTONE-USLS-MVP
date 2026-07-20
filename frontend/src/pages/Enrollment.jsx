@@ -224,16 +224,11 @@ export default function Enrollment() {
             <Inbox className="h-4 w-4" />
             {showDropRequests ? "Back to enrollment" : "Drop requests"}
           </button>
-          <Link to="/curriculum-planning" className="btn-ghost">
+          <Link to="/course-adjustments" className="btn-ghost">
             <BookOpenCheck className="h-4 w-4" /> Offering list
-          </Link>
-          <Link to="/workflow/course-audit" className="btn-ghost">
-            <ClipboardCheck className="h-4 w-4" /> Grade audit
           </Link>
         </div>
       </div>
-
-      <ProcessStrip />
 
       {showDropRequests ? (
         <DropRequestsPanel
@@ -267,7 +262,7 @@ export default function Enrollment() {
             >
               {(data?.terms || []).map((term) => (
                 <option key={term.id} value={term.id}>
-                  {term.label}{term.is_active_planning_term ? " (Current)" : ""}
+                  {term.label}{term.relative_label ? ` (${term.relative_label})` : ""}
                 </option>
               ))}
             </select>
@@ -325,7 +320,7 @@ export default function Enrollment() {
                       Official offered subjects
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      Only offerings published in Curriculum Planning appear here by default.
+                      Only offerings published in Course Adjustments appear here by default.
                     </p>
                   </div>
                   <StatusBadge
@@ -387,7 +382,7 @@ export default function Enrollment() {
                   <EmptyState
                     icon={BookOpenCheck}
                     title="No official subjects offered"
-                    hint="Publish subjects in Curriculum Planning for this program and semester before normal enrollment."
+                    hint="Publish subjects in Course Adjustments for this program and semester before normal enrollment."
                   />
                 )}
               </Card>
@@ -742,40 +737,6 @@ function DropRequestsPanel({ program, onEnrollmentChanged }) {
         </Card>
       )}
     </div>
-  );
-}
-
-function ProcessStrip() {
-  const steps = [
-    { label: "Student handoff", icon: UserRound },
-    { label: "Official offerings", icon: BookOpenCheck },
-    { label: "Enrollment", icon: GraduationCap },
-    { label: "Monitoring + profile", icon: RefreshCw },
-  ];
-  return (
-    <Card className="p-4">
-      <div className="grid gap-2 sm:grid-cols-4">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const active = index === 2;
-          return (
-            <div key={step.label} className="flex items-center gap-2">
-              <div
-                className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3 py-2.5 ${
-                  active ? "bg-brand-600 text-white" : "bg-slate-50 text-slate-600"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate text-xs font-semibold">{step.label}</span>
-              </div>
-              {index < steps.length - 1 && (
-                <ArrowRight className="hidden h-4 w-4 shrink-0 text-slate-300 sm:block" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Card>
   );
 }
 

@@ -288,7 +288,7 @@ export default function MonitoringGrid() {
             ))}
           </select>
           <select value={selectedTermId || String(grid?.selected_term?.id || "")} onChange={(e) => updateFilters({ term_id: e.target.value })} className="field-input cursor-pointer" aria-label="Semester">
-            {(grid?.terms || meta?.terms || []).map((term) => <option key={term.id} value={term.id}>{term.label}{term.is_active_planning_term ? " (Current)" : ""}</option>)}
+            {(grid?.terms || meta?.terms || []).map((term) => <option key={term.id} value={term.id}>{term.label}{term.relative_label ? ` (${term.relative_label})` : ""}</option>)}
           </select>
           <select
             value={progress}

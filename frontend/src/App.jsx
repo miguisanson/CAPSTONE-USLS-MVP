@@ -12,7 +12,6 @@ import WorkQueue from "./pages/WorkQueue";
 import ActivityLog from "./pages/ActivityLog";
 import WorkflowPage from "./pages/WorkflowPage";
 import MonitoringGrid from "./pages/MonitoringGrid";
-import CurriculumPlanning from "./pages/CurriculumPlanning";
 import CourseAdjustments from "./pages/CourseAdjustments";
 import Enrollment from "./pages/Enrollment";
 import DecisionSupport from "./pages/DecisionSupport";
@@ -80,7 +79,8 @@ export default function App() {
                 <Route path="/faculty" element={<Faculty />} />
                 <Route path="/students/:id" element={<StudentDetail />} />
                 <Route path="/monitoring-sheet" element={<MonitoringGrid />} />
-                <Route path="/curriculum-planning" element={<CurriculumPlanning />} />
+                {/* Curriculum Planning was merged into Course Adjustments. */}
+                <Route path="/curriculum-planning" element={<Navigate to="/course-adjustments" replace />} />
                 <Route path="/course-adjustments" element={<CourseAdjustments />} />
                 <Route path="/enrollment" element={<Enrollment />} />
                 <Route path="/term-settings" element={<TermSettings />} />

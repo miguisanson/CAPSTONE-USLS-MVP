@@ -34,7 +34,7 @@ import { useConfirm } from "../components/confirm";
 import { CheckList, Field, Input, Select, Textarea } from "../components/forms";
 import { formatDate, initials, relativeDays } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
-import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
+import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps, loaTimelineSteps } from "../components/WorkflowTimeline";
 
 const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
@@ -414,7 +414,7 @@ function MyCoursesPanel({ data, onSaved }) {
                 Offered subjects · {data.current_term?.label || "Current semester"}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Published by the Graduate School curriculum-planning process.
+                Published by the Graduate School course adjustments process.
               </p>
             </div>
             <StatusBadge value={`${offeredSubjects.length} offered`} dot={false} />
@@ -439,6 +439,11 @@ function MyCoursesPanel({ data, onSaved }) {
             </p>
           )}
         </div>
+        <div className="mb-2 flex items-center gap-2">
+          <ClipboardCheck className="h-4 w-4 text-brand-700" />
+          <p className="text-sm font-semibold text-ink">Your subjects — currently enrolled &amp; completed</p>
+        </div>
+        <p className="mb-3 text-xs text-slate-500">Your actual record from the monitoring sheet, separate from the offered list above.</p>
         {courses.length ? (
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-sm">
@@ -567,7 +572,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
         ) : (
           <>
             {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
-            {active === "loa" && <LoaRequestForm studentId={data.student.id} semesters={data.upcoming_semesters || []} onSaved={onSaved} />}
+            {active === "loa" && <LoaRequestForm data={data} semesters={data.upcoming_semesters || []} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
             {active === "awol" && <AwolReturnRequestForm data={data} onSaved={onSaved} />}
             {active === "withdrawal" && <WithdrawalRequestForm data={data} onSaved={onSaved} />}
@@ -1153,7 +1158,9 @@ function ConceptPaperCompliance({ compliance }) {
   );
 }
 
-function LoaRequestForm({ studentId, semesters = [], onSaved }) {
+function LoaRequestForm({ data, semesters = [], onSaved }) {
+  const studentId = data.student.id;
+  const onLeave = data.student.standing === "On Leave" || data.student.enrollment_tag === "LOA" || data.student.current_stage === "LOA";
   const [form, setForm] = useState({
     attachment_id: null,
     effective_start: "",
@@ -1168,22 +1175,61 @@ function LoaRequestForm({ studentId, semesters = [], onSaved }) {
     submit({ student_id: studentId, ...form });
   }
 
+  // LOA has no structured status record, so the step state is derived from the
+  // student's standing: On Leave means the application was approved.
+  const status = onLeave ? "On Leave" : "Not Submitted";
+  const loaSteps = loaTimelineSteps(status);
+  const applicationEditable = !onLeave;
+
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Leave starts (semester)" required>
-          <Select value={form.effective_start} onChange={set("effective_start")} placeholder="Select semester" options={semesters} required />
-        </Field>
-        <Field label="Leave ends (semester)" required>
-          <Select value={form.effective_end} onChange={set("effective_end")} placeholder="Select semester" options={semesters} required />
-        </Field>
-      </div>
-      <Field label="Reason / remarks" required>
-        <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} required />
-      </Field>
-      <RequestPdfUpload requestType="leave-of-absence" label="Completed LOA application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the completed LOA application before submitting." : ""} label="Submit LOA application" />
-    </form>
+    <div className="space-y-4">
+      <WorkflowTimeline steps={loaSteps} title="Leave of Absence timeline" />
+
+      <StageCard
+        number={1}
+        title="Leave of Absence Application"
+        state={applicationEditable ? "active" : "complete"}
+        helper={applicationEditable
+          ? "What you need to submit now: the effective start/end semester, your reason, and the signed LOA application PDF."
+          : "Your leave application is on file and your studies are paused."}
+      >
+        {applicationEditable ? (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Leave starts (semester)" required>
+                <Select value={form.effective_start} onChange={set("effective_start")} placeholder="Select semester" options={semesters} required />
+              </Field>
+              <Field label="Leave ends (semester)" required>
+                <Select value={form.effective_end} onChange={set("effective_end")} placeholder="Select semester" options={semesters} required />
+              </Field>
+            </div>
+            <Field label="Reason / remarks" required>
+              <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} required />
+            </Field>
+            <RequestPdfUpload requestType="leave-of-absence" label="Completed LOA application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
+            <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the completed LOA application before submitting." : ""} label="Submit LOA application" />
+          </form>
+        ) : null}
+      </StageCard>
+
+      <StageCard
+        number={2}
+        title="Staff Intake and Dean Review"
+        state={onLeave ? "complete" : "pending"}
+        helper={onLeave
+          ? "Graduate School staff checked eligibility and the Dean approved the leave."
+          : "After you submit, Graduate School staff check your LOA eligibility and forward it to the Dean for a decision."}
+      />
+
+      <StageCard
+        number={3}
+        title="On Leave (status paused, notice sent)"
+        state={onLeave ? "complete" : "locked"}
+        helper={onLeave
+          ? "Your status is On Leave. When your leave ends, open Readmission to return to active status."
+          : "Once the Dean approves, your record is paused (On Leave) and you receive a notice."}
+      />
+    </div>
   );
 }
 
