@@ -42,6 +42,7 @@ import {
   List,
   Send,
   CheckSquare,
+  Printer,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -49,7 +50,10 @@ import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from 
 import { Field, Input, Textarea, Select, CheckList } from "../components/forms";
 import StudentPicker from "../components/StudentPicker";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
+import WorkflowDiscussion from "../components/WorkflowDiscussion";
+import HistoryDisclosure from "../components/HistoryDisclosure";
 import { formatDate } from "../lib/format";
+import { printDataTable } from "../lib/print";
 import { useAuth } from "../auth";
 import { Form1EndorsementQueue } from "./Form1Endorsements";
 
@@ -364,17 +368,19 @@ export default function WorkflowPage() {
           <Card className="p-6">
             <SectionTitle title="Recent in this workflow" icon={Info} />
             {context?.recent_logs?.length ? (
-              <ul className="space-y-3">
-                {context.recent_logs.map((log) => (
-                  <li key={log.id} className="rounded-xl border border-slate-100 p-3">
-                    <p className="text-sm font-semibold text-ink">{log.result}</p>
-                    <p className="text-xs text-slate-500">
-                      {log.student_name || log.source_reference || "Workflow"} · {formatDate(log.created_at)}
-                    </p>
-                    {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
-                  </li>
-                ))}
-              </ul>
+              <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={context.recent_logs.length}>
+                <ul className="space-y-3">
+                  {context.recent_logs.map((log) => (
+                    <li key={log.id} className="rounded-xl border border-slate-100 p-3">
+                      <p className="text-sm font-semibold text-ink">{log.result}</p>
+                      <p className="text-xs text-slate-500">
+                        {log.student_name || log.source_reference || "Workflow"} · {formatDate(log.created_at)}
+                      </p>
+                      {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </HistoryDisclosure>
             ) : (
               <EmptyState title="No recent actions" />
             )}
@@ -863,6 +869,7 @@ function HandoffImport({ context }) {
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{uploadHistory?.items?.length || 0} backups</span>
         </div>
         {uploadHistory?.items?.length ? (
+          <HistoryDisclosure label="View upload history" hideLabel="Hide upload history" count={uploadHistory.items.length}>
           <div className="space-y-2">
             {uploadHistory.items.map((upload) => (
               <details key={upload.id} className="group rounded-xl border border-slate-200 p-3">
@@ -905,6 +912,7 @@ function HandoffImport({ context }) {
               </details>
             ))}
           </div>
+          </HistoryDisclosure>
         ) : (
           <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No monitoring-sheet backups yet.</p>
         )}
@@ -1380,9 +1388,22 @@ function CourseRosterGradeWorkspace({ meta }) {
     }
   }
 
+  function printGrades() {
+    if (!roster) return;
+    printDataTable({
+      title: `${roster.course.code} - ${roster.course.title} Grade List`,
+      subtitle: term || activeTermLabel || "Current semester",
+      columns: ["Student ID", "Student name", "Program", "Status", "Grade", "Remarks"],
+      rows: classStudents.map((student) => {
+        const edit = edits[student.student_id] || {};
+        return [student.student_number, student.name, student.program_code, edit.status || student.status, edit.grade_value || "No grade", edit.remarks || ""];
+      }),
+    });
+  }
+
   return (
     <div className="space-y-5">
-      <SectionTitle title="Course enrollment and grade audit" subtitle="Select the semester first, add students to the class roster, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />
+      <div className="flex flex-wrap items-start justify-between gap-3"><SectionTitle title="Course enrollment and grade audit" subtitle="Select the semester first, add students to the class roster, then enter grades. Blank grade keeps Current; INC marks Incomplete; 5.00 or F marks Failed." icon={ClipboardCheck} />{roster && classStudents.length > 0 && <button type="button" onClick={printGrades} className="btn-ghost cursor-pointer px-3 py-2"><Printer className="h-4 w-4" /> Print grade list</button>}</div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Program">
           <Select value={programId} onChange={(event) => setProgramId(event.target.value)} placeholder="All programs" options={(meta?.programs || []).map((program) => ({ value: program.id, label: `${program.code} - ${program.name}` }))} />
@@ -1583,11 +1604,24 @@ function CourseClassWorkspace({ meta, mode }) {
     }
   }
 
+  function printGrades() {
+    if (!roster || mode !== "grades") return;
+    printDataTable({
+      title: `${roster.course.code} - ${roster.course.title} Grade List`,
+      subtitle: term || "Current / all semesters",
+      columns: ["Student ID", "Student name", "Program", "Status", "Grade", "Remarks"],
+      rows: visibleStudents.map((student) => {
+        const edit = edits[student.student_id] || {};
+        return [student.student_number, student.name, student.program_code, edit.status || student.status, edit.grade_value || "No grade", edit.remarks || ""];
+      }),
+    });
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <SectionTitle title={title} subtitle={subtitle} icon={mode === "enrollment" ? Users : ClipboardCheck} />
-        {roster && <button type="button" onClick={() => setEditing((value) => !value)} className="btn-ghost cursor-pointer px-3 py-2">{editing ? "Normal view" : "Edit view"}</button>}
+        <div className="flex flex-wrap gap-2">{roster && mode === "grades" && visibleStudents.length > 0 && <button type="button" onClick={printGrades} className="btn-ghost cursor-pointer px-3 py-2"><Printer className="h-4 w-4" /> Print grade list</button>}{roster && <button type="button" onClick={() => setEditing((value) => !value)} className="btn-ghost cursor-pointer px-3 py-2">{editing ? "Normal view" : "Edit view"}</button>}</div>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Program">
@@ -2991,23 +3025,21 @@ function AvailabilityWorkspace({
 function ScheduleHistory({ schedules }) {
   return (
     <div className="border-t border-slate-200 pt-5">
-      <div className="mb-3 flex items-center gap-2">
-        <RotateCcw className="h-4 w-4 text-slate-500" />
-        <p className="text-sm font-semibold text-ink">Scheduling and rescheduling history</p>
-      </div>
-      <div className="space-y-2">
-        {schedules.map((schedule) => (
-          <div key={schedule.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
-              {schedule.display_conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.display_conflict_reason}</p>}
-              {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
+      <HistoryDisclosure label="View schedule history" hideLabel="Hide schedule history" count={schedules.length}>
+        <div className="space-y-2">
+          {schedules.map((schedule) => (
+            <div key={schedule.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
+                {schedule.display_conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.display_conflict_reason}</p>}
+                {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
+              </div>
+              <StatusBadge value={schedule.display_status || schedule.status} />
             </div>
-            <StatusBadge value={schedule.display_status || schedule.status} />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </HistoryDisclosure>
     </div>
   );
 }
@@ -3194,10 +3226,10 @@ const WORKFLOW_GUIDES = {
   },
   withdrawal: {
     purpose: "Records a voluntary withdrawal request through Graduate School review and Dean approval.",
-    submitter: "The student submits the request form and supporting proof.",
-    reviewers: "Graduate School Staff records and routes it; the Dean decides; the Academic Coordinator and GS Staff complete follow-through.",
-    stages: ["Submitted", "Staff review", "Dean review", "Requirements verification", "GS Staff confirmation"],
-    incomplete: "Any reviewer can return the case with a specific clarification message. The student remains Active until every approved follow-through step is complete.",
+    submitter: "The student submits the signed withdrawal request, reason, and effective semester.",
+    reviewers: "Graduate School Staff records and forwards the request; the Dean approves or denies; after approval, GS Staff performs and documents the follow-through actions.",
+    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "GS Staff follow-through", "Withdrawal confirmation"],
+    incomplete: "A Dean denial closes the request and keeps the student Active. Messages and action comments remain in the case discussion and logs.",
     final: "Completed means GS Staff confirmed the withdrawal and the monitoring record shows the student as Withdrawn.",
   },
   practicum: {
@@ -3229,7 +3261,7 @@ function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClose }) {
       onClose={onClose}
     >
       {mode === "activity" ? (
-        <WorkflowActivityList logs={logs} />
+        <WorkflowActivityList logs={logs} collapsible={false} />
       ) : guide ? (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -3255,9 +3287,9 @@ function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClose }) {
   );
 }
 
-function WorkflowActivityList({ logs }) {
+function WorkflowActivityList({ logs, collapsible = true }) {
   if (!logs.length) return <EmptyState title="No activity yet" hint="New submissions, messages, and decisions will appear here." />;
-  return (
+  const activity = (
     <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
       {logs.map((log) => (
         <li key={log.id} className="relative rounded-xl border border-slate-200 bg-slate-50/50 p-3">
@@ -3273,19 +3305,28 @@ function WorkflowActivityList({ logs }) {
       ))}
     </ol>
   );
+  if (!collapsible) return activity;
+  return (
+    <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={logs.length}>
+      {activity}
+    </HistoryDisclosure>
+  );
 }
 
-function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
+function WorkflowMessageModal({ slug, row, context, replyTo = null, onClose, onSaved }) {
   const student = row.student || row.endorsement?.student;
+  const remarksOnly = ["practicum", "graduation"].includes(slug);
   const [form, setForm] = useState({
-    action_type: "return",
-    recipient_role: "Student",
-    visibility: "student_visible",
-    template: context?.message_templates?.[0] || "Missing required document",
+    action_type: replyTo ? "response" : "return",
+    recipient_role: replyTo?.sender_role || "Student",
+    visibility: replyTo?.visibility || "student_visible",
+    template: remarksOnly ? "Remarks" : replyTo ? "Other / Custom comment" : context?.message_templates?.[0] || "Missing required document",
     comment: "",
+    reply_to_message_id: replyTo?.id || null,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const commentRequired = remarksOnly || Boolean(replyTo) || form.action_type === "return" || form.template === "Other / Custom comment";
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
   async function save(event) {
@@ -3306,7 +3347,7 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
   return (
     <WorkflowCaseModal
       id={`${slug}-message-${student.id}`}
-      title="Message / return for clarification"
+      title={replyTo ? "Reply in case discussion" : "Message / return for clarification"}
       subtitle={`${student.name} · ${student.student_number}`}
       onClose={onClose}
       size={["practicum", "graduation"].includes(slug) ? "wide" : "default"}
@@ -3314,6 +3355,8 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
     >
       <form id={`${slug}-message-form-${student.id}`} onSubmit={save} className="space-y-4">
         <ErrorNote message={error} />
+        {replyTo && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-sm font-semibold text-emerald-950">Replying to {replyTo.sender_name || replyTo.sender_role}{replyTo.sender_name && replyTo.sender_role ? ` (${replyTo.sender_role})` : ""} → {replyTo.recipient_role}</p>{replyTo.comment && <p className="mt-2 text-sm text-emerald-800">{replyTo.comment}</p>}</div>}
+        {!replyTo && <>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Action">
             <select value={form.action_type} onChange={update("action_type")} className="field-input cursor-pointer">
@@ -3331,36 +3374,28 @@ function WorkflowMessageModal({ slug, row, context, onClose, onSaved }) {
             <option value="internal">Internal reviewers only</option>
           </select>
         </Field>
-        <Field label="Message template">
+        {!remarksOnly && <Field label="Message template">
           <Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} />
+        </Field>}
+        </>}
+        <Field label={replyTo ? "Reply" : remarksOnly ? "Remarks" : form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"} required={commentRequired}>
+          <Textarea value={form.comment} onChange={update("comment")} required={commentRequired} placeholder={remarksOnly ? "Type your remarks or message." : "Add the exact file, record, or detail that needs attention."} />
         </Field>
-        <Field label={form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"} required={form.action_type === "return" || form.template === "Other / Custom comment"}>
-          <Textarea value={form.comment} onChange={update("comment")} required={form.action_type === "return" || form.template === "Other / Custom comment"} placeholder="Add the exact file, record, or detail that needs attention." />
-        </Field>
-        <p className="text-xs leading-relaxed text-slate-500">Returning the case moves it back to the selected recipient's stage and requires a reason. Use the case action button for normal forward approval; a note keeps the current stage unchanged.</p>
+        <p className="text-xs leading-relaxed text-slate-500">{replyTo ? "Your reply is added chronologically to this case discussion and routed to the original sender." : "Returning the case moves it back to the selected recipient's stage and requires a reason. Use the case action button for normal forward approval; a note keeps the current stage unchanged."}</p>
       </form>
     </WorkflowCaseModal>
   );
 }
 
-function CaseMessageHistory({ messages = [] }) {
-  if (!messages.length) return null;
+function CaseMessageHistory({ messages = [], onReply = null }) {
+  const { user } = useAuth();
+  const currentRoleLabel = WORKFLOW_ROLE_LABELS[user?.role] || user?.role_label || "";
   return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400"><MessageSquare className="h-4 w-4" /> Messages and clarifications</p>
-      <ul className="mt-3 space-y-3">
-        {[...messages].reverse().map((message) => (
-          <li key={message.id} className="rounded-xl bg-slate-50 p-3 text-sm">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <p className="font-semibold text-ink">{message.template}</p>
-              <span className="flex flex-wrap gap-1.5"><StatusBadge value={message.visibility === "internal" ? "Internal" : "Student visible"} dot={false} /><StatusBadge value={message.status} dot={false} /></span>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">{message.sender_name || message.sender_role} ({message.sender_role}) → {message.recipient_role} · {formatDateTime(message.created_at)}</p>
-            {message.comment && <p className="mt-2 text-sm leading-relaxed text-slate-600">{message.comment}</p>}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <WorkflowDiscussion
+      messages={messages}
+      onReply={onReply}
+      canReply={(message) => message.sender_role !== currentRoleLabel}
+    />
   );
 }
 
@@ -3390,13 +3425,14 @@ function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfi
   const [comment, setComment] = useState(action.reason || "");
   const [error, setError] = useState("");
   const requiresReason = Boolean(action.requireReason);
-  const showsTransitionComment = requiresReason || ["practicum", "graduation"].includes(slug);
+  const requiresComment = requiresReason || Boolean(action.requireComment);
+  const showsTransitionComment = requiresComment || ["practicum", "withdrawal", "graduation"].includes(slug);
 
   async function confirm(event) {
     event.preventDefault();
     const cleanComment = comment.trim();
-    if (requiresReason && !cleanComment) {
-      setError("Enter the exact reason before moving this request.");
+    if (requiresComment && !cleanComment) {
+      setError(action.commentRequiredError || (requiresReason ? "Enter the exact reason before moving this request." : "Enter the required follow-through details before moving this request."));
       return;
     }
     setError("");
@@ -3429,12 +3465,12 @@ function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfi
           <p className="mt-1 text-xs text-slate-500">This action is recorded against your signed-in account and preserves the submitted fields and files.</p>
         </div>
         {showsTransitionComment && (
-          <Field label={requiresReason ? "Message / reason" : "Comment sent with this action"} required={requiresReason}>
+          <Field label={action.commentLabel || (requiresReason ? "Message / reason" : "Comment sent with this action")} required={requiresComment}>
             <Textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              required={requiresReason}
-              placeholder={requiresReason ? "Tell the student what to correct or upload next." : "Add instructions or context for the next reviewer. Leave blank if there is nothing to add."}
+              required={requiresComment}
+              placeholder={action.commentPlaceholder || (requiresReason ? "Tell the student what to correct or upload next." : "Add instructions or context for the next reviewer. Leave blank if there is nothing to add.")}
             />
           </Field>
         )}
@@ -3462,12 +3498,19 @@ function graduationBatchName(form) {
 }
 
 const GRADUATION_STAGE_ACTIONS = {
+  create_batch: {
+    id: "create_batch",
+    label: "Create batch",
+    movement: "GS Staff creates the batch before forwarding",
+    nextOwner: "Graduate School Staff",
+    batchRequired: true,
+    commentLabel: "Optional batch note",
+  },
   compile_to_ac: {
     id: "compile_to_ac",
-    label: "Compile graduation candidate list",
+    label: "Forward to Academic Coordinator",
     movement: "GS Staff → Academic Coordinator",
     nextOwner: "Academic Coordinator",
-    batchRequired: true,
     commentLabel: "Optional note to Academic Coordinator",
   },
   check_coursework: {
@@ -3510,7 +3553,8 @@ const GRADUATION_STAGE_ACTIONS = {
 
 function graduationStageActionForRow(row, accountRole) {
   const status = row.endorsement?.endorsement_status || "Not Prepared";
-  if (accountRole === "staff" && ["Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"].includes(status)) return GRADUATION_STAGE_ACTIONS.compile_to_ac;
+  if (accountRole === "staff" && ["Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"].includes(status) && !row.endorsement?.batch_name) return GRADUATION_STAGE_ACTIONS.create_batch;
+  if (accountRole === "staff" && ["Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"].includes(status) && row.endorsement?.batch_name) return GRADUATION_STAGE_ACTIONS.compile_to_ac;
   if (accountRole === "academic_coordinator" && status === "Coursework Review") return GRADUATION_STAGE_ACTIONS.check_coursework;
   if (accountRole === "research_coordinator" && status === "Research Review") return GRADUATION_STAGE_ACTIONS.validate_research;
   if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return GRADUATION_STAGE_ACTIONS.mark_not_eligible;
@@ -3534,21 +3578,14 @@ function graduationStageSelection(rows, accountRole) {
   };
 }
 
-function graduationActionTargetLabel(target) {
-  const label = typeof target === "string" ? target : target?.label;
-  return label && label !== GRADUATION_UNBATCHED_LABEL ? label : "selected candidates";
-}
-
-function graduationBatchActionLabel(action, target) {
+function graduationBatchActionLabel(action) {
   if (!action) return "No action due";
-  return `${action.label} for ${graduationActionTargetLabel(target)}`;
+  return action.label;
 }
 
-function graduationSelectedActionLabel(action, groups) {
+function graduationSelectedActionLabel(action) {
   if (!action) return "Review selected candidates";
-  if (groups.length === 1) return graduationBatchActionLabel(action, groups[0]);
-  const allBatched = groups.length > 0 && groups.every((group) => group.label !== GRADUATION_UNBATCHED_LABEL);
-  return `${action.label} for ${allBatched ? `${groups.length} batches` : "selected candidates"}`;
+  return action.label;
 }
 
 const GRADUATION_UNBATCHED_LABEL = "Unbatched candidates";
@@ -3910,64 +3947,22 @@ function graduationFallbackChecklist(row) {
 }
 
 function GraduationRequirementBoxes({ row }) {
-  const [expandedKey, setExpandedKey] = useState(null);
   const eligibility = row.eligibility || {};
-  const checklist = eligibility.checklist?.length ? eligibility.checklist : graduationFallbackChecklist(row);
-  const allComplete = checklist.length > 0 && checklist.every((item) => graduationRequirementTone(item) === "complete");
-  const overallTone = allComplete && eligibility.status !== "Not eligible" ? "complete" : "missing";
-  const overallClasses = graduationRequirementClasses(overallTone);
+  const items = [
+    "Coursework completed",
+    "Thesis / research completed",
+    eligibility.practicum_status === "Not Required" ? "Practicum not required" : "Practicum completed",
+    "Eligible for graduation",
+  ];
   return (
-    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-      <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 ${overallClasses.card}`}>
-        <div className="flex items-center gap-2">
-          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${overallClasses.icon}`}>
-            {overallTone === "complete" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Graduation requirements</p>
-            <p className={`text-xs ${overallClasses.muted}`}>{overallTone === "complete" ? "Eligible based on visible requirements." : "Open the red stages to see what is missing."}</p>
-          </div>
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Completed graduation requirements">
+      {items.map((label) => (
+        <div key={label} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900">
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><CheckCircle2 className="h-3.5 w-3.5" /></span>
+          <p className="text-xs font-semibold">{label}</p>
         </div>
-        <StatusBadge value={eligibility.status || (overallTone === "complete" ? "Eligible" : "Not eligible")} dot={false} />
+      ))}
       </div>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        {checklist.map((item) => {
-          const key = item.key || item.label;
-          const tone = graduationRequirementTone(item);
-          const classes = graduationRequirementClasses(tone);
-          const expanded = expandedKey === key;
-          const detailLines = graduationRequirementDetailLines(item);
-          return (
-            <div key={key} className={`rounded-lg border px-2.5 py-2 ${classes.card}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${classes.icon}`}>
-                    {tone === "complete" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
-                  </span>
-                  <p className="truncate text-sm font-semibold">{item.label}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExpandedKey(expanded ? null : key)}
-                  className="btn-ghost shrink-0 cursor-pointer px-2 py-1"
-                  aria-label={`${expanded ? "Hide" : "View"} ${item.label} graduation requirement details`}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {expanded && (
-                <div className="mt-2 rounded-lg bg-white/75 px-3 py-2">
-                  <p className={`text-xs font-bold uppercase tracking-wide ${classes.text}`}>{item.status || (tone === "complete" ? "Passed" : "Not met")}</p>
-                  <div className="mt-1 space-y-1">
-                    {detailLines.map((line) => <p key={line} className={`break-words text-xs ${classes.muted}`}>{line}</p>)}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -4024,36 +4019,16 @@ function GraduationBatchModal({ rows, accountRole, onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [expandedCourseworkIds, setExpandedCourseworkIds] = useState(() => new Set());
-  const [expandedResearchIds, setExpandedResearchIds] = useState(() => new Set());
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const batchName = graduationBatchName(form);
   const showBatchFields = action?.batchRequired || (action?.id === "send_to_dean" && selection.processableRows.some((row) => !row.endorsement?.batch_name));
   const requiresComment = Boolean(action?.requiresComment);
-  const showCourseworkReviewTable = action?.id === "check_coursework";
-  const showResearchRequirementsInSummary = action?.id === "validate_research";
   const selectedGroups = graduationBatchGroups(selection.processableRows.length ? selection.processableRows : rows);
   const modalActionLabel = action
     ? showBatchFields
-      ? graduationBatchActionLabel(action, batchName)
-      : graduationSelectedActionLabel(action, selectedGroups)
+      ? graduationBatchActionLabel(action)
+      : graduationSelectedActionLabel(action)
     : "Review selected candidates";
-
-  function toggleCourseworkDetails(studentId) {
-    setExpandedCourseworkIds((current) => {
-      const next = new Set(current);
-      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
-      return next;
-    });
-  }
-
-  function toggleResearchDetails(studentId) {
-    setExpandedResearchIds((current) => {
-      const next = new Set(current);
-      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
-      return next;
-    });
-  }
 
   async function confirm(event) {
     event.preventDefault();
@@ -4120,109 +4095,23 @@ function GraduationBatchModal({ rows, accountRole, onClose, onSaved }) {
         )}
         {action && <Field label={action.commentLabel || "Comment"} required={requiresComment}><Textarea value={form.comment} onChange={update("comment")} required={requiresComment} /></Field>}
         {!showBatchFields && selectedGroups.length > 0 && (
-          <div className="grid w-full grid-cols-1 gap-3">
-            {selectedGroups.map((group) => <GraduationBatchStageCheck key={group.id} group={group} />)}
-          </div>
-        )}
-        {showCourseworkReviewTable && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-              <p className="text-sm font-semibold text-ink">Coursework completion review</p>
-              <p className="mt-1 text-xs text-slate-500">Use the status and details beside each selected student before confirming the coursework check.</p>
+          <HistoryDisclosure label="View stage history" hideLabel="Hide stage history" count={selectedGroups.length}>
+            <div className="grid w-full grid-cols-1 gap-3">
+              {selectedGroups.map((group) => <GraduationBatchStageCheck key={group.id} group={group} />)}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[780px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-white text-xs font-bold uppercase tracking-wide text-slate-400">
-                    <th className="px-4 py-2.5">Student</th>
-                    <th className="px-3 py-2.5">Coursework completion status</th>
-                    <th className="px-3 py-2.5">Endorsement stage</th>
-                    <th className="px-3 py-2.5">Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selection.processableRows.map((row) => {
-                    const expanded = expandedCourseworkIds.has(row.student.id);
-                    const courseworkItem = row.eligibility.checklist?.find((item) => item.key === "coursework");
-                    const missingCoursework = row.eligibility.missing_coursework || [];
-                    return [
-                        <tr key={`${row.student.id}-coursework-row`} className="border-b border-slate-100 align-top">
-                          <td className="px-4 py-3">
-                            <p className="font-semibold text-ink">{row.student.name}</p>
-                            <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code} · {row.endorsement?.batch_name || "No batch assigned"}</p>
-                          </td>
-                          <td className="px-3 py-3"><StatusBadge value={row.eligibility.coursework_status} dot={false} /></td>
-                          <td className="px-3 py-3"><StatusBadge value={row.endorsement?.endorsement_status || "Not Prepared"} dot={false} /></td>
-                          <td className="px-3 py-3">
-                            <button type="button" onClick={() => toggleCourseworkDetails(row.student.id)} className="btn-ghost cursor-pointer px-3 py-2">
-                              <Eye className="h-4 w-4" /> {expanded ? "Hide coursework completion details" : "View coursework completion details"}
-                            </button>
-                          </td>
-                        </tr>,
-                        expanded && (
-                          <tr key={`${row.student.id}-coursework-details`} className="border-b border-slate-100 bg-slate-50/70">
-                            <td colSpan={4} className="px-4 py-3">
-                              <div className="grid gap-3 md:grid-cols-2">
-                                <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-                                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Coursework checklist</p>
-                                  <p className="mt-2 text-sm font-semibold text-ink">{courseworkItem?.label || "Course units completed"}</p>
-                                  <p className="mt-1 text-sm text-slate-600">Required: {courseworkItem?.required_value || "Encoded curriculum total"}</p>
-                                  <p className="mt-1 text-sm text-slate-600">Current: {String(courseworkItem?.actual_value ?? "No curriculum data")}</p>
-                                  {courseworkItem?.message && <p className="mt-2 text-xs font-semibold text-amber-700">{courseworkItem.message}</p>}
-                                </div>
-                                <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-                                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing coursework</p>
-                                  {missingCoursework.length ? (
-                                    <ul className="mt-2 space-y-1 text-sm text-slate-600">
-                                      {missingCoursework.map((item) => <li key={item}>- {item}</li>)}
-                                    </ul>
-                                  ) : (
-                                    <p className="mt-2 text-sm font-semibold text-brand-700">None recorded</p>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        ),
-                    ];
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          </HistoryDisclosure>
         )}
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-semibold text-ink">Action summary</p>
-          <p className="mt-1 text-sm text-slate-600">{rows.length} candidate(s) selected · {selection.processableRows.length} ready for this action · {selection.skippedRows.length} blocked.</p>
-          <ul className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-            {rows.map((row) => {
-              const rowAction = graduationStageActionForRow(row, accountRole);
-              const rowBlocked = !action || rowAction?.id !== action.id;
-              const researchExpanded = expandedResearchIds.has(row.student.id);
-              const canViewResearch = showResearchRequirementsInSummary && rowAction?.id === "validate_research";
-              return (
-                <li key={row.student.id} className={`rounded-lg px-3 py-2 ${rowBlocked ? "bg-amber-50 text-amber-800" : "bg-white"}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="font-semibold text-ink">{row.student.name}</span>
-                      <br />
-                      <span className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code} · {row.endorsement?.endorsement_status || "Not Prepared"} · {rowAction?.label || "No action due"}</span>
-                    </div>
-                    {canViewResearch && (
-                      <button
-                        type="button"
-                        onClick={() => toggleResearchDetails(row.student.id)}
-                        className="btn-ghost shrink-0 cursor-pointer px-2 py-1 text-xs"
-                        aria-label={`${researchExpanded ? "Hide" : "View"} submitted research requirements for ${row.student.name}`}
-                      >
-                        <Eye className="h-3.5 w-3.5" /> {researchExpanded ? "Hide research" : "View research"}
-                      </button>
-                    )}
-                  </div>
-                  {canViewResearch && researchExpanded && <GraduationResearchRequirementsView row={row} />}
-                </li>
-              );
-            })}
+          <p className="text-sm font-semibold text-ink">Eligible candidates</p>
+          <p className="mt-1 text-sm text-slate-600">{selection.processableRows.length} of {rows.length} selected candidate{rows.length === 1 ? " is" : "s are"} ready for this action.</p>
+          <ul className="mt-3 grid gap-3 xl:grid-cols-2">
+            {rows.map((row) => (
+              <li key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                <p className="font-semibold text-ink">{row.student.name}</p>
+                <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+                <GraduationRequirementBoxes row={row} />
+              </li>
+            ))}
           </ul>
         </div>
       </form>
@@ -4231,6 +4120,7 @@ function GraduationBatchModal({ rows, accountRole, onClose, onSaved }) {
 }
 
 const PRACTICUM_BOARD_COLUMNS = [
+  { label: "Awaiting Submission", statuses: ["Not Submitted"] },
   { label: "Submitted", statuses: ["MOA Submitted", "MOA Received"] },
   { label: "Eligibility Review", statuses: ["MOA Under Review"] },
   { label: "Documents Review", statuses: ["Documents Submitted", "Documents Under Review"] },
@@ -4242,10 +4132,10 @@ const PRACTICUM_BOARD_COLUMNS = [
 
 const WITHDRAWAL_BOARD_COLUMNS = [
   { label: "Submitted", statuses: ["Submitted to GS Staff"] },
-  { label: "Staff Review", statuses: ["Coordinator Follow-through Complete", "Requirements Pending", "Requirements Submitted", "Requirements Verified"] },
   { label: "Dean Review", statuses: ["Dean Review"] },
   { label: "Returned for Clarification", statuses: ["Returned", "Returned for Clarification"] },
-  { label: "Approved", statuses: ["Approved - Follow-through", "Withdrawn Confirmed"] },
+  { label: "GS Staff Follow-through", statuses: ["Approved - Follow-through"] },
+  { label: "Confirmed", statuses: ["Withdrawn Confirmed"] },
   { label: "Rejected / Cancelled", statuses: ["Denied", "Cancelled"] },
 ];
 
@@ -4259,7 +4149,7 @@ const GRADUATION_BOARD_COLUMNS = [
   { label: "Returned / Not Eligible", statuses: ["Not Eligible", "Returned for Clarification"] },
 ];
 
-function WorkflowBoard({ columns, rows, getStatus, renderCard, empty }) {
+function WorkflowBoard({ columns, rows, getStatus, renderCard, empty, isDraggable = () => false, getDragId = () => "" }) {
   if (!rows.length) return <EmptyState title={empty} />;
   return (
     <div className="max-w-full overflow-x-auto pb-3">
@@ -4272,7 +4162,11 @@ function WorkflowBoard({ columns, rows, getStatus, renderCard, empty }) {
                 <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
                 <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
               </header>
-              <div className="space-y-3">{items.length ? items.map(renderCard) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
+              <div className="space-y-3">{items.length ? items.map((item, index) => {
+                const ready = isDraggable(item);
+                const dragId = getDragId(item) || item.student?.id || item.id || index;
+                return <div key={dragId} draggable={ready} onDragStart={(event) => { if (!ready) return; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(dragId)); }} className={ready ? "cursor-grab rounded-xl outline-none ring-2 ring-emerald-200 active:cursor-grabbing" : "rounded-xl"}>{renderCard(item)}</div>;
+              }) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
             </section>
           );
         })}
@@ -4291,12 +4185,16 @@ function ViewModeToggle({ value, onChange }) {
 }
 
 function PracticumBoardCard({ row, onOpen, onMessage }) {
+  const record = row.record;
+  const ready = Boolean(row.has_submitted_documents);
+  const latestMessage = row.messages?.[0];
   return (
-    <article key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
-      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-400">{row.student.student_number} · {row.student.program_code}</p></div>{row.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>{row.record.practicum_site || "Site pending"}</span><span className="text-right">{row.record.completed_hours}/{row.record.required_hours} hrs</span><span>{row.eligibility.status}</span><span className="text-right">Updated {formatDate(row.last_activity_at || row.record.updated_at)}</span><span className="col-span-2">Submitted {formatDate(row.record.created_at)}</span></div>
+    <article key={row.student.id} className={`rounded-xl border p-3 shadow-sm transition-colors ${ready ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p></div>{!ready && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600"><span>{record?.practicum_site || "Site pending"}</span><span className="text-right">{record ? `${record.completed_hours}/${record.required_hours} hrs` : "No hours yet"}</span><span>{row.eligibility.status}</span><span className="text-right">Updated {formatDate(row.last_activity_at || record?.updated_at)}</span><span className="col-span-2">{record ? `Submitted ${formatDate(record.created_at)}` : "No practicum documents submitted"}</span></div>
+      {row.messages?.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"><p className="text-[11px] font-bold uppercase tracking-wide text-amber-700">{row.messages.length} visible message{row.messages.length === 1 ? "" : "s"}</p><p className="mt-1 line-clamp-2 text-xs text-amber-900">{latestMessage?.comment || latestMessage?.template}</p></div>}
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
-      <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button><button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button></div>
+      <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button>{record && <button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}</div>
     </article>
   );
 }
@@ -4317,15 +4215,16 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, com
   return (
     <ul className="space-y-3">
       {rows.map((row) => (
-        <li key={row.student.id} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
+        <li key={row.student.id} draggable={Boolean(row.has_submitted_documents)} className={`rounded-lg px-3 py-2 ring-1 ${row.has_submitted_documents ? "cursor-grab bg-emerald-50 ring-emerald-200 active:cursor-grabbing" : "bg-white ring-slate-200"}`}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
               <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
             </div>
-            <StatusBadge value={graduationRowStatus(row)} dot={false} />
+            <span className="flex flex-wrap items-center gap-1.5"><StatusBadge value={graduationRowStatus(row)} dot={false} />{!row.has_submitted_documents && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}</span>
           </div>
           <GraduationRequirementBoxes row={row} />
+          {row.messages?.length > 0 && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> {row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</p>}
           {(onOpenStudent || onMessageStudent) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {onOpenStudent && <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2 py-1 text-xs"><Eye className="h-3.5 w-3.5" /> View</button>}
@@ -4354,15 +4253,17 @@ function GraduationBatchRow({
 }) {
   const selectionState = graduationBatchSelectionState(group, selectedIds);
   const stageSelection = graduationStageSelection(group.rows, accountRole);
-  const actionLabel = graduationBatchActionLabel(stageSelection.action, group);
+  const actionLabel = graduationBatchActionLabel(stageSelection.action);
   const visibleRows = expanded ? group.rows : [];
   const hiddenCount = group.rows.length - Math.min(group.rows.length, 4);
   const selectionLabel = selectionState.partiallySelected ? `${selectionState.selectedCount}/${group.rows.length} selected` : selectionState.allSelected ? "Batch selected" : "Select batch";
   const currentStage = graduationBatchCurrentStage(group);
   const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
   const canExpandStudents = Boolean(onToggleExpanded && onOpenStudent && onMessageStudent);
+  const readyToDrag = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
+  const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   return (
-    <article className={`rounded-xl border px-3 py-1.5 transition-colors hover:border-brand-300 ${selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}>
+    <article draggable={readyToDrag} className={`rounded-xl border px-3 py-1.5 transition-colors ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}>
       <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
         <div className="min-w-0">
           <div className="flex min-w-0 items-start gap-2">
@@ -4383,6 +4284,8 @@ function GraduationBatchRow({
                 <span>·</span>
                 <span>{selectionLabel}</span>
                 <StatusBadge value={group.boardStatus} dot={false} />
+                {!readyToDrag && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}
+                {messageCount > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"><MessageSquare className="mr-1 inline h-3 w-3" />{messageCount} message{messageCount === 1 ? "" : "s"}</span>}
               </div>
             </div>
           </div>
@@ -4458,6 +4361,61 @@ function GraduationBatchBoardSections({
   );
 }
 
+function GraduationEligiblePreBatchSection({
+  rows,
+  accountRole,
+  selectedIds,
+  onToggleStudent,
+  onSelectAll,
+  onClearSelection,
+  onCreateBatch,
+  onOpenStudent,
+}) {
+  if (!rows.length) return null;
+  const canCreateBatch = accountRole === "staff";
+  const selectedCount = rows.filter((row) => selectedIds.has(row.student.id)).length;
+  return (
+    <section className="rounded-xl border border-emerald-200 bg-white p-4" aria-labelledby="eligible-pre-batch-title">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p id="eligible-pre-batch-title" className="font-display text-lg font-semibold text-ink">Eligible students awaiting batch creation</p>
+          <p className="mt-1 text-xs text-slate-600">Only students with completed coursework, thesis/research, practicum requirements, and confirmed graduation eligibility appear here.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge value={`${rows.length} eligible`} dot={false} />
+          {canCreateBatch && <button type="button" onClick={onSelectAll} className="btn-ghost cursor-pointer px-3 py-2">Select all eligible</button>}
+          {canCreateBatch && selectedCount > 0 && <button type="button" onClick={onClearSelection} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
+          {canCreateBatch && <button type="button" disabled={!selectedCount} onClick={onCreateBatch} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> Create batch</button>}
+        </div>
+      </div>
+      <ul className="mt-4 grid gap-3 xl:grid-cols-2">
+        {rows.map((row) => {
+          const selected = selectedIds.has(row.student.id);
+          const readyToDrag = Boolean(row.has_submitted_documents);
+          return (
+            <li key={row.student.id} draggable={readyToDrag} className={`rounded-xl border p-3 ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 active:cursor-grabbing" : "border-slate-200 bg-white"}`}>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  {canCreateBatch && <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
+                    <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+                  </div>
+                </div>
+                {!readyToDrag && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}
+              </div>
+              <GraduationRequirementBoxes row={row} />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs"><Eye className="h-3.5 w-3.5" /> View student</button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function GraduationBatchOverviewSection({ groups, accountRole, onSelectBatch, onProcessBatch, onViewStage }) {
   if (!groups.length) return null;
   return (
@@ -4472,16 +4430,18 @@ function GraduationBatchOverviewSection({ groups, accountRole, onSelectBatch, on
       <div className="space-y-2">
         {groups.map((group) => {
           const stageSelection = graduationStageSelection(group.rows, accountRole);
-          const actionLabel = graduationBatchActionLabel(stageSelection.action, group);
+          const actionLabel = graduationBatchActionLabel(stageSelection.action);
           const currentStage = graduationBatchCurrentStage(group);
           const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
           const hiddenCount = group.rows.length - Math.min(group.rows.length, 4);
+          const readyToDrag = group.rows.every((row) => row.has_submitted_documents);
           return (
-            <div key={group.id} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
+            <div key={group.id} draggable={readyToDrag} className={`rounded-xl border px-3 py-2 ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 active:cursor-grabbing" : "border-slate-200 bg-slate-50/60"}`}>
               <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{group.label}</p>
                   <p className="text-xs text-slate-500">{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"} · Updated {formatDate(group.updatedAt)}</p>
+                  {!readyToDrag && <span className="mt-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">Waiting for documents</span>}
                 </div>
                 <div className="min-w-0 text-xs text-slate-600">
                   <p className="truncate"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
@@ -4508,12 +4468,13 @@ function GraduationBatchOverviewSection({ groups, accountRole, onSelectBatch, on
 function PracticumRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
+  const [replyTo, setReplyTo] = useState(null);
   const [messageNotice, setMessageNotice] = useState("");
   const [viewMode, setViewMode] = useState("board");
   const [pendingAction, setPendingAction] = useState(null);
   const reset = useDemoCaseReset("practicum", refetch);
-  const rows = context.roster || [];
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
+  const rows = (context.roster || []).filter((row) => row.eligibility?.eligible === true);
+  const [filters, setFilters] = useState({ query: "", program: "", status: "" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map((row) => row.record?.status || "Not Submitted")), [rows]);
   const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((row) => {
@@ -4568,8 +4529,10 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
       {viewMode === "board" ? (
         <WorkflowBoard
           columns={PRACTICUM_BOARD_COLUMNS}
-          rows={filteredRows.filter((row) => row.record)}
-          getStatus={(row) => row.record.status}
+          rows={filteredRows}
+          getStatus={(row) => row.record?.status || "Not Submitted"}
+          isDraggable={(row) => Boolean(row.has_submitted_documents)}
+          getDragId={(row) => row.student.id}
           empty="No recent practicum submissions match the filters."
           renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
         />
@@ -4610,11 +4573,10 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
             <>
               {accountRole === "staff" && selectedRow.record && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
               {selectedRow.record && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
-              {accountRole === "academic_coordinator" && ["Documents Under Review", "Completed"].includes(selectedRow.record?.status) && <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ label: "Mark not accepted", payload: { student_id: selectedRow.student.id, status: "Not Accepted - New Organization Required" }, fromStatus: selectedRow.record.status, toStatus: "Not Accepted - New Organization Required", requireReason: true, destructive: true })} className="btn-ghost cursor-pointer px-4 py-2 text-red-600">Mark not accepted</button>}
               {selectedAction ? (
-                <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedRow.record.status, toStatus: selectedAction.payload.status })} className="btn-primary cursor-pointer px-4 py-2">
+                <div><button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedRow.record.status, toStatus: selectedAction.payload.status })} className="btn-primary cursor-pointer px-4 py-2">
                   {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
-                </button>
+                </button>{selectedAction.label === "Request additional certificates" && <p className="mt-1 text-xs font-semibold text-red-600">*Incomplete hours</p>}</div>
               ) : (
                 <span className="self-center text-xs font-semibold text-slate-500">{selectedRow.record ? `No ${WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.` : "Awaiting student submission."}</span>
               )}
@@ -4625,12 +4587,12 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
             <WorkflowSubmitFeedback result={result} error={submitError} />
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <PracticumCaseDetails row={selectedRow} />
-            <CaseMessageHistory messages={selectedRow.messages} />
+            <CaseMessageHistory messages={selectedRow.messages} onReply={(message) => { setReplyTo(message); setMessageRow(selectedRow); }} />
             <WorkflowActivityList logs={selectedRow.history || []} />
           </div>
         </WorkflowCaseModal>
       )}
-      {messageRow && <WorkflowMessageModal slug="practicum" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
+      {messageRow && <WorkflowMessageModal slug="practicum" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
       {pendingAction && selectedRow && <WorkflowTransitionModal slug="practicum" student={selectedRow.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
     </div>
   );
@@ -4669,8 +4631,9 @@ function PracticumCaseDetails({ row }) {
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Student submission</p>
             <p className="mt-2 text-sm font-semibold text-ink">{record?.practicum_site || "No site submitted"}</p>
             <p className="mt-1 text-xs text-slate-500">Supervisor: {record?.supervisor_name || "Not provided"}</p>
-            <p className="mt-1 text-xs text-slate-500">Certificates: {record?.certificate_count || 0} · {record?.remarks || "No student remarks"}</p>
-            <div className="mt-2 flex flex-wrap gap-2">{record?.moa_attachment?.file_exists && <a className="btn-ghost px-3 py-1.5" href={record.moa_attachment.url} target="_blank" rel="noreferrer">MOA <ArrowUpRight className="h-3.5 w-3.5" /></a>}{record?.certificate_attachment?.file_exists && <a className="btn-ghost px-3 py-1.5" href={record.certificate_attachment.url} target="_blank" rel="noreferrer">Documents <ArrowUpRight className="h-3.5 w-3.5" /></a>}{(record?.moa_attachment?.file_exists === false || record?.certificate_attachment?.file_exists === false) && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">One or more saved files are unavailable</span>}</div>
+            <p className="mt-1 text-xs text-slate-500">System-detected certificate submissions: {record?.certificate_count || 0}</p>
+            {record?.remarks && <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2"><p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Latest student submission remark</p><p className="mt-1 text-sm text-emerald-900">{record.remarks}</p></div>}
+            <div className="mt-2 flex flex-wrap gap-2">{record?.moa_attachment?.file_exists && <a className="btn-ghost px-3 py-1.5" href={record.moa_attachment.url} target="_blank" rel="noreferrer">MOA <ArrowUpRight className="h-3.5 w-3.5" /></a>}{record?.completion_attachments?.map((file, index) => file.file_exists && <a key={file.id} className="btn-ghost px-3 py-1.5" href={file.url} target="_blank" rel="noreferrer">Certificate file {index + 1} <ArrowUpRight className="h-3.5 w-3.5" /></a>)}{(record?.moa_attachment?.file_exists === false || record?.certificate_attachment?.file_exists === false) && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">One or more saved files are unavailable</span>}</div>
           </div>
       </div>
       <WorkflowTimeline steps={timeline} title="Practicum workflow timeline" />
@@ -4702,10 +4665,14 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   function actionFor(item) {
     const base = { student_id: item.student_id };
     if (accountRole === "staff" && item.dean_decision === "Pending" && item.status === "Submitted to GS Staff") return { label: "Record & forward to Dean", payload: { ...base, workflow_action: "forward_to_dean" } };
-    if (accountRole === "academic_coordinator" && item.dean_decision === "Approved" && item.status === "Approved - Follow-through") return { label: "Record coordinator follow-through", payload: { ...base, workflow_action: "coordinator_follow_through" } };
-    if (accountRole === "staff" && item.status === "Coordinator Follow-through Complete") return { label: "Inform student of approval", payload: { ...base, workflow_action: "notify_student_of_approval" } };
-    if (accountRole === "staff" && item.status === "Requirements Submitted") return { label: "Verify form & proof", payload: { ...base, workflow_action: "verify_requirements" } };
-    if (accountRole === "staff" && item.status === "Requirements Verified") return { label: "Confirm completed withdrawal", payload: { ...base, workflow_action: "confirm_withdrawal" } };
+    if (accountRole === "staff" && item.dean_decision === "Approved" && item.status === "Approved - Follow-through") return {
+      label: "Complete follow-through & confirm",
+      payload: { ...base, workflow_action: "confirm_withdrawal" },
+      requireComment: true,
+      commentLabel: "Follow-through details",
+      commentPlaceholder: "Record the effective semester and the relevant Graduate School parties informed.",
+      commentRequiredError: "Record the effective semester and parties informed before confirming the withdrawal.",
+    };
     return null;
   }
   const selectedCurrent = rows.find((item) => item.id === selectedCaseId) || null;
@@ -4731,7 +4698,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Withdrawn is applied only after requirements are verified and GS Staff confirms`} icon={LogOut} />
+      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · GS Staff forwards to the Dean, then completes follow-through after approval`} icon={LogOut} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
@@ -4787,7 +4754,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <div className="grid gap-3 sm:grid-cols-2">
               <Detail label="Dean" value={selectedCurrent?.dean_decision || selectedItem.dean_decision} />
-              <Detail label="Requirements" value={selectedCurrent?.requirement_status || selectedItem.requirement_status} />
+              <Detail label="Student standing" value={selectedCurrent?.student?.standing || selectedItem.student?.standing || "Active"} />
             </div>
             <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
             <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
@@ -4798,8 +4765,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
               <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedItem.reason || "No reason provided"}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {selectedItem.request_attachment?.file_exists && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
-                {selectedItem.proof_attachment?.file_exists && <a href={selectedItem.proof_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Proof <ArrowUpRight className="h-3.5 w-3.5" /></a>}
-                {(selectedItem.request_attachment?.file_exists === false || selectedItem.proof_attachment?.file_exists === false) && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">One or more saved files are unavailable</span>}
+                {selectedItem.request_attachment?.file_exists === false && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">The saved request form is unavailable</span>}
               </div>
             </div>
             <WorkflowFileHistory files={selectedCurrent?.attachments || selectedItem.attachments || []} />
@@ -4815,6 +4781,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
 function GraduationRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
+  const [replyTo, setReplyTo] = useState(null);
   const [messageNotice, setMessageNotice] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
@@ -4829,35 +4796,40 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
     if (filters.query.trim()) setViewMode("table");
   }, [filters.query]);
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
-  const statuses = useMemo(() => uniqueValues(rows.map((row) => row.endorsement?.endorsement_status || "Not Prepared")), [rows]);
-  const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((row) => {
+  const statuses = useMemo(() => uniqueValues(rows.map(graduationRowStatus)), [rows]);
+  const filteredRows = useMemo(() => rows.filter((row) => {
     const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name} ${row.endorsement?.batch_name || ""}`.toLowerCase();
-    const eligibility = row.eligibility.status;
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
-      && (!filters.status || (row.endorsement?.endorsement_status || "Not Prepared") === filters.status)
-      && (!filters.secondary || eligibility === filters.secondary)
-      && dateMatches(row.last_activity_at || row.endorsement?.updated_at || row.endorsement?.created_at, filters.dateFrom, filters.dateTo);
-  }), filters.sort, (row) => row.last_activity_at || row.endorsement?.updated_at || row.endorsement?.created_at, (row) => row.student.name), [rows, filters]);
+      && (!filters.status || graduationRowStatus(row) === filters.status);
+  }).sort((left, right) => left.student.name.localeCompare(right.student.name)), [rows, filters]);
   const visibleRows = useMemo(
     () => sortSelectedWorkflowRows(filteredRows, selectedIds, (row) => row.student.name, (row) => row.student.id),
     [filteredRows, selectedIds],
   );
+  const preBatchRows = useMemo(
+    () => visibleRows.filter((row) => !row.endorsement?.batch_name),
+    [visibleRows],
+  );
+  const visibleBatchedRows = useMemo(
+    () => visibleRows.filter((row) => Boolean(row.endorsement?.batch_name)),
+    [visibleRows],
+  );
   const visibleSelectedRows = useMemo(
-    () => visibleRows.filter((row) => selectedIds.has(row.student.id)),
-    [visibleRows, selectedIds],
+    () => visibleBatchedRows.filter((row) => selectedIds.has(row.student.id)),
+    [visibleBatchedRows, selectedIds],
   );
   const boardRows = useMemo(
-    () => selectedIds.size ? visibleRows.filter((row) => !selectedIds.has(row.student.id)) : visibleRows,
-    [visibleRows, selectedIds],
+    () => selectedIds.size ? visibleBatchedRows.filter((row) => !selectedIds.has(row.student.id)) : visibleBatchedRows,
+    [visibleBatchedRows, selectedIds],
   );
   const selectedRows = useMemo(
     () => sortSelectedWorkflowRows(rows.filter((row) => selectedIds.has(row.student.id)), selectedIds, (row) => row.student.name, (row) => row.student.id),
     [rows, selectedIds],
   );
   const visibleBatchGroups = useMemo(
-    () => graduationBatchGroups(visibleRows, selectedIds),
-    [visibleRows, selectedIds],
+    () => graduationBatchGroups(visibleBatchedRows, selectedIds),
+    [visibleBatchedRows, selectedIds],
   );
   const visibleSelectedBatchGroups = useMemo(
     () => graduationBatchGroups(visibleSelectedRows, selectedIds),
@@ -4881,6 +4853,19 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   );
   function selectRows(predicate) {
     setSelectedIds(new Set(filteredRows.filter(predicate).map((row) => row.student.id)));
+  }
+  function toggleStudent(studentId) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
+      return next;
+    });
+  }
+  function createPreBatch() {
+    const candidateIds = preBatchRows.filter((row) => selectedIds.has(row.student.id)).map((row) => row.student.id);
+    if (!candidateIds.length) return;
+    setSelectedIds(new Set(candidateIds));
+    setBatchOpen(true);
   }
   function toggleBatchGroup(group) {
     setSelectedIds((current) => {
@@ -4919,6 +4904,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
   }
   const selectedRow = rows.find((row) => row.student.id === selectedStudentId) || null;
   const selectedAction = selectedRow ? actionFor(selectedRow) : null;
+  const selectedStageAction = selectedRow ? graduationStageActionForRow(selectedRow, accountRole) : null;
   const selectedEndorsement = selectedRow?.endorsement || null;
   const graduationSteps = selectedRow ? graduationTimelineSteps(selectedEndorsement?.endorsement_status, selectedRow.eligibility) : [];
 
@@ -4932,15 +4918,24 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
       <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`} icon={GraduationCap} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
+      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} count={filteredRows.length} total={rows.length} showAdvanced={false} />
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
         <span className="mr-auto text-sm font-semibold text-slate-700">{selectedIds.size} selected</span>
-        <button type="button" onClick={() => selectRows((row) => row.eligibility.status === "Eligible")} className="btn-ghost cursor-pointer px-3 py-2">Select all eligible</button>
         <button type="button" onClick={() => selectRows((row) => row.unresolved_messages > 0 || row.next_action_owner === WORKFLOW_ROLE_LABELS[accountRole])} className="btn-ghost cursor-pointer px-3 py-2">Select needs action</button>
         {selectedIds.size > 0 && <button type="button" onClick={() => setSelectedIds(new Set())} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
-        <button type="button" disabled={!selectedIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {graduationSelectedActionLabel(selectedStageSelection.action, selectedBatchGroups)}</button>
+        <button type="button" disabled={!selectedIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {graduationSelectedActionLabel(selectedStageSelection.action)}</button>
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </div>
+      <GraduationEligiblePreBatchSection
+        rows={preBatchRows}
+        accountRole={accountRole}
+        selectedIds={selectedIds}
+        onToggleStudent={toggleStudent}
+        onSelectAll={() => setSelectedIds(new Set(preBatchRows.map((row) => row.student.id)))}
+        onClearSelection={() => setSelectedIds(new Set())}
+        onCreateBatch={createPreBatch}
+        onOpenStudent={openCase}
+      />
       {createdBatchGroups.length > 0 && (
         <GraduationBatchOverviewSection groups={createdBatchGroups} accountRole={accountRole} onSelectBatch={selectBatchGroup} onProcessBatch={processBatchGroup} onViewStage={setStageGroup} />
       )}
@@ -5011,7 +5006,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
       ) : <WorkflowTable headers={["Select", "Batch / group", "Students", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement stages", "Updated", "Action"]} empty="No candidate batches match the current filters." rows={visibleBatchGroups} render={(group) => {
         const selectionState = graduationBatchSelectionState(group, selectedIds);
         const stageSelection = graduationStageSelection(group.rows, accountRole);
-        const actionLabel = graduationBatchActionLabel(stageSelection.action, group);
+        const actionLabel = graduationBatchActionLabel(stageSelection.action);
         const currentStage = graduationBatchCurrentStage(group);
         const expanded = expandedBatchIds.has(group.id);
         return [
@@ -5044,10 +5039,10 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
                 {group.rows.length > 4 && <p className="text-xs font-semibold text-slate-500">+{group.rows.length - 4} more</p>}
               </div>
             </td>
-            <td className="px-3 py-3 text-xs text-slate-600">{group.courseworkSummary}</td>
-            <td className="px-3 py-3 text-xs text-slate-600">{group.researchSummary}</td>
-            <td className="px-3 py-3 text-xs text-slate-600">{group.practicumSummary}</td>
-            <td className="px-3 py-3 text-xs text-slate-600">{group.eligibilitySummary}</td>
+            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Completed</td>
+            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Completed</td>
+            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Completed / not required</td>
+            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Eligible</td>
             <td className="px-3 py-3">
               <p className="text-xs font-semibold text-slate-700">Step {currentStage.number}: {currentStage.label}</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
@@ -5089,9 +5084,9 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
             <>
               {accountRole === "staff" && selectedEndorsement && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
               {selectedEndorsement && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
-              {selectedAction ? (
-                <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedEndorsement?.endorsement_status || "Not Prepared", toStatus: selectedAction.payload.endorsement_status })} className="btn-primary cursor-pointer px-4 py-2">
-                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
+              {selectedStageAction ? (
+                <button type="button" disabled={submitting || refreshing} onClick={() => { setSelectedIds(new Set([selectedRow.student.id])); setBatchOpen(true); }} className="btn-primary cursor-pointer px-4 py-2">
+                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedStageAction.label}
                 </button>
               ) : selectedEndorsement?.endorsement_status === "Dean Approved" ? (
                 <span className="self-center rounded-lg bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700 ring-1 ring-brand-200">Awaiting Dean export</span>
@@ -5104,61 +5099,16 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
           <div className="space-y-4">
             <WorkflowSubmitFeedback result={result} error={submitError} />
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-              <Detail label="Program" value={selectedRow.student.program_name} />
-              <Detail label="Batch" value={selectedEndorsement?.batch_name || "No batch assigned"} />
-              <Detail label="Coursework" value={selectedRow.eligibility.coursework_status} />
-              <Detail label="Research" value={selectedRow.eligibility.research_status} />
-              <Detail label="Practicum" value={selectedRow.eligibility.practicum_status} />
-              <Detail label="Eligibility" value={selectedRow.eligibility.status} />
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div><p className="text-sm font-semibold text-ink">Integrated research-to-graduation progress</p><p className="mt-0.5 text-xs text-slate-600">Live from Research Gate, Panel Matching, Defense Scheduling, and recorded defense results.</p></div>
-                <StatusBadge value={selectedRow.eligibility.research_status} dot={false} />
-              </div>
-              <div className="mt-4 grid gap-3 lg:grid-cols-4">
-                {selectedRow.eligibility.research_progress?.stages?.map((stage) => (
-                  <div key={stage.gate} className="rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{stage.name}</p><StatusBadge value={stage.complete ? "Complete" : "Incomplete"} dot={false} /></div>
-                    <dl className="mt-3 space-y-1.5 text-xs text-slate-600">
-                      <div className="flex justify-between gap-2"><dt>Requirements</dt><dd className="font-semibold text-slate-700">{stage.requirements_complete}/{stage.requirements_total}</dd></div>
-                      <div className="flex justify-between gap-2"><dt>Matched panel</dt><dd className="font-semibold text-slate-700">{stage.panel.assigned_count}/{stage.panel.required_count}</dd></div>
-                      <div className="flex justify-between gap-2"><dt>Schedule</dt><dd className="truncate font-semibold text-slate-700">{stage.schedule.status}</dd></div>
-                      <div className="flex justify-between gap-2"><dt>Defense result</dt><dd className="font-semibold text-slate-700">{stage.defense.status}</dd></div>
-                    </dl>
-                  </div>
-                ))}
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-slate-800">Completion Evidence</p><StatusBadge value={selectedRow.eligibility.research_progress?.completion_evidence?.status || "Incomplete"} dot={false} /></div>
-                  <p className="mt-3 text-xs text-slate-600">Post-defense graduation files</p>
-                  <p className="mt-1 text-lg font-bold text-slate-800">{selectedRow.eligibility.research_progress?.completion_evidence?.requirements_complete ?? 0}/{selectedRow.eligibility.research_progress?.completion_evidence?.requirements_total ?? 5}</p>
-                  <p className="mt-1 text-xs text-slate-600">requirements complete</p>
-                </div>
-              </div>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-slate-200">
-              {selectedRow.eligibility.checklist?.map((item) => <div key={item.key} className="grid gap-2 border-b border-slate-100 px-4 py-3 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div><p className="text-sm font-semibold text-slate-700">{item.label}</p><p className="text-xs text-slate-400">Source: {item.source_field}</p></div><p className="text-xs font-semibold text-slate-500">{String(item.actual_value)}</p><StatusBadge value={item.status} dot={false} /></div>)}
-            </div>
-            {selectedEndorsement?.dean_remarks && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"><span className="font-semibold text-ink">Dean remarks: </span>{selectedEndorsement.dean_remarks}</div>}
+            <div className="grid gap-3 sm:grid-cols-2"><Detail label="Program" value={selectedRow.student.program_name} /><Detail label="Batch" value={selectedEndorsement?.batch_name || "No batch assigned"} /></div>
+            <GraduationRequirementBoxes row={selectedRow} />
             <WorkflowTimeline steps={graduationSteps} title="Graduation endorsement timeline" />
-            <CaseMessageHistory messages={selectedRow.messages} />
+            <CaseMessageHistory messages={selectedRow.messages} onReply={(message) => { setReplyTo(message); setMessageRow(selectedRow); }} />
             <WorkflowActivityList logs={selectedRow.history || []} />
             <WorkflowFileHistory files={selectedEndorsement?.attachments || []} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing coursework</p>
-                {selectedRow.eligibility.missing_coursework?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_coursework.map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Missing research requirements</p>
-                {selectedRow.eligibility.missing_research_requirements?.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-600">{selectedRow.eligibility.missing_research_requirements.map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-sm font-semibold text-brand-700">None</p>}
-              </div>
-            </div>
           </div>
         </WorkflowCaseModal>
       )}
-      {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
+      {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
       {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
       {stageGroup && <GraduationBatchStageModal group={stageGroup} onClose={() => setStageGroup(null)} />}
       {pendingAction && selectedRow && <WorkflowTransitionModal slug="graduation" student={selectedRow.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
@@ -5171,9 +5121,12 @@ function WorkflowTable({ headers, rows, render, empty }) {
   return <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[980px] text-left"><thead><tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-400">{headers.map((header) => <th key={header} className="px-3 py-2.5">{header}</th>)}</tr></thead><tbody>{rows.map(render)}</tbody></table></div>;
 }
 
-function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions, count, total }) {
+function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions = [], count, total, showAdvanced = true }) {
   const active = Object.entries(filters).filter(([key, value]) => Boolean(value) && !(key === "sort" && value === "newest")).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  const clearFilters = () => setFilters(Object.fromEntries(
+    Object.keys(filters).map((key) => [key, key === "sort" ? "newest" : ""])
+  ));
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -5184,14 +5137,14 @@ function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel
         </label>
         <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
         <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter by workflow stage or status"><option value="">All stages / statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
-        <select value={filters.secondary} onChange={update("secondary")} className="field-input cursor-pointer" aria-label={`Filter by ${secondaryLabel}`}><option value="">All {secondaryLabel.toLowerCase()}</option>{secondaryOptions.map((option) => <option key={option}>{option}</option>)}</select>
-        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated from</span><input type="date" value={filters.dateFrom || ""} onChange={update("dateFrom")} className="field-input" /></label>
-        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated through</span><input type="date" value={filters.dateTo || ""} onChange={update("dateTo")} className="field-input" /></label>
-        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Sort</span><select value={filters.sort || "newest"} onChange={update("sort")} className="field-input cursor-pointer"><option value="newest">Newest updated</option><option value="oldest">Oldest updated</option><option value="student">Student name</option></select></label>
+        {secondaryLabel && <select value={filters.secondary || ""} onChange={update("secondary")} className="field-input cursor-pointer" aria-label={`Filter by ${secondaryLabel}`}><option value="">All {secondaryLabel.toLowerCase()}</option>{secondaryOptions.map((option) => <option key={option}>{option}</option>)}</select>}
+        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated from</span><input type="date" value={filters.dateFrom || ""} onChange={update("dateFrom")} className="field-input" /></label>}
+        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated through</span><input type="date" value={filters.dateTo || ""} onChange={update("dateTo")} className="field-input" /></label>}
+        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Sort</span><select value={filters.sort || "newest"} onChange={update("sort")} className="field-input cursor-pointer"><option value="newest">Newest updated</option><option value="oldest">Oldest updated</option><option value="student">Student name</option></select></label>}
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
         <span>Showing {count} of {total} records</span>
-        {active > 0 && <button type="button" onClick={() => setFilters({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" })} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button>}
+        {active > 0 && <button type="button" onClick={clearFilters} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button>}
       </div>
     </div>
   );
@@ -5248,9 +5201,7 @@ function PracticumForm({ context, studentId, submit, submitting }) {
     required_hours: 200,
     completed_hours: 0,
     document_status: "Pending Review",
-    certificate_count: 0,
     status: "Under Review",
-    remarks: "",
     source_reference: "",
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -5263,9 +5214,7 @@ function PracticumForm({ context, studentId, submit, submitting }) {
       required_hours: current?.required_hours || 200,
       completed_hours: current?.completed_hours || 0,
       document_status: current?.document_status || "Pending Review",
-      certificate_count: current?.certificate_count || 0,
       status: current?.status || "Under Review",
-      remarks: current?.remarks || "",
       source_reference: "",
     });
   }, [studentId, current?.id, current?.updated_at]);
@@ -5317,9 +5266,7 @@ function PracticumForm({ context, studentId, submit, submitting }) {
         <Field label="Certificate/document status">
           <Select value={form.document_status} onChange={set("document_status")} placeholder="" options={["Missing", "Uploaded", "Pending Review", "Verified", "Returned"]} />
         </Field>
-        <Field label="Number of certificates">
-          <Input type="number" min="0" value={form.certificate_count} onChange={set("certificate_count")} />
-        </Field>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Certificates detected by system</p><p className="mt-1 text-lg font-semibold text-emerald-950">{current?.certificate_count || 0}</p></div>
         <Field label="Workflow status">
           <Select
             value={form.status}
@@ -5332,9 +5279,7 @@ function PracticumForm({ context, studentId, submit, submitting }) {
           <Input value={form.source_reference} onChange={set("source_reference")} placeholder="Email, drive link, or staff note" />
         </Field>
       </div>
-      <Field label="Remarks">
-        <Textarea value={form.remarks} onChange={set("remarks")} />
-      </Field>
+      <p className="text-xs text-slate-500">Reviewer comments are added through the case discussion so the sender, recipient, date, and time remain visible.</p>
       {!completeEnough && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
           Completed hours are below the requirement. Saving will keep this case incomplete and queue the student for additional certificates.
@@ -6053,7 +5998,7 @@ function workflowGuidance(slug) {
     practicum:
       "Available only for programs marked with practicum requirements. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
     withdrawal:
-      "Withdrawal is a lifecycle-exit process. A Dean denial keeps the student Active. An approval moves through coordinator follow-through, student requirements, and GS Staff verification and confirmation, and only then marks the student Withdrawn.",
+      "Withdrawal is a lifecycle-exit process. GS Staff forwards the student request to the Dean. A denial keeps the student Active; an approval returns directly to GS Staff for documented follow-through and final confirmation.",
     graduation:
       "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and export.",
   };

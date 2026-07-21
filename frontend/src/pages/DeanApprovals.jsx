@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Send, Upload, Mail } from "lucide-react";
+import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Send, Upload, Mail, Printer } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
-import { formatDate } from "../lib/format";
+import { formatDate, formatDateTime } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
+import WorkflowDiscussion from "../components/WorkflowDiscussion";
+import HistoryDisclosure from "../components/HistoryDisclosure";
+import { printDataTable } from "../lib/print";
 
 const DEAN_NAV = [
   { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
@@ -75,6 +78,24 @@ function graduationBatchExportPayload(batch) {
     count: batch.rows.length,
     rows: batch.rows,
   };
+}
+
+function printGraduationBatch(batch) {
+  printDataTable({
+    title: `Graduate Endorsement - ${batch.label}`,
+    subtitle: "Dean-approved Graduate School endorsement list",
+    columns: ["Student ID", "Student name", "Program", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement status"],
+    rows: batch.rows.map((item) => [
+      item.student.student_number,
+      item.student.name,
+      item.student.program_code,
+      "Completed",
+      "Completed",
+      item.eligibility?.practicum_status === "Not Required" ? "Not required" : "Completed",
+      "Eligible for graduation",
+      item.status,
+    ]),
+  });
 }
 
 function graduationRegistrarStatus(item) {
@@ -146,10 +167,8 @@ function deanGraduationCurrentStage(batch) {
   return stages.find((stage) => ["Needs action", "Current", "Pending"].includes(stage.state)) || stages[stages.length - 1];
 }
 
-function deanGraduationBatchActionLabel(action, batchLabels) {
-  const base = action === "return" ? "Return endorsement list for revision" : "Approve endorsement list";
-  if (batchLabels.length === 1) return `${base} for ${batchLabels[0]}`;
-  return `${base} for ${batchLabels.length} batches`;
+function deanGraduationBatchActionLabel(action) {
+  return action === "return" ? "Return endorsement list for revision" : "Approve endorsement list";
 }
 
 function deanGraduationRequirementTone(item) {
@@ -214,64 +233,12 @@ function deanGraduationFallbackChecklist(item) {
 }
 
 function DeanGraduationRequirementBoxes({ item }) {
-  const [expandedKey, setExpandedKey] = useState(null);
   const eligibility = item.eligibility || {};
-  const checklist = eligibility.checklist?.length ? eligibility.checklist : deanGraduationFallbackChecklist(item);
-  const allComplete = checklist.length > 0 && checklist.every((entry) => deanGraduationRequirementTone(entry) === "complete");
-  const overallTone = allComplete && eligibility.status !== "Not eligible" ? "complete" : "missing";
-  const overallClasses = deanGraduationRequirementClasses(overallTone);
+  const items = ["Coursework completed", "Thesis / research completed", eligibility.practicum_status === "Not Required" ? "Practicum not required" : "Practicum completed", "Eligible for graduation"];
   return (
-    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-      <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 ${overallClasses.card}`}>
-        <div className="flex items-center gap-2">
-          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${overallClasses.icon}`}>
-            {overallTone === "complete" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Graduation requirements</p>
-            <p className={`text-xs ${overallClasses.muted}`}>{overallTone === "complete" ? "Eligible based on visible requirements." : "Open the red stages to see what is missing."}</p>
-          </div>
-        </div>
-        <StatusBadge value={eligibility.status || (overallTone === "complete" ? "Eligible" : "Not eligible")} dot={false} />
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((label) => <div key={label} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><CheckCircle2 className="h-3.5 w-3.5" /></span><p className="text-xs font-semibold">{label}</p></div>)}
       </div>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        {checklist.map((entry) => {
-          const key = entry.key || entry.label;
-          const tone = deanGraduationRequirementTone(entry);
-          const classes = deanGraduationRequirementClasses(tone);
-          const expanded = expandedKey === key;
-          const detailLines = deanGraduationRequirementDetailLines(entry);
-          return (
-            <div key={key} className={`rounded-lg border px-2.5 py-2 ${classes.card}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${classes.icon}`}>
-                    {tone === "complete" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
-                  </span>
-                  <p className="truncate text-sm font-semibold">{entry.label}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExpandedKey(expanded ? null : key)}
-                  className="btn-ghost shrink-0 cursor-pointer px-2 py-1"
-                  aria-label={`${expanded ? "Hide" : "View"} ${entry.label} graduation requirement details`}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {expanded && (
-                <div className="mt-2 rounded-lg bg-white/75 px-3 py-2">
-                  <p className={`text-xs font-bold uppercase tracking-wide ${classes.text}`}>{entry.status || (tone === "complete" ? "Passed" : "Not met")}</p>
-                  <div className="mt-1 space-y-1">
-                    {detailLines.map((line) => <p key={line} className={`break-words text-xs ${classes.muted}`}>{line}</p>)}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -325,9 +292,10 @@ export default function DeanApprovals() {
   const [stageBatch, setStageBatch] = useState(null);
   const [expandedGraduationBatches, setExpandedGraduationBatches] = useState(() => new Set());
   const [filters, setFilters] = useState({ query: "", program: "", status: "", dateFrom: "", dateTo: "", sort: "newest" });
-  const workflowPending = data?.workflow_pending || [];
-  const workflowRecent = data?.workflow_recent || [];
-  const workflowOverview = data?.workflow_overview || [];
+  const graduationEligibleItem = (item) => item.type !== "graduation" || item.eligibility?.eligible === true;
+  const workflowPending = (data?.workflow_pending || []).filter(graduationEligibleItem);
+  const workflowRecent = (data?.workflow_recent || []).filter(graduationEligibleItem);
+  const workflowOverview = (data?.workflow_overview || []).filter(graduationEligibleItem);
   const isStandingChange = (item) => ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
   const belongsToView = (item) => view === "overview" || (view === "leave" ? isStandingChange(item) : item.type === view);
   const baseWorkflowPending = workflowPending.filter(belongsToView);
@@ -338,11 +306,12 @@ export default function DeanApprovals() {
     return (!filters.query || text.includes(filters.query.toLowerCase()))
       && (!filters.program || program === filters.program)
       && (!filters.status || item.status === filters.status || item.workflow_status === filters.status)
-      && deanDateMatches(deanItemDate(item), filters.dateFrom, filters.dateTo);
+      && (view === "graduation" || deanDateMatches(deanItemDate(item), filters.dateFrom, filters.dateTo));
   };
-  const visibleWorkflowPending = sortDeanItems(baseWorkflowPending.filter(matchesFilters), filters.sort);
-  const visibleWorkflowRecent = sortDeanItems(baseWorkflowRecent.filter(matchesFilters), filters.sort);
-  const visibleWorkflowOverview = sortDeanItems(workflowOverview.filter(belongsToView).filter(matchesFilters), filters.sort);
+  const workflowSort = view === "graduation" ? "student" : filters.sort;
+  const visibleWorkflowPending = sortDeanItems(baseWorkflowPending.filter(matchesFilters), workflowSort);
+  const visibleWorkflowRecent = sortDeanItems(baseWorkflowRecent.filter(matchesFilters), workflowSort);
+  const visibleWorkflowOverview = sortDeanItems(workflowOverview.filter(belongsToView).filter(matchesFilters), workflowSort);
   const boardWorkflowRows = sortSelectedDeanItems(visibleWorkflowOverview.filter((item) => !isStandingChange(item)), selectedGraduationIds);
   const pendingPlans = (data?.pending || []).filter(matchesFilters);
   const recentPlans = (data?.recent || []).filter(matchesFilters);
@@ -539,7 +508,7 @@ export default function DeanApprovals() {
           </p>
         </div>
 
-        <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
+        <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} showAdvanced={view !== "graduation"} />
         {(view === "overview" || view === "graduation") && readyGraduation.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
             <span className="mr-auto text-sm font-semibold text-slate-700">{selectedGraduationIds.size} graduation candidate{selectedGraduationIds.size === 1 ? "" : "s"} selected</span>
@@ -590,8 +559,9 @@ export default function DeanApprovals() {
                       </div>
                       <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
                         <button type="button" onClick={() => toggleGraduationBatchStudents(batch.label)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
+                        <button type="button" onClick={() => printGraduationBatch(batch)} className="btn-ghost cursor-pointer px-2.5 py-1"><Printer className="h-4 w-4" /> Print endorsement</button>
                         <button type="button" onClick={() => setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id)))} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>
-                        <button type="button" onClick={() => { setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id))); setBatchOpen(true); }} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left"><CheckSquare className="h-4 w-4 shrink-0" /> Review endorsement list for {batch.label}</button>
+                        <button type="button" onClick={() => { setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id))); setBatchOpen(true); }} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left"><CheckSquare className="h-4 w-4 shrink-0" /> Review endorsement list</button>
                       </div>
                     </div>
                     {expanded && (
@@ -642,7 +612,7 @@ export default function DeanApprovals() {
                       </div>
                       <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
                         <button type="button" onClick={() => toggleGraduationBatchStudents(batch.label)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
-                        <button type="button" disabled={exportBusy || sendBusy} onClick={() => exportApproved(payload)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700"><Download className="h-4 w-4 shrink-0" /> {exportBusy ? "Exporting..." : `Export filtered approved list for ${batch.label}`}</button>
+                        <button type="button" disabled={exportBusy || sendBusy} onClick={() => exportApproved(payload)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700"><Download className="h-4 w-4 shrink-0" /> {exportBusy ? "Exporting..." : "Export approved list"}</button>
                         <button
                           type="button"
                           disabled={!readyToSend || exportBusy || sendBusy}
@@ -1019,7 +989,7 @@ function DeanGraduationBatchModal({ rows, onClose, onSaved }) {
       setBusy(false);
     }
   }
-  const submitLabel = deanGraduationBatchActionLabel(form.action, batchLabels);
+  const submitLabel = deanGraduationBatchActionLabel(form.action);
   return (
     <DeanDialog
       id="dean-graduation-batch"
@@ -1055,8 +1025,11 @@ function DeanGraduationBatchModal({ rows, onClose, onSaved }) {
   );
 }
 
-function DeanListFilters({ filters, setFilters, programs, statuses }) {
-  const active = Object.entries(filters).filter(([key, value]) => Boolean(value) && !(key === "sort" && value === "newest")).length;
+function DeanListFilters({ filters, setFilters, programs, statuses, showAdvanced = true }) {
+  const active = Object.entries(filters).filter(([key, value]) => {
+    if (!showAdvanced && ["dateFrom", "dateTo", "sort"].includes(key)) return false;
+    return Boolean(value) && !(key === "sort" && value === "newest");
+  }).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
   return (
     <Card className="mb-4 p-3">
@@ -1068,9 +1041,9 @@ function DeanListFilters({ filters, setFilters, programs, statuses }) {
         </label>
         <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter Dean list by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
         <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter Dean list by stage or status"><option value="">All stages / statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
-        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated from</span><input type="date" value={filters.dateFrom} onChange={update("dateFrom")} className="field-input" /></label>
-        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated through</span><input type="date" value={filters.dateTo} onChange={update("dateTo")} className="field-input" /></label>
-        <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Sort</span><select value={filters.sort} onChange={update("sort")} className="field-input cursor-pointer"><option value="newest">Newest updated</option><option value="oldest">Oldest updated</option><option value="student">Student name</option></select></label>
+        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated from</span><input type="date" value={filters.dateFrom} onChange={update("dateFrom")} className="field-input" /></label>}
+        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated through</span><input type="date" value={filters.dateTo} onChange={update("dateTo")} className="field-input" /></label>}
+        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Sort</span><select value={filters.sort} onChange={update("sort")} className="field-input cursor-pointer"><option value="newest">Newest updated</option><option value="oldest">Oldest updated</option><option value="student">Student name</option></select></label>}
       </div>
       {active > 0 && <div className="mt-2 flex justify-end"><button type="button" onClick={() => setFilters({ query: "", program: "", status: "", dateFrom: "", dateTo: "", sort: "newest" })} className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button></div>}
     </Card>
@@ -1081,8 +1054,9 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
   const key = `${item.type}-${item.id}`;
   const isBusy = busy === key;
   const standingChange = ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
+  const decisionOnly = ["practicum", "withdrawal", "graduation"].includes(item.type);
   const approveLabel = item.type === "practicum" ? "Mark reviewed" : standingChange || item.type === "withdrawal" ? "Approve" : "Approve & send";
-  const returnLabel = item.type === "withdrawal" ? "Return" : "Return for revision";
+  const returnLabel = "Return for revision";
   const timeline = standingChange
     ? null
     : item.type === "practicum"
@@ -1128,18 +1102,19 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
         </div>
       )}
       {item.messages?.length > 0 && (
-        <div className="mt-4 rounded-xl border border-slate-200 p-4">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400"><MessageSquare className="h-4 w-4" /> Saved messages</p>
-          <ul className="mt-2 space-y-2">{[...item.messages].reverse().map((message) => <li key={message.id} className="rounded-lg bg-slate-50 px-3 py-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">{message.template}</p><span className="flex flex-wrap gap-1.5"><StatusBadge value={message.visibility === "internal" ? "Internal" : "Student visible"} dot={false} /><StatusBadge value={message.status} dot={false} /></span></div><p className="mt-1 text-xs text-slate-500">{message.sender_name || message.sender_role} ({message.sender_role}) → {message.recipient_role} · {formatDate(message.created_at)}</p>{message.comment && <p className="mt-2 text-sm text-slate-600">{message.comment}</p>}</li>)}</ul>
+        <div className="mt-4">
+          <WorkflowDiscussion messages={item.messages} title="Case discussion / saved messages" />
         </div>
       )}
       {item.history?.length > 0 && (
-        <div className="mt-4 rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stage history · Request #{item.request_id || item.id}</p>
-          <ol className="mt-2 space-y-2">{[...item.history].reverse().map((entry) => <li key={entry.id} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-sm font-semibold text-ink">{entry.result}</p><p className="mt-1 text-xs text-slate-500">{entry.actor_role}{entry.actor_user_id ? ` · User #${entry.actor_user_id}` : ""}{entry.action_type ? ` · ${entry.action_type}` : ""} · {entry.previous_status || "—"} → {entry.new_status || "—"} · {formatDate(entry.created_at)}</p>{entry.notes && <p className="mt-1 text-xs text-slate-600">{entry.notes}</p>}</li>)}</ol>
-        </div>
+        <HistoryDisclosure className="mt-4" label="View logs" hideLabel="Hide logs" count={item.history.length}>
+          <div className="rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stage history · Request #{item.request_id || item.id}</p>
+            <ol className="mt-2 space-y-2">{[...item.history].reverse().map((entry) => <li key={entry.id} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-sm font-semibold text-ink">{entry.result}</p><p className="mt-1 text-xs text-slate-500">{entry.actor_role}{entry.actor_user_id ? ` · User #${entry.actor_user_id}` : ""}{entry.action_type ? ` · ${entry.action_type}` : ""} · {entry.previous_status || "—"} → {entry.new_status || "—"} · {formatDate(entry.created_at)}</p>{entry.notes && <p className="mt-1 text-xs text-slate-600">{entry.notes}</p>}</li>)}</ol>
+          </div>
+        </HistoryDisclosure>
       )}
-      {!standingChange && <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {!standingChange && !decisionOnly && <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <select value={template[key] || ""} onChange={(e) => setTemplate((current) => ({ ...current, [key]: e.target.value }))} className="field-input cursor-pointer" aria-label="Clarification message template">
         <option value="">Optional message template</option>
         {CLARIFICATION_TEMPLATES.map((item) => <option key={item}>{item}</option>)}
@@ -1156,6 +1131,7 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
         className="field-input"
       />
       </div>}
+      {decisionOnly && <label className="mt-3 block"><span className="mb-1 block text-xs font-semibold text-slate-600">Review comment <span className="font-normal text-slate-400">({item.type === "withdrawal" ? "required when denying" : "required when returning for revision"})</span></span><textarea value={note[key] || ""} onChange={(event) => setNote((current) => ({ ...current, [key]: event.target.value }))} className="field-input min-h-24" placeholder="Add a review comment. It will be saved with your name, role, date, and time." /></label>}
       <div className="mt-3 flex flex-wrap gap-2">
         {canDecide && (
           <>
@@ -1167,12 +1143,12 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
                 <AlertTriangle className="h-4 w-4" /> Deny
               </button>
             )}
-            <button type="button" disabled={isBusy} onClick={() => onDecide(item, "return")} className="btn-ghost">
+            {item.type !== "withdrawal" && <button type="button" disabled={isBusy} onClick={() => onDecide(item, "return")} className="btn-ghost">
               <RotateCcw className="h-4 w-4" /> {returnLabel}
-            </button>
+            </button>}
           </>
         )}
-        {!standingChange && <button type="button" disabled={busy === `message-${key}`} onClick={() => onMessage(item)} className="btn-ghost">
+        {!standingChange && !decisionOnly && <button type="button" disabled={busy === `message-${key}`} onClick={() => onMessage(item)} className="btn-ghost">
           <MessageSquare className="h-4 w-4" /> Add comment
         </button>}
         {!canDecide && (
@@ -1209,8 +1185,9 @@ function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
   const boardRows = selectedRows.length ? rows.filter((item) => !(item.type === "graduation" && selectedIds.has(item.student?.id))) : rows;
   const renderCard = (item) => {
     const selectable = item.type === "graduation" && item.status === "Ready for Dean Review";
+    const readyToDrag = Boolean(item.has_submitted_documents);
     return (
-      <article key={`${item.type}-${item.id}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40">
+      <article key={`${item.type}-${item.id}`} draggable={readyToDrag} className={`rounded-xl border p-3 shadow-sm transition-colors ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : "border-slate-200 bg-white hover:border-slate-300"}`}>
         <div className="flex items-start gap-2">
           {selectable && <input type="checkbox" checked={selectedIds.has(item.student.id)} onChange={() => onToggle(item.student.id)} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${item.student.name} for Dean group action`} />}
           <div className="min-w-0 flex-1">
@@ -1218,10 +1195,10 @@ function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
             <p className="text-xs text-slate-400">{item.student?.student_number} · {item.student?.program_code}</p>
             {item.type === "graduation" && <p className="mt-1 truncate text-xs font-semibold text-brand-700">{graduationBatchLabel(item)}</p>}
           </div>
-          {item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">{item.unresolved_messages}</span>}
         </div>
-        <div className="mt-3"><StatusBadge value={item.workflow_status || item.status} dot={false} /></div>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5"><StatusBadge value={item.workflow_status || item.status} dot={false} />{!readyToDrag && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}</div>
         <p className="mt-2 text-xs text-slate-500">{item.type} · updated {formatDate(item.last_activity_at || item.submitted_at)}</p>
+        {item.messages?.length > 0 && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-800"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> {item.messages.length} visible message{item.messages.length === 1 ? "" : "s"}</p>}
         <button type="button" onClick={() => onOpen(item)} className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:ring-2 focus:ring-brand-500">View full request <Eye className="h-3.5 w-3.5" /></button>
       </article>
     );

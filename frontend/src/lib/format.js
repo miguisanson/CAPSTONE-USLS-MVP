@@ -128,6 +128,13 @@ export function formatDate(value, opts = { month: "short", day: "numeric", year:
   return d.toLocaleDateString(undefined, opts);
 }
 
+export function formatDateTime(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
 export function relativeDays(value) {
   if (!value) return "";
   const d = new Date(value);

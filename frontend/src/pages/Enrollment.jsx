@@ -23,6 +23,7 @@ import {
 import { api } from "../api";
 import { useConfirm } from "../components/confirm";
 import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
+import HistoryDisclosure from "../components/HistoryDisclosure";
 import { formatDate } from "../lib/format";
 
 export default function Enrollment() {
@@ -968,22 +969,24 @@ function HistoryPanel({ rows }) {
       <h2 className="font-display text-lg font-semibold text-ink">Enrollment history</h2>
       <p className="mt-1 text-sm text-slate-500">Durable semester records for this student.</p>
       {visible.length ? (
-        <div className="mt-4 space-y-2">
-          {visible.map((row) => (
-            <div key={row.id} className="rounded-xl border border-slate-100 p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-ink">{row.course_code}</p>
-                  <p className="text-xs text-slate-500">{row.term_label}</p>
+        <HistoryDisclosure className="mt-4" label="View enrollment history" hideLabel="Hide enrollment history" count={visible.length}>
+          <div className="space-y-2">
+            {visible.map((row) => (
+              <div key={row.id} className="rounded-xl border border-slate-100 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{row.course_code}</p>
+                    <p className="text-xs text-slate-500">{row.term_label}</p>
+                  </div>
+                  <StatusBadge value={row.status} dot={false} />
                 </div>
-                <StatusBadge value={row.status} dot={false} />
+                <p className="mt-2 text-xs text-slate-400">
+                  Updated {formatDate(row.updated_at)}
+                </p>
               </div>
-              <p className="mt-2 text-xs text-slate-400">
-                Updated {formatDate(row.updated_at)}
-              </p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </HistoryDisclosure>
       ) : (
         <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
           No semester enrollment has been saved yet.

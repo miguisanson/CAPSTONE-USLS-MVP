@@ -20,6 +20,7 @@ import {
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ProgressBar } from "../components/ui";
+import HistoryDisclosure from "../components/HistoryDisclosure";
 import { initials, formatDate, relativeDays, SEVERITY } from "../lib/format";
 
 export default function StudentDetail() {
@@ -87,30 +88,32 @@ export default function StudentDetail() {
         </div>
 
         {/* Lifecycle stepper */}
-        <div className="mt-6">
-          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">Lifecycle progress</p>
-          <div className="flex flex-wrap gap-1.5">
-            {stages.map((stage, i) => {
-              const done = i < stage_index;
-              const current = i === stage_index;
-              return (
-                <div
-                  key={stage}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                    current
-                      ? "bg-brand-600 text-white"
-                      : done
-                      ? "bg-brand-50 text-brand-700"
-                      : "bg-slate-100 text-slate-400"
-                  }`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${current || done ? "bg-current" : "bg-slate-300"}`} />
-                  {stage}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <HistoryDisclosure className="mt-6" label="View stage history" hideLabel="Hide stage history" count={stages.length}>
+          <section aria-label="Student lifecycle stage history">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">Lifecycle progress</p>
+            <div className="flex flex-wrap gap-1.5">
+              {stages.map((stage, i) => {
+                const done = i < stage_index;
+                const current = i === stage_index;
+                return (
+                  <div
+                    key={stage}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                      current
+                        ? "bg-brand-600 text-white"
+                        : done
+                        ? "bg-brand-50 text-brand-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${current || done ? "bg-current" : "bg-slate-300"}`} />
+                    {stage}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </HistoryDisclosure>
       </Card>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
@@ -214,14 +217,8 @@ export default function StudentDetail() {
               </div>
             )}
             {subject_enrollments.length > 0 && (
-              <div className="mt-4 rounded-xl border border-slate-100">
-                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-3 py-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Semester enrollment history
-                  </p>
-                  <span className="text-xs text-slate-400">{subject_enrollments.length} records</span>
-                </div>
-                <div className="max-h-64 overflow-auto">
+              <HistoryDisclosure className="mt-4" label="View enrollment history" hideLabel="Hide enrollment history" count={subject_enrollments.length}>
+                <div className="max-h-64 overflow-auto rounded-xl border border-slate-100">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase text-slate-400">
@@ -246,7 +243,7 @@ export default function StudentDetail() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </HistoryDisclosure>
             )}
           </Card>
 
@@ -296,18 +293,20 @@ export default function StudentDetail() {
           <Card className="p-6">
             <SectionTitle title="Activity timeline" subtitle="What happened, by whom, and when" icon={Clock} />
             {logs.length ? (
-              <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
-                {logs.map((log) => (
-                  <li key={log.id} className="relative">
-                    <span className="absolute -left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
-                    <p className="text-sm font-semibold text-ink">{log.result}</p>
-                    <p className="text-xs text-slate-500">
-                      {log.actor_role} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
-                    </p>
-                    {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
-                  </li>
-                ))}
-              </ol>
+              <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={logs.length}>
+                <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
+                  {logs.map((log) => (
+                    <li key={log.id} className="relative">
+                      <span className="absolute -left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
+                      <p className="text-sm font-semibold text-ink">{log.result}</p>
+                      <p className="text-xs text-slate-500">
+                        {log.actor_role} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
+                      </p>
+                      {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
+                    </li>
+                  ))}
+                </ol>
+              </HistoryDisclosure>
             ) : (
               <EmptyState title="No recorded activity" />
             )}

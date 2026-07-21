@@ -4,6 +4,7 @@ import { Activity, AlertTriangle, Search, SlidersHorizontal } from "lucide-react
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
+import HistoryDisclosure from "../components/HistoryDisclosure";
 import { formatDate } from "../lib/format";
 
 const SLUG_LABEL = {
@@ -67,35 +68,37 @@ export default function ActivityLog() {
         ) : filtered.length === 0 ? (
           <EmptyState icon={Activity} title="No activity matches the selected filters" hint="Clear a filter or use a broader search." />
         ) : (
-          <ol className="relative space-y-5 border-l-2 border-slate-100 pl-6">
-            {filtered.map((log) => (
-              <li key={log.id} className="relative">
-                <span className="absolute -left-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-white bg-brand-500" />
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                    {workflowLabel(log.transaction_slug)}
-                  </span>
-                  <span className="text-xs text-slate-400">{formatDate(log.created_at, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                </div>
-                <p className="mt-1 text-sm font-semibold text-ink">{log.result}</p>
-                <p className="text-xs text-slate-500">
-                  {log.actor_role}
-                  {log.student_id && (
-                    <>
-                      {" · "}
-                      <Link to={`/students/${log.student_id}`} className="font-semibold text-brand-700 hover:underline">
-                        {log.student_name}
-                      </Link>
-                    </>
-                  )}
-                  {!log.student_id && log.source_reference && <>{" · "}{log.source_reference}</>}
-                  {" · next owner: "}
-                  {log.next_owner || "—"}
-                </p>
-                {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
-              </li>
-            ))}
-          </ol>
+          <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={filtered.length}>
+            <ol className="relative space-y-5 border-l-2 border-slate-100 pl-6">
+              {filtered.map((log) => (
+                <li key={log.id} className="relative">
+                  <span className="absolute -left-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-white bg-brand-500" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      {workflowLabel(log.transaction_slug)}
+                    </span>
+                    <span className="text-xs text-slate-400">{formatDate(log.created_at, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-ink">{log.result}</p>
+                  <p className="text-xs text-slate-500">
+                    {log.actor_role}
+                    {log.student_id && (
+                      <>
+                        {" · "}
+                        <Link to={`/students/${log.student_id}`} className="font-semibold text-brand-700 hover:underline">
+                          {log.student_name}
+                        </Link>
+                      </>
+                    )}
+                    {!log.student_id && log.source_reference && <>{" · "}{log.source_reference}</>}
+                    {" · next owner: "}
+                    {log.next_owner || "—"}
+                  </p>
+                  {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
+                </li>
+              ))}
+            </ol>
+          </HistoryDisclosure>
         )}
       </Card>
     </div>

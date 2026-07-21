@@ -36,6 +36,8 @@ import { CheckList, Field, Input, Select, Textarea } from "../components/forms";
 import { formatDate, initials, relativeDays } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps, loaTimelineSteps } from "../components/WorkflowTimeline";
+import WorkflowDiscussion from "../components/WorkflowDiscussion";
+import HistoryDisclosure from "../components/HistoryDisclosure";
 
 const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
@@ -728,8 +730,9 @@ function StudentClarificationPanel({ slug, data, onSaved }) {
       const result = await api.sendWorkflowMessage(slug, {
         action_type: "response",
         recipient_role: latest.sender_role,
-        template: "Please clarify request details",
+        template: "Remarks",
         comment,
+        reply_to_message_id: latest.id,
       });
       setNotice(result.message);
       setComment("");
@@ -833,12 +836,8 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
     return labels[slug] || slug || "Request";
   }
 
-  function messageKey(message, index) {
-    return message.id || `${message.transaction_slug || "message"}-${index}`;
-  }
-
   function canReply(message) {
-    return message.recipient_role === "Student" && message.status === "Open" && message.action_type === "return";
+    return message.recipient_role === "Student" && message.sender_role !== "Student";
   }
 
   async function sendReply(message, key) {
@@ -851,8 +850,9 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
       const result = await api.sendWorkflowMessage(message.transaction_slug, {
         action_type: "response",
         recipient_role: message.sender_role || "Graduate School Staff",
-        template: "Please clarify request details",
+        template: "Remarks",
         comment,
+        reply_to_message_id: message.id,
       });
       setDrafts((current) => ({ ...current, [key]: "" }));
       setNotice(result.message || "Reply sent.");
@@ -874,7 +874,7 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
       const result = await api.sendWorkflowMessage(composeWorkflow, {
         action_type: "note",
         recipient_role: composeRecipient,
-        template: "Other / Custom comment",
+        template: "Remarks",
         comment: question.trim(),
       });
       setQuestion("");
@@ -958,33 +958,23 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
                     </button>
                   )}
                 </div>
-                <ol className="mt-4 space-y-3 border-l-2 border-slate-100 pl-4">
-                  {thread.items.map((message, index) => {
-                    const key = messageKey(message, index);
-                    const replyAllowed = canReply(message);
-                    return (
-                      <li key={key} className="rounded-xl bg-slate-50 p-3">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-700">{message.template || "Message"}</p>
-                          <StatusBadge value={message.status || "Message"} dot={false} />
-                        </div>
-                        {message.comment && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{message.comment}</p>}
-                        <p className="mt-2 text-xs font-medium text-slate-500">
-                          {message.sender_name || message.sender_role || "Staff"} ({message.sender_role || "Staff"}) to {message.recipient_role || "Student"} · {formatDate(message.created_at)}
-                        </p>
-                        {replyAllowed && (
-                          <div className="mt-3 border-t border-slate-200 pt-3">
-                            <label className="text-xs font-semibold text-slate-600" htmlFor={`student-inbox-reply-${key}`}>Your reply</label>
-                            <textarea id={`student-inbox-reply-${key}`} value={drafts[key] || ""} onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} className="field-input mt-1 min-h-24" placeholder="Explain what you updated or ask a follow-up question." />
-                            <button type="button" disabled={busyId === key || !(drafts[key] || "").trim()} onClick={() => sendReply(message, key)} className="btn-primary mt-3 cursor-pointer">
-                              <Send className="h-4 w-4" /> {busyId === key ? "Sending..." : "Send reply"}
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
+                <div className="mt-4">
+                  <WorkflowDiscussion
+                    messages={thread.items}
+                    embedded
+                    showHeader={false}
+                    title={`${requestLabel(first.transaction_slug)} discussion`}
+                    renderMessageFooter={(message, key) => canReply(message) ? (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+                        <label className="text-xs font-semibold text-slate-600" htmlFor={`student-inbox-reply-${key}`}>Reply to {message.sender_name || message.sender_role || "staff"}</label>
+                        <textarea id={`student-inbox-reply-${key}`} value={drafts[key] || ""} onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} className="field-input mt-1 min-h-24" placeholder="Explain what you updated or ask a follow-up question." />
+                        <button type="button" disabled={busyId === key || !(drafts[key] || "").trim()} onClick={() => sendReply(message, key)} className="btn-primary mt-3 cursor-pointer">
+                          <Send className="h-4 w-4" /> {busyId === key ? "Sending..." : "Send reply"}
+                        </button>
+                      </div>
+                    ) : null}
+                  />
+                </div>
               </section>
             );
           })}
@@ -1496,7 +1486,6 @@ function WithdrawalRequestForm({ data, onSaved }) {
   const existing = data.withdrawal_application;
   const [form, setForm] = useState({
     attachment_id: existing?.request_attachment?.id || null,
-    proof_attachment_id: existing?.proof_attachment?.id || null,
     reason: existing?.reason || "",
     effective_term: existing?.effective_term || "",
   });
@@ -1514,21 +1503,13 @@ function WithdrawalRequestForm({ data, onSaved }) {
   const denied = existing?.dean_decision === "Denied" || status === "Denied";
   const reviewPending = ["Submitted to GS Staff", "Dean Review"].includes(status);
   const reviewComplete = existing?.dean_decision === "Approved";
-  const followThroughPending = ["Approved - Follow-through", "Coordinator Follow-through Complete"].includes(status);
-  const followThroughComplete = [
-    "Requirements Pending", "Requirements Submitted", "Requirements Verified",
-    "Withdrawn Confirmed",
-  ].includes(status);
-  const requirementsEditable = reviewComplete && status === "Requirements Pending";
-  const requirementsPending = status === "Requirements Submitted";
-  const finalPending = ["Requirements Verified"].includes(status);
-  const finalComplete = status === "Withdrawn Confirmed";
+  const followThroughPending = status === "Approved - Follow-through";
+  const followThroughComplete = status === "Withdrawn Confirmed";
   const withdrawalSteps = withdrawalTimelineSteps(status);
 
   useEffect(() => {
     setForm({
       attachment_id: existing?.request_attachment?.id || null,
-      proof_attachment_id: existing?.proof_attachment?.id || null,
       reason: existing?.reason || "",
       effective_term: existing?.effective_term || "",
     });
@@ -1541,12 +1522,8 @@ function WithdrawalRequestForm({ data, onSaved }) {
         {applicationEditable ? <div className="space-y-4"><Field label="Effective semester" required><Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 1st Semester" /></Field><Field label="Reason for withdrawal" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"} /></div> : <div className="space-y-3"><p className="text-sm text-slate-600">Effective {existing?.effective_term || "semester pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
       </StageCard>
       <StageCard number={2} title="Staff Intake / Dean Review" state={denied ? "rejected" : returned ? "returned" : reviewPending ? "pending" : reviewComplete ? "complete" : "locked"} helper={denied ? "The Dean denied this request. Your lifecycle standing remains active." : returned ? "Review the comments, update Step 1, and resubmit." : reviewPending ? "Graduate School staff and the Dean are reviewing the saved application." : reviewComplete ? "The Dean approved the request for follow-through." : "Available after the application is submitted."} />
-      <StageCard number={3} title="Approved Request Follow-through" state={followThroughPending ? "pending" : followThroughComplete ? "complete" : "locked"} helper={followThroughPending ? "The Academic Coordinator and Graduate School staff are recording the approved request and preparing the requirements notice." : followThroughComplete ? "Follow-through is complete and the student requirements stage has opened." : "Available after Dean approval."} />
-      <StageCard number={4} title="Withdrawal Requirements" state={requirementsEditable ? "active" : requirementsPending ? "pending" : followThroughComplete ? "complete" : "locked"} helper={requirementsEditable ? "What you need to submit now: the completed withdrawal form, clearance, and supporting proof in one PDF." : requirementsPending ? "Your completed form and proof are saved and waiting for staff verification." : followThroughComplete ? "Submitted requirements remain saved while GS Staff completes verification." : "Available after approved-request follow-through."}>
-        {requirementsEditable ? <div className="space-y-4"><RequestPdfUpload requestType="withdrawal" label="Completed withdrawal form and proof PDF" initialAttachment={existing?.proof_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, proof_attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.proof_attachment_id} disabledHint={!form.proof_attachment_id ? "Upload the completed form and proof first." : ""} label={existing?.proof_attachment ? "Resubmit withdrawal requirements" : "Submit withdrawal requirements"} /></div> : existing?.proof_attachment ? <SavedWorkflowFiles files={[existing.proof_attachment]} /> : null}
-      </StageCard>
-      <StageCard number={5} title="Final GS Staff Confirmation" state={finalComplete ? "complete" : finalPending ? "pending" : "locked"} helper={finalComplete ? "Graduate School staff confirmed the withdrawal and the workflow is complete." : finalPending ? "Graduate School staff are completing the final record and status checks." : "Available after the submitted requirements are verified."} />
-      {existing?.attachments?.length > 2 && <SavedWorkflowFiles files={existing.attachments} />}
+      <StageCard number={3} title="GS Staff Follow-through and Confirmation" state={followThroughPending ? "pending" : followThroughComplete ? "complete" : "locked"} helper={followThroughPending ? "The Dean approved your request. Graduate School staff are noting the effective semester, informing the relevant parties, and completing the withdrawal record." : followThroughComplete ? "Graduate School staff completed the follow-through actions and confirmed your withdrawal." : denied ? "This step is not opened for a denied request." : "Available after Dean approval."} />
+      {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} />}
       <WorkflowTimeline steps={withdrawalSteps} title="Detailed withdrawal timeline" />
     </form>
   );
@@ -1576,8 +1553,7 @@ function PracticumRequestForm({ data, onSaved }) {
     supervisor_name: existing?.supervisor_name || "",
     required_hours: existing?.required_hours || 200,
     completed_hours: existing?.completed_hours || 0,
-    certificate_count: existing?.certificate_count || 0,
-    remarks: existing?.remarks || "",
+    remarks: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("practicum", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -1590,8 +1566,7 @@ function PracticumRequestForm({ data, onSaved }) {
       supervisor_name: existing?.supervisor_name || "",
       required_hours: existing?.required_hours || 200,
       completed_hours: existing?.completed_hours || 0,
-      certificate_count: existing?.certificate_count || 0,
-      remarks: existing?.remarks || "",
+      remarks: "",
     });
   }, [data.student.id, existing?.id, existing?.updated_at, additionalCompletionPdfRequired]);
 
@@ -1628,11 +1603,11 @@ function PracticumRequestForm({ data, onSaved }) {
       </StageCard>
 
       <StageCard number={2} title="MOA Submission" state={moaEditable ? (returned ? "returned" : "active") : moaPending ? "pending" : existing?.moa_attachment ? "complete" : "locked"} helper={!eligibilityReady ? "Available after the eligibility requirements in Step 1 are verified." : moaEditable ? "What you need to submit now: practicum site details and the signed MOA PDF." : moaPending ? "Your MOA is saved and waiting for staff / Academic Coordinator review." : "Completed MOA information is read-only while you continue to the next stage."}>
-        {moaEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Practicum site / company" required><Input value={form.practicum_site} onChange={set("practicum_site")} required /></Field><Field label="Supervisor name"><Input value={form.supervisor_name} onChange={set("supervisor_name")} /></Field></div><RequestPdfUpload requestType="practicum" label="Practicum MOA PDF" initialAttachment={existing?.moa_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks"><Textarea value={form.remarks} onChange={set("remarks")} /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label={returned ? "Resubmit MOA stage" : "Submit MOA stage"} /></div> : <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase text-slate-400">Practicum site</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.practicum_site || "Not provided"}</p></div><div><p className="text-xs font-bold uppercase text-slate-400">Supervisor</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.supervisor_name || "Not provided"}</p></div></div>{existing?.moa_attachment && <SavedWorkflowFiles files={[existing.moa_attachment]} />}</div>}
+        {moaEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Practicum site / company" required><Input value={form.practicum_site} onChange={set("practicum_site")} required /></Field><Field label="Supervisor name"><Input value={form.supervisor_name} onChange={set("supervisor_name")} /></Field></div><RequestPdfUpload requestType="practicum" label="Practicum MOA PDF" initialAttachment={existing?.moa_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message for the staff reviewing this submission." /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label={returned ? "Resubmit MOA stage" : "Submit MOA stage"} /></div> : <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase text-slate-400">Practicum site</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.practicum_site || "Not provided"}</p></div><div><p className="text-xs font-bold uppercase text-slate-400">Supervisor</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.supervisor_name || "Not provided"}</p></div></div>{existing?.moa_attachment && <SavedWorkflowFiles files={[existing.moa_attachment]} />}</div>}
       </StageCard>
 
       <StageCard number={3} title="Practicum Document Submission" state={completionEditable ? (returned ? "returned" : "active") : documentsPending ? "pending" : completionPreviouslySubmitted ? "complete" : "locked"} helper={completionEditable ? (additionalCompletionPdfRequired ? "What you need to submit now: upload a new PDF for the requested additional certificates. Earlier uploaded PDFs stay in the file history." : "What you need to submit now: completed hours and one PDF containing the required completion documents.") : documentsPending ? "Your completion documents are saved and under review." : newOrganizationRequired || moaPending ? "A replacement or pending MOA must be approved before completion documents can be submitted again." : "Available after the MOA is approved and the practicum is marked in progress."}>
-        {completionEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-3"><Field label="Required hours"><Input type="number" value={form.required_hours} readOnly aria-readonly="true" /></Field><Field label="Completed hours" required><Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required /></Field><Field label="Number of certificates"><Input type="number" min="0" value={form.certificate_count} onChange={set("certificate_count")} /></Field></div><RequestPdfUpload requestType="practicum" label={additionalCompletionPdfRequired ? "New additional certificates / hours proof PDF" : "Completion certificates / forms / hours proof PDF"} initialAttachment={additionalCompletionPdfRequired ? null : existing?.certificate_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />{additionalCompletionPdfRequired && existing?.certificate_attachment && <SavedWorkflowFiles files={[existing.certificate_attachment]} empty="No previous practicum files submitted yet." />}<Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.certificate_attachment_id} disabledHint={!form.certificate_attachment_id ? "Upload the requested additional PDF before submitting." : ""} label={returned ? "Resubmit completion stage" : "Submit completion stage"} /></div> : existing?.certificate_attachment ? <div className="space-y-3"><p className="text-sm text-slate-600">{existing.completed_hours}/{existing.required_hours} hours · {existing.certificate_count} certificate(s)</p><SavedWorkflowFiles files={[existing.certificate_attachment]} /></div> : null}
+        {completionEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Required hours"><Input type="number" value={form.required_hours} readOnly aria-readonly="true" /></Field><Field label="Completed hours" required><Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required /></Field></div><div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><p className="font-semibold">Certificates are counted automatically</p><p className="mt-1 text-xs text-emerald-700">The system currently detects {existing?.certificate_count || 0} submitted certificate file{existing?.certificate_count === 1 ? "" : "s"}. Uploading an additional file updates this count.</p></div><RequestPdfUpload requestType="practicum" label={additionalCompletionPdfRequired ? "New additional certificates / hours proof PDF" : "Completion certificates / forms / hours proof PDF"} initialAttachment={additionalCompletionPdfRequired ? null : existing?.certificate_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />{additionalCompletionPdfRequired && existing?.completion_attachments?.length > 0 && <SavedWorkflowFiles files={existing.completion_attachments} empty="No previous practicum files submitted yet." />}<Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add any context the reviewer should see with these files." /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.certificate_attachment_id} disabledHint={!form.certificate_attachment_id ? "Upload the requested additional PDF before submitting." : ""} label={returned ? "Resubmit completion stage" : "Submit completion stage"} /></div> : existing?.certificate_attachment ? <div className="space-y-3"><p className="text-sm text-slate-600">{existing.completed_hours}/{existing.required_hours} hours · {existing.certificate_count} submitted certificate file{existing.certificate_count === 1 ? "" : "s"}</p><SavedWorkflowFiles files={existing.completion_attachments?.length ? existing.completion_attachments : [existing.certificate_attachment]} /></div> : null}
       </StageCard>
 
       <StageCard number={4} title="Review / Approval" state={reviewComplete ? "complete" : documentsPending ? "pending" : "locked"} helper={documentsPending ? "Graduate School staff and the Academic Coordinator are checking the submitted hours and documents." : reviewComplete ? "The completion evidence was accepted." : "Available after Step 3 is submitted."} />
@@ -1648,6 +1623,7 @@ function GraduationRequestForm({ data, onSaved }) {
   const [form, setForm] = useState({
     attachment_id: existing?.request_attachment?.id || null,
     review_window: existing?.review_window || "AY 2026-2027 Graduation Review",
+    remarks: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("graduation", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -1666,13 +1642,13 @@ function GraduationRequestForm({ data, onSaved }) {
     submit({ student_id: data.student.id, ...form });
   }
 
-  useEffect(() => setForm({ attachment_id: existing?.request_attachment?.id || null, review_window: existing?.review_window || "AY 2026-2027 Graduation Review" }), [data.student.id, existing?.id, existing?.updated_at]);
+  useEffect(() => setForm({ attachment_id: existing?.request_attachment?.id || null, review_window: existing?.review_window || "AY 2026-2027 Graduation Review", remarks: "" }), [data.student.id, existing?.id, existing?.updated_at]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current graduation stage</p><p className="mt-1 text-xs text-slate-500">Your application stays visible while each reviewing office completes its part.</p></div><StatusBadge value={status} dot={false} /></div></div>
       <StageCard number={1} title="Application / Review Window" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: the review window and any supporting graduation PDF." : "Your submitted application is saved and read-only during review."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Review window / semester" required><Input value={form.review_window} onChange={set("review_window")} required /></Field><RequestPdfUpload requestType="graduation" label="Optional graduation endorsement / supporting PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.review_window}</p><SavedWorkflowFiles files={existing?.attachments || []} /></div>}
+        {applicationEditable ? <div className="space-y-4"><Field label="Review window / semester" required><Input value={form.review_window} onChange={set("review_window")} required /></Field><RequestPdfUpload requestType="graduation" label="Optional graduation endorsement / supporting PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message to the staff reviewing your graduation submission." /></Field><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.review_window}</p><SavedWorkflowFiles files={existing?.attachments || []} /></div>}
       </StageCard>
       <StageCard number={2} title="Staff and Coursework Review" state={["For Review", "Coursework Review"].includes(status) ? "pending" : ["Research Review", "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar"].includes(status) ? "complete" : "locked"} helper={["For Review", "Coursework Review"].includes(status) ? "Graduate School staff and the Academic Coordinator are reviewing your coursework record." : "This stage opens after the application is submitted."} />
       <StageCard number={3} title="Requirements Validation" state={["Research Review", "Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status) ? "pending" : ["Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar"].includes(status) ? "complete" : status === "Not Eligible" ? "returned" : "locked"} helper={status === "Not Eligible" ? "Resolve the listed missing requirements before resubmitting your application." : "Coursework, research, practicum, and completion records are checked here."}>
@@ -1973,18 +1949,20 @@ function ActivityPanel({ logs }) {
     <Card className="p-6">
       <SectionTitle title="Activity History" subtitle="Submissions, decisions, and next owners" icon={Activity} />
       {visibleLogs.length ? (
-        <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
-          {visibleLogs.map((log) => (
-            <li key={log.id} className="relative">
-              <span className="absolute -left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
-              <p className="text-sm font-semibold text-ink">{log.result}</p>
-              <p className="text-xs text-slate-500">
-                {log.actor_role} - next: {log.next_owner || "Pending"} - {formatDate(log.created_at)}
-              </p>
-              {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
-            </li>
-          ))}
-        </ol>
+        <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={visibleLogs.length}>
+          <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
+            {visibleLogs.map((log) => (
+              <li key={log.id} className="relative">
+                <span className="absolute -left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
+                <p className="text-sm font-semibold text-ink">{log.result}</p>
+                <p className="text-xs text-slate-500">
+                  {log.actor_role} - next: {log.next_owner || "Pending"} - {formatDate(log.created_at)}
+                </p>
+                {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
+              </li>
+            ))}
+          </ol>
+        </HistoryDisclosure>
       ) : (
         <EmptyState title="No activity yet" />
       )}

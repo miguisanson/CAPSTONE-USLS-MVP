@@ -1,12 +1,11 @@
+import HistoryDisclosure from "./HistoryDisclosure";
+
 const WITHDRAWAL_STEPS = [
-  "Request Submitted",
-  "GS Staff Intake and Recording",
+  "Withdrawal Request Submitted",
+  "GS Staff Forwarded Request to Dean",
   "Dean Review",
-  "Academic Coordinator Follow-through",
-  "Student Informed of Approval",
-  "Requirements Submitted",
-  "GS Staff Verification and Confirmation",
-  "Withdrawn",
+  "GS Staff Follow-through Actions",
+  "Withdrawal Confirmed",
 ];
 
 const GRADUATION_STEPS = [
@@ -53,11 +52,7 @@ export function withdrawalTimelineSteps(status) {
     "Submitted to GS Staff": 1,
     "Dean Review": 2,
     "Approved - Follow-through": 3,
-    "Coordinator Follow-through Complete": 4,
-    "Requirements Pending": 4,
-    "Requirements Submitted": 5,
-    "Requirements Verified": 6,
-    "Withdrawn Confirmed": 7,
+    "Withdrawn Confirmed": 4,
     Denied: 2,
     Returned: 2,
   };
@@ -92,30 +87,32 @@ export function graduationTimelineSteps(status, eligibility = {}) {
 
 export default function WorkflowTimeline({ steps = [], title = "Workflow timeline" }) {
   return (
-    <section aria-label={title}>
-      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
-      <ol className="grid gap-2 sm:grid-cols-2">
-        {steps.map((step, index) => {
-          const state = step.state || "upcoming";
-          return (
-            <li
-              key={`${index}-${step.label}`}
-              aria-current={state === "current" ? "step" : undefined}
-              className={`rounded-xl border px-3 py-2 text-xs font-semibold leading-relaxed ${
-                state === "current"
-                  ? "border-brand-600 bg-brand-600 text-white"
-                  : state === "complete"
-                    ? "border-brand-200 bg-brand-50 text-brand-800"
-                    : "border-slate-200 bg-white text-slate-500"
-              }`}
-            >
-              <span className={`font-bold ${state === "upcoming" ? "text-slate-400" : "text-current"}`}>Step {index + 1}:</span>{" "}
-              {step.label}
-              {step.optional && <span className="ml-1 font-medium opacity-75">(if needed)</span>}
-            </li>
-          );
-        })}
-      </ol>
-    </section>
+    <HistoryDisclosure label="View stage history" hideLabel="Hide stage history" count={steps.length}>
+      <section aria-label={title}>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
+        <ol className="grid gap-2 sm:grid-cols-2">
+          {steps.map((step, index) => {
+            const state = step.state || "upcoming";
+            return (
+              <li
+                key={`${index}-${step.label}`}
+                aria-current={state === "current" ? "step" : undefined}
+                className={`rounded-xl border px-3 py-2 text-xs font-semibold leading-relaxed ${
+                  state === "current"
+                    ? "border-brand-600 bg-brand-600 text-white"
+                    : state === "complete"
+                      ? "border-brand-200 bg-brand-50 text-brand-800"
+                      : "border-slate-200 bg-white text-slate-500"
+                }`}
+              >
+                <span className={`font-bold ${state === "upcoming" ? "text-slate-400" : "text-current"}`}>Step {index + 1}:</span>{" "}
+                {step.label}
+                {step.optional && <span className="ml-1 font-medium opacity-75">(if needed)</span>}
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </HistoryDisclosure>
   );
 }

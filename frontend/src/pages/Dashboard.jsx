@@ -29,6 +29,7 @@ import {
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState } from "../components/ui";
+import HistoryDisclosure from "../components/HistoryDisclosure";
 import { CHART_COLORS, RISK_COLORS, SCHEDULE_COLORS, formatDate, relativeDays } from "../lib/format";
 
 function Kpi({ icon: Icon, label, value, sub, tone = "brand", to }) {
@@ -340,25 +341,27 @@ export default function Dashboard() {
         <Card className="p-5">
           <SectionTitle title="Recent activity" subtitle="Latest recorded transactions" icon={Clock} />
           {data.recent_logs.length ? (
-            <ul className="space-y-3">
-              {data.recent_logs.map((log) => (
-                <li key={log.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
-                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink">{log.result}</p>
-                    <p className="truncate text-xs text-slate-500">
-                      {log.student_name || log.source_reference || "Workflow"} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={data.recent_logs.length}>
+              <ul className="space-y-3">
+                {data.recent_logs.map((log) => (
+                  <li key={log.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink">{log.result}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {log.student_name || log.source_reference || "Workflow"} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <Link to="/activity" className="btn-ghost mt-4 w-full">
+                Open full activity log <ArrowRight className="h-4 w-4" />
+              </Link>
+            </HistoryDisclosure>
           ) : (
             <EmptyState title="No activity yet" hint="Complete a workflow to populate this feed." />
           )}
-          <Link to="/activity" className="btn-ghost mt-4 w-full">
-            View full activity log <ArrowRight className="h-4 w-4" />
-          </Link>
         </Card>
 
         <Card className="p-5">

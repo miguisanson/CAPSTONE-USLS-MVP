@@ -30,6 +30,12 @@ export const api = {
   me: () => request("/auth/me"),
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request("/auth/logout", { method: "POST", body: JSON.stringify({}) }),
+  demoStudents: () => request("/auth/demo-students"),
+  resetDemoStudent: (demoKey) =>
+    request(`/auth/demo-students/${encodeURIComponent(demoKey)}/reset`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
   meta: () => request("/meta"),
   adminTerms: () => request("/admin/terms"),
   updateTerm: (id, payload) => request(`/admin/terms/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),

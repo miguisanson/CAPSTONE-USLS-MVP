@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { GraduationCap, LogOut, Users, CalendarClock, BookOpen, Clock3, ClipboardCheck, AlertTriangle, LayoutDashboard, FileCheck } from "lucide-react";
+import { GraduationCap, LogOut, Users, CalendarClock, BookOpen, Clock3, ClipboardCheck, AlertTriangle, LayoutDashboard, FileCheck, Printer } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from "../components/ui";
 import { formatDate } from "../lib/format";
+import { printDataTable } from "../lib/print";
 import FacultyResearchWorkspace from "../components/FacultyResearchWorkspace";
 import RoleSidebar from "../components/RoleSidebar";
 
@@ -230,6 +231,16 @@ function FacultyGrades({ subjects, terms, alerts }) {
     } catch (err) { setNotice(err.message); } finally { setSaving(false); }
   }
 
+  function printGrades() {
+    if (!roster) return;
+    printDataTable({
+      title: `${roster.course.code} - ${roster.course.title} Grade List`,
+      subtitle: term,
+      columns: ["Student ID", "Student name", "Program", "Grade", "Remarks"],
+      rows: roster.students.map((student) => [student.student_number, student.name, student.program_code, edits[student.student_id]?.grade || "No grade", edits[student.student_id]?.remarks || ""]),
+    });
+  }
+
   return <div>
     <SectionTitle title="Submit class grades" subtitle="Choose a subject, then enter each student's final grade and optional remarks." icon={ClipboardCheck} />
     {alerts.map((alert) => <div key={alert.term_label} className={`mt-3 flex gap-2 rounded-xl border px-3 py-2 text-sm ${alert.coordinator_escalated ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{alert.missing_grades} grade{alert.missing_grades === 1 ? "" : "s"} missing for {alert.term_label}. Deadline: {formatDate(alert.deadline)}.{alert.coordinator_escalated ? " The Academic Coordinator has been alerted." : " Please submit before the deadline."}</span></div>)}
@@ -237,7 +248,7 @@ function FacultyGrades({ subjects, terms, alerts }) {
       <label><span className="field-label">Semester</span><select className="field-input cursor-pointer" value={term} onChange={(e) => setTerm(e.target.value)}>{terms.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}</select></label>
       <label><span className="field-label">Subject</span><select className="field-input cursor-pointer" value={courseId} onChange={(e) => setCourseId(e.target.value)}>{subjects.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select></label>
     </div>
-    {roster?.students?.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400"><th className="py-2">Student</th><th>Grade</th><th>Remarks</th></tr></thead><tbody>{roster.students.map((student) => <tr key={student.student_id} className="border-b border-slate-100"><td className="py-3 pr-3"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-500">{student.student_number}</p></td><td className="pr-3"><input className="field-input w-28" value={edits[student.student_id]?.grade || ""} onChange={(e) => change(student.student_id, "grade", e.target.value)} placeholder="1.25 / INC" /></td><td><input className="field-input" value={edits[student.student_id]?.remarks || ""} onChange={(e) => change(student.student_id, "remarks", e.target.value)} placeholder="Optional faculty remarks" /></td></tr>)}</tbody></table><button type="button" onClick={submit} disabled={saving} className="btn-primary mt-4 cursor-pointer">{saving ? "Submitting..." : "Submit grades"}</button></div> : <EmptyState icon={ClipboardCheck} title="No students in this class" hint="The Academic Coordinator must add students to the subject roster first." />}
+    {roster?.students?.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400"><th className="py-2">Student</th><th>Grade</th><th>Remarks</th></tr></thead><tbody>{roster.students.map((student) => <tr key={student.student_id} className="border-b border-slate-100"><td className="py-3 pr-3"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-500">{student.student_number}</p></td><td className="pr-3"><input className="field-input w-28" value={edits[student.student_id]?.grade || ""} onChange={(e) => change(student.student_id, "grade", e.target.value)} placeholder="1.25 / INC" /></td><td><input className="field-input" value={edits[student.student_id]?.remarks || ""} onChange={(e) => change(student.student_id, "remarks", e.target.value)} placeholder="Optional faculty remarks" /></td></tr>)}</tbody></table><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={submit} disabled={saving} className="btn-primary cursor-pointer">{saving ? "Submitting..." : "Submit grades"}</button><button type="button" onClick={printGrades} className="btn-ghost cursor-pointer"><Printer className="h-4 w-4" /> Print grade list</button></div></div> : <EmptyState icon={ClipboardCheck} title="No students in this class" hint="The Academic Coordinator must add students to the subject roster first." />}
     {notice && <p className="mt-3 text-sm font-semibold text-brand-700">{notice}</p>}
   </div>;
 }
