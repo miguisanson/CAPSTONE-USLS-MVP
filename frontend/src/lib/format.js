@@ -95,7 +95,6 @@ const STATUS_STYLES = {
   "Not taken": "bg-slate-100 text-slate-600 ring-slate-200",
   Incomplete: "bg-amber-50 text-amber-700 ring-amber-200",
   "Retake Required": "bg-orange-50 text-orange-700 ring-orange-200",
-  Dropped: "bg-amber-50 text-amber-700 ring-amber-200",
   Failed: "bg-red-50 text-red-700 ring-red-200",
   Missing: "bg-red-50 text-red-700 ring-red-200",
   // tasks

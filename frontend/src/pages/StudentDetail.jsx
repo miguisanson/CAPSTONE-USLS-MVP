@@ -16,6 +16,7 @@ import {
   Bot,
   LogOut,
   BookPlus,
+  UserPlus,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -78,6 +79,11 @@ export default function StudentDetail() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {student.monitoring_new_student && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-3 py-1 text-xs font-bold text-brand-800 ring-1 ring-brand-200">
+                <UserPlus className="h-3.5 w-3.5" /> New Student
+              </span>
+            )}
             {student.enrollment_tag && <StatusBadge value={student.enrollment_tag} dot={false} />}
             <StatusBadge value={student.standing} dot={false} />
             <StatusBadge value={student.risk_level} />

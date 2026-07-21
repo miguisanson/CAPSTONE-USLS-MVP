@@ -10,7 +10,6 @@ import {
   ExternalLink,
   FileSearch,
   GraduationCap,
-  Inbox,
   Lock,
   Plus,
   RefreshCw,
@@ -44,7 +43,6 @@ export default function Enrollment() {
   const programId = searchParams.get("program_id") || "";
   const termId = searchParams.get("term_id") || "";
   const studentId = searchParams.get("student_id") || "";
-  const showDropRequests = searchParams.get("view") === "drop-requests";
 
   async function load() {
     setLoading(true);
@@ -125,13 +123,6 @@ export default function Enrollment() {
       Object.fromEntries(Object.entries(params).filter(([, value]) => value)),
       { replace: true }
     );
-  }
-
-  function toggleDropRequests() {
-    const params = new URLSearchParams(searchParams);
-    if (showDropRequests) params.delete("view");
-    else params.set("view", "drop-requests");
-    setSearchParams(params);
   }
 
   function toggleCourse(courseId) {
@@ -222,27 +213,12 @@ export default function Enrollment() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={toggleDropRequests}
-            className={showDropRequests ? "btn-primary" : "btn-ghost"}
-          >
-            <Inbox className="h-4 w-4" />
-            {showDropRequests ? "Back to enrollment" : "Drop requests"}
-          </button>
           <Link to="/course-adjustments" className="btn-ghost">
             <BookOpenCheck className="h-4 w-4" /> Offering list
           </Link>
         </div>
       </div>
 
-      {showDropRequests ? (
-        <DropRequestsPanel
-          program={data?.program}
-          onEnrollmentChanged={load}
-        />
-      ) : (
-        <>
       <Card className="p-5">
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Program">
@@ -593,8 +569,6 @@ export default function Enrollment() {
           </div>
         </>
       )}
-        </>
-      )}
     </div>
   );
 }
@@ -608,176 +582,6 @@ function Field({ label, children }) {
   );
 }
 
-function DropRequestsPanel({ program, onEnrollmentChanged }) {
-  const confirm = useConfirm();
-  const [status, setStatus] = useState("Submitted");
-  const [items, setItems] = useState([]);
-  const [permissions, setPermissions] = useState({ can_decide: false });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busyId, setBusyId] = useState(null);
-
-  function load(nextStatus = status) {
-    setLoading(true);
-    setError("");
-    return api
-      .courseDropRequests(nextStatus, program?.id)
-      .then((res) => {
-        setItems(res.items || []);
-        setPermissions(res.permissions || { can_decide: false });
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load(status);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, program?.id]);
-
-  async function decide(item) {
-    const ok = await confirm({
-      title: "Record drop request?",
-      message:
-        `Record the drop of ${item.course_code} for ${item.student?.name || `student #${item.student_id}`}?\n\n` +
-        "Dropping is not a discretionary decision — this registers the student's request. The subject is marked Dropped here and follows in the next AIMS sync.",
-      confirmLabel: "Record drop",
-    });
-    if (!ok) return;
-    setBusyId(item.id);
-    setError("");
-    setNotice("");
-    try {
-      const response = await api.decideCourseDrop(item.id, { decision: "record" });
-      setNotice(response.message);
-      await load(status);
-      onEnrollmentChanged?.();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <Card className="p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="font-display text-xl font-semibold text-ink">Course drop requests</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Dropping has no deny option — the app records the student's request. Recorded drops
-              mark the subject Dropped here and follow in the next AIMS sync.
-            </p>
-          </div>
-          <StatusBadge value={program?.code || "All programs"} dot={false} />
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {["Submitted", "Recorded", "All"].map((itemStatus) => (
-            <button
-              key={itemStatus}
-              type="button"
-              onClick={() => setStatus(itemStatus)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                status === itemStatus
-                  ? "bg-brand-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {itemStatus}
-            </button>
-          ))}
-        </div>
-        {!permissions.can_decide && !loading && (
-          <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
-            Graduate School Staff have read-only access. An Academic Coordinator records a drop request.
-          </p>
-        )}
-      </Card>
-
-      <ErrorNote message={error} />
-      {notice && (
-        <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
-          {notice}
-        </div>
-      )}
-
-      {loading ? (
-        <Spinner label="Loading drop requests..." />
-      ) : items.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={Inbox}
-            title={`No ${status === "All" ? "" : `${status.toLowerCase()} `}drop requests`}
-            hint={`Student drop requests for ${program?.code || "the selected program"} will appear here.`}
-          />
-        </Card>
-      ) : (
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-3 py-3">Subject</th>
-                  <th className="px-3 py-3">Semester</th>
-                  <th className="px-3 py-3">Reason</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-5 py-3 text-right">Decision</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-50 hover:bg-brand-50/30">
-                    <td className="px-5 py-3">
-                      <Link
-                        to={`/students/${item.student_id}`}
-                        className="font-semibold text-ink hover:text-brand-700"
-                      >
-                        {item.student?.name || `Student #${item.student_id}`}
-                      </Link>
-                      <p className="text-xs text-slate-400">
-                        {item.student?.student_number || ""}
-                      </p>
-                    </td>
-                    <td className="px-3 py-3">
-                      <p className="font-semibold text-ink">{item.course_code}</p>
-                      <p className="text-xs text-slate-400">{item.course_title}</p>
-                    </td>
-                    <td className="px-3 py-3 text-slate-600">{item.term_label || "—"}</td>
-                    <td className="max-w-[280px] px-3 py-3 text-slate-600">
-                      {item.reason || "—"}
-                    </td>
-                    <td className="px-3 py-3">
-                      <StatusBadge value={item.status} dot={false} />
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      {item.status === "Submitted" && permissions.can_decide ? (
-                        <button
-                          type="button"
-                          onClick={() => decide(item)}
-                          disabled={busyId === item.id}
-                          className="btn-primary px-3 py-2"
-                        >
-                          Record drop
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400">
-                          {item.decided_by ? `Recorded by ${item.decided_by}` : "Awaiting coordinator"}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
 
 function StudentSummary({ data, selectedCount, dirty }) {
   const student = data.selected_student;

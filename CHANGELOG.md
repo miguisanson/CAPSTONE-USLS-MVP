@@ -26,7 +26,7 @@ Ownership shown below is based on Git commit author metadata. A linked GitHub ac
 - **June 22, 2026 (Monday) - Monitoring and academic planning merge:** Merged the active development branches, cleaned the repository, preserved local branch references, and added course-adjustment and curriculum-planning updates.
 - **June 24, 2026 (Wednesday) - Integration fixes:** Applied follow-up fixes after the academic-planning and workflow merge.
 - **June 25, 2026 (Thursday) - Course Audit:** Expanded Course Audit behavior and staff handling for student course completion records.
-- **June 26, 2026 (Friday) - BPM, RAG, faculty portal, and research ownership:** Updated the Academic Coordinator research-gate role, merged the BPM workflow and messaging work, added the policy RAG assistant, added Faculty login and the Faculty Portal, and consolidated course-drop and grade workflow support.
+- **June 26, 2026 (Friday) - BPM, RAG, faculty portal, and research ownership:** Updated the Academic Coordinator research-gate role, merged the BPM workflow and messaging work, added the policy RAG assistant, added Faculty login and the Faculty Portal, and consolidated grade workflow support.
 - **June 27, 2026 (Saturday) - Academic-period planning and UX:** Added active academic-period selection for course adjustment and curriculum planning, then applied supporting interface refinements.
 - **June 30, 2026 (Tuesday) - LOA and readmission roster views:** Added withdrawal-style Board and Table views, status columns, search and status filters, and click-through request review for Leave of Absence and readmission.
 - **July 1, 2026 (Wednesday) - Document and policy RAG:** Added concept-paper and Leave of Absence policy checks, then refined RAG behavior and research-gate handling.

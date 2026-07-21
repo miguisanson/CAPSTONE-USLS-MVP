@@ -395,7 +395,7 @@ function MyCoursesPanel({ data, onSaved }) {
   }, [data.student.id, subjects.filter((item) => item.is_enrolled).map((item) => item.id).join(",")]);
 
   function toggle(subject) {
-    if (subject.status === "Completed" || (!subject.is_offered && !subject.is_enrolled)) return;
+    if (subject.is_enrolled || subject.status === "Completed" || !subject.is_offered) return;
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(subject.id)) next.delete(subject.id); else next.add(subject.id);
@@ -421,10 +421,10 @@ function MyCoursesPanel({ data, onSaved }) {
 
   return (
     <Card className="p-6">
-      <SectionTitle title="My suggested curriculum" subtitle="Check the published subjects you are currently taking. Unchecking a current subject drops it immediately and updates every connected record." icon={BookOpenCheck} />
+      <SectionTitle title="My suggested curriculum" subtitle="Add published subjects you are taking this semester. Subjects already on your enrollment record stay locked." icon={BookOpenCheck} />
       <div className="mb-5 rounded-xl border border-brand-100 bg-brand-50/50 p-4 text-sm text-slate-700">
         <p className="font-semibold text-ink">{data.current_term?.label || "Current semester"}</p>
-        <p className="mt-1 text-xs">There is no separate drop request, approval, reason, or supporting document. Completed subjects stay locked as part of your academic history.</p>
+        <p className="mt-1 text-xs">Current and completed subjects stay locked as part of your academic record. You may select additional subjects only when they are offered this semester.</p>
       </div>
       {subjects.length ? <div className="space-y-5">
         {Object.entries(grouped).map(([category, rows]) => (
@@ -433,7 +433,7 @@ function MyCoursesPanel({ data, onSaved }) {
             <div className="overflow-hidden rounded-xl border border-slate-200">
               {rows.map((subject) => {
                 const checked = selected.has(subject.id);
-                const disabled = subject.status === "Completed" || (!subject.is_offered && !subject.is_enrolled);
+                const disabled = subject.is_enrolled || subject.status === "Completed" || !subject.is_offered;
                 return <label key={subject.id} className={`flex items-start gap-3 border-b border-slate-100 p-3 last:border-b-0 ${disabled ? "cursor-not-allowed bg-slate-50/70" : "cursor-pointer transition-colors hover:bg-brand-50/40"}`}>
                   <input type="checkbox" checked={subject.status === "Completed" || checked} onChange={() => toggle(subject)} disabled={disabled} className="mt-1 h-4 w-4 accent-brand-600" aria-label={`Currently enrolled in ${subject.code}`} />
                   <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{subject.code} · {subject.title}</span><span className="mt-0.5 block text-xs text-slate-500">{subject.units} units · {subject.recommended_term || "No suggested semester"}</span></span>
@@ -454,142 +454,6 @@ function MyCoursesPanel({ data, onSaved }) {
   );
 }
 
-function LegacyMyCoursesPanel({ data, onSaved }) {
-  const courses = data.course_records || [];
-  const offeredSubjects = data.offered_subjects || [];
-  const requests = data.course_drop_requests || [];
-  const currentCourses = courses.filter((course) => ["Enrolled", "Current", "Incomplete"].includes(course.status) && !course.drop_request);
-  const droppable = currentCourses;
-  const [activeCourseId, setActiveCourseId] = useState(currentCourses[0]?.course_id || "");
-  const [form, setForm] = useState({ reason: "", term_label: "", attachment_id: null });
-  const { busy, error, message, submit } = useSubmitRequest("course-drop", onSaved);
-  const activeCourse = courses.find((course) => String(course.course_id) === String(activeCourseId));
-  const selectedTerm = activeCourse?.term_label || data.current_term?.label || "Current semester";
-  const courseStatusLabel = (status) => status === "Missing" ? "Not taken" : status;
-
-  useEffect(() => {
-    setActiveCourseId((current) => {
-      if (currentCourses.some((course) => String(course.course_id) === String(current))) return current;
-      return currentCourses[0]?.course_id || "";
-    });
-  }, [data.student.id, currentCourses[0]?.course_id]);
-
-  function onSubmit(event) {
-    event.preventDefault();
-    if (!activeCourse) return;
-    submit({
-      course_id: activeCourse.course_id,
-      term_label: selectedTerm,
-      reason: form.reason,
-      attachment_id: form.attachment_id,
-    });
-  }
-
-  return (
-    <div className="space-y-5">
-      <Card className="p-6">
-        <SectionTitle title="My Courses" subtitle="Your current coursework status, grades, and pending drop requests" icon={ClipboardCheck} />
-        <div className="mb-5 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <BookOpenCheck className="h-4 w-4 text-brand-700" />
-                Offered subjects · {data.current_term?.label || "Current semester"}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Published by the Graduate School course adjustments process.
-              </p>
-            </div>
-            <StatusBadge value={`${offeredSubjects.length} offered`} dot={false} />
-          </div>
-          {offeredSubjects.length ? (
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {offeredSubjects.map((subject) => (
-                <div key={subject.id} className="rounded-lg border border-brand-100 bg-white px-3 py-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{subject.course_code}</p>
-                      <p className="text-xs text-slate-500">{subject.course_title}</p>
-                    </div>
-                    <StatusBadge value={subject.enrollment_status} dot={false} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-slate-500">
-              The official offering list has not been published for this semester.
-            </p>
-          )}
-        </div>
-        <div className="mb-2 flex items-center gap-2">
-          <ClipboardCheck className="h-4 w-4 text-brand-700" />
-          <p className="text-sm font-semibold text-ink">Your subjects — currently enrolled &amp; completed</p>
-        </div>
-        <p className="mb-3 text-xs text-slate-500">Your actual record from the monitoring sheet, separate from the offered list above.</p>
-        {courses.length ? (
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="px-4 py-2.5">Subject</th>
-                  <th className="px-3 py-2.5">Status</th>
-                  <th className="px-3 py-2.5">Grade</th>
-                  <th className="px-3 py-2.5">Semester</th>
-                  <th className="px-3 py-2.5">Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {courses.map((course) => (
-                  <tr key={course.id} className="border-b border-slate-50">
-                    <td className="px-4 py-2.5"><p className="font-semibold text-ink">{course.code}</p><p className="text-xs text-slate-500">{course.title}</p>{course.drop_request && <p className="mt-1 text-xs font-semibold text-amber-700">Drop request pending</p>}</td>
-                    <td className="px-3 py-2.5"><StatusBadge value={courseStatusLabel(course.status)} dot={false} /></td>
-                    <td className="px-3 py-2.5"><p className="font-semibold text-ink">{course.grade_value || "No grade"}</p><p className="text-xs text-slate-400">{course.grade_status}</p></td>
-                    <td className="px-3 py-2.5 text-slate-600">{course.term_label || "Not recorded"}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{course.remarks || (course.incomplete_deadline ? `Incomplete due ${formatDate(course.incomplete_deadline)}` : "—")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState icon={ClipboardCheck} title="No course records yet" hint="Your coursework list appears after Graduate School staff or the Academic Coordinator imports or syncs your curriculum." />
-        )}
-      </Card>
-
-      <Card className="p-6">
-        <SectionTitle title="Drop Subject Request" subtitle="Submitting a request does not change your record until the Academic Coordinator approves it" icon={LogOut} />
-        {requests.length > 0 && (
-          <div className="mb-4 grid gap-2 md:grid-cols-2">
-            {requests.slice(0, 4).map((request) => (
-              <div key={request.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                <div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-ink">{request.course_code}</p><StatusBadge value={request.status} dot={false} /></div>
-                <p className="mt-1 text-xs text-slate-500">{request.term_label || "No semester recorded"} · {formatDate(request.created_at)}</p>
-                {request.reviewer_remarks && <p className="mt-2 text-xs text-slate-600">{request.reviewer_remarks}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-        {currentCourses.length ? (
-          <form onSubmit={onSubmit} className="space-y-4">
-            <Field label="Subject to drop" required>
-              <Select value={activeCourseId} onChange={(event) => setActiveCourseId(event.target.value)} options={droppable.map((course) => ({ value: course.course_id, label: `${course.code} — ${course.title}` }))} required />
-            </Field>
-            <Field label="Semester">
-              <div className="field-input bg-slate-50 text-slate-600">{selectedTerm}</div>
-            </Field>
-            <Field label="Reason for dropping" required>
-              <Textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} required />
-            </Field>
-            <SubmitState busy={busy} error={error} message={message} disabled={!form.reason.trim()} disabledHint={!form.reason.trim() ? "Enter your reason before submitting." : ""} label="Submit drop request" />
-          </form>
-        ) : (
-          <EmptyState icon={LogOut} title="No currently enrolled subjects" hint="Only enrolled or current subjects can be requested for dropping." />
-        )}
-      </Card>
-    </div>
-  );
-}
 
 function StudentPolicyAssistant() {
   const [question, setQuestion] = useState("");

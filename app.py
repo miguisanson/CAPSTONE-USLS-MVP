@@ -318,6 +318,9 @@ class Student(db.Model):
     comprehensive_exam_status = db.Column(db.String(30), nullable=False, default="Not Taken")
     risk_level = db.Column(db.String(20), nullable=False, default="Low")
     adviser_name = db.Column(db.String(120))
+    monitoring_new_student = db.Column(db.Boolean, nullable=False, default=False)
+    monitoring_imported_at = db.Column(db.DateTime)
+    monitoring_upload_id = db.Column(db.Integer, db.ForeignKey("monitoring_sheet_upload.id"))
     created_at = db.Column(db.DateTime, default=now_utc)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
 
@@ -542,6 +545,37 @@ class MonitoringSheetUpload(db.Model):
     uploaded_at = db.Column(db.DateTime, default=now_utc, nullable=False)
 
 
+class MonitoringValidationIssue(db.Model):
+    """A persistent, auditable exception discovered in one uploaded student row."""
+    id = db.Column(db.Integer, primary_key=True)
+    upload_id = db.Column(db.Integer, db.ForeignKey("monitoring_sheet_upload.id"), nullable=False)
+    row_number = db.Column(db.Integer)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"))
+    incoming_student_number = db.Column(db.String(40))
+    incoming_name = db.Column(db.String(180))
+    issue_type = db.Column(db.String(120), nullable=False)
+    issue_summary = db.Column(db.Text, nullable=False)
+    details_json = db.Column(db.Text, nullable=False, default="[]")
+    existing_json = db.Column(db.Text, nullable=False, default="{}")
+    uploaded_json = db.Column(db.Text, nullable=False, default="{}")
+    status = db.Column(db.String(30), nullable=False, default="Unresolved")
+    resolution_action = db.Column(db.String(40))
+    resolution_upload_id = db.Column(db.Integer, db.ForeignKey("monitoring_sheet_upload.id"))
+    edited_json = db.Column(db.Text)
+    resolved_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    resolved_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+    upload = db.relationship(
+        "MonitoringSheetUpload",
+        foreign_keys=[upload_id],
+        backref=db.backref("validation_issues", lazy=True, foreign_keys=[upload_id]),
+    )
+    resolution_upload = db.relationship("MonitoringSheetUpload", foreign_keys=[resolution_upload_id])
+    student = db.relationship("Student", foreign_keys=[student_id])
+    resolved_by = db.relationship("UserAccount", foreign_keys=[resolved_by_user_id])
+
+
 # Research milestone container for thesis, dissertation, or project-paper cases.
 class ResearchCase(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -680,25 +714,6 @@ class WithdrawalApplication(db.Model):
 
     request_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[request_attachment_id])
     proof_attachment = db.relationship("StudentRequestAttachment", foreign_keys=[proof_attachment_id])
-
-
-class CourseDropRequest(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
-    term_label = db.Column(db.String(80))
-    reason = db.Column(db.Text)
-    attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
-    status = db.Column(db.String(60), nullable=False, default="Submitted")
-    reviewer_remarks = db.Column(db.Text)
-    decided_by = db.Column(db.String(160))
-    decided_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=now_utc)
-    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
-
-    student = db.relationship("Student")
-    course = db.relationship("Course")
-    attachment = db.relationship("StudentRequestAttachment")
 
 
 class GraduationEndorsement(db.Model):
@@ -1163,6 +1178,9 @@ def student_brief(student: Student) -> dict:
         "comprehensive_exam_status": student.comprehensive_exam_status,
         "risk_level": student.risk_level,
         "adviser_name": student.adviser_name,
+        "monitoring_new_student": bool(student.monitoring_new_student),
+        "monitoring_imported_at": iso(student.monitoring_imported_at),
+        "monitoring_upload_id": student.monitoring_upload_id,
         "search_label": student_search_label(student),
     }
 
@@ -1470,7 +1488,7 @@ def course_audit_dict(audit: dict) -> dict:
     }
 
 
-def course_record_dict(record: CourseRecord, pending_drop: "CourseDropRequest | None" = None) -> dict:
+def course_record_dict(record: CourseRecord) -> dict:
     return {
         "id": record.id,
         "course_id": record.course_id,
@@ -1487,40 +1505,7 @@ def course_record_dict(record: CourseRecord, pending_drop: "CourseDropRequest | 
         "resolved_at": iso(record.resolved_at),
         "remarks": record.remarks or "",
         "updated_at": iso(record.updated_at),
-        "drop_request": course_drop_request_dict(pending_drop, include_student=False) if pending_drop else None,
     }
-
-
-def latest_course_drop_request(student_id: int, course_id: int) -> "CourseDropRequest | None":
-    return (
-        CourseDropRequest.query.filter_by(student_id=student_id, course_id=course_id)
-        .order_by(CourseDropRequest.created_at.desc(), CourseDropRequest.id.desc())
-        .first()
-    )
-
-
-def course_drop_request_dict(request_item: "CourseDropRequest | None", include_student: bool = True) -> dict | None:
-    if not request_item:
-        return None
-    data = {
-        "id": request_item.id,
-        "student_id": request_item.student_id,
-        "course_id": request_item.course_id,
-        "course_code": request_item.course.code if request_item.course else None,
-        "course_title": request_item.course.title if request_item.course else None,
-        "term_label": request_item.term_label,
-        "reason": request_item.reason,
-        "status": request_item.status,
-        "reviewer_remarks": request_item.reviewer_remarks,
-        "decided_by": request_item.decided_by,
-        "decided_at": iso(request_item.decided_at),
-        "created_at": iso(request_item.created_at),
-        "updated_at": iso(request_item.updated_at),
-        "attachment": attachment_dict(request_item.attachment),
-    }
-    if include_student and request_item.student:
-        data["student"] = student_brief(request_item.student)
-    return data
 
 
 def research_case_dict(case: ResearchCase | None) -> dict | None:
@@ -2133,7 +2118,7 @@ def workflow_case_meta(slug: str, student_id: int) -> dict:
 def task_dict(task: Task) -> dict:
     action_url = None
     action_label = None
-    if task.title.startswith("Review course drop request") or "lapsed INC" in task.title:
+    if "lapsed INC" in task.title:
         action_url = "/workflow/course-audit"
         action_label = "Open Course Audit"
     elif any(value in task.title.lower() for value in ["awol", "refresher", "re-enroll courses after maximum residence"]):
@@ -2195,7 +2180,6 @@ RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Completed",
     "Failed",
     "Retake Required",
-    "Dropped",
 }
 NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken"}
 
@@ -2391,7 +2375,7 @@ def ensure_term_enrollment(
 def cancel_active_subject_enrollments(
     student: Student,
     source_reference: str,
-    course_status: str = "Dropped",
+    course_status: str = "Missing",
 ) -> int:
     """Close active class rows when a student exits active monitoring."""
     rows = SubjectEnrollment.query.filter(
@@ -2471,66 +2455,11 @@ def sync_subject_enrollment_from_course_record(
     else:
         item.status = status
         item.source_reference = source_reference
-        item.cancelled_at = now_utc() if status == "Dropped" else None
+        item.cancelled_at = None
         item.updated_at = now_utc()
     if status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
         ensure_term_enrollment(student, term, "Enrolled", source_reference)
     return item
-
-
-def record_student_drop(
-    student: Student,
-    course: Course,
-    term_label: str | None = None,
-    actor: str = "Student",
-) -> CourseDropRequest:
-    """Record a student's drop immediately and synchronize every dependent view."""
-    record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
-    if not record or record.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {"Incomplete"}:
-        raise ValueError("Only a currently enrolled subject can be dropped.")
-    effective_term = (term_label or record.term_label or "").strip()
-    previous = record.status
-    record.status = "Dropped"
-    record.grade_value = None
-    record.grade_status = "No Grade"
-    record.incomplete_deadline = None
-    record.resolved_at = None
-    record.remarks = "Dropped directly by the student; no approval or supporting document required."
-    record.evidence_reference = "Student self-service enrollment"
-    record.updated_at = now_utc()
-    sync_subject_enrollment_from_course_record(
-        student, course, effective_term, "Dropped", "Immediate student drop"
-    )
-    existing = (
-        CourseDropRequest.query.filter_by(student_id=student.id, course_id=course.id)
-        .order_by(CourseDropRequest.created_at.desc())
-        .first()
-    )
-    request_item = existing or CourseDropRequest(student_id=student.id, course_id=course.id)
-    if not existing:
-        db.session.add(request_item)
-    request_item.term_label = effective_term
-    request_item.reason = None
-    request_item.attachment_id = None
-    request_item.status = "Recorded"
-    request_item.reviewer_remarks = "Automatically recorded from the student curriculum checklist."
-    request_item.decided_by = actor
-    request_item.decided_at = now_utc()
-    request_item.updated_at = now_utc()
-    add_log(
-        "enrollment",
-        student.id,
-        actor,
-        "Student curriculum checklist",
-        f"{course.code} dropped and enrollment synchronized",
-        "Student",
-        "The enrollment ledger, monitoring record, demand summary, student profile, and activity history were updated immediately.",
-        previous_status=previous,
-        new_status="Dropped",
-    )
-    student.updated_at = now_utc()
-    recompute_risk(student)
-    return request_item
 
 
 def enrollment_conflict_options(kind: str) -> list[dict]:
@@ -2968,7 +2897,6 @@ REQUEST_ATTACHMENT_WORKFLOWS = {
     "withdrawal": "withdrawal",
     "graduation": "graduation",
     "graduation-endorsement": "graduation",
-    "course-drop": "course-audit",
 }
 
 ROLE_LABELS = {
@@ -4655,10 +4583,6 @@ def register_routes(app: Flask) -> None:
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
-        pending_drop_by_course = {
-            item.course_id: item
-            for item in CourseDropRequest.query.filter_by(student_id=student.id, status="Submitted").all()
-        }
         course_records = (
             CourseRecord.query.join(Course)
             .filter(CourseRecord.student_id == student.id)
@@ -4677,14 +4601,7 @@ def register_routes(app: Flask) -> None:
                 "subject_enrollments": subject_enrollment["enrollments"],
                 "curriculum_subjects": subject_enrollment["curriculum_subjects"],
                 "progress_status": student_priority(student),
-                "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
-                "course_drop_requests": [
-                    course_drop_request_dict(item, include_student=False)
-                    for item in CourseDropRequest.query.filter_by(student_id=student.id)
-                    .order_by(CourseDropRequest.created_at.desc())
-                    .limit(20)
-                    .all()
-                ],
+                "course_records": [course_record_dict(record) for record in course_records],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
@@ -4809,10 +4726,6 @@ def register_routes(app: Flask) -> None:
         docs_by_gate: dict[str, list] = {}
         for doc in document_checks:
             docs_by_gate.setdefault(doc.gate, []).append(document_check_dict(doc))
-        pending_drop_by_course = {
-            item.course_id: item
-            for item in CourseDropRequest.query.filter_by(student_id=student.id, status="Submitted").all()
-        }
         course_records = (
             CourseRecord.query.join(Course)
             .filter(CourseRecord.student_id == student.id)
@@ -4834,14 +4747,7 @@ def register_routes(app: Flask) -> None:
                 "subject_enrollments": subject_enrollment["enrollments"],
                 "curriculum_subjects": subject_enrollment["curriculum_subjects"],
                 "progress_status": student_priority(student),
-                "course_records": [course_record_dict(record, pending_drop_by_course.get(record.course_id)) for record in course_records],
-                "course_drop_requests": [
-                    course_drop_request_dict(item, include_student=False)
-                    for item in CourseDropRequest.query.filter_by(student_id=student.id)
-                    .order_by(CourseDropRequest.created_at.desc())
-                    .limit(20)
-                    .all()
-                ],
+                "course_records": [course_record_dict(record) for record in course_records],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
@@ -5164,29 +5070,6 @@ def register_routes(app: Flask) -> None:
             },
         })
 
-    @app.route("/api/student-portal/requests/course-drop", methods=["POST"])
-    @require_api_login("student")
-    def student_course_drop_request():
-        data = request_payload()
-        account = current_account()
-        student = Student.query.get_or_404(account.student_id)
-        course = Course.query.get_or_404(safe_int(data.get("course_id")))
-        try:
-            request_item = record_student_drop(
-                student,
-                course,
-                (data.get("term_label") or "").strip(),
-                actor=f"Student - {account.full_name}",
-            )
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "message": f"{course.code} was dropped immediately and all enrollment records were updated.",
-            "request": course_drop_request_dict(request_item, include_student=False),
-        })
-
     @app.route("/api/student-portal/enrollment", methods=["POST"])
     @require_api_login("student")
     def student_portal_enrollment_save():
@@ -5220,6 +5103,7 @@ def register_routes(app: Flask) -> None:
             for item in existing_rows
             if item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
         }
+        requested_ids |= set(active_by_course)
         unavailable = requested_ids - offered_ids - set(active_by_course)
         if unavailable:
             labels = ", ".join(curriculum_by_id[item].code for item in sorted(unavailable))
@@ -5232,13 +5116,6 @@ def register_routes(app: Flask) -> None:
                 return jsonify({
                     "error": f"{curriculum_by_id[course_id].code} is already completed and cannot be checked as current."
                 }), 409
-
-        dropped = []
-        for course_id in sorted(set(active_by_course) - requested_ids):
-            course = curriculum_by_id.get(course_id) or db.session.get(Course, course_id)
-            if course:
-                record_student_drop(student, course, term.label, actor=f"Student - {account.full_name}")
-                dropped.append(course.code)
 
         added = []
         for course_id in sorted(requested_ids - set(active_by_course)):
@@ -5285,9 +5162,8 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({
             "ok": True,
-            "message": f"Current subjects saved: {len(requested_ids)} checked, {len(added)} added, {len(dropped)} dropped.",
+            "message": f"Current subjects saved: {len(requested_ids)} checked and {len(added)} added.",
             "added": added,
-            "dropped": dropped,
             "data": student_enrollment_snapshot(student, term),
             "integrity": enrollment_integrity_payload(student.program, term),
         })
@@ -7666,10 +7542,6 @@ def register_routes(app: Flask) -> None:
         course_id = request.args.get("course_id", type=int)
         term_filter = (request.args.get("term") or "").strip()
         course = Course.query.get_or_404(course_id)
-        pending_drop_by_student = {
-            item.student_id: item
-            for item in CourseDropRequest.query.filter_by(course_id=course.id, status="Submitted").all()
-        }
         rows = (
             db.session.query(CourseRecord, Student)
             .join(Student, Student.id == CourseRecord.student_id)
@@ -7680,7 +7552,7 @@ def register_routes(app: Flask) -> None:
         students = []
         active_term = get_active_term()
         active_term_label = active_term.label if active_term else ""
-        class_statuses = {"Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Dropped", "Failed"}
+        class_statuses = {"Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Failed"}
         for rec, s in rows:
             record_term_label = rec.term_label or (active_term_label if rec.status in class_statuses else "")
             in_selected_term = not term_filter or record_term_label == term_filter
@@ -7693,7 +7565,6 @@ def register_routes(app: Flask) -> None:
                 "grade_status": (rec.grade_status or "No Grade") if in_selected_term else "No Grade",
                 "incomplete_deadline": rec.incomplete_deadline.isoformat() if in_selected_term and rec.incomplete_deadline else "",
                 "remarks": (rec.remarks or "") if in_selected_term else "",
-                "drop_request": course_drop_request_dict(pending_drop_by_student.get(s.id), include_student=False),
             })
         return jsonify({
             "course": {"id": course.id, "code": course.code, "title": course.title},
@@ -7715,7 +7586,7 @@ def register_routes(app: Flask) -> None:
         term = (data.get("term") or "").strip() or (active_term.label if active_term else "")
         account = current_account()
         actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
-        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Retake Required", "Dropped", "Missing", "Failed"}
+        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Retake Required", "Missing", "Failed"}
         changed = 0
         changed_students: set[int] = set()
         status_counts: dict[str, int] = {}
@@ -7783,8 +7654,8 @@ def register_routes(app: Flask) -> None:
                 rec.resolved_at = rec.resolved_at or now_utc()
                 rec.incomplete_deadline = None
             else:
-                rec.grade_status = explicit_grade_status or ("No Grade" if new_status in {"Current", "Enrolled", "Missing", "Dropped"} else rec.grade_status or "No Grade")
-                if new_status in {"Current", "Enrolled", "Missing", "Dropped"}:
+                rec.grade_status = explicit_grade_status or ("No Grade" if new_status in {"Current", "Enrolled", "Missing"} else rec.grade_status or "No Grade")
+                if new_status in {"Current", "Enrolled", "Missing"}:
                     rec.resolved_at = None
             rec.remarks = str(remarks.get(sid_str, remarks.get(sid, rec.remarks or "")) or "").strip() or None
             sync_subject_enrollment_from_course_record(
@@ -7844,94 +7715,6 @@ def register_routes(app: Flask) -> None:
             "ok": True, "course": course.code, "updated": changed,
             "message": f"Saved {course.code} audit — {changed} student record(s) updated.",
         })
-
-    @app.route("/api/course-drop/requests")
-    @require_api_login("staff", "academic_coordinator")
-    def course_drop_requests():
-        status = (request.args.get("status") or "Submitted").strip()
-        program_id = request.args.get("program_id", type=int)
-        query = CourseDropRequest.query
-        if status and status.lower() != "all":
-            query = query.filter(CourseDropRequest.status == status)
-        if program_id:
-            query = query.join(Student, Student.id == CourseDropRequest.student_id).filter(
-                Student.program_id == program_id
-            )
-        account = current_account()
-        return jsonify({
-            "permissions": {
-                "can_decide": bool(
-                    account and account.role in {"academic_coordinator", "admin"}
-                ),
-            },
-            "items": [
-                course_drop_request_dict(item)
-                for item in query.order_by(CourseDropRequest.created_at.desc()).limit(100).all()
-            ]
-        })
-
-    @app.route("/api/course-drop/requests/<int:request_id>/decide", methods=["POST"])
-    @require_api_login("academic_coordinator")
-    def course_drop_decide(request_id: int):
-        data = request.get_json(silent=True) or {}
-        request_item = CourseDropRequest.query.get_or_404(request_id)
-        if request_item.status != "Submitted":
-            return jsonify({"error": "This drop request has already been reviewed."}), 400
-        decision = (data.get("decision") or "").strip().lower()
-        remarks = (data.get("remarks") or "").strip()
-        account = current_account()
-        actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
-        record = CourseRecord.query.filter_by(student_id=request_item.student_id, course_id=request_item.course_id).first()
-        # Checklist items 19/79: dropping is not a discretionary decision — there is no
-        # Deny. A submitted drop is RECORDED (the app is registering the student's
-        # decision), and the official AIMS subject status follows in a later sync.
-        if decision in ("approve", "record"):
-            if not record:
-                record = CourseRecord(student_id=request_item.student_id, course_id=request_item.course_id, status="Missing")
-                db.session.add(record)
-            previous = record.status
-            record.status = "Dropped"
-            record.grade_status = "No Grade"
-            record.resolved_at = None
-            record.remarks = remarks or record.remarks
-            record.updated_at = now_utc()
-            sync_subject_enrollment_from_course_record(
-                request_item.student,
-                request_item.course,
-                request_item.term_label or record.term_label,
-                "Dropped",
-                "Recorded student course drop request",
-            )
-            request_item.status = "Recorded"
-            result = f"Drop request recorded for {request_item.course.code}"
-            add_log(
-                "course-audit",
-                request_item.student_id,
-                actor,
-                "Student course drop request",
-                result,
-                "Student",
-                remarks or f"Course status changed from {previous or 'Missing'} to Dropped (awaiting AIMS update).",
-                previous_status=previous,
-                new_status="Dropped",
-            )
-        else:
-            return jsonify({"error": "A drop request can only be recorded; there is no deny option."}), 400
-        request_item.reviewer_remarks = remarks
-        request_item.decided_by = account.full_name if account else "Academic Coordinator"
-        request_item.decided_at = now_utc()
-        request_item.updated_at = now_utc()
-        Task.query.filter(
-            Task.student_id == request_item.student_id,
-            Task.owner_role == "Academic Coordinator",
-            Task.status.in_(["Pending", "Overdue"]),
-            Task.title == f"Review course drop request for {request_item.course.code}",
-        ).update({"status": "Done"}, synchronize_session=False)
-        student = Student.query.get(request_item.student_id)
-        if student:
-            recompute_risk(student)
-        db.session.commit()
-        return jsonify({"ok": True, "message": result, "request": course_drop_request_dict(request_item)})
 
     # ---- Soft-remove a student from the monitoring sheet -------------------
     @app.route("/api/students/<int:student_id>/flag-issue", methods=["POST"])
@@ -8299,7 +8082,6 @@ def register_routes(app: Flask) -> None:
             parsed = parse_ac_monitoring(io.BytesIO(file_bytes))
             if not parsed["rows"]:
                 return jsonify({"error": "No student rows found. Check that the sheet matches the AC Monitoring template."}), 400
-            result = import_ac_monitoring(parsed)
             MONITORING_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
             safe_name = secure_filename(file.filename) or "monitoring-sheet.xlsx"
             stored_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:10]}-{safe_name}"
@@ -8311,11 +8093,13 @@ def register_routes(app: Flask) -> None:
                 row_count=len(parsed["rows"]),
                 subject_count=len(parsed["subjects"]),
                 snapshot_json=json.dumps(parsed, ensure_ascii=False),
-                result_json=json.dumps(result, ensure_ascii=False),
+                result_json="{}",
             )
             db.session.add(upload)
             db.session.flush()
+            result = import_ac_monitoring(parsed, upload=upload)
             result["upload_id"] = upload.id
+            upload.result_json = json.dumps(result, ensure_ascii=False)
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
@@ -8333,6 +8117,260 @@ def register_routes(app: Flask) -> None:
     def monitoring_upload_download(upload_id: int):
         upload = MonitoringSheetUpload.query.get_or_404(upload_id)
         return send_from_directory(MONITORING_UPLOAD_ROOT, upload.stored_name, as_attachment=True, download_name=upload.original_name)
+
+    @app.route("/api/monitoring/issues/<int:issue_id>/resolve", methods=["PATCH"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_issue_resolve(issue_id: int):
+        issue = MonitoringValidationIssue.query.get_or_404(issue_id)
+        if issue.status != "Unresolved":
+            return jsonify({"error": "This validation issue has already been resolved."}), 409
+        data = request.get_json(silent=True) or {}
+        action = str(data.get("action") or "").strip().lower()
+        if action not in {"keep_existing", "use_uploaded", "edit"}:
+            return jsonify({"error": "Choose Keep Existing, Use Uploaded, or Edit."}), 400
+        account = current_account()
+        changed_student = None
+        try:
+            if action != "keep_existing":
+                snapshot = json.loads(issue.uploaded_json or "{}")
+                if action == "edit":
+                    edited = data.get("edited") or {}
+                    snapshot.update({key: value for key, value in edited.items() if key != "subjects"})
+                    if "subjects" in edited:
+                        snapshot["subjects"] = edited["subjects"]
+                    issue.edited_json = json.dumps(snapshot, ensure_ascii=False)
+                row = _monitoring_row_from_snapshot(snapshot)
+                program = Program.query.filter_by(code=issue.upload.program_code).first_or_404()
+                course_by_code = {
+                    course.code: course
+                    for course in monitoring_curriculum_courses(program)
+                    if course.code in row["subjects"]
+                }
+                for code in row["subjects"]:
+                    if code not in course_by_code:
+                        course = Course(program_id=program.id, code=code, title=code, units=3, category="Core")
+                        db.session.add(course)
+                        db.session.flush()
+                        course_by_code[code] = course
+                target = issue.student
+                if not target and row["idno"]:
+                    target = Student.query.filter_by(student_number=row["idno"]).first()
+                applied = _apply_monitoring_row(
+                    row,
+                    program,
+                    course_by_code,
+                    get_active_term(),
+                    student=target,
+                    overwrite_completed=True,
+                    upload=issue.upload,
+                )
+                changed_student = applied["student"]
+                issue.student_id = changed_student.id
+                sync_program_curriculum(program)
+            issue.status = "Resolved"
+            issue.resolution_action = action
+            issue.resolved_by_user_id = account.id if account else None
+            issue.resolved_at = now_utc()
+            action_label = {
+                "keep_existing": "Kept existing record",
+                "use_uploaded": "Used uploaded record",
+                "edit": "Applied edited record",
+            }[action]
+            add_log(
+                "student-handoff",
+                changed_student.id if changed_student else issue.student_id,
+                account.role if account else "GS Staff",
+                f"Monitoring upload #{issue.upload_id}, row {issue.row_number}",
+                f"Validation resolved: {action_label}",
+                "Resolved",
+                issue.issue_summary,
+                previous_status="Unresolved",
+                new_status="Resolved",
+                visibility="internal",
+            )
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "ok": True,
+            "issue": monitoring_validation_issue_dict(issue),
+            "upload": monitoring_upload_dict(issue.upload),
+            "message": "Issue resolved, record synchronized, and audit trail saved.",
+        })
+
+    @app.route("/api/monitoring/issues/resolve-upload", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_issues_resolve_upload():
+        file = request.files.get("file")
+        if not file or not file.filename:
+            return jsonify({"error": "Choose one corrected monitoring workbook."}), 400
+        if not file.filename.lower().endswith((".xlsx", ".xlsm")):
+            return jsonify({"error": "Please upload an Excel .xlsx file in the AC Student Monitoring format."}), 400
+        try:
+            issue_ids = [int(value) for value in json.loads(request.form.get("issue_ids") or "[]")]
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return jsonify({"error": "The selected validation rows were not recognized."}), 400
+        issue_ids = list(dict.fromkeys(issue_ids))
+        if not issue_ids:
+            return jsonify({"error": "Select at least one student with unresolved discrepancies."}), 400
+
+        issues = MonitoringValidationIssue.query.filter(MonitoringValidationIssue.id.in_(issue_ids)).all()
+        if len(issues) != len(issue_ids):
+            return jsonify({"error": "One or more selected validation rows no longer exist."}), 404
+        if any(issue.status != "Unresolved" for issue in issues):
+            return jsonify({"error": "Only unresolved students can be included in a corrected-file upload."}), 409
+        program_codes = {issue.upload.program_code for issue in issues}
+        if len(program_codes) != 1:
+            return jsonify({"error": "Select students from one program and one validation list at a time."}), 400
+
+        file_bytes = file.read()
+        stored_name = None
+        try:
+            parsed = parse_ac_monitoring(io.BytesIO(file_bytes))
+            selected_program_code = next(iter(program_codes))
+            if parsed["program_code"].upper() != selected_program_code.upper():
+                return jsonify({"error": f"The corrected workbook is for {parsed['program_code']}, but the selected students are from {selected_program_code}."}), 400
+            if not parsed["rows"]:
+                return jsonify({"error": "No student rows were found in the corrected workbook."}), 400
+
+            program = Program.query.filter_by(code=selected_program_code).first_or_404()
+            categories = parsed.get("subject_categories", {})
+            titles = parsed.get("subject_titles", {})
+            course_by_code = {}
+            for code in parsed["subjects"]:
+                course = Course.query.filter_by(program_id=program.id, code=code).first()
+                if not course:
+                    course = Course(
+                        program_id=program.id,
+                        code=code,
+                        title=titles.get(code) or code,
+                        units=3,
+                        category=categories.get(code, "Core"),
+                    )
+                    db.session.add(course)
+                    db.session.flush()
+                course_by_code[code] = course
+
+            MONITORING_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+            safe_name = secure_filename(file.filename) or "corrected-monitoring-sheet.xlsx"
+            stored_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:10]}-{safe_name}"
+            (MONITORING_UPLOAD_ROOT / stored_name).write_bytes(file_bytes)
+            correction_upload = MonitoringSheetUpload(
+                original_name=file.filename,
+                stored_name=stored_name,
+                program_code=parsed["program_code"],
+                row_count=len(parsed["rows"]),
+                subject_count=len(parsed["subjects"]),
+                snapshot_json=json.dumps(parsed, ensure_ascii=False),
+                result_json="{}",
+            )
+            db.session.add(correction_upload)
+            db.session.flush()
+
+            id_counts = Counter(str(row.get("idno") or "").strip() for row in parsed["rows"] if row.get("idno"))
+            rows_by_id = {}
+            rows_by_name = {}
+            for row in parsed["rows"]:
+                incoming_id = str(row.get("idno") or "").strip()
+                if incoming_id and incoming_id not in rows_by_id:
+                    rows_by_id[incoming_id] = row
+                incoming_name = clean_person_name(f"{row.get('first_name', '')} {row.get('last_name', '')}").lower()
+                if incoming_name and incoming_name not in rows_by_name:
+                    rows_by_name[incoming_name] = row
+
+            account = current_account()
+            resolved_count = 0
+            remaining_count = 0
+            missing_count = 0
+            outcomes = []
+            for issue in issues:
+                candidate_ids = [issue.incoming_student_number]
+                if issue.student:
+                    candidate_ids.append(issue.student.student_number)
+                row = next((rows_by_id[value] for value in candidate_ids if value and value in rows_by_id), None)
+                if not row:
+                    candidate_names = [issue.incoming_name, issue.student.name if issue.student else ""]
+                    row = next((rows_by_name.get(clean_person_name(value).lower()) for value in candidate_names if value and rows_by_name.get(clean_person_name(value).lower())), None)
+                if not row:
+                    missing_count += 1
+                    outcomes.append({"issue_id": issue.id, "status": "Unresolved", "message": "Student was not found in the corrected workbook."})
+                    continue
+
+                target, _comparison, discrepancies = _monitoring_row_discrepancies(
+                    row, program, course_by_code, id_counts
+                )
+                issue.row_number = row.get("row")
+                issue.incoming_student_number = str(row.get("idno") or "").strip()
+                issue.incoming_name = f"{row.get('first_name', '')} {row.get('last_name', '')}".strip()
+                issue.student_id = target.id if target else issue.student_id
+                issue.existing_json = json.dumps(_monitoring_existing_snapshot(target or issue.student, course_by_code), ensure_ascii=False)
+                issue.uploaded_json = json.dumps(_monitoring_uploaded_snapshot(row), ensure_ascii=False)
+                issue.resolution_upload_id = correction_upload.id
+
+                if discrepancies:
+                    issue_types = [item["type"] for item in discrepancies]
+                    details = [message for item in discrepancies for message in item.get("messages", [])]
+                    issue.issue_type = "; ".join(dict.fromkeys(issue_types))
+                    issue.issue_summary = "; ".join(dict.fromkeys(details))
+                    issue.details_json = json.dumps(discrepancies, ensure_ascii=False)
+                    remaining_count += 1
+                    outcomes.append({"issue_id": issue.id, "status": "Unresolved", "message": f"{len(discrepancies)} discrepancy item(s) remain."})
+                    continue
+
+                applied = _apply_monitoring_row(
+                    row,
+                    program,
+                    course_by_code,
+                    get_active_term(),
+                    student=target or issue.student,
+                    overwrite_completed=True,
+                    upload=correction_upload,
+                )
+                issue.student_id = applied["student"].id
+                issue.status = "Resolved"
+                issue.resolution_action = "corrected_upload"
+                issue.resolved_by_user_id = account.id if account else None
+                issue.resolved_at = now_utc()
+                resolved_count += 1
+                outcomes.append({"issue_id": issue.id, "status": "Resolved", "message": "Corrected row applied."})
+                add_log(
+                    "student-handoff",
+                    applied["student"].id,
+                    account.role if account else "GS Staff",
+                    f"Corrected monitoring upload #{correction_upload.id}",
+                    "Validation resolved from corrected workbook",
+                    "Resolved",
+                    f"Original validation issue #{issue.id}; file {file.filename}.",
+                    previous_status="Unresolved",
+                    new_status="Resolved",
+                    visibility="internal",
+                )
+
+            sync_program_curriculum(program)
+            correction_result = {
+                "selected_count": len(issues),
+                "resolved_count": resolved_count,
+                "remaining_count": remaining_count,
+                "missing_count": missing_count,
+                "outcomes": outcomes,
+            }
+            correction_upload.result_json = json.dumps(correction_result, ensure_ascii=False)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            if stored_name:
+                (MONITORING_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
+            return jsonify({"error": f"Could not process the corrected workbook: {exc}"}), 400
+
+        updated_issues = MonitoringValidationIssue.query.filter(MonitoringValidationIssue.id.in_(issue_ids)).all()
+        return jsonify({
+            "ok": True,
+            **correction_result,
+            "issues": [monitoring_validation_issue_dict(issue) for issue in updated_issues],
+            "upload": monitoring_upload_dict(correction_upload),
+            "message": f"Corrected workbook checked for {len(issues)} selected student(s): {resolved_count} resolved, {remaining_count + missing_count} still need attention.",
+        })
 
     # then the resulting records are committed as one database transaction.
     @app.route("/api/transactions/<slug>", methods=["POST"])
@@ -10894,7 +10932,7 @@ def duplicate_student_groups(limit: int = 12) -> list[dict]:
 
 
 def status_rank(status: str | None) -> int:
-    ranks = {"Completed": 6, "Current": 5, "Enrolled": 5, "Incomplete": 4, "Retake Required": 3, "Failed": 3, "Dropped": 2, "Missing": 1}
+    ranks = {"Completed": 6, "Current": 5, "Enrolled": 5, "Incomplete": 4, "Retake Required": 3, "Failed": 3, "Missing": 1}
     return ranks.get(status or "", 0)
 
 
@@ -11340,24 +11378,14 @@ def parse_ac_monitoring(stream) -> dict:
         ay_here = cell(r, ay_c) if ay_c else ""
         if ay_here:
             last_ay = ay_here
-        if not idno:
-            last = cell(r, sn_c) if sn_c else ""
-            first = cell(r, fn_c) if fn_c else ""
-            if last or first:
-                issues.append({
-                    "row": r,
-                    "type": "Missing official student ID",
-                    "student_name": f"{first} {last}".strip(),
-                    "message": "This student was not imported because IDNO is blank.",
-                })
-            continue
         last = cell(r, sn_c) if sn_c else ""
         first = cell(r, fn_c) if fn_c else ""
-        if not last and not first:
+        if not idno and not last and not first:
             continue
         subj = {code: bool(cell(r, c)) for c, code, _title in subjects}
         milestones = {m: bool(cell(r, mc)) for m, mc in milestone_cols.items() if mc}
         rows.append({
+            "row": r,
             "idno": idno,
             "last_name": last,
             "first_name": first,
@@ -11369,6 +11397,24 @@ def parse_ac_monitoring(stream) -> dict:
             "comprehensive_exam_passed": bool(cell(r, compre_c)) if compre_c else False,
             "note": cell(r, note_c) if note_c else "",
         })
+
+        missing = []
+        if not idno:
+            missing.append("Student ID")
+        if not first:
+            missing.append("First name")
+        if not last:
+            missing.append("Last name")
+        if not (ay_here or last_ay):
+            missing.append("School year / AY Entry")
+        if missing:
+            issues.append({
+                "row": r,
+                "type": "Missing required fields",
+                "student_name": f"{first} {last}".strip() or idno or f"Row {r}",
+                "message": f"Missing: {', '.join(missing)}.",
+                "fields": missing,
+            })
 
     if not program_code:
         program_code = "IMPORT"
@@ -11412,7 +11458,9 @@ def _sheet_student_comparison(student: Student, row: dict, course_by_code: dict[
         rec.course_id: rec.status
         for rec in CourseRecord.query.filter_by(student_id=student.id).all()
     }
-    subject_differences = 0
+    new_completions = []
+    completion_regressions = []
+    subject_comparison = []
     incoming_completed = 0
     existing_completed = 0
     for code, done in row["subjects"].items():
@@ -11425,11 +11473,23 @@ def _sheet_student_comparison(student: Student, row: dict, course_by_code: dict[
             incoming_completed += 1
         if existing_status == "Completed":
             existing_completed += 1
-        if existing_status != incoming_status:
-            subject_differences += 1
+        if done and existing_status != "Completed":
+            new_completions.append(code)
+        elif not done and existing_status == "Completed":
+            completion_regressions.append(code)
+        subject_comparison.append({
+            "code": code,
+            "existing": existing_status,
+            "uploaded": incoming_status,
+            "changed": existing_status != incoming_status,
+            "regression": code in completion_regressions,
+        })
 
-    if subject_differences:
-        differences.append(f"{subject_differences} subject/unit status difference(s)")
+    if completion_regressions:
+        differences.append(
+            "previously completed subject(s) missing from upload: "
+            + ", ".join(completion_regressions)
+        )
 
     category_comparison = []
     for category in ("Basic", "Major", "Cognate"):
@@ -11444,11 +11504,205 @@ def _sheet_student_comparison(student: Student, row: dict, course_by_code: dict[
         "incoming_completed": incoming_completed,
         "existing_completed": existing_completed,
         "incoming_total": len(row["subjects"]),
+        "new_completions": new_completions,
+        "completion_regressions": completion_regressions,
+        "subject_comparison": subject_comparison,
         "category_comparison": category_comparison,
     }
 
 
-def import_ac_monitoring(parsed: dict) -> dict:
+def _monitoring_uploaded_snapshot(row: dict) -> dict:
+    completed = sorted(code for code, done in row.get("subjects", {}).items() if done)
+    return {
+        "row": row.get("row"),
+        "student_number": row.get("idno", ""),
+        "first_name": row.get("first_name", ""),
+        "last_name": row.get("last_name", ""),
+        "name": f"{row.get('first_name', '')} {row.get('last_name', '')}".strip(),
+        "course": row.get("course", ""),
+        "academic_year_entry": row.get("ay_entry", ""),
+        "year": row.get("year", ""),
+        "subjects": row.get("subjects", {}),
+        "completed_subjects": completed,
+        "completed_count": len(completed),
+        "milestones": row.get("milestones", {}),
+        "comprehensive_exam_passed": bool(row.get("comprehensive_exam_passed")),
+    }
+
+
+def _monitoring_existing_snapshot(student: Student | None, course_by_code: dict[str, Course]) -> dict:
+    if not student:
+        return {}
+    statuses = {
+        rec.course_id: rec.status
+        for rec in CourseRecord.query.filter_by(student_id=student.id).all()
+    }
+    subjects = {code: statuses.get(course.id, "Missing") for code, course in course_by_code.items()}
+    completed = sorted(code for code, status in subjects.items() if status == "Completed")
+    return {
+        "student_id": student.id,
+        "student_number": student.student_number,
+        "first_name": student.first_name,
+        "last_name": student.last_name,
+        "name": student.name,
+        "program": student.program.code,
+        "academic_year_entry": student_academic_year_entry(student),
+        "year": student.year_level,
+        "subjects": subjects,
+        "completed_subjects": completed,
+        "completed_count": len(completed),
+    }
+
+
+def _monitoring_row_discrepancies(row, program, course_by_code, id_counts=None):
+    """Return every independently detectable discrepancy for one uploaded student row."""
+    student_number = str(row.get("idno") or "").strip()
+    student = Student.query.filter_by(student_number=student_number).first() if student_number else None
+    discrepancies: list[dict] = []
+
+    def add(issue_type: str, *messages: str) -> None:
+        clean_messages = [str(message).strip() for message in messages if str(message or "").strip()]
+        discrepancies.append({"type": issue_type, "messages": clean_messages})
+
+    required = {
+        "Student ID": student_number,
+        "First name": row.get("first_name"),
+        "Last name": row.get("last_name"),
+        "School Year / AY Entry": row.get("ay_entry"),
+    }
+    missing_fields = [label for label, value in required.items() if not str(value or "").strip()]
+    if missing_fields:
+        add("Missing required fields", "Missing: " + ", ".join(missing_fields))
+    if student_number and id_counts and id_counts.get(student_number, 0) > 1:
+        add("Duplicate student ID in upload", f"Student ID {student_number} appears {id_counts[student_number]} times in this workbook")
+    uploaded_program_code = str(row.get("course") or "").strip().upper().split("-", 1)[0]
+    if uploaded_program_code and uploaded_program_code != program.code.upper():
+        add("Program mismatch", f"Row course {row['course']} does not match workbook program {program.code}")
+
+    comparison = _sheet_student_comparison(student, row, course_by_code) if student else None
+    if student:
+        if student.program_id != program.id:
+            add("Existing ID in another program", f"Existing program is {student.program.code}; uploaded program is {program.code}")
+        name_mismatch = (
+            (student.first_name or "").strip().lower() != (row.get("first_name") or "").strip().lower()
+            or (student.last_name or "").strip().lower() != (row.get("last_name") or "").strip().lower()
+        )
+        if name_mismatch:
+            uploaded_name = f"{row.get('first_name', '')} {row.get('last_name', '')}".strip()
+            add("Existing ID with different name", f"Existing name is {student.name}; uploaded name is {uploaded_name}")
+        uploaded_ay_entry = str(row.get("ay_entry") or "").strip()
+        uploaded_entry_year = _entry_year_from_ay(uploaded_ay_entry) if uploaded_ay_entry else None
+        if uploaded_entry_year and student.entry_year != uploaded_entry_year:
+            add("School year mismatch", f"Existing AY Entry is {student_academic_year_entry(student)}; uploaded AY Entry is {row.get('ay_entry', '')}")
+        if comparison and comparison["completion_regressions"]:
+            add(
+                "Subject mismatch",
+                "Previously completed subjects missing in upload: " + ", ".join(comparison["completion_regressions"]),
+            )
+    elif not missing_fields:
+        possible_match = possible_student_identity_match(
+            row.get("first_name", ""), row.get("last_name", ""), program.id,
+            _entry_year_from_ay(row.get("ay_entry", "")),
+        )
+        if possible_match:
+            student = possible_match
+            add("Existing student with different ID", f"Possible existing record is {possible_match.name} ({possible_match.student_number})")
+
+    return student, comparison, discrepancies
+
+
+def _create_monitoring_validation_issue(upload, row, student, discrepancies, course_by_code):
+    if not upload:
+        return None
+    issue_types = [item["type"] for item in discrepancies]
+    details = [message for item in discrepancies for message in item.get("messages", [])]
+    issue = MonitoringValidationIssue(
+        upload_id=upload.id,
+        row_number=row.get("row"),
+        student_id=student.id if student else None,
+        incoming_student_number=row.get("idno", ""),
+        incoming_name=f"{row.get('first_name', '')} {row.get('last_name', '')}".strip(),
+        issue_type="; ".join(dict.fromkeys(issue_types)),
+        issue_summary="; ".join(dict.fromkeys(details)),
+        details_json=json.dumps(discrepancies, ensure_ascii=False),
+        existing_json=json.dumps(_monitoring_existing_snapshot(student, course_by_code), ensure_ascii=False),
+        uploaded_json=json.dumps(_monitoring_uploaded_snapshot(row), ensure_ascii=False),
+        status="Unresolved",
+    )
+    db.session.add(issue)
+    db.session.flush()
+    return issue
+
+
+def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, overwrite_completed=False, upload=None):
+    student_number = str(row.get("idno") or "").strip()
+    first_name = clean_person_name(row.get("first_name", ""))
+    last_name = clean_person_name(row.get("last_name", ""))
+    ay_entry = str(row.get("ay_entry") or "").strip()
+    if not student_number or not first_name or not last_name or not ay_entry:
+        raise ValueError("Student ID, first name, last name, and School Year / AY Entry are required.")
+    collision = Student.query.filter_by(student_number=student_number).first()
+    if collision and (not student or collision.id != student.id):
+        raise ValueError(f"Student ID {student_number} already belongs to {collision.name}.")
+
+    is_new = student is None
+    if is_new:
+        student = Student(student_number=student_number, program_id=program.id, standing="Active")
+        db.session.add(student)
+    student.student_number = student_number
+    student.first_name = first_name
+    student.last_name = last_name
+    student.program_id = program.id
+    student.entry_year = _entry_year_from_ay(ay_entry)
+    student.academic_year_entry = ay_entry
+    course_year = max(1, (academic_year_start(term) if term else date.today().year) - student.entry_year + 1)
+    student.year_level = str(course_year or row.get("year") or "")
+    if row.get("comprehensive_exam_passed"):
+        student.comprehensive_exam_status = "Passed"
+    if is_new or not student.email:
+        student.email = unique_student_email(first_name, last_name, student_number, student.id if not is_new else None)
+    completed = sum(1 for done in row.get("subjects", {}).values() if done)
+    incoming_stage = _stage_from_sheet(row.get("milestones", {}), completed, bool(row.get("comprehensive_exam_passed")))
+    current_index = STAGES.index(student.current_stage) if student.current_stage in STAGES else 0
+    incoming_index = STAGES.index(incoming_stage) if incoming_stage in STAGES else 0
+    if is_new or incoming_index >= current_index:
+        student.current_stage = incoming_stage
+    if is_new:
+        student.monitoring_new_student = True
+        student.monitoring_imported_at = now_utc()
+        student.monitoring_upload_id = upload.id if upload else None
+    db.session.flush()
+
+    subject_changes = 0
+    for code, done in row.get("subjects", {}).items():
+        course = course_by_code.get(code)
+        if not course:
+            continue
+        rec = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+        if not rec:
+            rec = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+            db.session.add(rec)
+        new_status = "Completed" if done else "Missing"
+        should_apply = is_new or done or (overwrite_completed and rec.status == "Completed")
+        if should_apply and rec.status != new_status:
+            rec.status = new_status
+            subject_changes += 1
+        if should_apply:
+            rec.term_label = ""
+            rec.evidence_reference = f"AC Student Monitoring upload #{upload.id}" if upload else "AC Student Monitoring import"
+            rec.updated_at = now_utc()
+
+    if is_new and term:
+        db.session.add(TermEnrollment(student_id=student.id, term_id=term.id, status="Confirmed", source_reference="AC Student Monitoring import"))
+        for item in onboarding_requirements():
+            db.session.add(DocumentCheck(student_id=student.id, gate="Admission Handoff", item_name=item, status="Complete", evidence_reference="AC Student Monitoring import"))
+    if is_new:
+        ensure_student_account(student, student.email)
+    recompute_risk(student)
+    return {"student": student, "is_new": is_new, "subject_changes": subject_changes, "completed": completed}
+
+
+def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = None) -> dict:
     program = Program.query.filter_by(code=parsed["program_code"]).first()
     if not program:
         program = Program(code=parsed["program_code"], name=f"{parsed['program_code']} (imported)", college="Imported")
@@ -11477,128 +11731,67 @@ def import_ac_monitoring(parsed: dict) -> dict:
     term = get_active_term()
 
     created, updated, skipped, sample, conflicts, duplicates = 0, 0, 0, [], [], []
+    validation_issues: list[MonitoringValidationIssue] = []
     created_accounts = []
     subject_changes = 0
     students_changed = 0
+    id_counts = Counter(str(row.get("idno") or "").strip() for row in parsed["rows"] if row.get("idno"))
     for row in parsed["rows"]:
-        student = Student.query.filter_by(student_number=row["idno"]).first()
-        is_new = student is None
-        entry_year = _entry_year_from_ay(row["ay_entry"])
-        if student:
-            comparison = _sheet_student_comparison(student, row, course_by_code)
-            item = {
-                "incoming_student_number": row["idno"],
-                "incoming_name": f"{row['first_name']} {row['last_name']}".strip(),
-                "matched_student": student_brief(student),
-                "incoming_completed": comparison["incoming_completed"],
-                "existing_completed": comparison["existing_completed"],
-                "total_subjects": comparison["incoming_total"],
-                "category_comparison": comparison["category_comparison"],
+        student_number = str(row.get("idno") or "").strip()
+        student, comparison, discrepancies = _monitoring_row_discrepancies(
+            row, program, course_by_code, id_counts
+        )
+        if discrepancies:
+            details = [message for item in discrepancies for message in item.get("messages", [])]
+            issue = _create_monitoring_validation_issue(upload, row, student, discrepancies, course_by_code)
+            if issue:
+                validation_issues.append(issue)
+            conflict = {
+                "issue_id": issue.id if issue else None,
+                "incoming_student_number": student_number,
+                "incoming_name": f"{row.get('first_name', '')} {row.get('last_name', '')}".strip(),
+                "matched_student": student_brief(student) if student else None,
+                "reason": "; ".join(details),
+                "differences": details,
+                "status": "Unresolved",
             }
-            if comparison["conflicting"]:
-                conflicts.append({
-                    **item,
-                    "reason": "Conflicting monitoring sheet data. Please verify before changing this student.",
-                    "differences": comparison["differences"],
+            if comparison:
+                conflict.update({
+                    "incoming_completed": comparison["incoming_completed"],
+                    "existing_completed": comparison["existing_completed"],
+                    "total_subjects": comparison["incoming_total"],
+                    "category_comparison": comparison["category_comparison"],
                 })
-            else:
-                derived_year = str(student_current_course_year(student, term) or row["year"] or "")
-                metadata_changed = (
-                    student.academic_year_entry != row["ay_entry"]
-                    or student.year_level != derived_year
-                )
-                student.academic_year_entry = row["ay_entry"]
-                student.year_level = derived_year
-                if metadata_changed:
-                    updated += 1
-                duplicates.append({
-                    **item,
-                    "reason": (
-                        "Student is already in the system with the same monitoring data; "
-                        "AY Entry and YR were refreshed from the workbook."
-                        if metadata_changed
-                        else "Student is already in the system with the same monitoring data."
-                    ),
-                })
+            conflicts.append(conflict)
             skipped += 1
             continue
-        if is_new:
-            possible_match = possible_student_identity_match(row["first_name"], row["last_name"], program.id, entry_year)
-            if possible_match:
-                conflicts.append({
-                    "incoming_student_number": row["idno"],
-                    "incoming_name": f"{row['first_name']} {row['last_name']}".strip(),
-                    "matched_student": student_brief(possible_match),
-                    "reason": "Possible duplicate student with a different ID number. Please verify before importing.",
-                    "differences": ["student number"],
-                })
-                skipped += 1
-                continue
-        if is_new:
-            student = Student(student_number=row["idno"], program_id=program.id, standing="Active")
-            db.session.add(student)
-        student.first_name = clean_person_name(row["first_name"]) or student.first_name or "—"
-        student.last_name = clean_person_name(row["last_name"]) or student.last_name or "—"
-        student.program_id = program.id
-        student.entry_year = entry_year
-        student.academic_year_entry = row["ay_entry"]
-        student.year_level = str(student_current_course_year(student, term) or row["year"] or "")
-        if row.get("comprehensive_exam_passed"):
-            student.comprehensive_exam_status = "Passed"
-        if is_new or not student.email:
-            student.email = unique_student_email(row["first_name"], row["last_name"], row["idno"], student.id if not is_new else None)
-        completed = sum(1 for v in row["subjects"].values() if v)
-        student.current_stage = _stage_from_sheet(
-            row["milestones"], completed, row.get("comprehensive_exam_passed", False)
-        )
-        db.session.flush()
 
-        # per-subject course records (real subjects from the sheet)
-        row_subject_changes = 0
-        for code, done in row["subjects"].items():
-            course = course_by_code[code]
-            rec = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
-            new_status = "Completed" if done else "Missing"
-            if not rec:
-                rec = CourseRecord(student_id=student.id, course_id=course.id)
-                db.session.add(rec)
-            if rec.status != new_status:
-                row_subject_changes += 1
-            rec.status = new_status
-            # Coursework completion is cumulative, not tied to one semester — leave the
-            # term blank so it shows on the monitoring sheet under any selected semester.
-            rec.term_label = ""
-            rec.evidence_reference = "AC Student Monitoring import"
-            rec.updated_at = now_utc()
+        existing_before = _monitoring_existing_snapshot(student, course_by_code) if student else {}
+        applied = _apply_monitoring_row(row, program, course_by_code, term, student=student, upload=upload)
+        student = applied["student"]
+        row_subject_changes = applied["subject_changes"]
+        completed = applied["completed"]
         subject_changes += row_subject_changes
         if row_subject_changes:
             students_changed += 1
-
-        # onboarding evidence treated as complete (record came from the official sheet)
-        if is_new and term:
-            db.session.add(TermEnrollment(
-                student_id=student.id, term_id=term.id, status="Confirmed",
-                source_reference="AC Student Monitoring import"))
-            for item in onboarding_requirements():
-                db.session.add(DocumentCheck(
-                    student_id=student.id, gate="Admission Handoff", item_name=item,
-                    status="Complete", evidence_reference="AC Student Monitoring import"))
-
-        if is_new:
-            # Provision a student-portal account so the handed-off student can sign in
-            # (upload concept papers, file LOA / withdrawal) — realistic and demo-ready.
-            ensure_student_account(student, student.email)
-            created_accounts.append({"name": student.name, "email": student.email, "password": SIM_STUDENT_PASSWORD})
-
-        recompute_risk(student)
-
-        if is_new:
+        if applied["is_new"]:
             created += 1
+            created_accounts.append({"name": student.name, "email": student.email, "password": SIM_STUDENT_PASSWORD})
+        elif row_subject_changes or existing_before.get("academic_year_entry") != student.academic_year_entry:
+            updated += 1
+        else:
+            skipped += 1
+            duplicates.append({
+                "incoming_student_number": student_number,
+                "incoming_name": student.name,
+                "matched_student": student_brief(student),
+                "reason": "Student is already in the system with the same cumulative monitoring data.",
+            })
         if len(sample) < 10:
             sample.append({
                 "id": student.id, "name": student.name, "student_number": student.student_number,
                 "program_code": program.code, "stage": student.current_stage,
-                "completed": completed, "total_subjects": len(row["subjects"]),
+                "completed": completed, "total_subjects": len(row.get("subjects", {})),
             })
 
     sync_program_curriculum(program)
@@ -11628,6 +11821,8 @@ def import_ac_monitoring(parsed: dict) -> dict:
         "students_changed": students_changed,
         "conflicts": conflicts,
         "conflict_count": len(conflicts),
+        "validation_issues": [monitoring_validation_issue_dict(item) for item in validation_issues],
+        "unresolved_count": len(validation_issues),
         "sample": sample,
         "accounts": created_accounts,
         "message": f"Imported {created} new student(s) and refreshed AY/YR for {updated} student(s) "
@@ -11643,8 +11838,91 @@ def import_ac_monitoring(parsed: dict) -> dict:
     }
 
 
+def monitoring_validation_issue_dict(issue: MonitoringValidationIssue) -> dict:
+    existing = json.loads(issue.existing_json or "{}")
+    uploaded = json.loads(issue.uploaded_json or "{}")
+    edited = json.loads(issue.edited_json or "{}") if issue.edited_json else None
+    existing_subjects = existing.get("subjects", {})
+    uploaded_subjects = uploaded.get("subjects", {})
+    raw_details = json.loads(issue.details_json or "[]")
+    if raw_details and isinstance(raw_details[0], dict):
+        discrepancies = raw_details
+        details = [message for item in discrepancies for message in item.get("messages", [])]
+    else:
+        details = [str(item) for item in raw_details]
+        legacy_types = [item.strip() for item in (issue.issue_type or "").split(";") if item.strip()]
+        discrepancies = [
+            {"type": issue_type, "messages": [details[index]] if index < len(details) else []}
+            for index, issue_type in enumerate(legacy_types)
+        ]
+        if discrepancies and len(details) > len(discrepancies):
+            discrepancies[-1]["messages"].extend(details[len(discrepancies):])
+    subject_rows = []
+    for code in sorted(set(existing_subjects) | set(uploaded_subjects)):
+        uploaded_complete = bool(uploaded_subjects.get(code))
+        existing_status = existing_subjects.get(code, "Missing")
+        subject_rows.append({
+            "code": code,
+            "existing": existing_status,
+            "uploaded": "Completed" if uploaded_complete else "Missing",
+            "different": (existing_status == "Completed") != uploaded_complete,
+            "regression": existing_status == "Completed" and not uploaded_complete,
+        })
+    return {
+        "id": issue.id,
+        "upload_id": issue.upload_id,
+        "row_number": issue.row_number,
+        "student_id": issue.student_id,
+        "student": student_brief(issue.student) if issue.student else None,
+        "incoming_student_number": issue.incoming_student_number,
+        "incoming_name": issue.incoming_name,
+        "issue": issue.issue_type,
+        "summary": issue.issue_summary,
+        "details": details,
+        "discrepancies": discrepancies,
+        "discrepancy_count": len(discrepancies),
+        "existing": existing,
+        "uploaded": uploaded,
+        "edited": edited,
+        "subject_comparison": subject_rows,
+        "status": issue.status,
+        "resolution_action": issue.resolution_action,
+        "resolution_upload": {
+            "id": issue.resolution_upload.id,
+            "original_name": issue.resolution_upload.original_name,
+            "download_url": f"/api/monitoring/uploads/{issue.resolution_upload.id}/download",
+        } if issue.resolution_upload else None,
+        "resolved_by": issue.resolved_by.full_name if issue.resolved_by else None,
+        "resolved_at": iso(issue.resolved_at),
+        "created_at": iso(issue.created_at),
+    }
+
+
+def _monitoring_row_from_snapshot(snapshot: dict) -> dict:
+    return {
+        "row": snapshot.get("row"),
+        "idno": str(snapshot.get("student_number") or "").strip(),
+        "first_name": str(snapshot.get("first_name") or "").strip(),
+        "last_name": str(snapshot.get("last_name") or "").strip(),
+        "course": str(snapshot.get("course") or "").strip(),
+        "year": str(snapshot.get("year") or "").strip(),
+        "ay_entry": str(snapshot.get("academic_year_entry") or "").strip(),
+        "subjects": {str(code): bool(done) for code, done in (snapshot.get("subjects") or {}).items()},
+        "milestones": snapshot.get("milestones") or {},
+        "comprehensive_exam_passed": bool(snapshot.get("comprehensive_exam_passed")),
+        "note": "",
+    }
+
+
 def monitoring_upload_dict(upload: MonitoringSheetUpload) -> dict:
     result = json.loads(upload.result_json or "{}")
+    validation_issues = [
+        monitoring_validation_issue_dict(item)
+        for item in MonitoringValidationIssue.query.filter_by(upload_id=upload.id)
+        .order_by(MonitoringValidationIssue.status.desc(), MonitoringValidationIssue.row_number, MonitoringValidationIssue.id)
+        .all()
+    ]
+    unresolved_count = sum(1 for item in validation_issues if item["status"] == "Unresolved")
     return {
         "id": upload.id,
         "original_name": upload.original_name,
@@ -11655,9 +11933,11 @@ def monitoring_upload_dict(upload: MonitoringSheetUpload) -> dict:
         "created": result.get("created", 0),
         "updated": result.get("updated", 0),
         "skipped": result.get("skipped", 0),
-        "conflict_count": result.get("conflict_count", 0),
+        "conflict_count": unresolved_count,
+        "unresolved_count": unresolved_count,
+        "resolved_count": len(validation_issues) - unresolved_count,
         "conflicts": result.get("conflicts", []),
-        "issues": result.get("issues", []),
+        "issues": validation_issues,
         "download_url": f"/api/monitoring/uploads/{upload.id}/download",
     }
 
@@ -15266,7 +15546,7 @@ def compute_course_audit(student: Student) -> dict:
             cat["completed_units"] += units
         elif status in ["Current", "Enrolled"]:
             current.append(row)
-        elif status in ["Incomplete", "Retake Required", "Dropped", "Failed"]:
+        elif status in ["Incomplete", "Retake Required", "Failed"]:
             incomplete.append(row)
         else:
             missing.append(row)
@@ -15910,6 +16190,28 @@ def ensure_schedule_request_schema() -> None:
 def ensure_monitoring_upload_schema() -> None:
     """Create the additive upload-history table for existing MVP databases."""
     MonitoringSheetUpload.__table__.create(bind=db.engine, checkfirst=True)
+    MonitoringValidationIssue.__table__.create(bind=db.engine, checkfirst=True)
+    inspector = inspect(db.engine)
+    issue_columns = {column["name"] for column in inspector.get_columns("monitoring_validation_issue")}
+    if "resolution_upload_id" not in issue_columns:
+        db.session.execute(text("ALTER TABLE monitoring_validation_issue ADD COLUMN resolution_upload_id INTEGER"))
+        db.session.commit()
+        inspector = inspect(db.engine)
+    if "student" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("student")}
+    additions = {
+        "monitoring_new_student": "BOOLEAN NOT NULL DEFAULT 0",
+        "monitoring_imported_at": "DATETIME",
+        "monitoring_upload_id": "INTEGER",
+    }
+    changed = False
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE student ADD COLUMN {name} {sql_type}"))
+            changed = True
+    if changed:
+        db.session.commit()
 
 
 def ensure_student_comprehensive_exam_schema() -> None:
@@ -16310,9 +16612,7 @@ def ensure_subject_enrollment_schema() -> int:
                 source_reference=(
                     record.evidence_reference or "Legacy course-record backfill"
                 ),
-                cancelled_at=(
-                    now_utc() if record.status in {"Dropped"} else None
-                ),
+                cancelled_at=None,
             )
             db.session.add(item)
             changed += 1
@@ -17816,7 +18116,6 @@ def seed_simulation_demo() -> None:
     student_ids = [s.id for s in Student.query.filter_by(program_id=program.id).all()]
     if student_ids:
         CourseRecord.query.filter(CourseRecord.student_id.in_(student_ids)).delete(synchronize_session=False)
-        CourseDropRequest.query.filter(CourseDropRequest.student_id.in_(student_ids)).delete(synchronize_session=False)
         PanelAssignment.query.filter(PanelAssignment.student_id.in_(student_ids)).delete(synchronize_session=False)
         ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(student_ids)).delete(synchronize_session=False)
         ResearchCase.query.filter(ResearchCase.student_id.in_(student_ids)).delete(synchronize_session=False)

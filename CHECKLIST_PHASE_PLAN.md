@@ -16,8 +16,6 @@ Phase 1 progress:
 
 - Items **2, 5, 66** (manual student creation): **Done** — removed the manual "add a student" form from Student Handoff; students come only from the AIMS export import. (Full nav/title rename to "AIMS Export Import" still pending.)
 - Items **11, 74** (risk): **Done** — newly admitted students (Admission stage, no coursework) are **"Not Yet Assessed"** instead of a default Low/Medium.
-- Items **17, 78** (optional drop PDF): **Done** — removed the "Optional drop form/supporting PDF" upload from the student drop request.
-- Items **19, 79, 227** (drop has no Deny): **Done** — removed the Reject/Deny option; a drop is now **"Record drop" → status "Recorded" (awaiting AIMS update)**, not "Approved/Rejected".
 
 Still open in Phase 1: 3/67 (student-number generation/edit lockdown — numbers already come from the import; verify no edit path), 4 (admission external reference), 9 (fuller value-change audit trail beyond existing prev/new status). Phase 2 remaining: 16/75 (verify no generic course-readiness/prerequisites), 20/82 (fully separate enrollment vs grading), 21/80/81 (AIMS-only grade source, no manual grade entry), 25 (no invented grade deadlines).
 
@@ -91,7 +89,7 @@ The official portal confirms that AIMS is a separate system with Student/Alumni/
 The execution priority is the same as the checklist order:
 
 1. **Phase 1 first:** stop creating or editing data that should come from AIMS and establish the approved export/import boundary.
-2. **Phase 2 second:** remove unofficial grade paths and correct dropping without compromising AIMS status.
+2. **Phase 2 second:** remove unofficial grade paths without compromising AIMS status.
 3. **Phase 3 third:** rebuild planning and faculty assignment on trustworthy academic data.
 4. **Phase 4 fourth:** finish role correctness and research/practicum traceability.
 5. **Phase 5 fifth:** finalize graduation outputs and reliable demonstration coverage.
@@ -108,7 +106,6 @@ These questions must be answered through authorized stakeholder or university te
 | D1 | Phase 1 | **Resolved 2026-07-20:** AIMS is external; this project uses an authorized file export/import process and does not implement an AIMS clone or live integration. | Create the proposed workbook contract and label it pending AIMS/Registrar format approval. |
 | D2 | Phase 1 | Exact columns, formats, code lists, export frequency, and authorized exporting office for the real AIMS workbook | Accept only the versioned proposed schema in demo/development; fail closed on unknown layouts and label unavailable fields. |
 | D3 | Phase 1/6 | Final Low/Medium/High risk indicators, thresholds, weights, and recalculation policy | Use **Not Yet Assessed** or **Insufficient Data**. |
-| D4 | Phase 2 | How a student-initiated drop reaches AIMS and when local status may become Confirmed Dropped | Record the request separately as **Awaiting AIMS Update** until a later authorized AIMS export confirms the official status. |
 | D5 | Phase 2 | When grades become available in the authorized AIMS export and how corrections propagate | Show export-generated and import times plus a data-unavailable state; do not invent deadlines. |
 | D6 | Phase 3 | Approved local AI model/deployment target and acceptable latency/RAM/concurrency thresholds | Keep recommendation rules deterministic and disclose AI unavailability. |
 | D7 | Phase 4 | Exact defense participant count, whether adviser is additional, and validated chair/verdict roles | Do not silently infer a participant count; label the configured rule as pending validation. |
@@ -240,7 +237,6 @@ Correct the subject-drop workflow, separate enrollment from grades, and make AIM
 |---:|---|---|---|
 | 15 | Partial | P1 | Put the Drop action directly beside an eligible enrolled subject and show request date and separate request/official statuses. |
 | 16 | Contradicted | P0 | Remove generic Course Readiness and fabricated course prerequisites. Retain only validated comprehensive-exam and thesis/dissertation milestone eligibility. |
-| 17 | Contradicted | P0 | Remove the optional drop PDF, its validation, storage references, and placeholder copy. |
 | 18 | Decision | P0 | Resolve D4 and keep request status separate from official AIMS subject status until a later authorized AIMS export verifies the update. |
 | 19 | Contradicted | P0 | Remove Deny. Use non-discretionary request progression and avoid implying coordinator approval authority. |
 | 20 | Partial | P0 | Fully separate enrollment display/monitoring from grade display. Remove every combined enrollment-and-grade form. |
@@ -358,7 +354,7 @@ Finalize graduation outputs, demo/test coverage, safeguarded decision support, a
 | 61 | Partial | P0 | Align every demo record with explicit `AIMS Export Demo Fixture` provenance, terms, academic history, research, practicum, and eligibility without claiming live or official export origin. |
 | 62 | Partial | P1 | Present what-if, faculty, panel, scheduling, and risk recommendations with inputs, explanation, consequences, and human owner. |
 | 63 | Gap | P1 | Add a defense-script readiness checklist covering accounts, buttons, fixtures, refresh, and honest limitation statements. |
-| 64 | Process gap | P0 | Create and rehearse a single source-of-truth explanation for AIMS, enrollment, grades, prerequisites, subject needs, and dropping. |
+| 64 | Process gap | P0 | Create and rehearse a single source-of-truth explanation for AIMS, enrollment, grades, prerequisites, and subject needs. |
 | 65 | Ongoing | P0 | Complete a process-correctness audit before any final visual-polish pass. |
 
 ## Phase 5 exit gate

@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import tempfile
 import unittest
 from datetime import date
@@ -16,7 +17,6 @@ from app import (  # noqa: E402
     Course,
     CourseOffering,
     CourseOfferingPlan,
-    CourseDropRequest,
     CurriculumOffering,
     CourseRecord,
     DefenseVerdict,
@@ -25,6 +25,8 @@ from app import (  # noqa: E402
     FacultyCoursePreference,
     Form1Endorsement,
     GraduationEndorsement,
+    MonitoringSheetUpload,
+    MonitoringValidationIssue,
     PanelAssignment,
     PracticumRecord,
     Program,
@@ -46,6 +48,7 @@ from app import (  # noqa: E402
     WorkflowMessage,
     WithdrawalApplication,
     REQUEST_UPLOAD_ROOT,
+    MONITORING_UPLOAD_ROOT,
     UPLOAD_ROOT,
     app,
     awol_residency_roster_payload,
@@ -59,6 +62,7 @@ from app import (  # noqa: E402
     student_current_course_year,
     graduation_eligibility,
     graduation_candidate_payload,
+    import_ac_monitoring,
     ensure_demo_accounts,
     panel_roles_for_student,
     practicum_eligibility,
@@ -850,7 +854,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.refresh(offering)
             self.assertEqual(offering.assignment_status, "Approved")
 
-    def test_student_curriculum_checklist_adds_and_drops_without_approval(self):
+    def test_student_curriculum_checklist_adds_without_removing_existing_enrollment(self):
         with app.app_context():
             term = AcademicTerm(
                 label="AY 2026-2027 1st Semester",
@@ -888,13 +892,12 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             ).first()
             self.assertEqual(enrollment.status, "Enrolled")
 
-            dropped = client.post("/api/student-portal/enrollment", json={
+            saved = client.post("/api/student-portal/enrollment", json={
                 "term_id": term.id, "course_ids": [],
             })
-            self.assertEqual(dropped.status_code, 200, dropped.get_json())
+            self.assertEqual(saved.status_code, 200, saved.get_json())
             db.session.refresh(enrollment)
-            self.assertEqual(enrollment.status, "Dropped")
-            self.assertEqual(CourseDropRequest.query.filter_by(student_id=self.student_id).first().status, "Recorded")
+            self.assertEqual(enrollment.status, "Enrolled")
 
     def test_authoritative_curricula_and_derived_course_year(self):
         with app.app_context():
@@ -1255,35 +1258,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             self.assertEqual(blocked.status_code, 409, blocked.get_json())
             self.assertIsNotNone(db.session.get(AcademicTerm, referenced.id))
-
-    def test_course_drop_is_recorded_immediately_without_reason_or_approval(self):
-        with app.app_context():
-            record = CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Enrolled", term_label="AY 2026-2027 Term 1")
-            db.session.add(record)
-            student_account = UserAccount(
-                email="drop-student@example.test",
-                full_name="Drop Request Student",
-                password_hash=generate_password_hash("test-password"),
-                role="student",
-                student_id=self.student_id,
-                active=True,
-            )
-            db.session.add(student_account)
-            db.session.commit()
-
-            student_client = self._role_client(student_account.id, "student")
-            response = student_client.post("/api/student-portal/requests/course-drop", json={
-                "course_id": self.course_id,
-                "term_label": "AY 2026-2027 Term 1",
-            })
-            self.assertEqual(response.status_code, 200, response.get_json())
-            db.session.refresh(record)
-            self.assertEqual(record.status, "Dropped")
-            drop = CourseDropRequest.query.filter_by(student_id=self.student_id, course_id=self.course_id).first()
-            self.assertEqual(drop.status, "Recorded")
-            self.assertIsNone(drop.reason)
-            task = Task.query.filter_by(student_id=self.student_id, owner_role="Academic Coordinator").filter(Task.title.contains("Review course drop request")).first()
-            self.assertIsNone(task)
 
     def test_eligible_loa_and_readmission_auto_approve(self):
         with app.app_context():
@@ -2595,6 +2569,220 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.refresh(self.student)
             self.assertEqual(self.student.standing, "Active")
             self.assertEqual(self.student.current_stage, "Final Defense")
+
+
+    def test_cumulative_monitoring_validation_resolution_and_new_student_badge(self):
+        with app.app_context():
+            db.session.add(CourseRecord(
+                student_id=self.student_id,
+                course_id=self.course_id,
+                status="Completed",
+                evidence_reference="Prior monitoring sheet",
+            ))
+            additive_student = Student(
+                student_number="GS-ADD-001",
+                first_name="Additive",
+                last_name="Update",
+                email="additive@example.test",
+                program_id=self.program_id,
+                entry_year=2026,
+                academic_year_entry="26-27",
+                year_level="1",
+                current_stage="Admission",
+                standing="Active",
+            )
+            db.session.add(additive_student)
+            db.session.flush()
+            upload = MonitoringSheetUpload(
+                original_name="semester-monitoring.xlsx",
+                stored_name="test-semester-monitoring.xlsx",
+                program_code="BPM",
+                row_count=6,
+                subject_count=1,
+                snapshot_json="{}",
+                result_json="{}",
+            )
+            db.session.add(upload)
+            db.session.flush()
+            parsed = {
+                "program_code": "BPM",
+                "subjects": ["BPM-501"],
+                "subject_categories": {"BPM-501": "Major"},
+                "subject_titles": {"BPM-501": "Completion Course"},
+                "issues": [],
+                "rows": [
+                    {
+                        "row": 10, "idno": "GS-2026-TEST",
+                        "first_name": "Workflow Changed", "last_name": "Student",
+                        "course": "BPM", "year": "2", "ay_entry": "24-25",
+                        "subjects": {"BPM-501": False}, "milestones": {},
+                        "comprehensive_exam_passed": False, "note": "",
+                    },
+                    {
+                        "row": 11, "idno": "GS-NEW-001", "first_name": "New", "last_name": "Student",
+                        "course": "BPM", "year": "1", "ay_entry": "26-27",
+                        "subjects": {"BPM-501": True}, "milestones": {},
+                        "comprehensive_exam_passed": False, "note": "",
+                    },
+                    {
+                        "row": 15, "idno": "GS-ADD-001", "first_name": "Additive", "last_name": "Update",
+                        "course": "BPM", "year": "1", "ay_entry": "26-27",
+                        "subjects": {"BPM-501": True}, "milestones": {},
+                        "comprehensive_exam_passed": False, "note": "",
+                    },
+                    {
+                        "row": 12, "idno": "", "first_name": "Needs", "last_name": "Identifier",
+                        "course": "BPM", "year": "1", "ay_entry": "26-27",
+                        "subjects": {"BPM-501": True}, "milestones": {},
+                        "comprehensive_exam_passed": False, "note": "",
+                    },
+                    {
+                        "row": 13, "idno": "GS-DUP-001", "first_name": "Duplicate", "last_name": "One",
+                        "course": "BPM", "year": "1", "ay_entry": "26-27",
+                        "subjects": {"BPM-501": False}, "milestones": {},
+                        "comprehensive_exam_passed": False, "note": "",
+                    },
+                    {
+                        "row": 14, "idno": "GS-DUP-001", "first_name": "Duplicate", "last_name": "Two",
+                        "course": "BPM", "year": "1", "ay_entry": "26-27",
+                        "subjects": {"BPM-501": False}, "milestones": {},
+                        "comprehensive_exam_passed": False, "note": "",
+                    },
+                ],
+            }
+            result = import_ac_monitoring(parsed, upload=upload)
+            upload.result_json = "{}"
+            db.session.commit()
+
+            self.assertEqual(result["created"], 1)
+            self.assertEqual(result["unresolved_count"], 4)
+            issue_types = {item.issue_type for item in MonitoringValidationIssue.query.filter_by(upload_id=upload.id).all()}
+            self.assertTrue(any("Subject mismatch" in value for value in issue_types))
+            self.assertTrue(any("Missing required fields" in value for value in issue_types))
+            self.assertTrue(any("Duplicate student ID in upload" in value for value in issue_types))
+            multi_issue = next(item for item in result["validation_issues"] if item["incoming_student_number"] == "GS-2026-TEST")
+            self.assertGreaterEqual(multi_issue["discrepancy_count"], 3)
+            self.assertEqual(
+                {item["type"] for item in multi_issue["discrepancies"]},
+                {"Existing ID with different name", "School year mismatch", "Subject mismatch"},
+            )
+            new_student = Student.query.filter_by(student_number="GS-NEW-001").one()
+            self.assertTrue(new_student.monitoring_new_student)
+            self.assertEqual(new_student.monitoring_upload_id, upload.id)
+            self.assertEqual(
+                CourseRecord.query.filter_by(student_id=additive_student.id, course_id=self.course_id).one().status,
+                "Completed",
+            )
+
+            staff = self._staff_client()
+            subject_issue = MonitoringValidationIssue.query.filter(
+                MonitoringValidationIssue.upload_id == upload.id,
+                MonitoringValidationIssue.issue_type.like("%Subject mismatch%"),
+            ).one()
+            used = staff.patch(f"/api/monitoring/issues/{subject_issue.id}/resolve", json={"action": "use_uploaded"})
+            self.assertEqual(used.status_code, 200, used.get_json())
+            self.assertEqual(CourseRecord.query.filter_by(student_id=self.student_id, course_id=self.course_id).one().status, "Missing")
+
+            missing_issue = MonitoringValidationIssue.query.filter(
+                MonitoringValidationIssue.upload_id == upload.id,
+                MonitoringValidationIssue.issue_type.like("%Missing required fields%"),
+            ).one()
+            edited = staff.patch(f"/api/monitoring/issues/{missing_issue.id}/resolve", json={
+                "action": "edit",
+                "edited": {"student_number": "GS-EDIT-001"},
+            })
+            self.assertEqual(edited.status_code, 200, edited.get_json())
+            edited_student = Student.query.filter_by(student_number="GS-EDIT-001").one()
+            self.assertTrue(edited_student.monitoring_new_student)
+            self.assertTrue(TransactionLog.query.filter_by(student_id=edited_student.id, new_status="Resolved").first())
+
+            duplicate_issue = MonitoringValidationIssue.query.filter(
+                MonitoringValidationIssue.upload_id == upload.id,
+                MonitoringValidationIssue.issue_type.like("%Duplicate student ID in upload%"),
+            ).first()
+            kept = staff.patch(f"/api/monitoring/issues/{duplicate_issue.id}/resolve", json={"action": "keep_existing"})
+            self.assertEqual(kept.status_code, 200, kept.get_json())
+            self.assertEqual(kept.get_json()["issue"]["status"], "Resolved")
+
+    def test_corrected_monitoring_workbook_resolves_multiple_selected_students(self):
+        from openpyxl import Workbook
+
+        with app.app_context():
+            second_student = Student(
+                student_number="GS-BULK-002",
+                first_name="Second",
+                last_name="Student",
+                email="second-bulk@example.test",
+                program_id=self.program_id,
+                entry_year=2025,
+                academic_year_entry="25-26",
+                year_level="1",
+                current_stage="Coursework",
+                standing="Active",
+            )
+            db.session.add(second_student)
+            db.session.flush()
+            db.session.add_all([
+                CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Completed"),
+                CourseRecord(student_id=second_student.id, course_id=self.course_id, status="Completed"),
+            ])
+            source_upload = MonitoringSheetUpload(
+                original_name="source-errors.xlsx",
+                stored_name="test-source-errors.xlsx",
+                program_code="BPM",
+                row_count=2,
+                subject_count=1,
+                snapshot_json="{}",
+                result_json="{}",
+            )
+            db.session.add(source_upload)
+            db.session.flush()
+            parsed = {
+                "program_code": "BPM",
+                "subjects": ["BPM-501"],
+                "subject_categories": {"BPM-501": "Major"},
+                "subject_titles": {"BPM-501": "Completion Course"},
+                "issues": [],
+                "rows": [
+                    {"row": 5, "idno": "GS-2026-TEST", "first_name": "Wrong", "last_name": "Name", "course": "BPM", "year": "2", "ay_entry": "24-25", "subjects": {"BPM-501": False}, "milestones": {}, "comprehensive_exam_passed": False, "note": ""},
+                    {"row": 6, "idno": "GS-BULK-002", "first_name": "Also Wrong", "last_name": "Name", "course": "BPM", "year": "2", "ay_entry": "24-25", "subjects": {"BPM-501": False}, "milestones": {}, "comprehensive_exam_passed": False, "note": ""},
+                ],
+            }
+            result = import_ac_monitoring(parsed, upload=source_upload)
+            db.session.commit()
+            issue_ids = [item["id"] for item in result["validation_issues"]]
+            self.assertEqual(len(issue_ids), 2)
+            self.assertTrue(all(item["discrepancy_count"] >= 3 for item in result["validation_issues"]))
+
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet["A1"] = "PROGRAM: BPM"
+            sheet.append([])
+            sheet.append(["", "IDNO", "COURSE", "YR", "BASIC", "", "", "NOTE"])
+            sheet.append(["AY ENTRY", "", "", "", "BPM-501", "SN", "FN", ""])
+            sheet.append(["25-26", "GS-2026-TEST", "BPM", "1", "X", "Student", "Workflow", ""])
+            sheet.append(["25-26", "GS-BULK-002", "BPM", "1", "X", "Student", "Second", ""])
+            corrected_file = BytesIO()
+            workbook.save(corrected_file)
+            corrected_file.seek(0)
+
+            response = self._staff_client().post(
+                "/api/monitoring/issues/resolve-upload",
+                data={
+                    "issue_ids": json.dumps(issue_ids),
+                    "file": (corrected_file, "corrected-monitoring.xlsx"),
+                },
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            payload = response.get_json()
+            self.assertEqual(payload["resolved_count"], 2)
+            self.assertEqual(payload["remaining_count"], 0)
+            resolved = MonitoringValidationIssue.query.filter(MonitoringValidationIssue.id.in_(issue_ids)).all()
+            self.assertTrue(all(item.status == "Resolved" for item in resolved))
+            self.assertEqual(len({item.resolution_upload_id for item in resolved}), 1)
+            correction_upload = db.session.get(MonitoringSheetUpload, resolved[0].resolution_upload_id)
+            self.created_files.append(MONITORING_UPLOAD_ROOT / correction_upload.stored_name)
 
 
 if __name__ == "__main__":

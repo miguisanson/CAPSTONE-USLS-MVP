@@ -152,6 +152,24 @@ export const api = {
   saveCompreExam: (payload) =>
     request("/monitoring/compre-exam", { method: "POST", body: JSON.stringify(payload) }),
   monitoringUploads: () => request("/monitoring/uploads"),
+  resolveMonitoringIssue: (issueId, payload) =>
+    request(`/monitoring/issues/${issueId}/resolve`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  resolveMonitoringIssuesWithFile: async (issueIds, file) => {
+    const form = new FormData();
+    form.append("issue_ids", JSON.stringify(issueIds));
+    form.append("file", file);
+    const res = await fetch(`${BASE}/monitoring/issues/resolve-upload`, {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Corrected workbook upload failed (${res.status})`);
+    return body;
+  },
   curriculumPlanning: (params = {}) => {
     const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
     const qs = queryString(actual);
@@ -195,15 +213,6 @@ export const api = {
     request(`/course-audit/roster?course_id=${courseId}${term ? `&term=${encodeURIComponent(term)}` : ""}`),
   saveCourseAudit: (payload) =>
     request("/course-audit/roster", { method: "POST", body: JSON.stringify(payload) }),
-  courseDropRequests: (status = "Submitted", programId = "") => {
-    const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    if (programId) params.set("program_id", programId);
-    const query = params.toString();
-    return request(`/course-drop/requests${query ? `?${query}` : ""}`);
-  },
-  decideCourseDrop: (requestId, payload) =>
-    request(`/course-drop/requests/${requestId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
   removeStudent: (studentId, payload = {}) =>
     request(`/students/${studentId}/remove`, { method: "POST", body: JSON.stringify(payload) }),
   flagMonitoringIssue: (studentId, payload = {}) =>
