@@ -2813,7 +2813,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
         </div> : <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">No final panel is available. Complete Panel Matching before scheduling.</div>}
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-        <span>Monday-Friday use faculty working hours, then Google Calendar busy times are removed for connected panelists.</span>
+        <span>Monday-Friday use faculty working hours. Profile commitments and Google Calendar busy times are removed.</span>
         <Link to="/faculty" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" /></Link>
       </div>
       <AvailabilityWorkspace
@@ -2831,7 +2831,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
       <div className="border-t border-slate-200 pt-5"><p className="text-sm font-semibold text-ink">Final schedule</p><p className="text-xs text-slate-500">Only staff can finalize this stage schedule.</p></div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Selected date" required>
-          <Input type="date" value={form.preferred_date} min={window.start} max={window.end} onChange={set("preferred_date")} required />
+          <Input type="date" value={form.preferred_date} min={availability.today || window.start} max={window.end} onChange={set("preferred_date")} required />
         </Field>
         <Field label="Start time" required>
           <Input type="time" value={form.selected_start} onChange={set("selected_start")} required />
@@ -2892,12 +2892,18 @@ function AvailabilityWorkspace({
             <p className="mt-0.5 text-xs text-slate-500">
               The system searches for a {availability.duration_minutes || 120}-minute overlap.
             </p>
+            {availability.lead_days > 0 && (
+              <p className="mt-1 text-xs font-semibold text-brand-700">
+                {availability.lead_days}-day lead time applied. Suggestions begin {shortDate(availability.earliest_schedule_date)}.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:w-[360px]">
             <Field label="From">
               <Input
                 type="date"
                 value={window.start}
+                min={availability.earliest_schedule_date}
                 onChange={(e) => setWindow((current) => ({ ...current, start: e.target.value }))}
               />
             </Field>
@@ -2933,7 +2939,12 @@ function AvailabilityWorkspace({
                   return <tr key={start}>
                     <th className="sticky left-0 z-10 border-r border-t border-slate-200 bg-white px-2 py-2 text-left font-medium text-slate-500">{formatTime(start)}</th>
                     {visibleDates.map((day) => {
-                      const count = participants.filter((participant) => participant.slots.some((slot) => slot.date === day && !slot.blocked_by_google && slot.start <= start && slot.end > start) && !(participant.google_busy || []).some((busy) => busy.date === day && busy.start <= start && busy.end > start)).length;
+                      const count = participants.filter((participant) => {
+                        const available = participant.slots.some((slot) => slot.date === day && slot.start <= start && slot.end > start);
+                        const busy = [...(participant.profile_busy || []), ...(participant.google_busy || [])]
+                          .some((block) => block.date === day && block.start <= start && block.end > start);
+                        return available && !busy;
+                      }).length;
                       const option = filteredSlots.find((slot) => slot.date === day && slot.start === start);
                       const blockedOption = blockedSlots.find((slot) => slot.date === day && slot.start === start);
                       const selected = form.preferred_date === day && form.selected_start === start;
@@ -2994,7 +3005,8 @@ function AvailabilityWorkspace({
                       </td>
                       {participants.map((participant) => {
                         const slots = participant.slots.filter((slot) => slot.date === day);
-                        const busy = (participant.google_busy || []).filter((slot) => slot.date === day);
+                        const busy = [...(participant.profile_busy || []), ...(participant.google_busy || [])]
+                          .filter((slot) => slot.date === day);
                         return (
                           <td key={participant.faculty_id} className="border-t border-slate-200 px-3 py-3 align-top">
                             {slots.length || busy.length ? (
@@ -3002,11 +3014,7 @@ function AvailabilityWorkspace({
                                 {slots.map((slot) => (
                                   <span
                                     key={`${slot.start}-${slot.end}`}
-                                    className={`rounded-lg px-2 py-1 text-xs font-medium ring-1 ${
-                                      slot.blocked_by_google
-                                        ? "bg-amber-50 text-amber-800 ring-amber-200"
-                                        : "bg-white text-slate-700 ring-slate-200"
-                                    }`}
+                                    className="rounded-lg bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
                                   >
                                     {timeRange(slot.start, slot.end)}
                                   </span>

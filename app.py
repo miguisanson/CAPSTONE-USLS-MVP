@@ -4181,6 +4181,9 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(exc)}), 400
         for stored_name in result.pop("stored_names"):
             (REQUEST_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
+        for stored_name in result.pop("research_stored_names", []):
+            (UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
+        workflow_title = config.get("title") or config["workflow"].title()
         return jsonify({
             "ok": True,
             **result,
@@ -4189,7 +4192,7 @@ def register_routes(app: Flask) -> None:
                 None,
             ),
             "message": (
-                f"Reset {student.name}'s {config['workflow'].title()} demo. "
+                f"Reset {student.name}'s {workflow_title} demo. "
                 "All prerequisite stages are complete and the student is ready to begin again."
             ),
         })
@@ -8684,12 +8687,13 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/transactions/<slug>/demo-reset", methods=["POST"])
     @require_api_login("staff")
     def transaction_demo_reset(slug: str):
-        if slug not in {"practicum", "withdrawal", "graduation"}:
-            return jsonify({"error": "Demo reset is available only for Practicum, Withdrawal, and Graduation."}), 404
+        if slug not in {"practicum", "withdrawal", "graduation", "research"}:
+            return jsonify({"error": "Demo reset is not available for this workflow."}), 404
         data = request_payload()
         student = Student.query.get_or_404(safe_int(data.get("student_id")))
-        if not student.student_number.startswith("GS-2026-"):
-            return jsonify({"error": "Only seeded GS-2026 demo students can be reset from this control."}), 400
+        _, demo_config = workflow_demo_config_for_student(student)
+        if not demo_config or demo_config["workflow"] != slug:
+            return jsonify({"error": "Only the student assigned to this demo can be reset from this control."}), 400
         try:
             result = reset_workflow_demo_case(slug, student)
             db.session.commit()
@@ -8698,10 +8702,13 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(exc)}), 400
         for stored_name in result.pop("stored_names"):
             (REQUEST_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
+        for stored_name in result.pop("research_stored_names", []):
+            (UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
+        workflow_title = demo_config.get("title") or TRANSACTION_BY_SLUG.get(slug, {}).get("title") or slug.title()
         return jsonify({
             "ok": True,
             **result,
-            "message": f"Reset {student.name}'s {TRANSACTION_BY_SLUG[slug]['title']} demo case. The student can start that workflow again.",
+            "message": f"Reset {student.name}'s {workflow_title} demo case. The student can start that workflow again.",
         })
 
     # ---- SPA hosting -----------------------------------------------------
@@ -10806,13 +10813,20 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 "adviser_name": (research_case.adviser_name if research_case else None) or selected_student.adviser_name,
             }
             participants = defense_participants(selected_student, assignments) if assignments else []
-            window_start = date.today()
+            today = date.today()
+            lead_days = defense_lead_days(progress["stage"])
+            window_start = earliest_defense_date(progress["stage"], today)
             window_end = window_start + timedelta(days=60)
             context["availability"] = defense_availability_context(
                 participants,
                 window_start,
                 window_end,
             )
+            context["availability"].update({
+                "today": iso(today),
+                "lead_days": lead_days,
+                "earliest_schedule_date": iso(window_start),
+            })
             for slot in context["availability"]["possible_slots"]:
                 conflicts = defense_schedule_conflicts(
                     selected_student,
@@ -12583,7 +12597,7 @@ def handle_defense_scheduling(data: MultiDict) -> int:
             f"Panel Matching is incomplete: {len(panel_ids)} of {required_panel_count} required panelists are selected."
         )
     lead_days = defense_lead_days(defense_type)
-    lead_ok = preferred_date >= date.today() + timedelta(days=lead_days)
+    lead_ok = preferred_date >= earliest_defense_date(defense_type)
     selected_start = parse_time(data.get("selected_start"))
     selected_end = parse_time(data.get("selected_end"))
     if preferred_end_date < preferred_date:
@@ -13169,14 +13183,21 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
         "practicum": {"practicum"},
         "withdrawal": {"withdrawal"},
         "graduation": {"graduation", "graduation-endorsement", "graduation-registrar-handoff"},
+        "research": set(),
     }[slug]
     task_terms = {
         "practicum": ("practicum",),
         "withdrawal": ("withdrawal",),
         "graduation": ("graduation", "endorsement list", "endorsed list"),
+        "research": (
+            "research", "title defense", "proposal defense", "final defense",
+            "defense schedule", "defense verdict", "panel", "ethics clearance",
+            "form 1", "form 4",
+        ),
     }[slug]
 
     removed_records = 0
+    research_stored_names = []
     if slug == "practicum":
         records = PracticumRecord.query.filter_by(student_id=student.id).all()
         for record in records:
@@ -13208,6 +13229,23 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
                 "Completion Evidence": "Final Defense",
             }
             student.current_stage = stage_by_gate.get(research_case.current_gate, "Coursework") if research_case else "Coursework"
+    elif slug == "research":
+        # Delete only this student's research-cycle state. Academic records and
+        # the adviser assignment remain intact so existing role actions work again.
+        evidence_files = ResearchEvidenceFile.query.filter_by(student_id=student.id).all()
+        evidence_ids = [item.id for item in evidence_files]
+        research_stored_names = [item.stored_name for item in evidence_files]
+        if evidence_ids:
+            removed_records += AdviserDocumentApproval.query.filter(
+                AdviserDocumentApproval.evidence_file_id.in_(evidence_ids)
+            ).delete(synchronize_session=False)
+        removed_records += DefenseVerdict.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        removed_records += ScheduleRequest.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        removed_records += PanelAssignment.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        removed_records += Form1Endorsement.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        removed_records += ResearchEvidenceFile.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        removed_records += DocumentCheck.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        removed_records += ResearchCase.query.filter_by(student_id=student.id).delete(synchronize_session=False)
     else:
         records = GraduationEndorsement.query.filter_by(student_id=student.id).all()
         for endorsement in records:
@@ -13217,10 +13255,13 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
 
     db.session.flush()
 
-    attachments = StudentRequestAttachment.query.filter(
-        StudentRequestAttachment.student_id == student.id,
-        StudentRequestAttachment.request_type.in_(request_types),
-    ).all()
+    attachments = (
+        StudentRequestAttachment.query.filter(
+            StudentRequestAttachment.student_id == student.id,
+            StudentRequestAttachment.request_type.in_(request_types),
+        ).all()
+        if request_types else []
+    )
     stored_names = [attachment.stored_name for attachment in attachments]
     for attachment in attachments:
         db.session.delete(attachment)
@@ -13231,13 +13272,17 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
             db.session.delete(task)
             removed_tasks += 1
 
-    removed_logs = TransactionLog.query.filter_by(
-        student_id=student.id,
-        transaction_slug=slug,
+    transaction_slugs = (
+        {"research-gate", "panel-matching", "defense-scheduling"}
+        if slug == "research" else {slug}
+    )
+    removed_logs = TransactionLog.query.filter(
+        TransactionLog.student_id == student.id,
+        TransactionLog.transaction_slug.in_(transaction_slugs),
     ).delete(synchronize_session=False)
-    removed_messages = WorkflowMessage.query.filter_by(
-        student_id=student.id,
-        transaction_slug=slug,
+    removed_messages = WorkflowMessage.query.filter(
+        WorkflowMessage.student_id == student.id,
+        WorkflowMessage.transaction_slug.in_(transaction_slugs),
     ).delete(synchronize_session=False)
     db.session.flush()
 
@@ -13257,6 +13302,7 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
         "logs_removed": removed_logs,
         "messages_removed": removed_messages,
         "stored_names": stored_names,
+        "research_stored_names": research_stored_names,
     }
 
 
@@ -14638,31 +14684,56 @@ def defense_availability_context(
         )
         .all()
     )
-    slots_by_faculty: dict[int, list[FacultyAvailability]] = {faculty_id: [] for faculty_id in participant_ids}
-    dates = set()
+    # Recurring profile hours are the weekday source of truth. Dated
+    # FacultyAvailability rows are retained as weekend overrides; previously
+    # the calculation considered only those dated rows, which made valid
+    # Monday-Friday profile hours appear as 0/N throughout the matrix.
+    slots_by_faculty: dict[int, list[dict]] = {faculty_id: [] for faculty_id in participant_ids}
+    dated_rows_by_faculty: dict[int, list[FacultyAvailability]] = {faculty_id: [] for faculty_id in participant_ids}
     for row in rows:
-        if row.available_date.weekday() < 5:
+        dated_rows_by_faculty[row.faculty_id].append(row)
+    dates = set()
+    current_day = window_start
+    while current_day <= window_end:
+        for faculty_id, faculty in participant_faculty.items():
             profile = next(
                 (
                     item
-                    for item in faculty_working_hours(row.faculty)
-                    if item["weekday"] == row.available_date.weekday()
+                    for item in faculty_working_hours(faculty)
+                    if item["weekday"] == current_day.weekday()
                 ),
                 None,
             )
-            if not profile or not profile["enabled"]:
-                continue
-            profile_start = parse_time(profile["start"])
-            profile_end = parse_time(profile["end"])
-            if row.start_time < profile_start or row.end_time > profile_end:
-                continue
-        slots_by_faculty[row.faculty_id].append(row)
-        dates.add(row.available_date)
+            if profile and profile["enabled"] and profile["start"] and profile["end"]:
+                slots_by_faculty[faculty_id].append({
+                    "date": current_day,
+                    "start": parse_time(profile["start"]),
+                    "end": parse_time(profile["end"]),
+                    "source": "working_hours",
+                    "weekend_override": False,
+                })
+                dates.add(current_day)
+
+            # Weekend availability is opt-in through an explicit dated row.
+            # Weekday rows do not narrow the recurring profile hours.
+            if current_day.weekday() >= 5:
+                for row in dated_rows_by_faculty[faculty_id]:
+                    if row.available_date != current_day:
+                        continue
+                    slots_by_faculty[faculty_id].append({
+                        "date": current_day,
+                        "start": row.start_time,
+                        "end": row.end_time,
+                        "source": "dated_override",
+                        "weekend_override": True,
+                    })
+                    dates.add(current_day)
+        current_day += timedelta(days=1)
 
     possible_slots = []
     for day in sorted(dates):
         day_rows = {
-            faculty_id: [slot for slot in slots_by_faculty[faculty_id] if slot.available_date == day]
+            faculty_id: [slot for slot in slots_by_faculty[faculty_id] if slot["date"] == day]
             for faculty_id in participant_ids
         }
         if any(not faculty_slots for faculty_slots in day_rows.values()):
@@ -14671,8 +14742,8 @@ def defense_availability_context(
             end_minutes = start_minutes + duration_minutes
             all_available = all(
                 any(
-                    slot.start_time.hour * 60 + slot.start_time.minute <= start_minutes
-                    and slot.end_time.hour * 60 + slot.end_time.minute >= end_minutes
+                    slot["start"].hour * 60 + slot["start"].minute <= start_minutes
+                    and slot["end"].hour * 60 + slot["end"].minute >= end_minutes
                     and not candidate_conflicts_google_busy(
                         day,
                         start_minutes,
@@ -14728,14 +14799,11 @@ def defense_availability_context(
                 "profile_busy": profile_blocks.get(participant["faculty"].id, []),
                 "slots": [
                     {
-                        "date": iso(slot.available_date),
-                        "start": slot.start_time.strftime("%H:%M"),
-                        "end": slot.end_time.strftime("%H:%M"),
-                        "weekend_override": slot.available_date.weekday() >= 5,
-                        "blocked_by_google": slot_conflicts_google_busy(
-                            slot,
-                            google_busy.get(participant["faculty"].id, {}).get("busy", []),
-                        ),
+                        "date": iso(slot["date"]),
+                        "start": slot["start"].strftime("%H:%M"),
+                        "end": slot["end"].strftime("%H:%M"),
+                        "source": slot["source"],
+                        "weekend_override": slot["weekend_override"],
                     }
                     for slot in slots_by_faculty[participant["faculty"].id]
                 ],
@@ -15492,6 +15560,11 @@ def defense_lead_days(defense_type: str) -> int:
     if defense_type == "Public Final Defense":
         return 5
     return 14
+
+
+def earliest_defense_date(defense_type: str, reference_date: date | None = None) -> date:
+    """First date that satisfies the defense type's scheduling notice."""
+    return (reference_date or date.today()) + timedelta(days=defense_lead_days(defense_type))
 
 
 def onboarding_requirements() -> list[str]:
@@ -17761,6 +17834,17 @@ SIM_STUDENT_PASSWORD = "DemoPass123!"
 STUDENT_EMAIL_DOMAIN = os.getenv("STUDENT_EMAIL_DOMAIN", "student.usls.edu.ph")
 
 WORKFLOW_DEMO_STUDENTS = {
+    "research-miguel": {
+        "workflow": "research",
+        "title": "Research Gate, Panel Matching, Defense Scheduling",
+        "student_number": "2260004",
+        "first_name": "Miguel",
+        "last_name": "Yu",
+        "email": "student@usls.edu.ph",
+        "program_code": "MAED",
+        "preserve_student_email": True,
+        "ready_label": "Ready to submit Title Defense requirements",
+    },
     "practicum-andrea": {
         "workflow": "practicum",
         "student_number": "GS-2026-PRAC-01",
@@ -17887,11 +17971,12 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
 
     _, demo_config = workflow_demo_config_for_student(student)
     is_withdrawal_demo = workflow == "withdrawal"
+    is_research_demo = workflow == "research"
     withdrawal_application = latest_withdrawal_application(student.id) if is_withdrawal_demo else None
     withdrawal_complete = bool(withdrawal_application and withdrawal_application.status == "Withdrawn Confirmed")
     student.program_id = program.id
-    student.entry_year = 2026 if is_withdrawal_demo else 2024
-    student.academic_year_entry = "2026-2027" if is_withdrawal_demo else "2024-2025"
+    student.entry_year = student.entry_year if is_research_demo else 2026 if is_withdrawal_demo else 2024
+    student.academic_year_entry = student.academic_year_entry if is_research_demo else "2026-2027" if is_withdrawal_demo else "2024-2025"
     student.year_level = "Year 1" if is_withdrawal_demo else "Completed Coursework"
     student.standing = "Withdrawn" if withdrawal_complete else "Active"
     student.enrollment_tag = "Withdrawn" if withdrawal_complete else "Completed" if workflow == "graduation" else "Enrolled"
@@ -17900,6 +17985,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
         else "Withdrawal In Progress" if withdrawal_application and withdrawal_application.status == "Approved - Follow-through"
         else "Completed" if workflow == "graduation"
         else "Coursework" if is_withdrawal_demo
+        else "Proposal Development" if is_research_demo
         else "Final Defense"
     )
     student.comprehensive_exam_status = "Not Taken" if is_withdrawal_demo else "Passed"
@@ -17940,6 +18026,13 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     # Lifecycle withdrawal begins while the student is active in a specific
     # course; it does not require completed research or practicum milestones.
     if is_withdrawal_demo:
+        return
+
+    # Research starts at Title Defense with only its prerequisites complete.
+    # Existing progress is derived back from Miguel's current evidence, so a
+    # normal login never wipes an in-progress walkthrough; only Reset does.
+    if is_research_demo:
+        sync_research_progress(student)
         return
 
     # Practicum and Graduation demos have completed every academic and research gate that
@@ -18008,11 +18101,13 @@ def ensure_workflow_demo_students() -> list[Student]:
             db.session.flush()
         student.first_name = config["first_name"]
         student.last_name = config["last_name"]
-        student.email = config["email"]
+        if not config.get("preserve_student_email"):
+            student.email = config["email"]
         ensure_workflow_demo_student_baseline(student, config["workflow"])
         account = ensure_student_account(student, config["email"], SIM_STUDENT_PASSWORD)
         account.password_hash = generate_password_hash(SIM_STUDENT_PASSWORD)
-        account.full_name = f"{student.name} · {config['workflow'].title()} Demo"
+        workflow_title = config.get("title") or config["workflow"].title()
+        account.full_name = f"{student.name} · {workflow_title} Demo"
         students.append(student)
     return students
 
@@ -18026,6 +18121,7 @@ def workflow_demo_students_payload() -> list[dict]:
         payload.append({
             "key": demo_key,
             "workflow": config["workflow"],
+            "workflow_title": config.get("title") or config["workflow"].title(),
             "name": student.name,
             "student_number": student.student_number,
             "email": config["email"],

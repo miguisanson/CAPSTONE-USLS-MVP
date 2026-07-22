@@ -3,8 +3,9 @@ import re
 import json
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, time
 from io import BytesIO
+from unittest.mock import patch
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
@@ -23,6 +24,7 @@ from app import (  # noqa: E402
     DocumentCheck,
     Faculty,
     FacultyCoursePreference,
+    FacultyWorkingHour,
     Form1Endorsement,
     GraduationEndorsement,
     MonitoringSheetUpload,
@@ -56,6 +58,8 @@ from app import (  # noqa: E402
     curriculum_offerings_for_term,
     db,
     detected_research_progress,
+    defense_availability_context,
+    earliest_defense_date,
     enrollment_integrity_payload,
     ensure_authoritative_curricula,
     get_active_term,
@@ -1582,7 +1586,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         response = app.test_client().get("/api/auth/demo-students")
         self.assertEqual(response.status_code, 200, response.get_json())
         items = response.get_json()["items"]
-        self.assertEqual(len(items), 6)
+        self.assertEqual(len(items), 7)
+        self.assertEqual(sum(item["workflow"] == "research" for item in items), 1)
         self.assertEqual(sum(item["workflow"] == "practicum" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "graduation" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "withdrawal" for item in items), 2)
@@ -1617,10 +1622,12 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         practicum_item = practicum_items[0]
         graduation_item = next(item for item in items if item["workflow"] == "graduation")
         withdrawal_item = next(item for item in items if item["workflow"] == "withdrawal")
+        research_item = next(item for item in items if item["workflow"] == "research")
         with app.app_context():
             practicum_student = Student.query.filter_by(student_number=practicum_item["student_number"]).one()
             graduation_student = Student.query.filter_by(student_number=graduation_item["student_number"]).one()
             withdrawal_student = Student.query.filter_by(student_number=withdrawal_item["student_number"]).one()
+            research_student = Student.query.filter_by(student_number=research_item["student_number"]).one()
             for item in practicum_items:
                 demo_student = Student.query.filter_by(student_number=item["student_number"]).one()
                 practicum_status = practicum_eligibility(demo_student)
@@ -1644,6 +1651,17 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(current_withdrawal_courses, ["MAED-MAJ1"])
             self.assertEqual(withdrawal_student.standing, "Active")
             self.assertEqual(withdrawal_student.enrollment_tag, "Enrolled")
+            self.assertEqual(research_student.name, "Miguel Yu")
+            self.assertEqual(research_student.comprehensive_exam_status, "Passed")
+            self.assertTrue(all(
+                record.status == "Completed" and record.grade_status == "Passed"
+                for record in CourseRecord.query.filter_by(student_id=research_student.id).all()
+            ))
+
+            # Test-only filenames keep this temporary database's reset from
+            # deleting the repository's live seeded Miguel PDFs.
+            for evidence in ResearchEvidenceFile.query.filter_by(student_id=research_student.id).all():
+                evidence.stored_name = f"test-research-reset-{evidence.id}.pdf"
 
             attachment = StudentRequestAttachment(
                 student_id=practicum_student.id,
@@ -1728,6 +1746,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             practicum_student_id = practicum_student.id
             graduation_student_id = graduation_student.id
             withdrawal_student_id = withdrawal_student.id
+            research_student_id = research_student.id
+
+        reset_response = app.test_client().post(
+            f"/api/auth/demo-students/{research_item['key']}/reset",
+            json={},
+        )
+        self.assertEqual(reset_response.status_code, 200, reset_response.get_json())
+        self.assertGreater(reset_response.get_json()["records_removed"], 0)
 
         reset_response = app.test_client().post(
             f"/api/auth/demo-students/{practicum_item['key']}/reset",
@@ -1756,6 +1782,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             practicum_student = db.session.get(Student, practicum_student_id)
             graduation_student = db.session.get(Student, graduation_student_id)
             withdrawal_student = db.session.get(Student, withdrawal_student_id)
+            research_student = db.session.get(Student, research_student_id)
             self.assertIsNone(PracticumRecord.query.filter_by(student_id=practicum_student_id).first())
             self.assertIsNone(StudentRequestAttachment.query.filter_by(student_id=practicum_student_id, request_type="practicum").first())
             self.assertIsNone(WorkflowMessage.query.filter_by(student_id=practicum_student_id, transaction_slug="practicum").first())
@@ -1781,6 +1808,85 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 [record.course.code for record in CourseRecord.query.filter_by(student_id=withdrawal_student_id, status="Current").all()],
                 ["MAED-MAJ1"],
             )
+
+            research_progress = detected_research_progress(research_student)
+            self.assertEqual(research_progress["stage"], "Title Defense")
+            self.assertEqual(research_progress["status"], "Missing Requirements")
+            self.assertEqual(research_student.comprehensive_exam_status, "Passed")
+            self.assertEqual(research_student.current_stage, "Proposal Development")
+            self.assertEqual(ResearchEvidenceFile.query.filter_by(student_id=research_student_id).count(), 0)
+            self.assertEqual(PanelAssignment.query.filter_by(student_id=research_student_id).count(), 0)
+            self.assertEqual(ScheduleRequest.query.filter_by(student_id=research_student_id).count(), 0)
+            self.assertEqual(DefenseVerdict.query.filter_by(student_id=research_student_id).count(), 0)
+            self.assertIsNone(Form1Endorsement.query.filter_by(student_id=research_student_id).first())
+            self.assertTrue(all(
+                record.status == "Completed" and record.grade_status == "Passed"
+                for record in CourseRecord.query.filter_by(student_id=research_student_id).all()
+            ))
+
+    def test_defense_availability_uses_recurring_profile_hours_without_dated_rows(self):
+        target_day = date(2026, 7, 28)  # Tuesday
+        with app.app_context():
+            faculty = []
+            for index in range(5):
+                member = Faculty(
+                    name=f"Defense Availability Faculty {index + 1}",
+                    college="Graduate School",
+                    role="Panel Member",
+                    specialization="Research methods",
+                    active=True,
+                )
+                db.session.add(member)
+                faculty.append(member)
+            db.session.flush()
+            participants = [
+                {"faculty": member, "role": "Panel Member"}
+                for member in faculty
+            ]
+            google_status = {
+                member.id: {"configured": False, "busy": [], "error": None}
+                for member in faculty
+            }
+
+            with patch("app.google_busy_by_faculty", return_value=google_status), patch("app.faculty_calendar_blocks", return_value=[]):
+                availability = defense_availability_context(participants, target_day, target_day)
+
+            self.assertEqual(availability["dates"], ["2026-07-28"])
+            self.assertTrue(all(
+                any(slot["date"] == "2026-07-28" and slot["start"] == "08:00" and slot["end"] == "17:00" for slot in item["slots"])
+                for item in availability["participants"]
+            ))
+            self.assertTrue(any(
+                slot["date"] == "2026-07-28" and slot["start"] == "13:00" and slot["end"] == "15:00" and slot["matched_count"] == 5
+                for slot in availability["possible_slots"]
+            ))
+
+            # If one profile disables Tuesday, the payload must expose four of
+            # five individual availabilities and no false full-panel overlap.
+            db.session.add(FacultyWorkingHour(
+                faculty_id=faculty[-1].id,
+                weekday=1,
+                start_time=time(8, 0),
+                end_time=time(17, 0),
+                enabled=False,
+            ))
+            db.session.flush()
+            db.session.expire(faculty[-1], ["working_hours"])
+            with patch("app.google_busy_by_faculty", return_value=google_status), patch("app.faculty_calendar_blocks", return_value=[]):
+                partial = defense_availability_context(participants, target_day, target_day)
+            available_count = sum(
+                any(slot["date"] == "2026-07-28" and slot["start"] <= "13:00" and slot["end"] > "13:00" for slot in item["slots"])
+                for item in partial["participants"]
+            )
+            self.assertEqual(available_count, 4)
+            self.assertFalse(any(slot["start"] == "13:00" for slot in partial["possible_slots"]))
+
+    def test_defense_suggestions_start_after_required_lead_time(self):
+        reference = date(2026, 7, 23)
+        self.assertEqual(earliest_defense_date("Title Defense", reference), date(2026, 7, 23))
+        self.assertEqual(earliest_defense_date("Public Final Defense", reference), date(2026, 7, 28))
+        self.assertEqual(earliest_defense_date("Proposal Defense", reference), date(2026, 8, 6))
+        self.assertEqual(earliest_defense_date("Final Defense", reference), date(2026, 8, 6))
 
     def test_maed_monitoring_sheet_seeds_all_policy_valid_demo_personas(self):
         with app.app_context():

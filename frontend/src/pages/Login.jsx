@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { BriefcaseBusiness, CheckCircle2, ChevronDown, Eye, EyeOff, GraduationCap, LockKeyhole, LogOut, RotateCcw, UserCog, UserRound, Gavel } from "lucide-react";
+import { BriefcaseBusiness, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, RotateCcw, UserCog, UserRound, Gavel } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorNote } from "../components/ui";
@@ -97,7 +97,7 @@ export default function Login() {
 
   async function resetDemoStudent(student) {
     const confirmed = window.confirm(
-      `Reset ${student.name}'s ${student.workflow} demo? This clears this workflow's submissions, messages, tasks, and staff actions for the student.`,
+      `Reset ${student.name}'s ${student.workflow_title || student.workflow} demo? This clears this workflow's submissions, messages, tasks, and staff actions for the student.`,
     );
     if (!confirmed) return;
     setDemoError("");
@@ -185,6 +185,19 @@ export default function Login() {
                   description="All prior requirements complete; ready for Graduation."
                   icon={GraduationCap}
                   students={demoStudents.filter((student) => student.workflow === "graduation")}
+                  quickLoginBusy={quickLoginBusy}
+                  resetBusy={resetBusy}
+                  onLogin={quickLogin}
+                  onReset={resetDemoStudent}
+                />
+                <DemoStudentGroup
+                  className="sm:col-span-2 lg:col-span-1 xl:col-span-2"
+                  open={openDemoGroup === "research"}
+                  onToggle={() => setOpenDemoGroup((current) => current === "research" ? "" : "research")}
+                  title="Research Gate, Panel Matching, Defense Scheduling"
+                  description="Courses and comprehensive exam complete; ready to begin Title Defense requirements."
+                  icon={GitBranch}
+                  students={demoStudents.filter((student) => student.workflow === "research")}
                   quickLoginBusy={quickLoginBusy}
                   resetBusy={resetBusy}
                   onLogin={quickLogin}
@@ -290,10 +303,10 @@ export default function Login() {
   );
 }
 
-function DemoStudentGroup({ open, onToggle, title, description, icon: Icon, students, quickLoginBusy, resetBusy, onLogin, onReset }) {
-  const contentId = `demo-${title.toLowerCase()}-students`;
+function DemoStudentGroup({ className = "", open, onToggle, title, description, icon: Icon, students, quickLoginBusy, resetBusy, onLogin, onReset }) {
+  const contentId = `demo-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-students`;
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={`${title} demo students`}>
+    <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`} aria-label={`${title} demo students`}>
       <button
         type="button"
         onClick={onToggle}
