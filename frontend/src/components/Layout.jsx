@@ -48,6 +48,7 @@ const NAV_GROUPS = [
       { to: "/students", label: "Students", icon: Users },
       { to: "/faculty", label: "Faculty", icon: UsersRound },
       { to: "/monitoring-sheet", label: "Monitoring Sheet", icon: Table2 },
+      { to: "/enrollment-class-list", label: "Enrollment Class List", icon: BookOpenCheck },
     ],
   },
   {
@@ -55,13 +56,12 @@ const NAV_GROUPS = [
     items: [
       { to: "/workflow/student-handoff", label: "1 · Student Handoff", icon: UserPlus },
       { to: "/course-adjustments", label: "2 · Course Adjustments", icon: SlidersHorizontal },
-      { to: "/course-offerings", label: "3 · Course Offering Setup", icon: BookOpenCheck },
-      { to: "/enrollment", label: "4 · Enrollment", icon: BookPlus },
-      { to: "/workflow/research-gate", label: "5 · Research Gate", icon: FileCheck },
-      { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
-      { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
-      { to: "/workflow/practicum", label: "8 · Practicum", icon: Briefcase },
-      { to: "/workflow/graduation", label: "9 · Graduation", icon: GraduationCap },
+      { to: "/enrollment", label: "3 · Enrollment", icon: BookPlus },
+      { to: "/workflow/research-gate", label: "4 · Research Gate", icon: FileCheck },
+      { to: "/workflow/panel-matching", label: "5 · Panel Matching", icon: UsersRound },
+      { to: "/workflow/defense-scheduling", label: "6 · Defense Scheduling", icon: CalendarCheck },
+      { to: "/workflow/practicum", label: "7 · Practicum", icon: Briefcase },
+      { to: "/workflow/graduation", label: "8 · Graduation", icon: GraduationCap },
     ],
   },
   {
@@ -92,7 +92,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/students", "/faculty", "/monitoring-sheet", "/course-adjustments", "/course-offerings", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
+  academic_coordinator: new Set(["/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
 };
 
@@ -231,6 +231,8 @@ export default function Layout({ children }) {
 const BREADCRUMB_LABELS = {
   "term-settings": "Academic Semesters",
   enrollment: "Enrollment",
+  "course-adjustments": "Course Adjustments",
+  "enrollment-class-list": "Enrollment Class List",
 };
 
 function Breadcrumb({ path }) {

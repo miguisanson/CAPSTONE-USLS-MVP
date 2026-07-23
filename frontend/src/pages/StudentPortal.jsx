@@ -563,7 +563,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
         ) : (
           <>
             {active === "research" && <ResearchRequestForm data={data} onSaved={onSaved} />}
-            {active === "loa" && <LoaRequestForm data={data} semesters={data.upcoming_semesters || []} onSaved={onSaved} />}
+            {active === "loa" && <LoaRequestForm data={data} semesters={data.future_semesters || []} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
             {active === "awol" && <AwolReturnRequestForm data={data} onSaved={onSaved} />}
             {active === "withdrawal" && <WithdrawalRequestForm data={data} onSaved={onSaved} />}
@@ -1139,14 +1139,18 @@ function ConceptPaperCompliance({ compliance }) {
 
 function LoaRequestForm({ data, semesters = [], onSaved }) {
   const studentId = data.student.id;
+  const confirm = useConfirm();
   const onLeave = data.student.standing === "On Leave" || data.student.enrollment_tag === "LOA" || data.student.current_stage === "LOA";
+  const latestLoaLog = (data.logs || []).find((item) => item.transaction_slug === "leave-of-absence");
   const [form, setForm] = useState({
-    attachment_id: null,
     effective_start: "",
     effective_end: "",
+    reason_category: "",
     reason_remarks: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("leave-of-absence", onSaved);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState("");
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   function onSubmit(e) {
@@ -1154,11 +1158,34 @@ function LoaRequestForm({ data, semesters = [], onSaved }) {
     submit({ student_id: studentId, ...form });
   }
 
-  // LOA has no structured status record, so the step state is derived from the
-  // student's standing: On Leave means the application was approved.
-  const status = onLeave ? "On Leave" : "Not Submitted";
+  // The structured request is recorded in the workflow log. The student's
+  // standing remains the source of truth for an approved leave.
+  const status = onLeave
+    ? "On Leave"
+    : latestLoaLog?.new_status || (latestLoaLog?.result === "LOA application submitted" ? "Submitted" : "Not Submitted");
   const loaSteps = loaTimelineSteps(status);
-  const applicationEditable = !onLeave;
+  const applicationEditable = !onLeave && ["Not Submitted", "Denied", "Returned", "Returned for Revision", "Withdrawn"].includes(status);
+  const canWithdraw = ["Submitted", "Dean Review"].includes(status);
+
+  async function withdrawPendingApplication() {
+    const accepted = await confirm({
+      title: "Withdraw pending LOA application?",
+      message: "This stops the current review before the Dean decides. It does not change your academic standing, and you may submit a new application.",
+      confirmLabel: "Withdraw application",
+      tone: "danger",
+    });
+    if (!accepted) return;
+    setWithdrawing(true);
+    setWithdrawError("");
+    try {
+      await api.withdrawStudentLoaRequest();
+      await onSaved();
+    } catch (err) {
+      setWithdrawError(err.message || "Could not withdraw the application.");
+    } finally {
+      setWithdrawing(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -1169,26 +1196,37 @@ function LoaRequestForm({ data, semesters = [], onSaved }) {
         title="Leave of Absence Application"
         state={applicationEditable ? "active" : "complete"}
         helper={applicationEditable
-          ? "What you need to submit now: the effective start/end semester, your reason, and the signed LOA application PDF."
-          : "Your leave application is on file and your studies are paused."}
+          ? "Complete the structured fields below. No PDF upload or RAG document extraction is required."
+          : onLeave ? "Your leave application is approved and your studies are paused." : "Your structured application is saved and awaiting the next reviewer."}
       >
         {applicationEditable ? (
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Leave starts (semester)" required>
-                <Select value={form.effective_start} onChange={set("effective_start")} placeholder="Select semester" options={semesters} required />
+                <Select value={form.effective_start} onChange={(event) => setForm((current) => ({ ...current, effective_start: event.target.value, effective_end: current.effective_end || event.target.value }))} placeholder="Select semester" options={semesters} required />
               </Field>
               <Field label="Leave ends (semester)" required>
                 <Select value={form.effective_end} onChange={set("effective_end")} placeholder="Select semester" options={semesters} required />
               </Field>
             </div>
-            <Field label="Reason / remarks" required>
+            <Field label="Reason category" required>
+              <Select value={form.reason_category} onChange={set("reason_category")} placeholder="Choose an allowed reason" options={data.loa_allowed_reasons || []} required />
+            </Field>
+            <Field label="Circumstances / remarks" required>
               <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} required />
             </Field>
-            <RequestPdfUpload requestType="leave-of-absence" label="Completed LOA application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-            <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the completed LOA application before submitting." : ""} label="Submit LOA application" />
+            <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800"><span className="font-semibold">Policy format:</span> one or two consecutive semesters, beginning in the upcoming semester or later. Staff run a deterministic checklist before forwarding the request to the Dean.</div>
+            <SubmitState busy={busy} error={error} message={message} disabled={!form.effective_start || !form.effective_end || !form.reason_category || !form.reason_remarks.trim()} disabledHint="Complete all structured LOA fields before submitting." label="Submit LOA application" />
           </form>
         ) : null}
+        {canWithdraw && (
+          <div className="space-y-2">
+            <button type="button" onClick={withdrawPendingApplication} disabled={withdrawing} className="btn-ghost cursor-pointer text-red-700 hover:bg-red-50">
+              <LogOut className="h-4 w-4" /> {withdrawing ? "Withdrawing…" : "Withdraw pending application"}
+            </button>
+            <ErrorNote message={withdrawError} />
+          </div>
+        )}
       </StageCard>
 
       <StageCard
@@ -1196,17 +1234,17 @@ function LoaRequestForm({ data, semesters = [], onSaved }) {
         title="Staff Intake and Dean Review"
         state={onLeave ? "complete" : "pending"}
         helper={onLeave
-          ? "Graduate School staff checked eligibility and the Dean approved the leave."
+          ? "Graduate School staff checked eligibility, the Dean approved the leave, and your standing was updated."
           : "After you submit, Graduate School staff check your LOA eligibility and forward it to the Dean for a decision."}
       />
 
       <StageCard
         number={3}
-        title="On Leave (status paused, notice sent)"
+        title="On Leave Status"
         state={onLeave ? "complete" : "locked"}
         helper={onLeave
           ? "Your status is On Leave. When your leave ends, open Readmission to return to active status."
-          : "Once the Dean approves, your record is paused (On Leave) and you receive a notice."}
+          : "Your record changes to On Leave when the Dean approves the request."}
       />
     </div>
   );
@@ -1214,20 +1252,22 @@ function LoaRequestForm({ data, semesters = [], onSaved }) {
 
 function ReadmissionRequestForm({ data, onSaved }) {
   const requirements = data.readmission_requirements || [];
-  const semesters = data.upcoming_semesters || [];
+  const semesters = data.future_semesters || [];
   const [form, setForm] = useState({
-    attachment_id: null,
     target_return_term: "",
     previous_loa_period: "",
   });
+  const [selectedItems, setSelectedItems] = useState([]);
   const { busy, error, message, submit } = useSubmitRequest("readmission", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   function onSubmit(e) {
     e.preventDefault();
-    // All standard return requirements are taken as included with the uploaded application.
-    submit({ student_id: data.student.id, ...form, readmission_items: requirements });
+    submit({ student_id: data.student.id, ...form, readmission_items: selectedItems });
   }
+
+  const toggleItem = (item) => setSelectedItems((current) => current.includes(item) ? current.filter((value) => value !== item) : [...current, item]);
+  const complete = Boolean(form.target_return_term && form.previous_loa_period.trim() && requirements.every((item) => selectedItems.includes(item)));
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -1235,22 +1275,25 @@ function ReadmissionRequestForm({ data, onSaved }) {
         <Field label="Return semester" required>
           <Select value={form.target_return_term} onChange={set("target_return_term")} placeholder="Select semester" options={semesters} required />
         </Field>
-        <Field label="Semester you went on leave">
-          <Select value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="Select semester" options={semesters} />
+        <Field label="Previous LOA period" required>
+          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="Example: AY 2025-2026 1st to 2nd Semester" required />
         </Field>
       </div>
       {requirements.length > 0 && (
         <div>
-          <p className="field-label">Your application should include</p>
+          <p className="field-label">Readmission checklist</p>
           <div className="mt-2 space-y-1.5">
             {requirements.map((item) => (
-              <div key={item} className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> {item}</div>
+              <label key={item} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                <input type="checkbox" checked={selectedItems.includes(item)} onChange={() => toggleItem(item)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
+                {item}
+              </label>
             ))}
           </div>
         </div>
       )}
-      <RequestPdfUpload requestType="readmission" label="Completed readmission application PDF" onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-      <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the completed readmission application before submitting." : ""} label="Submit readmission request" />
+      <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">This structured form is checked with fixed rules. It does not upload or analyze a letter with RAG.</div>
+      <SubmitState busy={busy} error={error} message={message} disabled={!complete} disabledHint={!complete ? "Complete the return semester, prior LOA period, and every checklist item." : ""} label="Submit readmission request" />
     </form>
   );
 }
@@ -1291,7 +1334,7 @@ function AwolReturnRequestForm({ data, onSaved }) {
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
-            The handbook requires a written intention to enroll addressed to the University Registrar through the Graduate School Dean. Approval may include a refresher-course or full re-enrollment requirement when maximum residence is exceeded.
+            The handbook requires a written intention to enroll routed through the Graduate School Dean. Approval may include a refresher-course or full re-enrollment requirement when maximum residence is exceeded.
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Intended return semester" required><Select value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} required /></Field>
@@ -1348,10 +1391,11 @@ function SavedWorkflowFiles({ files = [], empty = "No files submitted yet." }) {
 
 function WithdrawalRequestForm({ data, onSaved }) {
   const existing = data.withdrawal_application;
+  const activeSubjects = (data.subject_enrollments || []).filter((item) => ["Enrolled", "Current", "Incomplete"].includes(item.status));
   const [form, setForm] = useState({
     attachment_id: existing?.request_attachment?.id || null,
     reason: existing?.reason || "",
-    effective_term: existing?.effective_term || "",
+    subject_enrollment_id: existing?.subject_enrollment_id || activeSubjects[0]?.id || "",
   });
   const { busy, error, message, submit } = useSubmitRequest("withdrawal", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -1367,7 +1411,6 @@ function WithdrawalRequestForm({ data, onSaved }) {
   const denied = existing?.dean_decision === "Denied" || status === "Denied";
   const reviewPending = ["Submitted to GS Staff", "Dean Review"].includes(status);
   const reviewComplete = existing?.dean_decision === "Approved";
-  const followThroughPending = status === "Approved - Follow-through";
   const followThroughComplete = status === "Withdrawn Confirmed";
   const withdrawalSteps = withdrawalTimelineSteps(status);
 
@@ -1375,18 +1418,18 @@ function WithdrawalRequestForm({ data, onSaved }) {
     setForm({
       attachment_id: existing?.request_attachment?.id || null,
       reason: existing?.reason || "",
-      effective_term: existing?.effective_term || "",
+      subject_enrollment_id: existing?.subject_enrollment_id || activeSubjects[0]?.id || "",
     });
-  }, [data.student.id, existing?.id, existing?.updated_at]);
+  }, [data.student.id, existing?.id, existing?.updated_at, activeSubjects[0]?.id]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current withdrawal stage</p><p className="mt-1 text-xs text-slate-500">Only the requirements due now can be edited. Earlier submissions remain available below.</p></div><StatusBadge value={status} dot={false} /></div></div>
-      <StageCard number={1} title="Withdrawal Application" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: effective semester, reason, and the signed withdrawal request PDF." : "Your application details and original file are saved and read-only."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Effective semester" required><Input value={form.effective_term} onChange={set("effective_term")} required placeholder="AY 2026-2027 1st Semester" /></Field><Field label="Reason for withdrawal" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Withdrawal request/form PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the withdrawal request/form PDF before submitting." : ""} label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"} /></div> : <div className="space-y-3"><p className="text-sm text-slate-600">Effective {existing?.effective_term || "semester pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
+      <StageCard number={1} title="Subject Withdrawal Application" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose the enrolled subject to withdraw from, state the reason, and upload the signed request. Your other subjects and program standing are not changed." : "Your selected subject, reason, and original file are saved and read-only."}>
+        {applicationEditable ? <div className="space-y-4"><Field label="Enrolled subject" required><select className="field-input cursor-pointer" value={form.subject_enrollment_id} onChange={set("subject_enrollment_id")} required><option value="">Choose an enrolled subject</option>{activeSubjects.map((item) => <option key={item.id} value={item.id}>{item.course_code} — {item.course_title} · {item.term_label}</option>)}</select>{!activeSubjects.length && <p className="mt-1 text-xs font-semibold text-amber-700">No active subject enrollment is available. Contact Graduate School staff before filing.</p>}</Field><Field label="Reason for withdrawing from this subject" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Signed subject withdrawal request PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || !form.subject_enrollment_id} disabledHint={!form.subject_enrollment_id ? "Choose an active enrolled subject before submitting." : !form.attachment_id ? "Upload the signed subject withdrawal request before submitting." : ""} label={returned ? "Resubmit subject withdrawal" : "Submit subject withdrawal"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.subject?.course_code || "Subject pending"} — {existing?.subject?.course_title || "Selected subject"}</p><p className="text-sm text-slate-600">{existing?.effective_term || existing?.subject?.term_label || "Semester pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
       </StageCard>
-      <StageCard number={2} title="Staff Intake / Dean Review" state={denied ? "rejected" : returned ? "returned" : reviewPending ? "pending" : reviewComplete ? "complete" : "locked"} helper={denied ? "The Dean denied this request. Your lifecycle standing remains active." : returned ? "Review the comments, update Step 1, and resubmit." : reviewPending ? "Graduate School staff and the Dean are reviewing the saved application." : reviewComplete ? "The Dean approved the request for follow-through." : "Available after the application is submitted."} />
-      <StageCard number={3} title="GS Staff Follow-through and Confirmation" state={followThroughPending ? "pending" : followThroughComplete ? "complete" : "locked"} helper={followThroughPending ? "The Dean approved your request. Graduate School staff are noting the effective semester, informing the relevant parties, and completing the withdrawal record." : followThroughComplete ? "Graduate School staff completed the follow-through actions and confirmed your withdrawal." : denied ? "This step is not opened for a denied request." : "Available after Dean approval."} />
+      <StageCard number={2} title="Staff Intake / Dean Review" state={denied ? "rejected" : returned ? "returned" : reviewPending ? "pending" : reviewComplete ? "complete" : "locked"} helper={denied ? "The Dean denied this subject request. Your enrollment remains unchanged." : returned ? "Review the comments, update Step 1, and resubmit." : reviewPending ? "Graduate School staff and the Dean are reviewing the saved subject withdrawal." : reviewComplete ? "The Dean approved the request and the selected subject was updated." : "Available after the application is submitted."} />
+      <StageCard number={3} title="Subject Status Updated" state={followThroughComplete ? "complete" : "locked"} helper={followThroughComplete ? `${existing?.subject?.course_code || "The selected subject"} is now marked Withdrawn. Your other enrollments and program standing remain unchanged.` : denied ? "This step is not opened for a denied request." : "Completed automatically after Dean approval."} />
       {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} />}
       <WorkflowTimeline steps={withdrawalSteps} title="Detailed withdrawal timeline" />
     </form>
@@ -1493,6 +1536,7 @@ function GraduationRequestForm({ data, onSaved }) {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const eligibility = data.graduation_eligibility || {};
   const status = existing?.endorsement_status || "Not Submitted";
+  const exported = existing?.registrar_status === "Exported - Ready to Send";
   const applicationEditable = !existing || ["Not Eligible", "Returned for Clarification"].includes(status);
   const returned = status === "Returned for Clarification";
   const missing = [
@@ -1514,12 +1558,12 @@ function GraduationRequestForm({ data, onSaved }) {
       <StageCard number={1} title="Application / Review Window" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: the review window and any supporting graduation PDF." : "Your submitted application is saved and read-only during review."}>
         {applicationEditable ? <div className="space-y-4"><Field label="Review window / semester" required><Input value={form.review_window} onChange={set("review_window")} required /></Field><RequestPdfUpload requestType="graduation" label="Optional graduation endorsement / supporting PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message to the staff reviewing your graduation submission." /></Field><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.review_window}</p><SavedWorkflowFiles files={existing?.attachments || []} /></div>}
       </StageCard>
-      <StageCard number={2} title="Staff and Coursework Review" state={["For Review", "Coursework Review"].includes(status) ? "pending" : ["Research Review", "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar"].includes(status) ? "complete" : "locked"} helper={["For Review", "Coursework Review"].includes(status) ? "Graduate School staff and the Academic Coordinator are reviewing your coursework record." : "This stage opens after the application is submitted."} />
-      <StageCard number={3} title="Requirements Validation" state={["Research Review", "Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status) ? "pending" : ["Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar"].includes(status) ? "complete" : status === "Not Eligible" ? "returned" : "locked"} helper={status === "Not Eligible" ? "Resolve the listed missing requirements before resubmitting your application." : "Coursework, research, practicum, and completion records are checked here."}>
+      <StageCard number={2} title="Staff and Coursework Review" state={["For Review", "Coursework Review"].includes(status) ? "pending" : ["Research Review", "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved"].includes(status) ? "complete" : "locked"} helper={["For Review", "Coursework Review"].includes(status) ? "Graduate School staff and the Academic Coordinator are reviewing your coursework record." : "This stage opens after the application is submitted."} />
+      <StageCard number={3} title="Requirements Validation" state={["Research Review", "Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status) ? "pending" : ["Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved"].includes(status) ? "complete" : status === "Not Eligible" ? "returned" : "locked"} helper={status === "Not Eligible" ? "Resolve the listed missing requirements before resubmitting your application." : "Coursework, research, practicum, and completion records are checked here."}>
         <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">Monitoring eligibility recommendation</p><StatusBadge value={eligibility.status || (eligibility.eligible ? "Eligible" : "Needs verification")} dot={false} /></div>{missing.length ? <ul className="mt-2 space-y-1 text-xs text-slate-500">{missing.slice(0, 8).map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500">No missing requirements are currently flagged by the monitoring layer.</p>}</div>
       </StageCard>
-      <StageCard number={4} title="Dean Endorsement" state={status === "Returned for Revision" ? "returned" : status === "Ready for Dean Review" ? "pending" : ["Dean Approved", "Sent to Registrar"].includes(status) ? "complete" : "locked"} helper={status === "Returned for Revision" ? "The endorsement list was returned to staff for correction. Your own submission remains saved." : status === "Ready for Dean Review" ? "The prepared endorsement is awaiting Dean action." : "Available after eligibility is confirmed and staff prepares the endorsement."} />
-      <StageCard number={5} title="Endorsement Export" state={status === "Sent to Registrar" ? "complete" : status === "Dean Approved" ? "pending" : "locked"} helper={status === "Sent to Registrar" ? "The Dean-approved endorsed list has been exported for the external graduation process." : status === "Dean Approved" ? "The Dean-approved list is ready for export." : "Available after Dean approval."} />
+      <StageCard number={4} title="Dean Endorsement" state={status === "Returned for Revision" ? "returned" : status === "Ready for Dean Review" ? "pending" : status === "Dean Approved" ? "complete" : "locked"} helper={status === "Returned for Revision" ? "The endorsement list was returned to staff for correction. Your own submission remains saved." : status === "Ready for Dean Review" ? "The prepared endorsement is awaiting Dean action." : "Available after eligibility is confirmed and staff prepares the endorsement."} />
+      <StageCard number={5} title="Endorsement Export" state={exported ? "complete" : status === "Dean Approved" ? "pending" : "locked"} helper={exported ? "The Dean-approved endorsed list has been exported for the external Registrar process." : status === "Dean Approved" ? "The Dean-approved list is ready for export." : "Available after Dean approval."} />
     </form>
   );
 }

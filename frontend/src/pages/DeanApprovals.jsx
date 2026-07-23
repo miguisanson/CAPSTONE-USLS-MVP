@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Send, Upload, Mail, Printer } from "lucide-react";
+import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Printer } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
@@ -31,8 +31,6 @@ const CLARIFICATION_TEMPLATES = [
   "Sending this back to the previous stage for correction.",
   "Other / Custom comment",
 ];
-
-const REGISTRAR_HANDOFF_EMAIL = "registrar@usls.edu.ph";
 
 function deanItemDate(item) {
   return item.last_activity_at || item.submitted_at || item.record?.updated_at || "";
@@ -110,35 +108,35 @@ const DEAN_GRADUATION_BATCH_STAGES = [
   {
     label: "Compile graduation list",
     detail: "GS Staff created the candidate batch.",
-    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Returned for Revision"],
   },
   {
     label: "Academic Coordinator checks course completion",
     detail: "Coursework completion was checked before Dean review.",
-    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Returned for Revision"],
   },
   {
     label: "Research Coordinator validates research requirements",
     detail: "Research completion evidence was validated before endorsement.",
-    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Returned for Revision"],
   },
   {
     label: "GS Staff prepares endorsement list",
     detail: "The endorsement list was prepared or revised for Dean action.",
-    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Sent to Registrar", "Returned for Revision"],
+    completeStatuses: ["Ready for Dean Review", "Dean Approved", "Returned for Revision"],
   },
   {
     label: "Dean reviews endorsement list",
     detail: "Dean approves the batch or returns it for revision.",
     currentStatuses: ["Ready for Dean Review"],
-    completeStatuses: ["Dean Approved", "Sent to Registrar"],
+    completeStatuses: ["Dean Approved"],
     attentionStatuses: ["Returned for Revision"],
   },
   {
-    label: "Send endorsed list to Registrar",
-    detail: "Dean-approved candidates are exported for Registrar receipt.",
+    label: "Export endorsed list",
+    detail: "Dean-approved candidates are available as an external-process export.",
     currentStatuses: ["Dean Approved"],
-    completeStatuses: ["Sent to Registrar"],
+    completeStatuses: ["Dean Approved"],
     attentionStatuses: ["Returned for Revision"],
   },
 ];
@@ -285,7 +283,6 @@ export default function DeanApprovals() {
   const [view, setView] = useState("overview");
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
   const [pendingDecision, setPendingDecision] = useState(null);
-  const [pendingRegistrarHandoff, setPendingRegistrarHandoff] = useState(null);
   const [exportedGraduationBatches, setExportedGraduationBatches] = useState(() => new Set());
   const [selectedGraduationIds, setSelectedGraduationIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
@@ -431,37 +428,10 @@ export default function DeanApprovals() {
     try {
       const result = await api.exportGraduationCsv(reviewWindow, endorsementIds);
       setExportedGraduationBatches((current) => new Set(current).add(batchLabel));
-      setMsg(`${batchLabel} exported as ${result.filename}. Attach the exported file when you send it to the Registrar.`);
+      setMsg(`${batchLabel} exported as ${result.filename}. The file is ready for the external Registrar process.`);
       await refetch();
     } catch (error) {
       setActErr(error.message || "Could not export the endorsed list.");
-    } finally {
-      setBusy(0);
-    }
-  }
-
-  async function sendRegistrarHandoff(payload) {
-    const key = `registrar-${payload.batchLabel}`;
-    setBusy(key);
-    setMsg("");
-    setActErr("");
-    try {
-      const result = await api.sendGraduationRegistrarHandoff({
-        endorsementIds: payload.endorsementIds,
-        recipientEmail: payload.recipientEmail,
-        file: payload.file,
-        comment: payload.comment,
-      });
-      setMsg(result.message);
-      setPendingRegistrarHandoff(null);
-      setExportedGraduationBatches((current) => {
-        const next = new Set(current);
-        next.delete(payload.batchLabel);
-        return next;
-      });
-      await refetch();
-    } catch (error) {
-      setActErr(error.message || "Could not send the endorsed list to the Registrar.");
     } finally {
       setBusy(0);
     }
@@ -583,7 +553,7 @@ export default function DeanApprovals() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="font-display text-lg font-semibold text-ink">Approved graduation batches</p>
-                <p className="text-xs text-slate-500">Export the endorsed list, then attach that file for the Registrar handoff.</p>
+                <p className="text-xs text-slate-500">Export the Dean-approved list for the external Registrar process.</p>
               </div>
               <StatusBadge value={`${approvedGraduation.length} approved`} dot={false} />
             </div>
@@ -596,7 +566,6 @@ export default function DeanApprovals() {
                 const expanded = expandedGraduationBatches.has(batch.label);
                 const readyToSend = graduationBatchReadyToSend(batch, exportedGraduationBatches);
                 const exportBusy = busy === `export-${batch.label}`;
-                const sendBusy = busy === `registrar-${batch.label}`;
                 return (
                   <div key={`approved-${batch.label}`} className="rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-1.5">
                     <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(320px,1.25fr)] lg:items-center">
@@ -612,15 +581,7 @@ export default function DeanApprovals() {
                       </div>
                       <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
                         <button type="button" onClick={() => toggleGraduationBatchStudents(batch.label)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
-                        <button type="button" disabled={exportBusy || sendBusy} onClick={() => exportApproved(payload)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700"><Download className="h-4 w-4 shrink-0" /> {exportBusy ? "Exporting..." : "Export approved list"}</button>
-                        <button
-                          type="button"
-                          disabled={!readyToSend || exportBusy || sendBusy}
-                          onClick={() => setPendingRegistrarHandoff(payload)}
-                          className={readyToSend ? "btn cursor-pointer bg-emerald-600 px-2.5 py-1 text-white hover:bg-emerald-700" : "btn border border-slate-200 bg-slate-100 px-2.5 py-1 text-slate-400"}
-                        >
-                          <Send className="h-4 w-4" /> {sendBusy ? "Sending..." : "Send to Registrar"}
-                        </button>
+                        <button type="button" disabled={exportBusy} onClick={() => exportApproved(payload)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700"><Download className="h-4 w-4 shrink-0" /> {exportBusy ? "Exporting..." : readyToSend ? "Export again" : "Export approved list"}</button>
                       </div>
                     </div>
                     {expanded && (
@@ -791,7 +752,6 @@ export default function DeanApprovals() {
         </DeanDialog>
       )}
       {pendingDecision && <DeanDecisionModal pending={pendingDecision} busy={busy === `${pendingDecision.item.type}-${pendingDecision.item.id}`} onClose={() => setPendingDecision(null)} onConfirm={confirmWorkflowDecision} />}
-      {pendingRegistrarHandoff && <DeanRegistrarHandoffModal pending={pendingRegistrarHandoff} busy={busy === `registrar-${pendingRegistrarHandoff.batchLabel}`} onClose={() => setPendingRegistrarHandoff(null)} onConfirm={sendRegistrarHandoff} />}
       {batchOpen && selectedGraduation.length > 0 && <DeanGraduationBatchModal rows={selectedGraduation} onClose={() => setBatchOpen(false)} onSaved={batchSaved} />}
       {stageBatch && <DeanGraduationStageModal batch={stageBatch} onClose={() => setStageBatch(null)} />}
       </div>
@@ -908,60 +868,6 @@ function DeanDecisionModal({ pending, busy, onClose, onConfirm }) {
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Workflow movement</p><p className="mt-2 text-sm font-semibold text-ink">{item.workflow_status || item.status} <span className="mx-1 text-slate-300">→</span> {decision === "approve" || decision === "review" ? "Approved / reviewed" : decision === "deny" ? "Denied" : "Returned for revision"}</p></div>
         {note ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-amber-700">Recorded comment</p><p className="mt-2 whitespace-pre-wrap text-sm text-amber-900">{note}</p></div> : <p className="text-sm text-slate-600">No optional comment was entered. A student-visible status notice will still be recorded.</p>}
       </div>
-    </DeanDialog>
-  );
-}
-
-function DeanRegistrarHandoffModal({ pending, busy, onClose, onConfirm }) {
-  const [recipientEmail, setRecipientEmail] = useState(REGISTRAR_HANDOFF_EMAIL);
-  const [file, setFile] = useState(null);
-  const [comment, setComment] = useState("");
-  const [error, setError] = useState("");
-  function submit(event) {
-    event.preventDefault();
-    if (!file) {
-      setError("Attach the exported endorsed list before sending it to the Registrar.");
-      return;
-    }
-    setError("");
-    onConfirm({ ...pending, recipientEmail, file, comment });
-  }
-  return (
-    <DeanDialog
-      id="dean-registrar-handoff"
-      title={`Send endorsement list to Registrar for ${pending.batchLabel}`}
-      subtitle={`${pending.count} approved candidate${pending.count === 1 ? "" : "s"} · attach the exported endorsed list`}
-      onClose={onClose}
-      size="wide"
-      footer={<button type="submit" form="dean-registrar-handoff-form" disabled={busy || !file} className="btn cursor-pointer bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"><Send className="h-4 w-4" /> {busy ? "Sending..." : "Send to Registrar email"}</button>}
-    >
-      <form id="dean-registrar-handoff-form" onSubmit={submit} className="space-y-4">
-        {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
-        <label className="block">
-          <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600"><Mail className="h-3.5 w-3.5" /> Send to</span>
-          <input value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} required type="email" className="field-input" />
-        </label>
-        <label className="block rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <span className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-600"><Upload className="h-3.5 w-3.5" /> Attach exported file</span>
-          <input type="file" accept=".csv,.pdf,.xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] || null)} className="field-input cursor-pointer bg-white" />
-          {file && <p className="mt-2 text-xs font-semibold text-emerald-700">{file.name}</p>}
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-slate-600">Optional email note</span>
-          <textarea value={comment} onChange={(event) => setComment(event.target.value)} className="field-input min-h-24" />
-        </label>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-sm font-semibold text-ink">Selected candidates</p>
-          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-            {pending.rows.map((item) => (
-              <li key={item.student.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                <p className="font-semibold text-ink">{item.student.name}</p>
-                <p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </form>
     </DeanDialog>
   );
 }
@@ -1174,8 +1080,8 @@ function deanBoardGroup(item) {
   if (["Report Sent to Dean", "Ready for Dean Review", "Dean Review"].includes(workflowStatus)) return "Pending Dean Review";
   if (["Returned", "Returned for Clarification", "Returned for Revision", "Additional Certificates Requested"].includes(item.status)
     || ["Returned", "Returned for Clarification", "Returned for Revision", "Additional Certificates Requested"].includes(workflowStatus)) return "Returned for Revision";
-  if (["Dean Approved", "Dean Reviewed", "Approved", "Sent to Registrar", "Withdrawn Confirmed"].includes(item.status)
-    || ["Dean Approved", "Dean Reviewed", "Approved", "Sent to Registrar", "Withdrawn Confirmed"].includes(workflowStatus)) return "Approved / Completed";
+  if (["Dean Approved", "Dean Reviewed", "Approved", "Withdrawn Confirmed"].includes(item.status)
+    || ["Dean Approved", "Dean Reviewed", "Approved", "Withdrawn Confirmed"].includes(workflowStatus)) return "Approved / Completed";
   if (["Denied", "Rejected", "Cancelled"].includes(item.status) || ["Denied", "Rejected", "Cancelled"].includes(workflowStatus)) return "Rejected / Withdrawn";
   return "New / Submitted";
 }

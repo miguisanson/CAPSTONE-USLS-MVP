@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { BriefcaseBusiness, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, RotateCcw, UserCog, UserRound, Gavel } from "lucide-react";
+import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX, Gavel } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorNote } from "../components/ui";
@@ -207,6 +207,63 @@ export default function Login() {
             )}
 
             {!demoLoading && <div className="space-y-3 pt-2">
+              <div>
+                <p className="field-label">Enrollment, adjustments, and standing demos</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Two resettable personas are available for each assigned process. Course-adjustment personas provide demand data for the Academic Coordinator view.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <DemoStudentGroup
+                  open={openDemoGroup === "enrollment"}
+                  onToggle={() => setOpenDemoGroup((current) => current === "enrollment" ? "" : "enrollment")}
+                  title="Enrollment"
+                  description="Ready for single-student offered-subject enrollment."
+                  icon={BookPlus}
+                  students={demoStudents.filter((student) => student.workflow === "enrollment")}
+                  quickLoginBusy={quickLoginBusy}
+                  resetBusy={resetBusy}
+                  onLogin={quickLogin}
+                  onReset={resetDemoStudent}
+                />
+                <DemoStudentGroup
+                  open={openDemoGroup === "course-adjustments"}
+                  onToggle={() => setOpenDemoGroup((current) => current === "course-adjustments" ? "" : "course-adjustments")}
+                  title="Course Adjustments"
+                  description="Missing-subject demand scenarios for the Academic Coordinator."
+                  icon={SlidersHorizontal}
+                  students={demoStudents.filter((student) => student.workflow === "course-adjustments")}
+                  quickLoginBusy={quickLoginBusy}
+                  resetBusy={resetBusy}
+                  onLogin={quickLogin}
+                  onReset={resetDemoStudent}
+                />
+                <DemoStudentGroup
+                  open={openDemoGroup === "leave-of-absence"}
+                  onToggle={() => setOpenDemoGroup((current) => current === "leave-of-absence" ? "" : "leave-of-absence")}
+                  title="Leave of Absence"
+                  description="Structured LOA requests with deterministic policy checks."
+                  icon={CalendarOff}
+                  students={demoStudents.filter((student) => student.workflow === "leave-of-absence")}
+                  quickLoginBusy={quickLoginBusy}
+                  resetBusy={resetBusy}
+                  onLogin={quickLogin}
+                  onReset={resetDemoStudent}
+                />
+                <DemoStudentGroup
+                  open={openDemoGroup === "awol"}
+                  onToggle={() => setOpenDemoGroup((current) => current === "awol" ? "" : "awol")}
+                  title="AWOL & Residency"
+                  description="One return-from-AWOL and one residency-ready persona."
+                  icon={UserX}
+                  students={demoStudents.filter((student) => student.workflow === "awol")}
+                  quickLoginBusy={quickLoginBusy}
+                  resetBusy={resetBusy}
+                  onLogin={quickLogin}
+                  onReset={resetDemoStudent}
+                />
+              </div>
+
               <div>
                 <p className="field-label">Standalone processes</p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">

@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BookOpenCheck, Plus, Save, Trash2, CalendarClock } from "lucide-react";
+import { BookOpenCheck, Plus, Save, Trash2, CalendarClock, Eye, Lightbulb } from "lucide-react";
 import { api } from "../api";
 import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
 import { useConfirm } from "../components/confirm";
+import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 
 // Course Offering Setup (Sir Eddie, 2026-07-21): the Academic Coordinator declares which
 // subjects are offered for a program + semester, assigns faculty and schedule, and those
 // offerings are what students get tagged/enrolled into on the Enrollment screen.
-export default function CourseOfferings() {
+export default function CourseOfferings({ embedded = false }) {
   const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState(null);
@@ -18,6 +19,7 @@ export default function CourseOfferings() {
   const [busy, setBusy] = useState("");
   const [addCourseId, setAddCourseId] = useState("");
   const [edits, setEdits] = useState({});
+  const [selectedFaculty, setSelectedFaculty] = useState(null);
 
   const programId = searchParams.get("program_id") || "";
   const termId = searchParams.get("term_id") || "";
@@ -31,7 +33,11 @@ export default function CourseOfferings() {
       setEdits({});
       const canonical = { program_id: String(res.program.id), term_id: String(res.term?.id || "") };
       if (canonical.program_id !== programId || canonical.term_id !== termId) {
-        setSearchParams(Object.fromEntries(Object.entries(canonical).filter(([, v]) => v)), { replace: true });
+        const params = new URLSearchParams(searchParams);
+        params.set("view", "offerings");
+        params.set("program_id", canonical.program_id);
+        if (canonical.term_id) params.set("term_id", canonical.term_id); else params.delete("term_id");
+        setSearchParams(params, { replace: true });
       }
     } catch (err) {
       setError(err.message);
@@ -48,8 +54,10 @@ export default function CourseOfferings() {
   const canManage = data?.permissions?.can_manage;
 
   function updateFilters(next) {
-    const params = { program_id: next.program_id ?? programId, term_id: next.term_id ?? termId };
-    setSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)), { replace: true });
+    const params = new URLSearchParams(searchParams);
+    const values = { program_id: next.program_id ?? programId, term_id: next.term_id ?? termId };
+    Object.entries(values).forEach(([key, value]) => value ? params.set(key, value) : params.delete(key));
+    setSearchParams(params, { replace: true });
   }
 
   function editOf(offering) {
@@ -98,15 +106,14 @@ export default function CourseOfferings() {
   if (loading && !data) return <Spinner label="Loading course offerings..." />;
 
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className={`space-y-5 ${embedded ? "" : "animate-fade-up"}`}>
       <Card className="p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white"><BookOpenCheck className="h-6 w-6" /></span>
+          {!embedded && <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white"><BookOpenCheck className="h-6 w-6" /></span>}
           <div className="flex-1">
-            <h1 className="font-display text-2xl font-semibold text-ink">Course Offering Setup</h1>
+            <h2 className={`font-display font-semibold text-ink ${embedded ? "text-xl" : "text-2xl"}`}>Course Offering Setup</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Declare the subjects offered for a program and semester, and assign the faculty and schedule.
-              These offerings are what students are enrolled into on the Enrollment screen.
+              Complete the official offering list, then choose the faculty, schedule, and section. Faculty suggestions are references only; the Academic Coordinator can change every assignment.
             </p>
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <select value={data?.program?.id || programId} onChange={(e) => updateFilters({ program_id: e.target.value })} className="field-input cursor-pointer" aria-label="Program">
@@ -164,10 +171,25 @@ export default function CourseOfferings() {
                       <td className="px-5 py-3"><p className="font-semibold text-ink">{o.code}</p><p className="text-xs text-slate-500">{o.title} · {o.units}u</p></td>
                       <td className="px-3 py-3">
                         {canManage ? (
-                          <select value={e.faculty_id} onChange={(ev) => setEdit(o.id, "faculty_id", ev.target.value)} className="field-input max-w-56 cursor-pointer">
-                            <option value="">Unassigned</option>
-                            {(data.faculty || []).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                          </select>
+                          <div className="min-w-64">
+                            <select value={e.faculty_id} onChange={(ev) => setEdit(o.id, "faculty_id", ev.target.value)} className="field-input cursor-pointer">
+                              <option value="">Unassigned</option>
+                              {(data.faculty || []).map((f) => <option key={f.id} value={f.id}>{f.name} · {f.specialization}</option>)}
+                            </select>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                              {o.suggested_faculty_name && (
+                                <button type="button" onClick={() => setEdit(o.id, "faculty_id", String(o.suggested_faculty_id))} className="inline-flex cursor-pointer items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">
+                                  <Lightbulb className="h-3.5 w-3.5" /> Suggested: {o.suggested_faculty_name}
+                                </button>
+                              )}
+                              {e.faculty_id && (
+                                <button type="button" onClick={() => setSelectedFaculty((data.faculty_profiles || []).find((faculty) => faculty.id === Number(e.faculty_id)) || null)} className="inline-flex cursor-pointer items-center gap-1 font-semibold text-slate-600 hover:text-brand-700">
+                                  <Eye className="h-3.5 w-3.5" /> View profile
+                                </button>
+                              )}
+                            </div>
+                            <p className="mt-1 text-[11px] text-slate-500">{o.suggestion_basis}</p>
+                          </div>
                         ) : (o.faculty_name || <span className="text-slate-400">Unassigned</span>)}
                       </td>
                       <td className="px-3 py-3">
@@ -195,6 +217,7 @@ export default function CourseOfferings() {
       ) : (
         <EmptyState icon={CalendarClock} title="No subjects offered yet for this semester" hint={canManage ? "Add subjects above to build this semester's offering list." : "The Academic Coordinator has not set up offerings for this semester."} />
       )}
+      {selectedFaculty && <FacultyAssignmentProfile faculty={selectedFaculty} onClose={() => setSelectedFaculty(null)} />}
     </div>
   );
 }

@@ -6,45 +6,23 @@ import { useApi } from "../hooks";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
 import { useConfirm } from "../components/confirm";
 
-// Cell styling per course status.
-const CELL = {
-  Completed: { cls: "bg-brand-500 text-white", mark: "✓" },
-  Current: { cls: "bg-amber-100 text-amber-700", mark: "·" },
-  Enrolled: { cls: "bg-amber-100 text-amber-700", mark: "·" },
-  Incomplete: { cls: "bg-amber-200 text-amber-800", mark: "!" },
-  "Retake Required": { cls: "bg-orange-200 text-orange-800", mark: "R" },
-  Failed: { cls: "bg-red-100 text-red-700", mark: "F" },
-  Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
-};
-
-const STATUS_CYCLE = ["Missing", "Current", "Completed", "Incomplete", "Failed"];
 const CELL_VIEW = {
   Completed: { cls: "bg-brand-500 text-white", mark: "C" },
+  Taken: { cls: "bg-brand-100 text-brand-800", mark: "T" },
   Current: { cls: "bg-blue-100 text-blue-700", mark: "R" },
   Enrolled: { cls: "bg-blue-100 text-blue-700", mark: "R" },
   Incomplete: { cls: "bg-amber-200 text-amber-800", mark: "I" },
   "Retake Required": { cls: "bg-orange-200 text-orange-800", mark: "R" },
   Failed: { cls: "bg-red-100 text-red-700", mark: "F" },
+  Dropped: { cls: "bg-violet-100 text-violet-700", mark: "D" },
+  Withdrawn: { cls: "bg-rose-100 text-rose-700", mark: "W" },
   Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
 };
-
 const MILES = [
   ["title", "Title"],
   ["proposal", "Proposal"],
   ["ethics", "Ethics"],
   ["final", "Final"],
-];
-const COMPRE_UNIT_REQUIREMENTS = { Basic: 6, Major: 9, Cognate: 6 };
-const COMPRE_TOTAL_UNITS_REQUIRED = 21;
-const RESEARCH_STAGE_ORDER = [
-  "Admission",
-  "Coursework",
-  "Comprehensive Exam",
-  "Proposal Development",
-  "Proposal Defense",
-  "Data Collection",
-  "Final Defense",
-  "Graduation",
 ];
 
 export default function MonitoringGrid() {
@@ -66,16 +44,10 @@ export default function MonitoringGrid() {
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  // View-only by default so a stray click can't change a student's status.
-  // Official AIMS enrollment data is read-only in this application (checklist items
-  // 7, 29, 71): staff view/filter/flag, but never edit the official values here.
-  const editMode = false;
   function load(pid, nextProgress = progress, nextRisk = risk, nextEnrollment = enrollment) {
     setLoading(true);
     setError("");
-    api
-      .monitoringGrid({ program_id: pid || undefined, term_id: selectedTermId || undefined, progress: nextProgress, risk: nextRisk, enrollment: nextEnrollment })
+    api.monitoringGrid({ program_id: pid || undefined, term_id: selectedTermId || undefined, progress: nextProgress, risk: nextRisk, enrollment: nextEnrollment })
       .then((g) => {
         setGrid(g);
         setProgramId(String(g.program.id));
@@ -113,97 +85,6 @@ export default function MonitoringGrid() {
     return rows;
   }, [grid?.students, sortBy]);
 
-  async function cycleCell(studentId, course, current) {
-    if (!editMode) return; // sheet is locked; enable Edit mode to make changes
-    const index = STATUS_CYCLE.indexOf(current);
-    const nextStatus = STATUS_CYCLE[(index + 1) % STATUS_CYCLE.length];
-    // Confirm changes that pull a subject backwards (e.g. Completed → Incomplete)
-    // or mark it Failed, so an accidental click can't quietly downgrade.
-    const isDowngrade = current === "Completed" && nextStatus !== "Completed";
-    const isNegative = nextStatus === "Failed";
-    if (isDowngrade || isNegative) {
-      const ok = await confirm({
-        title: "Change subject status?",
-        message: `Change ${course.code} from "${current}" to "${nextStatus}"?\n\nThis affects the student's progress and comprehensive-exam eligibility.`,
-        confirmLabel: "Change status",
-        tone: "danger",
-      });
-      if (!ok) return;
-    }
-    // optimistic update
-    setGrid((g) => {
-      if (!g) return g;
-      const students = g.students.map((s) => {
-        if (s.id !== studentId) return s;
-        const cells = { ...s.cells, [course.id]: nextStatus };
-        const completed = flatCourses.reduce((n, c) => n + (cells[c.id] === "Completed" ? 1 : 0), 0);
-        return refreshStudentProgress(
-          { ...s, cells, completed, rate: g.course_count ? Math.round((completed / g.course_count) * 1000) / 10 : 0 },
-          g.categories
-        );
-      });
-      return { ...g, students };
-    });
-    setSaving(true);
-    try {
-      await api.saveCourseAudit({ course_id: course.id, term: grid?.selected_term?.label || "", statuses: { [studentId]: nextStatus } });
-    } catch (e) {
-      setError(e.message);
-      load(programId); // revert by reloading on failure
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function toggleCompreExam(student) {
-    if (!editMode) return; // locked unless Edit mode is on
-    const nextStatus = nextCompreExamStatus(student);
-    if (!nextStatus) {
-      setError("The student must complete all curriculum subjects before the comprehensive exam can be marked Passed or Failed.");
-      return;
-    }
-    setError("");
-    setSaving(true);
-    setGrid((g) => {
-      if (!g) return g;
-      return {
-        ...g,
-        students: g.students.map((s) => {
-          if (s.id !== student.id) return s;
-          const updated = {
-            ...s,
-            compre_eligibility: {
-              ...s.compre_eligibility,
-              exam_status: nextStatus,
-              passed: nextStatus === "Passed",
-              research_allowed: !!s.compre_eligibility?.eligible && nextStatus === "Passed",
-            },
-          };
-          return refreshStudentProgress(updated, g.categories);
-        }),
-      };
-    });
-    try {
-      const res = await api.saveCompreExam({ student_id: student.id, status: nextStatus });
-      setGrid((g) => {
-        if (!g) return g;
-        return {
-          ...g,
-          students: g.students.map((s) => (
-            s.id === student.id
-              ? { ...s, stage: res.stage, risk: res.risk, eligible: res.eligible, compre_eligibility: res.compre_eligibility, milestones: res.milestones }
-              : s
-          )),
-        };
-      });
-    } catch (e) {
-      setError(e.message);
-      load(programId);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function flagIssue(student) {
     // Exception reporting (checklist item 72): official AIMS values are never edited
     // here. Staff report a discrepancy that is recorded for the proper office to
@@ -214,16 +95,12 @@ export default function MonitoringGrid() {
       confirmLabel: "Flag issue",
     });
     if (!ok) return;
-    setSaving(true);
-    setError("");
     try {
       await api.flagMonitoringIssue(student.id, {
         note: `Discrepancy flagged from the monitoring sheet for ${student.student_number}.`,
       });
     } catch (e) {
       setError(e.message);
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -239,11 +116,12 @@ export default function MonitoringGrid() {
       ];
       lines.push(row.join(","));
     });
+    const filename = `monitoring-${grid.program.code}.csv`;
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `monitoring-${grid.program.code}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -269,94 +147,30 @@ export default function MonitoringGrid() {
 
   return (
     <div className="space-y-5 animate-fade-up">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            The full class view — students by row, subjects by column. Official AIMS enrollment data is read-only; use “Flag issue” to report a discrepancy.
-          </p>
-        </div>
-        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-7">
-          <select
-            value={programId}
-            onChange={(e) => updateFilters({ program_id: e.target.value })}
-            className="field-input cursor-pointer"
-            aria-label="Program"
-          >
-            {(meta?.programs || []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
+      <div>
+        <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
+        <p className="mt-1 text-sm text-slate-500">Read-only curriculum progress synchronized from enrollment and approved workflows.</p>
+      </div>
+
+      <Card className="p-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+          <select value={programId} onChange={(e) => updateFilters({ program_id: e.target.value })} className="field-input cursor-pointer" aria-label="Program">
+            {(meta?.programs || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </select>
           <select value={selectedTermId || String(grid?.selected_term?.id || "")} onChange={(e) => updateFilters({ term_id: e.target.value })} className="field-input cursor-pointer" aria-label="Semester">
             {(grid?.terms || meta?.terms || []).map((term) => <option key={term.id} value={term.id}>{term.label}{term.relative_label ? ` (${term.relative_label})` : ""}</option>)}
           </select>
-          <select
-            value={progress}
-            onChange={(e) => updateFilters({ progress: e.target.value })}
-            className="field-input cursor-pointer"
-            aria-label="Progress"
-          >
-            <option value="">All progress</option>
-            <option value="not-started">Not started</option>
-            <option value="in-progress">In progress</option>
-            <option value="complete">All subjects complete</option>
-            <option value="units-complete">Eligible for compre</option>
-          </select>
-          <select
-            value={risk}
-            onChange={(e) => updateFilters({ risk: e.target.value })}
-            className="field-input cursor-pointer"
-            aria-label="Risk"
-          >
-            <option value="">All risk</option>
-            {["Low", "Medium", "High", "Critical", "Medium/High/Critical"].map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
-          </select>
-          <select
-            value={enrollment}
-            onChange={(e) => updateFilters({ enrollment: e.target.value })}
-            className="field-input cursor-pointer"
-            aria-label="Enrollment status"
-          >
-            <option value="">All enrollment</option>
-            <option value="LOA">LOA</option>
-            <option value="AWOL">AWOL</option>
-            <option value="LOA/AWOL">LOA or AWOL</option>
-            <option value="Enrolled">Enrolled</option>
-            <option value="Withdrawn">Withdrawn</option>
-          </select>
-          <select
-            value={sortBy}
-            onChange={(e) => updateFilters({ sort: e.target.value })}
-            className="field-input cursor-pointer"
-            aria-label="Sort monitoring sheet"
-          >
-            <option value="name">Sort: Last name</option>
-            <option value="entry-newest">Sort: AY Entry newest</option>
-            <option value="entry-oldest">Sort: AY Entry oldest</option>
-            <option value="completed-desc">Sort: Completed subjects most</option>
-            <option value="completed-asc">Sort: Completed subjects least</option>
-            <option value="units-desc">Sort: Completed units most</option>
-            <option value="risk">Sort: Highest risk</option>
-          </select>
-          <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}>
-            <Download className="h-4 w-4" /> Export CSV
-          </button>
+          <select value={progress} onChange={(e) => updateFilters({ progress: e.target.value })} className="field-input cursor-pointer" aria-label="Progress"><option value="">All progress</option><option value="not-started">Not started</option><option value="in-progress">In progress</option><option value="complete">All subjects complete</option><option value="units-complete">Eligible for compre</option></select>
+          <select value={risk} onChange={(e) => updateFilters({ risk: e.target.value })} className="field-input cursor-pointer" aria-label="Risk"><option value="">All risk</option>{["Low", "Medium", "High", "Critical", "Medium/High/Critical"].map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          <select value={enrollment} onChange={(e) => updateFilters({ enrollment: e.target.value })} className="field-input cursor-pointer" aria-label="Enrollment status"><option value="">All enrollment</option><option value="LOA">LOA</option><option value="AWOL">AWOL</option><option value="LOA/AWOL">LOA or AWOL</option><option value="Enrolled">Enrolled</option><option value="Withdrawn">Withdrawn</option></select>
+          <select value={sortBy} onChange={(e) => updateFilters({ sort: e.target.value })} className="field-input cursor-pointer" aria-label="Sort monitoring sheet"><option value="name">Sort: Last name</option><option value="entry-newest">Sort: AY Entry newest</option><option value="entry-oldest">Sort: AY Entry oldest</option><option value="completed-desc">Sort: Completed subjects most</option><option value="completed-asc">Sort: Completed subjects least</option><option value="units-desc">Sort: Completed units most</option><option value="risk">Sort: Highest risk</option></select>
+          <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}><Download className="h-4 w-4" /> Export CSV</button>
         </div>
-      </div>
+      </Card>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-        <Lock className="h-4 w-4 shrink-0 text-slate-400" />
-        <span className="font-semibold text-slate-700">Read-only</span>
-        <span>
-          Official enrollment and subject status comes from the AIMS export
-          {grid?.selected_term?.label ? ` · ${grid.selected_term.label}` : ""}. These values cannot be edited here — use
-          {" "}<span className="font-semibold">Flag issue</span> on a student row to report a discrepancy for the proper office to correct in AIMS.
-        </span>
-        {saving && <span className="text-brand-600">Working…</span>}
+      <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+        <p><span className="font-semibold text-ink">Read-only view.</span> Enrollment, approved withdrawal, and verified source imports update this page automatically. Use Flag issue only to record a discrepancy without changing the source value.</p>
       </div>
 
       {grid?.integrity && (
@@ -379,28 +193,17 @@ export default function MonitoringGrid() {
                 : `Enrollment and student profiles are synchronized (${grid.integrity.checked_enrollments} rows checked)`}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() =>
-              navigate(
-                `/enrollment?program_id=${grid.program.id}&term_id=${grid.selected_term?.id || ""}`
-              )
-            }
-            className="btn-ghost px-3 py-2"
-          >
-            Review enrollment
-          </button>
         </div>
       )}
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Completed</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Current</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Officially completed</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-100 ring-1 ring-brand-200" /> Taken</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Enrolled</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-amber-300" /> Incomplete</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-100 ring-1 ring-red-200" /> Failed</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-violet-100 ring-1 ring-violet-200" /> Dropped</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>
-        <span className="text-slate-400">Cycle: Not taken - Current - Completed - Incomplete - Failed</span>
       </div>
 
       {loading ? (
@@ -526,23 +329,23 @@ export default function MonitoringGrid() {
                     {flatCourses.map((c) => {
                       const status = s.cells[c.id] || "Missing";
                       const sty = CELL_VIEW[status] || CELL_VIEW.Missing;
+                      const officialStatus = s.official_cells?.[c.id] || "Missing";
+                      const statusSource = s.operational_sources?.[c.id] || "";
                       return (
                         <td key={c.id} className="border-b border-r border-slate-100 p-0 text-center">
-                          <button
-                            type="button"
-                            onClick={() => cycleCell(s.id, c, status)}
-                            disabled={!editMode}
-                            title={`${c.code} — ${status}${s.grades?.[c.id] ? ` · Grade ${s.grades[c.id]}` : ""}${s.grade_remarks?.[c.id] ? ` · ${s.grade_remarks[c.id]}` : ""}.${editMode ? " Click to cycle to the next status." : " Turn on Editing to change."}`}
-                            className={`flex h-9 w-full min-w-10 flex-col items-center justify-center text-[10px] font-bold transition-colors sm:h-10 sm:text-[11px] ${sty.cls} ${editMode ? "hover:opacity-80 cursor-pointer" : "cursor-default"}`}
+                          <span
+                            aria-label={`${c.code} for ${displayStudentName(s)}: ${status}`}
+                            title={`${c.code} — ${status}. Official/imported status: ${officialStatus}. Official grade: ${s.grades?.[c.id] || "No grade"}.${statusSource ? ` Source: ${statusSource}.` : ""} Read-only; changes are synchronized from the source workflow.`}
+                            className={`flex h-9 w-full min-w-10 cursor-default flex-col items-center justify-center text-[10px] font-bold sm:h-10 sm:text-[11px] ${sty.cls}`}
                           >
                             {sty.mark}
                             {s.grades?.[c.id] && <span className="text-[9px] font-semibold leading-none opacity-90">{s.grades[c.id]}</span>}
-                          </button>
+                          </span>
                         </td>
                       );
                     })}
                     <td className="border-b border-r border-slate-200 px-2 py-1.5 text-center">
-                      <CompreExamBadge student={s} onToggle={() => toggleCompreExam(s)} saving={saving} editMode={editMode} />
+                      <CompreExamBadge student={s} />
                     </td>
                     {MILES.map(([key]) => (
                       <td key={key} className="border-b border-r border-slate-100 text-center">
@@ -560,6 +363,7 @@ export default function MonitoringGrid() {
           </div>
         </Card>
       )}
+
     </div>
   );
 }
@@ -572,18 +376,12 @@ function compreTitle(student) {
   return `Not eligible: ${student.compre_eligibility?.completed_units || 0}/21 units completed`;
 }
 
-function CompreExamBadge({ student, onToggle, saving, editMode }) {
+function CompreExamBadge({ student }) {
   const label = compreExamLabel(student);
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={saving || !editMode || !student.compre_eligibility?.eligible}
-      title={editMode ? compreTitle(student) : `${compreTitle(student)} · Turn on Editing to change.`}
-      className="inline-flex cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
-    >
+    <span title={`${compreTitle(student)} · Read-only on the Monitoring Sheet.`} className="inline-flex">
       <StatusBadge value={label} dot={false} className="min-w-[76px] justify-center" />
-    </button>
+    </span>
   );
 }
 
@@ -595,83 +393,9 @@ function compreExamLabel(student) {
   return "Not eligible";
 }
 
-function nextCompreExamStatus(student) {
-  if (!student.compre_eligibility?.eligible) return null;
-  const examStatus = (student.compre_eligibility?.exam_status || "Not Taken").toLowerCase();
-  if (examStatus === "passed") return "Failed";
-  if (examStatus === "failed") return "Not Taken";
-  return "Passed";
-}
-
-function refreshStudentProgress(student, categories = []) {
-  const eligibility = computeCompreEligibility(student, categories);
-  const examStatus = student.compre_eligibility?.exam_status || "Not Taken";
-  const updated = {
-    ...student,
-    completed_units: eligibility.total_completed_units,
-    eligible: eligibility.eligible,
-    compre_eligibility: {
-      ...(student.compre_eligibility || {}),
-      eligible: eligibility.eligible,
-      status: eligibility.eligible ? "Eligible for Comprehensive Exam" : "Not Eligible",
-      passed: examStatus.toLowerCase() === "passed",
-      research_allowed: eligibility.eligible && examStatus.toLowerCase() === "passed",
-      categories: eligibility.categories,
-      completed_units: eligibility.completed_units,
-      required_units: COMPRE_TOTAL_UNITS_REQUIRED,
-      missing_subjects: eligibility.missing_subjects,
-      failed_subjects: eligibility.failed_subjects,
-      required_subjects: eligibility.required_subjects,
-    },
-  };
-  return { ...updated, milestones: computeResearchMilestones(updated) };
-}
-
-function computeCompreEligibility(student, categories = []) {
-  const cells = student.cells || {};
-  const categoryRows = Object.entries(COMPRE_UNIT_REQUIREMENTS).map(([category, required]) => {
-    const courseGroup = categories.find((item) => item.name === category);
-    const completed = (courseGroup?.courses || []).reduce((sum, course) => (
-      cells[course.id] === "Completed" ? sum + (course.units || 3) : sum
-    ), 0);
-    return { category, completed, required, complete: completed >= required };
-  });
-  const completedUnits = categoryRows.reduce((sum, item) => sum + item.completed, 0);
-  const totalCompletedUnits = categories.reduce((sum, group) => (
-    sum + (group.courses || []).reduce((courseSum, course) => (
-      cells[course.id] === "Completed" ? courseSum + (course.units || 3) : courseSum
-    ), 0)
-  ), 0);
-  const allCourses = categories.flatMap((group) => group.courses || []);
-  const missingSubjects = allCourses.filter((course) => cells[course.id] !== "Completed").length;
-  const failedSubjects = allCourses.filter((course) => cells[course.id] === "Failed").length;
-  return {
-    categories: categoryRows,
-    completed_units: completedUnits,
-    total_completed_units: totalCompletedUnits,
-    missing_subjects: missingSubjects,
-    failed_subjects: failedSubjects,
-    required_subjects: allCourses.length,
-    eligible: allCourses.length > 0 && missingSubjects === 0 && failedSubjects === 0,
-  };
-}
-
 function displayStudentName(student) {
   if (student.last_name || student.first_name) {
     return `${student.last_name || ""}, ${student.first_name || ""}`.replace(/^, /, "").trim();
   }
   return student.name || "Unnamed student";
-}
-
-function computeResearchMilestones(student) {
-  const stage = student.stage || "";
-  const idx = RESEARCH_STAGE_ORDER.indexOf(stage);
-  const stageIndex = idx >= 0 ? idx : 0;
-  const researchAllowed = !!student.compre_eligibility?.research_allowed;
-  return {
-    title: researchAllowed && stage !== "LOA" && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Proposal Development"),
-    proposal: researchAllowed && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Proposal Defense"),
-    ethics: researchAllowed && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Data Collection"),
-    final: researchAllowed && stageIndex >= RESEARCH_STAGE_ORDER.indexOf("Final Defense"),
-  };
 }

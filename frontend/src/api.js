@@ -95,21 +95,6 @@ export const api = {
     URL.revokeObjectURL(url);
     return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
   },
-  sendGraduationRegistrarHandoff: async ({ endorsementIds = [], recipientEmail, file, comment = "" }) => {
-    const form = new FormData();
-    endorsementIds.forEach((id) => form.append("endorsement_ids", id));
-    form.append("recipient_email", recipientEmail);
-    form.append("comment", comment);
-    if (file) form.append("file", file);
-    const res = await fetch(`${BASE}/graduation/registrar-handoff`, {
-      method: "POST",
-      credentials: "same-origin",
-      body: form,
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || `Registrar handoff failed (${res.status})`);
-    return body;
-  },
   transactionContext: (slug, params = {}) => {
     const qs = queryString(params);
     return request(`/transactions/${slug}/context${qs ? `?${qs}` : ""}`);
@@ -148,6 +133,10 @@ export const api = {
     const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
     const qs = queryString(actual);
     return request(`/monitoring/grid${qs ? `?${qs}` : ""}`);
+  },
+  monitoringClassList: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/monitoring/class-list${qs ? `?${qs}` : ""}`);
   },
   saveCompreExam: (payload) =>
     request("/monitoring/compre-exam", { method: "POST", body: JSON.stringify(payload) }),
@@ -219,6 +208,10 @@ export const api = {
     const qs = queryString(actual);
     return request(`/course-adjustments${qs ? `?${qs}` : ""}`);
   },
+  subjectNeedsReport: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/course-adjustments/subject-needs-report${qs ? `?${qs}` : ""}`);
+  },
   approvals: () => request("/approvals"),
   decideApproval: (planId, payload) =>
     request(`/approvals/${planId}/decide`, { method: "POST", body: JSON.stringify(payload) }),
@@ -226,6 +219,8 @@ export const api = {
     request(`/approvals/workflow/${type}/${id}/decide`, { method: "POST", body: JSON.stringify(payload) }),
   saveCourseAdjustmentPlan: (payload) =>
     request("/course-adjustments/plan", { method: "POST", body: JSON.stringify(payload) }),
+  facultyCvRag: (facultyId, question) =>
+    request(`/faculty/${facultyId}/cv-rag`, { method: "POST", body: JSON.stringify({ question }) }),
   courseAuditSubjects: (programId) =>
     request(`/course-audit/subjects${programId ? `?program_id=${programId}` : ""}`),
   courseAuditRoster: (courseId, term = "") =>
@@ -262,6 +257,8 @@ export const api = {
     request(`/faculty-portal/defense-verdicts/${scheduleId}`, { method: "POST", body: JSON.stringify(payload) }),
   submitStudentRequest: (type, payload) =>
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
+  withdrawStudentLoaRequest: () =>
+    request("/student-portal/requests/leave-of-absence/withdraw", { method: "POST", body: JSON.stringify({}) }),
   uploadResearchEvidence: async (gate, itemName, file) => {
     const form = new FormData();
     form.append("gate", gate);

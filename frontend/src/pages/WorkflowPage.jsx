@@ -45,6 +45,7 @@ import {
   Printer,
   Pencil,
   Database,
+  BookOpenCheck,
   FileUp,
 } from "lucide-react";
 import { api } from "../api";
@@ -607,10 +608,11 @@ function RequestTable({ rows, onOpen, onMessage }) {
 
 function RequestSummary({ request, compact = false }) {
   if (!request) return null;
+  const applicationSource = request.attachment || request.source_reference || "Structured portal form";
   return (
     <div className={`grid gap-3 text-sm ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
       <Detail label="Request" value={request.request_label || "Submitted application"} />
-      <Detail label="Application file" value={request.attachment || "Uploaded PDF"} />
+      <Detail label={request.attachment ? "Application file" : "Application source"} value={applicationSource} />
       <Detail label="Submitted" value={formatDate(request.submitted_at)} />
       {request.attachment_detail?.file_exists && request.attachment_detail?.url && (
         <a href={request.attachment_detail.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit px-3 py-2">
@@ -1340,7 +1342,25 @@ function HandoffForm({ meta, context, submit, submitting }) {
 // Course Audit — roster (by subject) or sheet upload
 // ---------------------------------------------------------------------------
 function CourseAuditPanel({ meta }) {
-  return <CourseRosterGradeWorkspace meta={meta} />;
+  return (
+    <Card className="p-6">
+      <SectionTitle
+        title="Course records are read-only"
+        subtitle="USLS grades remain in AIMS and are not encoded again in this portal."
+        icon={Database}
+      />
+      <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+        <p className="font-semibold">Use the dedicated coursework modules:</p>
+        <p className="mt-1 leading-relaxed">
+          Enrollment tags students into declared offerings. The Monitoring Sheet then reflects the term-scoped source records automatically and remains read-only.
+        </p>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link to="/monitoring-sheet" className="btn-primary"><Table2 className="h-4 w-4" /> Open Monitoring Sheet</Link>
+        <Link to="/enrollment" className="btn-ghost"><BookOpenCheck className="h-4 w-4" /> Open Enrollment</Link>
+      </div>
+    </Card>
+  );
 }
 
 
@@ -3317,12 +3337,12 @@ const WORKFLOW_GUIDES = {
     final: "A decided return updates the student standing; residency remains a separate active, no-subject enrollment record.",
   },
   withdrawal: {
-    purpose: "Records a voluntary withdrawal request through Graduate School review and Dean approval.",
-    submitter: "The student submits the signed withdrawal request, reason, and effective semester.",
-    reviewers: "Graduate School Staff records and forwards the request; the Dean approves or denies; after approval, GS Staff performs and documents the follow-through actions.",
-    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "GS Staff follow-through", "Withdrawal confirmation"],
-    incomplete: "A Dean denial closes the request and keeps the student Active. Messages and action comments remain in the case discussion and logs.",
-    final: "Completed means GS Staff confirmed the withdrawal and the monitoring record shows the student as Withdrawn.",
+    purpose: "Withdraws a student from one enrolled subject without changing the program standing or unrelated classes.",
+    submitter: "The student chooses an enrolled subject and submits the signed subject-withdrawal request with a reason.",
+    reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval immediately updates the selected subject.",
+    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Subject status update"],
+    incomplete: "A Dean denial closes this subject request and leaves every enrollment unchanged. Messages and action comments remain in the case history.",
+    final: "Completed means the selected subject is Withdrawn; the student's other subjects and program standing remain active.",
   },
   practicum: {
     purpose: "Tracks the practicum MOA, placement, required hours, certificates, completion review, and Dean report for programs that require practicum.",
@@ -3694,7 +3714,6 @@ const GRADUATION_STATUS_PRIORITY = [
   "Ready for Dean Review",
   "Returned for Revision",
   "Dean Approved",
-  "Sent to Registrar",
   "Not Eligible",
   "Returned for Clarification",
 ];
@@ -3702,19 +3721,19 @@ const GRADUATION_STATUS_PRIORITY = [
 const GRADUATION_STAGE_AFTER_COMPILE = [
   "Coursework Review", "Coursework Incomplete", "Research Review", "Research Incomplete",
   "Practicum Incomplete", "Eligibility Confirmed", "Endorsement Prepared",
-  "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar", "Not Eligible",
+  "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Not Eligible",
 ];
 const GRADUATION_STAGE_AFTER_COURSEWORK = [
   "Research Review", "Research Incomplete", "Practicum Incomplete", "Eligibility Confirmed",
-  "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Sent to Registrar",
+  "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved",
 ];
 const GRADUATION_STAGE_AFTER_RESEARCH = [
   "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review",
-  "Returned for Revision", "Dean Approved", "Sent to Registrar",
+  "Returned for Revision", "Dean Approved",
 ];
-const GRADUATION_STAGE_AFTER_PREPARATION = ["Endorsement Prepared", "Ready for Dean Review", "Dean Approved", "Sent to Registrar"];
-const GRADUATION_STAGE_AFTER_DEAN_HANDOFF = ["Ready for Dean Review", "Dean Approved", "Sent to Registrar"];
-const GRADUATION_STAGE_AFTER_DEAN_REVIEW = ["Dean Approved", "Sent to Registrar"];
+const GRADUATION_STAGE_AFTER_PREPARATION = ["Endorsement Prepared", "Ready for Dean Review", "Dean Approved"];
+const GRADUATION_STAGE_AFTER_DEAN_HANDOFF = ["Ready for Dean Review", "Dean Approved"];
+const GRADUATION_STAGE_AFTER_DEAN_REVIEW = ["Dean Approved"];
 
 const GRADUATION_BATCH_STAGES = [
   {
@@ -3776,10 +3795,10 @@ const GRADUATION_BATCH_STAGES = [
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
   },
   {
-    label: "Send endorsed list to Registrar",
-    detail: "Dean-approved candidates are exported for Registrar receipt.",
+    label: "Export endorsed list",
+    detail: "Dean-approved candidates are available as an external-process export.",
     currentStatuses: ["Dean Approved"],
-    completeStatuses: ["Sent to Registrar"],
+    completeStatuses: ["Dean Approved"],
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
   },
 ];
@@ -4226,8 +4245,7 @@ const WITHDRAWAL_BOARD_COLUMNS = [
   { label: "Submitted", statuses: ["Submitted to GS Staff"] },
   { label: "Dean Review", statuses: ["Dean Review"] },
   { label: "Returned for Clarification", statuses: ["Returned", "Returned for Clarification"] },
-  { label: "GS Staff Follow-through", statuses: ["Approved - Follow-through"] },
-  { label: "Confirmed", statuses: ["Withdrawn Confirmed"] },
+  { label: "Approved / Applied", statuses: ["Withdrawn Confirmed"] },
   { label: "Rejected / Cancelled", statuses: ["Denied", "Cancelled"] },
 ];
 
@@ -4237,7 +4255,7 @@ const GRADUATION_BOARD_COLUMNS = [
   { label: "Research / Practicum Review", statuses: ["Research Review", "Research Incomplete", "Practicum Incomplete"] },
   { label: "Preparation", statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"] },
   { label: "Dean Review", statuses: ["Ready for Dean Review"] },
-  { label: "Approved / Exported", statuses: ["Dean Approved", "Sent to Registrar"] },
+  { label: "Approved / Exported", statuses: ["Dean Approved"] },
   { label: "Returned / Not Eligible", statuses: ["Not Eligible", "Returned for Clarification"] },
 ];
 
@@ -4296,7 +4314,7 @@ function WithdrawalBoardCard({ item, onOpen, onMessage }) {
     <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
       <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} · {item.student.program_code}</p></div>{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
       <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.reason || "No reason provided"}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Submitted {formatDate(item.created_at)}</span><span className="text-right">Updated {formatDate(item.updated_at)}</span><span className="col-span-2">Effective: {item.effective_term || "Pending"}</span></div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Submitted {formatDate(item.created_at)}</span><span className="text-right">Updated {formatDate(item.updated_at)}</span><span className="col-span-2 font-semibold text-slate-700">{item.subject?.course_code || "Subject pending"} · {item.effective_term || item.subject?.term_label || "Semester pending"}</span></div>
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {item.next_action_owner || "Awaiting review"}</p>
       <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button><button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button></div>
     </article>
@@ -4757,14 +4775,6 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   function actionFor(item) {
     const base = { student_id: item.student_id };
     if (accountRole === "staff" && item.dean_decision === "Pending" && item.status === "Submitted to GS Staff") return { label: "Record & forward to Dean", payload: { ...base, workflow_action: "forward_to_dean" } };
-    if (accountRole === "staff" && item.dean_decision === "Approved" && item.status === "Approved - Follow-through") return {
-      label: "Complete follow-through & confirm",
-      payload: { ...base, workflow_action: "confirm_withdrawal" },
-      requireComment: true,
-      commentLabel: "Follow-through details",
-      commentPlaceholder: "Record the effective semester and the relevant Graduate School parties informed.",
-      commentRequiredError: "Record the effective semester and parties informed before confirming the withdrawal.",
-    };
     return null;
   }
   const selectedCurrent = rows.find((item) => item.id === selectedCaseId) || null;
@@ -4790,7 +4800,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · GS Staff forwards to the Dean, then completes follow-through after approval`} icon={LogOut} />
+      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · GS Staff forwards to the Dean; approval immediately marks only the selected subject Withdrawn`} icon={LogOut} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
@@ -4803,7 +4813,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
           empty="No recent withdrawal requests match the filters."
           renderCard={(item) => <WithdrawalBoardCard key={item.id} item={item} onOpen={() => openCase(item)} onMessage={() => setMessageRow(item)} />}
         />
-      ) : <WorkflowTable headers={["Student", "Request date", "Effective semester", "Reason", "Status", "Next owner", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
+      ) : <WorkflowTable headers={["Student", "Request date", "Subject / semester", "Reason", "Status", "Next owner", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
         return (
           <tr
             key={item.id}
@@ -4812,7 +4822,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
           >
             <StudentCell student={item.student} />
             <td className="px-3 py-3 text-sm text-slate-600">{formatDate(item.created_at)}</td>
-            <td className="px-3 py-3 text-sm text-slate-600">{item.effective_term || "—"}</td>
+            <td className="px-3 py-3 text-sm text-slate-600"><span className="font-semibold text-ink">{item.subject?.course_code || "Subject pending"}</span><span className="block text-xs">{item.effective_term || item.subject?.term_label || "—"}</span></td>
             <td className="max-w-[240px] px-3 py-3 text-sm text-slate-600"><span className="line-clamp-2">{item.reason || "No reason provided"}</span></td>
             <td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td>
             <td className="px-3 py-3 text-xs font-semibold text-slate-600">{item.next_action_owner || "—"}{item.unresolved_messages > 0 && <p className="mt-1 text-amber-700">{item.unresolved_messages} concern(s)</p>}</td>
@@ -4824,7 +4834,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
         <WorkflowCaseModal
           id={`withdrawal-case-${selectedItem.id}`}
           title={selectedItem.student.name}
-          subtitle={`${selectedItem.student.student_number} · ${selectedItem.student.program_code} · Withdrawal case`}
+          subtitle={`${selectedItem.student.student_number} · ${selectedItem.student.program_code} · Subject withdrawal`}
           status={selectedCurrent?.status || (reset.resetMessage ? "Reset" : selectedItem.status)}
           onClose={closeCase}
           footer={(
@@ -4846,18 +4856,22 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <div className="grid gap-3 sm:grid-cols-2">
               <Detail label="Dean" value={selectedCurrent?.dean_decision || selectedItem.dean_decision} />
-              <Detail label="Student standing" value={selectedCurrent?.student?.standing || selectedItem.student?.standing || "Active"} />
+              <Detail label="Applied subject status" value={selectedItem.subject?.status || (selectedItem.status === "Withdrawn Confirmed" ? "Withdrawn" : "Pending decision")} />
+              <Detail label="Selected subject" value={`${selectedItem.subject?.course_code || "Pending"} — ${selectedItem.subject?.course_title || "No subject attached"}`} />
+              <Detail label="Semester" value={selectedItem.effective_term || selectedItem.subject?.term_label || "Pending"} />
             </div>
             <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
             <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
             <WorkflowActivityList logs={selectedCurrent?.history || selectedItem.history || []} />
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Request</p>
-              <p className="mt-2 text-sm font-semibold text-ink">Effective {selectedItem.effective_term || "semester pending"}</p>
+              <p className="mt-2 text-sm font-semibold text-ink">{selectedItem.subject?.course_code || "Subject pending"} — {selectedItem.subject?.course_title || "Selected subject"}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">{selectedItem.effective_term || selectedItem.subject?.term_label || "Semester pending"}</p>
               <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedItem.reason || "No reason provided"}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {selectedItem.request_attachment?.file_exists && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
                 {selectedItem.request_attachment?.file_exists === false && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">The saved request form is unavailable</span>}
+                {selectedItem.dean_decision === "Approved" && <a href={selectedItem.registrar_report_url} className="btn-ghost cursor-pointer px-3 py-1.5">Export withdrawal report for Registrar <Download className="h-3.5 w-3.5" /></a>}
               </div>
             </div>
             <WorkflowFileHistory files={selectedCurrent?.attachments || selectedItem.attachments || []} />
@@ -5447,7 +5461,7 @@ function GraduationForm({ context, studentId, submit, submitting }) {
             value={form.endorsement_status}
             onChange={set("endorsement_status")}
             placeholder=""
-            options={["For Review", "Ready for Dean Review", "Not Eligible", "Returned for Revision", "Sent to Registrar"]}
+            options={["For Review", "Ready for Dean Review", "Not Eligible", "Returned for Revision"]}
           />
         </Field>
         <Field label="Source reference">
@@ -5504,7 +5518,7 @@ function timeRange(start, end) {
 // ---------------------------------------------------------------------------
 // AWOL & Residency
 // ---------------------------------------------------------------------------
-function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, result, submitError, setStudentId, setStudentLabel, refetch }) {
+function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, result, submitError, setStudentId, setStudentLabel, refetch, accountRole }) {
   const rows = context?.roster || [];
   const [viewMode, setViewMode] = useState("board");
   const [filters, setFilters] = useState({ query: "", status: "" });
@@ -5656,10 +5670,10 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
             </div>
           )}
           <Field label="Staff verification notes" hint={action === "record_residency" ? "Required when the policy result needs human review." : "Record the source used to establish the AWOL status."}><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>
-          {review && <PolicyReviewCard title="AWOL / residency policy review" description="Handbook-grounded standing and maximum-residence check." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
+          {review && <PolicyReviewCard title="AWOL / residency policy review" description="Deterministic standing and maximum-residence checks using the recorded case fields; no RAG or automated decision." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
           {!review && reviewError && <ErrorNote message={reviewError} />}
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => runReview()} disabled={reviewing || !selectedStudent.id || (action === "record_residency" && !form.residency_reason)} className="btn-ghost cursor-pointer"><Sparkles className="h-4 w-4" /> {reviewing ? "Reviewing…" : "Run policy review"}</button>
+            <button type="button" onClick={() => runReview()} disabled={reviewing || !selectedStudent.id || (action === "record_residency" && !form.residency_reason)} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run policy checker"}</button>
             <button type="submit" disabled={submitting || !selectedStudent.id || !review || (action === "record_residency" && !form.residency_reason)} className="btn-primary cursor-pointer">{submitting ? "Saving…" : action === "declare_awol" ? "Record AWOL" : "Record residency"}</button>
           </div>
           <WorkflowSubmitFeedback result={result} error={submitError} />
@@ -5690,7 +5704,21 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
             {selectedRow.kind === "residency" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="Semester" value={selectedRow.term_label} /><Detail label="Purpose" value={selectedRow.reason} /></div>}
             {selectedRow.intent_attachment?.file_exists && <a href={selectedRow.intent_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit cursor-pointer"><FileText className="h-4 w-4" /> Written return intent</a>}
             {selectedRow.intent_attachment?.file_exists === false && <span className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">The saved written return intent is unavailable.</span>}
-            {selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) && <><Field label="Staff review notes"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>{review && <PolicyReviewCard title="Return-from-AWOL policy review" description="Checks written intent and program-specific maximum residence before Dean routing." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview("forward_return_to_dean", selectedRow)} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}.`)} />}<button type="button" onClick={() => runReview("forward_return_to_dean", selectedRow)} disabled={reviewing} className="btn-ghost cursor-pointer"><Sparkles className="h-4 w-4" /> {reviewing ? "Reviewing…" : "Run policy review"}</button></>}
+            {selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) && <><Field label="Staff review notes"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>{review && <PolicyReviewCard title="Return-from-AWOL policy review" description="Deterministic checks for written intent and program-specific maximum residence before Dean routing." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview("forward_return_to_dean", selectedRow)} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}.`)} />}<button type="button" onClick={() => runReview("forward_return_to_dean", selectedRow)} disabled={reviewing} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run policy checker"}</button></>}
+            {selectedRow.kind === "awol" && accountRole === "staff" && ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(selectedRow.status) && (
+              <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+                <p className="text-sm font-semibold text-ink">Dean decision applied</p>
+                <p className="text-xs text-slate-600">The approved standing outcome is already reflected. Enrollment remains a separate Academic Coordinator action.</p>
+                <a href={selectedRow.registrar_report_url} className="btn-ghost w-fit cursor-pointer"><Download className="h-4 w-4" /> Export AWOL return report for Registrar</a>
+              </div>
+            )}
+            {selectedRow.kind === "residency" && accountRole === "staff" && selectedRow.status === "Residency" && (
+              <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+                <p className="text-sm font-semibold text-ink">Residency active</p>
+                <p className="text-xs text-slate-600">The term-enrollment and monitoring records were updated when staff recorded this residency.</p>
+                <a href={selectedRow.registrar_report_url} className="btn-ghost w-fit cursor-pointer"><Download className="h-4 w-4" /> Export residency report for Registrar</a>
+              </div>
+            )}
             {selectedRow.kind === "awol" && <CaseMessageHistory messages={selectedRow.messages || []} />}
             {selectedRow.kind === "awol" && <WorkflowActivityList logs={selectedRow.history || []} />}
             {selectedRow.kind === "awol" && <WorkflowFileHistory files={[selectedRow.intent_attachment].filter(Boolean)} />}
@@ -5721,7 +5749,7 @@ function AwolBoardCard({ item, onOpen, onMessage }) {
 // ---------------------------------------------------------------------------
 // Leave of Absence
 // ---------------------------------------------------------------------------
-function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded = false }) {
+function LeaveOfAbsenceForm({ context, studentId, submit, submitting, accountRole, embedded = false }) {
   const selectedRequest = context?.selected_request;
   const canForward = selectedRequest?.status === "Pending Review";
   const [policyReview, setPolicyReview] = useState(context?.loa_policy_review || null);
@@ -5733,8 +5761,8 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded =
     application_reference: "",
     effective_start: "",
     effective_end: "",
+    reason_category: "",
     reason_remarks: "",
-    prior_loa_count: 0,
     eligibility_status: "Eligible",
     staff_notes: "",
     source_reference: "",
@@ -5753,6 +5781,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded =
       application_reference: selectedRequest.attachment || selectedRequest.source_reference || "",
       effective_start: selectedRequest.effective_start || "",
       effective_end: selectedRequest.effective_end || "",
+      reason_category: selectedRequest.reason_category || "",
       reason_remarks: selectedRequest.reason_remarks || "",
       source_reference: selectedRequest.source_reference || selectedRequest.attachment || "",
     }));
@@ -5788,7 +5817,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded =
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review leave application" subtitle="Verify the submitted details; eligible requests auto-approve, exceptions go to the Dean" icon={CalendarOff} />
+      <SectionTitle title="Review leave application" subtitle="Run the fixed policy checks, record the review, and forward every decision to the Dean" icon={CalendarOff} />
       {!embedded && <RequestSummary request={selectedRequest} />}
       <LoaPolicyReviewCard
         review={policyReview}
@@ -5799,7 +5828,7 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded =
         onApply={() => runPolicyReview(true)}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Application attachment / file reference">
+        <Field label="Application source">
           <Input value={form.application_reference} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
         <Field label="Request date" required>
@@ -5811,8 +5840,8 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded =
         <Field label="Effective end semester">
           <Input value={form.effective_end} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
-        <Field label="Prior LOA count">
-          <Input type="number" min="0" value={form.prior_loa_count} onChange={set("prior_loa_count")} />
+        <Field label="Reason category">
+          <Input value={form.reason_category} readOnly aria-readonly="true" className="bg-slate-50" />
         </Field>
         <Field label="Eligibility status / check result">
           <Select
@@ -5837,7 +5866,16 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, embedded =
         <SubmitButton submitting={submitting}>Forward to Dean</SubmitButton>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; new eligible requests are auto-approved after review.
+          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; policy results remain advisory until the Dean decides.
+        </div>
+      )}
+      {accountRole === "staff" && selectedRequest?.status === "Approved" && (
+        <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
+          <p className="text-sm font-semibold text-ink">Approved and applied</p>
+          <p className="text-xs text-slate-600">The student standing changed to On Leave when the Dean approved the request.</p>
+          <a href={`/api/standing-changes/leave-of-absence/${studentId}/registrar-report`} className="btn-ghost w-fit cursor-pointer">
+            <Download className="h-4 w-4" /> Export LOA report for Registrar
+          </a>
         </div>
       )}
     </form>
@@ -5848,7 +5886,7 @@ function LoaPolicyReviewCard({ review, busy, error, notice, onReview, onApply })
   return (
     <PolicyReviewCard
       title="LOA policy review"
-      description="RAG-style check using the LOA/residency policy plus this student request. Eligible requests can be auto-approved."
+      description="Deterministic checklist using the approved LOA rules and the structured request fields. It does not use RAG and does not approve a case."
       emptyText="Run the review after selecting a submitted LOA request."
       review={review}
       busy={busy}
@@ -5867,7 +5905,7 @@ function PolicyReviewCard({ title, description, emptyText, review, busy, error, 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-brand-700 ring-1 ring-brand-100">
-            <Sparkles className="h-4 w-4" />
+            <ClipboardCheck className="h-4 w-4" />
           </span>
           <div>
             <p className="text-sm font-semibold text-ink">{title}</p>
@@ -5913,7 +5951,7 @@ function PolicyReviewCard({ title, description, emptyText, review, busy, error, 
       {notice && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{notice}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={onReview} disabled={busy} className="btn-ghost">
-          <Sparkles className="h-4 w-4" /> {busy ? "Reviewing..." : "Recheck policy"}
+          <ClipboardCheck className="h-4 w-4" /> {busy ? "Checking..." : "Run policy checker"}
         </button>
         <button type="button" onClick={onApply} disabled={busy || !review} className="btn-primary">
           Apply suggestion
@@ -5933,7 +5971,7 @@ function mergeReviewSummary(currentNotes, summary) {
 // ---------------------------------------------------------------------------
 // Readmission
 // ---------------------------------------------------------------------------
-function ReadmissionForm({ context, studentId, submit, submitting, embedded = false }) {
+function ReadmissionForm({ context, studentId, submit, submitting, accountRole, embedded = false }) {
   const requirements = context.readmission_requirements || [];
   const selectedRequest = context?.selected_request;
   const canForward = selectedRequest?.status === "Pending Review";
@@ -5999,11 +6037,11 @@ function ReadmissionForm({ context, studentId, submit, submitting, embedded = fa
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review readmission request" subtitle="Eligible requests auto-approve after review; incomplete requests go to the Dean" icon={UserCheck} />
+      <SectionTitle title="Review readmission request" subtitle="Run the fixed return checks, record the review, and forward every decision to the Dean" icon={UserCheck} />
       {!embedded && <RequestSummary request={selectedRequest} />}
       <PolicyReviewCard
         title="Readmission policy review"
-        description="RAG-style check using the readmission policy plus this student request. Eligible requests can be auto-approved."
+        description="Deterministic checklist using the approved readmission rules and structured request fields. It does not use RAG or make the decision."
         emptyText="Run the review after selecting a submitted readmission request."
         review={policyReview}
         busy={reviewing}
@@ -6047,7 +6085,16 @@ function ReadmissionForm({ context, studentId, submit, submitting, embedded = fa
         <SubmitButton submitting={submitting}>Complete review</SubmitButton>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; new eligible requests are auto-approved after review.
+          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; policy results remain advisory until the Dean decides.
+        </div>
+      )}
+      {accountRole === "staff" && selectedRequest?.status === "Approved" && (
+        <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
+          <p className="text-sm font-semibold text-ink">Approved and applied</p>
+          <p className="text-xs text-slate-600">Active standing was restored on Dean approval. Course enrollment remains a separate Academic Coordinator action.</p>
+          <a href={`/api/standing-changes/readmission/${studentId}/registrar-report`} className="btn-ghost w-fit cursor-pointer">
+            <Download className="h-4 w-4" /> Export readmission report for Registrar
+          </a>
         </div>
       )}
     </form>
@@ -6072,11 +6119,11 @@ function MiniBox({ label, value, tone }) {
 function workflowGuidance(slug) {
   const map = {
     "student-handoff":
-      "The registrar's data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically — no manual typing.",
+      "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically — no manual typing.",
     "leave-of-absence":
       "Leave of Absence is a stop/pause process. Staff verify the submitted application and forward it. The Dean alone approves, denies, or returns the request, and the student's status changes only after that decision.",
     readmission:
-      "Readmission is a separate return/re-entry process after the approved leave period. Eligible requests auto-approve after review; incomplete or uncertain requests go to the Dean queue.",
+      "Readmission is a separate return/re-entry process after the approved leave period. A deterministic policy checker supports staff review, and every approval remains a Dean decision.",
     awol:
       "AWOL restricts registration after a student leaves without formal LOA. A return requires written intent routed through the Dean. The policy review applies the 5/7-year normal and 7/9-year absolute residence limits, while valid no-subject residency remains a separate active enrollment state.",
     "course-audit":

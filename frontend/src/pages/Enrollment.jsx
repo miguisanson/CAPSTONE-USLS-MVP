@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ClipboardCheck,
   ExternalLink,
-  FileSearch,
   GraduationCap,
   Lock,
   Plus,
@@ -31,8 +30,6 @@ export default function Enrollment() {
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [preview, setPreview] = useState(null);
-  const [resolutions, setResolutions] = useState({});
-  const [manualCourseId, setManualCourseId] = useState("");
   const [sourceReference, setSourceReference] = useState("Graduate School enrollment review");
   const [studentSearch, setStudentSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -56,8 +53,6 @@ export default function Enrollment() {
       setData(response);
       setSelected(new Set(response.current_course_ids || []));
       setPreview(null);
-      setResolutions({});
-      setManualCourseId("");
       const canonical = {
         program_id: String(response.program.id),
         term_id: String(response.term.id),
@@ -85,19 +80,12 @@ export default function Enrollment() {
     () => new Set(data?.current_course_ids || []),
     [data?.current_course_ids]
   );
-  const offeredIds = useMemo(
-    () => new Set((data?.offered_subjects || []).map((course) => course.course_id)),
-    [data?.offered_subjects]
-  );
   const selectedCourses = useMemo(
     () =>
       (data?.curriculum_subjects || [])
         .filter((course) => selected.has(course.id))
         .sort((a, b) => a.code.localeCompare(b.code)),
     [data?.curriculum_subjects, selected]
-  );
-  const manualOptions = (data?.curriculum_subjects || []).filter(
-    (course) => course.selectable && !offeredIds.has(course.id) && !selected.has(course.id)
   );
   const filteredStudents = (data?.students || []).filter((student) => {
     const query = studentSearch.trim().toLowerCase();
@@ -107,9 +95,6 @@ export default function Enrollment() {
   const dirty =
     selected.size !== currentIds.size ||
     [...selected].some((courseId) => !currentIds.has(courseId));
-  const unresolved = (preview?.conflicts || []).filter(
-    (conflict) => !resolutions[conflict.id]
-  );
 
   function updateFilters(next) {
     const params = {
@@ -137,64 +122,42 @@ export default function Enrollment() {
       return next;
     });
     setPreview(null);
-    setResolutions({});
     setResult(null);
   }
 
-  function addManualCourse() {
-    if (!manualCourseId) return;
-    toggleCourse(Number(manualCourseId));
-    setManualCourseId("");
-  }
-
-  async function runPreview() {
+  async function confirmEnrollment() {
     if (!data?.selected_student) return;
-    setBusy("preview");
+    setBusy("save");
     setError("");
+    setPreview(null);
     setResult(null);
     try {
-      const response = await api.previewEnrollment({
+      const review = await api.previewEnrollment({
         student_id: data.selected_student.id,
         term_id: data.term.id,
         course_ids: [...selected],
       });
-      setPreview(response);
-      setResolutions({});
-    } catch (err) {
-      setError(err.message || "Could not check enrollment conflicts.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function save() {
-    if (!preview || unresolved.length || preview.has_blocking_conflicts) return;
-    const changeCount = preview.additions.length + preview.removals.length;
-    const ok = await confirm({
-      title: "Save this enrollment?",
-      message:
-        `${data.selected_student.name} · ${data.term.label}\n\n` +
-        `${preview.additions.length} subject(s) will be added and ${preview.removals.length} removed. ` +
-        "The monitoring sheet, student profile, portal, and semester record will update together.",
-      confirmLabel: changeCount ? "Save enrollment" : "Confirm enrollment",
-    });
-    if (!ok) return;
-    setBusy("save");
-    setError("");
-    try {
+      if (review.has_blocking_conflicts) {
+        setPreview(review);
+        return;
+      }
+      const automaticResolutions = Object.fromEntries(
+        (review.conflicts || [])
+          .filter((conflict) => conflict.options?.length)
+          .map((conflict) => [conflict.id, conflict.options[0].value])
+      );
       const response = await api.saveEnrollment({
         student_id: data.selected_student.id,
         term_id: data.term.id,
         course_ids: [...selected],
-        resolutions,
+        resolutions: automaticResolutions,
         source_reference: sourceReference,
         confirmed: true,
       });
-      setResult(response);
       await load();
-      setResult(response);
+      setResult({ ...response, automatic_conflicts: review.conflicts || [] });
     } catch (err) {
-      setError(err.message || "Could not save enrollment.");
+      setError(err.message || "Could not confirm enrollment.");
     } finally {
       setBusy("");
     }
@@ -233,8 +196,7 @@ export default function Enrollment() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Enrollment</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Assign the official semester offerings to an individual student. Every save checks
-            conflicts first and synchronizes the monitoring sheet, student profile, and portal.
+            Assign official semester offerings to an individual student. Confirming runs all checks and synchronizes the class list, monitoring sheet, student profile, and portal in one action.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -251,7 +213,7 @@ export default function Enrollment() {
               disabled={busy === "classlist"}
             />
           </label>
-          <Link to="/course-adjustments" className="btn-ghost">
+          <Link to="/course-adjustments?view=offerings" className="btn-ghost">
             <BookOpenCheck className="h-4 w-4" /> Offering list
           </Link>
         </div>
@@ -437,60 +399,12 @@ export default function Enrollment() {
                   <EmptyState
                     icon={BookOpenCheck}
                     title="No official subjects offered"
-                    hint="Publish subjects in Course Adjustments for this program and semester before normal enrollment."
+                    hint="Publish subjects under Course Adjustments → Offering setup for this program and semester before enrollment."
                   />
                 )}
               </Card>
 
-              <Card className="p-5">
-                <div className="flex items-start gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700">
-                    <AlertTriangle className="h-5 w-5" />
-                  </span>
-                  <div className="flex-1">
-                    <h2 className="font-display text-lg font-semibold text-ink">
-                      Manual curriculum exception
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Add a Not taken curriculum subject that is not on the official offering
-                      list. Completed, enrolled, and unresolved statuses cannot be selected here.
-                    </p>
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                      <select
-                        value={manualCourseId}
-                        onChange={(event) => setManualCourseId(event.target.value)}
-                        className="field-input cursor-pointer"
-                        aria-label="Manual subject exception"
-                      >
-                        <option value="">Choose a non-offered subject</option>
-                        {manualOptions.map((course) => (
-                          <option key={course.id} value={course.id}>
-                            {course.code} — {course.title}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={addManualCourse}
-                        disabled={!manualCourseId}
-                        className="btn-ghost shrink-0"
-                      >
-                        <Plus className="h-4 w-4" /> Add exception
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {preview && (
-                <ConflictPreview
-                  preview={preview}
-                  resolutions={resolutions}
-                  onResolve={(conflictId, value) =>
-                    setResolutions((current) => ({ ...current, [conflictId]: value }))
-                  }
-                />
-              )}
+              {preview && <ConflictNotice preview={preview} />}
             </div>
 
             <div className="space-y-5">
@@ -513,10 +427,6 @@ export default function Enrollment() {
                           {currentIds.has(course.id) ? (
                             <p className="mt-1 text-xs font-semibold text-brand-700">
                               Already enrolled · monitoring sheet
-                            </p>
-                          ) : !course.is_offered ? (
-                            <p className="mt-1 text-xs font-semibold text-amber-700">
-                              Manual exception
                             </p>
                           ) : null}
                         </div>
@@ -551,54 +461,30 @@ export default function Enrollment() {
                     value={sourceReference}
                     onChange={(event) => setSourceReference(event.target.value)}
                     className="field-input"
-                    placeholder="Registrar list, email, or review reference"
+                    placeholder="Official class list, email, or review reference"
                   />
                 </label>
                 <div className="mt-4 grid gap-2">
                   <button
                     type="button"
-                    onClick={runPreview}
+                    onClick={confirmEnrollment}
                     disabled={!dirty || busy}
                     className="btn-primary w-full"
                   >
-                    {busy === "preview" ? (
+                    {busy === "save" ? (
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                     ) : (
-                      <FileSearch className="h-4 w-4" />
+                      <ShieldCheck className="h-4 w-4" />
                     )}
-                    Check conflicts
+                    {busy === "save" ? "Checking and saving…" : "Confirm enrollment"}
                   </button>
-                  {preview && (
-                    <button
-                      type="button"
-                      onClick={save}
-                      disabled={
-                        busy ||
-                        unresolved.length > 0 ||
-                        preview.has_blocking_conflicts
-                      }
-                      className="btn-ghost w-full border-brand-200 text-brand-700"
-                    >
-                      {busy === "save" ? (
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
-                      ) : (
-                        <ShieldCheck className="h-4 w-4" />
-                      )}
-                      Save synchronized enrollment
-                    </button>
-                  )}
                 </div>
                 {!dirty && (
                   <p className="mt-3 text-xs text-slate-500">
                     The draft already matches the saved enrollment.
                   </p>
                 )}
-                {preview && unresolved.length > 0 && (
-                  <p className="mt-3 text-xs font-semibold text-amber-700">
-                    Resolve {unresolved.length} conflict{unresolved.length === 1 ? "" : "s"} below
-                    before saving.
-                  </p>
-                )}
+                <p className="mt-3 text-xs text-slate-500">Conflict checks run automatically. Safe warnings follow the authoritative record; blocking conflicts are reported without changing enrollment.</p>
               </Card>
 
               <IntegrityPanel integrity={data.integrity} />
@@ -683,38 +569,25 @@ function SubjectStatusSummary({ summary }) {
   );
 }
 
-function ConflictPreview({ preview, resolutions, onResolve }) {
-  const clean = preview.conflicts.length === 0;
+function ConflictNotice({ preview }) {
   return (
-    <Card className="p-5">
+    <Card className="border-red-200 bg-red-50/50 p-5" role="alert">
       <div className="flex items-start gap-3">
-        <span
-          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-            clean ? "bg-brand-50 text-brand-700" : "bg-amber-50 text-amber-700"
-          }`}
-        >
-          {clean ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-100 text-red-700">
+          <AlertTriangle className="h-5 w-5" />
         </span>
         <div>
-          <h2 className="font-display text-lg font-semibold text-ink">
-            {clean ? "No conflicts found" : `${preview.conflict_count} conflict(s) found`}
-          </h2>
+          <h2 className="font-display text-lg font-semibold text-ink">Enrollment was not changed</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Add {preview.additions.length} · remove {preview.removals.length} · keep{" "}
-            {preview.unchanged_count}
+            The system found {preview.conflict_count} blocking conflict{preview.conflict_count === 1 ? "" : "s"}. Correct the source record, then confirm again.
           </p>
         </div>
       </div>
-      {!clean && (
-        <div className="mt-4 space-y-3">
-          {preview.conflicts.map((conflict) => (
+      <div className="mt-4 space-y-3">
+          {preview.conflicts.filter((conflict) => conflict.severity === "blocking").map((conflict) => (
             <div
               key={conflict.id}
-              className={`rounded-xl border p-4 ${
-                conflict.severity === "blocking"
-                  ? "border-red-200 bg-red-50"
-                  : "border-amber-200 bg-amber-50/60"
-              }`}
+              className="rounded-xl border border-red-200 bg-white p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -725,33 +598,10 @@ function ConflictPreview({ preview, resolutions, onResolve }) {
                 </div>
                 <StatusBadge value={conflict.severity} dot={false} />
               </div>
-              {conflict.options?.length ? (
-                <label className="mt-3 block">
-                  <span className="mb-1 block text-xs font-bold text-slate-600">
-                    Which record should the system follow?
-                  </span>
-                  <select
-                    value={resolutions[conflict.id] || ""}
-                    onChange={(event) => onResolve(conflict.id, event.target.value)}
-                    className="field-input cursor-pointer"
-                  >
-                    <option value="">Choose a resolution</option>
-                    {conflict.options.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <p className="mt-3 text-xs font-semibold text-red-700">
-                  Remove this subject from the draft or correct its monitoring status before saving.
-                </p>
-              )}
+              <p className="mt-3 text-xs font-semibold text-red-700">No partial enrollment was saved.</p>
             </div>
           ))}
         </div>
-      )}
     </Card>
   );
 }
@@ -845,6 +695,11 @@ function SuccessPanel({ result }) {
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
         <div>
           <p className="font-semibold text-brand-900">{result.message}</p>
+          {result.automatic_conflicts?.length > 0 && (
+            <p className="mt-2 text-sm text-brand-800">
+              The system automatically resolved {result.automatic_conflicts.length} warning{result.automatic_conflicts.length === 1 ? "" : "s"} by keeping the authoritative enrollment record.
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
             <Link to={result.links.monitoring} className="btn-ghost px-3 py-2">
               <Table2 className="h-4 w-4" /> Monitoring sheet

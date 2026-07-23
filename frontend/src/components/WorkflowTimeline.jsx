@@ -1,11 +1,10 @@
 import HistoryDisclosure from "./HistoryDisclosure";
 
 const WITHDRAWAL_STEPS = [
-  "Withdrawal Request Submitted",
+  "Subject Withdrawal Request Submitted",
   "GS Staff Forwarded Request to Dean",
   "Dean Review",
-  "GS Staff Follow-through Actions",
-  "Withdrawal Confirmed",
+  "Selected Subject Marked Withdrawn",
 ];
 
 const GRADUATION_STEPS = [
@@ -24,8 +23,7 @@ const LOA_STEPS = [
   "Request Submitted",
   "GS Staff Intake and Eligibility Check",
   "Dean Review",
-  "Student Informed of Decision",
-  "Status Set to On Leave (notice sent)",
+  "Student Standing Updated",
 ];
 
 export function loaTimelineSteps(status) {
@@ -33,8 +31,10 @@ export function loaTimelineSteps(status) {
     "Not Submitted": 0,
     Submitted: 1,
     "Dean Review": 2,
-    "On Leave": 4,
+    Approved: 3,
+    "On Leave": 3,
     Denied: 2,
+    Withdrawn: 0,
   };
   return numberedStates(LOA_STEPS, activeByStatus[status] ?? 0);
 }
@@ -51,8 +51,7 @@ export function withdrawalTimelineSteps(status) {
   const activeByStatus = {
     "Submitted to GS Staff": 1,
     "Dean Review": 2,
-    "Approved - Follow-through": 3,
-    "Withdrawn Confirmed": 4,
+    "Withdrawn Confirmed": 3,
     Denied: 2,
     Returned: 2,
   };
@@ -79,8 +78,6 @@ export function graduationTimelineSteps(status, eligibility = {}) {
     activeIndex = status === "Returned for Revision" ? 6 : 5;
   } else if (status === "Dean Approved") {
     activeIndex = 7;
-  } else if (status === "Sent to Registrar") {
-    activeIndex = 8;
   }
   return numberedStates(GRADUATION_STEPS, activeIndex, [6]);
 }

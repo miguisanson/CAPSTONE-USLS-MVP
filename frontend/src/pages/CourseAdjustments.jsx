@@ -6,15 +6,19 @@ import {
   CheckCircle2,
   Circle,
   ClipboardList,
+  Download,
+  Eye,
+  FileSearch,
   Send,
   Settings2,
   Users,
 } from "lucide-react";
 import { api } from "../api";
 import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
+import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 
 const STEPS = ["Draft", "Submitted", "Approved", "Published"];
-export default function CourseAdjustments() {
+export default function CourseAdjustments({ embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
   const selectedTermId = searchParams.get("term_id") || "";
@@ -28,19 +32,24 @@ export default function CourseAdjustments() {
   const [message, setMessage] = useState("");
   const [sel, setSel] = useState({});
   const [autosave, setAutosave] = useState("idle");
+  const [subjectNeedsReport, setSubjectNeedsReport] = useState(null);
+  const [selectedFaculty, setSelectedFaculty] = useState(null);
   const dirtyRef = useRef(false);
 
   function load(pid, tid) {
     setLoading(true);
     setError("");
-    api
-      .courseAdjustments({ program_id: pid || undefined, term_id: tid || undefined })
-      .then((res) => {
+    Promise.all([
+      api.courseAdjustments({ program_id: pid || undefined, term_id: tid || undefined }),
+      api.subjectNeedsReport({ program_id: pid || undefined, term_id: tid || undefined }),
+    ])
+      .then(([res, report]) => {
         setData(res);
         setProgramId(String(res.program.id));
         setTermId(res.term ? String(res.term.id) : "");
         setTermLabel(res.latest_plan?.term_label || res.term?.label || "Current Semester");
         setSel(seedSelections(res.demand));
+        setSubjectNeedsReport(report);
         dirtyRef.current = false;
         setAutosave("idle");
       })
@@ -81,6 +90,7 @@ export default function CourseAdjustments() {
           course_id: row.course.id,
           offer: !!sel[row.course.id]?.offer,
           section_count: Number(sel[row.course.id]?.sections) || row.suggested_sections,
+          assigned_faculty_id: Number(sel[row.course.id]?.facultyId) || null,
           notes: sel[row.course.id]?.notes || "",
         })),
       };
@@ -166,11 +176,20 @@ export default function CourseAdjustments() {
     markDirty();
   }
 
+  function updateFaculty(row, value) {
+    if (!canEdit) return;
+    setSel((current) => ({
+      ...current,
+      [row.course.id]: { ...(current[row.course.id] || defaultSelection(row)), facultyId: value },
+    }));
+    markDirty();
+  }
+
   const offeredCount = useMemo(() => Object.values(sel).filter((s) => s.offer).length, [sel]);
 
   return (
-    <div className="space-y-5 animate-fade-up">
-      <Card className="p-6">
+    <div className={`space-y-5 ${embedded ? "" : "animate-fade-up"}`}>
+      {!embedded && <Card className="p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white">
             <ClipboardList className="h-6 w-6" />
@@ -187,12 +206,12 @@ export default function CourseAdjustments() {
               </p>
               <p>
                 <span className="font-bold uppercase tracking-wide text-slate-400">Data captured · </span>
-                Live demand, sections, faculty availability, offering status, Dean approval state.
+                Live demand, sections, editable faculty recommendations, offering status, Dean approval state.
               </p>
             </div>
           </div>
         </div>
-      </Card>
+      </Card>}
 
       {loading ? (
         <Spinner label="Loading course adjustments..." />
@@ -201,6 +220,12 @@ export default function CourseAdjustments() {
       ) : (
         <>
           <Card className="p-4">
+            {embedded && (
+              <div className="mb-4">
+                <h2 className="font-display text-xl font-semibold text-ink">Adjustments and subject demand</h2>
+                <p className="mt-1 text-sm text-slate-600">Demand is recalculated automatically from the current student records. The coordinator remains responsible for every offering and faculty decision.</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Field label="Program">
                 <select value={programId} onChange={(e) => updateFilters({ program_id: e.target.value })} className="field-input cursor-pointer" aria-label="Program">
@@ -212,6 +237,12 @@ export default function CourseAdjustments() {
                   {(data?.terms || []).map((term) => <option key={term.id} value={term.id}>{formatTermLabel(term.label)}{term.relative_label ? ` (${term.relative_label})` : ""}</option>)}
                 </select>
               </Field>
+            </div>
+            <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
+              <p className="text-sm font-semibold text-brand-900">Subject needs are calculated automatically</p>
+              <p className="mt-1 text-xs leading-relaxed text-brand-800">
+                Counts below update with the selected program and semester. They support the decision; they do not publish an offering or assign a faculty member by themselves.
+              </p>
             </div>
           </Card>
 
@@ -275,6 +306,13 @@ export default function CourseAdjustments() {
             <Metric icon={Settings2} label="Selected to offer" value={offeredCount} tone="brand" />
           </div>
 
+          {subjectNeedsReport && (
+            <SubjectNeedsReport
+              report={subjectNeedsReport}
+              onDownload={() => downloadSubjectNeedsCsv(subjectNeedsReport)}
+            />
+          )}
+
           <Card className="overflow-hidden">
             <div className="border-b border-slate-100 px-5 py-3">
               <h2 className="text-lg font-semibold text-ink">Course offering decisions</h2>
@@ -295,7 +333,7 @@ export default function CourseAdjustments() {
                       <th className="px-3 py-3">Affected students / delay impact</th>
                       <th className="px-3 py-3">Status</th>
                       <th className="px-3 py-3">Sections</th>
-                      <th className="px-3 py-3">Automated faculty assignment</th>
+                      <th className="px-3 py-3">Suggested faculty / coordinator choice</th>
                       <th className="px-5 py-3 text-right">Offer?</th>
                     </tr>
                   </thead>
@@ -350,9 +388,36 @@ export default function CourseAdjustments() {
                             />
                           </td>
                           <td className="px-3 py-3 align-top">
-                            <p className="font-semibold text-ink">{row.assigned_faculty_name || "No eligible faculty"}</p>
-                            <p className="mt-1 text-xs text-slate-500">{row.assignment_status || "Unassigned"} · {row.availability_count} eligible</p>
-                            {!row.assigned_faculty_name && row.faculty_candidates?.[0] && <p className="mt-1 text-xs text-brand-700">Best match: {row.faculty_candidates[0].name} · projected {row.faculty_candidates[0].projected_load}/24 units</p>}
+                            <select
+                              value={s.facultyId}
+                              onChange={(event) => updateFaculty(row, event.target.value)}
+                              disabled={!canEdit || !s.offer}
+                              className="field-input min-w-56 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100"
+                              aria-label={`Faculty assignment for ${row.course.code}`}
+                            >
+                              <option value="">Unassigned</option>
+                              {(data.faculty_profiles || []).map((faculty) => {
+                                const candidate = (row.faculty_candidates || []).find((item) => item.id === faculty.id);
+                                return <option key={faculty.id} value={faculty.id}>
+                                  {faculty.name}{candidate?.preferred ? " · preferred" : ""} · {candidate ? `${candidate.projected_load}/24u` : faculty.specialization}
+                                </option>;
+                              })}
+                            </select>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              {row.faculty_candidates?.[0] && (
+                                <span className="text-xs text-brand-700">Suggested: {row.faculty_candidates[0].name}</span>
+                              )}
+                              {s.facultyId && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedFaculty((data.faculty_profiles || []).find((faculty) => faculty.id === Number(s.facultyId)) || null)}
+                                  className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-slate-600 hover:text-brand-700"
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> View profile
+                                </button>
+                              )}
+                            </div>
+                            <p className="mt-1 text-[11px] text-slate-500">Recommendation uses preferences, availability, specialization, and current teaching load. You can change it.</p>
                           </td>
                           <td className="px-5 py-3 text-right">
                             <button
@@ -375,6 +440,7 @@ export default function CourseAdjustments() {
           </Card>
         </>
       )}
+      {selectedFaculty && <FacultyAssignmentProfile faculty={selectedFaculty} onClose={() => setSelectedFaculty(null)} />}
     </div>
   );
 }
@@ -392,6 +458,7 @@ function defaultSelection(row) {
   return {
     offer: status === "Offered" || status === "Suggested",
     sections: row.section_count ?? row.suggested_sections,
+    facultyId: row.assigned_faculty_id || "",
     status,
     notes: row.offering_notes || "",
   };
@@ -442,6 +509,164 @@ function OfferingStatusBadge({ status }) {
     "No decision": "bg-slate-100 text-slate-500 ring-slate-200",
   };
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${styles[label] || styles["No decision"]}`}>{label}</span>;
+}
+
+function SubjectNeedsReport({ report, onDownload }) {
+  const rows = report.rows || [];
+  const visibleRows = rows.filter((row) => row.need_count > 0 || row.pending_incomplete_count > 0);
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <FileSearch className="h-5 w-5 text-brand-600" />
+            <h2 className="text-lg font-semibold text-ink">Subject-needs report</h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">
+            {report.program.code} · {formatTermLabel(report.term?.label)} · Generated {formatGeneratedAt(report.generated_at)}
+          </p>
+          <p className="mt-1 max-w-4xl text-xs text-slate-500">{report.basis}</p>
+        </div>
+        <button type="button" onClick={onDownload} className="btn-ghost shrink-0">
+          <Download className="h-4 w-4" /> Download CSV
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50/70 p-4 lg:grid-cols-4">
+        <ReportMetric label="Students reviewed" value={report.summary.students_reviewed} />
+        <ReportMetric label="Subjects with need" value={report.summary.subjects_with_need} />
+        <ReportMetric label="Student-subject needs" value={report.summary.student_subject_needs} />
+        <ReportMetric label="Incomplete to resolve" value={report.summary.pending_incomplete} tone="amber" />
+      </div>
+      {visibleRows.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                <th className="px-5 py-3">Subject</th>
+                <th className="px-3 py-3 text-center">Students needing</th>
+                <th className="px-3 py-3 text-center">Not taken</th>
+                <th className="px-3 py-3 text-center">Retake</th>
+                <th className="px-3 py-3 text-center">Incomplete</th>
+                <th className="px-5 py-3">Affected students</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => (
+                <tr key={row.course.id} className="border-b border-slate-50 align-top">
+                  <td className="px-5 py-3">
+                    <p className="font-semibold text-ink">{row.course.code}</p>
+                    <p className="text-xs text-slate-500">{row.course.title}</p>
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    <span className="inline-flex min-w-8 justify-center rounded-full bg-brand-50 px-2.5 py-1 font-bold text-brand-700">
+                      {row.need_count}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-center font-semibold text-slate-700">{row.not_taken_count}</td>
+                  <td className="px-3 py-3 text-center font-semibold text-slate-700">{row.retake_required_count}</td>
+                  <td className="px-3 py-3 text-center">
+                    <span className={row.pending_incomplete_count ? "font-semibold text-amber-700" : "text-slate-500"}>
+                      {row.pending_incomplete_count}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <StudentNeedNames students={row.students} />
+                    {!!row.pending_incomplete_students?.length && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        Awaiting incomplete resolution: {row.pending_incomplete_students.map((student) => student.name).join(", ")}
+                      </p>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="px-5 py-8 text-center">
+          <CheckCircle2 className="mx-auto h-8 w-8 text-brand-500" />
+          <p className="mt-2 font-semibold text-ink">No missing-subject demand found</p>
+          <p className="mt-1 text-sm text-slate-500">All active monitored students are covered by completed or current subjects.</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ReportMetric({ label, value, tone = "brand" }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`mt-1 text-2xl font-bold ${tone === "amber" ? "text-amber-700" : "text-brand-700"}`}>{value ?? 0}</p>
+    </div>
+  );
+}
+
+function StudentNeedNames({ students = [] }) {
+  if (!students.length) return <span className="text-xs text-slate-400">No confirmed offering need</span>;
+  const shown = students.slice(0, 4);
+  return (
+    <p className="text-xs leading-5 text-slate-600">
+      {shown.map((student) => `${student.name} (${student.student_number})`).join(", ")}
+      {students.length > shown.length ? `, +${students.length - shown.length} more` : ""}
+    </p>
+  );
+}
+
+function downloadSubjectNeedsCsv(report) {
+  const metadata = [
+    ["Program", `${report.program.code} - ${report.program.name}`],
+    ["Planning semester", report.term?.label || "Not selected"],
+    ["Generated", report.generated_at || ""],
+    ["Basis", report.basis || ""],
+    [],
+  ];
+  const header = [
+    "Subject Code",
+    "Subject Title",
+    "Category",
+    "Students Needing",
+    "Not Taken",
+    "Retake Required",
+    "Incomplete to Resolve",
+    "Students Needing Subject",
+    "Incomplete Students",
+  ];
+  const rows = (report.rows || []).map((row) => [
+    row.course.code,
+    row.course.title,
+    row.course.category || "",
+    row.need_count,
+    row.not_taken_count,
+    row.retake_required_count,
+    row.pending_incomplete_count,
+    (row.students || []).map((student) => `${student.student_number} - ${student.name} (${student.reason})`).join("; "),
+    (row.pending_incomplete_students || []).map((student) => `${student.student_number} - ${student.name}`).join("; "),
+  ]);
+  const csv = [...metadata, header, ...rows]
+    .map((row) => row.map(csvCell).join(","))
+    .join("\r\n");
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const program = (report.program.code || "program").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  link.href = url;
+  link.download = `${program}-subject-needs-report.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function formatGeneratedAt(value) {
+  if (!value) return "now";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function ActionButton({ busy, onClick, icon: Icon, children, primary = false, disabled = false }) {

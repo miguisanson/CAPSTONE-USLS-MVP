@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness, Building2, CalendarCheck2, CalendarDays, ChevronLeft,
-  ChevronRight, ExternalLink, Link2, Mail, Search, UsersRound, X, BookOpenCheck, Save,
+  ChevronRight, ExternalLink, FileSearch, Link2, Mail, Search, UsersRound, X, BookOpenCheck, Save,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
 import { initials } from "../lib/format";
+import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 
 export default function Faculty() {
   const { data, loading, error, refetch } = useApi(() => api.faculty(), []);
@@ -144,6 +145,7 @@ export default function Faculty() {
 function FacultyProfileModal({ faculty, courses, onSaved, onClose }) {
   const calendar = faculty.calendar || {};
   const feedUrl = calendar.feed_url || `/api/faculty/${faculty.id}/calendar.ics`;
+  const [showCvAssistant, setShowCvAssistant] = useState(false);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="faculty-profile-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <Card className="max-h-[94vh] w-full max-w-7xl overflow-hidden shadow-2xl">
@@ -167,6 +169,7 @@ function FacultyProfileModal({ faculty, courses, onSaved, onClose }) {
               <p className="text-sm leading-relaxed text-slate-600">{faculty.specialization}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">{(faculty.matching_keywords || []).slice(0, 8).map((keyword) => <span key={keyword} className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700">{keyword}</span>)}</div>
               <p className="mt-2 text-xs text-slate-500">Used to explain recommendations in Panel Matching.</p>
+              {faculty.cv_profile && <button type="button" onClick={() => setShowCvAssistant(true)} className="btn-ghost mt-3 cursor-pointer"><FileSearch className="h-4 w-4" /> Open CV reference assistant</button>}
             </ProfileSection>
 
             <ProfileSection icon={BookOpenCheck} title="Preferred teaching subjects">
@@ -204,6 +207,7 @@ function FacultyProfileModal({ faculty, courses, onSaved, onClose }) {
           <WeeklyCalendar faculty={faculty} />
         </div>
       </Card>
+      {showCvAssistant && <FacultyAssignmentProfile faculty={faculty} onClose={() => setShowCvAssistant(false)} />}
     </div>
   );
 }
