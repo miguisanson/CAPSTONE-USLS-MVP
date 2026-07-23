@@ -375,11 +375,10 @@ export default function MonitoringGrid() {
                         <td key={c.id} className="border-b border-r border-slate-100 p-0 text-center">
                           <span
                             aria-label={`${c.code} for ${displayStudentName(s)}: ${status}`}
-                            title={`${c.code} — ${status}. Official/imported status: ${officialStatus}. Official grade: ${s.grades?.[c.id] || "No grade"}.${statusSource ? ` Source: ${statusSource}.` : ""} Read-only; changes are synchronized from the source workflow.`}
-                            className={`flex h-9 w-full min-w-10 cursor-default flex-col items-center justify-center text-[10px] font-bold sm:h-10 sm:text-[11px] ${sty.cls}`}
+                            title={`${c.code} — ${status}. Official/imported status: ${officialStatus}.${statusSource ? ` Source: ${statusSource}.` : ""} Read-only; changes are synchronized from the source workflow.`}
+                            className={`flex h-9 w-full min-w-10 cursor-default items-center justify-center text-[10px] font-bold sm:h-10 sm:text-[11px] ${sty.cls}`}
                           >
                             {sty.mark}
-                            {s.grades?.[c.id] && <span className="text-[9px] font-semibold leading-none opacity-90">{s.grades[c.id]}</span>}
                           </span>
                         </td>
                       );

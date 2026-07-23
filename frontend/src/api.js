@@ -194,6 +194,20 @@ export const api = {
     request(`/course-offerings/${id}`, { method: "DELETE" }),
   saveEnrollment: (payload) =>
     request("/enrollment", { method: "POST", body: JSON.stringify(payload) }),
+  updateEnrollmentSubjectStatus: (payload) =>
+    request("/enrollment/subject-status", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  previewClassList: async (file, termId) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (termId) form.append("term_id", termId);
+    const res = await fetch(`${BASE}/enrollment/class-list-preview`, { method: "POST", body: form, credentials: "same-origin" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Class list preview failed (${res.status})`);
+    return body;
+  },
   importClassList: async (file, termId) => {
     const form = new FormData();
     form.append("file", file);

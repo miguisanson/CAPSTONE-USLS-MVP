@@ -1081,6 +1081,13 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 course_id=self.course_id,
                 added_by="Class list fixture",
             ))
+            db.session.add(CurriculumOffering(
+                program_id=self.program_id,
+                academic_year="2026-2027",
+                semester="1st Semester",
+                course_id=other_course.id,
+                added_by="All class lists fixture",
+            ))
             db.session.commit()
             academic = self._academic_client()
             response = academic.get(
@@ -1093,6 +1100,20 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(payload["selected_offering"]["course_code"], "BPM-501")
             self.assertEqual(payload["summary"]["students_in_selected_class"], 1)
             self.assertEqual(payload["students"][0]["student_number"], "GS-2026-TEST")
+            all_response = academic.get(
+                f"/api/monitoring/class-list?program_id={self.program_id}"
+                f"&term_id={current_term.id}&view=all"
+            )
+            self.assertEqual(all_response.status_code, 200, all_response.get_json())
+            all_payload = all_response.get_json()
+            self.assertEqual(all_payload["view"], "all")
+            self.assertEqual(len(all_payload["class_lists"]), 2)
+            self.assertEqual(all_payload["summary"]["class_list_entries"], 2)
+            self.assertEqual(all_payload["summary"]["unique_students"], 1)
+            self.assertEqual(
+                {item["offering"]["course_code"] for item in all_payload["class_lists"]},
+                {"BPM-501", "BPM-502"},
+            )
             blocked = academic.post("/api/monitoring/subject-status", json={
                 "student_id": self.student_id,
                 "course_id": self.course_id,
@@ -1439,6 +1460,78 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(record.status, "Enrolled")
             self.assertIsNone(record.grade_value)
 
+    def test_only_academic_coordinator_can_mark_subject_dropped_or_withdrawn(self):
+        with app.app_context():
+            term = AcademicTerm(
+                label="AY 2026-2027 1st Semester",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 12, 15),
+            )
+            db.session.add(term)
+            db.session.flush()
+            enrollment = SubjectEnrollment(
+                student_id=self.student_id,
+                course_id=self.course_id,
+                term_id=term.id,
+                status="Enrolled",
+                source_reference="Test enrollment",
+            )
+            record = CourseRecord(
+                student_id=self.student_id,
+                course_id=self.course_id,
+                status="Enrolled",
+                term_label=term.label,
+                grade_value="1.50",
+                grade_status="Passed",
+            )
+            db.session.add_all([enrollment, record])
+            db.session.commit()
+
+            payload = {
+                "subject_enrollment_id": enrollment.id,
+                "status": "Dropped",
+                "effective_date": "2026-09-15",
+                "note": "Student stopped attending after the official change period.",
+            }
+            staff_response = self._staff_client().patch(
+                "/api/enrollment/subject-status",
+                json=payload,
+            )
+            self.assertEqual(staff_response.status_code, 403, staff_response.get_json())
+
+            academic_response = self._academic_client().patch(
+                "/api/enrollment/subject-status",
+                json=payload,
+            )
+            self.assertEqual(academic_response.status_code, 200, academic_response.get_json())
+            db.session.refresh(enrollment)
+            db.session.refresh(record)
+            self.assertEqual(enrollment.status, "Dropped")
+            self.assertEqual(enrollment.status_note, payload["note"])
+            self.assertIsNotNone(enrollment.status_changed_at)
+            self.assertEqual(record.status, "Dropped")
+            self.assertEqual(record.grade_value, "1.50")
+            self.assertEqual(record.grade_status, "Passed")
+
+    def test_student_subject_withdrawal_submission_is_disabled(self):
+        with app.app_context():
+            account = UserAccount(
+                email="student-withdrawal-disabled@example.test",
+                full_name="Student Withdrawal Disabled",
+                password_hash=generate_password_hash("test-password"),
+                role="student",
+                student_id=self.student_id,
+                active=True,
+            )
+            db.session.add(account)
+            db.session.commit()
+            response = self._role_client(account.id, "student").post(
+                "/api/student-portal/requests/withdrawal",
+                json={},
+            )
+            self.assertEqual(response.status_code, 403, response.get_json())
+            self.assertIn("Academic Coordinator", response.get_json()["error"])
+
     def test_enrollment_workspace_uses_monitoring_status_for_subject_eligibility(self):
         with app.app_context():
             term = AcademicTerm(
@@ -1661,7 +1754,23 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 units=3,
                 category="Major",
             )
-            db.session.add_all([term, faculty, not_offered])
+            completed_student = Student(
+                student_number="GS-2026-COMPLETED",
+                first_name="Completed",
+                last_name="Student",
+                email="completed-student@example.test",
+                program_id=self.program_id,
+                entry_year=2025,
+                standing="Active",
+            )
+            db.session.add_all([term, faculty, not_offered, completed_student])
+            db.session.flush()
+            db.session.add(CourseRecord(
+                student_id=completed_student.id,
+                course_id=self.course_id,
+                status="Completed",
+                grade_status="Passed",
+            ))
             db.session.commit()
 
             academic = self._academic_client()
@@ -1691,6 +1800,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(updated.status_code, 200, updated.get_json())
             self.assertEqual(updated.get_json()["offering"]["schedule"], "Saturday 9:00-12:00")
             self.assertEqual(updated.get_json()["offering"]["section"], "B")
+            offering.assigned_faculty_id = None
+            db.session.commit()
 
             staff_view = self._staff_client().get(
                 f"/api/course-offerings?program_id={self.program_id}&term_id={term.id}"
@@ -1699,11 +1810,26 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertFalse(staff_view.get_json()["permissions"]["can_manage"])
 
             csv_body = (
-                "Student ID,Subject Code\n"
-                "GS-2026-TEST,BPM-501\n"
-                "GS-UNKNOWN,BPM-501\n"
-                "GS-2026-TEST,BPM-599\n"
+                "Student ID,Subject Code,Faculty\n"
+                "GS-2026-TEST,BPM-501,Dr. Offering Test\n"
+                "GS-2026-COMPLETED,BPM-501,Dr. Offering Test\n"
+                "GS-UNKNOWN,BPM-501,Dr. Offering Test\n"
+                "GS-2026-TEST,BPM-599,Dr. Offering Test\n"
             ).encode("utf-8")
+            preview = academic.post(
+                "/api/enrollment/class-list-preview",
+                data={
+                    "term_id": str(term.id),
+                    "file": (BytesIO(csv_body), "class-list.csv"),
+                },
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(preview.status_code, 200, preview.get_json())
+            self.assertEqual(preview.get_json()["total_rows"], 4)
+            self.assertEqual(preview.get_json()["ready_count"], 1)
+            self.assertEqual(preview.get_json()["warning_count"], 0)
+            self.assertEqual(preview.get_json()["error_count"], 3)
+            self.assertEqual(preview.get_json()["rows"][0]["faculty"], faculty.name)
             imported = academic.post(
                 "/api/enrollment/class-list-import",
                 data={
@@ -1716,6 +1842,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(imported.get_json()["tagged"], 1)
             self.assertEqual(imported.get_json()["not_found_count"], 1)
             self.assertEqual(imported.get_json()["not_offered_count"], 1)
+            self.assertEqual(imported.get_json()["completed_subject_count"], 1)
+            self.assertEqual(imported.get_json()["faculty_assignments"], 1)
+            db.session.refresh(offering)
+            self.assertEqual(offering.assigned_faculty_id, faculty.id)
             enrollment = SubjectEnrollment.query.filter_by(
                 student_id=self.student_id,
                 course_id=self.course_id,
@@ -1729,6 +1859,18 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 ).one().status,
                 "Enrolled",
             )
+            self.assertEqual(
+                CourseRecord.query.filter_by(
+                    student_id=completed_student.id,
+                    course_id=self.course_id,
+                ).one().status,
+                "Completed",
+            )
+            self.assertIsNone(SubjectEnrollment.query.filter_by(
+                student_id=completed_student.id,
+                course_id=self.course_id,
+                term_id=term.id,
+            ).first())
 
             blocked_delete = academic.delete(f"/api/course-offerings/{offering.id}")
             self.assertEqual(blocked_delete.status_code, 400, blocked_delete.get_json())

@@ -44,7 +44,6 @@ const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal
 const STUDENT_REQUEST_VIEW_BY_SLUG = {
   awol: "awol",
   practicum: "practicum",
-  withdrawal: "withdrawal",
   graduation: "graduation",
 };
 
@@ -59,7 +58,6 @@ const STUDENT_NAV = [
   { id: "readmission", label: "Readmission", icon: UserCheck },
   { id: "awol", label: "Return from AWOL", icon: UserX },
   { id: "practicum", label: "Practicum", icon: Briefcase },
-  { id: "withdrawal", label: "Withdrawal Request", icon: LogOut },
   { id: "graduation", label: "Graduation Status", icon: GraduationCap },
   { id: "inbox", label: "Inbox / Messages", icon: Mail },
   { id: "documents", label: "Documents / Submissions", icon: FileUp },
@@ -131,7 +129,6 @@ const REQUEST_GROUPS = [
         lockedWhen: (data) => data.student.enrollment_tag !== "AWOL" && data.student.standing !== "AWOL",
         lockedReason: "Available only while your student record is marked AWOL.",
       },
-      { id: "withdrawal", label: "Withdrawal", icon: LogOut },
     ],
   },
   {
@@ -202,7 +199,7 @@ export default function StudentPortal() {
                 {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
                 {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
                 {view === "assistant" && <StudentPolicyAssistant />}
-                {["research", "schedule", "loa", "readmission", "awol", "practicum", "withdrawal", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
+                {["research", "schedule", "loa", "readmission", "awol", "practicum", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
                 {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
                 {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
               </StudentPortalSectionBoundary>
@@ -554,7 +551,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
           <ActiveIcon className="h-4 w-4 text-brand-700" /> {activeRequest?.label}
         </div>
-        {["practicum", "withdrawal", "graduation"].includes(active) && <StudentClarificationPanel slug={active} data={data} onSaved={onSaved} />}
+        {["practicum", "graduation"].includes(active) && <StudentClarificationPanel slug={active} data={data} onSaved={onSaved} />}
         {activeLocked ? (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
             <Lock className="mt-0.5 h-4 w-4 text-slate-400" />
@@ -566,7 +563,6 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
             {active === "loa" && <LoaRequestForm data={data} semesters={data.future_semesters || []} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
             {active === "awol" && <AwolReturnRequestForm data={data} onSaved={onSaved} />}
-            {active === "withdrawal" && <WithdrawalRequestForm data={data} onSaved={onSaved} />}
             {active === "practicum" && <PracticumRequestForm data={data} onSaved={onSaved} />}
             {active === "graduation" && <GraduationRequestForm data={data} onSaved={onSaved} />}
             {active === "schedule" && <ScheduleRequestForm studentId={data.student.id} onSaved={onSaved} />}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -36,6 +36,8 @@ export default function Enrollment() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const [statusEdit, setStatusEdit] = useState(null);
+  const [classListPreview, setClassListPreview] = useState(null);
 
   const programId = searchParams.get("program_id") || "";
   const termId = searchParams.get("term_id") || "";
@@ -53,6 +55,7 @@ export default function Enrollment() {
       setData(response);
       setSelected(new Set(response.current_course_ids || []));
       setPreview(null);
+      setStatusEdit(null);
       const canonical = {
         program_id: String(response.program.id),
         term_id: String(response.term.id),
@@ -163,26 +166,95 @@ export default function Enrollment() {
     }
   }
 
-  async function importClassList(event) {
+  async function previewClassList(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setBusy("classlist");
+    setBusy("classlist-preview");
     setError("");
     try {
-      const res = await api.importClassList(file, data?.term?.id || termId || undefined);
+      const response = await api.previewClassList(
+        file,
+        data?.term?.id || termId || undefined
+      );
+      setClassListPreview({ file, ...response });
+    } catch (err) {
+      setError(err.message || "Could not preview the class list.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function importClassList() {
+    if (!classListPreview?.file) return;
+    setBusy("classlist-import");
+    setError("");
+    try {
+      const res = await api.importClassList(
+        classListPreview.file,
+        data?.term?.id || termId || undefined
+      );
+      setClassListPreview(null);
       await confirm({
         title: "Class list imported",
         message:
           `${res.message}\n\n` +
           (res.sample_not_found?.length ? `Not found: ${res.sample_not_found.join(", ")}\n` : "") +
-          (res.sample_not_offered?.length ? `Not offered/unknown: ${res.sample_not_offered.join(", ")}` : ""),
+          (res.sample_not_offered?.length ? `Not offered/unknown: ${res.sample_not_offered.join(", ")}\n` : "") +
+          (res.sample_invalid_faculty?.length ? `Faculty issues: ${res.sample_invalid_faculty.join(", ")}\n` : "") +
+          (res.sample_faculty_conflicts?.length ? `Faculty conflicts: ${res.sample_faculty_conflicts.join(", ")}\n` : "") +
+          (res.sample_completed_subjects?.length ? `Already completed: ${res.sample_completed_subjects.join(", ")}` : ""),
         confirmLabel: "Done",
         cancelLabel: "Close",
       });
       await load();
     } catch (err) {
       setError(err.message || "Could not import the class list.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function beginStatusEdit(course) {
+    if (!course.current_enrollment_id) return;
+    setStatusEdit({
+      courseId: course.course_id,
+      enrollmentId: course.current_enrollment_id,
+      courseCode: course.course_code,
+      courseTitle: course.course_title,
+      studentName: data?.selected_student?.name || "Student",
+      termLabel: data?.term?.label || "",
+      status: "",
+      effectiveDate: new Date().toISOString().slice(0, 10),
+      note: "",
+    });
+    setError("");
+    setResult(null);
+  }
+
+  async function saveStatusEdit() {
+    if (!statusEdit?.status) {
+      setError("Choose Dropped or Withdrawn.");
+      return;
+    }
+    if (!statusEdit?.note.trim()) {
+      setError("Add a coordinator note before saving the subject status.");
+      return;
+    }
+
+    setBusy("subject-status");
+    setError("");
+    try {
+      const response = await api.updateEnrollmentSubjectStatus({
+        subject_enrollment_id: statusEdit.enrollmentId,
+        status: statusEdit.status,
+        effective_date: statusEdit.effectiveDate,
+        note: statusEdit.note.trim(),
+      });
+      await load();
+      setResult(response);
+    } catch (err) {
+      setError(err.message || "Could not update the subject status.");
     } finally {
       setBusy("");
     }
@@ -201,16 +273,16 @@ export default function Enrollment() {
         </div>
         <div className="flex flex-wrap gap-2">
           <label className={`btn-ghost cursor-pointer ${busy === "classlist" ? "pointer-events-none opacity-60" : ""}`}>
-            {busy === "classlist"
+            {busy === "classlist-preview"
               ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
               : <ClipboardCheck className="h-4 w-4" />}
-            Upload class list
+            {busy === "classlist-preview" ? "Reading class list..." : "Upload class list"}
             <input
               type="file"
               accept=".csv,.xlsx,.xlsm"
               className="hidden"
-              onChange={importClassList}
-              disabled={busy === "classlist"}
+              onChange={previewClassList}
+              disabled={Boolean(busy)}
             />
           </label>
           <Link to="/course-adjustments?view=offerings" className="btn-ghost">
@@ -356,7 +428,19 @@ export default function Enrollment() {
                               <td className="px-3 py-3 text-slate-600">{course.course_category}</td>
                               <td className="px-3 py-3 text-slate-600">{course.course_units}</td>
                               <td className="px-3 py-3">
-                                <StatusBadge value={course.status_label || "Not taken"} dot={false} />
+                                {alreadyEnrolled ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => beginStatusEdit(course)}
+                                    className="inline-flex cursor-pointer rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                                    aria-label={`Change ${course.course_code} student status`}
+                                    title="Change student status"
+                                  >
+                                    <StatusBadge value="Enrolled" dot={false} />
+                                  </button>
+                                ) : (
+                                  <StatusBadge value={course.status_label || "Not taken"} dot={false} />
+                                )}
                                 <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-slate-500">
                                   {course.status_reason}
                                 </p>
@@ -493,6 +577,358 @@ export default function Enrollment() {
           </div>
         </>
       )}
+      {statusEdit && (
+        <SubjectStatusDialog
+          edit={statusEdit}
+          setEdit={setStatusEdit}
+          error={error}
+          busy={busy === "subject-status"}
+          onClose={() => {
+            if (busy !== "subject-status") {
+              setStatusEdit(null);
+              setError("");
+            }
+          }}
+          onSave={saveStatusEdit}
+        />
+      )}
+      {classListPreview && (
+        <ClassListPreviewDialog
+          preview={classListPreview}
+          busy={busy === "classlist-import"}
+          onClose={() => {
+            if (busy !== "classlist-import") setClassListPreview(null);
+          }}
+          onImport={importClassList}
+        />
+      )}
+    </div>
+  );
+}
+
+function ClassListPreviewDialog({ preview, busy, onClose, onImport }) {
+  const dialogRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const closeRef = useRef(onClose);
+  const busyRef = useRef(busy);
+
+  useEffect(() => {
+    closeRef.current = onClose;
+    busyRef.current = busy;
+  }, [busy, onClose]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && !busyRef.current) closeRef.current();
+      if (event.key !== "Tab") return;
+      const focusable = dialogRef.current?.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 p-3 backdrop-blur-[1px] sm:p-5"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}
+    >
+      <section
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="class-list-preview-title"
+        aria-describedby="class-list-preview-description"
+        className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift animate-fade-up"
+      >
+        <header className="flex items-start gap-3 border-b border-slate-200 px-5 py-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+            <Table2 className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="class-list-preview-title" className="font-display text-lg font-semibold text-ink">
+              Preview class list
+            </h2>
+            <p id="class-list-preview-description" className="mt-1 truncate text-sm text-slate-500">
+              {preview.filename} · {preview.term}
+            </p>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Close class list preview"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-slate-50 px-5 py-3" aria-live="polite">
+          <PreviewCount label="Rows detected" value={preview.total_rows} tone="neutral" />
+          <PreviewCount label="Ready" value={preview.ready_count} tone="ready" />
+          <PreviewCount label="Already enrolled" value={preview.warning_count} tone="warning" />
+          <PreviewCount label="Needs review" value={preview.error_count} tone="error" />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[920px] text-sm">
+            <thead className="sticky top-0 z-10 bg-white">
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="w-14 px-4 py-3 text-center">Row</th>
+                <th className="px-3 py-3">Student</th>
+                <th className="px-3 py-3">Program</th>
+                <th className="px-3 py-3">Subject</th>
+                <th className="px-3 py-3">Faculty</th>
+                <th className="min-w-[260px] px-4 py-3">Import result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.rows.map((row) => (
+                <tr key={`${row.row}-${row.student_id}-${row.subject_code}`} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+                  <td className="px-4 py-3 text-center text-xs font-semibold text-slate-400">{row.row}</td>
+                  <td className="px-3 py-3">
+                    <p className="font-semibold text-ink">
+                      {[row.first_name, row.last_name].filter(Boolean).join(" ") || "Unknown student"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">{row.student_id || "No student ID"}</p>
+                  </td>
+                  <td className="px-3 py-3 font-medium text-slate-600">{row.program || "—"}</td>
+                  <td className="px-3 py-3 font-semibold text-slate-700">{row.subject_code || "—"}</td>
+                  <td className="px-3 py-3 text-slate-600">{row.faculty || "—"}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-start gap-2">
+                      {row.status === "ready" ? (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+                      ) : (
+                        <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${row.status === "warning" ? "text-amber-600" : "text-red-600"}`} />
+                      )}
+                      <p className={`text-xs font-medium leading-relaxed ${
+                        row.status === "ready"
+                          ? "text-brand-700"
+                          : row.status === "warning"
+                          ? "text-amber-700"
+                          : "text-red-700"
+                      }`}>
+                        {row.message}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {preview.truncated && (
+            <p className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-xs font-medium text-amber-800">
+              Showing the first 300 rows. All detected rows will still be processed.
+            </p>
+          )}
+        </div>
+
+        <footer className="flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-relaxed text-slate-500">
+            Rows that need review are skipped. Valid rows and faculty assignments are saved when you confirm.
+          </p>
+          <div className="flex shrink-0 justify-end gap-2">
+            <button type="button" onClick={onClose} disabled={busy} className="btn-ghost cursor-pointer">
+              Choose another file
+            </button>
+            <button
+              type="button"
+              onClick={onImport}
+              disabled={!preview.total_rows || busy}
+              className="btn-primary cursor-pointer"
+            >
+              {busy ? "Importing..." : "Confirm import"}
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function PreviewCount({ label, value, tone }) {
+  const styles = {
+    neutral: "border-slate-200 bg-white text-slate-700",
+    ready: "border-brand-200 bg-brand-50 text-brand-800",
+    warning: "border-amber-200 bg-amber-50 text-amber-800",
+    error: "border-red-200 bg-red-50 text-red-800",
+  };
+  return (
+    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${styles[tone]}`}>
+      {label}: {value}
+    </span>
+  );
+}
+
+function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
+  const statusRef = useRef(null);
+  const dialogRef = useRef(null);
+  const closeRef = useRef(onClose);
+  const busyRef = useRef(busy);
+
+  useEffect(() => {
+    closeRef.current = onClose;
+    busyRef.current = busy;
+  }, [busy, onClose]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    statusRef.current?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && !busyRef.current) closeRef.current();
+      if (event.key !== "Tab") return;
+      const focusable = dialogRef.current?.querySelectorAll(
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled])'
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-[1px]"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}
+    >
+      <section
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="subject-status-dialog-title"
+        aria-describedby="subject-status-dialog-description"
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift animate-fade-up"
+      >
+        <header className="flex items-start gap-3 border-b border-slate-200 px-5 py-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+            <ClipboardCheck className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="subject-status-dialog-title" className="font-display text-lg font-semibold text-ink">
+              Update subject status
+            </h2>
+            <p id="subject-status-dialog-description" className="mt-1 text-sm text-slate-500">
+              {edit.studentName} · {edit.courseCode} · {edit.termLabel}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Close status dialog"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="space-y-4 px-5 py-5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">{edit.courseTitle}</p>
+              <p className="mt-0.5 text-xs text-slate-500">Current status</p>
+            </div>
+            <StatusBadge value="Enrolled" dot={false} />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="field-label">New status</span>
+              <select
+                ref={statusRef}
+                value={edit.status}
+                onChange={(event) => setEdit((current) => ({ ...current, status: event.target.value }))}
+                className="field-input cursor-pointer"
+                required
+              >
+                <option value="">Choose status</option>
+                <option value="Dropped">Dropped</option>
+                <option value="Withdrawn">Withdrawn</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="field-label">Effective date</span>
+              <input
+                type="date"
+                value={edit.effectiveDate}
+                onChange={(event) => setEdit((current) => ({ ...current, effectiveDate: event.target.value }))}
+                className="field-input"
+                required
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="field-label">Coordinator note</span>
+            <textarea
+              value={edit.note}
+              onChange={(event) => setEdit((current) => ({ ...current, note: event.target.value }))}
+              className="field-input min-h-24 resize-y"
+              placeholder="Briefly explain this status change."
+              maxLength={2000}
+              required
+            />
+          </label>
+
+          <ErrorNote message={error} />
+          <p className="text-xs leading-relaxed text-slate-500">
+            This closes the active subject enrollment and records the note in the audit history. Official grades are not changed.
+          </p>
+        </div>
+
+        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+          <button type="button" onClick={onClose} disabled={busy} className="btn-ghost cursor-pointer">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!edit.status || !edit.effectiveDate || !edit.note.trim() || busy}
+            className="btn-primary cursor-pointer"
+          >
+            {busy ? "Saving..." : `Save ${edit.status || "status"}`}
+          </button>
+        </footer>
+      </section>
     </div>
   );
 }
