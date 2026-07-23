@@ -83,7 +83,7 @@ TRANSACTIONS = [
         "group": "Standing",
         "short": "Record an LOA application, route the Dean decision, and pause the student record when approved.",
         "actor": "Student / GS Staff / Dean",
-        "data": "Application reference, request date, effective period, prior LOA count, eligibility check, Dean decision, status update, notice.",
+        "data": "Structured request date, effective semester period, reason, prior LOA count, eligibility check, Dean decision, status update, notice.",
     },
     {
         "slug": "readmission",
@@ -93,7 +93,7 @@ TRANSACTIONS = [
         "group": "Standing",
         "short": "Record a return request after LOA, route the Dean decision, and reactivate approved students.",
         "actor": "Student / GS Staff / Dean",
-        "data": "Application reference, target return semester, previous LOA period, return eligibility, missing requirements, Dean decision, status update, notice.",
+        "data": "Structured return intention, target return semester, previous LOA semester period, return eligibility, missing requirements, Dean decision, status update, notice.",
     },
     {
         "slug": "awol",
@@ -101,9 +101,9 @@ TRANSACTIONS = [
         "title": "AWOL & Residency",
         "icon": "user-x",
         "group": "Standing",
-        "short": "Declare AWOL, review written return intent under maximum-residence rules, and record valid residency enrollment without subjects.",
+        "short": "Automatically flag policy-backed AWOL cases, review structured return declarations, and record valid residency enrollment without subjects.",
         "actor": "Student / GS Staff / Dean / Academic Coordinator",
-        "data": "AWOL effective date, return-intent letter, years in program, residence classification, refresher or re-enrollment requirement, residency reason, Dean decision, and notices.",
+        "data": "Automatic AWOL evidence, structured return declaration, years in program, residence classification, refresher or re-enrollment requirement, residency reason, Dean decision, and notices.",
     },
     {
         "slug": "course-audit",
@@ -488,6 +488,10 @@ class AwolCase(db.Model):
     return_requested_at = db.Column(db.DateTime)
     target_return_term = db.Column(db.String(80))
     intent_attachment_id = db.Column(db.Integer, db.ForeignKey("student_request_attachment.id"))
+    return_intent = db.Column(db.Text)
+    return_reason = db.Column(db.Text)
+    detection_source = db.Column(db.String(180))
+    automatically_flagged_at = db.Column(db.DateTime)
     years_in_program = db.Column(db.Integer)
     normal_residence_years = db.Column(db.Integer)
     absolute_residence_years = db.Column(db.Integer)
@@ -579,6 +583,30 @@ class MonitoringValidationIssue(db.Model):
     )
     resolution_upload = db.relationship("MonitoringSheetUpload", foreign_keys=[resolution_upload_id])
     student = db.relationship("Student", foreign_keys=[student_id])
+    resolved_by = db.relationship("UserAccount", foreign_keys=[resolved_by_user_id])
+
+
+class StudentMonitoringFlag(db.Model):
+    """Typed, auditable monitoring exception without editing official source values."""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    category = db.Column(db.String(100), nullable=False)
+    note = db.Column(db.Text, nullable=False)
+    source = db.Column(db.String(30), nullable=False, default="Manual")
+    source_reference = db.Column(db.String(220))
+    status = db.Column(db.String(30), nullable=False, default="Open")
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    resolved_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    resolution_note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+    resolved_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship(
+        "Student",
+        backref=db.backref("monitoring_flags", lazy=True, cascade="all, delete-orphan"),
+    )
+    created_by = db.relationship("UserAccount", foreign_keys=[created_by_user_id])
     resolved_by = db.relationship("UserAccount", foreign_keys=[resolved_by_user_id])
 
 
@@ -3087,9 +3115,6 @@ ROLE_TRANSACTION_ACCESS = {
 }
 
 REQUEST_ATTACHMENT_WORKFLOWS = {
-    "leave-of-absence": "leave-of-absence",
-    "readmission": "readmission",
-    "awol-return": "awol",
     "practicum": "practicum",
     "withdrawal": "withdrawal",
     "graduation": "graduation",
@@ -3829,6 +3854,12 @@ def readmission_policy_review(student: Student, request_data: dict | None = None
 
 AWOL_RESIDENCY_CITATIONS = [
     {
+        "id": "gs-handbook-awol-standing",
+        "title": "Absent without leave standing",
+        "source": "Graduate Programs Student Handbook 2022-2023, p. 53",
+        "text": "A student who withdraws from the college without a formal leave of absence is AWOL and has registration privileges curtailed or withdrawn.",
+    },
+    {
         "id": "gs-handbook-awol-return",
         "title": "Return from LOA or AWOL",
         "source": "Graduate Programs Student Handbook 2022-2023, p. 53",
@@ -3855,6 +3886,221 @@ RESIDENCY_REASONS = [
     "Comprehensive examination",
     "Awaiting research publication",
 ]
+
+MONITORING_FLAG_CATEGORIES = [
+    "Source data discrepancy",
+    "Enrollment mismatch",
+    "Subject status mismatch",
+    "Missing record",
+    "Academic advising follow-up",
+    "AWOL policy alert",
+    "Other",
+]
+
+SOURCE_CORRECTABLE_FLAG_CATEGORIES = {
+    "Source data discrepancy",
+    "Enrollment mismatch",
+    "Subject status mismatch",
+    "Missing record",
+}
+
+
+def monitoring_flag_dict(item: StudentMonitoringFlag) -> dict:
+    return {
+        "id": item.id,
+        "student_id": item.student_id,
+        "category": item.category,
+        "note": item.note,
+        "source": item.source,
+        "source_reference": item.source_reference,
+        "status": item.status,
+        "created_by": item.created_by.full_name if item.created_by else "Workflow System",
+        "resolved_by": item.resolved_by.full_name if item.resolved_by else None,
+        "resolution_note": item.resolution_note,
+        "created_at": iso(item.created_at),
+        "resolved_at": iso(item.resolved_at),
+        "updated_at": iso(item.updated_at),
+    }
+
+
+def ensure_monitoring_flag(
+    student: Student,
+    category: str,
+    note: str,
+    *,
+    source: str,
+    source_reference: str = "",
+    account: UserAccount | None = None,
+) -> tuple[StudentMonitoringFlag, bool]:
+    existing = (
+        StudentMonitoringFlag.query.filter_by(
+            student_id=student.id,
+            category=category,
+            status="Open",
+        )
+        .order_by(StudentMonitoringFlag.created_at.desc(), StudentMonitoringFlag.id.desc())
+        .first()
+    )
+    if existing:
+        return existing, False
+    item = StudentMonitoringFlag(
+        student_id=student.id,
+        category=category,
+        note=note.strip(),
+        source=source,
+        source_reference=source_reference.strip() or None,
+        created_by_user_id=account.id if account else None,
+        status="Open",
+    )
+    db.session.add(item)
+    return item, True
+
+
+def resolve_source_flags_after_monitoring_upload(
+    student: Student,
+    upload: MonitoringSheetUpload | None,
+) -> int:
+    if not upload:
+        return 0
+    rows = StudentMonitoringFlag.query.filter(
+        StudentMonitoringFlag.student_id == student.id,
+        StudentMonitoringFlag.status == "Open",
+        StudentMonitoringFlag.category.in_(SOURCE_CORRECTABLE_FLAG_CATEGORIES),
+    ).all()
+    for item in rows:
+        item.status = "Resolved"
+        item.resolved_at = now_utc()
+        item.resolution_note = (
+            f"Resolved automatically after monitoring upload {upload.original_name} "
+            f"(upload #{upload.id}) refreshed the official source snapshot."
+        )
+        item.updated_at = now_utc()
+    return len(rows)
+
+
+def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | None:
+    """Return explicit handbook-backed evidence; never infer AWOL from mere absence."""
+    if student.enrollment_tag == "AWOL" or student.standing == "AWOL":
+        latest_term = (
+            TermEnrollment.query.filter_by(student_id=student.id)
+            .join(AcademicTerm)
+            .order_by(AcademicTerm.start_date.desc(), TermEnrollment.id.desc())
+            .first()
+        )
+        return (
+            "Recorded AWOL standing",
+            "The official/imported student standing is AWOL.",
+            latest_term.term.start_date if latest_term and latest_term.term else None,
+        )
+    if student.enrollment_tag in {"LOA", "Completed"} or student.standing in {"On Leave", "Graduated"}:
+        return None
+    latest_term = (
+        TermEnrollment.query.filter_by(student_id=student.id)
+        .join(AcademicTerm)
+        .order_by(AcademicTerm.start_date.desc(), TermEnrollment.id.desc())
+        .first()
+    )
+    if latest_term and latest_term.status == "Withdrawn" and latest_term.term:
+        resolved_case = latest_awol_case(student.id)
+        if resolved_case and resolved_case.status in {
+            "Return Approved",
+            "Extension Approved - Refresher Required",
+            "Re-enrollment Required",
+        }:
+            return None
+        return (
+            "Full-semester withdrawal without approved LOA",
+            (
+                f"The source record marks the full {latest_term.term.label} enrollment "
+                "Withdrawn while no approved LOA standing is active."
+            ),
+            latest_term.confirmed_at.date() if latest_term.confirmed_at else latest_term.term.start_date,
+        )
+    return None
+
+
+def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
+    """Create AWOL cases, alerts, and AC work items from explicit source evidence."""
+    changed = 0
+    students = Student.query.filter(
+        Student.enrollment_tag.notin_(["Completed"]),
+        Student.standing.notin_(["Graduated"]),
+    ).all()
+    for student in students:
+        evidence = automatic_awol_evidence(student)
+        if not evidence:
+            continue
+        source, detail, effective_date = evidence
+        latest = latest_awol_case(student.id)
+        if not latest or latest.status not in {
+            "AWOL Declared",
+            "Return Submitted",
+            "Returned for Revision",
+            "Dean Review",
+        }:
+            latest = AwolCase(student_id=student.id)
+            db.session.add(latest)
+        newly_detected = not latest.automatically_flagged_at
+        latest.status = latest.status if latest.status in {
+            "Return Submitted", "Returned for Revision", "Dean Review"
+        } else "AWOL Declared"
+        latest.awol_effective_date = latest.awol_effective_date or effective_date or date.today()
+        latest.detection_source = source
+        latest.automatically_flagged_at = latest.automatically_flagged_at or now_utc()
+        latest.policy_classification = latest.policy_classification or "Awaiting structured return declaration"
+        latest.dean_decision = latest.dean_decision or "Not Submitted"
+        latest.updated_at = now_utc()
+
+        previous_status = student.enrollment_tag or student.standing
+        student.standing = "AWOL"
+        student.current_stage = "AWOL"
+        student.enrollment_tag = "AWOL"
+        student.risk_level = "Critical"
+        student.updated_at = now_utc()
+        _, flag_created = ensure_monitoring_flag(
+            student,
+            "AWOL policy alert",
+            detail,
+            source="Automatic",
+            source_reference=source,
+        )
+        if newly_detected or flag_created:
+            ensure_task(
+                student.id,
+                "Review automatic AWOL policy alert",
+                "Academic Coordinator",
+                date.today(),
+                85,
+            )
+            workflow_message_record(
+                "awol",
+                student,
+                None,
+                "Academic Coordinator",
+                "Automatic AWOL policy alert",
+                detail,
+                "notice",
+                previous_status,
+                "AWOL Declared",
+                visibility="internal",
+                status="Sent",
+            )
+            add_log(
+                "awol",
+                student.id,
+                "Workflow System",
+                source,
+                "Student automatically flagged AWOL",
+                "Academic Coordinator",
+                f"{detail} Registration privileges are restricted pending a structured return declaration.",
+                previous_status=previous_status,
+                new_status="AWOL Declared",
+                visibility="internal",
+            )
+            changed += 1
+    if commit and changed:
+        db.session.commit()
+    return changed
 
 
 def latest_awol_case(student_id: int) -> AwolCase | None:
@@ -3938,29 +4184,24 @@ def awol_policy_review(student: Student, request_data: dict | None = None) -> di
             "suggested_action": "Record Residency" if eligible else "Review or Use LOA",
             "summary": "The student matches the handbook conditions for residency without subjects." if eligible else "The residency request does not yet clearly match the handbook conditions; verify the record or use LOA.",
             "checks": checks,
-            "citations": [AWOL_RESIDENCY_CITATIONS[2]],
+            "citations": [AWOL_RESIDENCY_CITATIONS[3]],
             "limits": limits,
         }
 
     if action == "declare_awol":
-        valid = student.standing not in {"Withdrawn", "Graduated"} and student.enrollment_tag not in {"LOA", "Completed", "Withdrawn"}
+        evidence = automatic_awol_evidence(student)
         checks = [
             {
-                "label": "No approved leave",
-                "status": "Pass" if student.enrollment_tag != "LOA" else "Needs Review",
-                "detail": f"Current enrollment status: {student.enrollment_tag}.",
-            },
-            {
-                "label": "Active graduate record",
-                "status": "Pass" if valid else "Needs Review",
-                "detail": f"Current standing: {student.standing}.",
+                "label": "Automatic source evidence",
+                "status": "Pass" if evidence else "Needs Review",
+                "detail": evidence[1] if evidence else "No imported AWOL standing or full-semester withdrawal without approved LOA is recorded.",
             },
         ]
         return {
             "mode": "deterministic-policy-checker",
-            "recommendation": "Eligible to Record AWOL" if valid else "Needs Human Review",
-            "suggested_action": "Declare AWOL" if valid else "Verify Standing",
-            "summary": "The handbook treats withdrawal without formal leave as AWOL and curtails registration privileges." if valid else "The current standing conflicts with declaring AWOL and requires manual review.",
+            "recommendation": "Automatically Flagged" if evidence else "No AWOL Evidence",
+            "suggested_action": "Review Automatic Alert" if evidence else "Refresh Source Record",
+            "summary": "AWOL is created by the policy engine from explicit source evidence and cannot be manually declared.",
             "checks": checks,
             "citations": [AWOL_RESIDENCY_CITATIONS[0]],
             "limits": limits,
@@ -3991,7 +4232,7 @@ def awol_policy_review(student: Student, request_data: dict | None = None) -> di
         {
             "label": "Written intent to enroll",
             "status": "Present" if intent_reference else "Needs Review",
-            "detail": intent_reference or "Upload the written return intent addressed through the Graduate School Dean.",
+            "detail": intent_reference or "Complete the structured written return declaration addressed through the Graduate School Dean.",
         },
         {
             "label": "Maximum residence",
@@ -4009,7 +4250,7 @@ def awol_policy_review(student: Student, request_data: dict | None = None) -> di
         "refresher_required": classification == "Extension - Refresher Required",
         "full_reenrollment_required": classification == "Full Re-enrollment Required",
         "limits": limits,
-        "citations": AWOL_RESIDENCY_CITATIONS[:2],
+        "citations": [AWOL_RESIDENCY_CITATIONS[1], AWOL_RESIDENCY_CITATIONS[2]],
     }
 
 
@@ -4024,6 +4265,10 @@ def awol_case_dict(item: AwolCase, include_student: bool = True) -> dict:
         "return_requested_at": iso(item.return_requested_at),
         "target_return_term": item.target_return_term,
         "intent_attachment": attachment_dict(item.intent_attachment),
+        "return_intent": item.return_intent,
+        "return_reason": item.return_reason,
+        "detection_source": item.detection_source,
+        "automatically_flagged_at": iso(item.automatically_flagged_at),
         "years_in_program": item.years_in_program,
         "normal_residence_years": item.normal_residence_years,
         "absolute_residence_years": item.absolute_residence_years,
@@ -4675,6 +4920,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def dashboard():
         sync_overdue_incomplete_alerts(commit=True)
+        sync_automatic_awol_statuses(commit=True)
         return jsonify(dashboard_stats(request.args))
 
     @app.route("/api/dashboard/drilldown")
@@ -4910,6 +5156,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("student")
     def student_portal_context():
         sync_overdue_incomplete_alerts(commit=True)
+        sync_automatic_awol_statuses(commit=True)
         account = current_account()
         student_id = account.student_id if account else None
         if not student_id:
@@ -5017,6 +5264,10 @@ def register_routes(app: Flask) -> None:
                 "readmission_requirements": readmission_requirements(),
                 "upcoming_semesters": upcoming_semester_labels(5),
                 "future_semesters": future_semester_labels(5),
+                "semester_options": [
+                    term.label
+                    for term in AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
+                ],
             }
         )
 
@@ -5283,12 +5534,6 @@ def register_routes(app: Flask) -> None:
             editable_statuses = {"Returned", "Returned for Clarification", "Denied"}
             if application and application.status not in editable_statuses:
                 return jsonify({"error": "This withdrawal stage is awaiting reviewer action. Future uploads are locked."}), 409
-        elif request_type == "awol-return":
-            if student.enrollment_tag != "AWOL" and student.standing != "AWOL":
-                return jsonify({"error": "Return-from-AWOL documents are available only while the student is recorded AWOL."}), 409
-            awol_case = latest_awol_case(student.id)
-            if awol_case and awol_case.status in {"Dean Review", "Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"}:
-                return jsonify({"error": "This AWOL return stage is awaiting or has completed Dean action. Future uploads are locked."}), 409
         elif request_type in {"graduation", "graduation-endorsement"}:
             endorsement = latest_graduation_endorsement(student.id)
             if endorsement and endorsement.endorsement_status not in {"Not Eligible", "Returned for Clarification"}:
@@ -5503,12 +5748,19 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         target_return_term = (data.get("target_return_term") or "").strip()
-        previous_loa_period = (data.get("previous_loa_period") or "").strip()
+        previous_loa_start = (data.get("previous_loa_start") or "").strip()
+        previous_loa_end = (data.get("previous_loa_end") or "").strip()
+        return_intent = (data.get("return_intent") or "").strip()
+        previous_loa_period = f"{previous_loa_start} to {previous_loa_end}".strip()
         return_term = AcademicTerm.query.filter_by(label=target_return_term).first()
+        loa_start_term = AcademicTerm.query.filter_by(label=previous_loa_start).first()
+        loa_end_term = AcademicTerm.query.filter_by(label=previous_loa_end).first()
         if not return_term or return_term.start_date <= date.today():
             return jsonify({"error": "Choose a valid future return semester."}), 400
-        if not previous_loa_period:
-            return jsonify({"error": "Record the previous LOA period."}), 400
+        if not loa_start_term or not loa_end_term or loa_end_term.start_date < loa_start_term.start_date:
+            return jsonify({"error": "Choose a valid previous LOA start and end semester."}), 400
+        if not return_intent:
+            return jsonify({"error": "Enter your intention and readiness to resume studies."}), 400
         submitted = set(data.getlist("readmission_items"))
         missing = [item for item in readmission_requirements() if item not in submitted]
         if missing:
@@ -5526,6 +5778,9 @@ def register_routes(app: Flask) -> None:
             f"Target return semester: {target_return_term}.",
             f"Checklist submitted: {len(submitted)} item(s); missing/not marked: None.",
             f"Previous LOA period: {previous_loa_period}.",
+            f"Previous LOA start: {previous_loa_start}.",
+            f"Previous LOA end: {previous_loa_end}.",
+            f"Return intention: {return_intent}.",
             "Application format: structured portal form; no RAG or document extraction used.",
         ]
 
@@ -5550,12 +5805,20 @@ def register_routes(app: Flask) -> None:
         student = Student.query.get_or_404(account.student_id)
         if student.enrollment_tag != "AWOL" and student.standing != "AWOL":
             return jsonify({"error": "A return-from-AWOL request can be filed only while your record is marked AWOL."}), 409
-        attachment = request_attachment_from_payload(student, "awol-return", data)
-        if not attachment:
-            return jsonify({"error": "Upload your written intent to enroll before submitting."}), 400
         target_return_term = (data.get("target_return_term") or "").strip()
-        if not target_return_term:
-            return jsonify({"error": "Choose the semester when you intend to return."}), 400
+        last_enrolled_term = (data.get("last_enrolled_term") or "").strip()
+        return_intent = (data.get("return_intent") or "").strip()
+        return_reason = (data.get("return_reason") or "").strip()
+        target_term = AcademicTerm.query.filter_by(label=target_return_term).first()
+        last_term = AcademicTerm.query.filter_by(label=last_enrolled_term).first()
+        if not target_term or target_term.start_date <= date.today():
+            return jsonify({"error": "Choose a valid future semester when you intend to return."}), 400
+        if last_enrolled_term and not last_term:
+            return jsonify({"error": "Choose a valid last enrolled semester."}), 400
+        if not return_intent:
+            return jsonify({"error": "Enter your written intention to resume enrollment."}), 400
+        if not return_reason:
+            return jsonify({"error": "Explain why you are requesting to return."}), 400
         item = latest_awol_case(student.id)
         if item and item.status not in {"AWOL Declared", "Return Denied", "Returned for Revision", "Return Submitted"}:
             return jsonify({"error": "Your current AWOL return case cannot be resubmitted at this stage."}), 409
@@ -5564,18 +5827,21 @@ def register_routes(app: Flask) -> None:
                 student_id=student.id,
                 status="AWOL Declared",
                 awol_effective_date=date.today(),
-                last_enrolled_term=(data.get("last_enrolled_term") or "").strip() or None,
+                last_enrolled_term=last_enrolled_term or None,
             )
             db.session.add(item)
             db.session.flush()
         review = awol_policy_review(student, {
             "workflow_action": "return_from_awol",
-            "application_reference": attachment.original_name,
+            "application_reference": "Structured portal return declaration",
         })
         item.status = "Return Submitted"
         item.return_requested_at = now_utc()
         item.target_return_term = target_return_term
-        item.intent_attachment_id = attachment.id
+        item.last_enrolled_term = last_enrolled_term or item.last_enrolled_term
+        item.intent_attachment_id = None
+        item.return_intent = return_intent
+        item.return_reason = return_reason
         item.years_in_program = review["limits"]["years_in_program"]
         item.normal_residence_years = review["limits"]["normal_years"]
         item.absolute_residence_years = review["limits"]["absolute_years"]
@@ -5584,16 +5850,21 @@ def register_routes(app: Flask) -> None:
         item.full_reenrollment_required = review["full_reenrollment_required"]
         item.dean_decision = "Not Submitted"
         item.updated_at = now_utc()
-        bind_workflow_attachment(attachment, item, "Return Submitted", account)
-        add_task(student.id, "Review written intent to return from AWOL", "GS Staff", 3, 65)
+        add_task(student.id, "Review structured return declaration from AWOL", "GS Staff", 3, 65)
         add_log(
-            "awol", student.id, "Student", attachment.original_name,
-            "AWOL return intent submitted", "GS Staff",
-            f"Target return semester: {target_return_term}. Policy classification: {item.policy_classification}.",
+            "awol", student.id, "Student", "Structured portal return declaration",
+            "AWOL return declaration submitted", "GS Staff",
+            (
+                f"Target return semester: {target_return_term}.\n"
+                f"Last enrolled semester: {last_enrolled_term or 'Not recorded'}.\n"
+                f"Written intention: {return_intent}\n"
+                f"Reason for return: {return_reason}\n"
+                f"Policy classification: {item.policy_classification}."
+            ),
             previous_status="AWOL Declared", new_status="Return Submitted",
         )
         db.session.commit()
-        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your written return intent and route it to the Dean."})
+        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your structured return declaration and route it to the Dean."})
 
     @app.route("/api/student-portal/requests/practicum", methods=["POST"])
     @require_api_login("student")
@@ -5931,7 +6202,11 @@ def register_routes(app: Flask) -> None:
         writer.writerow(["Student ID", item.student.student_number])
         writer.writerow(["Program", item.student.program.code])
         writer.writerow(["AWOL effective date", iso(item.awol_effective_date)])
+        writer.writerow(["Automatic detection source", item.detection_source or ""])
+        writer.writerow(["Last enrolled semester", item.last_enrolled_term or ""])
         writer.writerow(["Target return semester", item.target_return_term or ""])
+        writer.writerow(["Written intention to enroll", item.return_intent or ""])
+        writer.writerow(["Reason for return", item.return_reason or ""])
         writer.writerow(["Dean decision", item.dean_decision])
         writer.writerow(["Policy classification", item.policy_classification or ""])
         writer.writerow(["Refresher required", "Yes" if item.refresher_required else "No"])
@@ -8267,13 +8542,24 @@ def register_routes(app: Flask) -> None:
             elif decision == "return":
                 item.status = "Returned for Revision"
                 item.dean_decision = "Returned"
-                result = "AWOL return intent returned by Dean for revision"
+                result = "AWOL return declaration returned by Dean for revision"
                 next_owner = "Student"
-                add_task(student.id, "Revise written intent to return from AWOL", "Student", 5, 55)
+                add_task(student.id, "Revise structured return declaration from AWOL", "Student", 5, 55)
             else:
                 return jsonify({"error": "AWOL return decisions must be approve, deny, or return."}), 400
             item.decided_at = now_utc()
             item.updated_at = now_utc()
+            if decision == "approve" and student.enrollment_tag != "AWOL":
+                for flag in StudentMonitoringFlag.query.filter_by(
+                    student_id=student.id,
+                    category="AWOL policy alert",
+                    status="Open",
+                ).all():
+                    flag.status = "Resolved"
+                    flag.resolved_by_user_id = account.id
+                    flag.resolution_note = "Resolved automatically when the Dean-approved return restored the active standing."
+                    flag.resolved_at = now_utc()
+                    flag.updated_at = now_utc()
             if note:
                 item.staff_notes = "\n".join(part for part in [item.staff_notes, f"Dean: {note}"] if part)
             resolve_standing_change_tasks(student.id, "AWOL", "Dean")
@@ -8806,20 +9092,103 @@ def register_routes(app: Flask) -> None:
         # for the proper office to correct in AIMS; the official value is not changed.
         data = request.get_json(silent=True) or {}
         student = Student.query.get_or_404(student_id)
-        note = (data.get("note") or "").strip() or "Data discrepancy flagged from the monitoring sheet."
+        category = (data.get("category") or "").strip()
+        note = (data.get("note") or "").strip()
+        if category not in MONITORING_FLAG_CATEGORIES:
+            return jsonify({"error": "Choose a valid flag category."}), 400
+        if category == "AWOL policy alert":
+            return jsonify({"error": "AWOL policy alerts are created automatically by the system."}), 400
+        if not note:
+            return jsonify({"error": "Enter the reason or observation for this flag."}), 400
         account = current_account()
         actor = workflow_actor_label(account) if account else "Graduate School Staff"
+        item, created = ensure_monitoring_flag(
+            student,
+            category,
+            note,
+            source="Manual",
+            source_reference="Monitoring Sheet",
+            account=account,
+        )
+        if not created:
+            return jsonify({
+                "error": f"{student.name} already has an open {category.lower()} flag. Resolve it before adding another."
+            }), 409
         add_log(
             "aims-discrepancy",
             student.id,
             actor,
-            "AIMS data discrepancy",
-            f"Discrepancy flagged for {student.name} ({student.student_number}).",
-            "Graduate School Staff",
-            note + "\nOfficial AIMS value unchanged; forward to the proper office for correction in AIMS.",
+            category,
+            f"{category} flagged for {student.name} ({student.student_number}).",
+            "Academic Coordinator",
+            note + "\nThe monitoring projection remains read-only; no official source value was changed.",
+            visibility="internal",
         )
         db.session.commit()
-        return jsonify({"ok": True, "message": "Discrepancy recorded for follow-up."})
+        return jsonify({
+            "ok": True,
+            "flag": monitoring_flag_dict(item),
+            "message": "Flag recorded for Academic Coordinator follow-up.",
+        })
+
+    @app.route("/api/students/<int:student_id>/flags")
+    @require_api_login("staff", "academic_coordinator")
+    def student_monitoring_flags(student_id: int):
+        student = Student.query.get_or_404(student_id)
+        rows = (
+            StudentMonitoringFlag.query.filter_by(student_id=student.id)
+            .order_by(
+                StudentMonitoringFlag.status.asc(),
+                StudentMonitoringFlag.created_at.desc(),
+                StudentMonitoringFlag.id.desc(),
+            )
+            .all()
+        )
+        return jsonify({
+            "student": student_brief(student),
+            "categories": [
+                item for item in MONITORING_FLAG_CATEGORIES if item != "AWOL policy alert"
+            ],
+            "items": [monitoring_flag_dict(item) for item in rows],
+        })
+
+    @app.route("/api/students/<int:student_id>/flags/<int:flag_id>/resolve", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def resolve_student_monitoring_flag(student_id: int, flag_id: int):
+        student = Student.query.get_or_404(student_id)
+        item = StudentMonitoringFlag.query.get_or_404(flag_id)
+        if item.student_id != student.id:
+            return jsonify({"error": "The selected flag does not belong to this student."}), 404
+        if item.status == "Resolved":
+            return jsonify({"ok": True, "flag": monitoring_flag_dict(item), "message": "Flag is already resolved."})
+        data = request.get_json(silent=True) or {}
+        resolution_note = (data.get("resolution_note") or "").strip()
+        if not resolution_note:
+            return jsonify({"error": "Enter how the flag was resolved."}), 400
+        account = current_account()
+        item.status = "Resolved"
+        item.resolved_by_user_id = account.id if account else None
+        item.resolution_note = resolution_note
+        item.resolved_at = now_utc()
+        item.updated_at = now_utc()
+        add_log(
+            "aims-discrepancy",
+            student.id,
+            workflow_actor_label(account) if account else "Graduate School Staff",
+            item.category,
+            f"{item.category} resolved",
+            "Academic Coordinator",
+            resolution_note + "\nNo monitoring cell was manually edited.",
+            previous_status="Open",
+            new_status="Resolved",
+            visibility="internal",
+        )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "flag": monitoring_flag_dict(item),
+            "message": "Flag resolved without editing the monitoring sheet.",
+        })
 
     @app.route("/api/students/<int:student_id>/remove", methods=["POST"])
     @require_api_login("staff", "academic_coordinator")
@@ -8869,6 +9238,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/monitoring/grid")
     @require_api_login("staff", "academic_coordinator")
     def monitoring_grid():
+        sync_automatic_awol_statuses(commit=True)
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
         if not program:
@@ -8904,6 +9274,7 @@ def register_routes(app: Flask) -> None:
         cids = [c.id for c in courses]
         records: dict[tuple[int, int], CourseRecord] = {}
         operational_rows: dict[tuple[int, int], SubjectEnrollment] = {}
+        flags_by_student: dict[int, list[StudentMonitoringFlag]] = {}
         if sids and cids:
             for rec in CourseRecord.query.filter(
                 CourseRecord.student_id.in_(sids), CourseRecord.course_id.in_(cids)
@@ -8916,6 +9287,11 @@ def register_routes(app: Flask) -> None:
                     SubjectEnrollment.term_id == selected_term.id,
                 ).all():
                     operational_rows[(item.student_id, item.course_id)] = item
+        if sids:
+            for item in StudentMonitoringFlag.query.filter(
+                StudentMonitoringFlag.student_id.in_(sids)
+            ).order_by(StudentMonitoringFlag.created_at.desc()).all():
+                flags_by_student.setdefault(item.student_id, []).append(item)
 
         cat_order = ["Basic", "Major", "Cognate", "Core", "Comprehensive"]
         grouped: dict[str, list] = {}
@@ -8977,6 +9353,10 @@ def register_routes(app: Flask) -> None:
                 "eligible": compre["eligible"],
                 "compre_eligibility": compre,
                 "milestones": monitoring_research_milestones(s),
+                "flags": [monitoring_flag_dict(item) for item in flags_by_student.get(s.id, [])],
+                "open_flag_count": sum(
+                    1 for item in flags_by_student.get(s.id, []) if item.status == "Open"
+                ),
             })
 
         progress = request.args.get("progress", "").strip()
@@ -9002,6 +9382,9 @@ def register_routes(app: Flask) -> None:
             "integrity": enrollment_integrity_payload(program, selected_term),
             "read_only": True,
             "permissions": {"can_update_subject_status": False},
+            "flag_categories": [
+                item for item in MONITORING_FLAG_CATEGORIES if item != "AWOL policy alert"
+            ],
         })
 
     @app.route("/api/monitoring/compre-exam", methods=["POST"])
@@ -9161,7 +9544,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Choose a valid student before running the AWOL/residency policy review."}), 400
         student = Student.query.get_or_404(student_id)
         action = (data.get("workflow_action") or data.get("action") or "return_from_awol").strip()
-        if action not in {"declare_awol", "return_from_awol", "forward_return_to_dean", "record_residency"}:
+        if action not in {"return_from_awol", "forward_return_to_dean", "record_residency"}:
             return jsonify({"error": "Choose a valid AWOL or residency review action."}), 400
         if action == "record_residency" and (data.get("residency_reason") or "").strip() not in RESIDENCY_REASONS:
             return jsonify({"error": "Choose a handbook-supported residency reason."}), 400
@@ -11667,7 +12050,7 @@ def submitted_request_students(request_type: str) -> list[dict]:
                 status = "In Progress"
         else:
             status = "Pending Review"
-        attachment = latest_request_attachment(student.id, request_type)
+        attachment = None
         row = {
             **student_brief(student),
             "student": student_brief(student),
@@ -11702,6 +12085,9 @@ def submitted_request_students(request_type: str) -> list[dict]:
                 "request_label": request_notes_value(log.notes, "Target return semester") or request_notes_value(log.notes, "Target return term") or "Readmission request",
                 "target_return_term": request_notes_value(log.notes, "Target return semester") or request_notes_value(log.notes, "Target return term"),
                 "previous_loa_period": request_notes_value(log.notes, "Previous LOA period"),
+                "previous_loa_start": request_notes_value(log.notes, "Previous LOA start"),
+                "previous_loa_end": request_notes_value(log.notes, "Previous LOA end"),
+                "return_intent": request_notes_value(log.notes, "Return intention"),
             })
         rows.append(row)
     return rows
@@ -11825,6 +12211,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
     elif slug == "graduation":
         context["roster"] = graduation_candidate_payload()
     elif slug == "awol":
+        sync_automatic_awol_statuses(commit=True)
         context["roster"] = awol_residency_roster_payload()
         context["residency_reasons"] = RESIDENCY_REASONS
         context["policy_citations"] = AWOL_RESIDENCY_CITATIONS
@@ -12841,8 +13228,29 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
             db.session.add(DocumentCheck(student_id=student.id, gate="Admission Handoff", item_name=item, status="Complete", evidence_reference="AC Student Monitoring import"))
     if is_new:
         ensure_student_account(student, student.email)
+    resolved_flags = resolve_source_flags_after_monitoring_upload(student, upload)
+    if resolved_flags:
+        add_log(
+            "aims-discrepancy",
+            student.id,
+            "Workflow System",
+            f"Monitoring upload #{upload.id}",
+            f"{resolved_flags} source-correctable monitoring flag(s) resolved",
+            "Academic Coordinator",
+            (
+                f"The refreshed source row from {upload.original_name} resolved the flagged "
+                "data condition. Official values were updated only through the upload."
+            ),
+            visibility="internal",
+        )
     recompute_risk(student)
-    return {"student": student, "is_new": is_new, "subject_changes": subject_changes, "completed": completed}
+    return {
+        "student": student,
+        "is_new": is_new,
+        "subject_changes": subject_changes,
+        "completed": completed,
+        "resolved_flags": resolved_flags,
+    }
 
 
 def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = None) -> dict:
@@ -13226,8 +13634,6 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     account = require_workflow_actor("staff")
     student = Student.query.get_or_404(int(data["student_id"]))
     submission = pending_student_request_log(student.id, "leave-of-absence", "LOA application submitted")
-    source = (data.get("source_reference") or data.get("application_reference") or "").strip()
-    application_reference = (data.get("application_reference") or "").strip()
     request_date = (data.get("request_date") or "").strip()
     effective_start = (data.get("effective_start") or "").strip()
     effective_end = (data.get("effective_end") or "").strip()
@@ -13249,11 +13655,11 @@ def handle_leave_of_absence(data: MultiDict) -> int:
         "reason_category": (data.get("reason_category") or "").strip(),
         "effective_start": effective_start,
         "effective_end": effective_end,
-        "application_reference": application_reference or source or submission.source_reference,
+        "application_reference": "Structured portal LOA application",
     })
     period = " to ".join([part for part in [effective_start, effective_end] if part])
     notes = [
-        f"Application reference: {application_reference or source or submission.source_reference or 'uploaded application'}.",
+        "Application format: structured portal LOA application.",
         f"Request date: {request_date or 'Not recorded'}.",
         f"Requested semester period: {period}.",
         f"Prior LOA count: {prior_loa_count}.",
@@ -13269,7 +13675,7 @@ def handle_leave_of_absence(data: MultiDict) -> int:
     add_task(student.id, "Decide Leave of Absence request", "Dean", 3, 60)
     add_log(
         "leave-of-absence", student.id, workflow_actor_label(account),
-        source or application_reference or submission.source_reference or "LOA application",
+        "Structured portal LOA application",
         "LOA request forwarded to Dean", "Dean", "\n".join(notes),
         previous_status="Submitted", new_status="Dean Review",
     )
@@ -13282,8 +13688,6 @@ def handle_readmission(data: MultiDict) -> int:
     account = require_workflow_actor("staff")
     student = Student.query.get_or_404(int(data["student_id"]))
     submission = pending_student_request_log(student.id, "readmission", "Readmission request submitted")
-    source = (data.get("source_reference") or data.get("application_reference") or "").strip()
-    application_reference = (data.get("application_reference") or "").strip()
     target_return_term = (data.get("target_return_term") or "").strip()
     previous_loa_period = (data.get("previous_loa_period") or "").strip()
     eligibility_status = (data.get("eligibility_status") or "Checked").strip()
@@ -13302,11 +13706,11 @@ def handle_readmission(data: MultiDict) -> int:
         "readmission_items": sorted(submitted),
         "target_return_term": target_return_term,
         "previous_loa_period": previous_loa_period,
-        "application_reference": application_reference or source or submission.source_reference,
+        "application_reference": "Structured portal readmission request",
     })
 
     notes = [
-        f"Application reference: {application_reference or source or submission.source_reference or 'uploaded application'}.",
+        "Application format: structured portal readmission request.",
         f"Return semester: {target_return_term}.",
         f"Previous leave semester: {previous_loa_period or 'Not recorded'}.",
         f"Eligibility result: {eligibility_status}.",
@@ -13320,7 +13724,7 @@ def handle_readmission(data: MultiDict) -> int:
     add_task(student.id, "Decide readmission request", "Dean", 3, 60)
     add_log(
         "readmission", student.id, workflow_actor_label(account),
-        source or application_reference or submission.source_reference or "Readmission application",
+        "Structured portal readmission request",
         "Readmission request forwarded to Dean", "Dean", "\n".join(notes),
         previous_status="Submitted", new_status="Dean Review",
     )
@@ -13980,49 +14384,20 @@ def handle_awol(data: MultiDict) -> int:
     staff_notes = (data.get("staff_notes") or "").strip()
 
     if action == "declare_awol":
-        if student.standing in {"Withdrawn", "Graduated"} or student.enrollment_tag in {"LOA", "Completed", "Withdrawn"}:
-            raise ValueError("The current student standing conflicts with declaring AWOL. Review the record first.")
-        if student.enrollment_tag == "AWOL" or student.standing == "AWOL":
-            raise ValueError("This student is already recorded as AWOL.")
-        effective_value = (data.get("awol_effective_date") or "").strip()
-        effective_date = parse_date(effective_value) if effective_value else date.today()
-        review = awol_policy_review(student, {"workflow_action": "declare_awol"})
-        item = AwolCase(
-            student_id=student.id,
-            status="AWOL Declared",
-            awol_effective_date=effective_date,
-            last_enrolled_term=(data.get("last_enrolled_term") or "").strip() or None,
-            years_in_program=review["limits"]["years_in_program"],
-            normal_residence_years=review["limits"]["normal_years"],
-            absolute_residence_years=review["limits"]["absolute_years"],
-            policy_classification="Awaiting return intent",
-            dean_decision="Not Submitted",
-            staff_notes=staff_notes or None,
+        raise ValueError(
+            "AWOL is policy-driven and cannot be declared manually. Refresh the source standing "
+            "or full-semester withdrawal record; the system will create the AWOL alert automatically."
         )
-        db.session.add(item)
-        previous_status = student.enrollment_tag or student.standing
-        student.standing = "AWOL"
-        student.current_stage = "AWOL"
-        student.enrollment_tag = "AWOL"
-        student.risk_level = "Critical"
-        result = "Student declared AWOL"
-        note = f"Effective date: {effective_date.isoformat()}. Last enrolled semester: {item.last_enrolled_term or 'Not recorded'}. {staff_notes}".strip()
-        workflow_message_record(
-            "awol", student, account, "Student", result,
-            "Your registration privileges are restricted while the record is AWOL. Submit a written intent to enroll for Dean endorsement when you are ready to return.",
-            "notice", previous_status, "AWOL Declared", status="Sent",
-        )
-        add_log("awol", student.id, workflow_actor_label(account), "AWOL standing review", result, "Student", note, previous_status=previous_status, new_status="AWOL Declared")
 
     elif action == "forward_return_to_dean":
         item = AwolCase.query.get_or_404(safe_int(data.get("case_id")))
         if item.student_id != student.id or item.status not in {"Return Submitted", "Returned for Revision"}:
             raise ValueError("Only a submitted AWOL return intent can be forwarded to the Dean.")
-        if not item.intent_attachment:
-            raise ValueError("The student's written intent to enroll is required before Dean review.")
+        if not item.return_intent:
+            raise ValueError("The student's structured written return declaration is required before Dean review.")
         review = awol_policy_review(student, {
             "workflow_action": "return_from_awol",
-            "application_reference": item.intent_attachment.original_name,
+            "application_reference": "Structured portal return declaration",
         })
         item.years_in_program = review["limits"]["years_in_program"]
         item.normal_residence_years = review["limits"]["normal_years"]
@@ -14034,9 +14409,8 @@ def handle_awol(data: MultiDict) -> int:
         item.status = "Dean Review"
         item.dean_decision = "Pending"
         item.updated_at = now_utc()
-        bind_workflow_attachment(item.intent_attachment, item, "Dean Review", account)
-        add_task(student.id, "Decide AWOL return intent", "Dean", 3, 70)
-        result = "AWOL return forwarded to Dean"
+        add_task(student.id, "Decide structured AWOL return declaration", "Dean", 3, 70)
+        result = "AWOL return declaration forwarded to Dean"
         workflow_message_record(
             "awol", student, account, "Student", result,
             f"Policy classification: {item.policy_classification}. The Dean will decide the return endorsement.",
@@ -14233,8 +14607,10 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
         "graduation": {"graduation", "graduation-endorsement", "graduation-registrar-handoff"},
         "research": set(),
         "enrollment": set(),
+        "student-handoff": set(),
         "course-adjustments": set(),
         "leave-of-absence": {"leave-of-absence"},
+        "readmission": {"readmission"},
         "awol": {"awol-return"},
     }[slug]
     task_terms = {
@@ -14247,8 +14623,10 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
             "form 1", "form 4",
         ),
         "enrollment": ("enrollment",),
+        "student-handoff": ("handoff", "onboarding", "admission"),
         "course-adjustments": ("course adjustment", "subject need"),
         "leave-of-absence": ("leave of absence", "loa"),
+        "readmission": ("readmission", "return"),
         "awol": ("awol", "residency", "refresher", "re-enrollment"),
     }[slug]
 
@@ -14315,6 +14693,10 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
         student.standing = "Active"
         student.current_stage = "Coursework"
         student.enrollment_tag = "Enrolled"
+    elif slug == "readmission":
+        student.standing = "On Leave"
+        student.current_stage = "LOA"
+        student.enrollment_tag = "LOA"
     elif slug == "awol":
         awol_rows = AwolCase.query.filter_by(student_id=student.id).all()
         for item in awol_rows:
@@ -14330,7 +14712,11 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
                 TermEnrollment.term_id.in_(residency_term_ids),
                 TermEnrollment.status == "Residency",
             ).delete(synchronize_session=False)
-    elif slug == "course-adjustments":
+        removed_records += StudentMonitoringFlag.query.filter_by(
+            student_id=student.id,
+            category="AWOL policy alert",
+        ).delete(synchronize_session=False)
+    elif slug in {"course-adjustments", "student-handoff"}:
         pass
 
     db.session.flush()
@@ -16662,10 +17048,10 @@ def onboarding_requirements() -> list[str]:
 def readmission_requirements() -> list[str]:
     # Return checklist for moving a student from LOA back to active monitoring.
     return [
-        "Return intent letter",
-        "Updated study plan",
-        "Program/adviser endorsement",
-        "No pending accountability",
+        "Structured return intention completed",
+        "Updated study plan confirmed",
+        "Program or adviser consultation completed",
+        "No pending accountability confirmed",
     ]
 
 
@@ -17481,6 +17867,7 @@ def ensure_monitoring_upload_schema() -> None:
     """Create the additive upload-history table for existing MVP databases."""
     MonitoringSheetUpload.__table__.create(bind=db.engine, checkfirst=True)
     MonitoringValidationIssue.__table__.create(bind=db.engine, checkfirst=True)
+    StudentMonitoringFlag.__table__.create(bind=db.engine, checkfirst=True)
     inspector = inspect(db.engine)
     issue_columns = {column["name"] for column in inspector.get_columns("monitoring_validation_issue")}
     if "resolution_upload_id" not in issue_columns:
@@ -17499,6 +17886,27 @@ def ensure_monitoring_upload_schema() -> None:
     for name, sql_type in additions.items():
         if name not in existing:
             db.session.execute(text(f"ALTER TABLE student ADD COLUMN {name} {sql_type}"))
+            changed = True
+    if changed:
+        db.session.commit()
+
+
+def ensure_awol_structured_request_schema() -> None:
+    """Add structured AWOL detection and return-declaration fields in place."""
+    inspector = inspect(db.engine)
+    if "awol_case" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("awol_case")}
+    additions = {
+        "return_intent": "TEXT",
+        "return_reason": "TEXT",
+        "detection_source": "VARCHAR(180)",
+        "automatically_flagged_at": "DATETIME",
+    }
+    changed = False
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE awol_case ADD COLUMN {name} {sql_type}"))
             changed = True
     if changed:
         db.session.commit()
@@ -18554,18 +18962,17 @@ def seed_maed_personas() -> None:
         loa.enrollment_tag = "Enrolled"
         loa.risk_level = "Medium"
         set_term_status(loa, "LOA Pending")
-        if not StudentRequestAttachment.query.filter_by(
+        if not TransactionLog.query.filter_by(
             student_id=loa.id,
-            request_type="leave-of-absence",
+            transaction_slug="leave-of-absence",
+            result="LOA application submitted",
         ).first():
-            filename = f"LOA_Application_{loa.student_number}.pdf"
-            item = attachment(loa, "leave-of-absence", filename, "loa", "Submitted")
             add_task(loa.id, "Review student Leave of Absence application", "GS Staff", 3, 55)
             add_log(
                 "leave-of-absence",
                 loa.id,
                 "Student",
-                item.original_name,
+                "Structured LOA portal form",
                 "LOA application submitted",
                 "GS Staff",
                 "Student submitted a Leave of Absence application for staff eligibility review.\n"
@@ -18654,30 +19061,26 @@ def seed_maed_personas() -> None:
             )
             db.session.add(case)
             db.session.flush()
-        intent = attachment(
-            returning,
-            "awol-return",
-            f"AWOL_Return_Intent_{returning.student_number}.pdf",
-            "awol-return",
-            "Return Submitted",
-        )
         case.status = "Return Submitted"
-        case.intent_attachment_id = intent.id
+        case.intent_attachment_id = None
+        case.return_intent = "I intend to resume enrollment in the selected semester."
+        case.return_reason = "My circumstances have stabilized and I am ready to continue the program."
+        case.detection_source = "Imported AWOL standing"
+        case.automatically_flagged_at = case.automatically_flagged_at or now_utc() - timedelta(days=200)
         case.return_requested_at = case.return_requested_at or now_utc() - timedelta(days=3)
         case.target_return_term = term_label
-        intent.workflow_request_id = case.id
         if not TransactionLog.query.filter_by(
             transaction_slug="awol",
             student_id=returning.id,
-            result="AWOL return intent submitted",
+            result="AWOL return declaration submitted",
         ).first():
-            add_task(returning.id, "Review written intent to return from AWOL", "GS Staff", 3, 65)
+            add_task(returning.id, "Review structured return declaration from AWOL", "GS Staff", 3, 65)
             add_log(
                 "awol",
                 returning.id,
                 "Student",
-                intent.original_name,
-                "AWOL return intent submitted",
+                "Structured portal return declaration",
+                "AWOL return declaration submitted",
                 "GS Staff",
                 f"Target return semester: {term_label}. "
                 "Policy classification: Within Maximum Residence.",
@@ -18909,29 +19312,26 @@ def seed_maed_personas() -> None:
         readmission.enrollment_tag = "LOA"
         readmission.risk_level = "Medium"
         set_term_status(readmission, "LOA")
-        if not StudentRequestAttachment.query.filter_by(
+        if not TransactionLog.query.filter_by(
             student_id=readmission.id,
-            request_type="readmission",
+            transaction_slug="readmission",
+            result="Readmission request submitted",
         ).first():
-            request_file = attachment(
-                readmission,
-                "readmission",
-                f"Readmission_Application_{readmission.student_number}.pdf",
-                "readmission",
-                "Submitted",
-            )
             add_task(readmission.id, "Review student readmission request", "GS Staff", 3, 55)
             add_log(
                 "readmission",
                 readmission.id,
                 "Student",
-                request_file.original_name,
+                "Structured readmission portal form",
                 "Readmission request submitted",
                 "GS Staff",
                 "Student submitted a readmission request for staff review.\n"
                 f"Target return semester: {term_label}.\n"
                 "Checklist submitted: 4 item(s); missing/not marked: None.\n"
-                "Previous LOA period: AY 2025-2026 2nd Semester.",
+                "Previous LOA period: AY 2025-2026 2nd Semester to AY 2025-2026 2nd Semester.\n"
+                "Previous LOA start: AY 2025-2026 2nd Semester.\n"
+                "Previous LOA end: AY 2025-2026 2nd Semester.\n"
+                "Return intention: I am ready to resume my graduate studies.",
                 previous_status="LOA",
                 new_status="Submitted",
             )
@@ -19061,6 +19461,7 @@ def seed_database(count: int = 350) -> None:
     for student in Student.query.all():
         recompute_risk(student)
     ensure_demo_accounts()
+    sync_automatic_awol_statuses(commit=False)
     db.session.commit()
 
 
@@ -19190,6 +19591,26 @@ WORKFLOW_DEMO_STUDENTS = {
         "program_code": "MAED",
         "ready_label": "Active student with completed prerequisites; ready for offered-subject enrollment",
     },
+    "student-handoff-sofia": {
+        "workflow": "student-handoff",
+        "scenario": "complete",
+        "student_number": "GS-2026-HO-01",
+        "first_name": "Sofia",
+        "last_name": "Reyes",
+        "email": "handoff.sofia@usls.edu.ph",
+        "program_code": "MAED",
+        "ready_label": "New student with a complete admissions handoff and portal profile",
+    },
+    "student-handoff-anton": {
+        "workflow": "student-handoff",
+        "scenario": "follow-up",
+        "student_number": "GS-2026-HO-02",
+        "first_name": "Anton",
+        "last_name": "Bautista",
+        "email": "handoff.anton@usls.edu.ph",
+        "program_code": "MAED",
+        "ready_label": "New student with one handoff item awaiting staff follow-up",
+    },
     "course-adjustments-lianne": {
         "workflow": "course-adjustments",
         "student_number": "GS-2026-CA-01",
@@ -19226,6 +19647,24 @@ WORKFLOW_DEMO_STUDENTS = {
         "program_code": "MAED",
         "ready_label": "Active student ready to demonstrate the two-semester LOA policy check",
     },
+    "readmission-therese": {
+        "workflow": "readmission",
+        "student_number": "GS-2026-READ-01",
+        "first_name": "Therese",
+        "last_name": "Lacson",
+        "email": "readmission.therese@usls.edu.ph",
+        "program_code": "MAED",
+        "ready_label": "On approved LOA; ready to submit a structured readmission request",
+    },
+    "readmission-gabriel": {
+        "workflow": "readmission",
+        "student_number": "GS-2026-READ-02",
+        "first_name": "Gabriel",
+        "last_name": "Domingo",
+        "email": "readmission.gabriel@usls.edu.ph",
+        "program_code": "MAED",
+        "ready_label": "On approved LOA; ready to demonstrate return-semester policy checks",
+    },
     "awol-maya": {
         "workflow": "awol",
         "scenario": "return",
@@ -19234,7 +19673,7 @@ WORKFLOW_DEMO_STUDENTS = {
         "last_name": "Torres",
         "email": "awol.maya@usls.edu.ph",
         "program_code": "MAED",
-        "ready_label": "Recorded AWOL; ready to submit written intent to return",
+        "ready_label": "Automatically flagged AWOL; ready to submit a structured return declaration",
     },
     "residency-nicolas": {
         "workflow": "awol",
@@ -19321,7 +19760,16 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     is_adjustments_demo = workflow == "course-adjustments"
     is_loa_demo = workflow == "leave-of-absence"
     is_awol_demo = workflow == "awol"
-    is_new_demo = is_enrollment_demo or is_adjustments_demo or is_loa_demo or is_awol_demo
+    is_handoff_demo = workflow == "student-handoff"
+    is_readmission_demo = workflow == "readmission"
+    is_new_demo = (
+        is_enrollment_demo
+        or is_adjustments_demo
+        or is_loa_demo
+        or is_awol_demo
+        or is_handoff_demo
+        or is_readmission_demo
+    )
     withdrawal_application = latest_withdrawal_application(student.id) if is_withdrawal_demo else None
     withdrawal_complete = bool(withdrawal_application and withdrawal_application.status == "Withdrawn Confirmed")
     student.program_id = program.id
@@ -19329,9 +19777,21 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     student.academic_year_entry = student.academic_year_entry if is_research_demo else "2026-2027" if (is_withdrawal_demo or is_new_demo) else "2024-2025"
     student.year_level = "Year 1" if (is_withdrawal_demo or is_new_demo) else "Completed Coursework"
     student.standing = "Active"
-    student.enrollment_tag = "Completed" if workflow == "graduation" else "Not Enrolled" if (is_enrollment_demo or is_adjustments_demo or (is_awol_demo and demo_config.get("scenario") == "residency")) else "Enrolled"
+    student.enrollment_tag = (
+        "Completed" if workflow == "graduation"
+        else "LOA" if is_readmission_demo
+        else "Not Enrolled" if (
+            is_enrollment_demo
+            or is_adjustments_demo
+            or is_handoff_demo
+            or (is_awol_demo and demo_config.get("scenario") == "residency")
+        )
+        else "Enrolled"
+    )
     student.current_stage = (
         "Completed" if workflow == "graduation"
+        else "Admission" if is_handoff_demo
+        else "LOA" if is_readmission_demo
         else "Coursework" if (is_withdrawal_demo or is_enrollment_demo or is_adjustments_demo or is_loa_demo)
         else "Research" if is_awol_demo and demo_config.get("scenario") == "residency"
         else "AWOL" if is_awol_demo
@@ -19365,7 +19825,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
                 completed_count = max(len(demo_courses) - 2, 0) if student.student_number.endswith("02") else min(2, len(demo_courses))
             elif is_enrollment_demo and student.student_number.endswith("02"):
                 completed_count = min(2, len(demo_courses))
-            elif is_loa_demo:
+            elif is_loa_demo or is_readmission_demo:
                 completed_count = min(3, len(demo_courses))
             elif is_awol_demo:
                 completed_count = min(4, len(demo_courses))
@@ -19439,6 +19899,41 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
         active_term = get_active_term()
         if is_loa_demo and active_term:
             ensure_term_enrollment(student, active_term, "Enrolled", "LOA demo active standing")
+        if is_readmission_demo:
+            student.standing = "On Leave"
+            student.current_stage = "LOA"
+            student.enrollment_tag = "LOA"
+            student.risk_level = "Medium"
+            if active_term:
+                ensure_term_enrollment(student, active_term, "LOA", "Approved LOA demo standing")
+        if is_handoff_demo:
+            student.standing = "Active"
+            student.current_stage = "Admission"
+            student.enrollment_tag = "Not Enrolled"
+            for index, requirement in enumerate(onboarding_requirements()):
+                check = DocumentCheck.query.filter_by(
+                    student_id=student.id,
+                    gate="Admission Handoff",
+                    item_name=requirement,
+                ).first()
+                if not check:
+                    check = DocumentCheck(
+                        student_id=student.id,
+                        gate="Admission Handoff",
+                        item_name=requirement,
+                    )
+                    db.session.add(check)
+                needs_follow_up = (
+                    demo_config.get("scenario") == "follow-up"
+                    and index == len(onboarding_requirements()) - 1
+                )
+                check.status = "Missing" if needs_follow_up else "Complete"
+                check.evidence_reference = (
+                    "Awaiting admissions source confirmation"
+                    if needs_follow_up
+                    else "Admissions handoff demo baseline"
+                )
+                check.updated_at = now_utc()
         if is_awol_demo and demo_config.get("scenario") == "return":
             student.standing = "AWOL"
             student.current_stage = "AWOL"
@@ -19457,6 +19952,8 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             item.last_enrolled_term = "AY 2025-2026 2nd Semester"
             item.policy_classification = "Awaiting return intent"
             item.dean_decision = "Not Submitted"
+            item.detection_source = "Demo imported AWOL standing"
+            item.automatically_flagged_at = item.automatically_flagged_at or now_utc()
             item.updated_at = now_utc()
         return
 
@@ -19918,6 +20415,7 @@ with app.app_context():
         db.session.commit()
     ensure_schedule_request_schema()
     ensure_monitoring_upload_schema()
+    ensure_awol_structured_request_schema()
     ensure_student_comprehensive_exam_schema()
     ensure_student_monitoring_columns_schema()
     ensure_panel_assignment_schema()
@@ -19957,6 +20455,7 @@ if __name__ == "__main__":
         sync_result = sync_all_curricula()
         ensure_subject_enrollment_schema()
         sync_overdue_incomplete_alerts(commit=False)
+        sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         if sync_result["created"]:
             print(f"Added {sync_result['created']} missing curriculum row(s) for {sync_result['students']} student(s).")

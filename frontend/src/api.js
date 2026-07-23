@@ -231,6 +231,12 @@ export const api = {
     request(`/students/${studentId}/remove`, { method: "POST", body: JSON.stringify(payload) }),
   flagMonitoringIssue: (studentId, payload = {}) =>
     request(`/students/${studentId}/flag-issue`, { method: "POST", body: JSON.stringify(payload) }),
+  monitoringFlags: (studentId) => request(`/students/${studentId}/flags`),
+  resolveMonitoringFlag: (studentId, flagId, payload = {}) =>
+    request(`/students/${studentId}/flags/${flagId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   decisionSupport: () => request("/decision-support"),
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),

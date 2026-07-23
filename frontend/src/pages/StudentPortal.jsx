@@ -342,7 +342,7 @@ function WorkflowStatusPanel({ data }) {
       status: data.residency_record?.status || data.awol_case?.status || data.student.enrollment_tag,
       detail: data.residency_record
         ? `${data.residency_record.term_label} · ${data.residency_record.reason}`
-        : data.awol_case?.policy_classification || "Submit written intent to enroll when ready to return.",
+        : data.awol_case?.policy_classification || "Submit the structured return declaration when ready to return.",
     });
   }
   rows.push({
@@ -1253,9 +1253,12 @@ function LoaRequestForm({ data, semesters = [], onSaved }) {
 function ReadmissionRequestForm({ data, onSaved }) {
   const requirements = data.readmission_requirements || [];
   const semesters = data.future_semesters || [];
+  const allSemesters = data.semester_options || [];
   const [form, setForm] = useState({
     target_return_term: "",
-    previous_loa_period: "",
+    previous_loa_start: "",
+    previous_loa_end: "",
+    return_intent: "",
   });
   const [selectedItems, setSelectedItems] = useState([]);
   const { busy, error, message, submit } = useSubmitRequest("readmission", onSaved);
@@ -1267,18 +1270,30 @@ function ReadmissionRequestForm({ data, onSaved }) {
   }
 
   const toggleItem = (item) => setSelectedItems((current) => current.includes(item) ? current.filter((value) => value !== item) : [...current, item]);
-  const complete = Boolean(form.target_return_term && form.previous_loa_period.trim() && requirements.every((item) => selectedItems.includes(item)));
+  const complete = Boolean(
+    form.target_return_term
+    && form.previous_loa_start
+    && form.previous_loa_end
+    && form.return_intent.trim()
+    && requirements.every((item) => selectedItems.includes(item))
+  );
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Return semester" required>
           <Select value={form.target_return_term} onChange={set("target_return_term")} placeholder="Select semester" options={semesters} required />
         </Field>
-        <Field label="Previous LOA period" required>
-          <Input value={form.previous_loa_period} onChange={set("previous_loa_period")} placeholder="Example: AY 2025-2026 1st to 2nd Semester" required />
+        <Field label="Previous LOA start" required>
+          <Select value={form.previous_loa_start} onChange={(event) => setForm((current) => ({ ...current, previous_loa_start: event.target.value, previous_loa_end: current.previous_loa_end || event.target.value }))} placeholder="Select semester" options={allSemesters} required />
+        </Field>
+        <Field label="Previous LOA end" required>
+          <Select value={form.previous_loa_end} onChange={set("previous_loa_end")} placeholder="Select semester" options={allSemesters} required />
         </Field>
       </div>
+      <Field label="Intention and readiness to resume studies" required>
+        <Textarea value={form.return_intent} onChange={set("return_intent")} placeholder="State that you intend to return and briefly explain your readiness to continue the program." required />
+      </Field>
       {requirements.length > 0 && (
         <div>
           <p className="field-label">Readmission checklist</p>
@@ -1293,15 +1308,22 @@ function ReadmissionRequestForm({ data, onSaved }) {
         </div>
       )}
       <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">This structured form is checked with fixed rules. It does not upload or analyze a letter with RAG.</div>
-      <SubmitState busy={busy} error={error} message={message} disabled={!complete} disabledHint={!complete ? "Complete the return semester, prior LOA period, and every checklist item." : ""} label="Submit readmission request" />
+      <SubmitState busy={busy} error={error} message={message} disabled={!complete} disabledHint={!complete ? "Complete the semester fields, return intention, and every checklist item." : ""} label="Submit readmission request" />
     </form>
   );
 }
 
 function AwolReturnRequestForm({ data, onSaved }) {
   const existing = data.awol_case;
+  const student = data.student;
   const semesters = data.upcoming_semesters || [];
-  const [form, setForm] = useState({ attachment_id: null, target_return_term: "", last_enrolled_term: existing?.last_enrolled_term || "" });
+  const allSemesters = data.semester_options || [];
+  const [form, setForm] = useState({
+    target_return_term: "",
+    last_enrolled_term: existing?.last_enrolled_term || "",
+    return_intent: existing?.return_intent || "",
+    return_reason: existing?.return_reason || "",
+  });
   const { busy, error, message, submit } = useSubmitRequest("awol-return", onSaved);
   const locked = existing && ["Dean Review", "Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(existing.status);
 
@@ -1316,12 +1338,12 @@ function AwolReturnRequestForm({ data, onSaved }) {
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">Current AWOL return case</p><p className="mt-1 text-xs text-slate-500">{existing.policy_classification || "Policy review pending"}</p></div><StatusBadge value={existing.status} dot={false} /></div>
           {existing.years_in_program !== null && existing.years_in_program !== undefined && <p className="mt-3 text-sm text-slate-600">Years in program: {existing.years_in_program} · normal limit {existing.normal_residence_years} · absolute limit {existing.absolute_residence_years}</p>}
-          {existing.intent_attachment && <SavedWorkflowFiles files={[existing.intent_attachment]} />}
+          {existing.detection_source && <p className="mt-2 text-xs text-slate-500">Detected from: {existing.detection_source}</p>}
         </div>
       )}
       {(student.standing === "AWOL" || student.enrollment_tag === "AWOL") && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
-          Your record is currently AWOL and registration privileges are restricted. Use Return from AWOL to submit your written intention to enroll for Dean endorsement.
+          Your record was automatically flagged AWOL from an official standing or full-semester withdrawal without approved LOA. Registration privileges remain restricted until your return request is reviewed.
         </div>
       )}
       {student.enrollment_tag === "Residency" && (
@@ -1330,18 +1352,19 @@ function AwolReturnRequestForm({ data, onSaved }) {
         </div>
       )}
       {locked ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Your written intent has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Your structured return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
-            The handbook requires a written intention to enroll routed through the Graduate School Dean. Approval may include a refresher-course or full re-enrollment requirement when maximum residence is exceeded.
+            The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete it here as structured fields; no PDF upload or RAG analysis is used.
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Intended return semester" required><Select value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} required /></Field>
-            <Field label="Last enrolled semester"><Input value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="AY 2025-2026 2nd Semester" /></Field>
+            <Field label="Last enrolled semester"><Select value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="Select semester" options={allSemesters} /></Field>
           </div>
-          <RequestPdfUpload requestType="awol-return" label="Written intent to enroll PDF" initialAttachment={existing?.intent_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} />
-          <SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || !form.target_return_term} disabledHint={!form.attachment_id ? "Upload the written intent PDF before submitting." : !form.target_return_term ? "Choose your intended return semester." : ""} label={existing?.status === "Returned for Revision" ? "Resubmit return intent" : "Submit return intent"} />
+          <Field label="Written intention to resume enrollment" required><Textarea value={form.return_intent} onChange={(event) => setForm((current) => ({ ...current, return_intent: event.target.value }))} placeholder="I intend to resume enrollment in the selected semester…" required /></Field>
+          <Field label="Reason for returning and readiness to continue" required><Textarea value={form.return_reason} onChange={(event) => setForm((current) => ({ ...current, return_reason: event.target.value }))} required /></Field>
+          <SubmitState busy={busy} error={error} message={message} disabled={!form.target_return_term || !form.return_intent.trim() || !form.return_reason.trim()} disabledHint={!form.target_return_term ? "Choose your intended return semester." : "Complete the written intention and return reason."} label={existing?.status === "Returned for Revision" ? "Resubmit return declaration" : "Submit return declaration"} />
         </form>
       )}
     </div>

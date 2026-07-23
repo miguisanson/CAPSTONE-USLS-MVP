@@ -608,11 +608,11 @@ function RequestTable({ rows, onOpen, onMessage }) {
 
 function RequestSummary({ request, compact = false }) {
   if (!request) return null;
-  const applicationSource = request.attachment || request.source_reference || "Structured portal form";
+  const applicationSource = request.attachment || "Structured portal form";
   return (
     <div className={`grid gap-3 text-sm ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
       <Detail label="Request" value={request.request_label || "Submitted application"} />
-      <Detail label={request.attachment ? "Application file" : "Application source"} value={applicationSource} />
+      <Detail label={request.attachment ? "Application file" : "Request format"} value={applicationSource} />
       <Detail label="Submitted" value={formatDate(request.submitted_at)} />
       {request.attachment_detail?.file_exists && request.attachment_detail?.url && (
         <a href={request.attachment_detail.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit px-3 py-2">
@@ -3314,26 +3314,26 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
 const WORKFLOW_GUIDES = {
   "leave-of-absence": {
     purpose: "Reviews a student-filed Leave of Absence application without changing standing before an authorized decision.",
-    submitter: "The student submits the completed application PDF and requested leave period.",
+    submitter: "The student completes a structured request with semester dropdowns, an allowed reason, and remarks; no PDF is required.",
     reviewers: "Graduate School Staff verifies eligibility and routes exceptions; the Dean reviews cases requiring a decision.",
     stages: ["Student submission", "Staff policy review", "Dean review when required", "Standing update", "Student notice"],
-    incomplete: "Staff can return the request with a specific message while preserving its uploaded file and activity history.",
+    incomplete: "Staff can return the request with a specific message while preserving its structured fields and activity history.",
     final: "Approved means the authorized leave period is recorded and the monitoring profile shows the student On Leave.",
   },
   readmission: {
     purpose: "Reviews a student-filed request to return after an approved leave period.",
-    submitter: "The student submits the readmission PDF, target return semester, and prior leave details.",
+    submitter: "The student completes a structured return intention, prior LOA semester dropdowns, target return semester, and checklist.",
     reviewers: "Graduate School Staff checks return eligibility and missing requirements; the Dean reviews exceptions.",
     stages: ["Student submission", "Eligibility review", "Dean review when required", "Reactivation", "Student notice"],
-    incomplete: "The case can be returned with a message naming the exact requirement that must be corrected or uploaded.",
+    incomplete: "The case can be returned with a message naming the exact structured field or checklist item that must be corrected.",
     final: "Approved means the student is reactivated for the approved return semester and the monitoring profile is synchronized.",
   },
   awol: {
-    purpose: "Tracks AWOL standing, written intent to return, maximum-residence review, and valid no-subject residency.",
-    submitter: "A returning AWOL student submits a written intent PDF; staff records standing or residency actions.",
+    purpose: "Automatically flags evidence-backed AWOL standing, reviews structured return declarations, and tracks valid no-subject residency.",
+    submitter: "A returning AWOL student completes a structured written declaration; staff reviews alerts and may record policy-valid residency.",
     reviewers: "Graduate School Staff performs the policy review and routes return cases to the Dean.",
-    stages: ["AWOL declaration", "Written return intent", "Policy review", "Dean review", "Return or residency update"],
-    incomplete: "Reviewers can message or return an AWOL case while its written intent and complete audit trail remain visible.",
+    stages: ["Automatic AWOL flag", "Structured return declaration", "Policy review", "Dean review", "Return or residency update"],
+    incomplete: "Reviewers can message or return an AWOL case while its structured declaration and audit trail remain visible.",
     final: "A decided return updates the student standing; residency remains a separate active, no-subject enrollment record.",
   },
   withdrawal: {
@@ -5524,10 +5524,7 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
   const [filters, setFilters] = useState({ query: "", status: "" });
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState({ id: null, label: "" });
-  const [action, setAction] = useState("declare_awol");
   const [form, setForm] = useState({
-    awol_effective_date: new Date().toISOString().slice(0, 10),
-    last_enrolled_term: "",
     residency_reason: "",
     term_id: "",
     staff_notes: "",
@@ -5561,7 +5558,7 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
     setReviewNotice("");
   }
 
-  async function runReview(reviewAction = action, row = selectedRow) {
+  async function runReview(reviewAction = "record_residency", row = selectedRow) {
     const studentId = row?.student_id || selectedStudent.id;
     if (!studentId) {
       setReviewError("Choose a student before running the policy review.");
@@ -5575,7 +5572,7 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
         student_id: studentId,
         workflow_action: reviewAction === "forward_return_to_dean" ? "return_from_awol" : reviewAction,
         residency_reason: form.residency_reason,
-        application_reference: row?.intent_attachment?.name || "",
+        application_reference: row?.return_intent ? "Structured portal return declaration" : "",
       });
       setReview(response.review);
     } catch (error) {
@@ -5590,9 +5587,7 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
     if (!selectedStudent.id) return;
     const saved = await submit({
       student_id: selectedStudent.id,
-      workflow_action: action,
-      awol_effective_date: form.awol_effective_date,
-      last_enrolled_term: form.last_enrolled_term,
+      workflow_action: "record_residency",
       residency_reason: form.residency_reason,
       term_id: selectedTerm,
       staff_notes: form.staff_notes,
@@ -5602,7 +5597,7 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
       setStudentId(null);
       setStudentLabel("");
       setReview(null);
-      setForm((current) => ({ ...current, last_enrolled_term: "", residency_reason: "", staff_notes: "" }));
+      setForm((current) => ({ ...current, residency_reason: "", staff_notes: "" }));
     }
   }
 
@@ -5640,41 +5635,26 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
         </div>
       )}
       <Card className="p-6">
-        <SectionTitle title="Record an AWOL or residency status" subtitle="Use the policy review before changing standing; return requests originate from the student's written intent" icon={UserX} />
+        <SectionTitle title="Automatic AWOL alerts and residency" subtitle="AWOL is created from source evidence; staff only review alerts, return requests, and valid residency enrollment" icon={UserX} />
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">AWOL cannot be declared manually</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800">The system flags an imported AWOL standing or a full-semester withdrawal without approved LOA, then creates an Academic Coordinator work item. A missing pre-enrollment record by itself is not enough.</p>
+        </div>
         <form onSubmit={saveNewAction} className="mt-5 space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Action" required>
-              <Select
-                value={action}
-                onChange={(event) => { setAction(event.target.value); setReview(null); setReviewNotice(""); }}
-                options={[
-                  { value: "declare_awol", label: "Declare AWOL" },
-                  { value: "record_residency", label: "Record residency without subjects" },
-                ]}
-              />
-            </Field>
             <div>
               <p className="field-label">Student</p>
               <StudentPicker value={selectedStudent.id} selectedLabel={selectedStudent.label} meta={meta} onChange={chooseStudent} />
             </div>
+            <Field label="Residency purpose" required><Select value={form.residency_reason} onChange={(event) => { setForm((current) => ({ ...current, residency_reason: event.target.value })); setReview(null); }} placeholder="Select handbook purpose" options={context?.residency_reasons || []} required /></Field>
           </div>
-          {action === "declare_awol" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="AWOL effective date" required><Input type="date" value={form.awol_effective_date} onChange={(event) => setForm((current) => ({ ...current, awol_effective_date: event.target.value }))} required /></Field>
-              <Field label="Last enrolled semester"><Input value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="AY 2026-2027 1st Semester" /></Field>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Residency purpose" required><Select value={form.residency_reason} onChange={(event) => { setForm((current) => ({ ...current, residency_reason: event.target.value })); setReview(null); }} placeholder="Select handbook purpose" options={context?.residency_reasons || []} required /></Field>
-              <Field label="Semester" required><Select value={selectedTerm} onChange={(event) => setForm((current) => ({ ...current, term_id: event.target.value }))} placeholder="Select semester" options={(meta?.terms || []).map((term) => ({ value: String(term.id), label: term.label }))} required /></Field>
-            </div>
-          )}
-          <Field label="Staff verification notes" hint={action === "record_residency" ? "Required when the policy result needs human review." : "Record the source used to establish the AWOL status."}><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>
-          {review && <PolicyReviewCard title="AWOL / residency policy review" description="Deterministic standing and maximum-residence checks using the recorded case fields; no RAG or automated decision." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
+          <Field label="Semester" required><Select value={selectedTerm} onChange={(event) => setForm((current) => ({ ...current, term_id: event.target.value }))} placeholder="Select semester" options={(meta?.terms || []).map((term) => ({ value: String(term.id), label: term.label }))} required /></Field>
+          <Field label="Staff verification notes" hint="Required when the residency policy result needs human review."><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>
+          {review && <PolicyReviewCard title="Residency policy review" description="Deterministic handbook checks using the recorded academic state; no RAG or automated decision." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
           {!review && reviewError && <ErrorNote message={reviewError} />}
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => runReview()} disabled={reviewing || !selectedStudent.id || (action === "record_residency" && !form.residency_reason)} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run policy checker"}</button>
-            <button type="submit" disabled={submitting || !selectedStudent.id || !review || (action === "record_residency" && !form.residency_reason)} className="btn-primary cursor-pointer">{submitting ? "Saving…" : action === "declare_awol" ? "Record AWOL" : "Record residency"}</button>
+            <button type="button" onClick={() => runReview()} disabled={reviewing || !selectedStudent.id || !form.residency_reason} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run residency policy checker"}</button>
+            <button type="submit" disabled={submitting || !selectedStudent.id || !review || !form.residency_reason} className="btn-primary cursor-pointer">{submitting ? "Saving…" : "Record residency"}</button>
           </div>
           <WorkflowSubmitFeedback result={result} error={submitError} />
         </form>
@@ -5700,10 +5680,9 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
         <WorkflowCaseModal id={`awol-residency-${selectedRow.kind}-${selectedRow.id}`} title={selectedRow.student?.name || "Standing case"} subtitle={`${selectedRow.student?.student_number || ""} · ${selectedRow.student?.program_code || ""} · ${selectedRow.kind === "residency" ? "Residency" : "AWOL / Return"}`} status={selectedRow.status} onClose={() => { setSelectedRow(null); setReview(null); }} footer={<>{selectedRow.kind === "awol" && selectedRow.request_id && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}{selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) ? <button type="button" disabled={submitting || !review} onClick={forwardReturn} className="btn-primary cursor-pointer">Forward to Dean</button> : selectedRow.kind === "residency" && selectedRow.record_status === "Active" ? <button type="button" disabled={submitting} onClick={endResidency} className="btn-primary cursor-pointer">Close residency</button> : null}</>}>
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3"><Detail label="Status" value={selectedRow.status} /><Detail label="Policy classification" value={selectedRow.policy_classification || selectedRow.policy_status || "Not reviewed"} /><Detail label="Dean decision" value={selectedRow.dean_decision || "Not applicable"} /></div>
-            {selectedRow.kind === "awol" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="AWOL effective date" value={formatDate(selectedRow.awol_effective_date)} /><Detail label="Target return semester" value={selectedRow.target_return_term || "Not submitted"} /><Detail label="Years in program" value={selectedRow.years_in_program ?? "Not calculated"} /><Detail label="Residence limits" value={selectedRow.normal_residence_years ? `${selectedRow.normal_residence_years} normal / ${selectedRow.absolute_residence_years} absolute` : "Not calculated"} /></div>}
+            {selectedRow.kind === "awol" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="AWOL effective date" value={formatDate(selectedRow.awol_effective_date)} /><Detail label="Automatic detection source" value={selectedRow.detection_source || "Imported standing"} /><Detail label="Last enrolled semester" value={selectedRow.last_enrolled_term || "Not recorded"} /><Detail label="Target return semester" value={selectedRow.target_return_term || "Not submitted"} /><Detail label="Years in program" value={selectedRow.years_in_program ?? "Not calculated"} /><Detail label="Residence limits" value={selectedRow.normal_residence_years ? `${selectedRow.normal_residence_years} normal / ${selectedRow.absolute_residence_years} absolute` : "Not calculated"} /></div>}
             {selectedRow.kind === "residency" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="Semester" value={selectedRow.term_label} /><Detail label="Purpose" value={selectedRow.reason} /></div>}
-            {selectedRow.intent_attachment?.file_exists && <a href={selectedRow.intent_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit cursor-pointer"><FileText className="h-4 w-4" /> Written return intent</a>}
-            {selectedRow.intent_attachment?.file_exists === false && <span className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">The saved written return intent is unavailable.</span>}
+            {selectedRow.kind === "awol" && selectedRow.return_intent && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Student's written intention</p><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selectedRow.return_intent}</p>{selectedRow.return_reason && <><p className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500">Reason for return</p><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selectedRow.return_reason}</p></>}</div>}
             {selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) && <><Field label="Staff review notes"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>{review && <PolicyReviewCard title="Return-from-AWOL policy review" description="Deterministic checks for written intent and program-specific maximum residence before Dean routing." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview("forward_return_to_dean", selectedRow)} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}.`)} />}<button type="button" onClick={() => runReview("forward_return_to_dean", selectedRow)} disabled={reviewing} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run policy checker"}</button></>}
             {selectedRow.kind === "awol" && accountRole === "staff" && ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(selectedRow.status) && (
               <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
@@ -5721,7 +5700,6 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
             )}
             {selectedRow.kind === "awol" && <CaseMessageHistory messages={selectedRow.messages || []} />}
             {selectedRow.kind === "awol" && <WorkflowActivityList logs={selectedRow.history || []} />}
-            {selectedRow.kind === "awol" && <WorkflowFileHistory files={[selectedRow.intent_attachment].filter(Boolean)} />}
             <WorkflowSubmitFeedback result={result} error={submitError} />
           </div>
         </WorkflowCaseModal>
@@ -5758,14 +5736,12 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, accountRol
   const [reviewNotice, setReviewNotice] = useState("");
   const [form, setForm] = useState({
     request_date: new Date().toISOString().slice(0, 10),
-    application_reference: "",
     effective_start: "",
     effective_end: "",
     reason_category: "",
     reason_remarks: "",
     eligibility_status: "Eligible",
     staff_notes: "",
-    source_reference: "",
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -5778,12 +5754,10 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, accountRol
     setForm((current) => ({
       ...current,
       request_date: (selectedRequest.submitted_at || "").slice(0, 10) || current.request_date,
-      application_reference: selectedRequest.attachment || selectedRequest.source_reference || "",
       effective_start: selectedRequest.effective_start || "",
       effective_end: selectedRequest.effective_end || "",
       reason_category: selectedRequest.reason_category || "",
       reason_remarks: selectedRequest.reason_remarks || "",
-      source_reference: selectedRequest.source_reference || selectedRequest.attachment || "",
     }));
   }, [selectedRequest?.request_log_id]);
 
@@ -5828,9 +5802,6 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, accountRol
         onApply={() => runPolicyReview(true)}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Application source">
-          <Input value={form.application_reference} readOnly aria-readonly="true" className="bg-slate-50" />
-        </Field>
         <Field label="Request date" required>
           <Input type="date" value={form.request_date} readOnly aria-readonly="true" className="bg-slate-50" required />
         </Field>
@@ -5858,9 +5829,6 @@ function LeaveOfAbsenceForm({ context, studentId, submit, submitting, accountRol
       </Field>
       <Field label="Staff notes">
         <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
-      </Field>
-      <Field label="Source / reference number">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
       {canForward ? (
         <SubmitButton submitting={submitting}>Forward to Dean</SubmitButton>
@@ -5981,13 +5949,14 @@ function ReadmissionForm({ context, studentId, submit, submitting, accountRole, 
   const [reviewError, setReviewError] = useState("");
   const [reviewNotice, setReviewNotice] = useState("");
   const [form, setForm] = useState({
-    application_reference: "",
     target_return_term: "",
     previous_loa_period: "",
+    previous_loa_start: "",
+    previous_loa_end: "",
+    return_intent: "",
     eligibility_status: "Eligible to Return",
     missing_requirements: "",
     staff_notes: "",
-    source_reference: "",
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const toggle = (item) => setItems((r) => (r.includes(item) ? r.filter((x) => x !== item) : [...r, item]));
@@ -5999,10 +5968,11 @@ function ReadmissionForm({ context, studentId, submit, submitting, accountRole, 
     if (!selectedRequest) return;
     setForm((current) => ({
       ...current,
-      application_reference: selectedRequest.attachment || selectedRequest.source_reference || "",
       target_return_term: selectedRequest.target_return_term || "",
       previous_loa_period: selectedRequest.previous_loa_period || "",
-      source_reference: selectedRequest.source_reference || selectedRequest.attachment || "",
+      previous_loa_start: selectedRequest.previous_loa_start || "",
+      previous_loa_end: selectedRequest.previous_loa_end || "",
+      return_intent: selectedRequest.return_intent || "",
     }));
   }, [selectedRequest?.request_log_id]);
 
@@ -6051,9 +6021,6 @@ function ReadmissionForm({ context, studentId, submit, submitting, accountRole, 
         onApply={() => runPolicyReview(true)}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Application attachment / file reference">
-          <Input value={form.application_reference} readOnly aria-readonly="true" className="bg-slate-50" />
-        </Field>
         <Field label="Target return semester" required>
           <Input value={form.target_return_term} readOnly aria-readonly="true" className="bg-slate-50" required />
         </Field>
@@ -6069,6 +6036,9 @@ function ReadmissionForm({ context, studentId, submit, submitting, accountRole, 
           />
         </Field>
       </div>
+      <Field label="Student's return intention">
+        <Textarea value={form.return_intent} readOnly aria-readonly="true" className="bg-slate-50" />
+      </Field>
       <Field label="Eligibility to return checklist" hint="Unticked items are treated as missing requirements.">
         <CheckList items={requirements} selected={items} onToggle={toggle} />
       </Field>
@@ -6077,9 +6047,6 @@ function ReadmissionForm({ context, studentId, submit, submitting, accountRole, 
       </Field>
       <Field label="Staff notes">
         <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
-      </Field>
-      <Field label="Source / reference number">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
       {canForward ? (
         <SubmitButton submitting={submitting}>Complete review</SubmitButton>

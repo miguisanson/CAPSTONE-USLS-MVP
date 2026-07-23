@@ -215,6 +215,18 @@ export default function Login() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <DemoStudentGroup
+                  open={openDemoGroup === "student-handoff"}
+                  onToggle={() => setOpenDemoGroup((current) => current === "student-handoff" ? "" : "student-handoff")}
+                  title="Student Handoff"
+                  description="New-student profiles after admissions handoff."
+                  icon={UserCog}
+                  students={demoStudents.filter((student) => student.workflow === "student-handoff")}
+                  quickLoginBusy={quickLoginBusy}
+                  resetBusy={resetBusy}
+                  onLogin={quickLogin}
+                  onReset={resetDemoStudent}
+                />
+                <DemoStudentGroup
                   open={openDemoGroup === "enrollment"}
                   onToggle={() => setOpenDemoGroup((current) => current === "enrollment" ? "" : "enrollment")}
                   title="Enrollment"
@@ -251,10 +263,22 @@ export default function Login() {
                   onReset={resetDemoStudent}
                 />
                 <DemoStudentGroup
+                  open={openDemoGroup === "readmission"}
+                  onToggle={() => setOpenDemoGroup((current) => current === "readmission" ? "" : "readmission")}
+                  title="Readmission"
+                  description="Approved-LOA personas ready for structured return requests."
+                  icon={UserRound}
+                  students={demoStudents.filter((student) => student.workflow === "readmission")}
+                  quickLoginBusy={quickLoginBusy}
+                  resetBusy={resetBusy}
+                  onLogin={quickLogin}
+                  onReset={resetDemoStudent}
+                />
+                <DemoStudentGroup
                   open={openDemoGroup === "awol"}
                   onToggle={() => setOpenDemoGroup((current) => current === "awol" ? "" : "awol")}
                   title="AWOL & Residency"
-                  description="One return-from-AWOL and one residency-ready persona."
+                  description="One automatically flagged AWOL return and one residency-ready persona."
                   icon={UserX}
                   students={demoStudents.filter((student) => student.workflow === "awol")}
                   quickLoginBusy={quickLoginBusy}

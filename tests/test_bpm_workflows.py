@@ -41,6 +41,7 @@ from app import (  # noqa: E402
     ResidencyEnrollment,
     ScheduleRequest,
     Student,
+    StudentMonitoringFlag,
     SubjectEnrollment,
     StudentRequestAttachment,
     Task,
@@ -65,6 +66,7 @@ from app import (  # noqa: E402
     ensure_authoritative_curricula,
     get_active_term,
     student_current_course_year,
+    sync_automatic_awol_statuses,
     graduation_eligibility,
     graduation_candidate_payload,
     import_ac_monitoring,
@@ -73,6 +75,7 @@ from app import (  # noqa: E402
     practicum_eligibility,
     required_documents_for_gate,
     research_requirement_presentation,
+    resolve_source_flags_after_monitoring_upload,
     seed_database,
     submitted_request_students,
     task_dict,
@@ -974,6 +977,42 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(row["official_cells"][str(self.course_id)], "Enrolled")
             self.assertEqual(row["grades"][str(self.course_id)], "1.50")
 
+    def test_monitoring_flags_are_typed_audited_and_source_uploads_can_resolve_them(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            staff = self._staff_client()
+            invalid = staff.post(f"/api/students/{student.id}/flag-issue", json={
+                "note": "The source row appears incomplete.",
+            })
+            self.assertEqual(invalid.status_code, 400, invalid.get_json())
+
+            created = staff.post(f"/api/students/{student.id}/flag-issue", json={
+                "category": "Source data discrepancy",
+                "note": "The AY entry does not match the latest AIMS export.",
+            })
+            self.assertEqual(created.status_code, 200, created.get_json())
+            flag_id = created.get_json()["flag"]["id"]
+            item = db.session.get(StudentMonitoringFlag, flag_id)
+            self.assertEqual(item.status, "Open")
+            self.assertEqual(item.source, "Manual")
+
+            upload = MonitoringSheetUpload(
+                original_name="corrected-monitoring.xlsx",
+                stored_name="corrected-monitoring-fixture.xlsx",
+                program_code=student.program.code,
+                row_count=1,
+                subject_count=0,
+                snapshot_json="{}",
+                result_json="{}",
+            )
+            db.session.add(upload)
+            db.session.flush()
+            self.assertEqual(resolve_source_flags_after_monitoring_upload(student, upload), 1)
+            db.session.commit()
+            db.session.refresh(item)
+            self.assertEqual(item.status, "Resolved")
+            self.assertIn("corrected-monitoring.xlsx", item.resolution_note)
+
     def test_monitoring_class_list_is_synced_from_enrollment_and_read_only(self):
         with app.app_context():
             current_term = AcademicTerm(
@@ -1811,10 +1850,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "previous_loa_period": "AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester",
                 "eligibility_status": "Eligible to Return",
                 "readmission_items": [
-                    "Return intent letter",
-                    "Updated study plan",
-                    "Program/adviser endorsement",
-                    "No pending accountability",
+                    "Structured return intention completed",
+                    "Updated study plan confirmed",
+                    "Program or adviser consultation completed",
+                    "No pending accountability confirmed",
                 ],
                 "dean_action": "Deny",
             })
@@ -1878,6 +1917,17 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.commit()
             client = self._role_client(student_account.id, "student")
 
+            for request_type in ("leave-of-absence", "readmission", "awol-return"):
+                upload = client.post(
+                    "/api/student-portal/request-attachments/upload",
+                    data={
+                        "request_type": request_type,
+                        "file": (BytesIO(b"%PDF-1.4\nlegacy standing form\n%%EOF\n"), "legacy.pdf"),
+                    },
+                    content_type="multipart/form-data",
+                )
+                self.assertEqual(upload.status_code, 400, upload.get_json())
+
             rejected = client.post("/api/student-portal/requests/leave-of-absence", json={
                 "effective_start": past.label,
                 "effective_end": past.label,
@@ -1913,12 +1963,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.commit()
             readmission = client.post("/api/student-portal/requests/readmission", json={
                 "target_return_term": future_one.label,
-                "previous_loa_period": "Previous academic year",
+                "previous_loa_start": past.label,
+                "previous_loa_end": past.label,
+                "return_intent": "I am ready to resume my studies in the selected semester.",
                 "readmission_items": [
-                    "Return intent letter",
-                    "Updated study plan",
-                    "Program/adviser endorsement",
-                    "No pending accountability",
+                    "Structured return intention completed",
+                    "Updated study plan confirmed",
+                    "Program or adviser consultation completed",
+                    "No pending accountability confirmed",
                 ],
             })
             self.assertEqual(readmission.status_code, 200, readmission.get_json())
@@ -1957,9 +2009,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "previous_loa_period": "AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester",
                 "eligibility_status": "Needs Review",
                 "readmission_items": [
-                    "Return intent letter",
-                    "Updated study plan",
-                    "Program/adviser endorsement",
+                    "Structured return intention completed",
+                    "Updated study plan confirmed",
+                    "Program or adviser consultation completed",
                 ],
             })
             self.assertEqual(response.status_code, 200, response.get_json())
@@ -1994,27 +2046,41 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student.enrollment_tag = "Enrolled"
             student_account = self._account("student", "awol-return-student@example.test")
             student_account.student_id = student.id
+            term = AcademicTerm(
+                label="AWOL Source Semester",
+                start_date=date(date.today().year, 1, 1),
+                end_date=date(date.today().year, 5, 31),
+                is_active_planning_term=True,
+            )
+            future_term = AcademicTerm(
+                label="AWOL Return Semester",
+                start_date=date(date.today().year + 1, 1, 10),
+                end_date=date(date.today().year + 1, 5, 31),
+            )
+            db.session.add_all([term, future_term])
+            db.session.flush()
+            term_row = TermEnrollment(student_id=student.id, term_id=term.id)
+            db.session.add(term_row)
+            term_row.status = "Withdrawn"
+            term_row.source_reference = "AIMS full-semester withdrawal"
             db.session.commit()
 
-            response = self._staff_client().post("/api/transactions/awol", json={
-                "student_id": student.id,
-                "workflow_action": "declare_awol",
-                "awol_effective_date": date.today().isoformat(),
-                "last_enrolled_term": "AY 2025-2026 2nd Semester",
-                "staff_notes": "No formal leave was filed.",
-            })
-            self.assertEqual(response.status_code, 200, response.get_json())
+            self.assertEqual(sync_automatic_awol_statuses(commit=True), 1)
             db.session.refresh(student)
             self.assertEqual(student.enrollment_tag, "AWOL")
             item = AwolCase.query.filter_by(student_id=student.id).first()
             self.assertEqual(item.status, "AWOL Declared")
-
-            attachment = self._attachment("awol-return", "written-intent")
-            attachment.student_id = student.id
-            db.session.commit()
+            self.assertEqual(item.detection_source, "Full-semester withdrawal without approved LOA")
+            self.assertIsNotNone(StudentMonitoringFlag.query.filter_by(
+                student_id=student.id,
+                category="AWOL policy alert",
+                status="Open",
+            ).first())
             response = self._role_client(student_account.id, "student").post("/api/student-portal/requests/awol-return", json={
-                "attachment_id": attachment.id,
-                "target_return_term": "AY 2026-2027 1st Semester",
+                "target_return_term": future_term.label,
+                "last_enrolled_term": term.label,
+                "return_intent": "I intend to resume enrollment in the selected semester.",
+                "return_reason": "My circumstances have stabilized and I am ready to continue.",
             })
             self.assertEqual(response.status_code, 200, response.get_json())
             db.session.refresh(item)
@@ -2055,18 +2121,31 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student.enrollment_tag = "Enrolled"
             student_account = self._account("student", "awol-limit-student@example.test")
             student_account.student_id = student.id
+            term = AcademicTerm(
+                label="AWOL Limit Source Semester",
+                start_date=date(date.today().year, 1, 1),
+                end_date=date(date.today().year, 5, 31),
+                is_active_planning_term=True,
+            )
+            future_term = AcademicTerm(
+                label="AWOL Limit Return Semester",
+                start_date=date(date.today().year + 1, 1, 10),
+                end_date=date(date.today().year + 1, 5, 31),
+            )
+            db.session.add_all([term, future_term])
+            db.session.flush()
+            term_row = TermEnrollment(student_id=student.id, term_id=term.id)
+            db.session.add(term_row)
+            term_row.status = "Withdrawn"
+            term_row.source_reference = "AIMS full-semester withdrawal"
             db.session.commit()
 
-            self.assertEqual(self._staff_client().post("/api/transactions/awol", json={
-                "student_id": student.id,
-                "workflow_action": "declare_awol",
-            }).status_code, 200)
-            attachment = self._attachment("awol-return", "over-limit-intent")
-            attachment.student_id = student.id
-            db.session.commit()
+            self.assertEqual(sync_automatic_awol_statuses(commit=True), 1)
             response = self._role_client(student_account.id, "student").post("/api/student-portal/requests/awol-return", json={
-                "attachment_id": attachment.id,
-                "target_return_term": "AY 2026-2027 1st Semester",
+                "target_return_term": future_term.label,
+                "last_enrolled_term": term.label,
+                "return_intent": "I intend to resume enrollment.",
+                "return_reason": "I am ready for program re-evaluation and continued study.",
             })
             self.assertEqual(response.status_code, 200, response.get_json())
             item = AwolCase.query.filter_by(student_id=student.id).first()
@@ -2145,14 +2224,16 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         response = app.test_client().get("/api/auth/demo-students")
         self.assertEqual(response.status_code, 200, response.get_json())
         items = response.get_json()["items"]
-        self.assertEqual(len(items), 15)
+        self.assertEqual(len(items), 19)
         self.assertEqual(sum(item["workflow"] == "research" for item in items), 1)
         self.assertEqual(sum(item["workflow"] == "practicum" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "graduation" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "withdrawal" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "enrollment" for item in items), 2)
+        self.assertEqual(sum(item["workflow"] == "student-handoff" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "course-adjustments" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "leave-of-absence" for item in items), 2)
+        self.assertEqual(sum(item["workflow"] == "readmission" for item in items), 2)
         self.assertEqual(sum(item["workflow"] == "awol" for item in items), 2)
 
         for item in items:
@@ -2461,7 +2542,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 student.student_number: student
                 for student in Student.query.filter_by(program_id=program.id).all()
             }
-            self.assertEqual(len(all_students), 25)
+            self.assertEqual(len(all_students), 29)
             students = {
                 student_number: student
                 for student_number, student in all_students.items()
@@ -2546,7 +2627,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             clarisse = students["2460005"]
             clarisse_case = AwolCase.query.filter_by(student_id=clarisse.id).one()
             self.assertEqual(clarisse_case.status, "Return Submitted")
-            self.assertIsNotNone(clarisse_case.intent_attachment_id)
+            self.assertIsNone(clarisse_case.intent_attachment_id)
+            self.assertTrue(clarisse_case.return_intent)
 
             adrian = students["2360006"]
             self.assertEqual(
@@ -2611,7 +2693,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             attachments = StudentRequestAttachment.query.order_by(
                 StudentRequestAttachment.id,
             ).all()
-            self.assertEqual(len(attachments), 10)
+            self.assertEqual(len(attachments), 7)
             for item in attachments:
                 path = REQUEST_UPLOAD_ROOT / item.stored_name
                 self.assertTrue(path.is_file(), item.original_name)

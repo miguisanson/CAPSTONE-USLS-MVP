@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Table2, Download, AlertTriangle, Check, Lock, Flag, ShieldCheck } from "lucide-react";
+import { Table2, Download, AlertTriangle, Check, Lock, Flag, ShieldCheck, X, CheckCircle2 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
-import { useConfirm } from "../components/confirm";
 
 const CELL_VIEW = {
   Completed: { cls: "bg-brand-500 text-white", mark: "C" },
@@ -27,7 +26,6 @@ const MILES = [
 
 export default function MonitoringGrid() {
   const navigate = useNavigate();
-  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
   const selectedProgress = searchParams.get("progress") || "";
@@ -44,6 +42,12 @@ export default function MonitoringGrid() {
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [flagStudent, setFlagStudent] = useState(null);
+  const [flagForm, setFlagForm] = useState({ category: "", note: "" });
+  const [flagBusy, setFlagBusy] = useState(false);
+  const [flagError, setFlagError] = useState("");
+  const [resolvingFlagId, setResolvingFlagId] = useState(null);
+  const [resolutionNote, setResolutionNote] = useState("");
   function load(pid, nextProgress = progress, nextRisk = risk, nextEnrollment = enrollment) {
     setLoading(true);
     setError("");
@@ -85,22 +89,57 @@ export default function MonitoringGrid() {
     return rows;
   }, [grid?.students, sortBy]);
 
-  async function flagIssue(student) {
-    // Exception reporting (checklist item 72): official AIMS values are never edited
-    // here. Staff report a discrepancy that is recorded for the proper office to
-    // correct in AIMS; the official value stays unchanged.
-    const ok = await confirm({
-      title: "Flag a data discrepancy?",
-      message: `Record a discrepancy for ${displayStudentName(student)} (${student.student_number}).\n\nThis logs an issue for the proper office to correct in AIMS. The official value is not changed here.`,
-      confirmLabel: "Flag issue",
-    });
-    if (!ok) return;
+  function openFlagDialog(student) {
+    setFlagStudent(student);
+    setFlagForm({ category: "", note: "" });
+    setFlagError("");
+    setResolvingFlagId(null);
+    setResolutionNote("");
+  }
+
+  async function flagIssue(event) {
+    event.preventDefault();
+    if (!flagStudent) return;
+    setFlagBusy(true);
+    setFlagError("");
     try {
-      await api.flagMonitoringIssue(student.id, {
-        note: `Discrepancy flagged from the monitoring sheet for ${student.student_number}.`,
+      await api.flagMonitoringIssue(flagStudent.id, {
+        category: flagForm.category,
+        note: flagForm.note,
       });
+      load(programId);
+      setFlagStudent(null);
     } catch (e) {
-      setError(e.message);
+      setFlagError(e.message);
+    } finally {
+      setFlagBusy(false);
+    }
+  }
+
+  async function resolveFlag(item) {
+    if (!flagStudent) return;
+    setFlagBusy(true);
+    setFlagError("");
+    try {
+      await api.resolveMonitoringFlag(flagStudent.id, item.id, {
+        resolution_note: resolutionNote,
+      });
+      load(programId);
+      setFlagStudent((current) => current ? {
+        ...current,
+        flags: (current.flags || []).map((flag) => flag.id === item.id ? {
+          ...flag,
+          status: "Resolved",
+          resolution_note: resolutionNote,
+        } : flag),
+        open_flag_count: Math.max(0, (current.open_flag_count || 1) - 1),
+      } : current);
+      setResolvingFlagId(null);
+      setResolutionNote("");
+    } catch (e) {
+      setFlagError(e.message);
+    } finally {
+      setFlagBusy(false);
     }
   }
 
@@ -295,12 +334,13 @@ export default function MonitoringGrid() {
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => flagIssue(s)}
-                          title={`Flag a data discrepancy for ${displayStudentName(s)}`}
-                          aria-label={`Flag issue for ${displayStudentName(s)}`}
-                          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-amber-50 hover:text-amber-600 cursor-pointer"
+                          onClick={() => openFlagDialog(s)}
+                          title={`${s.open_flag_count || 0} open flag(s) for ${displayStudentName(s)}`}
+                          aria-label={`Open flags for ${displayStudentName(s)}`}
+                          className={`relative grid h-6 w-6 shrink-0 place-items-center rounded-md cursor-pointer transition-colors ${s.open_flag_count ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "text-slate-400 hover:bg-amber-50 hover:text-amber-600"}`}
                         >
                           <Flag className="h-3.5 w-3.5" />
+                          {s.open_flag_count > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-amber-600 px-1 text-[9px] font-bold text-white">{s.open_flag_count}</span>}
                         </button>
                         <button
                           type="button"
@@ -362,6 +402,71 @@ export default function MonitoringGrid() {
             </table>
           </div>
         </Card>
+      )}
+
+      {flagStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFlagStudent(null); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="monitoring-flag-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+              <div>
+                <h2 id="monitoring-flag-title" className="text-lg font-semibold text-ink">Flags for {displayStudentName(flagStudent)}</h2>
+                <p className="mt-1 text-xs text-slate-500">{flagStudent.student_number} · monitoring remains read-only</p>
+              </div>
+              <button type="button" onClick={() => setFlagStudent(null)} className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100" aria-label="Close flag dialog"><X className="h-4 w-4" /></button>
+            </div>
+
+            <div className="space-y-5 p-5">
+              {(flagStudent.flags || []).filter((item) => item.status === "Open").length > 0 && (
+                <div className="space-y-3">
+                  <p className="field-label">Open flags</p>
+                  {(flagStudent.flags || []).filter((item) => item.status === "Open").map((item) => (
+                    <div key={item.id} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div><p className="text-sm font-semibold text-amber-950">{item.category}</p><p className="mt-1 text-sm text-amber-900">{item.note}</p><p className="mt-2 text-xs text-amber-700">{item.source} · {item.created_by}</p></div>
+                        <StatusBadge value="Open" dot={false} />
+                      </div>
+                      {resolvingFlagId === item.id ? (
+                        <div className="mt-4 space-y-2 border-t border-amber-200 pt-4">
+                          <label className="field-label" htmlFor={`resolve-flag-${item.id}`}>How was this resolved?</label>
+                          <textarea id={`resolve-flag-${item.id}`} className="field-input min-h-24 resize-y" value={resolutionNote} onChange={(event) => setResolutionNote(event.target.value)} placeholder="Describe the corrected source, advising outcome, or verified resolution." />
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" disabled={flagBusy || !resolutionNote.trim()} onClick={() => resolveFlag(item)} className="btn-primary cursor-pointer"><CheckCircle2 className="h-4 w-4" /> Resolve flag</button>
+                            <button type="button" onClick={() => { setResolvingFlagId(null); setResolutionNote(""); }} className="btn-ghost cursor-pointer">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => setResolvingFlagId(item.id)} className="btn-ghost mt-3 cursor-pointer px-3 py-2">Resolve</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <form onSubmit={flagIssue} className="space-y-4 border-t border-slate-200 pt-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-ink">Add a manual flag</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">Choose what is being flagged and record the observation. Source-correctable flags can close automatically after a clean monitoring upload.</p>
+                </div>
+                <label className="block">
+                  <span className="field-label">Flag category</span>
+                  <select className="field-input mt-1 cursor-pointer" value={flagForm.category} onChange={(event) => setFlagForm((current) => ({ ...current, category: event.target.value }))} required>
+                    <option value="">Choose category</option>
+                    {(grid?.flag_categories || []).map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="field-label">Note / reason</span>
+                  <textarea className="field-input mt-1 min-h-28 resize-y" value={flagForm.note} onChange={(event) => setFlagForm((current) => ({ ...current, note: event.target.value }))} placeholder="Describe what appears incorrect or what follow-up is needed." required />
+                </label>
+                {flagError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{flagError}</div>}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button type="button" onClick={() => setFlagStudent(null)} className="btn-ghost cursor-pointer">Cancel</button>
+                  <button type="submit" disabled={flagBusy || !flagForm.category || !flagForm.note.trim()} className="btn-primary cursor-pointer">{flagBusy ? "Saving…" : "Save flag"}</button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
       )}
 
     </div>
