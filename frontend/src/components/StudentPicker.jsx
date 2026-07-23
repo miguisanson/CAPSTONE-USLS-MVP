@@ -70,7 +70,7 @@ export default function StudentPicker({ value, onChange, selectedLabel, meta }) 
     );
   }
 
-  const filterSelect = "rounded-lg border bg-white px-2.5 py-1.5 text-sm font-medium cursor-pointer transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+  const filterSelect = "block w-full min-w-0 max-w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm font-medium cursor-pointer transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
   return (
     <div ref={boxRef} className="relative">
@@ -88,7 +88,7 @@ export default function StudentPicker({ value, onChange, selectedLabel, meta }) 
       </div>
 
       {/* Filter row */}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="mt-2 grid min-w-0 grid-cols-1 gap-2">
         <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
           <Filter className="h-3.5 w-3.5" /> Filter
         </span>

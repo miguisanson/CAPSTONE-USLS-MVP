@@ -23,7 +23,6 @@ export default function Assistant() {
   const [input, setInput] = useState(initialQuestion);
   const [studentId, setStudentId] = useState(initialStudentId ? Number(initialStudentId) : null);
   const [studentLabel, setStudentLabel] = useState(searchParams.get("student_label") || "");
-  const [assistantMode, setAssistantMode] = useState("offline");
   const [busy, setBusy] = useState(false);
   const endRef = useRef(null);
 
@@ -47,7 +46,6 @@ export default function Assistant() {
     setBusy(true);
     try {
       const res = await api.assistant(q, studentId);
-      setAssistantMode(res.mode || "offline");
       setMessages((m) => [
         ...m,
         {
@@ -92,7 +90,6 @@ export default function Assistant() {
                 {studentId ? `Focused on ${studentLabel.split(" - ")[1] || "a student"}` : "General · policy + all students"}
               </p>
             </div>
-            <AssistantModeBadge mode={assistantMode} />
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
@@ -237,38 +234,6 @@ function Message({ m }) {
         )}
       </div>
     </div>
-  );
-}
-
-function AssistantModeBadge({ mode }) {
-  const usingRag = mode === "document-rag";
-  return (
-    <span
-      title={
-        usingRag
-          ? "Document RAG mode - answers use local handbook/research files with Gemini."
-          : "Fallback mode - answers are grounded on live records and the built-in policy library."
-      }
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${
-        usingRag
-          ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-          : "bg-amber-50 text-amber-700 ring-amber-200"
-      }`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${usingRag ? "bg-emerald-500" : "bg-amber-500"}`} />
-      {usingRag ? "Document RAG" : "Fallback"}
-    </span>
-  );
-}
-
-function OfflineBadge() {
-  return (
-    <span
-      title="Offline mode — answers are grounded on live records + policy. Connect Google AI Studio for full natural-language generation."
-      className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Offline mode
-    </span>
   );
 }
 

@@ -9,8 +9,11 @@ import json
 import csv
 import io
 import html
+import math
 import threading
-from collections import Counter
+import zipfile
+import xml.etree.ElementTree as ET
+from collections import Counter, OrderedDict
 from functools import wraps
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -49,8 +52,15 @@ RAG_DOCUMENT_PATHS = [
     BASE_DIR / "Documents" / "USLS_Documents",
 ]
 CONCEPT_PAPER_RAG_SOURCE = BASE_DIR / "Documents" / "RAG_Source" / "Concept_Paper"
-_RAG_CHAT_ENGINE = None
+RAG_INDEX_DIR = Path(os.getenv("RAG_INDEX_DIR", str(BASE_DIR / ".rag_index")))
+_RAG_DOCUMENT_CHUNKS = None
+_RAG_DOCUMENT_VECTORS = None
 _RAG_LOAD_ERROR = None
+_RAG_INDEX_LOCK = threading.Lock()
+_RAG_VECTOR_LOCK = threading.Lock()
+_RAG_RESPONSE_CACHE: OrderedDict[tuple, tuple[str, list[dict]]] = OrderedDict()
+_RAG_RESPONSE_CACHE_LOCK = threading.Lock()
+ASSISTANT_MAX_QUESTION_LENGTH = int(os.getenv("ASSISTANT_MAX_QUESTION_LENGTH", "1500"))
 PDF_OCR_MIN_WORDS = int(os.getenv("PDF_OCR_MIN_WORDS", "30"))
 PDF_OCR_MAX_PAGES = int(os.getenv("PDF_OCR_MAX_PAGES", "8"))
 PDF_OCR_DPI = int(os.getenv("PDF_OCR_DPI", "200"))
@@ -4372,85 +4382,388 @@ def _rag_document_files() -> list[Path]:
     return sorted(dict.fromkeys(files))
 
 
-def _load_rag_chat_engine():
-    """Build and cache a LlamaIndex chat engine over local handbook/research files."""
-    global _RAG_CHAT_ENGINE, _RAG_LOAD_ERROR
-    if _RAG_CHAT_ENGINE is not None:
-        return _RAG_CHAT_ENGINE
+def _rag_index_signature(files: list[Path]) -> dict:
+    return {
+        "files": [
+            {
+                "path": str(path.resolve()),
+                "size": path.stat().st_size,
+                "modified_ns": path.stat().st_mtime_ns,
+            }
+            for path in files
+        ],
+        "chunk_size": int(os.getenv("RAG_CHUNK_SIZE", "350")),
+        "chunk_overlap": int(os.getenv("RAG_CHUNK_OVERLAP", "40")),
+    }
+
+
+def _chunk_rag_text(text: str, source: str, page: str = "") -> list[dict]:
+    words = (text or "").split()
+    chunk_size = max(100, int(os.getenv("RAG_CHUNK_SIZE", "350")))
+    overlap = min(
+        chunk_size // 3,
+        max(0, int(os.getenv("RAG_CHUNK_OVERLAP", "40"))),
+    )
+    chunks = []
+    start = 0
+    while start < len(words):
+        body = " ".join(words[start:start + chunk_size]).strip()
+        if body:
+            chunks.append({
+                "id": f"document-{len(chunks) + 1}",
+                "title": Path(source).name,
+                "source": f"{Path(source).name}, p. {page}" if page else Path(source).name,
+                "text": body,
+            })
+        if start + chunk_size >= len(words):
+            break
+        start += max(1, chunk_size - overlap)
+    return chunks
+
+
+def _read_rag_document_chunks(files: list[Path]) -> list[dict]:
+    chunks: list[dict] = []
+    for path in files:
+        suffix = path.suffix.lower()
+        try:
+            if suffix == ".pdf":
+                from pypdf import PdfReader
+
+                reader = PdfReader(str(path))
+                for page_index, page in enumerate(reader.pages, start=1):
+                    chunks.extend(
+                        _chunk_rag_text(
+                            page.extract_text() or "",
+                            path.name,
+                            str(page_index),
+                        )
+                    )
+            elif suffix == ".docx":
+                with zipfile.ZipFile(path) as archive:
+                    root = ET.fromstring(archive.read("word/document.xml"))
+                namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+                paragraphs = []
+                for paragraph in root.iter(f"{namespace}p"):
+                    text = "".join(
+                        node.text or ""
+                        for node in paragraph.iter(f"{namespace}t")
+                    ).strip()
+                    if text:
+                        paragraphs.append(text)
+                chunks.extend(_chunk_rag_text("\n".join(paragraphs), path.name))
+            else:
+                chunks.extend(
+                    _chunk_rag_text(
+                        path.read_text(encoding="utf-8", errors="replace"),
+                        path.name,
+                    )
+                )
+        except Exception:  # noqa: BLE001
+            continue
+    for index, chunk in enumerate(chunks, start=1):
+        chunk["id"] = f"document-{index}"
+    return chunks
+
+
+def _load_rag_document_index() -> list[dict]:
+    """Load persisted document chunks without initializing a model client."""
+    global _RAG_DOCUMENT_CHUNKS, _RAG_LOAD_ERROR
+    if _RAG_DOCUMENT_CHUNKS is not None:
+        return _RAG_DOCUMENT_CHUNKS
     if _RAG_LOAD_ERROR is not None:
         raise RuntimeError(_RAG_LOAD_ERROR)
 
+    with _RAG_INDEX_LOCK:
+        if _RAG_DOCUMENT_CHUNKS is not None:
+            return _RAG_DOCUMENT_CHUNKS
+        if _RAG_LOAD_ERROR is not None:
+            raise RuntimeError(_RAG_LOAD_ERROR)
+
+        files = _rag_document_files()
+        if not files:
+            _RAG_LOAD_ERROR = "No RAG documents found. Add PDF, DOCX, TXT, or MD files to data/ or Documents/USLS_Documents/."
+            raise RuntimeError(_RAG_LOAD_ERROR)
+
+        signature = _rag_index_signature(files)
+        metadata_path = RAG_INDEX_DIR / "corpus.json"
+        chunks_path = RAG_INDEX_DIR / "chunks.json"
+        _RAG_DOCUMENT_CHUNKS = None
+        if metadata_path.exists() and chunks_path.exists():
+            try:
+                saved_signature = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if saved_signature == signature:
+                    saved_chunks = json.loads(
+                        chunks_path.read_text(encoding="utf-8")
+                    )
+                    if isinstance(saved_chunks, list) and saved_chunks:
+                        _RAG_DOCUMENT_CHUNKS = saved_chunks
+            except Exception:  # noqa: BLE001
+                _RAG_DOCUMENT_CHUNKS = None
+
+        if _RAG_DOCUMENT_CHUNKS is None:
+            _RAG_DOCUMENT_CHUNKS = _read_rag_document_chunks(files)
+            if not _RAG_DOCUMENT_CHUNKS:
+                _RAG_LOAD_ERROR = "RAG documents were found, but no readable text could be loaded."
+                raise RuntimeError(_RAG_LOAD_ERROR)
+            RAG_INDEX_DIR.mkdir(parents=True, exist_ok=True)
+            chunks_path.write_text(
+                json.dumps(_RAG_DOCUMENT_CHUNKS, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            metadata_path.write_text(
+                json.dumps(signature, indent=2),
+                encoding="utf-8",
+            )
+
+        return _RAG_DOCUMENT_CHUNKS
+
+
+def _gemini_generate(prompt: str) -> str:
+    """Make one bounded, stateless Gemini request without a heavyweight SDK."""
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     if not api_key:
-        _RAG_LOAD_ERROR = "GOOGLE_API_KEY not found in .env file."
-        raise RuntimeError(_RAG_LOAD_ERROR)
-
-    files = _rag_document_files()
-    if not files:
-        _RAG_LOAD_ERROR = "No RAG documents found. Add PDF, DOCX, TXT, or MD files to data/ or Documents/USLS_Documents/."
-        raise RuntimeError(_RAG_LOAD_ERROR)
-
-    try:
-        from llama_index.core import Settings, SimpleDirectoryReader, VectorStoreIndex
-        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-        from llama_index.llms.gemini import Gemini
-        from llama_index.readers.file import PyMuPDFReader
-    except ImportError as exc:
-        _RAG_LOAD_ERROR = (
-            "LlamaIndex RAG packages are not installed. Run pip install -r requirements.txt, "
-            f"then restart the app. Missing import: {exc}"
-        )
-        raise RuntimeError(_RAG_LOAD_ERROR) from exc
-
-    try:
-        Settings.llm = Gemini(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-            api_key=api_key,
-        )
-    except TypeError:
-        Settings.llm = Gemini(model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
-    Settings.embed_model = HuggingFaceEmbedding(
-        model_name=os.getenv("RAG_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+        raise RuntimeError("Google AI Studio is not configured.")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").removeprefix("models/")
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", model_name):
+        raise RuntimeError("The configured Gemini model name is invalid.")
+    endpoint = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model_name}:generateContent"
     )
-    Settings.chunk_size = int(os.getenv("RAG_CHUNK_SIZE", "512"))
-    Settings.chunk_overlap = int(os.getenv("RAG_CHUNK_OVERLAP", "50"))
-
-    reader = SimpleDirectoryReader(
-        input_files=[str(path) for path in files],
-        file_extractor={".pdf": PyMuPDFReader()},
+    body = json.dumps({
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "500")),
+        },
+    }).encode("utf-8")
+    request_item = Request(
+        endpoint,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
+        method="POST",
     )
-    documents = reader.load_data()
-    if not documents:
-        _RAG_LOAD_ERROR = "RAG documents were found, but no readable text could be loaded."
-        raise RuntimeError(_RAG_LOAD_ERROR)
+    timeout = max(3.0, float(os.getenv("RAG_REQUEST_TIMEOUT_SECONDS", "18")))
+    try:
+        with urlopen(request_item, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise RuntimeError(f"Gemini returned HTTP {exc.code}.") from exc
+    except (URLError, TimeoutError) as exc:
+        raise RuntimeError("Gemini did not respond before the timeout.") from exc
+    candidates = payload.get("candidates") or []
+    if not candidates:
+        raise RuntimeError("Gemini returned no answer.")
+    parts = ((candidates[0].get("content") or {}).get("parts") or [])
+    answer = "".join(str(part.get("text") or "") for part in parts).strip()
+    if not answer:
+        raise RuntimeError("Gemini returned an empty answer.")
+    return answer
 
-    index = VectorStoreIndex.from_documents(documents)
-    _RAG_CHAT_ENGINE = index.as_chat_engine(chat_mode="context", verbose=False)
-    return _RAG_CHAT_ENGINE
+
+def _normalized_embedding(values: list) -> list[float]:
+    vector = [float(value) for value in values]
+    if not vector or not all(math.isfinite(value) for value in vector):
+        raise RuntimeError("The embedding service returned an invalid vector.")
+    magnitude = math.sqrt(sum(value * value for value in vector))
+    if magnitude <= 0:
+        raise RuntimeError("The embedding service returned an empty vector.")
+    return [value / magnitude for value in vector]
 
 
-def _rag_citations(response, limit: int = 5) -> list[dict]:
-    citations = []
-    seen = set()
-    for idx, node in enumerate(getattr(response, "source_nodes", []) or []):
-        metadata = getattr(node.node, "metadata", {}) or {}
-        file_name = metadata.get("file_name") or metadata.get("filename") or metadata.get("file_path") or "Document"
-        page = metadata.get("page_label") or metadata.get("page")
-        source = f"{file_name}, p. {page}" if page else str(file_name)
-        text = (getattr(node.node, "text", "") or "").strip()
-        key = (source, text[:80])
-        if key in seen:
-            continue
-        seen.add(key)
-        citations.append({
-            "id": f"rag-{idx}",
-            "title": Path(str(file_name)).name,
-            "source": source,
-            "text": text[:700],
-        })
-        if len(citations) >= limit:
-            break
-    return citations
+def _gemini_embed_texts(texts: list[str], purpose: str) -> list[list[float]]:
+    """Generate bounded semantic vectors with Gemini's current embedding model."""
+    if not texts:
+        return []
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    if not api_key:
+        raise RuntimeError("Google AI Studio is not configured for vector retrieval.")
+    model_name = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2").removeprefix("models/")
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", model_name):
+        raise RuntimeError("The configured Gemini embedding model name is invalid.")
+    dimensions = max(128, min(3072, int(os.getenv("RAG_EMBEDDING_DIMENSIONS", "768"))))
+    batch_size = max(1, min(50, int(os.getenv("RAG_EMBEDDING_BATCH_SIZE", "20"))))
+    instruction = {
+        "document": "Represent this USLS Graduate School policy passage for semantic document retrieval.",
+        "query": "Retrieve USLS Graduate School policy passages that answer this question.",
+    }.get(purpose, "Represent this text for semantic similarity.")
+    endpoint = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model_name}:batchEmbedContents"
+    )
+    vectors: list[list[float]] = []
+    timeout = max(5.0, float(os.getenv("RAG_EMBEDDING_TIMEOUT_SECONDS", "45")))
+    for start in range(0, len(texts), batch_size):
+        batch = texts[start:start + batch_size]
+        body = json.dumps({
+            "requests": [
+                {
+                    "model": f"models/{model_name}",
+                    "content": {
+                        "parts": [{"text": f"{instruction}\n\n{text[:12000]}"}],
+                    },
+                    "outputDimensionality": dimensions,
+                }
+                for text in batch
+            ],
+        }).encode("utf-8")
+        request_item = Request(
+            endpoint,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request_item, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise RuntimeError(f"Gemini embeddings returned HTTP {exc.code}.") from exc
+        except (URLError, TimeoutError) as exc:
+            raise RuntimeError("Gemini embeddings did not respond before the timeout.") from exc
+        embeddings = payload.get("embeddings") or []
+        if len(embeddings) != len(batch):
+            raise RuntimeError("Gemini embeddings returned an incomplete batch.")
+        vectors.extend(
+            _normalized_embedding(item.get("values") or [])
+            for item in embeddings
+        )
+    return vectors
+
+
+def _rag_vector_signature() -> dict:
+    return {
+        "corpus": _rag_index_signature(_rag_document_files()),
+        "model": os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2").removeprefix("models/"),
+        "dimensions": max(128, min(3072, int(os.getenv("RAG_EMBEDDING_DIMENSIONS", "768")))),
+        "prompt_version": 1,
+    }
+
+
+def _load_rag_vector_index(chunks: list[dict]) -> dict[str, list[float]]:
+    """Load persisted vectors or embed the corpus once when it changes."""
+    global _RAG_DOCUMENT_VECTORS
+    signature = _rag_vector_signature()
+    if (
+        isinstance(_RAG_DOCUMENT_VECTORS, dict)
+        and _RAG_DOCUMENT_VECTORS.get("signature") == signature
+    ):
+        return _RAG_DOCUMENT_VECTORS["vectors"]
+
+    with _RAG_VECTOR_LOCK:
+        if (
+            isinstance(_RAG_DOCUMENT_VECTORS, dict)
+            and _RAG_DOCUMENT_VECTORS.get("signature") == signature
+        ):
+            return _RAG_DOCUMENT_VECTORS["vectors"]
+
+        vectors_path = RAG_INDEX_DIR / "vectors.json"
+        if vectors_path.exists():
+            try:
+                stored = json.loads(vectors_path.read_text(encoding="utf-8"))
+                stored_vectors = stored.get("vectors") or {}
+                expected_ids = {chunk["id"] for chunk in chunks}
+                if (
+                    stored.get("signature") == signature
+                    and set(stored_vectors) == expected_ids
+                    and all(isinstance(values, list) and values for values in stored_vectors.values())
+                ):
+                    _RAG_DOCUMENT_VECTORS = stored
+                    return stored_vectors
+            except Exception:  # noqa: BLE001
+                pass
+
+        texts = [
+            f"Title: {chunk['title']}\nSource: {chunk['source']}\nPassage: {chunk['text']}"
+            for chunk in chunks
+        ]
+        embedded = _gemini_embed_texts(texts, "document")
+        vector_map = {
+            chunk["id"]: [round(value, 8) for value in vector]
+            for chunk, vector in zip(chunks, embedded, strict=True)
+        }
+        stored = {"signature": signature, "vectors": vector_map}
+        RAG_INDEX_DIR.mkdir(parents=True, exist_ok=True)
+        temporary_path = vectors_path.with_suffix(".json.tmp")
+        temporary_path.write_text(
+            json.dumps(stored, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        temporary_path.replace(vectors_path)
+        _RAG_DOCUMENT_VECTORS = stored
+        return vector_map
+
+
+def _retrieve_rag_document_chunks_lexically(
+    question: str,
+    chunks: list[dict],
+    limit: int,
+) -> list[dict]:
+    query_terms = set(_tokenize(question))
+    scored = []
+    for chunk in chunks:
+        title_terms = set(_tokenize(chunk.get("title", "")))
+        text_terms = _tokenize(chunk.get("text", ""))
+        text_counts = Counter(text_terms)
+        score = sum(
+            min(text_counts.get(term, 0), 3)
+            + (3 if term in title_terms else 0)
+            for term in query_terms
+        )
+        if score:
+            scored.append((score, chunk))
+    scored.sort(key=lambda item: (-item[0], item[1].get("id", "")))
+    return [
+        {**chunk, "_retrieval": "lexical-fallback", "_score": score}
+        for score, chunk in scored[:limit]
+    ]
+
+
+def _retrieve_rag_document_chunks(
+    question: str,
+    chunks: list[dict],
+    limit: int | None = None,
+) -> list[dict]:
+    limit = limit or max(1, int(os.getenv("RAG_TOP_K", "3")))
+    try:
+        vectors = _load_rag_vector_index(chunks)
+        query_vector = _gemini_embed_texts([question], "query")[0]
+        scored = [
+            (
+                sum(a * b for a, b in zip(query_vector, vectors[chunk["id"]])),
+                chunk,
+            )
+            for chunk in chunks
+            if chunk["id"] in vectors
+        ]
+        scored.sort(key=lambda item: (-item[0], item[1].get("id", "")))
+        if scored:
+            return [
+                {**chunk, "_retrieval": "vector", "_score": round(score, 6)}
+                for score, chunk in scored[:limit]
+            ]
+    except Exception:  # noqa: BLE001
+        # Keep policy guidance available during an embedding outage. Generation
+        # still receives retrieved source text and remains citation-grounded.
+        pass
+    return _retrieve_rag_document_chunks_lexically(question, chunks, limit)
+
+
+def prewarm_document_rag() -> None:
+    """Prepare persisted document chunks and semantic vectors in the background."""
+    try:
+        chunks = _load_rag_document_index()
+        vectors = _load_rag_vector_index(chunks)
+        print(
+            f"Policy Assistant vector index is ready "
+            f"({len(chunks)} chunks, {len(vectors)} vectors)."
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"Policy Assistant document index prewarm skipped: {exc}")
 
 
 def _case_context_for_rag(student: Student | None, payload: dict | None, snippets: list[dict]) -> str:
@@ -4471,7 +4784,8 @@ def _case_context_for_rag(student: Student | None, payload: dict | None, snippet
 
 
 def call_document_rag(question: str, snippets: list[dict], payload: dict | None, student: Student | None) -> tuple[str, list[dict]]:
-    chat_engine = _load_rag_chat_engine()
+    document_chunks = _load_rag_document_index()
+    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks)
     case_context = _case_context_for_rag(student, payload, snippets)
     prompt = (
         "Answer as the USLS Graduate School assistant. Use the retrieved handbook and research guideline "
@@ -4481,9 +4795,27 @@ def call_document_rag(question: str, snippets: list[dict], payload: dict | None,
     )
     if case_context:
         prompt += case_context + "\n\n"
+    if retrieved_chunks:
+        prompt += "Retrieved document excerpts:\n"
+        prompt += "\n\n".join(
+            f"[{chunk['source']}]\n{chunk['text']}"
+            for chunk in retrieved_chunks
+        )
+        prompt += "\n\n"
     prompt += f"Question: {question}"
-    response = chat_engine.chat(prompt)
-    return str(response).strip(), _rag_citations(response)
+    response = _gemini_generate(prompt)
+    citations = [
+        {
+            "id": chunk["id"],
+            "title": chunk["title"],
+            "source": chunk["source"],
+            "text": chunk["text"][:700],
+            "retrieval": chunk.get("_retrieval", "vector"),
+            "similarity": chunk.get("_score"),
+        }
+        for chunk in retrieved_chunks
+    ]
+    return response, citations
 
 
 def local_grounded_answer(question: str, student: Student | None, payload: dict | None, snippets: list[dict]) -> str:
@@ -4502,8 +4834,27 @@ def local_grounded_answer(question: str, student: Student | None, payload: dict 
     ) and any(w in q for w in ["eligible", "clear", "cleared", "move", "ready", "proposal development"])
     asks_portfolio = any(w in q for w in ["delayed", "overdue", "at risk", "risk", "stalled", "which students",
                                           "attention", "bottleneck", "escalate", "behind"])
+    asks_oldest_record = (
+        any(phrase in q for phrase in ["oldest student", "earliest student", "longest enrolled"])
+        and any(word in q for word in ["record", "student", "enrolled"])
+    )
 
-    if asks_coursework_eligibility:
+    if asks_oldest_record:
+        earliest = (
+            Student.query
+            .order_by(Student.entry_year.asc(), Student.created_at.asc(), Student.id.asc())
+            .first()
+        )
+        if earliest:
+            out.append(
+                "Student birth dates are not stored, so I cannot determine who is oldest by age. "
+                f"The earliest academic entry on record is {earliest.name} "
+                f"({earliest.student_number}, {earliest.program.code}), with entry year {earliest.entry_year}."
+            )
+        else:
+            out.append("There are no student records available.")
+
+    elif asks_coursework_eligibility:
         out.append(_status_sentence(student, ind))
         if ind["missing_subjects"] == 0:
             out.append(
@@ -4530,11 +4881,15 @@ def local_grounded_answer(question: str, student: Student | None, payload: dict 
         else:
             out.append("No outstanding follow-ups are flagged for this student.")
 
-    elif asks_portfolio and not student:
+    elif asks_portfolio:
         port = portfolio_recommendations()
         s = port["summary"]
+        severity_counts = {
+            item["severity"]: item["count"]
+            for item in s.get("by_severity", [])
+        }
         out.append(f"{s['students_flagged']} student(s) currently need attention "
-                   f"({s['by_severity']['high']} high, {s['by_severity']['medium']} medium).")
+                   f"({severity_counts.get('high', 0)} high, {severity_counts.get('medium', 0)} medium).")
         for r in port["items"][:5]:
             out.append(f"• {r['student_name']} ({r['program_code']}, {r['stage']}): {r['trigger']} → {r['recommendation']} [{r['owner']}]")
 
@@ -4563,20 +4918,127 @@ def call_google_ai_studio(question: str, snippets: list[dict], payload: dict | N
     raise NotImplementedError("Google AI Studio not connected in this build.")
 
 
+def assistant_validation_message(question: str) -> str | None:
+    normalized = (question or "").strip()
+    if len(normalized) > ASSISTANT_MAX_QUESTION_LENGTH:
+        return (
+            f"That message is too long for the Policy Assistant. Please shorten it to "
+            f"{ASSISTANT_MAX_QUESTION_LENGTH} characters or fewer and ask one question at a time."
+        )
+    if any(ord(character) < 32 and character not in "\n\r\t" for character in normalized):
+        return "I could not safely read that message. Please remove control characters and try again."
+    unsupported_patterns = [
+        r"\b(?:drop|truncate|delete|erase)\s+(?:the\s+)?(?:database|table|records?|students?)\b",
+        r"\b(?:insert|alter|update)\s+(?:the\s+)?(?:database|table)\b",
+        r"\b(?:run|execute)\s+(?:this\s+)?(?:sql|shell|command|script|code)\b",
+        r"\b(?:ignore|bypass|override)\s+(?:all\s+)?(?:previous\s+)?(?:instructions?|permissions?|security)\b",
+        r"\b(?:show|reveal|print|give me)\b.{0,50}\b(?:api key|password|secret|system prompt|environment variables?)\b",
+    ]
+    if any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in unsupported_patterns):
+        return (
+            "I can explain Graduate School policy and summarize authorized read-only records, "
+            "but I cannot execute commands, change or delete database records, bypass permissions, "
+            "or reveal protected system information."
+        )
+    if re.search(
+        r"\b(?:query the database|database query|select \* from|consolidate all students)\b",
+        normalized,
+        flags=re.IGNORECASE,
+    ):
+        return (
+            "The Policy Assistant cannot run arbitrary database queries. Use an approved read-only "
+            "report or filter in the relevant workspace; database changes require an authorized workflow."
+        )
+    return None
+
+
+def assistant_validation_response(
+    message: str,
+    student: Student | None = None,
+    payload: dict | None = None,
+) -> dict:
+    return {
+        "answer": message,
+        "mode": "validation",
+        "citations": [],
+        "grounded": payload["indicators"] if payload else None,
+        "recommendations": payload["recommendations"] if payload else [],
+        "student": student_brief(student) if student else None,
+    }
+
+
+def assistant_requires_document_rag(
+    question: str,
+    student: Student | None,
+    snippets: list[dict],
+) -> bool:
+    """Use document RAG only when the user explicitly asks to search source files."""
+    lowered = (question or "").lower()
+    document_intent = any(
+        phrase in lowered
+        for phrase in [
+            "according to the handbook",
+            "according to the manual",
+            "research protocol",
+            "policy document",
+            "source document",
+            "search the handbook",
+            "search the manual",
+            "cite the handbook",
+            "cite the manual",
+            "exact wording",
+            "what does the handbook say",
+            "what does the manual say",
+        ]
+    )
+    if not document_intent:
+        return False
+    # Student context is safe to include, but the query remains stateless and
+    # therefore cannot leak a previous user's conversation into this answer.
+    return bool(snippets or student or document_intent)
+
+
+def _rag_cache_get(key: tuple) -> tuple[str, list[dict]] | None:
+    with _RAG_RESPONSE_CACHE_LOCK:
+        value = _RAG_RESPONSE_CACHE.get(key)
+        if value is not None:
+            _RAG_RESPONSE_CACHE.move_to_end(key)
+        return value
+
+
+def _rag_cache_set(key: tuple, value: tuple[str, list[dict]]) -> None:
+    with _RAG_RESPONSE_CACHE_LOCK:
+        _RAG_RESPONSE_CACHE[key] = value
+        _RAG_RESPONSE_CACHE.move_to_end(key)
+        while len(_RAG_RESPONSE_CACHE) > max(1, int(os.getenv("RAG_RESPONSE_CACHE_SIZE", "128"))):
+            _RAG_RESPONSE_CACHE.popitem(last=False)
+
+
 def generate_answer(question: str, student_id: int | None = None) -> dict:
     student = Student.query.get(student_id) if student_id else None
     payload = student_recommendations(student) if student else None
+    validation_message = assistant_validation_message(question)
+    if validation_message:
+        return assistant_validation_response(validation_message, student, payload)
     snippets = retrieve_policy(question, k=3)
 
     # The assistant is advisory only: it retrieves policy snippets and explains
     # backend-computed facts. It never changes records or approves decisions.
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
-    mode = "offline"
+    mode = "local-fast"
     rag_citations = []
-    if api_key:
+    if api_key and assistant_requires_document_rag(question, student, snippets):
         try:
-            answer, rag_citations = call_document_rag(question, snippets, payload, student)
-            mode = "document-rag"
+            cache_key = ("general-policy", " ".join(question.lower().split()))
+            cached = _rag_cache_get(cache_key) if not student else None
+            if cached:
+                answer, rag_citations = cached
+                mode = "document-rag-cache"
+            else:
+                answer, rag_citations = call_document_rag(question, snippets, payload, student)
+                mode = "document-rag"
+                if not student:
+                    _rag_cache_set(cache_key, (answer, rag_citations))
         except Exception:
             answer = local_grounded_answer(question, student, payload, snippets)
             mode = "offline-fallback"
@@ -4596,11 +5058,21 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
 
 def generate_student_answer(question: str, student: Student) -> dict:
     """Handbook and own-record assistant with no staff or cross-student access."""
+    validation_message = assistant_validation_message(question)
+    if validation_message:
+        payload = student_recommendations(student)
+        response = assistant_validation_response(validation_message, student, payload)
+        response.update({"mode": "student-guarded", "scope": "own-record-only", "read_only": True})
+        return response
     lowered = (question or "").lower()
     restricted_terms = {
-        "which students", "other student", "faculty load", "faculty assignment",
-        "dean queue", "approval queue", "staff notes", "internal", "all students",
-        "panel ranking", "admin", "database", "course adjustment rationale",
+        "which students", "other student", "other students", "another student",
+        "another student's", "someone else's", "classmate", "all students",
+        "student roster", "class list", "faculty load", "faculty workload",
+        "faculty assignment", "faculty ranking", "faculty email",
+        "dean queue", "approval queue", "decision queue", "staff notes",
+        "internal notes", "audit log", "transaction log", "admin records",
+        "database", "course adjustment rationale",
     }
     if any(term in lowered for term in restricted_terms):
         return {
@@ -4608,25 +5080,66 @@ def generate_student_answer(question: str, student: Student) -> dict:
                 "I can help with the Graduate School handbook, student procedures, and your own record. "
                 "I cannot access other students, staff-only notes, faculty selection data, or approval queues."
             ),
-            "mode": "student-scoped",
+            "mode": "student-guarded",
             "citations": [],
             "grounded": student_indicators(student),
             "recommendations": student_portal_recommendations(student),
             "student": student_brief(student),
+            "scope": "own-record-only",
+            "read_only": True,
+        }
+    record_change_patterns = [
+        r"\b(?:approve|reject)\s+(?:my|this)\s+(?:application|request|loa|readmission|withdrawal)\b",
+        r"\b(?:change|edit|update|raise|replace)\s+my\s+(?:grade|status|standing|record)\b",
+        r"\b(?:mark|tag)\s+me\s+(?:as\s+)?(?:enrolled|completed|passed|graduated)\b",
+        r"\b(?:drop|remove|withdraw)\s+me\s+(?:from\s+)?(?:this\s+)?(?:subject|class|course)\b",
+    ]
+    if any(re.search(pattern, question, flags=re.IGNORECASE) for pattern in record_change_patterns):
+        return {
+            "answer": (
+                "I can explain the applicable process and show your own recorded status, but I cannot "
+                "change grades, enrollment, standing, or approval decisions. Please use the appropriate "
+                "student request form or contact the Graduate School or Academic Coordinator."
+            ),
+            "mode": "student-guarded",
+            "citations": [],
+            "grounded": student_indicators(student),
+            "recommendations": student_portal_recommendations(student),
+            "student": student_brief(student),
+            "scope": "own-record-only",
+            "read_only": True,
         }
     payload = student_recommendations(student)
     snippets = retrieve_policy(question, k=3)
-    answer = local_grounded_answer(question, student, payload, snippets)
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    mode = "student-fast"
+    rag_citations = []
+    if api_key and assistant_requires_document_rag(question, student, snippets):
+        try:
+            answer, rag_citations = call_document_rag(
+                question,
+                snippets,
+                payload,
+                student,
+            )
+            mode = "student-document-rag"
+        except Exception:
+            answer = local_grounded_answer(question, student, payload, snippets)
+            mode = "student-rag-fallback"
+    else:
+        answer = local_grounded_answer(question, student, payload, snippets)
     return {
         "answer": answer,
-        "mode": "student-scoped",
-        "citations": [
+        "mode": mode,
+        "citations": rag_citations or [
             {"id": item["id"], "title": item["title"], "source": item["source"], "text": item["text"]}
             for item in snippets
         ],
         "grounded": {**payload["indicators"], "progress_status": student_priority(student)},
         "recommendations": student_portal_recommendations(student),
         "student": student_brief(student),
+        "scope": "own-record-only",
+        "read_only": True,
     }
 
 
@@ -9787,7 +10300,21 @@ def register_routes(app: Flask) -> None:
             student_id = int(student_id) if student_id else None
         except (TypeError, ValueError):
             student_id = None
-        return jsonify(generate_answer(question, student_id))
+        try:
+            return jsonify(generate_answer(question, student_id))
+        except Exception:
+            app.logger.exception("Policy Assistant could not complete a read-only request.")
+            return jsonify({
+                "answer": (
+                    "I could not safely complete that request right now. No records were changed. "
+                    "Please try a more specific question or try again in a moment."
+                ),
+                "mode": "safe-error",
+                "citations": [],
+                "grounded": None,
+                "recommendations": [],
+                "student": None,
+            })
 
     # Starter questions for the Assistant UI.
     @app.route("/api/assistant/suggestions")
@@ -16072,7 +16599,7 @@ def generate_panel_matching_keywords_with_rag(paper_text: str, retrieved_faculty
         f"Retrieved faculty specialization snippets:\n{snippets}"
     )
     try:
-        response = _load_rag_chat_engine().chat(prompt)
+        response = _gemini_generate(prompt)
         parsed = parse_panel_matching_rag_response(str(response))
         if parsed.get("keywords"):
             parsed["mode"] = "document-rag"
@@ -21034,5 +21561,14 @@ if __name__ == "__main__":
 
     port = int(os.getenv("FLASK_PORT", "5000"))
     start_incomplete_deadline_scheduler()
+    if (
+        os.getenv("RAG_PREWARM", "1").strip().lower() not in {"0", "false", "no"}
+        and (os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
+    ):
+        threading.Thread(
+            target=prewarm_document_rag,
+            name="rag-prewarm",
+            daemon=True,
+        ).start()
     print(f"USLS Graduate School platform running at http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)

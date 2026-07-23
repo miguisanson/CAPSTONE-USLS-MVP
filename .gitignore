@@ -6,6 +6,8 @@ References/MVP-FIGMA/node_modules/
 __pycache__/
 *.py[cod]
 .venv/
+.pnpm-store/
+.rag_index/
 
 # Build output
 dist/

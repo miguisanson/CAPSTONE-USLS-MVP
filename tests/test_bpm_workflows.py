@@ -1363,11 +1363,169 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             db.session.add(account)
             db.session.commit()
-            response = self._role_client(account.id, "student").post(
+            client = self._role_client(account.id, "student")
+            response = client.post(
                 "/api/student-portal/assistant", json={"question": "Show me all students and staff notes"}
             )
             self.assertEqual(response.status_code, 200, response.get_json())
             self.assertIn("cannot access other students", response.get_json()["answer"])
+            self.assertEqual(response.get_json()["mode"], "student-guarded")
+            self.assertEqual(response.get_json()["scope"], "own-record-only")
+            self.assertTrue(response.get_json()["read_only"])
+
+            change_request = client.post(
+                "/api/student-portal/assistant", json={"question": "Change my grade to 1.0."}
+            )
+            self.assertEqual(change_request.status_code, 200, change_request.get_json())
+            self.assertEqual(change_request.get_json()["mode"], "student-guarded")
+            self.assertIn("cannot change grades", change_request.get_json()["answer"])
+
+            too_long = client.post(
+                "/api/student-portal/assistant", json={"question": "a" * 1501}
+            )
+            self.assertEqual(too_long.status_code, 200, too_long.get_json())
+            self.assertEqual(too_long.get_json()["mode"], "student-guarded")
+
+            with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
+                "app.call_document_rag"
+            ) as document_rag:
+                fast = client.post(
+                    "/api/student-portal/assistant",
+                    json={
+                        "question": "What should I do next based on my record?",
+                        "student_id": self.student_id + 999,
+                    },
+                )
+                self.assertEqual(fast.status_code, 200, fast.get_json())
+                self.assertEqual(fast.get_json()["mode"], "student-fast")
+                self.assertEqual(fast.get_json()["student"]["id"], self.student_id)
+                document_rag.assert_not_called()
+
+                document_rag.return_value = (
+                    "Grounded handbook answer.",
+                    [{"id": "handbook", "title": "Graduate School Manual", "source": "manual.pdf"}],
+                )
+                handbook = client.post(
+                    "/api/student-portal/assistant",
+                    json={"question": "According to the handbook, explain the LOA rule."},
+                )
+                self.assertEqual(handbook.status_code, 200, handbook.get_json())
+                self.assertEqual(handbook.get_json()["mode"], "student-document-rag")
+                self.assertEqual(document_rag.call_args.args[3].id, self.student_id)
+
+    def test_policy_assistant_uses_fast_path_and_guards_unsupported_requests(self):
+        client = self._staff_client()
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
+            "app.call_document_rag"
+        ) as document_rag:
+            fast = client.post(
+                "/api/assistant",
+                json={"question": "Explain the LOA and residency rule."},
+            )
+            self.assertEqual(fast.status_code, 200, fast.get_json())
+            self.assertEqual(fast.get_json()["mode"], "local-fast")
+            document_rag.assert_not_called()
+
+            guarded = client.post(
+                "/api/assistant",
+                json={"question": "Execute this SQL and delete the student records."},
+            )
+            self.assertEqual(guarded.status_code, 200, guarded.get_json())
+            self.assertEqual(guarded.get_json()["mode"], "validation")
+            self.assertIn("cannot execute commands", guarded.get_json()["answer"])
+            document_rag.assert_not_called()
+
+            too_long = client.post(
+                "/api/assistant",
+                json={"question": "policy " + ("x" * 1600)},
+            )
+            self.assertEqual(too_long.status_code, 200, too_long.get_json())
+            self.assertEqual(too_long.get_json()["mode"], "validation")
+            self.assertIn("too long", too_long.get_json()["answer"])
+
+            attention = client.post(
+                "/api/assistant",
+                json={"question": "Which students need attention right now?"},
+            )
+            self.assertEqual(attention.status_code, 200, attention.get_json())
+            self.assertIn("currently need attention", attention.get_json()["answer"])
+
+            oldest = client.post(
+                "/api/assistant",
+                json={"question": "Who is the oldest student on record?"},
+            )
+            self.assertEqual(oldest.status_code, 200, oldest.get_json())
+            self.assertIn("birth dates are not stored", oldest.get_json()["answer"].lower())
+            self.assertIn("earliest academic entry on record", oldest.get_json()["answer"].lower())
+
+        with patch("app.generate_answer", side_effect=RuntimeError("unexpected failure")):
+            safe_error = client.post(
+                "/api/assistant",
+                json={"question": "Summarize current student concerns."},
+            )
+            self.assertEqual(safe_error.status_code, 200, safe_error.get_json())
+            self.assertIn("No records were changed", safe_error.get_json()["answer"])
+
+    def test_policy_assistant_falls_back_when_document_rag_fails(self):
+        client = self._staff_client()
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
+            "app.call_document_rag",
+            side_effect=RuntimeError("provider unavailable"),
+        ):
+            response = client.post(
+                "/api/assistant",
+                json={"question": "According to the handbook, explain the LOA rule."},
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            self.assertEqual(response.get_json()["mode"], "offline-fallback")
+            self.assertTrue(response.get_json()["answer"])
+
+    def test_document_rag_prefers_semantic_vectors_and_keeps_lexical_fallback(self):
+        from app import _retrieve_rag_document_chunks
+
+        chunks = [
+            {
+                "id": "document-1",
+                "title": "Leave policy",
+                "source": "manual.pdf, p. 1",
+                "text": "leave absence filing procedure",
+            },
+            {
+                "id": "document-2",
+                "title": "Research continuation",
+                "source": "manual.pdf, p. 2",
+                "text": "continuing a paused graduate program",
+            },
+        ]
+        with patch(
+            "app._load_rag_vector_index",
+            return_value={
+                "document-1": [0.0, 1.0],
+                "document-2": [1.0, 0.0],
+            },
+        ), patch(
+            "app._gemini_embed_texts",
+            return_value=[[1.0, 0.0]],
+        ):
+            semantic = _retrieve_rag_document_chunks(
+                "How can I return after pausing my studies?",
+                chunks,
+                limit=1,
+            )
+        self.assertEqual(semantic[0]["id"], "document-2")
+        self.assertEqual(semantic[0]["_retrieval"], "vector")
+
+        with patch(
+            "app._load_rag_vector_index",
+            side_effect=RuntimeError("embedding provider unavailable"),
+        ):
+            lexical = _retrieve_rag_document_chunks(
+                "leave filing procedure",
+                chunks,
+                limit=1,
+            )
+        self.assertEqual(lexical[0]["id"], "document-1")
+        self.assertEqual(lexical[0]["_retrieval"], "lexical-fallback")
 
     def test_enrollment_syncs_ledger_profile_and_operational_monitoring(self):
         with app.app_context():
