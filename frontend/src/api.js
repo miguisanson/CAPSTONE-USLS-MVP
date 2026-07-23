@@ -193,8 +193,27 @@ export const api = {
   },
   previewEnrollment: (payload) =>
     request("/enrollment/preview", { method: "POST", body: JSON.stringify(payload) }),
+  courseOfferings: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/course-offerings${qs ? `?${qs}` : ""}`);
+  },
+  addCourseOffering: (payload) =>
+    request("/course-offerings", { method: "POST", body: JSON.stringify(payload) }),
+  updateCourseOffering: (id, payload) =>
+    request(`/course-offerings/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteCourseOffering: (id) =>
+    request(`/course-offerings/${id}`, { method: "DELETE" }),
   saveEnrollment: (payload) =>
     request("/enrollment", { method: "POST", body: JSON.stringify(payload) }),
+  importClassList: async (file, termId) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (termId) form.append("term_id", termId);
+    const res = await fetch(`${BASE}/enrollment/class-list-import`, { method: "POST", body: form, credentials: "same-origin" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Class list import failed (${res.status})`);
+    return body;
+  },
   courseAdjustments: (params = {}) => {
     const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
     const qs = queryString(actual);

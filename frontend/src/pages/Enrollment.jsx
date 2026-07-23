@@ -200,6 +200,31 @@ export default function Enrollment() {
     }
   }
 
+  async function importClassList(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setBusy("classlist");
+    setError("");
+    try {
+      const res = await api.importClassList(file, data?.term?.id || termId || undefined);
+      await confirm({
+        title: "Class list imported",
+        message:
+          `${res.message}\n\n` +
+          (res.sample_not_found?.length ? `Not found: ${res.sample_not_found.join(", ")}\n` : "") +
+          (res.sample_not_offered?.length ? `Not offered/unknown: ${res.sample_not_offered.join(", ")}` : ""),
+        confirmLabel: "Done",
+        cancelLabel: "Close",
+      });
+      await load();
+    } catch (err) {
+      setError(err.message || "Could not import the class list.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (loading && !data) return <Spinner label="Loading enrollment workspace..." />;
 
   return (
@@ -213,6 +238,19 @@ export default function Enrollment() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <label className={`btn-ghost cursor-pointer ${busy === "classlist" ? "pointer-events-none opacity-60" : ""}`}>
+            {busy === "classlist"
+              ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              : <ClipboardCheck className="h-4 w-4" />}
+            Upload class list
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xlsm"
+              className="hidden"
+              onChange={importClassList}
+              disabled={busy === "classlist"}
+            />
+          </label>
           <Link to="/course-adjustments" className="btn-ghost">
             <BookOpenCheck className="h-4 w-4" /> Offering list
           </Link>

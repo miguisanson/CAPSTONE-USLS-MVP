@@ -421,11 +421,17 @@ class CurriculumOffering(db.Model):
     semester = db.Column(db.String(20), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
     added_by = db.Column(db.String(160))
+    # Course Offering Setup (Sir Eddie, 2026-07-21): each offered subject carries the
+    # assigned faculty and the schedule that students are then tagged/enrolled into.
+    assigned_faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"))
+    schedule = db.Column(db.String(160))
+    section = db.Column(db.String(40))
     created_at = db.Column(db.DateTime, default=now_utc)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
 
     program = db.relationship("Program")
     course = db.relationship("Course")
+    assigned_faculty = db.relationship("Faculty", foreign_keys=[assigned_faculty_id])
 
 
 # Term-level enrollment signal copied from an institutional source such as AIMS.
@@ -6948,6 +6954,226 @@ def register_routes(app: Flask) -> None:
                 "course_audit": "/workflow/course-audit",
             },
         })
+
+    @app.route("/api/enrollment/class-list-import", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def enrollment_class_list_import():
+        # Sir Eddie (2026-07-21): the coordinator tags students as enrolled by uploading a
+        # class list (or by searching a student). This bulk-tags every matched student to the
+        # named subject as Enrolled for the given semester. It only tags subjects that are
+        # officially offered, and every change is logged. Grades are never touched here.
+        import csv as _csv
+        import io as _io
+
+        file = request.files.get("file")
+        if not file or not file.filename:
+            return jsonify({"error": "Choose a class list .csv or .xlsx file."}), 400
+        term_id = safe_int(request.form.get("term_id"))
+        term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
+        if not term:
+            return jsonify({"error": "Select an academic semester first."}), 400
+        academic_year, semester = split_academic_term_label(term.label)
+
+        # Parse the file into rows of dicts keyed by a normalized header.
+        name = file.filename.lower()
+        rows: list[dict] = []
+        try:
+            if name.endswith((".xlsx", ".xlsm")):
+                import openpyxl
+                wb = openpyxl.load_workbook(file, data_only=True, read_only=True)
+                ws = wb.active
+                grid = [[_norm(c.value) for c in r] for r in ws.iter_rows()]
+                header_idx = next((i for i, r in enumerate(grid) if any("ID" in (v or "").upper() for v in r)), 0)
+                headers = [(_norm(v)).upper() for v in grid[header_idx]]
+                for r in grid[header_idx + 1:]:
+                    rows.append({headers[i]: (r[i] if i < len(r) else "") for i in range(len(headers))})
+            else:
+                text = file.read().decode("utf-8-sig", errors="replace")
+                reader = _csv.DictReader(_io.StringIO(text))
+                for r in reader:
+                    rows.append({(k or "").strip().upper(): (v or "").strip() for k, v in r.items()})
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": f"Could not read the file: {exc}"}), 400
+
+        def pick(row, *keys):
+            for k in keys:
+                for hk, hv in row.items():
+                    if hk.replace(" ", "").replace("_", "") == k.replace(" ", "").replace("_", ""):
+                        return (hv or "").strip()
+            return ""
+
+        tagged, not_found, not_offered, no_subject, already = 0, [], [], 0, 0
+        actor = workflow_actor_label(current_account()) if current_account() else "Academic Coordinator"
+        for row in rows:
+            sid = pick(row, "STUDENTID", "IDNUMBER", "IDNO", "ID")
+            code = pick(row, "SUBJECTCODE", "CODE", "SUBJECT")
+            if not sid and not code:
+                continue
+            if not code:
+                no_subject += 1
+                continue
+            student = Student.query.filter_by(student_number=sid).first()
+            if not student:
+                not_found.append(sid or "(blank ID)")
+                continue
+            course = Course.query.filter_by(program_id=student.program_id, code=code).first()
+            if not course:
+                not_offered.append(f"{sid}:{code}")
+                continue
+            offered = CurriculumOffering.query.filter_by(
+                program_id=student.program_id, academic_year=academic_year,
+                semester=semester, course_id=course.id,
+            ).first()
+            if not offered:
+                not_offered.append(f"{code} (not offered this semester)")
+                continue
+            record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+            if record and record.status in ("Enrolled", "Current"):
+                already += 1
+                continue
+            previous = record.status if record else "Missing"
+            if not record:
+                record = CourseRecord(student_id=student.id, course_id=course.id)
+                db.session.add(record)
+            record.status = "Enrolled"
+            record.term_label = term.label
+            record.evidence_reference = f"Class list import ({file.filename})"
+            record.updated_at = now_utc()
+            sync_subject_enrollment_from_course_record(student, course, term.label, "Enrolled", "Class list import")
+            add_log("enrollment", student.id, actor, "Class list import",
+                    f"Tagged {student.name} as Enrolled in {course.code} for {term.label}.",
+                    "Academic Coordinator",
+                    f"Bulk enrollment tag from uploaded class list. {previous} -> Enrolled.",
+                    previous_status=previous, new_status="Enrolled")
+            tagged += 1
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "term": term.label,
+            "tagged": tagged,
+            "already_enrolled": already,
+            "not_found_count": len(not_found),
+            "not_offered_count": len(not_offered),
+            "rows_without_subject": no_subject,
+            "sample_not_found": not_found[:8],
+            "sample_not_offered": not_offered[:8],
+            "message": (
+                f"Tagged {tagged} student-subject enrollment(s) for {term.label}. "
+                f"{already} already enrolled, {len(not_found)} student(s) not found, "
+                f"{len(not_offered)} subject(s) not offered or unknown."
+            ),
+        })
+
+    # ---- Course Offering Setup (declare offered subjects + faculty + schedule) ----
+    def _offering_dict(off, program):
+        fac = Faculty.query.get(off.assigned_faculty_id) if off.assigned_faculty_id else None
+        enrolled = (
+            CourseRecord.query.join(Student, Student.id == CourseRecord.student_id)
+            .filter(CourseRecord.course_id == off.course_id, Student.program_id == program.id,
+                    CourseRecord.status.in_(["Enrolled", "Current"]))
+            .count()
+        )
+        return {
+            "id": off.id, "course_id": off.course_id,
+            "code": off.course.code if off.course else "", "title": off.course.title if off.course else "",
+            "units": (off.course.units or 3) if off.course else 3,
+            "faculty_id": off.assigned_faculty_id, "faculty_name": fac.name if fac else None,
+            "schedule": off.schedule or "", "section": off.section or "", "enrolled_count": enrolled,
+        }
+
+    @app.route("/api/course-offerings")
+    @require_api_login("staff", "academic_coordinator", "admin")
+    def course_offerings_list():
+        program_id = request.args.get("program_id", type=int)
+        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        if not program:
+            return jsonify({"error": "No program found."}), 404
+        term_id = request.args.get("term_id", type=int)
+        term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
+        academic_year, semester = split_academic_term_label(term.label) if term else ("", "")
+        offerings = (
+            CurriculumOffering.query.filter_by(program_id=program.id, academic_year=academic_year, semester=semester)
+            .join(Course).order_by(Course.code).all()
+        )
+        offered_ids = {o.course_id for o in offerings}
+        curriculum = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
+        faculty = Faculty.query.filter_by(active=True).order_by(Faculty.name).all()
+        account = current_account()
+        return jsonify({
+            "program": program_dict(program),
+            "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+            "term": term_dict(term) if term else None,
+            "terms": [term_dict(t) for t in reversed(visible_terms())],
+            "offerings": [_offering_dict(o, program) for o in offerings],
+            "faculty": [{"id": f.id, "name": f.name, "college": f.college, "specialization": f.specialization} for f in faculty],
+            "available_subjects": [
+                {"id": c.id, "code": c.code, "title": c.title, "category": c.category}
+                for c in curriculum if c.id not in offered_ids
+            ],
+            "permissions": {"can_manage": bool(account and account.role in ("academic_coordinator", "admin"))},
+        })
+
+    @app.route("/api/course-offerings", methods=["POST"])
+    @require_api_login("academic_coordinator", "admin")
+    def course_offerings_add():
+        data = request.get_json(silent=True) or {}
+        program = Program.query.get_or_404(safe_int(data.get("program_id")))
+        term = AcademicTerm.query.get(safe_int(data.get("term_id"))) or get_active_term()
+        if not term:
+            return jsonify({"error": "Select an academic semester first."}), 400
+        academic_year, semester = split_academic_term_label(term.label)
+        if not academic_year or not semester:
+            return jsonify({"error": "The selected semester label is invalid."}), 400
+        course = Course.query.get_or_404(safe_int(data.get("course_id")))
+        if course.program_id != program.id:
+            return jsonify({"error": "That subject is not in this program's curriculum."}), 400
+        if CurriculumOffering.query.filter_by(program_id=program.id, academic_year=academic_year, semester=semester, course_id=course.id).first():
+            return jsonify({"error": f"{course.code} is already offered this semester."}), 400
+        actor = workflow_actor_label(current_account()) if current_account() else "Academic Coordinator"
+        off = CurriculumOffering(
+            program_id=program.id, academic_year=academic_year, semester=semester, course_id=course.id,
+            added_by=actor, assigned_faculty_id=safe_int(data.get("faculty_id")) or None,
+            schedule=(data.get("schedule") or "").strip() or None,
+            section=(data.get("section") or "").strip() or None,
+        )
+        db.session.add(off)
+        add_log("course-adjustments", None, actor, "Course Offering Setup",
+                f"{course.code} added to the offerings for {program.code} {term.label}.",
+                "Graduate School Staff", "")
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"{course.code} is now offered for {term.label}."})
+
+    @app.route("/api/course-offerings/<int:offering_id>", methods=["PATCH"])
+    @require_api_login("academic_coordinator", "admin")
+    def course_offerings_update(offering_id: int):
+        data = request.get_json(silent=True) or {}
+        off = CurriculumOffering.query.get_or_404(offering_id)
+        if "faculty_id" in data:
+            off.assigned_faculty_id = safe_int(data.get("faculty_id")) or None
+        if "schedule" in data:
+            off.schedule = (data.get("schedule") or "").strip() or None
+        if "section" in data:
+            off.section = (data.get("section") or "").strip() or None
+        off.updated_at = now_utc()
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Offering updated.", "offering": _offering_dict(off, off.program)})
+
+    @app.route("/api/course-offerings/<int:offering_id>", methods=["DELETE"])
+    @require_api_login("academic_coordinator", "admin")
+    def course_offerings_delete(offering_id: int):
+        off = CurriculumOffering.query.get_or_404(offering_id)
+        enrolled = (
+            CourseRecord.query.join(Student, Student.id == CourseRecord.student_id)
+            .filter(CourseRecord.course_id == off.course_id, Student.program_id == off.program_id,
+                    CourseRecord.status.in_(["Enrolled", "Current"]))
+            .count()
+        )
+        if enrolled:
+            return jsonify({"error": f"Cannot remove: {enrolled} student(s) are already enrolled in this subject."}), 400
+        code = off.course.code if off.course else "subject"
+        db.session.delete(off)
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"{code} removed from offerings."})
 
     @app.route("/api/course-adjustments")
     @require_api_login("staff", "academic_coordinator")
@@ -16771,6 +16997,16 @@ def ensure_curriculum_offering_schema() -> None:
         for name, sql_type in additions.items():
             if name not in existing:
                 db.session.execute(text(f"ALTER TABLE course_offering ADD COLUMN {name} {sql_type}"))
+    if "curriculum_offering" in tables:
+        existing = {column["name"] for column in inspector.get_columns("curriculum_offering")}
+        additions = {
+            "assigned_faculty_id": "INTEGER",
+            "schedule": "VARCHAR(160)",
+            "section": "VARCHAR(40)",
+        }
+        for name, sql_type in additions.items():
+            if name not in existing:
+                db.session.execute(text(f"ALTER TABLE curriculum_offering ADD COLUMN {name} {sql_type}"))
     db.session.commit()
 
 
@@ -18398,6 +18634,14 @@ def ensure_demo_accounts() -> None:
 app = create_app()
 
 with app.app_context():
+    # Add newly declared columns before any schema-check queries the affected tables.
+    _early_inspector = inspect(db.engine)
+    if "curriculum_offering" in set(_early_inspector.get_table_names()):
+        _co_existing = {c["name"] for c in _early_inspector.get_columns("curriculum_offering")}
+        for _name, _sql in {"assigned_faculty_id": "INTEGER", "schedule": "VARCHAR(160)", "section": "VARCHAR(40)"}.items():
+            if _name not in _co_existing:
+                db.session.execute(text(f"ALTER TABLE curriculum_offering ADD COLUMN {_name} {_sql}"))
+        db.session.commit()
     ensure_schedule_request_schema()
     ensure_monitoring_upload_schema()
     ensure_student_comprehensive_exam_schema()

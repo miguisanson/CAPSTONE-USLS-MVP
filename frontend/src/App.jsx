@@ -13,6 +13,7 @@ import ActivityLog from "./pages/ActivityLog";
 import WorkflowPage from "./pages/WorkflowPage";
 import MonitoringGrid from "./pages/MonitoringGrid";
 import CourseAdjustments from "./pages/CourseAdjustments";
+import CourseOfferings from "./pages/CourseOfferings";
 import Enrollment from "./pages/Enrollment";
 import DecisionSupport from "./pages/DecisionSupport";
 import Assistant from "./pages/Assistant";
@@ -82,6 +83,7 @@ export default function App() {
                 {/* Curriculum Planning was merged into Course Adjustments. */}
                 <Route path="/curriculum-planning" element={<Navigate to="/course-adjustments" replace />} />
                 <Route path="/course-adjustments" element={<CourseAdjustments />} />
+                <Route path="/course-offerings" element={<CourseOfferings />} />
                 <Route path="/enrollment" element={<Enrollment />} />
                 <Route path="/term-settings" element={<TermSettings />} />
                 <Route path="/work-queue" element={<WorkQueue />} />

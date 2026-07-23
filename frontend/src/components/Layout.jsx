@@ -54,13 +54,14 @@ const NAV_GROUPS = [
     label: "Lifecycle workflows",
     items: [
       { to: "/workflow/student-handoff", label: "1 · Student Handoff", icon: UserPlus },
-      { to: "/enrollment", label: "2 · Enrollment", icon: BookPlus },
-      { to: "/course-adjustments", label: "3 · Course Adjustments", icon: SlidersHorizontal },
-      { to: "/workflow/research-gate", label: "4 · Research Gate", icon: FileCheck },
-      { to: "/workflow/panel-matching", label: "5 · Panel Matching", icon: UsersRound },
-      { to: "/workflow/defense-scheduling", label: "6 · Defense Scheduling", icon: CalendarCheck },
-      { to: "/workflow/practicum", label: "7 · Practicum", icon: Briefcase },
-      { to: "/workflow/graduation", label: "8 · Graduation", icon: GraduationCap },
+      { to: "/course-adjustments", label: "2 · Course Adjustments", icon: SlidersHorizontal },
+      { to: "/course-offerings", label: "3 · Course Offering Setup", icon: BookOpenCheck },
+      { to: "/enrollment", label: "4 · Enrollment", icon: BookPlus },
+      { to: "/workflow/research-gate", label: "5 · Research Gate", icon: FileCheck },
+      { to: "/workflow/panel-matching", label: "6 · Panel Matching", icon: UsersRound },
+      { to: "/workflow/defense-scheduling", label: "7 · Defense Scheduling", icon: CalendarCheck },
+      { to: "/workflow/practicum", label: "8 · Practicum", icon: Briefcase },
+      { to: "/workflow/graduation", label: "9 · Graduation", icon: GraduationCap },
     ],
   },
   {
@@ -91,7 +92,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/students", "/faculty", "/monitoring-sheet", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
+  academic_coordinator: new Set(["/students", "/faculty", "/monitoring-sheet", "/course-adjustments", "/course-offerings", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
 };
 
