@@ -66,6 +66,7 @@ from app import (  # noqa: E402
     ensure_authoritative_curricula,
     get_active_term,
     student_current_course_year,
+    student_priority,
     sync_automatic_awol_statuses,
     graduation_eligibility,
     graduation_candidate_payload,
@@ -719,7 +720,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(record.status, "Enrolled")
             self.assertEqual(record.grade_status, "No Grade")
             self.assertIsNone(record.grade_value)
-            self.assertIsNone(record.incomplete_deadline)
             self.assertEqual(record.remarks, "Imported from AIMS")
             self.assertEqual(
                 TransactionLog.query.filter_by(
@@ -728,6 +728,65 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 ).count(),
                 0,
             )
+
+    def test_recommended_year_delay_only_uses_authoritative_curricula(self):
+        with app.app_context():
+            course = db.session.get(Course, self.course_id)
+            student = db.session.get(Student, self.student_id)
+            course.recommended_term = "Year 1"
+            student.entry_year = date.today().year - 3
+            student.current_stage = "Coursework"
+            db.session.commit()
+
+            self.assertEqual(student_priority(student)["level"], "On Track")
+
+            ensure_authoritative_curricula()
+            mba = Program.query.filter_by(code="MBA").one()
+            mba_student = Student(
+                student_number="MBA-RISK-TEST",
+                first_name="Planned",
+                last_name="Student",
+                email="mba-risk@example.test",
+                program_id=mba.id,
+                entry_year=date.today().year - 3,
+                current_stage="Coursework",
+                standing="Active",
+            )
+            db.session.add(mba_student)
+            db.session.commit()
+
+            assessment = student_priority(mba_student)
+            self.assertEqual(assessment["level"], "Delayed")
+            self.assertIn("suggested course year", " ".join(assessment["causes"]))
+
+    def test_approved_loa_does_not_create_delay_risk(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.current_stage = "LOA"
+            student.standing = "On Leave"
+            student.enrollment_tag = "LOA"
+            db.session.commit()
+
+            assessment = student_priority(student)
+            self.assertEqual(assessment["level"], "On Track")
+            self.assertEqual(assessment["causes"], [])
+
+    def test_failed_course_record_does_not_create_delay_risk(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            course = db.session.get(Course, self.course_id)
+            student.current_stage = "Coursework"
+            db.session.add(CourseRecord(
+                student_id=student.id,
+                course_id=course.id,
+                status="Failed",
+                grade_status="Failed",
+            ))
+            db.session.commit()
+
+            assessment = student_priority(student)
+            self.assertEqual(assessment["level"], "On Track")
+            self.assertEqual(assessment["causes"], [])
 
     def test_course_adjustments_manual_selection_publishes_to_curriculum_planning(self):
         with app.app_context():
@@ -848,36 +907,21 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 end_date=date(2027, 12, 15),
                 is_active_planning_term=True,
             )
-            retake_course = Course(
+            failed_course = Course(
                 program_id=self.program_id,
                 code="BPM-502",
-                title="Retake Course",
+                title="Failed Course",
                 units=3,
                 category="Major",
             )
-            incomplete_course = Course(
-                program_id=self.program_id,
-                code="BPM-503",
-                title="Incomplete Course",
-                units=3,
-                category="Major",
-            )
-            db.session.add_all([term, retake_course, incomplete_course])
+            db.session.add_all([term, failed_course])
             db.session.flush()
-            db.session.add_all([
-                CourseRecord(
-                    student_id=self.student_id,
-                    course_id=retake_course.id,
-                    status="Retake Required",
-                    grade_status="No Credit - Retake Required",
-                ),
-                CourseRecord(
-                    student_id=self.student_id,
-                    course_id=incomplete_course.id,
-                    status="Incomplete",
-                    grade_status="INC",
-                ),
-            ])
+            db.session.add(CourseRecord(
+                student_id=self.student_id,
+                course_id=failed_course.id,
+                status="Failed",
+                grade_status="Failed",
+            ))
             db.session.commit()
 
             academic = self._academic_client()
@@ -891,11 +935,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(payload["summary"]["students_reviewed"], 1)
             self.assertEqual(payload["summary"]["subjects_with_need"], 2)
             self.assertEqual(payload["summary"]["student_subject_needs"], 2)
-            self.assertEqual(payload["summary"]["pending_incomplete"], 1)
             self.assertEqual(rows["BPM-501"]["not_taken_count"], 1)
-            self.assertEqual(rows["BPM-502"]["retake_required_count"], 1)
-            self.assertEqual(rows["BPM-503"]["need_count"], 0)
-            self.assertEqual(rows["BPM-503"]["pending_incomplete_count"], 1)
+            self.assertEqual(rows["BPM-502"]["not_taken_count"], 1)
+            self.assertEqual(rows["BPM-502"]["students"][0]["reason"], "Failed")
 
             # The target term is still in the future and has no TermEnrollment rows.
             # Demand must nevertheless use the active monitoring population.
@@ -2469,13 +2511,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student.entry_year = date.today().year
             student.standing = "Active"
             student.enrollment_tag = "Enrolled"
-            student.current_stage = "Coursework"
-            db.session.add(CourseRecord(
-                student_id=student.id,
-                course_id=self.course_id,
-                status="Incomplete",
-                grade_status="Incomplete",
-            ))
+            student.current_stage = "Comprehensive Exam"
             term = AcademicTerm(
                 label="AY 2026-2027 1st Semester",
                 start_date=date(date.today().year, 1, 1),
@@ -2488,7 +2524,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "student_id": student.id,
                 "workflow_action": "record_residency",
                 "term_id": term.id,
-                "residency_reason": "Completing an INC",
+                "residency_reason": "Comprehensive examination",
             })
             self.assertEqual(response.status_code, 200, response.get_json())
             residency = ResidencyEnrollment.query.filter_by(student_id=student.id, status="Active").first()

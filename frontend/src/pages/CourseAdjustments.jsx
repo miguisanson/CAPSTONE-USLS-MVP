@@ -513,7 +513,7 @@ function OfferingStatusBadge({ status }) {
 
 function SubjectNeedsReport({ report, onDownload }) {
   const rows = report.rows || [];
-  const visibleRows = rows.filter((row) => row.need_count > 0 || row.pending_incomplete_count > 0);
+  const visibleRows = rows.filter((row) => row.need_count > 0);
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
@@ -531,22 +531,19 @@ function SubjectNeedsReport({ report, onDownload }) {
           <Download className="h-4 w-4" /> Download CSV
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50/70 p-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 border-b border-slate-100 bg-slate-50/70 p-4 sm:grid-cols-3">
         <ReportMetric label="Students reviewed" value={report.summary.students_reviewed} />
         <ReportMetric label="Subjects with need" value={report.summary.subjects_with_need} />
         <ReportMetric label="Student-subject needs" value={report.summary.student_subject_needs} />
-        <ReportMetric label="Incomplete to resolve" value={report.summary.pending_incomplete} tone="amber" />
       </div>
       {visibleRows.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                 <th className="px-5 py-3">Subject</th>
                 <th className="px-3 py-3 text-center">Students needing</th>
                 <th className="px-3 py-3 text-center">Not taken</th>
-                <th className="px-3 py-3 text-center">Retake</th>
-                <th className="px-3 py-3 text-center">Incomplete</th>
                 <th className="px-5 py-3">Affected students</th>
               </tr>
             </thead>
@@ -563,19 +560,8 @@ function SubjectNeedsReport({ report, onDownload }) {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-center font-semibold text-slate-700">{row.not_taken_count}</td>
-                  <td className="px-3 py-3 text-center font-semibold text-slate-700">{row.retake_required_count}</td>
-                  <td className="px-3 py-3 text-center">
-                    <span className={row.pending_incomplete_count ? "font-semibold text-amber-700" : "text-slate-500"}>
-                      {row.pending_incomplete_count}
-                    </span>
-                  </td>
                   <td className="px-5 py-3">
                     <StudentNeedNames students={row.students} />
-                    {!!row.pending_incomplete_students?.length && (
-                      <p className="mt-1 text-xs text-amber-700">
-                        Awaiting incomplete resolution: {row.pending_incomplete_students.map((student) => student.name).join(", ")}
-                      </p>
-                    )}
                   </td>
                 </tr>
               ))}
@@ -627,10 +613,7 @@ function downloadSubjectNeedsCsv(report) {
     "Category",
     "Students Needing",
     "Not Taken",
-    "Retake Required",
-    "Incomplete to Resolve",
     "Students Needing Subject",
-    "Incomplete Students",
   ];
   const rows = (report.rows || []).map((row) => [
     row.course.code,
@@ -638,10 +621,7 @@ function downloadSubjectNeedsCsv(report) {
     row.course.category || "",
     row.need_count,
     row.not_taken_count,
-    row.retake_required_count,
-    row.pending_incomplete_count,
     (row.students || []).map((student) => `${student.student_number} - ${student.name} (${student.reason})`).join("; "),
-    (row.pending_incomplete_students || []).map((student) => `${student.student_number} - ${student.name}`).join("; "),
   ]);
   const csv = [...metadata, header, ...rows]
     .map((row) => row.map(csvCell).join(","))

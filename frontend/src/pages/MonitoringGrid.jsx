@@ -10,8 +10,6 @@ const CELL_VIEW = {
   Taken: { cls: "bg-brand-100 text-brand-800", mark: "T" },
   Current: { cls: "bg-blue-100 text-blue-700", mark: "R" },
   Enrolled: { cls: "bg-blue-100 text-blue-700", mark: "R" },
-  Incomplete: { cls: "bg-amber-200 text-amber-800", mark: "I" },
-  "Retake Required": { cls: "bg-orange-200 text-orange-800", mark: "R" },
   Failed: { cls: "bg-red-100 text-red-700", mark: "F" },
   Dropped: { cls: "bg-violet-100 text-violet-700", mark: "D" },
   Withdrawn: { cls: "bg-rose-100 text-rose-700", mark: "W" },
@@ -241,7 +239,6 @@ export default function MonitoringGrid() {
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-500" /> Officially completed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-100 ring-1 ring-brand-200" /> Taken</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Enrolled</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-amber-300" /> Incomplete</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-100 ring-1 ring-red-200" /> Failed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-violet-100 ring-1 ring-violet-200" /> Dropped</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>

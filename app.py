@@ -546,7 +546,6 @@ class CourseRecord(db.Model):
     evidence_reference = db.Column(db.String(160))
     grade_value = db.Column(db.String(40))
     grade_status = db.Column(db.String(40), nullable=False, default="No Grade")
-    incomplete_deadline = db.Column(db.Date)
     resolved_at = db.Column(db.DateTime)
     remarks = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, default=now_utc)
@@ -1640,7 +1639,6 @@ def course_audit_dict(audit: dict) -> dict:
             "evidence_reference": record.evidence_reference if record else None,
             "grade_value": record.grade_value if record else "",
             "grade_status": record.grade_status if record else "No Grade",
-            "incomplete_deadline": record.incomplete_deadline.isoformat() if record and record.incomplete_deadline else None,
             "remarks": record.remarks if record else "",
         }
 
@@ -1673,7 +1671,6 @@ def course_record_dict(record: CourseRecord) -> dict:
         "evidence_reference": record.evidence_reference,
         "grade_value": record.grade_value or "",
         "grade_status": record.grade_status or "No Grade",
-        "incomplete_deadline": record.incomplete_deadline.isoformat() if record.incomplete_deadline else None,
         "resolved_at": iso(record.resolved_at),
         "remarks": record.remarks or "",
         "updated_at": iso(record.updated_at),
@@ -2356,23 +2353,15 @@ def curriculum_offering_dict(offering: CurriculumOffering) -> dict:
     }
 
 
-ACTIVE_SUBJECT_ENROLLMENT_STATUSES = {"Enrolled", "Current", "Incomplete"}
+ACTIVE_SUBJECT_ENROLLMENT_STATUSES = {"Enrolled", "Current"}
 RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Completed",
     "Taken",
     "Failed",
-    "Retake Required",
     "Dropped",
     "Withdrawn",
 }
 NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken"}
-MONITORING_SUBJECT_STATUSES = {
-    "Enrolled",
-    "Taken",
-    "Incomplete",
-    "Failed",
-    "Dropped",
-}
 
 
 def subject_enrollment_dict(item: SubjectEnrollment) -> dict:
@@ -2460,7 +2449,7 @@ def enrollment_subject_states(
             (
                 item for item in rows
                 if item.term_id == term.id
-                and item.status in {"Dropped", "Withdrawn", "Failed", "Retake Required"}
+                and item.status in {"Dropped", "Withdrawn", "Failed"}
             ),
             None,
         )
@@ -2468,7 +2457,7 @@ def enrollment_subject_states(
             (
                 item for item in rows
                 if item.term_id != term.id
-                and item.status in {"Dropped", "Withdrawn", "Failed", "Retake Required"}
+                and item.status in {"Dropped", "Withdrawn", "Failed"}
             ),
             None,
         )
@@ -2620,7 +2609,6 @@ def cancel_active_subject_enrollments(
         ):
             record.status = course_status
             record.grade_status = "No Grade"
-            record.incomplete_deadline = None
             record.resolved_at = None
             record.remarks = source_reference
             record.evidence_reference = "Enrollment synchronization"
@@ -3385,20 +3373,14 @@ def student_delay_assessment(student: Student) -> dict:
     for course in monitoring_curriculum_courses(student.program):
         record = records.get(course.id)
         status = record.status if record else "Missing"
-        if status == "Failed":
-            delayed.append(f"{course.code} has a failing mark")
-        elif status == "Retake Required" or (
-            status == "Incomplete" and record and record.incomplete_deadline
-            and record.incomplete_deadline < date.today()
-        ):
-            delayed.append(f"{course.code} must be re-enrolled after a lapsed incomplete mark")
-        year_match = re.search(r"year\s*(\d+)", course.recommended_term or "", re.IGNORECASE)
-        required_for_sequence = course.category != "Cognate" or course.code == "MBA218"
-        if (
-            year_match and int(year_match.group(1)) < current_year
-            and required_for_sequence and status not in {"Completed", "Current", "Enrolled"}
-        ):
-            delayed.append(f"{course.code} remains unfinished past its suggested course year")
+        if student.program.code in AUTHORITATIVE_CURRICULA:
+            year_match = re.search(r"year\s*(\d+)", course.recommended_term or "", re.IGNORECASE)
+            required_for_sequence = course.category != "Cognate" or course.code == "MBA218"
+            if (
+                year_match and int(year_match.group(1)) < current_year
+                and required_for_sequence and status not in {"Completed", "Current", "Enrolled"}
+            ):
+                delayed.append(f"{course.code} remains unfinished past its suggested course year")
 
     if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
         delayed.append("AWOL status has interrupted enrollment")
@@ -3410,10 +3392,7 @@ def student_delay_assessment(student: Student) -> dict:
         at_risk.append(f"{indicators['overdue_tasks']} overdue action(s) may delay progress")
     if indicators["missing_documents"]:
         at_risk.append(f"{indicators['missing_documents']} required document(s) may delay the current milestone")
-    if student.standing == "On Leave" or student.enrollment_tag == "LOA":
-        at_risk.append("leave status pauses the normal study sequence")
-
-    if term:
+    if term and student.program.code in AUTHORITATIVE_CURRICULA:
         next_ids = {row["id"] for row in student_semester_subjects(student, term)["next_subjects"]}
         plan = (
             CourseOfferingPlan.query.filter_by(program_id=student.program_id, term_label=term.label)
@@ -3445,7 +3424,7 @@ def student_priority(student: Student) -> dict:
     # Assessed" until verified indicators exist.
     has_coursework = CourseRecord.query.filter(
         CourseRecord.student_id == student.id,
-        CourseRecord.status.in_(["Completed", "Failed", "Incomplete", "Current", "Enrolled"]),
+        CourseRecord.status.in_(["Completed", "Failed", "Current", "Enrolled"]),
     ).first()
     if student.current_stage == "Admission" and not has_coursework:
         return {"level": "Not Yet Assessed", "score": 0, "reason": "Newly admitted — not yet assessed for risk (insufficient data)"}
@@ -3874,14 +3853,13 @@ AWOL_RESIDENCY_CITATIONS = [
         "id": "gs-handbook-residency-enrollment",
         "title": "Residency enrollment",
         "source": "Graduate Programs Student Handbook 2022-2023, p. 48",
-        "text": "Residency without subjects is for specified thesis, practicum, INC, comprehensive-exam, or publication work; students with remaining course units who will not enroll should file LOA.",
+        "text": "Residency without subjects is for specified thesis, practicum, comprehensive-exam, or publication work; students with remaining course units who will not enroll should file LOA.",
     },
 ]
 
 RESIDENCY_REASONS = [
     "Thesis / dissertation work",
     "Practicum / internship completion",
-    "Completing an INC",
     "Comprehensive examination",
     "Awaiting research publication",
 ]
@@ -4150,14 +4128,10 @@ def awol_policy_review(student: Student, request_data: dict | None = None) -> di
         reason = (request_data.get("residency_reason") or "").strip()
         records = CourseRecord.query.filter_by(student_id=student.id).all()
         active_subjects = [item for item in records if item.status in {"Enrolled", "Current"}]
-        incomplete_subjects = [item for item in records if item.status == "Incomplete"]
         audit = compute_course_audit(student)
         reason_supported = False
         reason_detail = "Choose the work the student will continue during residency."
-        if reason == "Completing an INC":
-            reason_supported = bool(incomplete_subjects)
-            reason_detail = f"{len(incomplete_subjects)} incomplete subject(s) are recorded."
-        elif reason == "Comprehensive examination":
+        if reason == "Comprehensive examination":
             reason_supported = student.current_stage == "Comprehensive Exam"
             reason_detail = f"Current lifecycle stage: {student.current_stage}."
         elif reason == "Awaiting research publication":
@@ -5428,7 +5402,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/dashboard")
     @require_api_login("staff")
     def dashboard():
-        sync_overdue_incomplete_alerts(commit=True)
         sync_automatic_awol_statuses(commit=True)
         return jsonify(dashboard_stats(request.args))
 
@@ -5530,7 +5503,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/students/<int:student_id>")
     @require_api_login("staff", "academic_coordinator")
     def student_detail(student_id: int):
-        sync_overdue_incomplete_alerts(commit=True)
         student = Student.query.get_or_404(student_id)
         audit = compute_course_audit(student)
         research_case, research_progress = sync_research_progress(student)
@@ -5664,7 +5636,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/student-portal/context")
     @require_api_login("student")
     def student_portal_context():
-        sync_overdue_incomplete_alerts(commit=True)
         sync_automatic_awol_statuses(commit=True)
         account = current_account()
         student_id = account.student_id if account else None
@@ -6130,7 +6101,6 @@ def register_routes(app: Flask) -> None:
             record.term_label = term.label
             record.grade_value = None
             record.grade_status = "No Grade"
-            record.incomplete_deadline = None
             record.evidence_reference = "Student self-service enrollment"
             record.remarks = "Checked as currently enrolled by the student."
             record.updated_at = now_utc()
@@ -7066,7 +7036,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/tasks")
     @require_api_login(*BACKOFFICE_ROLES)
     def tasks_list():
-        sync_overdue_incomplete_alerts(commit=True)
         owner = request.args.get("owner", "").strip()
         status = request.args.get("status", "").strip()
         query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
@@ -7092,7 +7061,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports")
     @require_api_login("staff", "academic_coordinator")
     def reports():
-        sync_overdue_incomplete_alerts(commit=True)
         return jsonify(reports_payload(request.args))
 
     # Changes made in this system that the Registrar must mirror in AIMS.
@@ -8186,7 +8154,6 @@ def register_routes(app: Flask) -> None:
                 record.status = "Missing"
                 record.grade_value = None
                 record.grade_status = "No Grade"
-                record.incomplete_deadline = None
                 record.resolved_at = None
                 record.remarks = (
                     f"Enrollment cancelled for {term.label}. "
@@ -8243,7 +8210,6 @@ def register_routes(app: Flask) -> None:
             record.evidence_reference = "Enrollment synchronization"
             record.grade_value = None
             record.grade_status = "No Grade"
-            record.incomplete_deadline = None
             record.resolved_at = None
             record.remarks = (
                 f"Enrolled through {source_reference}."
@@ -9545,7 +9511,7 @@ def register_routes(app: Flask) -> None:
         students = []
         active_term = get_active_term()
         active_term_label = active_term.label if active_term else ""
-        class_statuses = {"Enrolled", "Current", "Completed", "Incomplete", "Retake Required", "Failed"}
+        class_statuses = {"Enrolled", "Current", "Completed", "Failed"}
         for rec, s in rows:
             record_term_label = rec.term_label or (active_term_label if rec.status in class_statuses else "")
             in_selected_term = not term_filter or record_term_label == term_filter
@@ -9556,7 +9522,6 @@ def register_routes(app: Flask) -> None:
                 "completed": status == "Completed", "term_label": record_term_label if in_selected_term else term_filter,
                 "grade_value": (rec.grade_value or "") if in_selected_term else "",
                 "grade_status": (rec.grade_status or "No Grade") if in_selected_term else "No Grade",
-                "incomplete_deadline": rec.incomplete_deadline.isoformat() if in_selected_term and rec.incomplete_deadline else "",
                 "remarks": (rec.remarks or "") if in_selected_term else "",
             })
         return jsonify({
@@ -9577,149 +9542,6 @@ def register_routes(app: Flask) -> None:
             "monitoring_url": "/monitoring-sheet",
         }), 409
 
-        # Retained below temporarily for migration reference; this branch is
-        # intentionally unreachable in the USLS deployment.
-        data = request.get_json(silent=True) or {}
-        course = Course.query.get_or_404(int(data.get("course_id") or 0))
-        completions = data.get("completions") or {}
-        status_updates = data.get("statuses") or data.get("status_updates") or {}
-        grades = data.get("grades") or {}
-        grade_statuses = data.get("grade_statuses") or {}
-        deadlines = data.get("incomplete_deadlines") or {}
-        remarks = data.get("remarks") or {}
-        active_term = get_active_term()
-        term = (data.get("term") or "").strip() or (active_term.label if active_term else "")
-        account = current_account()
-        actor = f"Academic Coordinator · {account.full_name}" if account else "Academic Coordinator"
-        allowed_statuses = {"Completed", "Current", "Enrolled", "Incomplete", "Retake Required", "Missing", "Failed"}
-        changed = 0
-        changed_students: set[int] = set()
-        status_counts: dict[str, int] = {}
-
-        if status_updates:
-            updates = status_updates.items()
-        else:
-            updates = ((sid, "Completed" if done else "Missing") for sid, done in completions.items())
-
-        for sid_str, new_status in updates:
-            try:
-                sid = int(sid_str)
-            except (TypeError, ValueError):
-                return jsonify({"error": f"Invalid student id: {sid_str}."}), 400
-            if new_status not in allowed_statuses:
-                return jsonify({"error": f"Invalid course status for student {sid}: {new_status}."}), 400
-            rec = CourseRecord.query.filter_by(student_id=sid, course_id=course.id).first()
-            if not rec:
-                student = Student.query.get(sid)
-                if not student:
-                    return jsonify({"error": f"Student {sid} was not found."}), 400
-                rec = CourseRecord(student_id=sid, course_id=course.id)
-                db.session.add(rec)
-            else:
-                student = Student.query.get(sid)
-                if not student:
-                    return jsonify({"error": f"Student {sid} was not found."}), 400
-            previous = rec.status
-            previous_grade = rec.grade_value or ""
-            previous_grade_status = rec.grade_status or "No Grade"
-            previous_deadline = rec.incomplete_deadline
-            previous_remarks = rec.remarks or ""
-            rec.status = new_status
-            rec.updated_at = now_utc()
-            rec.evidence_reference = "Course audit update"
-            if term:
-                rec.term_label = term
-            grade_value = str(grades.get(sid_str, grades.get(sid, rec.grade_value or "")) or "").strip()
-            rec.grade_value = grade_value or None
-            explicit_grade_status = str(grade_statuses.get(sid_str, grade_statuses.get(sid, "")) or "").strip()
-            if new_status == "Completed":
-                rec.grade_status = explicit_grade_status or "Passed"
-                rec.resolved_at = rec.resolved_at or now_utc()
-                rec.incomplete_deadline = None
-                if previous == "Incomplete":
-                    for task in Task.query.filter(
-                        Task.student_id == student.id,
-                        Task.title == f"Resolve incomplete grade for {course.code}",
-                        Task.status.in_(["Pending", "Overdue"]),
-                    ).all():
-                        task.status = "Done"
-            elif new_status == "Incomplete":
-                rec.grade_status = "Incomplete"
-                deadline_value = str(deadlines.get(sid_str, deadlines.get(sid, "")) or "").strip()
-                if deadline_value:
-                    try:
-                        rec.incomplete_deadline = parse_date(deadline_value)
-                    except ValueError:
-                        return jsonify({"error": f"Invalid incomplete deadline for {student.name}. Use YYYY-MM-DD."}), 400
-                if not rec.incomplete_deadline:
-                    rec.incomplete_deadline = date.today() + timedelta(days=365)
-                ensure_task(student.id, f"Resolve incomplete grade for {course.code}", "Academic Coordinator", rec.incomplete_deadline, 55)
-            elif new_status == "Failed":
-                rec.grade_status = "Failed"
-                rec.resolved_at = rec.resolved_at or now_utc()
-                rec.incomplete_deadline = None
-            else:
-                rec.grade_status = explicit_grade_status or ("No Grade" if new_status in {"Current", "Enrolled", "Missing"} else rec.grade_status or "No Grade")
-                if new_status in {"Current", "Enrolled", "Missing"}:
-                    rec.resolved_at = None
-            rec.remarks = str(remarks.get(sid_str, remarks.get(sid, rec.remarks or "")) or "").strip() or None
-            sync_subject_enrollment_from_course_record(
-                student,
-                course,
-                rec.term_label,
-                new_status,
-                f"Course audit {term}".strip(),
-            )
-            if (
-                rec.status == previous
-                and (rec.grade_value or "") == previous_grade
-                and (rec.grade_status or "No Grade") == previous_grade_status
-                and rec.incomplete_deadline == previous_deadline
-                and (rec.remarks or "") == previous_remarks
-            ):
-                continue
-            if new_status == "Incomplete" and (previous != "Incomplete" or rec.incomplete_deadline != previous_deadline):
-                workflow_message_record(
-                    "course-audit", student, current_account(), "Student",
-                    f"Incomplete grade recorded for {course.code}",
-                    f"Complete the remaining course requirements by {rec.incomplete_deadline.isoformat()}. Contact the Graduate School or your Academic Coordinator if you need clarification.",
-                    "notice", previous or "No Grade", "Incomplete", status="Sent",
-                )
-            elif new_status == "Completed" and previous == "Incomplete":
-                workflow_message_record(
-                    "course-audit", student, current_account(), "Student",
-                    f"Incomplete grade resolved for {course.code}",
-                    f"Your final grade is {rec.grade_value or 'recorded'} and the incomplete deadline has been cleared.",
-                    "notice", "Incomplete", "Completed", status="Sent",
-                )
-            changed += 1
-            changed_students.add(student.id)
-            status_counts[new_status] = status_counts.get(new_status, 0) + 1
-            audit = compute_course_audit(student)
-            compre = comprehensive_exam_eligibility(student)
-            if compre["eligible"] and student.current_stage in ("Admission", "Coursework"):
-                student.current_stage = "Comprehensive Exam"
-            recompute_risk(student)
-            add_log("course-audit", sid, actor, f"Course audit {term}".strip(),
-                    f"{course.code} marked {new_status}",
-                    "Academic Coordinator", f"End-of-semester course audit for {course.code}.")
-        if changed:
-            sync_overdue_incomplete_alerts()
-            status_summary = ", ".join(f"{status}: {count}" for status, count in sorted(status_counts.items()))
-            add_log(
-                "course-audit",
-                None,
-                actor,
-                "Course audit summary",
-                f"{course.code} audit saved: {changed} record(s) updated",
-                "Academic Coordinator",
-                f"{len(changed_students)} student(s) affected. Status changes: {status_summary}.",
-            )
-        db.session.commit()
-        return jsonify({
-            "ok": True, "course": course.code, "updated": changed,
-            "message": f"Saved {course.code} audit — {changed} student record(s) updated.",
-        })
 
     @app.route("/api/monitoring/subject-status", methods=["POST"])
     @require_api_login("academic_coordinator", "staff")
@@ -9734,143 +9556,6 @@ def register_routes(app: Flask) -> None:
             "read_only": True,
         }), 409
 
-        # Retained temporarily as migration reference. This branch is intentionally
-        # unreachable now that source workflows own every status change.
-        data = request_payload()
-        student = Student.query.get_or_404(safe_int(data.get("student_id")))
-        course = Course.query.get_or_404(safe_int(data.get("course_id")))
-        if course.program_id != student.program_id:
-            return jsonify({"error": "The subject does not belong to the student's program."}), 400
-
-        aliases = {"Current": "Enrolled"}
-        requested_status = str(data.get("status") or "").strip()
-        if requested_status == "Withdrawn":
-            return jsonify({
-                "error": "Use the subject-withdrawal workflow to record an official withdrawal."
-            }), 409
-        new_status = aliases.get(requested_status, requested_status)
-        if new_status not in MONITORING_SUBJECT_STATUSES:
-            return jsonify({
-                "error": "Choose Enrolled, Taken, Incomplete, Failed, or Dropped."
-            }), 400
-
-        source_reference = str(data.get("source_reference") or "").strip()
-        note = str(data.get("note") or "").strip()
-        if not source_reference:
-            return jsonify({"error": "Enter the source or reference for this status update."}), 400
-        if len(source_reference) > 160:
-            return jsonify({"error": "The source or reference must be 160 characters or fewer."}), 400
-        if not note:
-            return jsonify({"error": "Enter a note explaining the status update."}), 400
-
-        term_id = safe_int(data.get("term_id"))
-        term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
-        if not term:
-            return jsonify({"error": "Choose an academic semester for this status update."}), 400
-
-        record = CourseRecord.query.filter_by(
-            student_id=student.id,
-            course_id=course.id,
-        ).first()
-        enrollment = SubjectEnrollment.query.filter_by(
-            student_id=student.id,
-            course_id=course.id,
-            term_id=term.id,
-        ).first()
-        if not enrollment:
-            return jsonify({
-                "error": (
-                    f"{student.name} has no {course.code} enrollment for {term.label}. "
-                    "Use Enrollment to add the student first."
-                )
-            }), 409
-
-        previous_status = enrollment.status or "Enrolled"
-        expected_status = str(data.get("expected_status") or "").strip()
-        if expected_status and expected_status != previous_status:
-            return jsonify({
-                "error": (
-                    f"This cell changed from {expected_status} to {previous_status} while you were editing. "
-                    "Reload the sheet and review the latest status."
-                )
-            }), 409
-        if previous_status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
-            return jsonify({
-                "error": (
-                    f"{course.code} is already in the terminal {previous_status} state for {term.label}. "
-                    "Flag a discrepancy instead of overwriting its history."
-                )
-            }), 409
-
-        effective_date = None
-        if new_status == "Dropped":
-            raw_effective_date = str(data.get("effective_date") or "").strip()
-            if not raw_effective_date:
-                return jsonify({"error": "Enter the effective date for the dropped subject."}), 400
-            try:
-                effective_date = parse_date(raw_effective_date)
-            except ValueError:
-                return jsonify({"error": "Invalid effective date. Use YYYY-MM-DD."}), 400
-
-        if new_status == previous_status:
-            return jsonify({
-                "ok": True,
-                "updated": False,
-                "student_id": student.id,
-                "course_id": course.id,
-                "status": previous_status,
-                "message": f"{course.code} is already marked {previous_status}.",
-            })
-
-        # SubjectEnrollment is the term-scoped operational layer. CourseRecord and
-        # every grade field remain the official/imported layer and are not mutated.
-        enrollment.status = new_status
-        enrollment.source_reference = source_reference
-        enrollment.updated_at = now_utc()
-        enrollment.cancelled_at = (
-            datetime.combine(effective_date, time.min) if effective_date else None
-        )
-        if new_status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
-            ensure_term_enrollment(student, term, "Enrolled", source_reference)
-
-        account = current_account()
-        actor = workflow_actor_label(account) if account else "Graduate School Staff"
-        display_status = {"Current": "Enrolled"}
-        audit_note = note
-        if effective_date:
-            audit_note += f" Effective date: {effective_date.isoformat()}."
-        add_log(
-            "monitoring-status",
-            student.id,
-            actor,
-            source_reference,
-            (
-                f"{course.code} monitoring status changed from "
-                f"{display_status.get(previous_status, previous_status)} to "
-                f"{display_status.get(new_status, new_status)}"
-            ),
-            "Academic Coordinator",
-            audit_note + " Official grade fields were unchanged.",
-            previous_status=previous_status,
-            new_status=new_status,
-            visibility="internal",
-        )
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "updated": True,
-            "student_id": student.id,
-            "course_id": course.id,
-            "status": new_status,
-            "subject_enrollment_id": enrollment.id,
-            "term_label": term.label,
-            "grade_value": (record.grade_value or "") if record else "",
-            "grade_status": (record.grade_status or "No Grade") if record else "No Grade",
-            "message": (
-                f"{student.name}'s {course.code} monitoring status is now "
-                f"{display_status.get(new_status, new_status)}. Official grade data was not changed."
-            ),
-        })
 
     @app.route("/api/monitoring/class-list")
     @require_api_login("staff", "academic_coordinator")
@@ -10405,7 +10090,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/decision-support")
     @require_api_login("staff")
     def decision_support():
-        sync_overdue_incomplete_alerts(commit=True)
         return jsonify(portfolio_recommendations())
 
     # RAG-style policy/case guidance endpoint.
@@ -13441,7 +13125,7 @@ def duplicate_student_groups(limit: int = 12) -> list[dict]:
 
 
 def status_rank(status: str | None) -> int:
-    ranks = {"Completed": 6, "Current": 5, "Enrolled": 5, "Incomplete": 4, "Retake Required": 3, "Failed": 3, "Missing": 1}
+    ranks = {"Completed": 6, "Current": 5, "Enrolled": 5, "Failed": 3, "Missing": 1}
     return ranks.get(status or "", 0)
 
 
@@ -13658,97 +13342,6 @@ def ensure_task(student_id: int, title: str, owner: str, due_at: date, priority:
     db.session.add(task)
     return task
 
-
-def sync_overdue_incomplete_alerts(commit: bool = False) -> int:
-    """Apply the handbook INC lapse rule after the one-year completion deadline."""
-    today = date.today()
-    changed = 0
-    records = (
-        CourseRecord.query.join(Student)
-        .join(Course)
-        .filter(
-            CourseRecord.status == "Incomplete",
-            CourseRecord.incomplete_deadline.isnot(None),
-            CourseRecord.incomplete_deadline < today,
-        )
-        .all()
-    )
-    for record in records:
-        if not record.student or not record.course:
-            continue
-        deadline = record.incomplete_deadline
-        limits = residence_limits(record.student)
-        lapse_grade = "2.0" if limits["program_level"] == "Doctorate" else "3.0"
-        review_title = f"Arrange retake after lapsed INC for {record.course.code}"
-        ensure_task(record.student_id, review_title, "Academic Coordinator", today, 75, "Pending")
-        note = (
-            f"{record.course.code} incomplete deadline passed on {deadline.isoformat()}. "
-            f"The handbook lapse grade {lapse_grade} was recorded with no graduate credit; the subject must be retaken."
-        )
-        if note not in (record.remarks or ""):
-            record.remarks = f"{record.remarks}\n{note}".strip() if record.remarks else note
-            changed += 1
-        record.status = "Retake Required"
-        record.grade_value = lapse_grade
-        record.grade_status = "No Credit - Retake Required"
-        record.resolved_at = record.resolved_at or now_utc()
-        record.incomplete_deadline = None
-        record.updated_at = now_utc()
-        sync_subject_enrollment_from_course_record(
-            record.student,
-            record.course,
-            record.term_label,
-            "Retake Required",
-            "Incomplete grade deadline monitor",
-        )
-        changed += 1
-        result = f"{record.course.code} incomplete deadline lapsed to retake required"
-        already_logged = TransactionLog.query.filter_by(
-            transaction_slug="course-audit",
-            student_id=record.student_id,
-            source_reference="Incomplete grade deadline monitor",
-            result=result,
-        ).first()
-        if not already_logged:
-            add_log(
-                "course-audit",
-                record.student_id,
-                "System",
-                "Incomplete grade deadline monitor",
-                result,
-                "Academic Coordinator",
-                note,
-                previous_status="Incomplete",
-                new_status="Retake Required",
-            )
-            workflow_message_record(
-                "course-audit", record.student, None, "Student",
-                f"Incomplete deadline passed for {record.course.code}",
-                note, "notice", "Incomplete", "Retake Required", status="Sent",
-            )
-            changed += 1
-    if commit and changed:
-        db.session.commit()
-    return changed
-
-
-def start_incomplete_deadline_scheduler():
-    """Run the INC deadline sweep independently of page/API access for the local app."""
-    interval = max(30, int(os.getenv("INCOMPLETE_SWEEP_INTERVAL_SECONDS", "300")))
-    stopped = threading.Event()
-
-    def sweep_loop():
-        while not stopped.wait(interval):
-            with app.app_context():
-                try:
-                    sync_overdue_incomplete_alerts(commit=True)
-                except Exception as exc:  # noqa: BLE001 - keep the scheduler alive and roll back the failed sweep
-                    db.session.rollback()
-                    print(f"Incomplete deadline sweep failed: {exc}", file=sys.stderr)
-
-    thread = threading.Thread(target=sweep_loop, name="incomplete-deadline-scheduler", daemon=True)
-    thread.start()
-    return stopped, thread
 
 
 # ---------------------------------------------------------------------------
@@ -18118,7 +17711,7 @@ def compute_course_audit(student: Student) -> dict:
             cat["completed_units"] += units
         elif status in ["Current", "Enrolled"]:
             current.append(row)
-        elif status in ["Incomplete", "Retake Required", "Failed"]:
+        elif status == "Failed":
             incomplete.append(row)
         else:
             missing.append(row)
@@ -18505,9 +18098,7 @@ def subject_needs_report_payload(
     """Build the AC's missing-subject report from official and operational status layers.
 
     Completed and currently enrolled subjects are excluded from offering need.
-    Failed/retake-required subjects are counted as demand. Incomplete subjects are
-    shown separately because they still have a completion path and should not be
-    treated as a re-enrollment need until that status is resolved.
+    All other recorded outcomes count as subject demand.
     """
     students = (
         Student.query.filter_by(
@@ -18533,8 +18124,6 @@ def subject_needs_report_payload(
                     "units": course.units or 3,
                 },
                 "not_taken": [],
-                "retake_required": [],
-                "pending_incomplete": [],
             }
         return rows_by_course[course.id]
 
@@ -18575,16 +18164,8 @@ def subject_needs_report_payload(
             status = operational_status or official_status
             if status in {"Current", "Enrolled"}:
                 continue
-            if status == "Incomplete":
-                bucket = "pending_incomplete"
-                reason = "Incomplete — resolve first"
-            elif status in {"Failed", "Retake Required"}:
-                bucket = "retake_required"
-                reason = "Retake required"
-            else:
-                bucket = "not_taken"
-                reason = status if status in {"Dropped", "Withdrawn"} else "Not taken"
-            report_row(course)[bucket].append({
+            reason = status if status in {"Dropped", "Withdrawn", "Failed"} else "Not taken"
+            report_row(course)["not_taken"].append({
                 **student_brief(student),
                 "status": status or "Missing",
                 "reason": reason,
@@ -18592,19 +18173,15 @@ def subject_needs_report_payload(
 
     rows = []
     for item in rows_by_course.values():
-        students_needing = item["not_taken"] + item["retake_required"]
+        students_needing = item["not_taken"]
         rows.append({
             "course": item["course"],
             "need_count": len(students_needing),
             "not_taken_count": len(item["not_taken"]),
-            "retake_required_count": len(item["retake_required"]),
-            "pending_incomplete_count": len(item["pending_incomplete"]),
             "students": students_needing,
-            "pending_incomplete_students": item["pending_incomplete"],
         })
     rows.sort(key=lambda row: (
         -row["need_count"],
-        -row["pending_incomplete_count"],
         row["course"]["code"],
     ))
     return {
@@ -18614,14 +18191,12 @@ def subject_needs_report_payload(
         "basis": (
             "Active monitored students in the selected program. Official completion and "
             "the latest semester enrollment status are considered. Completed, taken, and "
-            "current subjects are excluded; failed/retake-required subjects count as need, "
-            "while incomplete subjects are listed separately for resolution."
+            "current subjects are excluded; all other subjects count as offering need."
         ),
         "summary": {
             "students_reviewed": len(students),
             "subjects_with_need": sum(1 for row in rows if row["need_count"] > 0),
             "student_subject_needs": sum(row["need_count"] for row in rows),
-            "pending_incomplete": sum(row["pending_incomplete_count"] for row in rows),
         },
         "rows": rows,
     }
@@ -19351,7 +18926,6 @@ def ensure_course_workflow_schema() -> None:
         additions = {
             "grade_value": "VARCHAR(40)",
             "grade_status": "VARCHAR(40) DEFAULT 'No Grade'",
-            "incomplete_deadline": "DATE",
             "resolved_at": "DATETIME",
             "remarks": "TEXT",
         }
@@ -20606,7 +20180,6 @@ def seed_bianca_mendoza_enrollment() -> None:
         record.evidence_reference = source_reference
         record.grade_value = None
         record.grade_status = "No Grade"
-        record.incomplete_deadline = None
         record.resolved_at = None
         record.remarks = "Current enrollment populated for the DBA demo student."
         record.updated_at = now_utc()
@@ -21015,7 +20588,6 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             record.term_label = record.term_label or "AY 2025-2026 2nd Semester"
             record.evidence_reference = "Workflow demo prerequisite baseline"
             record.resolved_at = record.resolved_at or now_utc()
-        record.incomplete_deadline = None
         record.updated_at = now_utc()
 
     # Subject withdrawal begins while the student is active in one selected
@@ -21399,7 +20971,7 @@ def ensure_miguel_yu_research_demo_unlock() -> int:
             record.status = "Completed"
             record.updated_at = now_utc()
             changed += 1
-        if record.grade_status in {None, "", "No Grade", "Incomplete", "Failed"}:
+        if record.grade_status in {None, "", "No Grade", "Failed"}:
             record.grade_status = "Passed"
             changed += 1
 
@@ -21695,14 +21267,12 @@ if __name__ == "__main__":
         ensure_workflow_activity_schema()
         sync_result = sync_all_curricula()
         ensure_subject_enrollment_schema()
-        sync_overdue_incomplete_alerts(commit=False)
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         if sync_result["created"]:
             print(f"Added {sync_result['created']} missing curriculum row(s) for {sync_result['students']} student(s).")
 
     port = int(os.getenv("FLASK_PORT", "5000"))
-    start_incomplete_deadline_scheduler()
     if (
         os.getenv("RAG_PREWARM", "1").strip().lower() not in {"0", "false", "no"}
         and (os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
