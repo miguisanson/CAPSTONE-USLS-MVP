@@ -73,6 +73,15 @@ export const api = {
     const qs = queryString(params);
     return request(`/reports${qs ? `?${qs}` : ""}`);
   },
+  dailyChanges: (date = "") => {
+    const qs = queryString({ date });
+    return request(`/reports/daily-changes${qs ? `?${qs}` : ""}`);
+  },
+  markChangeReflected: (logId, reflected) =>
+    request(`/reports/daily-changes/${logId}/reflected`, {
+      method: "PATCH",
+      body: JSON.stringify({ reflected }),
+    }),
   exportGraduationCsv: async (reviewWindow = "", endorsementIds = []) => {
     const res = await fetch(`${BASE}/graduation/endorsed.csv`, {
       method: "POST",
@@ -246,6 +255,10 @@ export const api = {
   flagMonitoringIssue: (studentId, payload = {}) =>
     request(`/students/${studentId}/flag-issue`, { method: "POST", body: JSON.stringify(payload) }),
   monitoringFlags: (studentId) => request(`/students/${studentId}/flags`),
+  monitoringConflicts: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/monitoring/conflicts${qs ? `?${qs}` : ""}`);
+  },
   resolveMonitoringFlag: (studentId, flagId, payload = {}) =>
     request(`/students/${studentId}/flags/${flagId}/resolve`, {
       method: "POST",

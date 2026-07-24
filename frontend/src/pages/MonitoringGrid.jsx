@@ -43,7 +43,7 @@ export default function MonitoringGrid() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [flagStudent, setFlagStudent] = useState(null);
-  const [flagForm, setFlagForm] = useState({ category: "", note: "" });
+  const [flagForm, setFlagForm] = useState({ category: "", note: "", target_label: "" });
   const [flagBusy, setFlagBusy] = useState(false);
   const [flagError, setFlagError] = useState("");
   const [resolvingFlagId, setResolvingFlagId] = useState(null);
@@ -91,7 +91,7 @@ export default function MonitoringGrid() {
 
   function openFlagDialog(student) {
     setFlagStudent(student);
-    setFlagForm({ category: "", note: "" });
+    setFlagForm({ category: "", note: "", target_label: "" });
     setFlagError("");
     setResolvingFlagId(null);
     setResolutionNote("");
@@ -106,6 +106,8 @@ export default function MonitoringGrid() {
       await api.flagMonitoringIssue(flagStudent.id, {
         category: flagForm.category,
         note: flagForm.note,
+        target_kind: flagForm.target_label ? "Subject" : "Whole record",
+        target_label: flagForm.target_label,
       });
       load(programId);
       setFlagStudent(null);
@@ -421,7 +423,7 @@ export default function MonitoringGrid() {
                   {(flagStudent.flags || []).filter((item) => item.status === "Open").map((item) => (
                     <div key={item.id} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <div><p className="text-sm font-semibold text-amber-950">{item.category}</p><p className="mt-1 text-sm text-amber-900">{item.note}</p><p className="mt-2 text-xs text-amber-700">{item.source} · {item.created_by}</p></div>
+                        <div><p className="text-sm font-semibold text-amber-950">{item.category}</p><p className="mt-0.5 text-xs font-medium text-amber-800">On: {item.target_label || "Whole record"}</p><p className="mt-1 text-sm text-amber-900">{item.note}</p><p className="mt-2 text-xs text-amber-700">{item.source} · {item.created_by}</p></div>
                         <StatusBadge value="Open" dot={false} />
                       </div>
                       {resolvingFlagId === item.id ? (
@@ -446,6 +448,13 @@ export default function MonitoringGrid() {
                   <h3 className="text-sm font-semibold text-ink">Add a manual flag</h3>
                   <p className="mt-1 text-xs leading-relaxed text-slate-500">Choose what is being flagged and record the observation. Source-correctable flags can close automatically after a clean monitoring upload.</p>
                 </div>
+                <label className="block">
+                  <span className="field-label">What is this flag about?</span>
+                  <select className="field-input mt-1 cursor-pointer" value={flagForm.target_label} onChange={(event) => setFlagForm((current) => ({ ...current, target_label: event.target.value }))}>
+                    <option value="">Whole record</option>
+                    {flatCourses.map((course) => <option key={course.id} value={`${course.code} — ${course.title}`}>{course.code} — {course.title}</option>)}
+                  </select>
+                </label>
                 <label className="block">
                   <span className="field-label">Flag category</span>
                   <select className="field-input mt-1 cursor-pointer" value={flagForm.category} onChange={(event) => setFlagForm((current) => ({ ...current, category: event.target.value }))} required>

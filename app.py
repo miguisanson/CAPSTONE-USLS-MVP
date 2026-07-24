@@ -606,6 +606,9 @@ class StudentMonitoringFlag(db.Model):
     note = db.Column(db.Text, nullable=False)
     source = db.Column(db.String(30), nullable=False, default="Manual")
     source_reference = db.Column(db.String(220))
+    # What the flag points at: "Whole record" or a specific subject/field.
+    target_kind = db.Column(db.String(30), nullable=False, default="Whole record")
+    target_label = db.Column(db.String(160))
     status = db.Column(db.String(30), nullable=False, default="Open")
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
     resolved_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
@@ -973,6 +976,10 @@ class TransactionLog(db.Model):
     previous_status = db.Column(db.String(100))
     new_status = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=now_utc)
+    # Daily change report: whether this change has been mirrored into AIMS.
+    reflected_in_aims = db.Column(db.Boolean, nullable=False, default=False)
+    reflected_at = db.Column(db.DateTime)
+    reflected_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
 
 
 # ---------------------------------------------------------------------------
@@ -1037,7 +1044,6 @@ def term_dict(term: AcademicTerm, active: AcademicTerm | None = None) -> dict:
         "end_date": iso(term.end_date),
         "planning_window_open": iso(term.planning_window_open),
         "planning_window_close": iso(term.planning_window_close),
-        "grade_submission_deadline": iso(term.grade_submission_deadline),
         "status": term.status,
         "is_active_planning_term": bool(term.is_active_planning_term),
         "relative_label": term_relative_label(term, active),
@@ -1089,27 +1095,6 @@ def course_audit_subject_items() -> list[dict]:
         {"id": course.id, "code": course.code, "title": course.title, "program_id": course.program_id, "enrolled": counts[course.id]}
         for course in Course.query.order_by(Course.code).all() if counts.get(course.id)
     ]
-
-
-def faculty_grade_alerts() -> list[dict]:
-    """Deadline reminders; after five days the same item is flagged for AC escalation."""
-    today = date.today()
-    alerts = []
-    for term in AcademicTerm.query.filter(AcademicTerm.grade_submission_deadline.isnot(None)).all():
-        missing = CourseRecord.query.filter(
-            CourseRecord.term_label == term.label,
-            CourseRecord.status.in_(["Current", "Enrolled"]),
-            or_(CourseRecord.grade_value.is_(None), CourseRecord.grade_value == ""),
-        ).count()
-        if not missing:
-            continue
-        days_late = max((today - term.grade_submission_deadline).days, 0)
-        alerts.append({
-            "term_label": term.label, "deadline": iso(term.grade_submission_deadline),
-            "missing_grades": missing, "days_late": days_late,
-            "coordinator_escalated": days_late >= 5,
-        })
-    return alerts
 
 
 # Academic calendar is semester-based: two semesters per academic year (not trimester).
@@ -3927,6 +3912,8 @@ def monitoring_flag_dict(item: StudentMonitoringFlag) -> dict:
         "note": item.note,
         "source": item.source,
         "source_reference": item.source_reference,
+        "target_kind": item.target_kind or "Whole record",
+        "target_label": item.target_label,
         "status": item.status,
         "created_by": item.created_by.full_name if item.created_by else "Workflow System",
         "resolved_by": item.resolved_by.full_name if item.resolved_by else None,
@@ -3944,13 +3931,17 @@ def ensure_monitoring_flag(
     *,
     source: str,
     source_reference: str = "",
+    target_kind: str = "Whole record",
+    target_label: str | None = None,
     account: UserAccount | None = None,
 ) -> tuple[StudentMonitoringFlag, bool]:
+    target_label = (target_label or "").strip() or None
     existing = (
         StudentMonitoringFlag.query.filter_by(
             student_id=student.id,
             category=category,
             status="Open",
+            target_label=target_label,
         )
         .order_by(StudentMonitoringFlag.created_at.desc(), StudentMonitoringFlag.id.desc())
         .first()
@@ -3963,6 +3954,8 @@ def ensure_monitoring_flag(
         note=note.strip(),
         source=source,
         source_reference=source_reference.strip() or None,
+        target_kind=(target_kind or "Whole record").strip() or "Whole record",
+        target_label=target_label,
         created_by_user_id=account.id if account else None,
         status="Open",
     )
@@ -5315,7 +5308,6 @@ def register_routes(app: Flask) -> None:
                 end_date=parse_api_date(data.get("end_date")),
                 planning_window_open=parse_api_date(data.get("planning_window_open")),
                 planning_window_close=parse_api_date(data.get("planning_window_close")),
-                grade_submission_deadline=parse_api_date(data.get("grade_submission_deadline")),
                 status=(data.get("status") or "").strip() or None,
             )
         except ValueError as exc:
@@ -5339,7 +5331,7 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "Semester label must look like AY 2026-2027 1st Semester."}), 400
             term.label = label
         try:
-            for field in ["start_date", "end_date", "planning_window_open", "planning_window_close", "grade_submission_deadline"]:
+            for field in ["start_date", "end_date", "planning_window_open", "planning_window_close"]:
                 if field in data:
                     setattr(term, field, parse_api_date(data.get(field)))
         except ValueError as exc:
@@ -7098,10 +7090,89 @@ def register_routes(app: Flask) -> None:
         return jsonify({"items": [log_dict(l) for l in logs]})
 
     @app.route("/api/reports")
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def reports():
         sync_overdue_incomplete_alerts(commit=True)
         return jsonify(reports_payload(request.args))
+
+    # Changes made in this system that the Registrar must mirror in AIMS.
+    REGISTRAR_CHANGE_SLUGS = (
+        "enrollment", "withdrawal", "course-adjustments",
+        "leave-of-absence", "readmission", "awol", "graduation",
+    )
+    CHANGE_TYPE_LABELS = {
+        "enrollment": "Enrollment / subject change",
+        "withdrawal": "Subject withdrawal",
+        "course-adjustments": "Course offering / adjustment",
+        "leave-of-absence": "Leave of absence",
+        "readmission": "Readmission",
+        "awol": "AWOL / residency",
+        "graduation": "Graduation",
+    }
+
+    @app.route("/api/reports/daily-changes")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_daily_changes():
+        # A dated list of every change the Registrar needs to apply in AIMS,
+        # so the coordinator can update the official system manually.
+        raw = (request.args.get("date") or "").strip()
+        try:
+            target = parse_date(raw) if raw else date.today()
+        except ValueError:
+            return jsonify({"error": "Use a valid date (YYYY-MM-DD)."}), 400
+        rows = (
+            db.session.query(TransactionLog, Student)
+            .join(Student, Student.id == TransactionLog.student_id)
+            .filter(
+                func.date(TransactionLog.created_at) == target.isoformat(),
+                TransactionLog.transaction_slug.in_(REGISTRAR_CHANGE_SLUGS),
+            )
+            .order_by(TransactionLog.created_at.asc())
+            .all()
+        )
+        items = []
+        for log, student in rows:
+            items.append({
+                "id": log.id,
+                "time": iso(log.created_at),
+                "change_type": CHANGE_TYPE_LABELS.get(log.transaction_slug, log.transaction_slug),
+                "slug": log.transaction_slug,
+                "student_name": student.name,
+                "student_number": student.student_number,
+                "program_code": student.program.code if student.program else "",
+                "detail": log.result,
+                "previous_status": log.previous_status,
+                "new_status": log.new_status,
+                "actor": log.actor_role,
+                "reflected_in_aims": bool(log.reflected_in_aims),
+                "reflected_at": iso(log.reflected_at),
+            })
+        return jsonify({
+            "date": target.isoformat(),
+            "items": items,
+            "summary": {
+                "total": len(items),
+                "reflected": sum(1 for item in items if item["reflected_in_aims"]),
+                "pending": sum(1 for item in items if not item["reflected_in_aims"]),
+            },
+        })
+
+    @app.route("/api/reports/daily-changes/<int:log_id>/reflected", methods=["PATCH"])
+    @require_api_login("staff", "academic_coordinator")
+    def reports_daily_change_reflected(log_id: int):
+        log = TransactionLog.query.get_or_404(log_id)
+        data = request.get_json(silent=True) or {}
+        reflected = bool(data.get("reflected", True))
+        account = current_account()
+        log.reflected_in_aims = reflected
+        log.reflected_at = now_utc() if reflected else None
+        log.reflected_by_user_id = (account.id if account else None) if reflected else None
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "reflected_in_aims": reflected,
+            "reflected_at": iso(log.reflected_at),
+        })
 
     @app.route("/api/graduation/endorsed.csv", methods=["POST"])
     @require_api_login("dean")
@@ -7492,7 +7563,6 @@ def register_routes(app: Flask) -> None:
             "panel_count": len(panels),
             "terms": [term_dict(term) for term in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
             "subjects": course_audit_subject_items(),
-            "grade_alerts": faculty_grade_alerts(),
             "working_hours": faculty_working_hours(faculty),
             "availability": [
                 {
@@ -9938,12 +10008,20 @@ def register_routes(app: Flask) -> None:
         student = Student.query.get_or_404(student_id)
         category = (data.get("category") or "").strip()
         note = (data.get("note") or "").strip()
+        target_kind = (data.get("target_kind") or "Whole record").strip() or "Whole record"
+        target_label = (data.get("target_label") or "").strip() or None
         if category not in MONITORING_FLAG_CATEGORIES:
             return jsonify({"error": "Choose a valid flag category."}), 400
         if category == "AWOL policy alert":
             return jsonify({"error": "AWOL policy alerts are created automatically by the system."}), 400
         if not note:
             return jsonify({"error": "Enter the reason or observation for this flag."}), 400
+        # A flag targets either the whole record or a specific subject/field.
+        if target_kind not in ("Whole record", "Subject", "Field"):
+            return jsonify({"error": "Choose a valid flag target."}), 400
+        if target_kind != "Whole record" and not target_label:
+            return jsonify({"error": "Select the subject or field this flag is about."}), 400
+        target_text = target_label if target_kind != "Whole record" else "the whole record"
         account = current_account()
         actor = workflow_actor_label(account) if account else "Graduate School Staff"
         item, created = ensure_monitoring_flag(
@@ -9952,18 +10030,20 @@ def register_routes(app: Flask) -> None:
             note,
             source="Manual",
             source_reference="Monitoring Sheet",
+            target_kind=target_kind,
+            target_label=target_label,
             account=account,
         )
         if not created:
             return jsonify({
-                "error": f"{student.name} already has an open {category.lower()} flag. Resolve it before adding another."
+                "error": f"{student.name} already has an open {category.lower()} flag on {target_text}. Resolve it before adding another."
             }), 409
         add_log(
             "aims-discrepancy",
             student.id,
             actor,
             category,
-            f"{category} flagged for {student.name} ({student.student_number}).",
+            f"{category} flagged for {student.name} ({student.student_number}) on {target_text}.",
             "Academic Coordinator",
             note + "\nThe monitoring projection remains read-only; no official source value was changed.",
             visibility="internal",
@@ -10032,6 +10112,47 @@ def register_routes(app: Flask) -> None:
             "ok": True,
             "flag": monitoring_flag_dict(item),
             "message": "Flag resolved without editing the monitoring sheet.",
+        })
+
+    @app.route("/api/monitoring/conflicts")
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_conflicts():
+        # Consolidated view of every open flag/conflict across students so the
+        # Academic Coordinator can work through them in one place (Work Queue).
+        status_filter = (request.args.get("status") or "Open").strip()
+        query = StudentMonitoringFlag.query
+        if status_filter and status_filter != "All":
+            query = query.filter(StudentMonitoringFlag.status == status_filter)
+        rows = (
+            query.order_by(
+                StudentMonitoringFlag.status.asc(),
+                StudentMonitoringFlag.created_at.desc(),
+                StudentMonitoringFlag.id.desc(),
+            )
+            .all()
+        )
+        items = []
+        for flag in rows:
+            student = flag.student
+            record = monitoring_flag_dict(flag)
+            record.update({
+                "student_name": student.name if student else "",
+                "student_number": student.student_number if student else "",
+                "program_code": student.program.code if student and student.program else "",
+                # Source-correctable categories clear automatically on a corrected
+                # re-import; everything else needs coordinator supervision.
+                "auto_resolvable": flag.category in SOURCE_CORRECTABLE_FLAG_CATEGORIES,
+                "system_generated": (flag.source or "Manual") != "Manual",
+            })
+            items.append(record)
+        open_items = [item for item in items if item["status"] == "Open"]
+        return jsonify({
+            "items": items,
+            "summary": {
+                "open_total": len(open_items),
+                "auto_resolvable": sum(1 for item in open_items if item["auto_resolvable"]),
+                "needs_action": sum(1 for item in open_items if not item["auto_resolvable"]),
+            },
         })
 
     @app.route("/api/students/<int:student_id>/remove", methods=["POST"])
@@ -18774,6 +18895,22 @@ def ensure_schedule_request_schema() -> None:
     db.session.commit()
 
 
+def ensure_monitoring_flag_schema() -> None:
+    """Add subject/field targeting columns to the flag table without dropping data."""
+    inspector = inspect(db.engine)
+    if "student_monitoring_flag" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("student_monitoring_flag")}
+    additions = {
+        "target_kind": "VARCHAR(30) NOT NULL DEFAULT 'Whole record'",
+        "target_label": "VARCHAR(160)",
+    }
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE student_monitoring_flag ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+
+
 def ensure_monitoring_upload_schema() -> None:
     """Create the additive upload-history table for existing MVP databases."""
     MonitoringSheetUpload.__table__.create(bind=db.engine, checkfirst=True)
@@ -18956,6 +19093,10 @@ def ensure_workflow_activity_schema() -> None:
         "actor_user_id": "INTEGER",
         "action_type": "VARCHAR(40)",
         "visibility": "VARCHAR(30)",
+        # Daily change report: track which changes have been mirrored into AIMS.
+        "reflected_in_aims": "BOOLEAN NOT NULL DEFAULT 0",
+        "reflected_at": "DATETIME",
+        "reflected_by_user_id": "INTEGER",
     }
     for name, sql_type in additions.items():
         if name not in existing:
@@ -21514,6 +21655,7 @@ with app.app_context():
         db.session.commit()
     ensure_schedule_request_schema()
     ensure_monitoring_upload_schema()
+    ensure_monitoring_flag_schema()
     ensure_awol_structured_request_schema()
     ensure_student_comprehensive_exam_schema()
     ensure_student_monitoring_columns_schema()

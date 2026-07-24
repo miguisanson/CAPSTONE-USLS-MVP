@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { AlertTriangle, Download, FileText, GraduationCap, ListTodo, ClipboardCheck, Briefcase, LogOut, Activity, FlaskConical } from "lucide-react";
+import { AlertTriangle, Download, FileText, GraduationCap, ListTodo, ClipboardCheck, Briefcase, LogOut, Activity, FlaskConical, RefreshCw, Printer, CheckSquare, Square } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from "../components/ui";
+import { printDataTable } from "../lib/print";
 
 const REPORT_TABS = [
   { id: "summary", label: "Dashboard summary", icon: FileText },
+  { id: "daily_changes", label: "Daily changes (Registrar)", icon: RefreshCw },
   { id: "graduation_candidates", label: "Graduation candidates", icon: GraduationCap },
   { id: "missing_requirements", label: "Missing requirements", icon: ClipboardCheck },
   { id: "practicum_monitoring", label: "Practicum monitoring", icon: Briefcase },
@@ -71,7 +73,7 @@ export default function Reports() {
         {REPORT_TABS.map((tab) => {
           const Icon = tab.icon;
           const selected = activeTab.id === tab.id;
-          const count = tab.id === "summary" ? null : data?.[tab.id]?.count || 0;
+          const count = (tab.id === "summary" || tab.id === "daily_changes") ? null : data?.[tab.id]?.count || 0;
           return (
             <button
               key={tab.id}
@@ -87,14 +89,18 @@ export default function Reports() {
         })}
       </div>
 
-      <Card className="p-5">
-        <SectionTitle
-          title={activeTab.label}
-          icon={activeTab.icon}
-          action={active !== "summary" && rows.length ? <button type="button" onClick={() => exportCsv(active, rows)} className="btn-ghost"><Download className="h-4 w-4" /> Export CSV</button> : null}
-        />
-        {active === "summary" ? <SummaryReport summary={data.summary} /> : <ReportTable type={active} rows={rows} />}
-      </Card>
+      {active === "daily_changes" ? (
+        <DailyChangesReport />
+      ) : (
+        <Card className="p-5">
+          <SectionTitle
+            title={activeTab.label}
+            icon={activeTab.icon}
+            action={active !== "summary" && rows.length ? <button type="button" onClick={() => exportCsv(active, rows)} className="btn-ghost"><Download className="h-4 w-4" /> Export CSV</button> : null}
+          />
+          {active === "summary" ? <SummaryReport summary={data.summary} /> : <ReportTable type={active} rows={rows} />}
+        </Card>
+      )}
     </div>
   );
 }
@@ -293,6 +299,172 @@ function ResearchTable({ rows }) {
       <td className="px-4 py-2.5"><StatusBadge value={row.case.status} dot={false} /></td>
     </tr>
   )} />;
+}
+
+function todayISO() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function DailyChangesReport() {
+  const [date, setDate] = useState(todayISO());
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState(null);
+
+  async function load(targetDate) {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.dailyChanges(targetDate);
+      setData(res);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load(date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  async function toggleReflected(item) {
+    setBusyId(item.id);
+    try {
+      const next = !item.reflected_in_aims;
+      await api.markChangeReflected(item.id, next);
+      setData((current) => ({
+        ...current,
+        items: current.items.map((row) => (row.id === item.id ? { ...row, reflected_in_aims: next } : row)),
+        summary: {
+          ...current.summary,
+          reflected: current.summary.reflected + (next ? 1 : -1),
+          pending: current.summary.pending + (next ? -1 : 1),
+        },
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const items = data?.items || [];
+  const summary = data?.summary || { total: 0, reflected: 0, pending: 0 };
+
+  function changeText(item) {
+    if (item.previous_status && item.new_status && item.previous_status !== item.new_status) {
+      return `${item.detail} (${item.previous_status} → ${item.new_status})`;
+    }
+    return item.detail;
+  }
+
+  function exportChangesCsv() {
+    const headers = ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Reflected in AIMS"];
+    const lines = [headers.join(",")];
+    items.forEach((item) => {
+      lines.push([
+        item.time, item.change_type, item.student_name, item.student_number,
+        item.program_code, changeText(item), item.actor, item.reflected_in_aims ? "Yes" : "No",
+      ].map(csvCell).join(","));
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `registrar-changes-${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function printChanges() {
+    printDataTable({
+      title: "Registrar update list — changes to apply in AIMS",
+      subtitle: `Date: ${date}`,
+      columns: ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Reflected"],
+      rows: items.map((item) => [
+        item.time ? new Date(item.time).toLocaleTimeString() : "",
+        item.change_type, item.student_name, item.student_number, item.program_code,
+        changeText(item), item.actor, item.reflected_in_aims ? "Yes" : "No",
+      ]),
+    });
+  }
+
+  return (
+    <Card className="p-5">
+      <SectionTitle
+        title="Daily changes for the Registrar"
+        subtitle="Every change made in this system on the selected date. Use it to mirror updates into AIMS, then tick each one as reflected."
+        icon={RefreshCw}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="field-input max-w-44" aria-label="Change report date" />
+            <button type="button" onClick={exportChangesCsv} disabled={!items.length} className="btn-ghost cursor-pointer"><Download className="h-4 w-4" /> CSV</button>
+            <button type="button" onClick={printChanges} disabled={!items.length} className="btn-ghost cursor-pointer"><Printer className="h-4 w-4" /> Print</button>
+          </div>
+        }
+      />
+
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <MiniStat label="Changes today" value={summary.total} />
+        <MiniStat label="Reflected in AIMS" value={summary.reflected} tone="green" />
+        <MiniStat label="Pending" value={summary.pending} tone="amber" />
+      </div>
+
+      {error && <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">{error}</div>}
+
+      {loading ? (
+        <div className="mt-4"><Spinner label="Loading changes…" /></div>
+      ) : items.length === 0 ? (
+        <div className="mt-4"><EmptyState icon={FileText} title="No changes on this date" hint="Pick another date, or make changes in Enrollment, Withdrawal, or the standing-change workflows." /></div>
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-100">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                <th className="px-4 py-2.5">Time</th>
+                <th className="px-4 py-2.5">Change type</th>
+                <th className="px-4 py-2.5">Student</th>
+                <th className="px-4 py-2.5">Change</th>
+                <th className="px-4 py-2.5">By</th>
+                <th className="px-4 py-2.5 text-right">Reflected in AIMS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-slate-50 align-top">
+                  <td className="px-4 py-2.5 text-slate-500">{item.time ? new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                  <td className="px-4 py-2.5"><StatusBadge value={item.change_type} dot={false} /></td>
+                  <td className="px-4 py-2.5"><Link to={`/students/${item.student_id}`} className="font-semibold text-brand-700 hover:underline">{item.student_name}</Link><p className="text-xs text-slate-400">{item.student_number} · {item.program_code}</p></td>
+                  <td className="px-4 py-2.5 text-slate-600">{changeText(item)}</td>
+                  <td className="px-4 py-2.5 text-slate-500">{item.actor}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button type="button" onClick={() => toggleReflected(item)} disabled={busyId === item.id} className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors ${item.reflected_in_aims ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                      {item.reflected_in_aims ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                      {item.reflected_in_aims ? "Reflected" : "Mark reflected"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function MiniStat({ label, value, tone }) {
+  const tones = { green: "text-green-700", amber: "text-amber-700" };
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+      <p className={`font-display text-2xl font-semibold ${tones[tone] || "text-ink"}`}>{value}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
+    </div>
+  );
 }
 
 function exportCsv(type, rows) {
