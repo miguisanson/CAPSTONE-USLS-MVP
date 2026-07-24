@@ -100,7 +100,7 @@ export default function Students() {
               { value: "loa", label: "LOA" },
             ]} />
             <Select label="Stage" value={stage} onChange={setStage} options={meta?.stages || []} />
-            <Select label="Risk" value={risk} onChange={setRisk} options={["Low", "Medium", "High", "Critical", "Medium/High/Critical"]} />
+            <Select label="Risk" value={risk} onChange={setRisk} options={["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"]} />
             <Select label="Standing" value={standing} onChange={setStanding} options={["Active", "On Leave", "Withdrawn", "Completed"]} />
             <Select
               label="Program"

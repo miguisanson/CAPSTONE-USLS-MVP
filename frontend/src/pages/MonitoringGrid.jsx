@@ -73,7 +73,7 @@ export default function MonitoringGrid() {
   );
   const sortedStudents = useMemo(() => {
     const rows = [...(grid?.students || [])];
-    const riskRank = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+    const riskRank = { Delayed: 0, "At Risk of Delay": 1, "On Track": 2, "Not Yet Assessed": 3 };
     const nameKey = (student) => `${student.last_name || ""}, ${student.first_name || ""}`.toLowerCase();
     rows.sort((a, b) => {
       if (sortBy === "entry-newest") return (b.entry_year || 0) - (a.entry_year || 0) || nameKey(a).localeCompare(nameKey(b));
@@ -200,7 +200,7 @@ export default function MonitoringGrid() {
             {(grid?.terms || meta?.terms || []).map((term) => <option key={term.id} value={term.id}>{term.label}{term.relative_label ? ` (${term.relative_label})` : ""}</option>)}
           </select>
           <select value={progress} onChange={(e) => updateFilters({ progress: e.target.value })} className="field-input cursor-pointer" aria-label="Progress"><option value="">All progress</option><option value="not-started">Not started</option><option value="in-progress">In progress</option><option value="complete">All subjects complete</option><option value="units-complete">Eligible for compre</option></select>
-          <select value={risk} onChange={(e) => updateFilters({ risk: e.target.value })} className="field-input cursor-pointer" aria-label="Risk"><option value="">All risk</option>{["Low", "Medium", "High", "Critical", "Medium/High/Critical"].map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          <select value={risk} onChange={(e) => updateFilters({ risk: e.target.value })} className="field-input cursor-pointer" aria-label="Risk"><option value="">All risk</option>{["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"].map((item) => <option key={item} value={item}>{item}</option>)}</select>
           <select value={enrollment} onChange={(e) => updateFilters({ enrollment: e.target.value })} className="field-input cursor-pointer" aria-label="Enrollment status"><option value="">All enrollment</option><option value="LOA">LOA</option><option value="AWOL">AWOL</option><option value="LOA/AWOL">LOA or AWOL</option><option value="Enrolled">Enrolled</option><option value="Withdrawn">Withdrawn</option></select>
           <select value={sortBy} onChange={(e) => updateFilters({ sort: e.target.value })} className="field-input cursor-pointer" aria-label="Sort monitoring sheet"><option value="name">Sort: Last name</option><option value="entry-newest">Sort: AY Entry newest</option><option value="entry-oldest">Sort: AY Entry oldest</option><option value="completed-desc">Sort: Completed subjects most</option><option value="completed-asc">Sort: Completed subjects least</option><option value="units-desc">Sort: Completed units most</option><option value="risk">Sort: Highest risk</option></select>
           <button type="button" onClick={exportCsv} className="btn-ghost" disabled={!grid}><Download className="h-4 w-4" /> Export CSV</button>

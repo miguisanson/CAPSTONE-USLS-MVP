@@ -58,7 +58,7 @@
           </div>
           <div>
             <dt>Attention</dt>
-            <dd><span class="risk {{ context.selected_student.risk_level|lower }}">{{ context.selected_student.risk_level }}</span></dd>
+            <dd><span class="risk {{ context.selected_student.risk_level|lower|replace(' ', '-') }}">{{ context.selected_student.risk_level }}</span></dd>
           </div>
         </dl>
       {% else %}

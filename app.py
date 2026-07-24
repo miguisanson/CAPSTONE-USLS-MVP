@@ -326,7 +326,7 @@ class Student(db.Model):
     # Current-term enrollment tag (per AC notes): Enrolled / LOA / AWOL / Completed.
     enrollment_tag = db.Column(db.String(20), nullable=False, default="Enrolled")
     comprehensive_exam_status = db.Column(db.String(30), nullable=False, default="Not Taken")
-    risk_level = db.Column(db.String(20), nullable=False, default="Low")
+    risk_level = db.Column(db.String(20), nullable=False, default="Not Yet Assessed")
     adviser_name = db.Column(db.String(120))
     monitoring_new_student = db.Column(db.Boolean, nullable=False, default=False)
     monitoring_imported_at = db.Column(db.DateTime)
@@ -3420,8 +3420,8 @@ def student_priority(student: Student) -> dict:
     """A student's overall priority = the highest-scoring recommendation. Keeps the
     student record consistent with the Decision Support queue."""
     # Checklist items 11/74: a newly admitted student has not accumulated the signals
-    # the risk model needs, so it must NOT default to Medium/Low. It is "Not Yet
-    # Assessed" until verified indicators exist.
+    # the risk model needs, so it remains "Not Yet Assessed" until verified
+    # indicators exist.
     has_coursework = CourseRecord.query.filter(
         CourseRecord.student_id == student.id,
         CourseRecord.status.in_(["Completed", "Failed", "Current", "Enrolled"]),
@@ -3429,16 +3429,6 @@ def student_priority(student: Student) -> dict:
     if student.current_stage == "Admission" and not has_coursework:
         return {"level": "Not Yet Assessed", "score": 0, "reason": "Newly admitted — not yet assessed for risk (insufficient data)"}
     return student_delay_assessment(student)
-
-    recs = student_recommendations(student)["recommendations"]
-    if not recs:
-        return {"level": "Low", "score": 0, "reason": "On track — no flagged actions"}
-    top = recs[0]
-    return {
-        "level": band_from_score(top["score"]).capitalize(),
-        "score": top["score"],
-        "reason": top["trigger"],
-    }
 
 
 def recompute_risk(student: Student) -> None:
@@ -4040,7 +4030,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
         student.standing = "AWOL"
         student.current_stage = "AWOL"
         student.enrollment_tag = "AWOL"
-        student.risk_level = "Critical"
+        recompute_risk(student)
         student.updated_at = now_utc()
         _, flag_created = ensure_monitoring_flag(
             student,
@@ -9297,10 +9287,8 @@ def register_routes(app: Flask) -> None:
                     student.standing = "On Leave"
                     student.current_stage = "LOA"
                     student.enrollment_tag = "LOA"
-                    student.risk_level = "Medium"
                     result, new_status, next_owner = "LOA approved by Dean", "Approved", "Student"
                 elif decision == "deny":
-                    student.risk_level = "Medium"
                     result, new_status, next_owner = "LOA denied by Dean", "Denied", "Graduate School Staff"
                 elif decision == "return":
                     result, new_status, next_owner = "LOA returned by Dean for revision", "Returned for Revision", "Student"
@@ -9314,11 +9302,9 @@ def register_routes(app: Flask) -> None:
                     student.standing = "Active"
                     student.current_stage = "Coursework"
                     student.enrollment_tag = "Not Enrolled"
-                    student.risk_level = "Low"
                     result, new_status, next_owner = "Readmission approved by Dean", "Approved", "Academic Coordinator"
                     add_task(student.id, "Review readmitted student study plan and enrollment", "Academic Coordinator", 5, 45)
                 elif decision == "deny":
-                    student.risk_level = "Medium"
                     result, new_status, next_owner = "Readmission denied by Dean", "Denied", "Graduate School Staff"
                 elif decision == "return":
                     result, new_status, next_owner = "Readmission returned by Dean for revision", "Returned for Revision", "Student"
@@ -9327,6 +9313,7 @@ def register_routes(app: Flask) -> None:
                     return jsonify({"error": "Readmission decisions must be approve, deny, or return."}), 400
                 detail = f"Return semester: {return_semester or 'Not recorded'}."
 
+            recompute_risk(student)
             resolve_standing_change_tasks(student.id, "Decide", "Dean")
             workflow_message_record(
                 case_type, student, account, "Student", result,
@@ -9353,7 +9340,6 @@ def register_routes(app: Flask) -> None:
                     item.status = "Re-enrollment Required"
                     item.dean_decision = "Approved for Re-enrollment Review"
                     result = "AWOL return endorsed by Dean for full re-enrollment review"
-                    student.risk_level = "Critical"
                     add_task(student.id, "Re-evaluate courses after maximum residence", "Academic Coordinator", 7, 80)
                 elif item.refresher_required:
                     item.status = "Extension Approved - Refresher Required"
@@ -9362,7 +9348,6 @@ def register_routes(app: Flask) -> None:
                     student.standing = "Active"
                     student.current_stage = "Coursework"
                     student.enrollment_tag = "Not Enrolled"
-                    student.risk_level = "High"
                     add_task(student.id, "Review graded 6-unit refresher enrollment", "Academic Coordinator", 7, 75)
                 else:
                     item.status = "Return Approved"
@@ -9371,7 +9356,6 @@ def register_routes(app: Flask) -> None:
                     student.standing = "Active"
                     student.current_stage = "Coursework"
                     student.enrollment_tag = "Not Enrolled"
-                    student.risk_level = "Medium"
                     add_task(student.id, "Review AWOL return study plan and enrollment", "Academic Coordinator", 5, 45)
                 next_owner = "Academic Coordinator"
             elif decision == "deny":
@@ -9390,6 +9374,7 @@ def register_routes(app: Flask) -> None:
                 add_task(student.id, "Revise structured return declaration from AWOL", "Student", 5, 55)
             else:
                 return jsonify({"error": "AWOL return decisions must be approve, deny, or return."}), 400
+            recompute_risk(student)
             item.decided_at = now_utc()
             item.updated_at = now_utc()
             if decision == "approve" and student.enrollment_tag != "AWOL":
@@ -14157,7 +14142,7 @@ def handle_student_handoff(data: MultiDict) -> int:
         entry_year=int(data.get("entry_year") or date.today().year),
         current_stage="Admission",
         standing="Active",
-        risk_level="Medium" if missing_items else "Low",
+        risk_level="Not Yet Assessed",
     )
     db.session.add(student)
     db.session.flush()
@@ -14387,7 +14372,7 @@ def handle_course_audit(data: MultiDict) -> int:
     audit = compute_course_audit(student)
     if audit["missing_count"] > 0:
         add_task(student.id, "Resolve missing curriculum subjects", "Academic Coordinator", 7, 25)
-        student.risk_level = "Medium" if audit["missing_count"] >= 3 else student.risk_level
+        recompute_risk(student)
     if comprehensive_exam_eligibility(student)["eligible"] and student.current_stage in ("Admission", "Coursework"):
         student.current_stage = "Comprehensive Exam"
 
@@ -14517,8 +14502,8 @@ def handle_research_gate(data: MultiDict) -> int:
 
     if result in ["Missing Requirements", "Revisions Required", "Returned", "Pending Staff Action", "Pending Academic Coordinator Endorsement"]:
         add_task(student.id, f"Resolve {gate} requirements", next_owner, 5, 45)
-        student.risk_level = "High" if result == "Returned" else "Medium"
     sync_research_progress(student)
+    recompute_risk(student)
 
     add_log(
         "research-gate",
@@ -14872,7 +14857,7 @@ def handle_practicum(data: MultiDict) -> int:
         )
         transition_message_added = True
         add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
-        student.risk_level = "Medium"
+        recompute_risk(student)
         next_owner = "Student"
         record.completion_status = "Incomplete - additional evidence required"
     elif requested_status == "Not Accepted - New Organization Required":
@@ -14892,7 +14877,7 @@ def handle_practicum(data: MultiDict) -> int:
         )
         transition_message_added = True
         add_task(student.id, "Arrange another practicum organization and submit an updated MOA", "Student", 10, 55)
-        student.risk_level = "Medium"
+        recompute_risk(student)
         next_owner = "Student"
     elif requested_status == "Dean Reviewed":
         account = require_workflow_actor("dean")
@@ -19564,7 +19549,7 @@ def seed_maed_personas() -> None:
         daniel.standing = "Active"
         daniel.enrollment_tag = "Enrolled"
         daniel.comprehensive_exam_status = "Not Taken"
-        daniel.risk_level = "Low"
+        daniel.risk_level = "On Track"
         set_term_status(daniel, "Pending Enrollment")
 
     # 0002: early coursework is complete, but the next subjects remain unassigned.
@@ -19574,7 +19559,7 @@ def seed_maed_personas() -> None:
         grace.standing = "Active"
         grace.enrollment_tag = "Enrolled"
         grace.comprehensive_exam_status = "Not Taken"
-        grace.risk_level = "Low"
+        grace.risk_level = "On Track"
         set_term_status(grace, "Confirmed")
         if active_term:
             academic_year, semester = split_academic_term_label(active_term.label)
@@ -19599,7 +19584,7 @@ def seed_maed_personas() -> None:
         loa.current_stage = "Coursework"
         loa.standing = "Active"
         loa.enrollment_tag = "Enrolled"
-        loa.risk_level = "Medium"
+        loa.risk_level = "On Track"
         set_term_status(loa, "LOA Pending")
         if not TransactionLog.query.filter_by(
             student_id=loa.id,
@@ -19629,7 +19614,7 @@ def seed_maed_personas() -> None:
         miguel.standing = "Active"
         miguel.enrollment_tag = "Enrolled"
         miguel.comprehensive_exam_status = "Passed"
-        miguel.risk_level = "Low"
+        miguel.risk_level = "On Track"
         miguel.adviser_name = "Dr. Liwayway Bautista"
         set_term_status(miguel, "Confirmed")
         title = "Learning Analytics for Graduate Student Engagement"
@@ -19681,7 +19666,7 @@ def seed_maed_personas() -> None:
         returning.current_stage = "AWOL"
         returning.standing = "AWOL"
         returning.enrollment_tag = "AWOL"
-        returning.risk_level = "Critical"
+        returning.risk_level = "Delayed"
         set_term_status(returning, "AWOL")
         case = AwolCase.query.filter_by(student_id=returning.id).first()
         if not case:
@@ -19733,7 +19718,7 @@ def seed_maed_personas() -> None:
         withdrawal_student.current_stage = "Coursework"
         withdrawal_student.standing = "Active"
         withdrawal_student.enrollment_tag = "Enrolled"
-        withdrawal_student.risk_level = "Medium"
+        withdrawal_student.risk_level = "On Track"
         set_term_status(withdrawal_student, "Withdrawal Pending")
         application = WithdrawalApplication.query.filter_by(
             student_id=withdrawal_student.id,
@@ -19790,7 +19775,7 @@ def seed_maed_personas() -> None:
         isabel.current_stage = "Final Defense"
         isabel.standing = "Active"
         isabel.enrollment_tag = "Completed"
-        isabel.risk_level = "Low"
+        isabel.risk_level = "On Track"
         set_term_status(isabel, "Completed")
         seed_completed_research(
             isabel,
@@ -19882,7 +19867,7 @@ def seed_maed_personas() -> None:
         hector.current_stage = "Final Defense"
         hector.standing = "Active"
         hector.enrollment_tag = "Enrolled"
-        hector.risk_level = "Low"
+        hector.risk_level = "On Track"
         set_term_status(hector, "Practicum In Progress")
         seed_completed_research(
             hector,
@@ -19949,7 +19934,7 @@ def seed_maed_personas() -> None:
         readmission.current_stage = "LOA"
         readmission.standing = "On Leave"
         readmission.enrollment_tag = "LOA"
-        readmission.risk_level = "Medium"
+        readmission.risk_level = "On Track"
         set_term_status(readmission, "LOA")
         if not TransactionLog.query.filter_by(
             student_id=readmission.id,
@@ -19981,7 +19966,7 @@ def seed_maed_personas() -> None:
         declared_awol.current_stage = "AWOL"
         declared_awol.standing = "AWOL"
         declared_awol.enrollment_tag = "AWOL"
-        declared_awol.risk_level = "Critical"
+        declared_awol.risk_level = "Delayed"
         set_term_status(declared_awol, "AWOL")
         if not AwolCase.query.filter_by(student_id=declared_awol.id).first():
             db.session.add(AwolCase(
@@ -20015,7 +20000,7 @@ def seed_maed_personas() -> None:
         residency_student.standing = "Active"
         residency_student.enrollment_tag = "Residency"
         residency_student.comprehensive_exam_status = "Passed"
-        residency_student.risk_level = "Low"
+        residency_student.risk_level = "On Track"
         set_term_status(residency_student, "Residency")
         if not ResidencyEnrollment.query.filter_by(
             student_id=residency_student.id,
@@ -20535,7 +20520,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
         else "Final Defense"
     )
     student.comprehensive_exam_status = "Not Taken" if (is_withdrawal_demo or is_enrollment_demo or is_adjustments_demo or is_loa_demo) else "Passed"
-    student.risk_level = "Low"
+    student.risk_level = "Not Yet Assessed"
     student.adviser_name = student.adviser_name or "Dr. Liwayway Bautista"
     student.updated_at = now_utc()
 
@@ -20689,7 +20674,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             student.standing = "On Leave"
             student.current_stage = "LOA"
             student.enrollment_tag = "LOA"
-            student.risk_level = "Medium"
+            student.risk_level = "On Track"
             if active_term:
                 ensure_term_enrollment(student, active_term, "LOA", "Approved LOA demo standing")
         if is_handoff_demo:
@@ -20724,7 +20709,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             student.standing = "AWOL"
             student.current_stage = "AWOL"
             student.enrollment_tag = "AWOL"
-            student.risk_level = "Critical"
+            student.risk_level = "Delayed"
             item = (
                 AwolCase.query.filter_by(student_id=student.id)
                 .order_by(AwolCase.id.desc())
@@ -20912,19 +20897,19 @@ def normalize_immediate_standing_outcomes() -> int:
             student.standing = "AWOL"
             student.current_stage = "AWOL"
             student.enrollment_tag = "AWOL"
-            student.risk_level = "Critical"
+            student.risk_level = "Delayed"
         elif item.refresher_required:
             item.status = "Extension Approved - Refresher Required"
             student.standing = "Active"
             student.current_stage = "Coursework"
             student.enrollment_tag = "Not Enrolled"
-            student.risk_level = "High"
+            student.risk_level = "On Track"
         else:
             item.status = "Return Approved"
             student.standing = "Active"
             student.current_stage = "Coursework"
             student.enrollment_tag = "Not Enrolled"
-            student.risk_level = "Medium"
+            student.risk_level = "On Track"
         item.updated_at = now_utc()
         updated += 1
 

@@ -570,19 +570,24 @@ legend {
   font-weight: 850;
 }
 
-.risk.low {
+.risk.on-track {
   background: var(--green-soft);
   color: var(--green-dark);
 }
 
-.risk.medium {
+.risk.at-risk-of-delay {
   background: #fff7e6;
   color: var(--warning);
 }
 
-.risk.high {
+.risk.delayed {
   background: #fff1f0;
   color: var(--red);
+}
+
+.risk.not-yet-assessed {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .plain-list {

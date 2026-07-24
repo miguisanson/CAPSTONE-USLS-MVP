@@ -3,10 +3,10 @@
 
 const STATUS_STYLES = {
   // risk
-  Low: "bg-brand-50 text-brand-700 ring-brand-200",
-  Medium: "bg-amber-50 text-amber-700 ring-amber-200",
-  High: "bg-red-50 text-red-700 ring-red-200",
-  Critical: "bg-red-100 text-red-800 ring-red-300",
+  "On Track": "bg-brand-50 text-brand-700 ring-brand-200",
+  "At Risk of Delay": "bg-amber-50 text-amber-700 ring-amber-200",
+  Delayed: "bg-red-50 text-red-700 ring-red-200",
+  "Not Yet Assessed": "bg-slate-100 text-slate-600 ring-slate-200",
   // standing
   Active: "bg-brand-50 text-brand-700 ring-brand-200",
   "On Leave": "bg-amber-50 text-amber-700 ring-amber-200",
@@ -163,5 +163,10 @@ export const SEVERITY = {
 };
 
 export const CHART_COLORS = ["#0f7a44", "#1c9a59", "#3fb673", "#71d094", "#a6e4ba", "#138096", "#f59e0b", "#ef4444"];
-export const RISK_COLORS = { Low: "#1c9a59", Medium: "#f59e0b", High: "#ef4444", Critical: "#991b1b" };
+export const RISK_COLORS = {
+  "On Track": "#1c9a59",
+  "At Risk of Delay": "#f59e0b",
+  Delayed: "#ef4444",
+  "Not Yet Assessed": "#94a3b8",
+};
 export const SCHEDULE_COLORS = { Confirmed: "#0f7a44", "Needs Availability": "#f59e0b", Rescheduled: "#3b82f6" };

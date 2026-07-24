@@ -97,11 +97,11 @@ function DashboardFilters({ filters, meta, onChange, onClear }) {
         </FilterSelect>
         <FilterSelect label="Risk" value={filters.risk} onChange={(value) => onChange("risk", value)}>
           <option value="">All risk levels</option>
-          <option value="Low">Low</option>
-          <option value="Medium">Medium</option>
-          <option value="High">High</option>
-          <option value="Critical">Critical</option>
-          <option value="Medium/High/Critical">Medium/High/Critical</option>
+          <option value="On Track">On Track</option>
+          <option value="At Risk of Delay">At Risk of Delay</option>
+          <option value="Delayed">Delayed</option>
+          <option value="Not Yet Assessed">Not Yet Assessed</option>
+          <option value="At Risk of Delay/Delayed">At Risk of Delay/Delayed</option>
         </FilterSelect>
         <FilterSelect label="Standing" value={filters.standing} onChange={(value) => onChange("standing", value)}>
           <option value="">All standings</option>
@@ -203,7 +203,7 @@ export default function Dashboard() {
       {/* Primary KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Users} label="Students monitored" value={k.total_students} sub={`${k.active_students} active`} tone="brand" to="/students" />
-        <Kpi icon={AlertTriangle} label="Needing attention" value={k.at_risk} sub={`${k.high_risk} high or critical risk`} tone="amber" to="/students?risk=Medium/High/Critical" />
+        <Kpi icon={AlertTriangle} label="At risk or delayed" value={k.at_risk} sub={`${k.high_risk} delayed`} tone="amber" to="/students?risk=At Risk of Delay/Delayed" />
         <Kpi icon={ListTodo} label="Open tasks" value={k.pending_tasks} sub={`${k.overdue_tasks} overdue`} tone="red" to="/work-queue" />
         <Kpi icon={CalendarCheck} label="Confirmed defenses" value={k.confirmed_schedules} sub={`${k.needs_availability} awaiting availability`} tone="blue" to="/reports" />
       </div>
