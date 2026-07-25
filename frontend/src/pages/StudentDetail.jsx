@@ -243,6 +243,7 @@ export default function StudentDetail() {
                           <td className="px-3 py-2 text-slate-600">{item.term_label}</td>
                           <td className="px-3 py-2">
                             <StatusBadge value={item.status} dot={false} />
+                            {item.academic_record_effect && <p className="mt-1 text-xs font-semibold text-emerald-700">{item.academic_record_effect}</p>}
                           </td>
                         </tr>
                       ))}

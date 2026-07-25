@@ -65,6 +65,8 @@ const WORKFLOW_ROLE_LABELS = {
   staff: "Graduate School Staff",
   academic_coordinator: "Academic Coordinator",
   research_coordinator: "Research Coordinator",
+  dean: "Dean",
+  admin: "Administrator",
 };
 const GRADUATION_BATCH_MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -2388,8 +2390,11 @@ function useDemoCaseReset(slug, refetch) {
   const [resetError, setResetError] = useState("");
 
   async function resetCase(student) {
+    const removedData = slug === "withdrawal"
+      ? "structured withdrawal request, related tasks, and activity entries"
+      : `${slug} records, uploaded request PDFs, related tasks, and activity entries`;
     const confirmed = window.confirm(
-      `Reset the ${slug} demo case for ${student.name}?\n\nThis removes only this student's ${slug} records, uploaded request PDFs, related tasks, and activity entries. Academic and research source data are kept.`
+      `Reset the ${slug} demo case for ${student.name}?\n\nThis removes only this student's ${removedData}. Academic and research source data are kept.`
     );
     if (!confirmed) return;
     setResettingId(student.id);
@@ -2560,12 +2565,12 @@ const WORKFLOW_GUIDES = {
     final: "A decided return updates the student standing; residency remains a separate active, no-subject enrollment record.",
   },
   withdrawal: {
-    purpose: "Withdraws a student from one enrolled subject without changing the program standing or unrelated classes.",
-    submitter: "The student chooses an enrolled subject and submits the signed subject-withdrawal request with a reason.",
-    reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval immediately updates the selected subject.",
-    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Subject status update"],
+    purpose: "Withdraws a student from one enrolled subject before classes or during the first week, without changing program standing or unrelated classes.",
+    submitter: "The student chooses an eligible enrolled subject and states the reason for withdrawing. No PDF upload is required.",
+    reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval returns to GS Staff for Excel export and Registrar handoff.",
+    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Excel list export", "Registrar handoff", "Penalty-free subject removal"],
     incomplete: "A Dean denial closes this subject request and leaves every enrollment unchanged. Messages and action comments remain in the case history.",
-    final: "Completed means the selected subject is Withdrawn; the student's other subjects and program standing remain active.",
+    final: "Completed means the selected subject was removed with no grade or academic penalty; the student's other subjects and program standing remain active.",
   },
   practicum: {
     purpose: "Tracks the practicum MOA, placement, required hours, certificates, completion review, and Dean report for programs that require practicum.",
@@ -2580,7 +2585,7 @@ const WORKFLOW_GUIDES = {
     submitter: "Students may request readiness review, while GS Staff compiles the review window and candidate list.",
     reviewers: "The Academic Coordinator checks coursework, the Research Coordinator validates completion evidence, and the Dean approves the endorsement list.",
     stages: ["Candidate review", "Requirements checks", "Batch preparation", "Dean endorsement", "Endorsement export"],
-    incomplete: "A candidate can be returned individually or as part of a batch with the unresolved requirement clearly named.",
+    incomplete: "Unusual case: if GS Staff finds incorrect details in the student PDF, staff returns Step 1 with a visible message and can require a replacement document. The prior PDF remains in history and cannot be reused.",
     final: "Endorsed means the Dean-approved list was exported for the external graduation process.",
   },
 };
@@ -2649,6 +2654,7 @@ function WorkflowActivityList({ logs, collapsible = true }) {
 }
 
 function WorkflowMessageModal({ slug, row, context, replyTo = null, onClose, onSaved }) {
+  const { user } = useAuth();
   const student = row.student || row.endorsement?.student;
   const remarksOnly = ["practicum", "graduation"].includes(slug);
   const [form, setForm] = useState({
@@ -2658,10 +2664,19 @@ function WorkflowMessageModal({ slug, row, context, replyTo = null, onClose, onS
     template: remarksOnly ? "Remarks" : replyTo ? "Other / Custom comment" : context?.message_templates?.[0] || "Missing required document",
     comment: "",
     reply_to_message_id: replyTo?.id || null,
+    require_document_resubmission: false,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const commentRequired = remarksOnly || Boolean(replyTo) || form.action_type === "return" || form.template === "Other / Custom comment";
+  const canRequireGraduationDocument = (
+    !replyTo
+    && user?.role === "staff"
+    && slug === "graduation"
+    && form.action_type === "return"
+    && form.recipient_role === "Student"
+  );
+  const returningToStudent = !replyTo && form.action_type === "return" && form.recipient_role === "Student";
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
   async function save(event) {
@@ -2686,7 +2701,7 @@ function WorkflowMessageModal({ slug, row, context, replyTo = null, onClose, onS
       subtitle={`${student.name} · ${student.student_number}`}
       onClose={onClose}
       size={["practicum", "graduation"].includes(slug) ? "wide" : "default"}
-      footer={<button type="submit" form={`${slug}-message-form-${student.id}`} disabled={busy} className="btn-primary cursor-pointer px-4 py-2"><Send className="h-4 w-4" /> {busy ? "Saving…" : "Send message"}</button>}
+      footer={<button type="submit" form={`${slug}-message-form-${student.id}`} disabled={busy} className={`${returningToStudent ? "btn cursor-pointer bg-red-600 px-4 py-2 text-white hover:bg-red-700" : "btn-primary cursor-pointer px-4 py-2"}`}><Send className="h-4 w-4" /> {busy ? "Saving…" : returningToStudent ? "Return to student" : "Send message"}</button>}
     >
       <form id={`${slug}-message-form-${student.id}`} onSubmit={save} className="space-y-4">
         <ErrorNote message={error} />
@@ -2694,13 +2709,13 @@ function WorkflowMessageModal({ slug, row, context, replyTo = null, onClose, onS
         {!replyTo && <>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Action">
-            <select value={form.action_type} onChange={update("action_type")} className="field-input cursor-pointer">
+            <select value={form.action_type} onChange={(event) => setForm((current) => ({ ...current, action_type: event.target.value, require_document_resubmission: false }))} className="field-input cursor-pointer">
               <option value="return">Return for clarification</option>
               <option value="note">Send note to current reviewer</option>
             </select>
           </Field>
           <Field label="Recipient / next stage">
-            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal" }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean"]} />
+            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal", require_document_resubmission: event.target.value === "Student" ? current.require_document_resubmission : false }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean"]} />
           </Field>
         </div>
         <Field label="Visibility">
@@ -2713,6 +2728,20 @@ function WorkflowMessageModal({ slug, row, context, replyTo = null, onClose, onS
           <Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} />
         </Field>}
         </>}
+        {canRequireGraduationDocument && (
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${form.require_document_resubmission ? "border-red-300 bg-red-50" : "border-slate-200 bg-white hover:border-red-200 hover:bg-red-50/40"}`}>
+            <input
+              type="checkbox"
+              checked={form.require_document_resubmission}
+              onChange={(event) => setForm((current) => ({ ...current, require_document_resubmission: event.target.checked }))}
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 text-red-600 focus:ring-red-500"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-900">Have student resubmit document</span>
+              <span className="mt-1 block text-xs leading-relaxed text-slate-600">When checked, Graduation Step 1 is reset. The existing PDF stays in file history, but the student must upload a new PDF before resubmitting.</span>
+            </span>
+          </label>
+        )}
         <Field label={replyTo ? "Reply" : remarksOnly ? "Remarks" : form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"} required={commentRequired}>
           <Textarea value={form.comment} onChange={update("comment")} required={commentRequired} placeholder={remarksOnly ? "Type your remarks or message." : "Add the exact file, record, or detail that needs attention."} />
         </Field>
@@ -2884,17 +2913,33 @@ const GRADUATION_STAGE_ACTIONS = {
     nextOwner: "Dean",
     commentLabel: "Optional note to Dean",
   },
+  approve: {
+    id: "approve",
+    label: "Approve endorsement list",
+    movement: "Dean approval",
+    nextOwner: "Dean / Registrar export",
+    commentLabel: "Optional Dean comment",
+  },
+  return: {
+    id: "return",
+    label: "Return endorsement list for revision",
+    movement: "Dean → Graduate School Staff",
+    nextOwner: "Graduate School Staff",
+    requiresComment: true,
+    commentLabel: "Required revision reason",
+  },
 };
 
 function graduationStageActionForRow(row, accountRole) {
   const status = row.endorsement?.endorsement_status || "Not Prepared";
-  if (accountRole === "staff" && ["Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"].includes(status) && !row.endorsement?.batch_name) return GRADUATION_STAGE_ACTIONS.create_batch;
+  if (accountRole === "staff" && row.has_submitted_documents && ["Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"].includes(status) && !row.endorsement?.batch_name) return GRADUATION_STAGE_ACTIONS.create_batch;
   if (accountRole === "staff" && ["Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"].includes(status) && row.endorsement?.batch_name) return GRADUATION_STAGE_ACTIONS.compile_to_ac;
   if (accountRole === "academic_coordinator" && status === "Coursework Review") return GRADUATION_STAGE_ACTIONS.check_coursework;
   if (accountRole === "research_coordinator" && status === "Research Review") return GRADUATION_STAGE_ACTIONS.validate_research;
   if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return GRADUATION_STAGE_ACTIONS.mark_not_eligible;
   if (accountRole === "staff" && status === "Eligibility Confirmed") return GRADUATION_STAGE_ACTIONS.prepare_endorsement;
   if (accountRole === "staff" && ["Endorsement Prepared", "Returned for Revision"].includes(status)) return GRADUATION_STAGE_ACTIONS.send_to_dean;
+  if (accountRole === "dean" && status === "Ready for Dean Review") return GRADUATION_STAGE_ACTIONS.approve;
   return null;
 }
 
@@ -2946,82 +2991,67 @@ const GRADUATION_STAGE_AFTER_COMPILE = [
   "Practicum Incomplete", "Eligibility Confirmed", "Endorsement Prepared",
   "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Not Eligible",
 ];
-const GRADUATION_STAGE_AFTER_COURSEWORK = [
-  "Research Review", "Research Incomplete", "Practicum Incomplete", "Eligibility Confirmed",
-  "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved",
-];
 const GRADUATION_STAGE_AFTER_RESEARCH = [
   "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review",
   "Returned for Revision", "Dean Approved",
 ];
-const GRADUATION_STAGE_AFTER_PREPARATION = ["Endorsement Prepared", "Ready for Dean Review", "Dean Approved"];
 const GRADUATION_STAGE_AFTER_DEAN_HANDOFF = ["Ready for Dean Review", "Dean Approved"];
 const GRADUATION_STAGE_AFTER_DEAN_REVIEW = ["Dean Approved"];
 
 const GRADUATION_BATCH_STAGES = [
   {
-    label: "Compile graduation list",
-    detail: "GS Staff creates the candidate batch.",
-    currentStatuses: ["Not Prepared", "For Review", "Returned for Clarification"],
-    completeStatuses: GRADUATION_STAGE_AFTER_COMPILE,
+    label: "Student submits graduation application",
+    detail: "The signed application / review-window PDF is saved before the candidate can be selected.",
+    completeStatuses: GRADUATION_STATUS_PRIORITY.filter((status) => status !== "Not Prepared"),
   },
   {
-    label: "Send to Academic Coordinator",
-    detail: "Batch is available for coursework review.",
-    completeStatuses: GRADUATION_STAGE_AFTER_COMPILE,
+    label: "GS Staff creates graduation batch",
+    detail: "Application-submitted candidates are grouped by the selected cohort.",
+    completeStatuses: GRADUATION_STATUS_PRIORITY.filter((status) => status !== "Not Prepared"),
   },
   {
-    label: "Academic Coordinator checks course completion",
-    detail: "Coursework is reviewed for every candidate in the batch.",
+    label: "GS Staff forwards batch for coursework review",
+    detail: "The created batch is sent to the Academic Coordinator.",
+    currentStatuses: ["For Review"],
+    completeStatuses: GRADUATION_STAGE_AFTER_COMPILE,
+    attentionStatuses: ["Returned for Clarification"],
+  },
+  {
+    label: "Academic Coordinator reviews coursework",
+    detail: "Completed curriculum requirements are revalidated for every candidate.",
     currentStatuses: ["Coursework Review"],
-    completeStatuses: GRADUATION_STAGE_AFTER_COURSEWORK,
+    completeStatuses: [
+      "Research Review", "Research Incomplete", "Practicum Incomplete", "Eligibility Confirmed",
+      "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved",
+    ],
     attentionStatuses: ["Coursework Incomplete", "Not Eligible"],
   },
   {
-    label: "Send course completion to Research Coordinator",
-    detail: "Candidates with complete coursework move to research validation.",
-    completeStatuses: GRADUATION_STAGE_AFTER_COURSEWORK,
-    attentionStatuses: ["Coursework Incomplete", "Not Eligible"],
-  },
-  {
-    label: "Research Coordinator validates research requirements",
-    detail: "Research, post-defense files, and related completion evidence are checked.",
+    label: "Research Coordinator validates research and practicum",
+    detail: "Research, post-defense evidence, and any required practicum completion are revalidated.",
     currentStatuses: ["Research Review"],
     completeStatuses: GRADUATION_STAGE_AFTER_RESEARCH,
     attentionStatuses: ["Research Incomplete", "Practicum Incomplete", "Not Eligible"],
   },
   {
-    label: "Send validation back to GS Staff",
-    detail: "Validated candidates return to GS Staff for endorsement preparation.",
-    completeStatuses: GRADUATION_STAGE_AFTER_RESEARCH,
-    attentionStatuses: ["Research Incomplete", "Practicum Incomplete", "Not Eligible"],
-  },
-  {
-    label: "Prepare endorsement list",
-    detail: "GS Staff prepares the batch endorsement list.",
-    currentStatuses: ["Eligibility Confirmed", "Returned for Revision"],
-    completeStatuses: GRADUATION_STAGE_AFTER_PREPARATION,
-    attentionStatuses: ["Not Eligible"],
-  },
-  {
-    label: "Send endorsement list to Dean",
-    detail: "Prepared or revised endorsement list is sent to the Dean.",
-    currentStatuses: ["Endorsement Prepared", "Returned for Revision"],
+    label: "GS Staff prepares and forwards endorsement",
+    detail: "Validated candidates are prepared as an endorsement list and sent to the Dean.",
+    currentStatuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"],
     completeStatuses: GRADUATION_STAGE_AFTER_DEAN_HANDOFF,
-    attentionStatuses: ["Not Eligible"],
+    attentionStatuses: ["Returned for Revision", "Not Eligible"],
   },
   {
-    label: "Dean reviews endorsement list",
-    detail: "Dean approves the batch or returns it for revision.",
+    label: "Dean reviews graduation batch",
+    detail: "The Dean approves the endorsement list or returns it to GS Staff for revision.",
     currentStatuses: ["Ready for Dean Review"],
     completeStatuses: GRADUATION_STAGE_AFTER_DEAN_REVIEW,
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
   },
   {
-    label: "Export endorsed list",
-    detail: "Dean-approved candidates are available as an external-process export.",
+    label: "Export Dean-approved list",
+    detail: "The approved candidates are ready for the recorded external Registrar export.",
     currentStatuses: ["Dean Approved"],
-    completeStatuses: ["Dean Approved"],
+    completeStatuses: [],
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
   },
 ];
@@ -3289,7 +3319,7 @@ function GraduationRequirementBoxes({ row }) {
     "Eligible for graduation",
   ];
   return (
-    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Completed graduation requirements">
+    <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Completed graduation requirements">
       {items.map((label) => (
         <div key={label} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900">
           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><CheckCircle2 className="h-3.5 w-3.5" /></span>
@@ -3342,15 +3372,26 @@ function GraduationResearchRequirementsView({ row }) {
   );
 }
 
-function GraduationBatchModal({ rows, accountRole, onClose, onSaved }) {
+function GraduationBatchModal({ rows, accountRole, reviewWindows, defaultReviewWindow, onClose, onSaved }) {
   const selection = graduationStageSelection(rows, accountRole);
-  const action = selection.action;
+  const stageAction = selection.action;
   const defaultBatch = defaultGraduationBatchForm(rows);
+  const activeReviewWindow = defaultReviewWindow || reviewWindows[0] || "";
+  const selectedReviewWindow = activeReviewWindow;
+  const reviewWindowOptions = reviewWindows.map((schoolYear) => ({
+    value: schoolYear,
+    label: schoolYear === activeReviewWindow ? `${schoolYear} — Current school year` : `${schoolYear} — Not currently open`,
+    disabled: schoolYear !== activeReviewWindow,
+  }));
   const [form, setForm] = useState({
     comment: "",
-    review_window: rows.find((row) => row.endorsement?.review_window)?.endorsement?.review_window || "AY 2026-2027 Graduation Review",
+    review_window: selectedReviewWindow,
     ...defaultBatch,
   });
+  const [deanActionId, setDeanActionId] = useState("approve");
+  const action = accountRole === "dean" && stageAction?.id === "approve"
+    ? GRADUATION_STAGE_ACTIONS[deanActionId]
+    : stageAction;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
@@ -3405,6 +3446,22 @@ function GraduationBatchModal({ rows, accountRole, onClose, onSaved }) {
     >
       <form id="graduation-batch-form" onSubmit={confirm} className="space-y-4">
         <ErrorNote message={error} />
+        {accountRole === "dean" && stageAction?.id === "approve" && (
+          <Field label="Dean decision" required>
+            <Select
+              value={deanActionId}
+              onChange={(event) => {
+                setDeanActionId(event.target.value);
+                setForm((current) => ({ ...current, comment: "" }));
+              }}
+              options={[
+                { value: "approve", label: "Approve endorsement list" },
+                { value: "return", label: "Return endorsement list for revision" },
+              ]}
+              placeholder=""
+            />
+          </Field>
+        )}
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Selected action</p>
           {action ? (
@@ -3422,7 +3479,7 @@ function GraduationBatchModal({ rows, accountRole, onClose, onSaved }) {
               <Field label="Batch No."><Input value={form.batch_no} onChange={update("batch_no")} inputMode="numeric" required /></Field>
               <Field label="Month"><select value={form.batch_month} onChange={update("batch_month")} className="field-input cursor-pointer">{GRADUATION_BATCH_MONTHS.map((month) => <option key={month}>{month}</option>)}</select></Field>
               <Field label="Year"><Input value={form.batch_year} onChange={update("batch_year")} inputMode="numeric" required /></Field>
-              <Field label="Review window"><Input value={form.review_window} onChange={update("review_window")} /></Field>
+              <Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} can be selected.`}><Select value={form.review_window} onChange={update("review_window")} options={reviewWindowOptions} placeholder="" required /></Field>
             </div>
             <p className="text-sm font-semibold text-brand-800">Batch label: {batchName}</p>
           </div>
@@ -3468,18 +3525,55 @@ const WITHDRAWAL_BOARD_COLUMNS = [
   { label: "Submitted", statuses: ["Submitted to GS Staff"] },
   { label: "Dean Review", statuses: ["Dean Review"] },
   { label: "Returned for Clarification", statuses: ["Returned", "Returned for Clarification"] },
-  { label: "Approved / Applied", statuses: ["Withdrawn Confirmed"] },
+  { label: "Subject Tagging", statuses: ["Approved - Awaiting Subject Tag", "Approved - Registrar Preparation"] },
+  { label: "Registrar Preparation", statuses: ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send"] },
+  { label: "Sent to Registrar", statuses: ["Sent to Registrar", "Withdrawn Confirmed"] },
   { label: "Rejected / Cancelled", statuses: ["Denied", "Cancelled"] },
 ];
 
 const GRADUATION_BOARD_COLUMNS = [
-  { label: "New / Submitted", statuses: ["Not Prepared", "For Review"] },
-  { label: "Coursework Review", statuses: ["Coursework Review", "Coursework Incomplete"] },
-  { label: "Research / Practicum Review", statuses: ["Research Review", "Research Incomplete", "Practicum Incomplete"] },
-  { label: "Preparation", statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"] },
-  { label: "Dean Review", statuses: ["Ready for Dean Review"] },
-  { label: "Approved / Exported", statuses: ["Dean Approved"] },
-  { label: "Returned / Not Eligible", statuses: ["Not Eligible", "Returned for Clarification"] },
+  {
+    label: "3 · Graduation Batch Created",
+    description: "Application-submitted candidates are now grouped and ready for GS Staff to forward for coursework review.",
+    statuses: ["For Review"],
+    empty: "No newly created batches are waiting for GS Staff routing.",
+  },
+  {
+    label: "4 · Academic Coordinator Coursework Review",
+    description: "The Academic Coordinator verifies completed curriculum requirements for each candidate in the batch.",
+    statuses: ["Coursework Review"],
+    empty: "No batches are waiting for coursework review.",
+  },
+  {
+    label: "5 · Research and Practicum Validation",
+    description: "The Research Coordinator validates research, defense, completion evidence, and required practicum completion.",
+    statuses: ["Research Review"],
+    empty: "No batches are waiting for research and practicum validation.",
+  },
+  {
+    label: "6 · Endorsement Preparation or Revision",
+    description: "Validated batches return to GS Staff for endorsement preparation or Dean-requested revision.",
+    statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"],
+    empty: "No batches are waiting for endorsement preparation or revision.",
+  },
+  {
+    label: "7 · Dean Review",
+    description: "Prepared endorsement batches await the Dean's approval or return decision.",
+    statuses: ["Ready for Dean Review"],
+    empty: "No batches are waiting for Dean review.",
+  },
+  {
+    label: "8 · Dean Approved and Ready for Export",
+    description: "Only approved and currently eligible candidates are available for the external Registrar CSV export.",
+    statuses: ["Dean Approved"],
+    empty: "No Dean-approved graduation batches are ready for export.",
+  },
+  {
+    label: "Exception Queue",
+    description: "Candidates whose revalidation found missing requirements remain visible for correction and student notification.",
+    statuses: ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete", "Not Eligible", "Returned for Clarification"],
+    empty: "No graduation exceptions currently require correction.",
+  },
 ];
 
 function WorkflowBoard({ columns, rows, getStatus, renderCard, empty, isDraggable = () => false, getDragId = () => "" }) {
@@ -3548,7 +3642,7 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, com
   return (
     <ul className="space-y-3">
       {rows.map((row) => (
-        <li key={row.student.id} draggable={Boolean(row.has_submitted_documents)} className={`rounded-lg px-3 py-2 ring-1 ${row.has_submitted_documents ? "cursor-grab bg-emerald-50 ring-emerald-200 active:cursor-grabbing" : "bg-white ring-slate-200"}`}>
+        <li key={row.student.id} className={`rounded-lg px-3 py-2 ring-1 ${row.has_submitted_documents ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-slate-200"}`}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
@@ -3561,7 +3655,7 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, com
           {(onOpenStudent || onMessageStudent) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {onOpenStudent && <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2 py-1 text-xs"><Eye className="h-3.5 w-3.5" /> View</button>}
-              {row.endorsement && onMessageStudent && <button type="button" onClick={() => onMessageStudent(row)} className="btn-ghost cursor-pointer px-2 py-1 text-xs"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}
+              {row.endorsement && onMessageStudent && <button type="button" onClick={() => onMessageStudent(row)} className="btn cursor-pointer border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700 hover:border-red-300 hover:bg-red-100"><MessageSquare className="h-3.5 w-3.5" /> Message / Return</button>}
             </div>
           )}
         </li>
@@ -3583,6 +3677,8 @@ function GraduationBatchRow({
   onOpenStudent,
   onMessageStudent,
   onViewStage,
+  onExportBatch,
+  exporting = false,
 }) {
   const selectionState = graduationBatchSelectionState(group, selectedIds);
   const stageSelection = graduationStageSelection(group.rows, accountRole);
@@ -3593,11 +3689,13 @@ function GraduationBatchRow({
   const currentStage = graduationBatchCurrentStage(group);
   const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
   const canExpandStudents = Boolean(onToggleExpanded && onOpenStudent && onMessageStudent);
-  const readyToDrag = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
+  const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
+  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
+  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
   const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   return (
-    <article draggable={readyToDrag} className={`rounded-xl border px-3 py-1.5 transition-colors ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}>
-      <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
+    <article className={`rounded-xl border px-3 py-1.5 transition-colors ${applicationComplete ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}>
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex min-w-0 items-start gap-2">
             {onToggleBatch && (
@@ -3617,13 +3715,13 @@ function GraduationBatchRow({
                 <span>·</span>
                 <span>{selectionLabel}</span>
                 <StatusBadge value={group.boardStatus} dot={false} />
-                {!readyToDrag && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}
+                {!applicationComplete && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Application document issue</span>}
                 {messageCount > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"><MessageSquare className="mr-1 inline h-3 w-3" />{messageCount} message{messageCount === 1 ? "" : "s"}</span>}
               </div>
             </div>
           </div>
         </div>
-        <div className="min-w-0 text-xs text-slate-600">
+        <div className="min-w-0 border-t border-slate-200/70 pt-2 text-xs text-slate-600">
           <p className="truncate"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
           <p className="mt-0.5 truncate"><span className="font-semibold text-slate-700">Next:</span> {group.nextOwners.join(", ")}</p>
         </div>
@@ -3632,10 +3730,14 @@ function GraduationBatchRow({
           <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
           <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>
         </div>
-        <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
+        <div className="flex min-w-0 flex-wrap justify-start gap-1.5 border-t border-slate-200/70 pt-2">
           {canExpandStudents && <button type="button" onClick={() => onToggleExpanded(group.id)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>}
           {onSelectBatch && <button type="button" onClick={() => onSelectBatch(group)} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>}
-          <button type="button" disabled={!stageSelection.action} onClick={() => onProcessBatch(group)} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4 shrink-0" /> {actionLabel}</button>
+          {canExport ? (
+            <button type="button" disabled={exporting} onClick={() => onExportBatch(group)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"><Download className="h-4 w-4 shrink-0" /> {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}</button>
+          ) : (
+            <button type="button" disabled={!stageSelection.action} onClick={() => onProcessBatch(group)} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4 shrink-0" /> {actionLabel}</button>
+          )}
         </div>
       </div>
       {canExpandStudents && expanded && (
@@ -3658,19 +3760,23 @@ function GraduationBatchBoardSections({
   onOpenStudent,
   onMessageStudent,
   onViewStage,
+  onExportBatch,
+  exportingBatchId,
 }) {
-  if (!groups.length) return <EmptyState title="No graduation candidates match the current filters." />;
   return (
-    <div className="space-y-3">
+    <>
       {GRADUATION_BOARD_COLUMNS.map((column) => {
         const items = groups.filter((group) => column.statuses.includes(group.boardStatus));
         return (
-          <section key={column.label} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-            <header className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
+          <section key={column.label} className="flex min-h-[520px] w-full flex-col rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:w-[380px] sm:shrink-0">
+            <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-slate-800">{column.label}</h3>
+                <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-500">{column.description}</p>
+              </div>
               <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
             </header>
-            <div className="space-y-2">
+            <div className="flex-1 space-y-3">
               {items.length ? items.map((group) => (
                 <GraduationBatchRow
                   key={group.id}
@@ -3684,17 +3790,23 @@ function GraduationBatchBoardSections({
                   onOpenStudent={onOpenStudent}
                   onMessageStudent={onMessageStudent}
                   onViewStage={onViewStage}
+                  onExportBatch={onExportBatch}
+                  exporting={exportingBatchId === group.id}
                 />
-              )) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-4 text-center text-xs text-slate-400">No batches</p>}
+              )) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-4 text-center text-xs text-slate-400">{column.empty}</p>}
             </div>
           </section>
         );
       })}
-    </div>
+    </>
   );
 }
 
-function GraduationEligiblePreBatchSection({
+function GraduationCandidateStageSection({
+  stageNumber,
+  title,
+  description,
+  empty,
   rows,
   accountRole,
   selectedIds,
@@ -3703,30 +3815,35 @@ function GraduationEligiblePreBatchSection({
   onClearSelection,
   onCreateBatch,
   onOpenStudent,
+  selectable = false,
 }) {
-  if (!rows.length) return null;
-  const canCreateBatch = accountRole === "staff";
+  const canCreateBatch = selectable && accountRole === "staff";
   const selectedCount = rows.filter((row) => selectedIds.has(row.student.id)).length;
+  const titleId = `graduation-candidate-stage-${stageNumber}`;
   return (
-    <section className="rounded-xl border border-emerald-200 bg-white p-4" aria-labelledby="eligible-pre-batch-title">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p id="eligible-pre-batch-title" className="font-display text-lg font-semibold text-ink">Eligible students awaiting batch creation</p>
-          <p className="mt-1 text-xs text-slate-600">Only students with completed coursework, thesis/research, practicum requirements, and confirmed graduation eligibility appear here.</p>
+    <section className={`flex min-h-[520px] w-full flex-col rounded-xl border bg-white p-4 sm:w-[380px] sm:shrink-0 ${selectable ? "border-emerald-200" : "border-slate-200"}`} aria-labelledby={titleId}>
+      <div className="space-y-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${selectable ? "bg-emerald-600 text-white" : "bg-slate-700 text-white"}`}>{stageNumber}</span>
+          <div>
+            <p id={titleId} className="font-display text-lg font-semibold text-ink">{title}</p>
+            <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-600">{description}</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge value={`${rows.length} eligible`} dot={false} />
-          {canCreateBatch && <button type="button" onClick={onSelectAll} className="btn-ghost cursor-pointer px-3 py-2">Select all eligible</button>}
+          <StatusBadge value={`${rows.length} student${rows.length === 1 ? "" : "s"}`} dot={false} />
+          {canCreateBatch && rows.length > 0 && <button type="button" onClick={onSelectAll} className="btn-ghost cursor-pointer px-3 py-2">Select all visible</button>}
           {canCreateBatch && selectedCount > 0 && <button type="button" onClick={onClearSelection} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
-          {canCreateBatch && <button type="button" disabled={!selectedCount} onClick={onCreateBatch} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> Create batch</button>}
+          {canCreateBatch && <button type="button" disabled={!selectedCount} onClick={onCreateBatch} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> Create graduation batch</button>}
         </div>
       </div>
-      <ul className="mt-4 grid gap-3 xl:grid-cols-2">
+      {rows.length ? <ul className="mt-4 flex-1 space-y-3">
         {rows.map((row) => {
           const selected = selectedIds.has(row.student.id);
-          const readyToDrag = Boolean(row.has_submitted_documents);
+          const completedCourses = row.eligibility?.completed_courses || [];
+          const applicationFile = row.endorsement?.request_attachment;
           return (
-            <li key={row.student.id} draggable={readyToDrag} className={`rounded-xl border p-3 ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 active:cursor-grabbing" : "border-slate-200 bg-white"}`}>
+            <li key={row.student.id} className={`rounded-xl border p-3 ${selectable ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50/60"}`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2.5">
                   {canCreateBatch && <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />}
@@ -3735,16 +3852,39 @@ function GraduationEligiblePreBatchSection({
                     <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
                   </div>
                 </div>
-                {!readyToDrag && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}
+                <span className="flex flex-wrap items-center justify-end gap-1.5">
+                  <StatusBadge value={row.application_status} dot={false} />
+                  {row.has_submitted_documents && applicationFile?.file_exists !== false && applicationFile?.url && (
+                    <a
+                      href={applicationFile.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-brand-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                      aria-label={`View submitted graduation application PDF for ${row.student.name}`}
+                    >
+                      <FileText className="h-3.5 w-3.5" /> View PDF <ArrowUpRight className="h-3 w-3" />
+                    </a>
+                  )}
+                  {row.has_submitted_documents && applicationFile?.file_exists === false && (
+                    <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">PDF unavailable</span>
+                  )}
+                </span>
               </div>
               <GraduationRequirementBoxes row={row} />
+              {completedCourses.length > 0 && (
+                <p className="mt-2 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-700">Completed-course cohort:</span>{" "}
+                  {completedCourses.slice(0, 4).map((course) => course.code).join(", ")}
+                  {completedCourses.length > 4 ? ` +${completedCourses.length - 4} more` : ""}
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs"><Eye className="h-3.5 w-3.5" /> View student</button>
               </div>
             </li>
           );
         })}
-      </ul>
+      </ul> : <p className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-5 text-center text-xs text-slate-400">{empty}</p>}
     </section>
   );
 }
@@ -3982,6 +4122,13 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   const [messageNotice, setMessageNotice] = useState("");
   const [viewMode, setViewMode] = useState("board");
   const [pendingAction, setPendingAction] = useState(null);
+  const [registrarOpen, setRegistrarOpen] = useState(false);
+  const [registrarBusy, setRegistrarBusy] = useState("");
+  const [registrarError, setRegistrarError] = useState("");
+  const [registrarReference, setRegistrarReference] = useState("");
+  const [selectedRegistrarIds, setSelectedRegistrarIds] = useState(() => new Set());
+  const [downloadedRegistrarIds, setDownloadedRegistrarIds] = useState(() => new Set());
+  const autoOpenedRegistrarSignature = useRef("");
   const reset = useDemoCaseReset("withdrawal", refetch);
   const rows = context.roster || [];
   const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
@@ -3998,16 +4145,38 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   function actionFor(item) {
     const base = { student_id: item.student_id };
     if (accountRole === "staff" && item.dean_decision === "Pending" && item.status === "Submitted to GS Staff") return { label: "Record & forward to Dean", payload: { ...base, workflow_action: "forward_to_dean" } };
+    if (accountRole === "staff" && item.dean_decision === "Approved" && ["Approved - Awaiting Subject Tag", "Approved - Registrar Preparation"].includes(item.status)) return { label: "Tag student as withdrawn from subject", payload: { ...base, workflow_action: "tag_subject_withdrawn" } };
     return null;
   }
   const selectedCurrent = rows.find((item) => item.id === selectedCaseId) || null;
   const selectedItem = selectedCurrent || selectedSnapshot;
   const selectedAction = selectedCurrent ? actionFor(selectedCurrent) : null;
   const withdrawalSteps = withdrawalTimelineSteps(selectedCurrent?.status || (reset.resetMessage ? undefined : selectedItem?.status));
+  const registrarRows = useMemo(
+    () => rows.filter((item) => item.dean_decision === "Approved" && ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send"].includes(item.status)),
+    [rows],
+  );
+  const selectedRegistrarRows = useMemo(
+    () => registrarRows.filter((item) => selectedRegistrarIds.has(item.id)),
+    [registrarRows, selectedRegistrarIds],
+  );
+  const selectedRegistrarReady = selectedRegistrarRows.length > 0 && selectedRegistrarRows.every(
+    (item) => item.registrar_status === "Exported - Ready to Send" || downloadedRegistrarIds.has(item.id),
+  );
 
   useEffect(() => {
     if (selectedCurrent) setSelectedSnapshot(selectedCurrent);
   }, [selectedCurrent]);
+
+  useEffect(() => {
+    if (accountRole !== "staff" || !registrarRows.length) return;
+    const signature = registrarRows.map((item) => item.id).sort((a, b) => a - b).join("-");
+    if (autoOpenedRegistrarSignature.current === signature) return;
+    autoOpenedRegistrarSignature.current = signature;
+    setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id)));
+    setRegistrarError("");
+    setRegistrarOpen(true);
+  }, [accountRole, registrarRows]);
 
   function openCase(item) {
     clearSubmitFeedback();
@@ -4021,11 +4190,71 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
     setSelectedSnapshot(null);
   }
 
+  function toggleRegistrarRow(applicationId) {
+    setSelectedRegistrarIds((current) => {
+      const next = new Set(current);
+      if (next.has(applicationId)) next.delete(applicationId); else next.add(applicationId);
+      return next;
+    });
+  }
+
+  async function exportRegistrarWorkbook() {
+    const applicationIds = selectedRegistrarRows.map((item) => item.id);
+    if (!applicationIds.length) return;
+    setRegistrarBusy("export");
+    setRegistrarError("");
+    try {
+      const exported = await api.exportWithdrawalXlsx(applicationIds);
+      setDownloadedRegistrarIds((current) => {
+        const next = new Set(current);
+        applicationIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setMessageNotice(`${exported.count} approved subject withdrawal${exported.count === 1 ? "" : "s"} exported as ${exported.filename}.`);
+      await refetch();
+    } catch (error) {
+      setRegistrarError(error.message || "Could not export the approved-withdrawals workbook.");
+    } finally {
+      setRegistrarBusy("");
+    }
+  }
+
+  async function forwardRegistrarWorkbook() {
+    const applicationIds = selectedRegistrarRows.map((item) => item.id);
+    if (!applicationIds.length) return;
+    setRegistrarBusy("send");
+    setRegistrarError("");
+    try {
+      const response = await api.forwardWithdrawalsToRegistrar(applicationIds, registrarReference);
+      setMessageNotice(response.message);
+      setRegistrarOpen(false);
+      setSelectedRegistrarIds(new Set());
+      setDownloadedRegistrarIds(new Set());
+      setRegistrarReference("");
+      await refetch();
+    } catch (error) {
+      setRegistrarError(error.message || "Could not record the Registrar handoff.");
+    } finally {
+      setRegistrarBusy("");
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · GS Staff forwards to the Dean; approval immediately marks only the selected subject Withdrawn`} icon={LogOut} />
+      <SectionTitle title="Submitted subject withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Student request → GS Staff → Dean → GS Staff subject tag → Excel export → Registrar; approved withdrawals carry no academic grade or penalty`} icon={LogOut} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+      {accountRole === "staff" && registrarRows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-emerald-900">{registrarRows.length} tagged withdrawal{registrarRows.length === 1 ? "" : "s"} waiting for Registrar handoff</p>
+            <p className="mt-0.5 text-xs text-emerald-800">Each selected subject already shows Withdrawn in Official Offered Subjects. Download the Excel workbook, then confirm the Registrar handoff.</p>
+          </div>
+          <button type="button" onClick={() => { setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id))); setRegistrarError(""); setRegistrarOpen(true); }} className="btn cursor-pointer bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">
+            <FileSpreadsheet className="h-4 w-4" /> Prepare Registrar handoff
+          </button>
+        </div>
+      )}
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
       <div className="flex justify-end"><ViewModeToggle value={viewMode} onChange={setViewMode} /></div>
       {viewMode === "board" ? (
@@ -4079,9 +4308,12 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <div className="grid gap-3 sm:grid-cols-2">
               <Detail label="Dean" value={selectedCurrent?.dean_decision || selectedItem.dean_decision} />
-              <Detail label="Applied subject status" value={selectedItem.subject?.status || (selectedItem.status === "Withdrawn Confirmed" ? "Withdrawn" : "Pending decision")} />
+              <Detail label="Registrar handoff" value={selectedItem.registrar_status || "Pending"} />
               <Detail label="Selected subject" value={`${selectedItem.subject?.course_code || "Pending"} — ${selectedItem.subject?.course_title || "No subject attached"}`} />
+              <Detail label="Official offered-subject status" value={["Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(selectedCurrent?.status || selectedItem.status) ? "Withdrawn" : "Awaiting GS Staff tag"} />
               <Detail label="Semester" value={selectedItem.effective_term || selectedItem.subject?.term_label || "Pending"} />
+              <Detail label="Eligibility window" value={selectedItem.withdrawal_window?.status || "Not recorded"} />
+              <Detail label="Academic record effect" value={selectedItem.academic_record_effect || "No academic record / no grade impact"} />
             </div>
             <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
             <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
@@ -4094,10 +4326,82 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
               <div className="mt-3 flex flex-wrap gap-2">
                 {selectedItem.request_attachment?.file_exists && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
                 {selectedItem.request_attachment?.file_exists === false && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">The saved request form is unavailable</span>}
-                {selectedItem.dean_decision === "Approved" && <a href={selectedItem.registrar_report_url} className="btn-ghost cursor-pointer px-3 py-1.5">Export withdrawal report for Registrar <Download className="h-3.5 w-3.5" /></a>}
               </div>
             </div>
             <WorkflowFileHistory files={selectedCurrent?.attachments || selectedItem.attachments || []} />
+          </div>
+        </WorkflowCaseModal>
+      )}
+      {registrarOpen && accountRole === "staff" && (
+        <WorkflowCaseModal
+          id="withdrawal-registrar-handoff"
+          title="Approved subject withdrawals"
+          subtitle={`${selectedRegistrarRows.length} selected · Excel list for Graduate School Staff to forward to the Registrar`}
+          status={selectedRegistrarReady ? "Exported - Ready to Send" : "Pending Excel Export"}
+          onClose={() => { if (!registrarBusy) setRegistrarOpen(false); }}
+          size="wide"
+          footer={(
+            <>
+              <button type="button" disabled={Boolean(registrarBusy)} onClick={() => setRegistrarOpen(false)} className="btn-ghost cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
+              <button type="button" disabled={Boolean(registrarBusy) || !selectedRegistrarRows.length} onClick={exportRegistrarWorkbook} className="btn-ghost cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">
+                <Download className="h-4 w-4" /> {registrarBusy === "export" ? "Exporting…" : "Download Excel list"}
+              </button>
+              <button type="button" disabled={Boolean(registrarBusy) || !selectedRegistrarReady} onClick={forwardRegistrarWorkbook} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">
+                <Send className="h-4 w-4" /> {registrarBusy === "send" ? "Forwarding…" : "Confirm forwarded to Registrar"}
+              </button>
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-sm font-semibold text-emerald-900">Registrar handoff sequence</p>
+              <ol className="mt-2 grid gap-2 text-xs font-semibold text-emerald-800 sm:grid-cols-3">
+                <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 1: Select approved students</li>
+                <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 2: Download the Excel list</li>
+                <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 3: Forward it and confirm the handoff</li>
+              </ol>
+            </div>
+            {registrarError && <div role="alert"><ErrorNote message={registrarError} /></div>}
+            <label className="block">
+              <span className="field-label">Registrar reference / delivery note</span>
+              <Input value={registrarReference} onChange={(event) => setRegistrarReference(event.target.value)} placeholder="Optional: email subject, receiving office, or tracking reference" />
+            </label>
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">Tagged withdrawn students</p>
+                  <p className="text-xs text-slate-500">Every selected subject already shows Withdrawn in Official Offered Subjects, with no academic grade or penalty.</p>
+                </div>
+                <button type="button" onClick={() => setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id)))} className="btn-ghost cursor-pointer px-3 py-1.5">Select all</button>
+              </div>
+              <div className="max-h-[48vh] overflow-auto">
+                <table className="w-full min-w-[860px] text-left text-sm">
+                  <thead className="sticky top-0 bg-white text-xs font-bold uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Select</th>
+                      <th className="px-4 py-3">Student</th>
+                      <th className="px-4 py-3">Subject</th>
+                      <th className="px-4 py-3">Semester / deadline</th>
+                      <th className="px-4 py-3">Academic record</th>
+                      <th className="px-4 py-3">Registrar status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registrarRows.map((item) => (
+                      <tr key={item.id} className="border-t border-slate-100 align-top transition-colors hover:bg-emerald-50/50">
+                        <td className="px-4 py-3"><input type="checkbox" checked={selectedRegistrarIds.has(item.id)} onChange={() => toggleRegistrarRow(item.id)} className="h-4 w-4 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" aria-label={`Select ${item.student.name}`} /></td>
+                        <td className="px-4 py-3"><p className="font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p></td>
+                        <td className="px-4 py-3"><p className="font-semibold text-slate-700">{item.subject?.course_code || "Subject pending"}</p><p className="text-xs text-slate-500">{item.subject?.course_title || "No title"}</p></td>
+                        <td className="px-4 py-3 text-xs text-slate-600"><p className="font-semibold">{item.effective_term || item.subject?.term_label || "Not recorded"}</p><p>Deadline: {item.withdrawal_window?.deadline || "Not recorded"}</p></td>
+                        <td className="px-4 py-3 text-xs font-semibold text-emerald-700">No grade / no penalty</td>
+                        <td className="px-4 py-3"><StatusBadge value={item.registrar_status || "Pending Excel Export"} dot={false} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {!selectedRegistrarReady && selectedRegistrarRows.length > 0 && <p className="text-xs font-semibold text-amber-700">Download the Excel list before confirming the Registrar handoff.</p>}
           </div>
         </WorkflowCaseModal>
       )}
@@ -4107,50 +4411,54 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   );
 }
 
-function GraduationRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
+export function GraduationRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
   const [messageNotice, setMessageNotice] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
-  const [viewMode, setViewMode] = useState("board");
-  const [pendingAction, setPendingAction] = useState(null);
   const [expandedBatchIds, setExpandedBatchIds] = useState(() => new Set());
   const [stageGroup, setStageGroup] = useState(null);
+  const [exportingBatchId, setExportingBatchId] = useState("");
+  const [exportError, setExportError] = useState("");
   const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
-  useEffect(() => {
-    if (filters.query.trim()) setViewMode("table");
-  }, [filters.query]);
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", course: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map(graduationRowStatus)), [rows]);
+  const completedCourses = useMemo(() => {
+    const coursesByCode = new Map();
+    rows.forEach((row) => {
+      (row.eligibility?.completed_courses || []).forEach((course) => {
+        if (course.code && !coursesByCode.has(course.code)) coursesByCode.set(course.code, course);
+      });
+    });
+    return [...coursesByCode.values()].sort((left, right) => left.code.localeCompare(right.code));
+  }, [rows]);
   const filteredRows = useMemo(() => rows.filter((row) => {
-    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name} ${row.endorsement?.batch_name || ""}`.toLowerCase();
+    const courseText = (row.eligibility?.completed_courses || []).map((course) => `${course.code} ${course.title}`).join(" ");
+    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name} ${row.endorsement?.batch_name || ""} ${courseText}`.toLowerCase();
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
-      && (!filters.status || graduationRowStatus(row) === filters.status);
+      && (!filters.status || graduationRowStatus(row) === filters.status)
+      && (!filters.course || (row.eligibility?.completed_courses || []).some((course) => course.code === filters.course));
   }).sort((left, right) => left.student.name.localeCompare(right.student.name)), [rows, filters]);
   const visibleRows = useMemo(
     () => sortSelectedWorkflowRows(filteredRows, selectedIds, (row) => row.student.name, (row) => row.student.id),
     [filteredRows, selectedIds],
   );
-  const preBatchRows = useMemo(
-    () => visibleRows.filter((row) => !row.endorsement?.batch_name),
+  const awaitingApplicationRows = useMemo(
+    () => visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && !row.has_submitted_documents),
+    [visibleRows],
+  );
+  const readyForBatchRows = useMemo(
+    () => visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && row.has_submitted_documents),
     [visibleRows],
   );
   const visibleBatchedRows = useMemo(
     () => visibleRows.filter((row) => Boolean(row.endorsement?.batch_name)),
     [visibleRows],
-  );
-  const visibleSelectedRows = useMemo(
-    () => visibleBatchedRows.filter((row) => selectedIds.has(row.student.id)),
-    [visibleBatchedRows, selectedIds],
-  );
-  const boardRows = useMemo(
-    () => selectedIds.size ? visibleBatchedRows.filter((row) => !selectedIds.has(row.student.id)) : visibleBatchedRows,
-    [visibleBatchedRows, selectedIds],
   );
   const selectedRows = useMemo(
     () => sortSelectedWorkflowRows(rows.filter((row) => selectedIds.has(row.student.id)), selectedIds, (row) => row.student.name, (row) => row.student.id),
@@ -4160,38 +4468,16 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
     () => graduationBatchGroups(visibleBatchedRows, selectedIds),
     [visibleBatchedRows, selectedIds],
   );
-  const visibleSelectedBatchGroups = useMemo(
-    () => graduationBatchGroups(visibleSelectedRows, selectedIds),
-    [visibleSelectedRows, selectedIds],
-  );
-  const boardBatchGroups = useMemo(
-    () => graduationBatchGroups(boardRows, selectedIds),
-    [boardRows, selectedIds],
-  );
-  const selectedBatchGroups = useMemo(
-    () => graduationBatchGroups(selectedRows, selectedIds),
-    [selectedRows, selectedIds],
-  );
-  const createdBatchGroups = useMemo(
-    () => graduationBatchGroups(rows.filter((row) => row.endorsement?.batch_name), selectedIds),
-    [rows, selectedIds],
-  );
-  const selectedStageSelection = useMemo(
-    () => graduationStageSelection(selectedRows, accountRole),
-    [selectedRows, accountRole],
-  );
-  function selectRows(predicate) {
-    setSelectedIds(new Set(filteredRows.filter(predicate).map((row) => row.student.id)));
-  }
-  function toggleStudent(studentId) {
+  function toggleReadyStudent(studentId) {
+    const readyIds = new Set(readyForBatchRows.map((row) => row.student.id));
     setSelectedIds((current) => {
-      const next = new Set(current);
+      const next = new Set([...current].filter((id) => readyIds.has(id)));
       if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
       return next;
     });
   }
   function createPreBatch() {
-    const candidateIds = preBatchRows.filter((row) => selectedIds.has(row.student.id)).map((row) => row.student.id);
+    const candidateIds = readyForBatchRows.filter((row) => selectedIds.has(row.student.id)).map((row) => row.student.id);
     if (!candidateIds.length) return;
     setSelectedIds(new Set(candidateIds));
     setBatchOpen(true);
@@ -4206,9 +4492,6 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
       return next;
     });
   }
-  function selectBatchGroup(group) {
-    setSelectedIds(new Set(group.rows.map((row) => row.student.id)));
-  }
   function processBatchGroup(group) {
     setSelectedIds(new Set(group.rows.map((row) => row.student.id)));
     setBatchOpen(true);
@@ -4220,19 +4503,21 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
       return next;
     });
   }
-  function actionFor(row) {
-    const status = row.endorsement?.endorsement_status;
-    const base = { student_id: row.student.id, review_window: row.endorsement?.review_window || "AY 2026-2027 Graduation Review" };
-    if (accountRole === "staff" && (!status || ["For Review", "Not Eligible"].includes(status))) return { label: status === "Not Eligible" ? "Restart role-based review" : "Compile & send to Academic Coordinator", payload: { ...base, endorsement_status: "Coursework Review" } };
-    if (accountRole === "academic_coordinator" && status === "Coursework Review") return { label: "Record coursework review", payload: { ...base, endorsement_status: "Research Review" } };
-    if (accountRole === "research_coordinator" && status === "Research Review") return { label: "Validate research requirements", payload: { ...base, endorsement_status: "Eligibility Confirmed" } };
-    if (accountRole === "staff" && ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status)) return { label: "List missing requirements & mark not eligible", payload: { ...base, endorsement_status: "Not Eligible" }, requireReason: true };
-    if (accountRole === "staff" && status === "Eligibility Confirmed") return { label: "Prepare endorsement list", payload: { ...base, endorsement_status: "Endorsement Prepared" } };
-    if (accountRole === "staff" && ["Endorsement Prepared", "Returned for Revision"].includes(status)) return { label: status === "Returned for Revision" ? "Resend revised list to Dean" : "Send endorsement list to Dean", payload: { ...base, endorsement_status: "Ready for Dean Review" } };
-    return null;
+  async function exportApprovedBatch(group) {
+    setExportingBatchId(group.id);
+    setExportError("");
+    try {
+      const endorsementIds = group.rows.map((row) => row.endorsement?.id).filter(Boolean);
+      const exportResult = await api.exportGraduationCsv("", endorsementIds);
+      setMessageNotice(`${group.label} exported as ${exportResult.filename}. The file is ready for the external Registrar process.`);
+      await refetch();
+    } catch (error) {
+      setExportError(error.message || "Could not export the Dean-approved graduation list.");
+    } finally {
+      setExportingBatchId("");
+    }
   }
   const selectedRow = rows.find((row) => row.student.id === selectedStudentId) || null;
-  const selectedAction = selectedRow ? actionFor(selectedRow) : null;
   const selectedStageAction = selectedRow ? graduationStageActionForRow(selectedRow, accountRole) : null;
   const selectedEndorsement = selectedRow?.endorsement || null;
   const graduationSteps = selectedRow ? graduationTimelineSteps(selectedEndorsement?.endorsement_status, selectedRow.eligibility) : [];
@@ -4246,161 +4531,70 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
     <div className="space-y-4">
       <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`} icon={GraduationCap} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
+      {exportError && <div role="alert"><ErrorNote message={exportError} /></div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} count={filteredRows.length} total={rows.length} showAdvanced={false} />
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-        <span className="mr-auto text-sm font-semibold text-slate-700">{selectedIds.size} selected</span>
-        <button type="button" onClick={() => selectRows((row) => row.unresolved_messages > 0 || row.next_action_owner === WORKFLOW_ROLE_LABELS[accountRole])} className="btn-ghost cursor-pointer px-3 py-2">Select needs action</button>
-        {selectedIds.size > 0 && <button type="button" onClick={() => setSelectedIds(new Set())} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
-        <button type="button" disabled={!selectedIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {graduationSelectedActionLabel(selectedStageSelection.action)}</button>
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
-      </div>
-      <GraduationEligiblePreBatchSection
-        rows={preBatchRows}
-        accountRole={accountRole}
-        selectedIds={selectedIds}
-        onToggleStudent={toggleStudent}
-        onSelectAll={() => setSelectedIds(new Set(preBatchRows.map((row) => row.student.id)))}
-        onClearSelection={() => setSelectedIds(new Set())}
-        onCreateBatch={createPreBatch}
-        onOpenStudent={openCase}
-      />
-      {createdBatchGroups.length > 0 && (
-        <GraduationBatchOverviewSection groups={createdBatchGroups} accountRole={accountRole} onSelectBatch={selectBatchGroup} onProcessBatch={processBatchGroup} onViewStage={setStageGroup} />
-      )}
-      {selectedBatchGroups.length > 0 && (
-        <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Selected graduation batches</p>
-          <div className="mt-2 grid gap-2 lg:grid-cols-2">
-            {selectedBatchGroups.map((group) => (
-              <div key={group.id} className="rounded-lg bg-white px-3 py-2 text-xs text-slate-700 ring-1 ring-brand-100">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-semibold text-ink">{group.label}</p>
-                  <span className="font-semibold text-brand-700">{group.rows.length} selected</span>
-                </div>
-                <p className="mt-1 text-slate-500">{group.rows.map((row) => row.student.name).join(", ")}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {viewMode === "board" ? (
-        <>
-          {visibleSelectedBatchGroups.length > 0 && (
-            <section className="rounded-2xl border border-brand-200 bg-brand-50/50 p-3">
-              <header className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-brand-800">Selected batches</h3>
-                  <p className="text-xs text-brand-700">Selected batch cards stay on top, with students alphabetized inside each batch.</p>
-                </div>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-brand-700 ring-1 ring-brand-100">{visibleSelectedRows.length}</span>
-              </header>
-              <div className="space-y-2">
-                {visibleSelectedBatchGroups.map((group) => (
-                  <GraduationBatchRow
-                    key={group.id}
-                    group={group}
-                    accountRole={accountRole}
-                    selectedIds={selectedIds}
-                    expanded={expandedBatchIds.has(group.id)}
-                    selectedTone
-                    onToggleBatch={toggleBatchGroup}
-                    onToggleExpanded={toggleExpandedBatch}
-                    onProcessBatch={processBatchGroup}
-                    onOpenStudent={openCase}
-                    onMessageStudent={setMessageRow}
-                    onViewStage={setStageGroup}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {boardBatchGroups.length > 0 ? (
-            <GraduationBatchBoardSections
-              groups={boardBatchGroups}
-              accountRole={accountRole}
-              selectedIds={selectedIds}
-              expandedBatchIds={expandedBatchIds}
-              onToggleBatch={toggleBatchGroup}
-              onToggleExpanded={toggleExpandedBatch}
-              onProcessBatch={processBatchGroup}
-              onOpenStudent={openCase}
-              onMessageStudent={setMessageRow}
-              onViewStage={setStageGroup}
-            />
-          ) : visibleSelectedBatchGroups.length ? null : (
-            <EmptyState title="No graduation candidates match the current filters." />
-          )}
-        </>
-      ) : <WorkflowTable headers={["Select", "Batch / group", "Students", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement stages", "Updated", "Action"]} empty="No candidate batches match the current filters." rows={visibleBatchGroups} render={(group) => {
-        const selectionState = graduationBatchSelectionState(group, selectedIds);
-        const stageSelection = graduationStageSelection(group.rows, accountRole);
-        const actionLabel = graduationBatchActionLabel(stageSelection.action);
-        const currentStage = graduationBatchCurrentStage(group);
-        const expanded = expandedBatchIds.has(group.id);
-        return [
-          <tr
-            key={group.id}
-            className="border-b border-slate-100 align-top transition-colors hover:bg-brand-50/60"
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <label className="block max-w-xl">
+          <span className="field-label">Completed course cohort</span>
+          <select
+            value={filters.course}
+            onChange={(event) => setFilters((current) => ({ ...current, course: event.target.value }))}
+            className="field-input"
           >
-            <td className="px-3 py-3">
-              <input
-                type="checkbox"
-                checked={selectionState.allSelected}
-                aria-checked={selectionState.partiallySelected ? "mixed" : selectionState.allSelected}
-                onChange={() => toggleBatchGroup(group)}
-                className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                aria-label={`Select ${group.label}`}
-              />
-              {selectionState.selectedCount > 0 && <p className="mt-1 text-[11px] font-semibold text-brand-700">{selectionState.selectedCount}/{group.rows.length}</p>}
-            </td>
-            <td className="px-3 py-3">
-              <p className="text-sm font-semibold text-ink">{group.label}</p>
-              <p className="text-xs text-slate-500">{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"} · Next: {group.nextOwners.join(", ")}</p>
-            </td>
-            <td className="px-3 py-3">
-              <div className="space-y-1">
-                {group.rows.slice(0, 4).map((row) => (
-                  <button key={row.student.id} type="button" onClick={() => openCase(row.student.id)} className="block text-left text-xs font-semibold text-slate-700 hover:text-brand-700">
-                    {row.student.name} <span className="font-normal text-slate-400">· {row.student.student_number} · {row.student.program_code}</span>
-                  </button>
-                ))}
-                {group.rows.length > 4 && <p className="text-xs font-semibold text-slate-500">+{group.rows.length - 4} more</p>}
-              </div>
-            </td>
-            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Completed</td>
-            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Completed</td>
-            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Completed / not required</td>
-            <td className="px-3 py-3 text-xs font-semibold text-emerald-700"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Eligible</td>
-            <td className="px-3 py-3">
-              <p className="text-xs font-semibold text-slate-700">Step {currentStage.number}: {currentStage.label}</p>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                <StatusBadge value={currentStage.state} dot={false} />
-                {group.statuses.map((status) => <StatusBadge key={status} value={status} dot={false} />)}
-              </div>
-            </td>
-            <td className="px-3 py-3 text-xs text-slate-500">{formatDate(group.updatedAt)}</td>
-            <td className="px-3 py-3">
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setStageGroup(group)} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> View stage</button>
-                <button type="button" onClick={() => toggleExpandedBatch(group.id)} className="btn-ghost cursor-pointer px-3 py-2"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
-                <button type="button" onClick={() => selectBatchGroup(group)} className="btn-ghost cursor-pointer px-3 py-2">Select batch</button>
-                <button type="button" disabled={!stageSelection.action} onClick={() => processBatchGroup(group)} className="btn-primary cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> {actionLabel}</button>
-              </div>
-            </td>
-          </tr>,
-          expanded && (
-            <tr key={`${group.id}-students`} className="border-b border-slate-100 bg-slate-50/70">
-              <td colSpan={10} className="px-4 py-3">
-                <div>
-                  <p className="mb-2 text-sm font-semibold text-ink">Students in {group.label}</p>
-                  <GraduationBatchStudentList rows={group.rows} onOpenStudent={openCase} onMessageStudent={setMessageRow} />
-                </div>
-              </td>
-            </tr>
-          ),
-        ];
-      }} />}
+            <option value="">All completed courses</option>
+            {completedCourses.map((course) => <option key={course.code} value={course.code}>{course.code} — {course.title}</option>)}
+          </select>
+        </label>
+        <p className="mt-2 text-xs text-slate-500">GS Staff can filter by program or completed course, choose “Select all visible” in Step 2, and create a cohort-specific graduation batch.</p>
+      </div>
+      <div className="max-w-full overflow-x-auto rounded-xl pb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" role="region" aria-label="Graduation workflow Kanban board" tabIndex={0}>
+        <div className="grid grid-cols-1 gap-4 sm:flex sm:w-max sm:items-start">
+          <GraduationCandidateStageSection
+            stageNumber={1}
+            title="Academically Eligible — Awaiting Student Application"
+            description="These students completed all required academic, research, and practicum stages. They are visible to staff, but cannot be selected for a graduation batch until they submit the signed application / review-window PDF in the student portal."
+            empty="No academically eligible students are currently waiting for a graduation application."
+            rows={awaitingApplicationRows}
+            accountRole={accountRole}
+            selectedIds={selectedIds}
+            onToggleStudent={toggleReadyStudent}
+            onSelectAll={() => {}}
+            onClearSelection={() => setSelectedIds(new Set())}
+            onCreateBatch={createPreBatch}
+            onOpenStudent={openCase}
+          />
+          <GraduationCandidateStageSection
+            stageNumber={2}
+            title="Application Submitted — Ready for Batch Creation"
+            description="The required student application / review-window PDF is on file. GS Staff may select individual students, all visible students, a program, or a completed-course cohort before creating the batch. Other staff accounts see this stage as read-only."
+            empty="No submitted graduation applications are waiting for batch creation."
+            rows={readyForBatchRows}
+            accountRole={accountRole}
+            selectedIds={selectedIds}
+            selectable
+            onToggleStudent={toggleReadyStudent}
+            onSelectAll={() => setSelectedIds(new Set(readyForBatchRows.map((row) => row.student.id)))}
+            onClearSelection={() => setSelectedIds(new Set())}
+            onCreateBatch={createPreBatch}
+            onOpenStudent={openCase}
+          />
+          <GraduationBatchBoardSections
+            groups={visibleBatchGroups}
+            accountRole={accountRole}
+            selectedIds={selectedIds}
+            expandedBatchIds={expandedBatchIds}
+            onToggleBatch={["staff", "academic_coordinator", "research_coordinator"].includes(accountRole) ? toggleBatchGroup : null}
+            onToggleExpanded={toggleExpandedBatch}
+            onProcessBatch={processBatchGroup}
+            onOpenStudent={openCase}
+            onMessageStudent={setMessageRow}
+            onViewStage={setStageGroup}
+            onExportBatch={accountRole === "dean" ? exportApprovedBatch : null}
+            exportingBatchId={exportingBatchId}
+          />
+        </div>
+      </div>
       {selectedRow && (
         <WorkflowCaseModal
           id={`graduation-case-${selectedRow.student.id}`}
@@ -4412,7 +4606,7 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
           footer={(
             <>
               {accountRole === "staff" && selectedEndorsement && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
-              {selectedEndorsement && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
+              {selectedEndorsement && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn cursor-pointer border border-red-200 bg-red-50 px-4 py-2 text-red-700 hover:border-red-300 hover:bg-red-100"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
               {selectedStageAction ? (
                 <button type="button" disabled={submitting || refreshing} onClick={() => { setSelectedIds(new Set([selectedRow.student.id])); setBatchOpen(true); }} className="btn-primary cursor-pointer px-4 py-2">
                   {submitting ? "Saving…" : refreshing ? "Updating…" : selectedStageAction.label}
@@ -4429,6 +4623,20 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
             <WorkflowSubmitFeedback result={result} error={submitError} />
             <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <div className="grid gap-3 sm:grid-cols-2"><Detail label="Program" value={selectedRow.student.program_name} /><Detail label="Batch" value={selectedEndorsement?.batch_name || "No batch assigned"} /></div>
+            {selectedEndorsement?.request_attachment?.file_exists !== false && selectedEndorsement?.request_attachment?.url && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-brand-900">Student graduation application PDF</p>
+                  <p className="truncate text-xs text-brand-700">{selectedEndorsement.request_attachment.name}</p>
+                </div>
+                <a href={selectedEndorsement.request_attachment.url} target="_blank" rel="noreferrer" className="btn-primary cursor-pointer px-3 py-2">
+                  <Eye className="h-4 w-4" /> View submitted PDF <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            )}
+            {selectedEndorsement?.request_attachment?.file_exists === false && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">The submitted graduation application PDF is unavailable.</div>
+            )}
             <GraduationRequirementBoxes row={selectedRow} />
             <WorkflowTimeline steps={graduationSteps} title="Graduation endorsement timeline" />
             <CaseMessageHistory messages={selectedRow.messages} onReply={(message) => { setReplyTo(message); setMessageRow(selectedRow); }} />
@@ -4438,9 +4646,8 @@ function GraduationRoster({ context, submit, submitting, refreshing, result, sub
         </WorkflowCaseModal>
       )}
       {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
-      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
+      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
       {stageGroup && <GraduationBatchStageModal group={stageGroup} onClose={() => setStageGroup(null)} />}
-      {pendingAction && selectedRow && <WorkflowTransitionModal slug="graduation" student={selectedRow.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
     </div>
   );
 }
@@ -4625,8 +4832,16 @@ function PracticumForm({ context, studentId, submit, submitting }) {
 function GraduationForm({ context, studentId, submit, submitting }) {
   const eligibility = context.graduation_eligibility || {};
   const current = context.graduation_endorsement;
+  const reviewWindows = context.graduation_review_windows || [];
+  const activeReviewWindow = context.graduation_default_review_window || reviewWindows[0] || "";
+  const defaultReviewWindow = activeReviewWindow || current?.review_window || "";
+  const reviewWindowOptions = reviewWindows.map((schoolYear) => ({
+    value: schoolYear,
+    label: schoolYear === activeReviewWindow ? `${schoolYear} — Current school year` : `${schoolYear} — Not currently open`,
+    disabled: schoolYear !== activeReviewWindow,
+  }));
   const [form, setForm] = useState({
-    review_window: "AY 2026-2027 Graduation Review",
+    review_window: defaultReviewWindow,
     endorsement_status: "For Review",
     dean_remarks: "",
     source_reference: "",
@@ -4635,12 +4850,12 @@ function GraduationForm({ context, studentId, submit, submitting }) {
 
   useEffect(() => {
     setForm({
-      review_window: current?.review_window || "AY 2026-2027 Graduation Review",
+      review_window: defaultReviewWindow,
       endorsement_status: current?.endorsement_status || (eligibility.eligible ? "Ready for Dean Review" : "For Review"),
       dean_remarks: current?.dean_remarks || "",
       source_reference: "",
     });
-  }, [studentId, current?.id, current?.updated_at, eligibility.eligible]);
+  }, [studentId, current?.id, current?.updated_at, eligibility.eligible, defaultReviewWindow]);
 
   function onSubmit(e) {
     e.preventDefault();
@@ -4676,8 +4891,8 @@ function GraduationForm({ context, studentId, submit, submitting }) {
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Review window / semester" required>
-          <Input value={form.review_window} onChange={set("review_window")} required />
+        <Field label="Graduation school year" required>
+          <Select value={form.review_window} onChange={set("review_window")} options={reviewWindowOptions} placeholder="" required />
         </Field>
         <Field label="Endorsement status">
           <Select
@@ -5327,7 +5542,7 @@ function workflowGuidance(slug) {
     practicum:
       "Available only for programs marked with practicum requirements. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
     withdrawal:
-      "Withdrawal is a lifecycle-exit process. GS Staff forwards the student request to the Dean. A denial keeps the student Active; an approval returns directly to GS Staff for documented follow-through and final confirmation.",
+      "Withdrawal applies to one subject before classes or during the first week. GS Staff forwards the student request to the Dean; approval returns to GS Staff for an Excel Registrar handoff, and the subject is removed without a grade or academic penalty.",
     graduation:
       "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and export.",
   };

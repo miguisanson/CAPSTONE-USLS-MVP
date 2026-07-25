@@ -24,6 +24,72 @@ const STAFF_ACCOUNTS = [
   { role: "admin", label: "Administrator", detail: "All staff screens (review)" },
 ];
 
+const STUDENT_LIFECYCLE_DEMOS = [
+  {
+    workflow: "student-handoff",
+    title: "1 · Student Handoff",
+    description: "New-student profiles after admissions handoff.",
+    icon: UserCog,
+  },
+  {
+    workflow: "course-adjustments",
+    title: "2 · Course Adjustments",
+    description: "Missing-subject demand scenarios for official course offerings.",
+    icon: SlidersHorizontal,
+  },
+  {
+    workflow: "enrollment",
+    title: "3 · Enrollment",
+    description: "Ready for single-student offered-subject enrollment.",
+    icon: BookPlus,
+  },
+  {
+    workflow: "research",
+    title: "4–6 · Research, Panel & Defense",
+    description: "Courses and comprehensive exam complete; ready for Title Defense requirements.",
+    icon: GitBranch,
+  },
+  {
+    workflow: "practicum",
+    title: "7 · Practicum",
+    description: "Prerequisites complete; ready to begin Practicum.",
+    icon: BriefcaseBusiness,
+  },
+  {
+    workflow: "graduation",
+    title: "8 · Graduation",
+    description: "All prior requirements complete; ready for Graduation.",
+    icon: GraduationCap,
+  },
+];
+
+const STANDALONE_STUDENT_DEMOS = [
+  {
+    workflow: "leave-of-absence",
+    title: "Leave of Absence",
+    description: "Structured LOA requests with deterministic policy checks.",
+    icon: CalendarOff,
+  },
+  {
+    workflow: "readmission",
+    title: "Readmission",
+    description: "Approved-LOA personas ready for structured return requests.",
+    icon: UserRound,
+  },
+  {
+    workflow: "awol",
+    title: "AWOL & Residency",
+    description: "One automatically flagged AWOL return and one residency-ready persona.",
+    icon: UserX,
+  },
+  {
+    workflow: "withdrawal",
+    title: "Withdrawal",
+    description: "Active subject enrollment; ready to apply before classes or during the first week.",
+    icon: LogOut,
+  },
+];
+
 export default function Login() {
   const { user, login, loading, error } = useAuth();
   const navigate = useNavigate();
@@ -156,7 +222,7 @@ export default function Login() {
             <div>
               <p className="field-label">Student workflow demos</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                Select a student to sign in instantly, or reset one case for a clean walkthrough.
+                Arranged in the Graduate School lifecycle sequence. Select a student to sign in instantly, or reset one case for a clean walkthrough.
               </p>
             </div>
 
@@ -166,146 +232,48 @@ export default function Login() {
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <DemoStudentGroup
-                  open={openDemoGroup === "practicum"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "practicum" ? "" : "practicum")}
-                  title="Practicum"
-                  description="Prerequisites complete; ready to begin Practicum."
-                  icon={BriefcaseBusiness}
-                  students={demoStudents.filter((student) => student.workflow === "practicum")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
-                <DemoStudentGroup
-                  open={openDemoGroup === "graduation"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "graduation" ? "" : "graduation")}
-                  title="Graduation"
-                  description="All prior requirements complete; ready for Graduation."
-                  icon={GraduationCap}
-                  students={demoStudents.filter((student) => student.workflow === "graduation")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
-                <DemoStudentGroup
-                  className="sm:col-span-2 lg:col-span-1 xl:col-span-2"
-                  open={openDemoGroup === "research"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "research" ? "" : "research")}
-                  title="Research Gate, Panel Matching, Defense Scheduling"
-                  description="Courses and comprehensive exam complete; ready to begin Title Defense requirements."
-                  icon={GitBranch}
-                  students={demoStudents.filter((student) => student.workflow === "research")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
+                {STUDENT_LIFECYCLE_DEMOS.map((group) => (
+                  <DemoStudentGroup
+                    key={group.workflow}
+                    open={openDemoGroup === group.workflow}
+                    onToggle={() => setOpenDemoGroup((current) => current === group.workflow ? "" : group.workflow)}
+                    title={group.title}
+                    description={group.description}
+                    icon={group.icon}
+                    students={demoStudents.filter((student) => student.workflow === group.workflow)}
+                    quickLoginBusy={quickLoginBusy}
+                    resetBusy={resetBusy}
+                    onLogin={quickLogin}
+                    onReset={resetDemoStudent}
+                  />
+                ))}
               </div>
             )}
 
             {!demoLoading && <div className="space-y-3 pt-2">
               <div>
-                <p className="field-label">Enrollment, adjustments, and standing demos</p>
+                <p className="field-label">Standalone processes</p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  Two resettable personas are available for each assigned process. Course-adjustment personas provide demand data for the Academic Coordinator view.
+                  Leave, return, AWOL or residency, and early subject-withdrawal scenarios that can branch from the main student lifecycle.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <DemoStudentGroup
-                  open={openDemoGroup === "student-handoff"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "student-handoff" ? "" : "student-handoff")}
-                  title="Student Handoff"
-                  description="New-student profiles after admissions handoff."
-                  icon={UserCog}
-                  students={demoStudents.filter((student) => student.workflow === "student-handoff")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
-                <DemoStudentGroup
-                  open={openDemoGroup === "enrollment"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "enrollment" ? "" : "enrollment")}
-                  title="Enrollment"
-                  description="Ready for single-student offered-subject enrollment."
-                  icon={BookPlus}
-                  students={demoStudents.filter((student) => student.workflow === "enrollment")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
-                <DemoStudentGroup
-                  open={openDemoGroup === "course-adjustments"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "course-adjustments" ? "" : "course-adjustments")}
-                  title="Course Adjustments"
-                  description="Missing-subject demand scenarios for the Academic Coordinator."
-                  icon={SlidersHorizontal}
-                  students={demoStudents.filter((student) => student.workflow === "course-adjustments")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
-                <DemoStudentGroup
-                  open={openDemoGroup === "leave-of-absence"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "leave-of-absence" ? "" : "leave-of-absence")}
-                  title="Leave of Absence"
-                  description="Structured LOA requests with deterministic policy checks."
-                  icon={CalendarOff}
-                  students={demoStudents.filter((student) => student.workflow === "leave-of-absence")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
-                <DemoStudentGroup
-                  open={openDemoGroup === "readmission"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "readmission" ? "" : "readmission")}
-                  title="Readmission"
-                  description="Approved-LOA personas ready for structured return requests."
-                  icon={UserRound}
-                  students={demoStudents.filter((student) => student.workflow === "readmission")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
-                <DemoStudentGroup
-                  open={openDemoGroup === "awol"}
-                  onToggle={() => setOpenDemoGroup((current) => current === "awol" ? "" : "awol")}
-                  title="AWOL & Residency"
-                  description="One automatically flagged AWOL return and one residency-ready persona."
-                  icon={UserX}
-                  students={demoStudents.filter((student) => student.workflow === "awol")}
-                  quickLoginBusy={quickLoginBusy}
-                  resetBusy={resetBusy}
-                  onLogin={quickLogin}
-                  onReset={resetDemoStudent}
-                />
+                {STANDALONE_STUDENT_DEMOS.map((group) => (
+                  <DemoStudentGroup
+                    key={group.workflow}
+                    open={openDemoGroup === group.workflow}
+                    onToggle={() => setOpenDemoGroup((current) => current === group.workflow ? "" : group.workflow)}
+                    title={group.title}
+                    description={group.description}
+                    icon={group.icon}
+                    students={demoStudents.filter((student) => student.workflow === group.workflow)}
+                    quickLoginBusy={quickLoginBusy}
+                    resetBusy={resetBusy}
+                    onLogin={quickLogin}
+                    onReset={resetDemoStudent}
+                  />
+                ))}
               </div>
-
-              <div>
-                <p className="field-label">Standalone processes</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  These active students are enrolled in a specific course and ready to demonstrate a lifecycle withdrawal.
-                </p>
-              </div>
-              <DemoStudentGroup
-                open={openDemoGroup === "withdrawal"}
-                onToggle={() => setOpenDemoGroup((current) => current === "withdrawal" ? "" : "withdrawal")}
-                title="Withdrawal"
-                description="Active enrollment; ready to apply for lifecycle withdrawal."
-                icon={LogOut}
-                students={demoStudents.filter((student) => student.workflow === "withdrawal")}
-                quickLoginBusy={quickLoginBusy}
-                resetBusy={resetBusy}
-                onLogin={quickLogin}
-                onReset={resetDemoStudent}
-              />
             </div>}
 
             <div aria-live="polite" className="min-h-5">

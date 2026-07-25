@@ -1,10 +1,12 @@
 import HistoryDisclosure from "./HistoryDisclosure";
 
 const WITHDRAWAL_STEPS = [
-  "Subject Withdrawal Request Submitted",
-  "GS Staff Forwarded Request to Dean",
-  "Dean Review",
-  "Selected Subject Marked Withdrawn",
+  "Student sends a subject withdrawal request",
+  "GS Staff records and forwards the request to the Dean",
+  "Dean reviews and approves or denies the request",
+  "GS Staff tags the student as Withdrawn from the selected subject",
+  "GS Staff exports the approved-withdrawals Excel list",
+  "GS Staff forwards the approved list to the Registrar",
 ];
 
 const GRADUATION_STEPS = [
@@ -51,9 +53,15 @@ export function withdrawalTimelineSteps(status) {
   const activeByStatus = {
     "Submitted to GS Staff": 1,
     "Dean Review": 2,
-    "Withdrawn Confirmed": 3,
+    "Approved - Awaiting Subject Tag": 3,
+    "Approved - Registrar Preparation": 3,
+    "Subject Tagged - Registrar Preparation": 4,
+    "Exported - Ready to Send": 5,
+    "Sent to Registrar": WITHDRAWAL_STEPS.length,
+    "Withdrawn Confirmed": WITHDRAWAL_STEPS.length,
     Denied: 2,
-    Returned: 2,
+    Returned: 0,
+    "Returned for Clarification": 0,
   };
   return numberedStates(WITHDRAWAL_STEPS, activeByStatus[status] ?? 0);
 }

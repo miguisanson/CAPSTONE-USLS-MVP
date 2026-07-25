@@ -26,6 +26,8 @@ from dotenv import load_dotenv
 from flask import Flask, Response, has_request_context, jsonify, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, inspect, or_, text
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 from werkzeug.datastructures import MultiDict
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
@@ -171,9 +173,9 @@ TRANSACTIONS = [
         "title": "Withdrawal Application",
         "icon": "log-out",
         "group": "Standing",
-        "short": "Record subject-withdrawal requests, route Dean decisions, and immediately apply approved subject outcomes.",
-        "actor": "Student / GS Staff / Dean / Academic Coordinator",
-        "data": "Selected subject, reason, effective semester, request form, Dean decision, and audit remarks.",
+        "short": "Process penalty-free subject withdrawals filed before classes or during the first week, then hand approved lists to the Registrar.",
+        "actor": "Student / GS Staff / Dean",
+        "data": "Selected subject, eligibility window, reason, Dean decision, Registrar Excel handoff, and audit remarks.",
     },
     {
         "slug": "graduation",
@@ -819,6 +821,7 @@ class WorkflowMessage(db.Model):
     previous_status = db.Column(db.String(100))
     new_status = db.Column(db.String(100))
     status = db.Column(db.String(40), nullable=False, default="Open")
+    requires_document_resubmission = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=now_utc)
     resolved_at = db.Column(db.DateTime)
     read_at = db.Column(db.DateTime)
@@ -1151,6 +1154,57 @@ def split_academic_term_label(label: str) -> tuple[str, str]:
         else:
             semester = matched.title()
     return academic_year, semester
+
+
+def normalize_graduation_school_year(value: str | None) -> str:
+    """Return the canonical school-year value stored by the graduation workflow."""
+    academic_year, _ = split_academic_term_label(value or "")
+    return f"AY {academic_year}" if academic_year else ""
+
+
+def graduation_school_year_options() -> list[str]:
+    """School years configured by the semester calendar, with the active year first."""
+    configured: list[str] = []
+    for term in AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all():
+        school_year = normalize_graduation_school_year(term.label)
+        if school_year and school_year not in configured:
+            configured.append(school_year)
+
+    active = get_active_term()
+    active_year = normalize_graduation_school_year(active.label) if active else ""
+    if active_year and active_year in configured:
+        active_index = configured.index(active_year)
+        future_years = configured[active_index + 1:]
+        previous_years = list(reversed(configured[:active_index]))
+        configured = [active_year, *future_years, *previous_years]
+    if configured:
+        return configured
+
+    # New/test databases may not have an academic calendar yet. Keep the form
+    # usable until staff configure terms, while still requiring an AY value.
+    today = date.today()
+    start_year = today.year if today.month >= 6 else today.year - 1
+    return [f"AY {start_year}-{start_year + 1}"]
+
+
+def default_graduation_school_year() -> str:
+    active = get_active_term()
+    active_year = normalize_graduation_school_year(active.label) if active else ""
+    options = graduation_school_year_options()
+    return active_year or (options[0] if options else "")
+
+
+def validate_graduation_school_year(value: str | None) -> str:
+    school_year = normalize_graduation_school_year(value)
+    if not school_year:
+        raise ValueError("Choose a graduation school year from the list.")
+    configured_years = graduation_school_year_options()
+    if AcademicTerm.query.first() and school_year not in configured_years:
+        raise ValueError("Choose a graduation school year configured in the academic calendar.")
+    active_year = default_graduation_school_year()
+    if active_year and school_year != active_year:
+        raise ValueError(f"The graduation review window is open only for {active_year}.")
+    return school_year
 
 
 SAMPLE_FACULTY_CV_LIBRARY = (
@@ -2121,6 +2175,16 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
 def withdrawal_application_dict(application: WithdrawalApplication | None, include_student: bool = True) -> dict | None:
     if not application:
         return None
+    submission_date = (
+        application.created_at.date()
+        if application.created_at
+        else date.today()
+    )
+    withdrawal_window = (
+        subject_withdrawal_window(application.subject_enrollment, submission_date)
+        if application.subject_enrollment
+        else None
+    )
     payload = {
         "id": application.id,
         "student_id": application.student_id,
@@ -2129,6 +2193,8 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
         "withdrawal_scope": application.withdrawal_scope or "Subject",
         "subject_enrollment_id": application.subject_enrollment_id,
         "subject": subject_enrollment_dict(application.subject_enrollment) if application.subject_enrollment else None,
+        "withdrawal_window": withdrawal_window,
+        "academic_record_effect": "No academic record / no grade impact",
         "fee_status": application.fee_status,
         "requirement_status": application.requirement_status,
         "dean_decision": application.dean_decision,
@@ -2158,10 +2224,11 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
 def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, include_student: bool = True) -> dict | None:
     if not endorsement:
         return None
+    review_window = normalize_graduation_school_year(endorsement.review_window) or endorsement.review_window
     payload = {
         "id": endorsement.id,
         "student_id": endorsement.student_id,
-        "review_window": endorsement.review_window,
+        "review_window": review_window,
         "batch_name": endorsement.batch_name,
         "coursework_status": endorsement.coursework_status,
         "research_status": endorsement.research_status,
@@ -2214,6 +2281,7 @@ def workflow_message_dict(message: WorkflowMessage) -> dict:
         "previous_status": message.previous_status,
         "new_status": message.new_status,
         "status": message.status,
+        "requires_document_resubmission": bool(message.requires_document_resubmission),
         "created_at": iso(message.created_at),
         "resolved_at": iso(message.resolved_at),
         "read_at": iso(message.read_at),
@@ -2362,9 +2430,62 @@ RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Withdrawn",
 }
 NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken"}
+SUBJECT_WITHDRAWAL_WINDOW_DAYS = 7
+
+
+def subject_withdrawal_window(
+    item: SubjectEnrollment,
+    as_of: date | None = None,
+) -> dict:
+    """Return the penalty-free subject-withdrawal window for one enrollment.
+
+    Graduate School subject withdrawal is available before classes begin and
+    through the first seven calendar days of the semester. The request remains
+    valid if reviewers act after the deadline because eligibility is determined
+    from the date the student submitted it.
+    """
+    check_date = as_of or date.today()
+    term = item.term
+    if not term or not term.start_date:
+        return {
+            "eligible": False,
+            "status": "Needs semester dates",
+            "term_start_date": None,
+            "deadline": None,
+            "checked_on": iso(check_date),
+            "policy": (
+                "Subject withdrawal is allowed before classes begin or during "
+                "the first seven calendar days of class."
+            ),
+            "academic_record_effect": "No academic grade or penalty when approved within the window.",
+        }
+
+    deadline = term.start_date + timedelta(days=SUBJECT_WITHDRAWAL_WINDOW_DAYS - 1)
+    if check_date < term.start_date:
+        eligible = True
+        status = "Before classes begin"
+    elif check_date <= deadline:
+        eligible = True
+        status = "First week of classes"
+    else:
+        eligible = False
+        status = "Withdrawal window closed"
+    return {
+        "eligible": eligible,
+        "status": status,
+        "term_start_date": iso(term.start_date),
+        "deadline": iso(deadline),
+        "checked_on": iso(check_date),
+        "policy": (
+            "Subject withdrawal is allowed before classes begin or during "
+            "the first seven calendar days of class."
+        ),
+        "academic_record_effect": "No academic grade or penalty when approved within the window.",
+    }
 
 
 def subject_enrollment_dict(item: SubjectEnrollment) -> dict:
+    withdrawal_window = subject_withdrawal_window(item)
     return {
         "id": item.id,
         "student_id": item.student_id,
@@ -2385,6 +2506,14 @@ def subject_enrollment_dict(item: SubjectEnrollment) -> dict:
         "enrolled_at": iso(item.enrolled_at),
         "cancelled_at": iso(item.cancelled_at),
         "updated_at": iso(item.updated_at),
+        "withdrawal_eligible": withdrawal_window["eligible"],
+        "withdrawal_window": withdrawal_window,
+        "academic_record_effect": (
+            "No academic record / no grade impact"
+            if item.status == "Withdrawn"
+            and "no academic record" in (item.status_note or "").lower()
+            else None
+        ),
     }
 
 
@@ -3097,7 +3226,7 @@ BACKOFFICE_ROLES = {
 }
 
 ROLE_TRANSACTION_ACCESS = {
-    "academic_coordinator": {"course-audit", "research-gate", "panel-matching", "practicum", "graduation", "withdrawal", "awol"},
+    "academic_coordinator": {"course-audit", "research-gate", "panel-matching", "practicum", "graduation", "awol"},
     "research_coordinator": {"research-gate", "graduation"},
 }
 
@@ -5567,6 +5696,8 @@ def register_routes(app: Flask) -> None:
                 "withdrawal_application": withdrawal_application_dict(withdrawal_application, include_student=False),
                 "graduation_endorsement": graduation_endorsement_dict(graduation_endorsement, include_student=False),
                 "graduation_eligibility": graduation_eligibility(student),
+                "graduation_review_windows": graduation_school_year_options(),
+                "graduation_default_review_window": default_graduation_school_year(),
                 "awol_case": awol_case_dict(awol_case, include_student=False) if awol_case else None,
                 "residency_record": residency_enrollment_dict(residency_record) if residency_record else None,
                 "tasks": [task_dict(t) for t in tasks],
@@ -5713,6 +5844,8 @@ def register_routes(app: Flask) -> None:
                 "withdrawal_application": withdrawal_application_dict(withdrawal_application, include_student=False),
                 "graduation_endorsement": graduation_endorsement_dict(graduation_endorsement, include_student=False),
                 "graduation_eligibility": graduation_eligibility(student),
+                "graduation_review_windows": graduation_school_year_options(),
+                "graduation_default_review_window": default_graduation_school_year(),
                 "awol_case": awol_case_dict(awol_case, include_student=False) if awol_case else None,
                 "residency_record": residency_enrollment_dict(residency_record) if residency_record else None,
                 "tasks": [task_dict(t) for t in tasks],
@@ -6456,25 +6589,23 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/student-portal/requests/withdrawal", methods=["POST"])
     @require_api_login("student")
     def student_withdrawal_request():
-        return jsonify({
-            "error": (
-                "Students cannot change a subject's enrollment status. "
-                "Contact the Academic Coordinator for dropped or withdrawn subjects."
-            )
-        }), 403
-
-        # Retained as historical migration reference for existing withdrawal records.
-        # This branch is intentionally unreachable now that the Academic Coordinator
-        # exclusively owns subject status changes.
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         current = latest_withdrawal_application(student.id)
-        if current and current.status not in {"Denied", "Returned", "Returned for Clarification", "Withdrawn Confirmed"}:
+        terminal_statuses = {
+            "Denied",
+            "Returned",
+            "Returned for Clarification",
+            "Withdrawn Confirmed",
+            "Sent to Registrar",
+        }
+        if current and current.status not in terminal_statuses:
             return jsonify({"error": "You already have an active withdrawal request. Follow its current status instead of creating another request."}), 400
+        # Withdrawal is a structured portal request. A PDF is not required.
+        # Preserve support for legacy/optional attachments sent by older clients,
+        # but do not make them part of the current submission contract.
         attachment = request_attachment_from_payload(student, "withdrawal", data)
-        if not attachment:
-            return jsonify({"error": "Upload the completed withdrawal request PDF before submitting."}), 400
         if not (data.get("reason") or (current.reason if current else "")):
             return jsonify({"error": "Enter the reason for withdrawal before submitting."}), 400
         subject_enrollment_id = safe_int(
@@ -6489,6 +6620,17 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Choose one of your enrolled subjects to withdraw from."}), 400
         if subject_enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
             return jsonify({"error": "Only an active enrolled subject can be withdrawn. Refresh and choose another subject."}), 400
+        withdrawal_window = subject_withdrawal_window(subject_enrollment)
+        if not withdrawal_window["eligible"]:
+            deadline = withdrawal_window.get("deadline")
+            deadline_text = f" The deadline was {deadline}." if deadline else ""
+            return jsonify({
+                "error": (
+                    "Penalty-free subject withdrawal is only available before "
+                    "classes begin or during the first seven calendar days of class."
+                    f"{deadline_text} Contact Graduate School staff if the semester dates are incorrect."
+                )
+            }), 409
 
         previous_status = current.status if current else "Not Submitted"
         application = current if current and current.status in {"Returned", "Returned for Clarification"} else WithdrawalApplication(student_id=student.id)
@@ -6498,8 +6640,9 @@ def register_routes(app: Flask) -> None:
         application.subject_enrollment_id = subject_enrollment.id
         application.withdrawal_scope = "Subject"
         application.effective_term = subject_enrollment.term.label
-        application.request_attachment_id = attachment.id
-        application.fee_status = "Pending"
+        if attachment:
+            application.request_attachment_id = attachment.id
+        application.fee_status = "Not Applicable"
         application.requirement_status = "Not Applicable"
         application.dean_decision = "Pending"
         application.registrar_status = "Pending"
@@ -6507,30 +6650,39 @@ def register_routes(app: Flask) -> None:
         application.registrar_report_generated_at = None
         application.registrar_sent_at = None
         application.registrar_confirmed_at = None
-        application.effective_date = None
+        application.effective_date = date.today()
         application.status = "Submitted to GS Staff"
         application.decided_at = None
         application.completed_at = None
         application.updated_at = now_utc()
         db.session.flush()
-        bind_workflow_attachment(attachment, application, "Withdrawal Application", account)
+        if attachment:
+            bind_workflow_attachment(attachment, application, "Withdrawal Application", account)
         resolve_student_returns("withdrawal", student.id)
         add_task(student.id, "Record and forward withdrawal request", "Graduate School Staff", 3, 60)
         add_log(
             "withdrawal",
             student.id,
             "Student",
-            attachment.original_name,
+            attachment.original_name if attachment else "Structured student portal request",
             "Withdrawal request submitted",
             "Graduate School Staff",
             f"Subject: {subject_enrollment.course.code if subject_enrollment.course else subject_enrollment.course_id}; "
             f"semester: {application.effective_term}. Reason: {application.reason or 'Not provided'}. "
-            "File is uploaded for staff recording and forwarding.",
+            f"Eligibility: {withdrawal_window['status']} (deadline {withdrawal_window['deadline']}). "
+            "If approved, the subject is removed without an academic grade or penalty. "
+            "No PDF attachment is required.",
             previous_status=previous_status,
             new_status=application.status,
         )
         db.session.commit()
-        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will record and forward your request to the Dean."})
+        return jsonify({
+            "ok": True,
+            "message": (
+                "Submitted within the penalty-free withdrawal window. Graduate "
+                "School staff will record and forward your subject request to the Dean."
+            ),
+        })
 
     @app.route("/api/withdrawal/<int:application_id>/registrar-report")
     @require_api_login("staff", "academic_coordinator")
@@ -6542,6 +6694,20 @@ def register_routes(app: Flask) -> None:
         enrollment = application.subject_enrollment
         if not enrollment or not enrollment.course or not enrollment.term:
             return jsonify({"error": "This case has no valid subject enrollment attached."}), 400
+        if (
+            application.status not in {
+                "Subject Tagged - Registrar Preparation",
+                "Exported - Ready to Send",
+                "Sent to Registrar",
+            }
+            or enrollment.status != "Withdrawn"
+        ):
+            return jsonify({
+                "error": (
+                    "Graduate School Staff must tag the student as Withdrawn "
+                    "from the selected subject before generating a Registrar report."
+                )
+            }), 409
         first_generation = not application.registrar_report_generated_at
         application.registrar_report_generated_at = application.registrar_report_generated_at or now_utc()
         if first_generation:
@@ -6578,6 +6744,158 @@ def register_routes(app: Flask) -> None:
             mimetype="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    @app.route("/api/withdrawal/approved.xlsx", methods=["POST"])
+    @require_api_login("staff")
+    def withdrawal_approved_workbook():
+        """Export Dean-approved subject withdrawals as one Registrar Excel list."""
+        data = request.get_json(silent=True) or {}
+        try:
+            application_ids = [int(value) for value in (data.get("application_ids") or [])]
+        except (TypeError, ValueError):
+            return jsonify({"error": "Withdrawal application IDs must be whole numbers."}), 400
+        applications = approved_withdrawal_applications(application_ids or None)
+        if application_ids and len(applications) != len(set(application_ids)):
+            return jsonify({
+                "error": (
+                    "Every selected request must be Dean-approved, tagged as "
+                    "Withdrawn from its selected subject, and awaiting Registrar preparation."
+                )
+            }), 409
+        if not applications:
+            return jsonify({
+                "error": (
+                    "No Dean-approved subject withdrawals have been tagged and "
+                    "made ready for Excel export."
+                )
+            }), 400
+        untagged = [
+            application.student.name
+            for application in applications
+            if (
+                not application.subject_enrollment
+                or application.subject_enrollment.status != "Withdrawn"
+            )
+        ]
+        if untagged:
+            return jsonify({
+                "error": (
+                    "Tag each selected student as Withdrawn from the approved "
+                    "subject before exporting: " + ", ".join(untagged)
+                )
+            }), 409
+
+        exported_at = now_utc()
+        actor = workflow_actor_label(current_account())
+        for application in applications:
+            previous_status = application.status
+            application.status = "Exported - Ready to Send"
+            application.registrar_status = "Exported - Ready to Send"
+            application.registrar_report_generated_at = exported_at
+            application.updated_at = exported_at
+            add_log(
+                "withdrawal",
+                application.student_id,
+                actor,
+                "Approved subject withdrawals workbook",
+                "Approved subject withdrawal added to Registrar Excel list",
+                "Graduate School Staff",
+                withdrawal_notes(application),
+                previous_status=previous_status,
+                new_status=application.status,
+                visibility="internal",
+            )
+        workbook_bytes = withdrawal_registrar_workbook(applications)
+        db.session.commit()
+        filename = f"approved-subject-withdrawals-{date.today().isoformat()}.xlsx"
+        return Response(
+            workbook_bytes,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Exported-Count": str(len(applications)),
+            },
+        )
+
+    @app.route("/api/withdrawal/registrar-handoff", methods=["POST"])
+    @require_api_login("staff")
+    def withdrawal_registrar_handoff():
+        """Record GS Staff forwarding an exported withdrawal list to Registrar."""
+        data = request.get_json(silent=True) or {}
+        try:
+            application_ids = [int(value) for value in (data.get("application_ids") or [])]
+        except (TypeError, ValueError):
+            return jsonify({"error": "Withdrawal application IDs must be whole numbers."}), 400
+        if not application_ids:
+            return jsonify({"error": "Select at least one approved withdrawal request."}), 400
+
+        applications = approved_withdrawal_applications(application_ids)
+        if len(applications) != len(set(application_ids)):
+            return jsonify({
+                "error": "Every selected request must still be approved and awaiting Registrar handoff."
+            }), 409
+        not_exported = [
+            application.student.name
+            for application in applications
+            if application.registrar_status != "Exported - Ready to Send"
+        ]
+        if not_exported:
+            return jsonify({
+                "error": (
+                    "Download the approved-withdrawals Excel list before forwarding: "
+                    + ", ".join(not_exported)
+                )
+            }), 409
+
+        reference = (
+            str(data.get("registrar_reference") or "").strip()
+            or f"GS Registrar handoff {date.today().isoformat()}"
+        )
+        sent_at = now_utc()
+        actor = workflow_actor_label(current_account())
+        for application in applications:
+            previous_status = application.status
+            enrollment = application.subject_enrollment
+            if not enrollment or enrollment.status != "Withdrawn":
+                return jsonify({
+                    "error": (
+                        f"{application.student.name} has not yet been tagged as "
+                        "Withdrawn from the selected subject."
+                    )
+                }), 409
+            application.status = "Sent to Registrar"
+            application.registrar_status = "Sent - Awaiting Receipt"
+            application.registrar_reference = reference
+            application.registrar_sent_at = sent_at
+            application.completed_at = sent_at
+            application.updated_at = sent_at
+            resolve_standing_change_tasks(
+                application.student_id,
+                "Tag approved subject withdrawal",
+                "Graduate School Staff",
+            )
+            add_log(
+                "withdrawal",
+                application.student_id,
+                actor,
+                "Registrar handoff",
+                "Penalty-free subject withdrawal forwarded to Registrar",
+                "External Registrar",
+                withdrawal_notes(application),
+                previous_status=previous_status,
+                new_status=application.status,
+            )
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "count": len(applications),
+            "application_ids": [application.id for application in applications],
+            "message": (
+                f"Forwarded {len(applications)} approved subject withdrawal"
+                f"{'' if len(applications) == 1 else 's'} to the Registrar. "
+                "Each selected course was removed without an academic grade or penalty."
+            ),
+        })
 
     @app.route("/api/standing-changes/<slug>/<int:student_id>/registrar-report")
     @require_api_login("staff", "academic_coordinator")
@@ -6732,17 +7050,53 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         attachment = request_attachment_from_payload(student, "graduation", data)
+        if not attachment:
+            return jsonify({
+                "error": (
+                    "Upload the signed graduation application / review-window "
+                    "PDF before submitting Step 1."
+                )
+            }), 400
         eligibility = graduation_eligibility(student)
+        if not eligibility["eligible"]:
+            return jsonify({
+                "error": (
+                    "The graduation application opens only after coursework, research, "
+                    "completion documents, and any required practicum are complete."
+                )
+            }), 400
         endorsement = latest_graduation_endorsement(student.id)
         if endorsement and endorsement.endorsement_status not in {"Not Eligible", "Returned for Clarification"}:
             return jsonify({"error": "Your graduation request is already in review. Submitted details remain saved while the current reviewer completes the next stage."}), 400
+        latest_return = latest_open_student_return("graduation", student.id)
+        if (
+            latest_return
+            and latest_return.requires_document_resubmission
+            and (
+                not attachment.uploaded_at
+                or not latest_return.created_at
+                or attachment.uploaded_at <= latest_return.created_at
+            )
+        ):
+            return jsonify({
+                "error": (
+                    "GS Staff requires a replacement graduation application PDF. "
+                    "Upload a new file before resubmitting Step 1."
+                )
+            }), 400
+        try:
+            review_window = validate_graduation_school_year(
+                data.get("review_window") or data.get("term")
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         previous_status = endorsement.endorsement_status if endorsement else "Not Submitted"
         student_remark = (data.get("remarks") or "").strip()
         if not endorsement:
             endorsement = GraduationEndorsement(student_id=student.id)
             db.session.add(endorsement)
         apply_graduation_eligibility(endorsement, eligibility)
-        endorsement.review_window = (data.get("review_window") or data.get("term") or "Current review window").strip()
+        endorsement.review_window = review_window
         endorsement.request_attachment_id = attachment.id if attachment else endorsement.request_attachment_id
         # Eligibility is displayed as monitoring context, but the workflow decision
         # is recorded only after the AC and Research Coordinator reviews.
@@ -8321,9 +8675,13 @@ def register_routes(app: Flask) -> None:
         note = str(data.get("note") or "").strip()
         raw_effective_date = str(data.get("effective_date") or "").strip()
 
-        if new_status not in {"Dropped", "Withdrawn"}:
+        if new_status != "Dropped":
             return jsonify({
-                "error": "Choose either Dropped or Withdrawn."
+                "error": (
+                    "Only a dropped-subject status can be recorded here. "
+                    "Penalty-free withdrawal must be initiated by the student "
+                    "and completed through the Withdrawal workflow."
+                )
             }), 400
         if enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
             return jsonify({
@@ -9227,28 +9585,25 @@ def register_routes(app: Flask) -> None:
                     return jsonify({"error": "This withdrawal request is not linked to a valid subject enrollment."}), 400
                 if subject_enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
                     return jsonify({"error": f"The selected subject is already {subject_enrollment.status}."}), 409
-                effective_date = application.effective_date or date.today()
-                application.status = "Withdrawn Confirmed"
+                application.effective_date = application.effective_date or (
+                    application.created_at.date() if application.created_at else date.today()
+                )
+                application.status = "Approved - Awaiting Subject Tag"
                 application.requirement_status = "Not Applicable"
-                application.registrar_status = "Report Available"
-                application.completed_at = now_utc()
-                subject_enrollment.status = "Withdrawn"
-                subject_enrollment.source_reference = "Dean-approved subject withdrawal"
-                subject_enrollment.cancelled_at = datetime.combine(effective_date, datetime.min.time())
-                subject_enrollment.updated_at = now_utc()
-                record = CourseRecord.query.filter_by(
-                    student_id=application.student_id,
-                    course_id=subject_enrollment.course_id,
-                ).first()
-                if record and record.term_label == subject_enrollment.term.label:
-                    record.status = "Withdrawn"
-                    record.evidence_reference = "Dean-approved subject withdrawal"
-                    record.remarks = "\n".join(
-                        part for part in [record.remarks, f"Subject withdrawal approved {effective_date.isoformat()}."] if part
-                    )
-                    record.updated_at = now_utc()
-                result = f"Withdrawal approved by Dean; {subject_enrollment.course.code} marked Withdrawn"
-                next_owner = "Student"
+                application.registrar_status = "Pending Subject Tag"
+                application.completed_at = None
+                result = (
+                    f"Withdrawal approved by Dean; {subject_enrollment.course.code} "
+                    "assigned to GS Staff for subject-withdrawal tagging"
+                )
+                next_owner = "Graduate School Staff"
+                add_task(
+                    application.student_id,
+                    "Tag approved subject withdrawal and forward to Registrar",
+                    "Graduate School Staff",
+                    3,
+                    60,
+                )
             else:
                 application.dean_decision = "Denied"
                 application.status = "Denied"
@@ -9257,6 +9612,11 @@ def register_routes(app: Flask) -> None:
                 # A denied subject withdrawal does not alter the program-level
                 # lifecycle or the enrollment of any other subject.
             application.decided_at = now_utc()
+            resolve_standing_change_tasks(
+                application.student_id,
+                "Review withdrawal request",
+                "Dean",
+            )
             if note:
                 application.staff_remarks = "\n".join([part for part in [application.staff_remarks, f"Dean: {note}"] if part])
                 add_transition_comment_message(
@@ -10201,11 +10561,13 @@ def register_routes(app: Flask) -> None:
     # Supplies each workflow screen with student-specific context before
     # submission, such as current audit status or panel recommendations.
     @app.route("/api/transactions/<slug>/context")
-    @require_api_login(*BACKOFFICE_ROLES)
+    @require_api_login(*BACKOFFICE_ROLES, "dean")
     def transaction_context(slug: str):
         if slug not in TRANSACTION_BY_SLUG:
             return jsonify({"error": "Unknown workflow."}), 404
         account = current_account()
+        if account.role == "dean" and slug != "graduation":
+            return jsonify({"error": "This workflow is not assigned to your role."}), 403
         allowed = ROLE_TRANSACTION_ACCESS.get(account.role)
         if allowed is not None and slug not in allowed:
             return jsonify({"error": "This workflow is not assigned to your role."}), 403
@@ -10575,6 +10937,21 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "This workflow is not assigned to your role."}), 403
         recipient_role = (data.get("recipient_role") or "Graduate School Staff").strip()
         action_type = (data.get("action_type") or "note").strip()
+        require_document_resubmission = str(
+            data.get("require_document_resubmission") or ""
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        if require_document_resubmission and not (
+            account.role == "staff"
+            and slug == "graduation"
+            and action_type == "return"
+            and recipient_role == "Student"
+        ):
+            return jsonify({
+                "error": (
+                    "Only Graduate School Staff may require a replacement graduation "
+                    "document when returning the request to the student."
+                )
+            }), 403
         reply_to_message_id = safe_int(data.get("reply_to_message_id"), 0) or None
         reply_to = None
         if reply_to_message_id:
@@ -10622,6 +10999,28 @@ def register_routes(app: Flask) -> None:
                 visibility,
                 reply_to_message_id=reply_to_message_id,
             )
+            if require_document_resubmission:
+                endorsement = latest_graduation_endorsement(student.id)
+                if not endorsement:
+                    raise ValueError("This student does not have a graduation application to return.")
+                message.requires_document_resubmission = True
+                endorsement.request_attachment_id = None
+                endorsement.updated_at = now_utc()
+                add_log(
+                    "graduation",
+                    student.id,
+                    workflow_actor_label(account),
+                    "GS Staff document review",
+                    "Replacement graduation application PDF required",
+                    "Student",
+                    (
+                        "The active Step 1 document was reset. The previous PDF remains "
+                        "in file history, and the student must upload a newer PDF before resubmitting."
+                    ),
+                    previous_status=message.previous_status,
+                    new_status=message.new_status,
+                    visibility="student_visible",
+                )
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
@@ -10654,8 +11053,12 @@ def register_routes(app: Flask) -> None:
         updated = []
         skipped = []
         comment = (data.get("comment") or "").strip()
-        review_window = (data.get("review_window") or "Current review window").strip()
         try:
+            review_window = (
+                validate_graduation_school_year(data.get("review_window"))
+                if data.get("review_window")
+                else ""
+            )
             batch_name = graduation_batch_name_from_payload(data, required=action == "create_batch")
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
@@ -10688,13 +11091,20 @@ def register_routes(app: Flask) -> None:
                 result = action_labels[action]
 
                 if action == "create_batch":
-                    if current_status not in {"Not Prepared", "For Review", "Not Eligible", "Returned for Clarification"}:
+                    if not eligibility["eligible"]:
+                        raise ValueError("Student is not currently eligible for graduation")
+                    if not endorsement or not endorsement.request_attachment_id:
+                        raise ValueError(
+                            "Student must submit the graduation application / review-window PDF before batch creation"
+                        )
+                    if current_status not in {"For Review", "Returned for Clarification"}:
                         raise ValueError(f"Current stage is {current_status}")
-                    if not endorsement:
-                        endorsement = GraduationEndorsement(student_id=student.id, review_window=review_window)
-                        db.session.add(endorsement)
+                    if endorsement.batch_name:
+                        raise ValueError(f"Student is already assigned to {endorsement.batch_name}")
                     apply_graduation_eligibility(endorsement, eligibility)
-                    endorsement.review_window = review_window
+                    endorsement.review_window = review_window or validate_graduation_school_year(
+                        endorsement.review_window or default_graduation_school_year()
+                    )
                     endorsement.batch_name = batch_name
                     endorsement.endorsement_status = "For Review"
                     next_owner = "Graduate School Staff"
@@ -10704,10 +11114,16 @@ def register_routes(app: Flask) -> None:
                         raise ValueError(f"Current stage is {current_status}")
                     if not endorsement:
                         raise ValueError("Create the graduation batch before forwarding it")
+                    if not endorsement.request_attachment_id:
+                        raise ValueError(
+                            "Student graduation application documents are required before coursework routing"
+                        )
                     if not endorsement.batch_name:
                         raise ValueError("Create the graduation batch before forwarding it")
                     apply_graduation_eligibility(endorsement, eligibility)
-                    endorsement.review_window = review_window
+                    endorsement.review_window = review_window or validate_graduation_school_year(
+                        endorsement.review_window or default_graduation_school_year()
+                    )
                     endorsement.endorsement_status = "Coursework Review"
                     next_owner = "Academic Coordinator"
                     result = "Graduation candidate list compiled and sent for coursework review"
@@ -11419,12 +11835,188 @@ def apply_withdrawal_payload(application: WithdrawalApplication, data: MultiDict
 
 def withdrawal_notes(application: WithdrawalApplication) -> str:
     subject = application.subject_enrollment
+    window = (
+        subject_withdrawal_window(
+            subject,
+            application.created_at.date() if application.created_at else date.today(),
+        )
+        if subject
+        else None
+    )
     return (
         f"Subject: {subject.course.code if subject and subject.course else 'Not selected'}; "
         f"semester: {application.effective_term or 'Not specified'}; reason: {application.reason or 'Not provided'}; "
+        f"withdrawal window: {window['status'] if window else 'Not verified'}; "
         f"Dean decision: {application.dean_decision}; "
-        f"Registrar: {application.registrar_status}; reference: {application.registrar_reference or 'Pending'}."
+        f"Registrar: {application.registrar_status}; reference: {application.registrar_reference or 'Pending'}; "
+        "academic record effect: no grade or academic penalty."
     )
+
+
+def approved_withdrawal_applications(application_ids: list[int] | None = None) -> list[WithdrawalApplication]:
+    query = WithdrawalApplication.query.filter(
+        WithdrawalApplication.dean_decision == "Approved",
+        WithdrawalApplication.status.in_({
+            "Subject Tagged - Registrar Preparation",
+            "Exported - Ready to Send",
+        }),
+    )
+    if application_ids is not None:
+        query = query.filter(WithdrawalApplication.id.in_(application_ids or {-1}))
+    return query.order_by(WithdrawalApplication.decided_at.asc(), WithdrawalApplication.id.asc()).all()
+
+
+def apply_penalty_free_subject_withdrawal(application: WithdrawalApplication) -> None:
+    """Close one approved subject enrollment without adding an academic mark."""
+    enrollment = application.subject_enrollment
+    if not enrollment or not enrollment.course or not enrollment.term:
+        raise ValueError("This withdrawal request is not linked to a valid subject enrollment.")
+    if enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
+        raise ValueError(
+            f"{enrollment.course.code} is already {enrollment.status}; refresh the Registrar handoff list."
+        )
+
+    effective_date = application.effective_date or (
+        application.created_at.date() if application.created_at else date.today()
+    )
+    changed_at = now_utc()
+    enrollment.status = "Withdrawn"
+    enrollment.source_reference = "Approved early subject withdrawal - no academic record"
+    enrollment.status_note = (
+        "Approved before classes or during the first week. Retained in the "
+        "workflow audit only; no academic grade, penalty, or transcript mark."
+    )
+    enrollment.status_changed_at = changed_at
+    enrollment.cancelled_at = datetime.combine(effective_date, time.min)
+    enrollment.updated_at = changed_at
+
+    # CourseRecord is the academic monitoring projection. Reset it to the
+    # curriculum's not-started state so the withdrawal never appears as a grade
+    # or adverse course result. WithdrawalApplication remains the audit trail.
+    record = CourseRecord.query.filter_by(
+        student_id=application.student_id,
+        course_id=enrollment.course_id,
+    ).first()
+    if record and (
+        record.term_label == enrollment.term.label
+        or record.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+    ):
+        record.status = "Not Started"
+        record.term_label = None
+        record.evidence_reference = None
+        record.grade_value = None
+        record.grade_status = "No Grade"
+        record.resolved_at = None
+        record.remarks = None
+        record.updated_at = changed_at
+
+    remaining_active = SubjectEnrollment.query.filter(
+        SubjectEnrollment.student_id == application.student_id,
+        SubjectEnrollment.term_id == enrollment.term_id,
+        SubjectEnrollment.id != enrollment.id,
+        SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES),
+    ).count()
+    if not remaining_active:
+        term_enrollment = TermEnrollment.query.filter_by(
+            student_id=application.student_id,
+            term_id=enrollment.term_id,
+        ).first()
+        if term_enrollment:
+            term_enrollment.status = "Confirmed"
+            term_enrollment.source_reference = "Penalty-free subject withdrawal"
+            term_enrollment.confirmed_at = changed_at
+        if application.student.enrollment_tag == "Enrolled":
+            application.student.enrollment_tag = "Not Enrolled"
+    application.student.standing = "Active"
+    application.updated_at = changed_at
+
+
+def withdrawal_registrar_workbook(applications: list[WithdrawalApplication]) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Approved Withdrawals"
+    sheet.freeze_panes = "A4"
+
+    sheet.merge_cells("A1:P1")
+    title = sheet["A1"]
+    title.value = "USLS Graduate School Approved Subject Withdrawals"
+    title.font = Font(name="Arial", size=14, bold=True, color="FFFFFF")
+    title.fill = PatternFill("solid", fgColor="166534")
+    title.alignment = Alignment(horizontal="center")
+
+    sheet.merge_cells("A2:P2")
+    note = sheet["A2"]
+    note.value = (
+        "Registrar action list. Each request was submitted before classes began "
+        "or within the first seven calendar days and carries no academic grade or penalty."
+    )
+    note.font = Font(name="Arial", size=10, italic=True, color="475569")
+    note.alignment = Alignment(wrap_text=True)
+
+    headers = [
+        "Application ID",
+        "Student ID",
+        "Student Name",
+        "Program",
+        "Subject Code",
+        "Subject Title",
+        "Units",
+        "Semester",
+        "Semester Start",
+        "Withdrawal Deadline",
+        "Request Date",
+        "Dean Approval Date",
+        "Reason",
+        "Registrar Action",
+        "Academic Record Effect",
+        "GS Status",
+    ]
+    header_fill = PatternFill("solid", fgColor="DCFCE7")
+    for column, value in enumerate(headers, 1):
+        cell = sheet.cell(row=3, column=column, value=value)
+        cell.font = Font(name="Arial", size=10, bold=True, color="14532D")
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    for row_index, application in enumerate(applications, 4):
+        enrollment = application.subject_enrollment
+        if not enrollment or not enrollment.course or not enrollment.term:
+            continue
+        request_date = application.created_at.date() if application.created_at else date.today()
+        window = subject_withdrawal_window(enrollment, request_date)
+        values = [
+            application.id,
+            application.student.student_number,
+            application.student.name,
+            application.student.program.code if application.student.program else "",
+            enrollment.course.code,
+            enrollment.course.title,
+            enrollment.course.units,
+            enrollment.term.label,
+            enrollment.term.start_date,
+            date.fromisoformat(window["deadline"]) if window.get("deadline") else "",
+            request_date,
+            application.decided_at.date() if application.decided_at else "",
+            application.reason or "",
+            "Confirm subject withdrawal (already tagged Withdrawn)",
+            "No academic record / no grade impact",
+            application.registrar_status,
+        ]
+        for column, value in enumerate(values, 1):
+            cell = sheet.cell(row=row_index, column=column, value=value)
+            cell.font = Font(name="Arial", size=10)
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+            if isinstance(value, date):
+                cell.number_format = "yyyy-mm-dd"
+
+    widths = [15, 16, 28, 12, 16, 34, 8, 30, 16, 19, 15, 18, 38, 24, 31, 25]
+    for index, width in enumerate(widths, 1):
+        sheet.column_dimensions[chr(64 + index)].width = width
+    sheet.auto_filter.ref = f"A3:P{max(sheet.max_row, 3)}"
+
+    output = io.BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 def graduation_research_progress(student: Student, research_case: ResearchCase | None = None) -> dict:
@@ -11583,6 +12175,14 @@ def graduation_research_progress(student: Student, research_case: ResearchCase |
 
 def graduation_eligibility(student: Student) -> dict:
     audit = compute_course_audit(student)
+    completed_courses = [
+        {
+            "id": row["course"].id,
+            "code": row["course"].code,
+            "title": row["course"].title,
+        }
+        for row in audit["completed"]
+    ]
     missing_coursework = [
         f"{row['course'].code} - {row['course'].title}"
         for row in audit["missing"] + audit["incomplete"]
@@ -11733,6 +12333,7 @@ def graduation_eligibility(student: Student) -> dict:
         "missing_coursework": missing_coursework,
         "missing_research_requirements": research_missing,
         "missing_practicum_requirement": missing_practicum,
+        "completed_courses": completed_courses,
         "checklist": checklist,
         "research_progress": research_progress,
         "pending_tasks": [task_dict(task) for task in open_tasks],
@@ -12020,10 +12621,10 @@ def workflow_transition_action(result: str) -> str:
         return "return"
     if "reject" in value or "denied" in value or "not accepted" in value:
         return "reject"
-    if "forward" in value or "sent" in value or "handoff" in value:
-        return "forward"
     if "approv" in value or "verified" in value or "reviewed" in value or "complete" in value:
         return "approve"
+    if "forward" in value or "sent" in value or "handoff" in value:
+        return "forward"
     return "transition"
 
 
@@ -12370,9 +12971,7 @@ def workflow_approval_item(kind: str, item) -> dict:
         "batch_name": item.batch_name,
         "details": graduation_notes(item),
         "record": record_payload,
-        "has_submitted_documents": bool(
-            record_payload.get("request_attachment") or record_payload.get("attachments")
-        ),
+        "has_submitted_documents": bool(record_payload.get("request_attachment")),
         "eligibility": eligibility,
         **meta,
     }
@@ -12795,21 +13394,31 @@ def graduation_candidate_payload() -> list[dict]:
     rows = []
     for student in students:
         eligibility = graduation_eligibility(student)
-        if not eligibility["eligible"]:
-            continue
         endorsement = latest_graduation_endorsement(student.id)
+        if not eligibility["eligible"] and (not endorsement or not endorsement.batch_name):
+            continue
         case_meta = workflow_case_meta("graduation", student.id)
         endorsement_payload = graduation_endorsement_dict(endorsement) if endorsement else None
+        application_submitted = bool(
+            endorsement_payload
+            and endorsement_payload.get("request_attachment")
+        )
         rows.append({
             "student": student_brief(student),
             "eligibility": eligibility,
             "endorsement": endorsement_payload,
-            "has_submitted_documents": bool(
-                endorsement_payload
-                and (endorsement_payload.get("request_attachment") or endorsement_payload.get("attachments"))
+            "application_submitted": application_submitted,
+            "application_status": (
+                "Application Submitted"
+                if application_submitted
+                else "Awaiting Student Application"
             ),
+            "has_submitted_documents": application_submitted,
             **case_meta,
-            "next_action_owner": case_meta["next_action_owner"] or eligibility["next_owner"],
+            "next_action_owner": (
+                case_meta["next_action_owner"]
+                or ("Student" if not application_submitted else eligibility["next_owner"])
+            ),
         })
     return sorted(rows, key=lambda item: item["last_activity_at"] or "", reverse=True)
 
@@ -12858,6 +13467,8 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         context["roster"] = withdrawal_roster_payload()
     elif slug == "graduation":
         context["roster"] = graduation_candidate_payload()
+        context["graduation_review_windows"] = graduation_school_year_options()
+        context["graduation_default_review_window"] = default_graduation_school_year()
     elif slug == "awol":
         sync_automatic_awol_statuses(commit=True)
         context["roster"] = awol_residency_roster_payload()
@@ -14952,12 +15563,43 @@ def handle_withdrawal(data: MultiDict) -> int:
         application.status = "Dean Review"
         next_owner = "Dean"
         result = "Withdrawal request recorded and forwarded to the Dean"
+        resolve_standing_change_tasks(
+            student.id,
+            "Record and forward withdrawal request",
+            "Graduate School Staff",
+        )
         add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+    elif action == "tag_subject_withdrawn":
+        account = require_workflow_actor("staff")
+        if (
+            application.dean_decision != "Approved"
+            or application.status not in {
+                "Approved - Awaiting Subject Tag",
+                "Approved - Registrar Preparation",
+            }
+        ):
+            raise ValueError(
+                "The Dean must approve this request before GS Staff can tag the selected subject as Withdrawn."
+            )
+        apply_penalty_free_subject_withdrawal(application)
+        application.status = "Subject Tagged - Registrar Preparation"
+        application.registrar_status = "Pending Excel Export"
+        application.completed_at = None
+        application.updated_at = now_utc()
+        next_owner = "Graduate School Staff"
+        result = (
+            f"{application.subject_enrollment.course.code} tagged as Withdrawn "
+            "in Official Offered Subjects; Registrar Excel preparation is now available"
+        )
     elif action in {
         "coordinator_follow_through", "notify_student_of_approval",
         "verify_requirements", "return_requirements",
     }:
-        raise ValueError("That action is not part of the standalone withdrawal BPM. Follow-through belongs directly to Graduate School Staff after Dean approval.")
+        raise ValueError(
+            "That action is not available here. After Dean approval, Graduate "
+            "School Staff must first tag the selected subject as Withdrawn, then "
+            "use the approved-withdrawals Excel popup to forward the list."
+        )
     else:
         raise ValueError("Choose the next available withdrawal workflow action.")
 
@@ -15104,7 +15746,10 @@ def handle_graduation(data: MultiDict) -> int:
     previous_status = endorsement.endorsement_status
     eligibility = graduation_eligibility(student)
     apply_graduation_eligibility(endorsement, eligibility)
-    endorsement.review_window = (data.get("review_window") or endorsement.review_window or "Current review window").strip()
+    if data.get("review_window"):
+        endorsement.review_window = validate_graduation_school_year(data.get("review_window"))
+    elif not normalize_graduation_school_year(endorsement.review_window):
+        endorsement.review_window = default_graduation_school_year()
     requested_status = (data.get("endorsement_status") or "").strip()
     if data.get("dean_remarks"):
         endorsement.dean_remarks = data.get("dean_remarks")
@@ -15114,6 +15759,12 @@ def handle_graduation(data: MultiDict) -> int:
 
     if requested_status == "Coursework Review":
         account = require_workflow_actor("staff")
+        if not endorsement.request_attachment_id:
+            raise ValueError(
+                "The student must submit the graduation application / review-window PDF before staff review."
+            )
+        if not endorsement.batch_name:
+            raise ValueError("Create a graduation batch before forwarding the candidate for coursework review.")
         if endorsement.endorsement_status not in {"For Review", "Not Eligible"}:
             raise ValueError("GS Staff can start coursework review only for a compiled or previously ineligible candidate.")
         endorsement.endorsement_status = "Coursework Review"
@@ -18691,6 +19342,7 @@ def ensure_workflow_activity_schema() -> None:
             "reply_to_message_id": "INTEGER",
             "visibility": "VARCHAR(30)",
             "read_at": "DATETIME",
+            "requires_document_resubmission": "BOOLEAN NOT NULL DEFAULT 0",
         }
         for name, sql_type in message_additions.items():
             if name not in message_existing:
@@ -20492,7 +21144,10 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
         or is_readmission_demo
     )
     withdrawal_application = latest_withdrawal_application(student.id) if is_withdrawal_demo else None
-    withdrawal_complete = bool(withdrawal_application and withdrawal_application.status == "Withdrawn Confirmed")
+    withdrawal_complete = bool(
+        withdrawal_application
+        and withdrawal_application.status in {"Withdrawn Confirmed", "Sent to Registrar"}
+    )
     student.program_id = program.id
     student.entry_year = student.entry_year if is_research_demo else 2026 if (is_withdrawal_demo or is_new_demo) else 2024
     student.academic_year_entry = student.academic_year_entry if is_research_demo else "2026-2027" if (is_withdrawal_demo or is_new_demo) else "2024-2025"
@@ -20501,6 +21156,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     student.enrollment_tag = (
         "Completed" if workflow == "graduation"
         else "LOA" if is_readmission_demo
+        else "Not Enrolled" if is_withdrawal_demo and withdrawal_complete
         else "Not Enrolled" if (
             is_enrollment_demo
             or is_adjustments_demo
@@ -20531,7 +21187,14 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     for course_index, course in enumerate(demo_courses):
         record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
         if not record:
-            record = CourseRecord(student_id=student.id, course_id=course.id)
+            # Some workflow fixtures look up the active term before assigning
+            # their final status. Give new records a valid interim value so
+            # SQLAlchemy's query-triggered autoflush cannot violate NOT NULL.
+            record = CourseRecord(
+                student_id=student.id,
+                course_id=course.id,
+                status="Not Started",
+            )
             db.session.add(record)
         if course.code in current_course_codes:
             active_term = active_term or get_active_term()
@@ -20543,11 +21206,11 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             record.resolved_at = None
         elif is_withdrawal_demo:
             is_active_course = course.code == active_course_code
-            record.status = "Withdrawn" if is_active_course and withdrawal_complete else "Current" if is_active_course else "Not Started"
+            record.status = "Not Started" if is_active_course and withdrawal_complete else "Current" if is_active_course else "Not Started"
             record.grade_status = "No Grade"
             record.grade_value = None
-            record.term_label = active_term.label if is_active_course and active_term else None
-            record.evidence_reference = "Withdrawal demo active enrollment" if is_active_course else None
+            record.term_label = active_term.label if is_active_course and active_term and not withdrawal_complete else None
+            record.evidence_reference = "Withdrawal demo active enrollment" if is_active_course and not withdrawal_complete else None
             record.resolved_at = None
         elif is_new_demo:
             completed_count = 0
@@ -20608,6 +21271,11 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
                 )
                 db.session.add(enrollment)
             enrollment.status = "Withdrawn" if withdrawal_complete else "Enrolled"
+            enrollment.status_note = (
+                "Approved early subject withdrawal; no academic record or grade impact."
+                if withdrawal_complete
+                else None
+            )
             enrollment.cancelled_at = withdrawal_application.completed_at if withdrawal_complete and withdrawal_application else None
             enrollment.updated_at = now_utc()
             if not withdrawal_complete:
@@ -20842,40 +21510,64 @@ def workflow_demo_students_payload() -> list[dict]:
 
 
 def normalize_withdrawal_workflow_states() -> int:
-    """Collapse legacy post-approval stages into the immediate subject update."""
+    """Migrate retired withdrawal states into the Registrar handoff workflow."""
     legacy_post_approval_statuses = {
         "Approved - Follow-through",
         "Coordinator Follow-through Complete",
         "Requirements Pending",
         "Requirements Submitted",
         "Requirements Verified",
-        "Approved - Registrar Preparation",
-        "Sent to Registrar",
     }
     updated = 0
     for application in WithdrawalApplication.query.all():
-        if application.dean_decision == "Approved" and application.status in legacy_post_approval_statuses and application.subject_enrollment:
-            application.status = "Withdrawn Confirmed"
-            application.registrar_status = "Report Available"
-            application.completed_at = application.completed_at or now_utc()
-            application.subject_enrollment.status = "Withdrawn"
-            application.subject_enrollment.cancelled_at = application.subject_enrollment.cancelled_at or now_utc()
-            application.subject_enrollment.source_reference = "Dean-approved subject withdrawal"
-            record = CourseRecord.query.filter_by(
-                student_id=application.student_id,
-                course_id=application.subject_enrollment.course_id,
-            ).first()
-            if record and application.subject_enrollment.term and record.term_label == application.subject_enrollment.term.label:
-                record.status = "Withdrawn"
-                record.evidence_reference = "Dean-approved subject withdrawal"
+        if application.dean_decision == "Approved" and application.status in legacy_post_approval_statuses:
+            application.status = "Approved - Awaiting Subject Tag"
+            application.registrar_status = "Pending Subject Tag"
+            application.completed_at = None
+            updated += 1
+        if application.dean_decision == "Approved" and application.status == "Approved - Registrar Preparation":
+            if application.subject_enrollment and application.subject_enrollment.status == "Withdrawn":
+                application.status = "Subject Tagged - Registrar Preparation"
+                application.registrar_status = "Pending Excel Export"
+            else:
+                application.status = "Approved - Awaiting Subject Tag"
+                application.registrar_status = "Pending Subject Tag"
+            application.completed_at = None
             updated += 1
         if application.requirement_status != "Not Applicable":
             application.requirement_status = "Not Applicable"
             updated += 1
-        if application.status == "Withdrawn Confirmed" and application.subject_enrollment:
+        if application.status == "Withdrawn Confirmed":
+            application.status = "Sent to Registrar"
+            application.registrar_status = "Sent - Awaiting Receipt"
+            application.registrar_sent_at = application.registrar_sent_at or application.completed_at or now_utc()
+            updated += 1
+        if application.status == "Sent to Registrar" and application.subject_enrollment:
             application.withdrawal_scope = "Subject"
-            application.registrar_status = "Report Available"
+            application.registrar_status = "Sent - Awaiting Receipt"
             application.subject_enrollment.status = "Withdrawn"
+            application.subject_enrollment.status_note = (
+                application.subject_enrollment.status_note
+                or "Approved early subject withdrawal; no academic record or grade impact."
+            )
+            record = CourseRecord.query.filter_by(
+                student_id=application.student_id,
+                course_id=application.subject_enrollment.course_id,
+            ).first()
+            if record and (
+                record.status == "Withdrawn"
+                or (
+                    application.subject_enrollment.term
+                    and record.term_label == application.subject_enrollment.term.label
+                )
+            ):
+                record.status = "Not Started"
+                record.term_label = None
+                record.evidence_reference = None
+                record.grade_value = None
+                record.grade_status = "No Grade"
+                record.resolved_at = None
+                record.remarks = None
             student = application.student
             if student and student.standing == "Withdrawn":
                 student.standing = "Active"

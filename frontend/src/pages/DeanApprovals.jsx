@@ -10,14 +10,35 @@ import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } fr
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import { printDataTable } from "../lib/print";
+import { GraduationRoster } from "./WorkflowPage";
 
-const DEAN_NAV = [
-  { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
-  { id: "practicum", label: "Practicum Reports", icon: Briefcase },
-  { id: "graduation", label: "Graduation Review", icon: GraduationCap },
-  { id: "withdrawal", label: "Withdrawal Requests", icon: LogOut },
-  { id: "leave", label: "LOA / Readmission / AWOL", icon: CalendarOff },
-  { id: "reports", label: "Reports / Analytics", icon: BarChart3 },
+const DEAN_NAV_GROUPS = [
+  {
+    label: "Overview",
+    items: [
+      { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: "Lifecycle Workflows",
+    items: [
+      { id: "practicum", number: 7, label: "Practicum Reports", icon: Briefcase },
+      { id: "graduation", number: 8, label: "Graduation Review", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Standalone Processes",
+    items: [
+      { id: "leave", label: "LOA / Readmission / AWOL", icon: CalendarOff },
+      { id: "withdrawal", label: "Withdrawal Requests", icon: LogOut },
+    ],
+  },
+  {
+    label: "Monitoring & Support",
+    items: [
+      { id: "reports", label: "Reports / Analytics", icon: BarChart3 },
+    ],
+  },
 ];
 
 const CLARIFICATION_TEMPLATES = [
@@ -270,6 +291,37 @@ function sortSelectedDeanItems(items, selectedIds) {
   });
 }
 
+function DeanGraduationWorkspace() {
+  const { data: context, loading, error, refetch } = useApi(
+    () => api.transactionContext("graduation"),
+    [],
+  );
+  const [result, setResult] = useState(null);
+  const [submitError, setSubmitError] = useState("");
+
+  if (loading && !context) return <Card className="p-6"><Spinner label="Loading graduation workflow…" /></Card>;
+  if (error && !context) return <Card className="p-6"><EmptyState icon={AlertTriangle} title="Could not load graduation workflow" hint={error} /></Card>;
+
+  return (
+    <Card className="p-6">
+      <GraduationRoster
+        context={context || { roster: [] }}
+        submit={async () => false}
+        submitting={false}
+        refreshing={loading}
+        result={result}
+        submitError={submitError}
+        clearSubmitFeedback={() => {
+          setResult(null);
+          setSubmitError("");
+        }}
+        refetch={refetch}
+        accountRole="dean"
+      />
+    </Card>
+  );
+}
+
 export default function DeanApprovals() {
   const { user, logout } = useAuth();
   const { data, loading, error, refetch } = useApi(() => api.approvals(), []);
@@ -453,9 +505,30 @@ export default function DeanApprovals() {
     await refetch();
   }
 
+  if (view === "graduation") {
+    return (
+      <div className="min-h-screen bg-canvas lg:flex">
+        <RoleSidebar roleLabel="Dean Portal" groups={DEAN_NAV_GROUPS} active={view} onChange={setView} />
+        <div className="min-w-0 flex-1">
+          <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white"><Gavel className="h-5 w-5" /></span>
+            <div className="flex-1">
+              <p className="font-display text-[15px] font-semibold text-ink">Dean · Graduation Review</p>
+              <p className="text-[11px] text-slate-400">{user?.full_name}</p>
+            </div>
+            <button type="button" onClick={logout} className="btn-ghost cursor-pointer"><LogOut className="h-4 w-4" /> Sign out</button>
+          </header>
+          <main className="mx-auto w-full max-w-[1600px] px-4 py-6 lg:px-8">
+            <DeanGraduationWorkspace />
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-canvas lg:flex">
-      <RoleSidebar roleLabel="Dean Portal" items={DEAN_NAV} active={view} onChange={setView} />
+      <RoleSidebar roleLabel="Dean Portal" groups={DEAN_NAV_GROUPS} active={view} onChange={setView} />
       <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white">

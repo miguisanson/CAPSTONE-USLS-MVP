@@ -26,7 +26,7 @@ export function Select({ options, placeholder = "Select…", ...props }) {
     <select {...props} className={`field-input cursor-pointer ${props.className || ""}`}>
       {placeholder && <option value="">{placeholder}</option>}
       {opts.map((o) => (
-        <option key={o.value} value={o.value}>
+        <option key={o.value} value={o.value} disabled={Boolean(o.disabled)}>
           {o.label}
         </option>
       ))}

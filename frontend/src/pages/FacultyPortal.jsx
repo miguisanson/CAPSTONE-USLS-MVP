@@ -9,12 +9,22 @@ import { printDataTable } from "../lib/print";
 import FacultyResearchWorkspace from "../components/FacultyResearchWorkspace";
 import RoleSidebar from "../components/RoleSidebar";
 
-const FACULTY_NAV = [
-  { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
-  { id: "classes", label: "Assigned Classes", icon: ClipboardCheck },
-  { id: "research", label: "Advisees & Research", icon: FileCheck },
-  { id: "panels", label: "Panel Assignments", icon: Users },
-  { id: "availability", label: "My Availability", icon: Clock3 },
+const FACULTY_NAV_GROUPS = [
+  {
+    label: "Overview",
+    items: [
+      { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: "Assigned Workflows",
+    items: [
+      { id: "classes", number: 3, label: "Assigned Classes", icon: ClipboardCheck },
+      { id: "research", number: 4, label: "Advisees & Research", icon: FileCheck },
+      { id: "panels", number: 5, label: "Panel Assignments", icon: Users },
+      { id: "availability", number: 6, label: "My Availability", icon: Clock3 },
+    ],
+  },
 ];
 
 export default function FacultyPortal() {
@@ -28,7 +38,7 @@ export default function FacultyPortal() {
 
   return (
     <div className="min-h-screen bg-canvas lg:flex">
-      <RoleSidebar roleLabel="Faculty Portal" items={FACULTY_NAV} active={view} onChange={setView} />
+      <RoleSidebar roleLabel="Faculty Portal" groups={FACULTY_NAV_GROUPS} active={view} onChange={setView} />
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 lg:px-8">

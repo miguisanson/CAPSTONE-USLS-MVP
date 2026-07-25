@@ -104,6 +104,36 @@ export const api = {
     URL.revokeObjectURL(url);
     return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
   },
+  exportWithdrawalXlsx: async (applicationIds = []) => {
+    const res = await fetch(`${BASE}/withdrawal/approved.xlsx`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ application_ids: applicationIds }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] || "approved-subject-withdrawals.xlsx";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
+  },
+  forwardWithdrawalsToRegistrar: (applicationIds, registrarReference = "") =>
+    request("/withdrawal/registrar-handoff", {
+      method: "POST",
+      body: JSON.stringify({
+        application_ids: applicationIds,
+        registrar_reference: registrarReference,
+      }),
+    }),
   transactionContext: (slug, params = {}) => {
     const qs = queryString(params);
     return request(`/transactions/${slug}/context${qs ? `?${qs}` : ""}`);

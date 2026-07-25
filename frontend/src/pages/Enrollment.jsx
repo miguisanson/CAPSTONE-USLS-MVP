@@ -234,7 +234,7 @@ export default function Enrollment() {
 
   async function saveStatusEdit() {
     if (!statusEdit?.status) {
-      setError("Choose Dropped or Withdrawn.");
+      setError("Choose Dropped.");
       return;
     }
     if (!statusEdit?.note.trim()) {
@@ -844,7 +844,7 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
           </span>
           <div className="min-w-0 flex-1">
             <h2 id="subject-status-dialog-title" className="font-display text-lg font-semibold text-ink">
-              Update subject status
+              Record dropped subject
             </h2>
             <p id="subject-status-dialog-description" className="mt-1 text-sm text-slate-500">
               {edit.studentName} · {edit.courseCode} · {edit.termLabel}
@@ -882,7 +882,6 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
               >
                 <option value="">Choose status</option>
                 <option value="Dropped">Dropped</option>
-                <option value="Withdrawn">Withdrawn</option>
               </select>
             </label>
             <label className="block">
@@ -911,7 +910,7 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
 
           <ErrorNote message={error} />
           <p className="text-xs leading-relaxed text-slate-500">
-            This closes the active subject enrollment and records the note in the audit history. Official grades are not changed.
+            Dropping is recorded here by the Academic Coordinator. Penalty-free withdrawal before classes or during the first week must be initiated by the student in the Withdrawal workflow.
           </p>
         </div>
 

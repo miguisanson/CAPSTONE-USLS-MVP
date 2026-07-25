@@ -66,10 +66,11 @@ export default function WorkflowDiscussion({
   onReply = null,
   canReply = null,
   renderMessageFooter = null,
+  highlightLatest = false,
 }) {
   const thread = buildWorkflowMessageThread(messages);
   const latestMessage = [...messages].sort(messageSort).at(-1) || null;
-  const latestOnlyHighlight = messages.some((message) => ["practicum", "graduation"].includes(message.transaction_slug));
+  const latestOnlyHighlight = highlightLatest || messages.some((message) => ["practicum", "graduation"].includes(message.transaction_slug));
 
   return (
     <div className={embedded ? "" : "rounded-xl border border-slate-200 bg-white p-4"}>

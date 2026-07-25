@@ -52,7 +52,7 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "Lifecycle workflows",
+    label: "Lifecycle Workflows",
     items: [
       { to: "/workflow/student-handoff", label: "1 · Student Handoff", icon: UserPlus },
       { to: "/course-adjustments", label: "2 · Course Adjustments", icon: SlidersHorizontal },
@@ -65,7 +65,7 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "Standing changes",
+    label: "Standalone Processes",
     items: [
       { to: "/workflow/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
       { to: "/workflow/readmission", label: "Readmission", icon: UserCheck },
@@ -92,7 +92,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/withdrawal", "/workflow/awol", "/work-queue"]),
+  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue"]),
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
 };
 

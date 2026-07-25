@@ -42,25 +42,53 @@ import HistoryDisclosure from "../components/HistoryDisclosure";
 const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
 const STUDENT_REQUEST_VIEW_BY_SLUG = {
+  "leave-of-absence": "loa",
+  readmission: "readmission",
   awol: "awol",
   practicum: "practicum",
+  withdrawal: "withdrawal",
   graduation: "graduation",
 };
 
-const STUDENT_NAV = [
-  { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
-  { id: "lifecycle", label: "Lifecycle Status", icon: Activity },
-  { id: "courses", label: "My Courses", icon: ClipboardCheck },
-  { id: "assistant", label: "Policy Assistant", icon: Bot },
-  { id: "research", label: "Research Submission", icon: FileCheck },
-  { id: "schedule", label: "Defense Schedule", icon: CalendarCheck },
-  { id: "loa", label: "Leave of Absence", icon: CalendarOff },
-  { id: "readmission", label: "Readmission", icon: UserCheck },
-  { id: "awol", label: "Return from AWOL", icon: UserX },
-  { id: "practicum", label: "Practicum", icon: Briefcase },
-  { id: "graduation", label: "Graduation Status", icon: GraduationCap },
-  { id: "inbox", label: "Inbox / Messages", icon: Mail },
-  { id: "documents", label: "Documents / Submissions", icon: FileUp },
+const STUDENT_MESSAGE_SLUG_BY_VIEW = Object.fromEntries(
+  Object.entries(STUDENT_REQUEST_VIEW_BY_SLUG).map(([slug, view]) => [view, slug]),
+);
+
+const STUDENT_NAV_GROUPS = [
+  {
+    label: "Overview",
+    items: [
+      { id: "overview", label: "Dashboard / Overview", icon: LayoutDashboard },
+      { id: "lifecycle", label: "Lifecycle Status", icon: Activity },
+    ],
+  },
+  {
+    label: "Student Workflows",
+    items: [
+      { id: "courses", number: 3, label: "My Courses", icon: ClipboardCheck },
+      { id: "research", number: 4, label: "Research Submission", icon: FileCheck },
+      { id: "schedule", number: 6, label: "Defense Schedule", icon: CalendarCheck },
+      { id: "practicum", number: 7, label: "Practicum", icon: Briefcase },
+      { id: "graduation", number: 8, label: "Graduation Status", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Standalone Processes",
+    items: [
+      { id: "loa", label: "Leave of Absence", icon: CalendarOff },
+      { id: "readmission", label: "Readmission", icon: UserCheck },
+      { id: "awol", label: "Return from AWOL", icon: UserX },
+      { id: "withdrawal", label: "Subject Withdrawal", icon: LogOut },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { id: "inbox", label: "Inbox / Messages", icon: Mail },
+      { id: "documents", label: "Documents / Submissions", icon: FileUp },
+      { id: "assistant", label: "Policy Assistant", icon: Bot },
+    ],
+  },
 ];
 
 class StudentPortalSectionBoundary extends Component {
@@ -112,7 +140,7 @@ const REQUEST_GROUPS = [
   },
   {
     title: "Leave & Return",
-    description: "Submit a leave application or request your return after an approved leave.",
+    description: "Submit a standalone standing-change or subject-withdrawal request.",
     items: [
       { id: "loa", label: "Leave of Absence", icon: CalendarOff },
       {
@@ -129,6 +157,7 @@ const REQUEST_GROUPS = [
         lockedWhen: (data) => data.student.enrollment_tag !== "AWOL" && data.student.standing !== "AWOL",
         lockedReason: "Available only while your student record is marked AWOL.",
       },
+      { id: "withdrawal", label: "Subject Withdrawal", icon: LogOut },
     ],
   },
   {
@@ -156,7 +185,7 @@ export default function StudentPortal() {
 
   return (
     <div className="min-h-screen bg-canvas lg:flex">
-      <RoleSidebar roleLabel="Student Portal" items={STUDENT_NAV} active={view} onChange={setView} />
+      <RoleSidebar roleLabel="Student Portal" groups={STUDENT_NAV_GROUPS} active={view} onChange={setView} />
       <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 lg:px-8">
@@ -199,7 +228,7 @@ export default function StudentPortal() {
                 {view === "lifecycle" && <div className="space-y-5"><ProgressPanel data={data} /><WorkflowStatusPanel data={data} /></div>}
                 {view === "courses" && <MyCoursesPanel data={data} onSaved={refetch} />}
                 {view === "assistant" && <StudentPolicyAssistant />}
-                {["research", "schedule", "loa", "readmission", "awol", "practicum", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
+                {["research", "schedule", "loa", "readmission", "awol", "withdrawal", "practicum", "graduation"].includes(view) && <RequestCenter data={data} onSaved={refetch} focusedRequest={view} />}
                 {view === "inbox" && <StudentInbox data={data} onSaved={refetch} onOpenRequest={setView} />}
                 {view === "documents" && <div className="space-y-5"><AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} /><ActivityPanel logs={data.logs} /></div>}
               </StudentPortalSectionBoundary>
@@ -581,7 +610,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
           <ActiveIcon className="h-4 w-4 text-brand-700" /> {activeRequest?.label}
         </div>
-        {["practicum", "graduation"].includes(active) && <StudentClarificationPanel slug={active} data={data} onSaved={onSaved} />}
+        {STUDENT_MESSAGE_SLUG_BY_VIEW[active] && <StudentClarificationPanel slug={STUDENT_MESSAGE_SLUG_BY_VIEW[active]} data={data} onSaved={onSaved} />}
         {activeLocked ? (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
             <Lock className="mt-0.5 h-4 w-4 text-slate-400" />
@@ -593,6 +622,7 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
             {active === "loa" && <LoaRequestForm data={data} semesters={data.future_semesters || []} onSaved={onSaved} />}
             {active === "readmission" && <ReadmissionRequestForm data={data} onSaved={onSaved} />}
             {active === "awol" && <AwolReturnRequestForm data={data} onSaved={onSaved} />}
+            {active === "withdrawal" && <WithdrawalRequestForm data={data} onSaved={onSaved} />}
             {active === "practicum" && <PracticumRequestForm data={data} onSaved={onSaved} />}
             {active === "graduation" && <GraduationRequestForm data={data} onSaved={onSaved} />}
             {active === "schedule" && <ScheduleRequestForm studentId={data.student.id} onSaved={onSaved} />}
@@ -604,25 +634,32 @@ function RequestCenter({ data, onSaved, focusedRequest }) {
 }
 
 function StudentClarificationPanel({ slug, data, onSaved }) {
-  const messages = (data.workflow_messages || []).filter((item) => item.transaction_slug === slug && item.recipient_role === "Student" && item.status === "Open" && item.action_type === "return");
-  const latest = messages[0];
+  const messages = (data.workflow_messages || [])
+    .filter((item) => item.transaction_slug === slug)
+    .sort((left, right) => new Date(left.created_at || 0) - new Date(right.created_at || 0));
+  const replyableRoles = new Set(["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean"]);
+  const openReturns = messages.filter((item) => item.recipient_role === "Student" && item.status === "Open" && item.action_type === "return");
+  const latestReturn = openReturns.at(-1) || null;
+  const latestStaffMessage = messages.filter((item) => item.recipient_role === "Student" && replyableRoles.has(item.sender_role)).at(-1) || null;
+  const replyTarget = latestReturn || latestStaffMessage;
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  if (!latest) return null;
+  if (!messages.length) return null;
 
   async function respond() {
+    if (!replyTarget) return;
     setBusy(true);
     setError("");
     setNotice("");
     try {
       const result = await api.sendWorkflowMessage(slug, {
         action_type: "response",
-        recipient_role: latest.sender_role,
+        recipient_role: replyTarget.sender_role,
         template: "Remarks",
         comment,
-        reply_to_message_id: latest.id,
+        reply_to_message_id: replyTarget.id,
       });
       setNotice(result.message);
       setComment("");
@@ -635,14 +672,32 @@ function StudentClarificationPanel({ slug, data, onSaved }) {
   }
 
   return (
-    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-      <div className="flex items-start gap-3"><MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><p className="text-sm font-semibold text-amber-950">Clarification requested</p><p className="mt-1 text-sm text-amber-800">{latest.template}{latest.comment ? ` · ${latest.comment}` : ""}</p><p className="mt-1 text-xs text-amber-700">From {latest.sender_role} · {formatDate(latest.created_at)}</p></div></div>
-      <label className="mt-3 block text-xs font-semibold text-amber-900" htmlFor={`${slug}-clarification-response`}>Your response</label>
-      <textarea id={`${slug}-clarification-response`} value={comment} onChange={(event) => setComment(event.target.value)} className="field-input mt-1 min-h-24" placeholder="Explain what you updated or ask a follow-up question." />
-      <ErrorNote message={error} />
-      {notice && <p aria-live="polite" className="mt-2 text-sm font-semibold text-brand-700">{notice}</p>}
-      <button type="button" disabled={busy || !comment.trim()} onClick={respond} className="btn-primary mt-3 cursor-pointer"><Send className="h-4 w-4" /> {busy ? "Sending…" : "Send clarification response"}</button>
-    </div>
+    <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4" aria-label="Request discussion">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-semibold text-ink"><MessageSquare className="h-4 w-4 text-brand-700" /> Request discussion</p>
+          <p className="mt-1 text-xs text-slate-500">Messages and replies are shown chronologically. The newest post is highlighted in green.</p>
+        </div>
+        {latestReturn?.requires_document_resubmission && <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">New PDF required</span>}
+      </div>
+      {latestReturn?.requires_document_resubmission && <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Step 1 has been reopened. Upload a replacement graduation application PDF before resubmitting.</p>}
+      <WorkflowDiscussion
+        messages={messages}
+        title="Request discussion"
+        embedded
+        showHeader={false}
+        highlightLatest
+      />
+      {replyTarget && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <label className="block text-xs font-semibold text-slate-700" htmlFor={`${slug}-clarification-response`}>Reply to {replyTarget.sender_name || replyTarget.sender_role}</label>
+          <textarea id={`${slug}-clarification-response`} value={comment} onChange={(event) => setComment(event.target.value)} className="field-input mt-1 min-h-24 bg-white" placeholder="Explain what you updated or ask a follow-up question." />
+          <ErrorNote message={error} />
+          {notice && <p aria-live="polite" className="mt-2 text-sm font-semibold text-emerald-700">{notice}</p>}
+          <button type="button" disabled={busy || !comment.trim()} onClick={respond} className="btn-primary mt-3 cursor-pointer"><Send className="h-4 w-4" /> {busy ? "Sending…" : "Send reply"}</button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -651,19 +706,24 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const activeWorkflows = [
+  const allMessages = [...(data.workflow_messages || [])].sort(
+    (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)
+  );
+  const supportedMessagingWorkflows = ["leave-of-absence", "readmission", "awol", "practicum", "withdrawal", "graduation"];
+  const activeWorkflowSet = new Set([
     data.practicum_record && "practicum",
     data.withdrawal_application && "withdrawal",
     data.graduation_endorsement && "graduation",
-  ].filter(Boolean);
+    data.awol_case && "awol",
+    ...(data.logs || []).map((item) => item.transaction_slug),
+    ...allMessages.map((item) => item.transaction_slug),
+  ].filter(Boolean));
+  const activeWorkflows = supportedMessagingWorkflows.filter((slug) => activeWorkflowSet.has(slug));
   const [workflowFilter, setWorkflowFilter] = useState("all");
   const [composeWorkflow, setComposeWorkflow] = useState(activeWorkflows[0] || "");
   const [composeRecipient, setComposeRecipient] = useState("Graduate School Staff");
   const [question, setQuestion] = useState("");
   const [questionBusy, setQuestionBusy] = useState(false);
-  const allMessages = [...(data.workflow_messages || [])].sort(
-    (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)
-  );
   const messages = workflowFilter === "all"
     ? allMessages
     : allMessages.filter((message) => message.transaction_slug === workflowFilter);
@@ -854,6 +914,7 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
                     embedded
                     showHeader={false}
                     title={`${requestLabel(first.transaction_slug)} discussion`}
+                    highlightLatest
                     renderMessageFooter={(message, key) => canReply(message) ? (
                       <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
                         <label className="text-xs font-semibold text-slate-600" htmlFor={`student-inbox-reply-${key}`}>Reply to {message.sender_name || message.sender_role || "staff"}</label>
@@ -1440,11 +1501,11 @@ function SavedWorkflowFiles({ files = [], empty = "No files submitted yet." }) {
 
 function WithdrawalRequestForm({ data, onSaved }) {
   const existing = data.withdrawal_application;
-  const activeSubjects = (data.subject_enrollments || []).filter((item) => ["Enrolled", "Current", "Incomplete"].includes(item.status));
+  const activeSubjects = (data.subject_enrollments || []).filter((item) => ["Enrolled", "Current"].includes(item.status));
+  const eligibleSubjects = activeSubjects.filter((item) => item.withdrawal_eligible);
   const [form, setForm] = useState({
-    attachment_id: existing?.request_attachment?.id || null,
     reason: existing?.reason || "",
-    subject_enrollment_id: existing?.subject_enrollment_id || activeSubjects[0]?.id || "",
+    subject_enrollment_id: existing?.subject_enrollment_id || eligibleSubjects[0]?.id || "",
   });
   const { busy, error, message, submit } = useSubmitRequest("withdrawal", onSaved);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -1458,27 +1519,105 @@ function WithdrawalRequestForm({ data, onSaved }) {
   const returned = ["Returned", "Returned for Clarification"].includes(status) && existing?.dean_decision !== "Approved";
   const applicationEditable = !existing || returned;
   const denied = existing?.dean_decision === "Denied" || status === "Denied";
-  const reviewPending = ["Submitted to GS Staff", "Dean Review"].includes(status);
-  const reviewComplete = existing?.dean_decision === "Approved";
-  const followThroughComplete = status === "Withdrawn Confirmed";
+  const staffForwarded = !["Not Submitted", "Submitted to GS Staff", "Returned", "Returned for Clarification"].includes(status);
+  const deanPending = status === "Dean Review";
+  const deanApproved = existing?.dean_decision === "Approved";
+  const subjectTagged = ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(status);
+  const excelReady = ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(status);
+  const sentToRegistrar = ["Sent to Registrar", "Withdrawn Confirmed"].includes(status);
+  const selectedSubject = activeSubjects.find((item) => String(item.id) === String(form.subject_enrollment_id));
   const withdrawalSteps = withdrawalTimelineSteps(status);
 
   useEffect(() => {
     setForm({
-      attachment_id: existing?.request_attachment?.id || null,
       reason: existing?.reason || "",
-      subject_enrollment_id: existing?.subject_enrollment_id || activeSubjects[0]?.id || "",
+      subject_enrollment_id: existing?.subject_enrollment_id || eligibleSubjects[0]?.id || "",
     });
-  }, [data.student.id, existing?.id, existing?.updated_at, activeSubjects[0]?.id]);
+  }, [data.student.id, existing?.id, existing?.updated_at, eligibleSubjects[0]?.id]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current withdrawal stage</p><p className="mt-1 text-xs text-slate-500">Only the requirements due now can be edited. Earlier submissions remain available below.</p></div><StatusBadge value={status} dot={false} /></div></div>
-      <StageCard number={1} title="Subject Withdrawal Application" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose the enrolled subject to withdraw from, state the reason, and upload the signed request. Your other subjects and program standing are not changed." : "Your selected subject, reason, and original file are saved and read-only."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Enrolled subject" required><select className="field-input cursor-pointer" value={form.subject_enrollment_id} onChange={set("subject_enrollment_id")} required><option value="">Choose an enrolled subject</option>{activeSubjects.map((item) => <option key={item.id} value={item.id}>{item.course_code} — {item.course_title} · {item.term_label}</option>)}</select>{!activeSubjects.length && <p className="mt-1 text-xs font-semibold text-amber-700">No active subject enrollment is available. Contact Graduate School staff before filing.</p>}</Field><Field label="Reason for withdrawing from this subject" required><Textarea value={form.reason} onChange={set("reason")} required /></Field><RequestPdfUpload requestType="withdrawal" label="Signed subject withdrawal request PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id || !form.subject_enrollment_id} disabledHint={!form.subject_enrollment_id ? "Choose an active enrolled subject before submitting." : !form.attachment_id ? "Upload the signed subject withdrawal request before submitting." : ""} label={returned ? "Resubmit subject withdrawal" : "Submit subject withdrawal"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.subject?.course_code || "Subject pending"} — {existing?.subject?.course_title || "Selected subject"}</p><p className="text-sm text-slate-600">{existing?.effective_term || existing?.subject?.term_label || "Semester pending"} · submitted {formatDate(existing?.created_at)}</p><p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>{existing?.request_attachment && <SavedWorkflowFiles files={[existing.request_attachment]} />}</div>}
+      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current subject withdrawal stage</p><p className="mt-1 text-xs text-slate-500">This process applies to one subject only and never changes your active program standing.</p></div><StatusBadge value={status} dot={false} /></div></div>
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <p className="font-semibold">Penalty-free withdrawal window</p>
+        <p className="mt-1 text-xs leading-relaxed text-emerald-800">You may withdraw before classes begin or during the first seven calendar days of class. Once approved and forwarded, the subject carries no grade, academic penalty, or transcript mark.</p>
+      </div>
+      <StageCard number={1} title="Send Withdrawal Request" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}>
+        {applicationEditable ? (
+          <div className="space-y-4">
+            <Field label="Enrolled subject" required>
+              <select className="field-input cursor-pointer" value={form.subject_enrollment_id} onChange={set("subject_enrollment_id")} required>
+                <option value="">Choose an eligible enrolled subject</option>
+                {activeSubjects.map((item) => (
+                  <option key={item.id} value={item.id} disabled={!item.withdrawal_eligible}>
+                    {item.course_code} — {item.course_title} · {item.term_label}
+                    {item.withdrawal_eligible ? ` · ELIGIBLE UNTIL ${item.withdrawal_window?.deadline || "semester deadline"}` : " · WITHDRAWAL WINDOW CLOSED"}
+                  </option>
+                ))}
+              </select>
+              {selectedSubject?.withdrawal_window && (
+                <div
+                  role="status"
+                  className={`mt-3 flex items-start gap-3 rounded-xl border px-4 py-4 ${
+                    selectedSubject.withdrawal_eligible
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                      : "border-red-300 bg-red-50 text-red-950"
+                  }`}
+                >
+                  <CalendarClock className={`mt-0.5 h-5 w-5 shrink-0 ${selectedSubject.withdrawal_eligible ? "text-emerald-700" : "text-red-700"}`} aria-hidden="true" />
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider">
+                      {selectedSubject.withdrawal_eligible ? "Penalty-free withdrawal deadline" : "Withdrawal availability"}
+                    </p>
+                    <p className="mt-1 text-lg font-extrabold leading-tight">
+                      {selectedSubject.withdrawal_eligible
+                        ? `Eligible until ${formatDate(selectedSubject.withdrawal_window.deadline)}`
+                        : "Withdrawal window closed"}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold opacity-80">
+                      {selectedSubject.withdrawal_window.status}
+                      {selectedSubject.withdrawal_window.term_start_date
+                        ? ` · Classes begin ${formatDate(selectedSubject.withdrawal_window.term_start_date)}`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!eligibleSubjects.length && <p role="alert" className="mt-2 text-xs font-semibold text-amber-700">No active subject is currently inside the penalty-free withdrawal window. Contact Graduate School staff if the recorded semester dates are incorrect.</p>}
+            </Field>
+            <Field label="Reason for withdrawing from this subject" required>
+              <Textarea value={form.reason} onChange={set("reason")} required />
+            </Field>
+            <SubmitState
+              busy={busy}
+              error={error}
+              message={message}
+              disabled={!form.subject_enrollment_id || !selectedSubject?.withdrawal_eligible}
+              disabledHint={!eligibleSubjects.length ? "No subject is currently eligible for penalty-free withdrawal." : !form.subject_enrollment_id ? "Choose an eligible enrolled subject before submitting." : ""}
+              label={returned ? "Resubmit subject withdrawal" : "Send withdrawal request"}
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-ink">{existing?.subject?.course_code || "Subject pending"} — {existing?.subject?.course_title || "Selected subject"}</p>
+            <p className="text-sm text-slate-600">{existing?.effective_term || existing?.subject?.term_label || "Semester pending"} · submitted {formatDate(existing?.created_at)}</p>
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-emerald-950">
+              <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" aria-hidden="true" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider">Eligibility recorded at submission</p>
+                <p className="mt-1 text-base font-extrabold">Eligible until {formatDate(existing?.withdrawal_window?.deadline)}</p>
+                <p className="mt-1 text-xs font-semibold text-emerald-800">{existing?.withdrawal_window?.status || "Penalty-free eligibility recorded"}</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>
+          </div>
+        )}
       </StageCard>
-      <StageCard number={2} title="Staff Intake / Dean Review" state={denied ? "rejected" : returned ? "returned" : reviewPending ? "pending" : reviewComplete ? "complete" : "locked"} helper={denied ? "The Dean denied this subject request. Your enrollment remains unchanged." : returned ? "Review the comments, update Step 1, and resubmit." : reviewPending ? "Graduate School staff and the Dean are reviewing the saved subject withdrawal." : reviewComplete ? "The Dean approved the request and the selected subject was updated." : "Available after the application is submitted."} />
-      <StageCard number={3} title="Subject Status Updated" state={followThroughComplete ? "complete" : "locked"} helper={followThroughComplete ? `${existing?.subject?.course_code || "The selected subject"} is now marked Withdrawn. Your other enrollments and program standing remain unchanged.` : denied ? "This step is not opened for a denied request." : "Completed automatically after Dean approval."} />
+      <StageCard number={2} title="GS Staff Forwards Request to Dean" state={status === "Submitted to GS Staff" ? "pending" : staffForwarded || denied ? "complete" : returned ? "returned" : "locked"} helper={status === "Submitted to GS Staff" ? "Graduate School staff is recording your structured request and forwarding it to the Dean." : staffForwarded || denied ? "Graduate School staff forwarded the request to the Dean." : "Available after Step 1 is submitted."} />
+      <StageCard number={3} title="Dean Reviews Request" state={denied ? "rejected" : deanPending ? "pending" : deanApproved ? "complete" : "locked"} helper={denied ? "The Dean denied this request. The subject remains enrolled and your record is unchanged." : deanPending ? "The Dean is reviewing the selected subject, request date, and eligibility window." : deanApproved ? "The Dean approved the request and returned it to Graduate School staff for subject tagging." : "Available after GS Staff forwards the request."} />
+      <StageCard number={4} title="GS Staff Tags Subject as Withdrawn" state={subjectTagged ? "complete" : deanApproved ? "pending" : "locked"} helper={subjectTagged ? `${existing?.subject?.course_code || "The selected subject"} now shows Withdrawn in Official Offered Subjects, with no grade or academic penalty. Your other subjects and active program standing remain unchanged.` : deanApproved ? "Graduate School staff must tag you as Withdrawn from the selected subject before any Registrar Excel list can be prepared." : denied ? "This step does not open for a denied request." : "Available after Dean approval."} />
+      <StageCard number={5} title="GS Staff Exports Approved Excel List" state={excelReady ? "complete" : subjectTagged ? "pending" : "locked"} helper={excelReady ? "Your tagged withdrawal was included in the Excel list for the Registrar." : subjectTagged ? "The official subject status is updated, so Graduate School staff can now prepare the Excel list." : "Available after GS Staff tags the selected subject as Withdrawn."} />
+      <StageCard number={6} title="GS Staff Forwards List to Registrar" state={sentToRegistrar ? "complete" : excelReady ? "pending" : "locked"} helper={sentToRegistrar ? "Graduate School staff recorded the Registrar handoff." : excelReady ? "The Excel list is ready for Graduate School staff to forward to the Registrar." : "Available after the approved list is exported."} />
       {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} />}
       <WorkflowTimeline steps={withdrawalSteps} title="Detailed withdrawal timeline" />
     </form>
@@ -1576,9 +1715,17 @@ function PracticumRequestForm({ data, onSaved }) {
 
 function GraduationRequestForm({ data, onSaved }) {
   const existing = data.graduation_endorsement;
+  const reviewWindows = data.graduation_review_windows || [];
+  const activeReviewWindow = data.graduation_default_review_window || reviewWindows[0] || "";
+  const defaultReviewWindow = activeReviewWindow || existing?.review_window || "";
+  const reviewWindowOptions = reviewWindows.map((schoolYear) => ({
+    value: schoolYear,
+    label: schoolYear === activeReviewWindow ? `${schoolYear} — Current school year` : `${schoolYear} — Not currently open`,
+    disabled: schoolYear !== activeReviewWindow,
+  }));
   const [form, setForm] = useState({
     attachment_id: existing?.request_attachment?.id || null,
-    review_window: existing?.review_window || "AY 2026-2027 Graduation Review",
+    review_window: defaultReviewWindow,
     remarks: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("graduation", onSaved);
@@ -1586,7 +1733,8 @@ function GraduationRequestForm({ data, onSaved }) {
   const eligibility = data.graduation_eligibility || {};
   const status = existing?.endorsement_status || "Not Submitted";
   const exported = existing?.registrar_status === "Exported - Ready to Send";
-  const applicationEditable = !existing || ["Not Eligible", "Returned for Clarification"].includes(status);
+  const eligibilityReady = Boolean(eligibility.eligible);
+  const applicationEditable = eligibilityReady && (!existing || ["Not Eligible", "Returned for Clarification"].includes(status));
   const returned = status === "Returned for Clarification";
   const missing = [
     ...(eligibility.missing_coursework || []).map((item) => `Coursework: ${item}`),
@@ -1599,14 +1747,19 @@ function GraduationRequestForm({ data, onSaved }) {
     submit({ student_id: data.student.id, ...form });
   }
 
-  useEffect(() => setForm({ attachment_id: existing?.request_attachment?.id || null, review_window: existing?.review_window || "AY 2026-2027 Graduation Review", remarks: "" }), [data.student.id, existing?.id, existing?.updated_at]);
+  useEffect(() => setForm({ attachment_id: existing?.request_attachment?.id || null, review_window: defaultReviewWindow, remarks: "" }), [data.student.id, existing?.id, existing?.updated_at, defaultReviewWindow]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current graduation stage</p><p className="mt-1 text-xs text-slate-500">Your application stays visible while each reviewing office completes its part.</p></div><StatusBadge value={status} dot={false} /></div></div>
-      <StageCard number={1} title="Application / Review Window" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "What you need to submit now: the review window and any supporting graduation PDF." : "Your submitted application is saved and read-only during review."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Review window / semester" required><Input value={form.review_window} onChange={set("review_window")} required /></Field><RequestPdfUpload requestType="graduation" label="Optional graduation endorsement / supporting PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message to the staff reviewing your graduation submission." /></Field><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing?.review_window}</p><SavedWorkflowFiles files={existing?.attachments || []} /></div>}
+      <StageCard number={1} title="Application / Review Window" state={!eligibilityReady && !existing ? "locked" : applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={!eligibilityReady && !existing ? "This step opens only after coursework, research, completion documents, and any required practicum are complete." : applicationEditable ? "What you need to submit now: the review window and signed graduation application / review-window PDF." : "Your submitted application is saved and read-only during review."}>
+        {applicationEditable ? <div className="space-y-4"><Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} is open. Other school years are shown in gray and cannot be selected.`} required><Select value={form.review_window} onChange={set("review_window")} options={reviewWindowOptions} placeholder="" required /></Field><RequestPdfUpload requestType="graduation" label="Signed graduation application / review-window PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message to the staff reviewing your graduation submission." /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the signed graduation application PDF before submitting Step 1." : ""} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : existing ? <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing.review_window}</p><SavedWorkflowFiles files={existing.attachments || []} /></div> : <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">Complete the requirements listed in Step 3 before submitting a graduation application.</p>}
       </StageCard>
+      {applicationEditable && existing?.attachments?.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <SavedWorkflowFiles files={existing.attachments} empty="No prior graduation application files." />
+        </div>
+      )}
       <StageCard number={2} title="Staff and Coursework Review" state={["For Review", "Coursework Review"].includes(status) ? "pending" : ["Research Review", "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved"].includes(status) ? "complete" : "locked"} helper={["For Review", "Coursework Review"].includes(status) ? "Graduate School staff and the Academic Coordinator are reviewing your coursework record." : "This stage opens after the application is submitted."} />
       <StageCard number={3} title="Requirements Validation" state={["Research Review", "Coursework Incomplete", "Research Incomplete", "Practicum Incomplete"].includes(status) ? "pending" : ["Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved"].includes(status) ? "complete" : status === "Not Eligible" ? "returned" : "locked"} helper={status === "Not Eligible" ? "Resolve the listed missing requirements before resubmitting your application." : "Coursework, research, practicum, and completion records are checked here."}>
         <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">Monitoring eligibility recommendation</p><StatusBadge value={eligibility.status || (eligibility.eligible ? "Eligible" : "Needs verification")} dot={false} /></div>{missing.length ? <ul className="mt-2 space-y-1 text-xs text-slate-500">{missing.slice(0, 8).map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500">No missing requirements are currently flagged by the monitoring layer.</p>}</div>
