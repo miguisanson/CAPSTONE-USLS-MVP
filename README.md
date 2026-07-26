@@ -191,15 +191,26 @@ Change `DEMO_SEED_COUNT` in `.env` to seed 200-500 records.
 
 ## Google Calendar availability
 
-Defense Scheduling can subtract each panelist's Google Calendar busy blocks from their recorded faculty availability before confirming a shared slot. Configure these values in `.env`:
+Faculty members connect their own Google Calendar from the Faculty Portal. After
+connection, Defense Scheduling uses Google Calendar FreeBusy data as that
+faculty member's schedule source and stops using the local demo/profile
+schedule. Configure a Google OAuth 2.0 Web application in `.env`:
 
 ```env
-GOOGLE_CALENDAR_ACCESS_TOKEN=ya29...
+GOOGLE_CALENDAR_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret
+GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:5000/api/faculty-portal/google-calendar/callback
 GOOGLE_CALENDAR_TIMEZONE=Asia/Manila
-GOOGLE_CALENDAR_IDS_JSON={"1":"faculty.one@group.calendar.google.com","2":"faculty.two@group.calendar.google.com"}
 ```
 
-Calendar IDs can be mapped by faculty ID, exact faculty name, or an uppercase underscore slug such as `DR_ADRIANA_SANTOS`. Without these values, the workflow remains usable but labels that participant as using profile availability only.
+Add the same redirect URI to the Google Cloud OAuth client's authorized redirect
+URIs and enable the Google Calendar API. The integration requests read-only
+calendar access and uses FreeBusy periods, so GS Staff can see that a time is
+blocked without seeing private event titles or descriptions.
+
+The legacy `GOOGLE_CALENDAR_ACCESS_TOKEN` and `GOOGLE_CALENDAR_IDS_JSON`
+configuration remains supported for existing deployments. Faculty-owned OAuth
+credentials take precedence.
 
 ## Project Structure
 

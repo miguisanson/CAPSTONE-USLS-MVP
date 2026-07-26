@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BriefcaseBusiness, Building2, CalendarCheck2, CalendarDays, ChevronLeft,
+  BriefcaseBusiness, Building2, CalendarDays, ChevronLeft,
   ChevronRight, ExternalLink, FileSearch, Link2, Mail, Search, UsersRound, X, BookOpenCheck, Save,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
@@ -142,7 +142,12 @@ export default function Faculty() {
   );
 }
 
-function FacultyProfileModal({ faculty, courses, onSaved, onClose }) {
+function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClose }) {
+  const { data: detail, loading: detailLoading, error: detailError } = useApi(
+    () => api.facultyProfile(initialFaculty.id),
+    [initialFaculty.id],
+  );
+  const faculty = detail?.faculty || initialFaculty;
   const calendar = faculty.calendar || {};
   const feedUrl = calendar.feed_url || `/api/faculty/${faculty.id}/calendar.ics`;
   const [showCvAssistant, setShowCvAssistant] = useState(false);
@@ -164,6 +169,8 @@ function FacultyProfileModal({ faculty, courses, onSaved, onClose }) {
         </div>
 
         <div className="max-h-[calc(94vh-104px)] space-y-6 overflow-y-auto p-4 sm:p-6">
+          {detailLoading && <p className="text-xs font-semibold text-slate-500" role="status">Refreshing calendar status and schedule...</p>}
+          {detailError && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800" role="alert">Live calendar details could not be refreshed: {detailError}</p>}
           <div className="grid gap-6 lg:grid-cols-3">
             <ProfileSection icon={BriefcaseBusiness} title="Specialization">
               <p className="text-sm leading-relaxed text-slate-600">{faculty.specialization}</p>
@@ -197,9 +204,21 @@ function FacultyProfileModal({ faculty, courses, onSaved, onClose }) {
             </div>
 
             <ProfileSection icon={Link2} title="Calendar connection">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">{calendar.provider || "Google Calendar"}</p><p className="mt-1 text-xs text-slate-500">{calendar.sync_status}</p></div><StatusBadge value={calendar.connected ? "Connected" : calendar.demo_mode ? "Mock active" : "Profile only"} dot={calendar.connected} /></div>
-                <div className="mt-3 grid grid-cols-2 gap-2"><a className="btn-primary justify-center" href={calendar.connect_url} target="_blank" rel="noreferrer"><CalendarCheck2 className="h-4 w-4" />Connect</a><a className="btn-ghost justify-center" href={feedUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />Export feed</a></div>
+              <div className={`rounded-xl border p-3 ${calendar.connected ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{calendar.provider || "Google Calendar"}</p>
+                    <p className="mt-1 text-xs text-slate-600">{calendar.sync_status}</p>
+                    {calendar.connected_email && <p className="mt-1 text-xs font-medium text-slate-500">{calendar.connected_email}</p>}
+                  </div>
+                  <StatusBadge value={calendar.connected ? "Connected" : "Not connected"} dot={calendar.connected} />
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-slate-600">
+                  {calendar.connected
+                    ? "Google busy periods are the source used by Defense Scheduling. Event names and details remain private."
+                    : "This faculty member must connect Google Calendar from their own Faculty Portal. Until then, the profile schedule remains active."}
+                </p>
+                <a className="btn-ghost mt-3 w-full justify-center" href={feedUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />View availability feed</a>
               </div>
             </ProfileSection>
           </div>
@@ -272,6 +291,7 @@ const CALENDAR_END_HOUR = 18;
 const HOUR_HEIGHT = 52;
 
 function WeeklyCalendar({ faculty }) {
+  const calendarConnected = Boolean(faculty.calendar?.connected);
   const events = useMemo(() => [
     ...(faculty.upcoming_availability || []).map((event) => ({ ...event, title: "Available for defense", status: "available" })),
     ...(faculty.calendar_events || []),
@@ -293,7 +313,11 @@ function WeeklyCalendar({ faculty }) {
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-brand-700" /><h3 className="font-semibold text-ink">Weekly availability & schedule</h3></div>
-          <p className="mt-1 text-xs text-slate-500">Recurring working hours, available defense windows, and blocked commitments in one view.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {calendarConnected
+              ? "Live Google Calendar busy periods within the standard weekday defense window."
+              : "Recurring profile hours, available defense windows, and blocked commitments in one view."}
+          </p>
         </div>
         <div className="flex items-center gap-1.5">
           <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))} className="btn-ghost px-2" aria-label="Previous week"><ChevronLeft className="h-4 w-4" /></button>
@@ -305,7 +329,7 @@ function WeeklyCalendar({ faculty }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-slate-700">{formatWeekRange(weekStart, weekEnd)}</p>
         <div className="flex flex-wrap gap-3 text-[11px] font-medium text-slate-500">
-          <Legend color="border-emerald-300 bg-emerald-50" label="Working hours" />
+          <Legend color="border-emerald-300 bg-emerald-50" label={calendarConnected ? "Defense scheduling window" : "Working hours"} />
           <Legend color="border-emerald-600 bg-emerald-500" label="Available slot" />
           <Legend color="border-blue-600 bg-blue-500" label="Blocked / busy" />
         </div>
@@ -322,12 +346,14 @@ function WeeklyCalendar({ faculty }) {
               {Array.from({ length: CALENDAR_END_HOUR - CALENDAR_START_HOUR + 1 }, (_, index) => <span key={index} className="absolute right-2 -translate-y-1/2 text-[10px] font-medium text-slate-400" style={{ top: index * HOUR_HEIGHT }}>{formatHour(CALENDAR_START_HOUR + index)}</span>)}
             </div>
             {days.map((day, dayIndex) => {
-              const workingDay = faculty.working_hours?.find((item) => item.weekday === dayIndex);
+              const workingDay = calendarConnected
+                ? (dayIndex < 5 ? { enabled: true, start: "08:00", end: "18:00" } : null)
+                : faculty.working_hours?.find((item) => item.weekday === dayIndex);
               const dayEvents = visibleEvents.filter((event) => sameDate(dateFromIso(event.date), day));
               return (
                 <div key={day.toISOString()} className="relative border-r border-slate-200 last:border-r-0" style={{ height: (CALENDAR_END_HOUR - CALENDAR_START_HOUR) * HOUR_HEIGHT }}>
                   {Array.from({ length: CALENDAR_END_HOUR - CALENDAR_START_HOUR }, (_, index) => <div key={index} className="absolute inset-x-0 border-t border-slate-100" style={{ top: index * HOUR_HEIGHT }} />)}
-                  {workingDay?.enabled && <CalendarBlock event={{ start: workingDay.start, end: workingDay.end, title: "Working hours", status: "working" }} />}
+                  {workingDay?.enabled && <CalendarBlock event={{ start: workingDay.start, end: workingDay.end, title: calendarConnected ? "Scheduling window" : "Working hours", status: "working" }} />}
                   {dayEvents.map((event, index) => <CalendarBlock key={`${event.date}-${event.start}-${event.title}-${index}`} event={event} index={index} />)}
                   {!workingDay?.enabled && <p className="absolute inset-x-2 top-3 text-center text-[10px] font-semibold text-slate-300">Unavailable</p>}
                 </div>
@@ -336,7 +362,11 @@ function WeeklyCalendar({ faculty }) {
           </div>
         </div>
       </div>
-      <p className="mt-2 text-xs text-slate-500">Defense Scheduling excludes blue busy blocks when comparing common panel availability.</p>
+      <p className="mt-2 text-xs text-slate-500">
+        {calendarConnected
+          ? "Defense Scheduling treats Google Calendar as authoritative and excludes every blue busy block. Event details stay private."
+          : "Defense Scheduling excludes blue profile commitments when comparing common panel availability."}
+      </p>
     </section>
   );
 }

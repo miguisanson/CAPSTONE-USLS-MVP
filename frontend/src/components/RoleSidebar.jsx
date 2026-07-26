@@ -27,7 +27,7 @@ function RoleNavItem({ item, active, onChange, mobile = false }) {
   );
 }
 
-export default function RoleSidebar({ roleLabel, groups, items = [], active, onChange }) {
+export default function RoleSidebar({ roleLabel, groups, items = [], active, onChange, footer = null }) {
   const navigationGroups = groups?.length
     ? groups.filter((group) => group.items?.length)
     : [{ label: "Workflow Overview", items }];
@@ -49,6 +49,7 @@ export default function RoleSidebar({ roleLabel, groups, items = [], active, onC
               </section>
             ))}
           </nav>
+          {footer && <div className="border-t border-slate-200 px-3 py-3">{footer}</div>}
           <p className="border-t border-slate-200 px-5 py-4 text-[11px] leading-relaxed text-slate-400">Only transactions assigned to this role are shown.</p>
         </div>
       </aside>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { GraduationCap, LogOut, Users, CalendarClock, BookOpen, Clock3, ClipboardCheck, LayoutDashboard, FileCheck, Printer, Lock } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { GraduationCap, LogOut, Users, CalendarClock, CalendarCheck2, BookOpen, Clock3, ClipboardCheck, LayoutDashboard, FileCheck, Printer, Lock } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
@@ -31,14 +32,22 @@ export default function FacultyPortal() {
   const { user, logout } = useAuth();
   const { data, loading, error, refetch } = useApi(() => api.facultyPortalContext(), []);
   const [view, setView] = useState("overview");
+  const [searchParams] = useSearchParams();
 
   const faculty = data?.faculty;
   const panels = data?.panels || [];
   const availability = data?.availability || [];
+  const calendarNotice = searchParams.get("calendar");
 
   return (
     <div className="min-h-screen bg-canvas lg:flex">
-      <RoleSidebar roleLabel="Faculty Portal" groups={FACULTY_NAV_GROUPS} active={view} onChange={setView} />
+      <RoleSidebar
+        roleLabel="Faculty Portal"
+        groups={FACULTY_NAV_GROUPS}
+        active={view}
+        onChange={setView}
+        footer={faculty ? <FacultyCalendarConnection calendar={faculty.calendar} /> : null}
+      />
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 lg:px-8">
@@ -80,6 +89,25 @@ export default function FacultyPortal() {
                     <StatusBadge value={`${panels.length} panel${panels.length === 1 ? "" : "s"}`} dot={false} />
                   </div>
                 </div>
+                <div className="lg:hidden">
+                  <FacultyCalendarConnection calendar={faculty?.calendar} />
+                </div>
+                {calendarNotice && (
+                  <p
+                    className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
+                      calendarNotice === "connected"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-amber-200 bg-amber-50 text-amber-800"
+                    }`}
+                    role="status"
+                  >
+                    {calendarNotice === "connected"
+                      ? "Google Calendar connected. Its busy periods are now used for defense scheduling."
+                      : calendarNotice === "cancelled"
+                        ? "Google Calendar connection was cancelled."
+                        : "Google Calendar could not be connected. Please try again."}
+                  </p>
+                )}
 
                 {view === "overview" && (
                   <FacultyOverview
@@ -140,9 +168,35 @@ export default function FacultyPortal() {
 
                 {view === "availability" && (
                   <Card className="p-6">
-                    <SectionTitle title="My availability" subtitle="Upcoming windows used for defense scheduling" icon={Clock3} />
-                    {availability.length === 0 ? (
-                      <EmptyState icon={Clock3} title="No availability recorded" hint="Availability windows are managed with the Graduate School office." />
+                    <SectionTitle
+                      title={faculty?.calendar?.connected ? "My connected calendar" : "My availability"}
+                      subtitle={
+                        faculty?.calendar?.connected
+                          ? "Google Calendar busy periods that are excluded from defense scheduling"
+                          : "Upcoming profile windows used for defense scheduling"
+                      }
+                      icon={Clock3}
+                    />
+                    {faculty?.calendar?.connected ? (
+                      (faculty.calendar_events || []).length === 0 ? (
+                        <EmptyState
+                          icon={CalendarCheck2}
+                          title="No busy periods in the next five weeks"
+                          hint={faculty.calendar_event_status || "Your Google Calendar is connected and will be checked again when staff review defense dates."}
+                        />
+                      ) : (
+                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {(faculty.calendar_events || []).map((event, i) => (
+                            <div key={`${event.date}-${event.start}-${i}`} className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+                              <CalendarClock className="h-4 w-4 text-amber-700" />
+                              <span className="font-semibold text-ink">{formatDate(event.date)}</span>
+                              <span className="ml-auto text-slate-600">{event.start}â€“{event.end}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    ) : availability.length === 0 ? (
+                      <EmptyState icon={Clock3} title="No availability recorded" hint="Connect Google Calendar or ask the Graduate School office to maintain profile availability." />
                     ) : (
                       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         {availability.map((slot, i) => (
@@ -162,6 +216,58 @@ export default function FacultyPortal() {
         </main>
       </div>
     </div>
+  );
+}
+
+function FacultyCalendarConnection({ calendar }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const connected = Boolean(calendar?.connected);
+
+  async function connectCalendar() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.googleCalendarAuthorization();
+      window.location.assign(result.authorization_url);
+    } catch (err) {
+      setError(err.message || "Could not start the Google Calendar connection.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-brand-200 bg-brand-50 p-3 shadow-sm" aria-label="Google Calendar connection">
+      <div className="flex items-start gap-2.5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-brand-700 ring-1 ring-brand-100">
+          <CalendarCheck2 className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-ink">Google Calendar</p>
+          <p className={`mt-0.5 text-xs font-semibold ${connected ? "text-emerald-700" : "text-slate-500"}`}>
+            {connected ? "Connected" : "Not connected"}
+          </p>
+          {connected && calendar?.connected_email && (
+            <p className="mt-0.5 truncate text-[11px] text-slate-500" title={calendar.connected_email}>{calendar.connected_email}</p>
+          )}
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
+        {connected
+          ? "Busy classes, appointments, and personal events automatically block defense times."
+          : "Connect once so staff checks your real busy times instead of the profile schedule."}
+      </p>
+      <button
+        type="button"
+        onClick={connectCalendar}
+        disabled={busy}
+        className="mt-3 flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-3 py-2 text-xs font-bold text-white transition-colors duration-200 hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:cursor-wait disabled:opacity-70"
+      >
+        <CalendarCheck2 className="h-4 w-4" />
+        {busy ? "Opening Google..." : connected ? "Reconnect calendar" : "Connect Google Calendar"}
+      </button>
+      {error && <p className="mt-2 text-xs font-semibold leading-relaxed text-red-700" role="alert">{error}</p>}
+    </section>
   );
 }
 

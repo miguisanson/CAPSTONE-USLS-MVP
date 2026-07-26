@@ -54,6 +54,7 @@ export const api = {
     return request(`/students${qs ? `?${qs}` : ""}`);
   },
   faculty: () => request("/faculty"),
+  facultyProfile: (facultyId) => request(`/faculty/${facultyId}`),
   saveFacultyPreferences: (facultyId, courseIds) =>
     request(`/faculty/${facultyId}/preferences`, {
       method: "PUT",
@@ -306,6 +307,7 @@ export const api = {
     request("/student-portal/assistant", { method: "POST", body: JSON.stringify({ question }) }),
   studentAssistantSuggestions: () => request("/student-portal/assistant/suggestions"),
   facultyPortalContext: () => request("/faculty-portal/context"),
+  googleCalendarAuthorization: () => request("/faculty-portal/google-calendar/authorization"),
   signAdviserPaper: (evidenceId, payload) =>
     request(`/faculty-portal/adviser-approvals/${evidenceId}`, { method: "POST", body: JSON.stringify(payload) }),
   submitDefenseVerdict: (scheduleId, payload) =>

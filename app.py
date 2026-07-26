@@ -19,11 +19,11 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, urlencode, urlparse
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from flask import Flask, Response, has_request_context, jsonify, request, send_from_directory, session
+from flask import Flask, Response, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, inspect, or_, text
 from openpyxl import Workbook
@@ -837,6 +837,12 @@ class Faculty(db.Model):
     email = db.Column(db.String(160), unique=True)
     eligible_roles = db.Column(db.Text)
     active = db.Column(db.Boolean, default=True)
+    google_calendar_id = db.Column(db.String(255))
+    google_calendar_email = db.Column(db.String(160))
+    google_calendar_access_token = db.Column(db.Text)
+    google_calendar_refresh_token = db.Column(db.Text)
+    google_calendar_token_expires_at = db.Column(db.DateTime)
+    google_calendar_connected_at = db.Column(db.DateTime)
 
     availabilities = db.relationship("FacultyAvailability", backref="faculty", lazy=True, cascade="all, delete-orphan")
     working_hours = db.relationship("FacultyWorkingHour", backref="faculty", lazy=True, cascade="all, delete-orphan")
@@ -1416,10 +1422,7 @@ def faculty_dict(faculty: Faculty) -> dict:
         .all()
     )
     working_hours = faculty_working_hours(faculty)
-    calendar_id = faculty_calendar_id(faculty)
     calendar_ready = google_calendar_configured(faculty)
-    first_faculty_id = db.session.query(Faculty.id).order_by(Faculty.id.asc()).limit(1).scalar()
-    mock_calendar = faculty.id == first_faculty_id
     return {
         "id": faculty.id,
         "name": faculty.name,
@@ -1458,12 +1461,15 @@ def faculty_dict(faculty: Faculty) -> dict:
         "calendar": {
             "provider": "Google Calendar",
             "connected": calendar_ready,
-            "demo_mode": bool(mock_calendar and not calendar_ready),
             "status": "Connected" if calendar_ready else "Not connected",
-            "sync_status": "FreeBusy checks enabled" if calendar_ready else ("Mock Google Calendar schedule" if mock_calendar else "Profile schedule"),
-            "connect_url": "https://calendar.google.com/calendar/u/0/r/settings",
+            "sync_status": (
+                "Google busy times replace the profile schedule"
+                if calendar_ready
+                else "Profile schedule is used until faculty connects"
+            ),
+            "connected_email": faculty.google_calendar_email,
+            "connected_at": iso(faculty.google_calendar_connected_at),
             "feed_url": f"/api/faculty/{faculty.id}/calendar.ics",
-            "calendar_id": calendar_id,
         },
     }
 
@@ -7596,6 +7602,14 @@ def register_routes(app: Flask) -> None:
             "teaching_load_limit": FACULTY_TEACHING_LOAD_LIMIT,
         })
 
+    @app.route("/api/faculty/<int:faculty_id>")
+    @require_api_login("staff", "academic_coordinator")
+    def faculty_detail(faculty_id: int):
+        faculty = Faculty.query.get_or_404(faculty_id)
+        return jsonify({
+            "faculty": faculty_profile_dict(faculty, include_calendar_events=True),
+        })
+
     @app.route("/api/faculty/<int:faculty_id>/cv-rag", methods=["POST"])
     @require_api_login("staff", "academic_coordinator")
     def faculty_cv_rag(faculty_id: int):
@@ -7804,22 +7818,101 @@ def register_routes(app: Flask) -> None:
             .all()
         )
         return jsonify({
-            "faculty": faculty_profile_dict(faculty),
+            "faculty": faculty_profile_dict(faculty, include_calendar_events=True),
             "panels": panels,
             "advisees": advisees,
             "panel_count": len(panels),
             "terms": [term_dict(term) for term in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
             "subjects": course_audit_subject_items(),
             "working_hours": faculty_working_hours(faculty),
-            "availability": [
-                {
-                    "date": iso(slot.available_date),
-                    "start": slot.start_time.strftime("%H:%M"),
-                    "end": slot.end_time.strftime("%H:%M"),
-                }
-                for slot in upcoming
-            ],
+            "availability": (
+                []
+                if google_calendar_configured(faculty)
+                else [
+                    {
+                        "date": iso(slot.available_date),
+                        "start": slot.start_time.strftime("%H:%M"),
+                        "end": slot.end_time.strftime("%H:%M"),
+                    }
+                    for slot in upcoming
+                ]
+            ),
         })
+
+    @app.route("/api/faculty-portal/google-calendar/authorization")
+    @require_api_login("faculty")
+    def faculty_google_calendar_authorization():
+        account = current_account()
+        faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
+        if not faculty:
+            return jsonify({"error": "This faculty account is not linked to a faculty record yet."}), 400
+        if not google_calendar_oauth_configured():
+            return jsonify({
+                "error": (
+                    "Google Calendar OAuth is not configured. Add "
+                    "GOOGLE_CALENDAR_CLIENT_ID and GOOGLE_CALENDAR_CLIENT_SECRET on the server."
+                )
+            }), 503
+        state = uuid4().hex
+        session["google_calendar_oauth_state"] = state
+        session["google_calendar_oauth_faculty_id"] = faculty.id
+        return jsonify({
+            "authorization_url": google_calendar_authorization_url(state),
+        })
+
+    @app.route("/api/faculty-portal/google-calendar/callback")
+    @require_api_login("faculty")
+    def faculty_google_calendar_callback():
+        account = current_account()
+        faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
+        expected_state = session.pop("google_calendar_oauth_state", None)
+        expected_faculty_id = session.pop("google_calendar_oauth_faculty_id", None)
+        supplied_state = request.args.get("state")
+        if not faculty or expected_faculty_id != faculty.id or not expected_state or supplied_state != expected_state:
+            return redirect("/faculty-portal?calendar=invalid-state")
+        if request.args.get("error"):
+            return redirect("/faculty-portal?calendar=cancelled")
+        code = (request.args.get("code") or "").strip()
+        if not code:
+            return redirect("/faculty-portal?calendar=missing-code")
+        try:
+            token_payload = google_token_request({
+                "client_id": os.getenv("GOOGLE_CALENDAR_CLIENT_ID", "").strip(),
+                "client_secret": os.getenv("GOOGLE_CALENDAR_CLIENT_SECRET", "").strip(),
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": google_calendar_redirect_uri(),
+            })
+            access_token = (token_payload.get("access_token") or "").strip()
+            if not access_token:
+                raise ValueError("Google returned no access token")
+            calendar_request = Request(
+                "https://www.googleapis.com/calendar/v3/users/me/calendarList/primary",
+                headers={"Authorization": f"Bearer {access_token}"},
+                method="GET",
+            )
+            with urlopen(calendar_request, timeout=10) as response:
+                calendar_payload = json.loads(response.read().decode("utf-8"))
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+            return redirect("/faculty-portal?calendar=connection-failed")
+
+        faculty.google_calendar_access_token = access_token
+        faculty.google_calendar_refresh_token = (
+            (token_payload.get("refresh_token") or "").strip()
+            or faculty.google_calendar_refresh_token
+        )
+        faculty.google_calendar_token_expires_at = now_utc() + timedelta(
+            seconds=max(int(token_payload.get("expires_in") or 3600) - 30, 60)
+        )
+        faculty.google_calendar_id = (calendar_payload.get("id") or "primary").strip()
+        faculty.google_calendar_email = (
+            (calendar_payload.get("id") or "").strip()
+            if "@" in (calendar_payload.get("id") or "")
+            else faculty.email
+        )
+        faculty.google_calendar_connected_at = now_utc()
+        db.session.commit()
+        return redirect("/faculty-portal?calendar=connected")
 
     @app.route("/api/faculty-portal/adviser-approvals/<int:evidence_id>", methods=["POST"])
     @require_api_login("faculty")
@@ -16205,7 +16298,7 @@ def candidate_conflicts_profile_blocks(
     return False
 
 
-def faculty_profile_dict(faculty: Faculty) -> dict:
+def faculty_profile_dict(faculty: Faculty, include_calendar_events: bool = False) -> dict:
     payload = faculty_dict(faculty)
     upcoming = (
         FacultyAvailability.query.filter(
@@ -16216,15 +16309,19 @@ def faculty_profile_dict(faculty: Faculty) -> dict:
         .limit(12)
         .all()
     )
-    payload["upcoming_availability"] = [
-        {
-            "date": iso(slot.available_date),
-            "start": slot.start_time.strftime("%H:%M"),
-            "end": slot.end_time.strftime("%H:%M"),
-            "weekend_override": slot.available_date.weekday() >= 5,
-        }
-        for slot in upcoming
-    ]
+    payload["upcoming_availability"] = (
+        []
+        if payload["calendar"]["connected"]
+        else [
+            {
+                "date": iso(slot.available_date),
+                "start": slot.start_time.strftime("%H:%M"),
+                "end": slot.end_time.strftime("%H:%M"),
+                "weekend_override": slot.available_date.weekday() >= 5,
+            }
+            for slot in upcoming
+        ]
+    )
     assignments = (
         PanelAssignment.query.filter_by(faculty_id=faculty.id)
         .order_by(PanelAssignment.assigned_at.desc())
@@ -16266,8 +16363,33 @@ def faculty_profile_dict(faculty: Faculty) -> dict:
         )
         if offering.course and offering.plan
     ]
-    window_end = date.today() + timedelta(days=35)
-    payload["calendar_events"] = faculty_calendar_blocks(faculty, date.today(), window_end)
+    payload["calendar_events"] = []
+    payload["calendar_event_status"] = None
+    if include_calendar_events:
+        window_end = date.today() + timedelta(days=35)
+        if payload["calendar"]["connected"]:
+            google_result = google_freebusy_lookup(faculty, date.today(), window_end)
+            payload["calendar_event_status"] = (
+                google_result.get("error")
+                or "Live Google Calendar busy periods loaded"
+            )
+            payload["calendar_events"] = [
+                {
+                    **busy,
+                    "title": "Busy on Google Calendar",
+                    "category": "google_calendar",
+                    "status": "busy",
+                    "source": "google_calendar",
+                }
+                for day_offset in range((window_end - date.today()).days + 1)
+                for busy in google_busy_payload_for_day(
+                    google_result.get("busy", []),
+                    date.today() + timedelta(days=day_offset),
+                )
+            ]
+        else:
+            payload["calendar_event_status"] = "Profile schedule is active"
+            payload["calendar_events"] = faculty_calendar_blocks(faculty, date.today(), window_end)
     return payload
 
 
@@ -17249,6 +17371,8 @@ def has_hard_schedule_conflict(conflicts: list[str]) -> bool:
 
 
 def faculty_calendar_id(faculty: Faculty) -> str | None:
+    if faculty.google_calendar_id:
+        return faculty.google_calendar_id
     raw = os.getenv("GOOGLE_CALENDAR_IDS_JSON", "").strip()
     mapping = {}
     if raw:
@@ -17267,7 +17391,99 @@ def faculty_calendar_id(faculty: Faculty) -> str | None:
 
 
 def google_calendar_configured(faculty: Faculty) -> bool:
-    return bool(os.getenv("GOOGLE_CALENDAR_ACCESS_TOKEN") and faculty_calendar_id(faculty))
+    has_faculty_token = bool(
+        faculty.google_calendar_access_token
+        or faculty.google_calendar_refresh_token
+    )
+    has_legacy_token = bool(os.getenv("GOOGLE_CALENDAR_ACCESS_TOKEN"))
+    return bool(faculty_calendar_id(faculty) and (has_faculty_token or has_legacy_token))
+
+
+def google_calendar_oauth_configured() -> bool:
+    return bool(
+        os.getenv("GOOGLE_CALENDAR_CLIENT_ID", "").strip()
+        and os.getenv("GOOGLE_CALENDAR_CLIENT_SECRET", "").strip()
+    )
+
+
+def google_calendar_redirect_uri() -> str:
+    configured = os.getenv("GOOGLE_CALENDAR_REDIRECT_URI", "").strip()
+    if configured:
+        return configured
+    return f"{request.url_root.rstrip('/')}/api/faculty-portal/google-calendar/callback"
+
+
+def google_calendar_authorization_url(state: str) -> str:
+    params = {
+        "client_id": os.getenv("GOOGLE_CALENDAR_CLIENT_ID", "").strip(),
+        "redirect_uri": google_calendar_redirect_uri(),
+        "response_type": "code",
+        "scope": " ".join([
+            "openid",
+            "email",
+            "https://www.googleapis.com/auth/calendar.readonly",
+        ]),
+        "access_type": "offline",
+        "include_granted_scopes": "true",
+        "prompt": "consent",
+        "state": state,
+    }
+    return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+
+
+def google_token_request(payload: dict) -> dict:
+    req = Request(
+        "https://oauth2.googleapis.com/token",
+        data=urlencode(payload).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urlopen(req, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def faculty_google_calendar_token(faculty: Faculty) -> tuple[str | None, str | None]:
+    """Return a usable per-faculty token, refreshing it when necessary.
+
+    The environment-token path remains as a compatibility fallback for existing
+    deployments, but faculty-owned OAuth credentials take precedence.
+    """
+    has_faculty_connection = bool(
+        faculty.google_calendar_access_token
+        or faculty.google_calendar_refresh_token
+        or faculty.google_calendar_connected_at
+    )
+    if faculty.google_calendar_access_token:
+        expiry = faculty.google_calendar_token_expires_at
+        if not expiry or expiry > now_utc() + timedelta(minutes=2):
+            return faculty.google_calendar_access_token, None
+    if faculty.google_calendar_refresh_token:
+        if not google_calendar_oauth_configured():
+            return None, "Google Calendar OAuth credentials are not configured"
+        try:
+            payload = google_token_request({
+                "client_id": os.getenv("GOOGLE_CALENDAR_CLIENT_ID", "").strip(),
+                "client_secret": os.getenv("GOOGLE_CALENDAR_CLIENT_SECRET", "").strip(),
+                "refresh_token": faculty.google_calendar_refresh_token,
+                "grant_type": "refresh_token",
+            })
+        except HTTPError as exc:
+            return None, f"Google Calendar token refresh HTTP {exc.code}"
+        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            return None, f"Google Calendar token refresh unavailable: {exc}"
+        token = (payload.get("access_token") or "").strip()
+        if not token:
+            return None, "Google Calendar token refresh returned no access token"
+        faculty.google_calendar_access_token = token
+        faculty.google_calendar_token_expires_at = now_utc() + timedelta(
+            seconds=max(int(payload.get("expires_in") or 3600) - 30, 60)
+        )
+        db.session.commit()
+        return token, None
+    if has_faculty_connection:
+        return None, "Google Calendar access expired; faculty must reconnect"
+    legacy_token = os.getenv("GOOGLE_CALENDAR_ACCESS_TOKEN", "").strip()
+    return (legacy_token, None) if legacy_token else (None, "Google Calendar access token is missing")
 
 
 def local_calendar_bounds(start_day: date, end_day: date) -> tuple[datetime, datetime]:
@@ -17279,11 +17495,16 @@ def local_calendar_bounds(start_day: date, end_day: date) -> tuple[datetime, dat
 
 def google_freebusy_lookup(faculty: Faculty, start_day: date, end_day: date) -> dict:
     calendar_id = faculty_calendar_id(faculty)
-    token = os.getenv("GOOGLE_CALENDAR_ACCESS_TOKEN", "").strip()
     if not calendar_id:
         return {"configured": False, "calendar_id": None, "busy": [], "error": None}
+    token, token_error = faculty_google_calendar_token(faculty)
     if not token:
-        return {"configured": False, "calendar_id": calendar_id, "busy": [], "error": "Missing GOOGLE_CALENDAR_ACCESS_TOKEN"}
+        return {
+            "configured": google_calendar_configured(faculty),
+            "calendar_id": calendar_id,
+            "busy": [],
+            "error": token_error,
+        }
 
     start_dt, end_dt = local_calendar_bounds(start_day, end_day)
     body = json.dumps(
@@ -17361,6 +17582,33 @@ def candidate_conflicts_google_busy(day: date, start_minutes: int, end_minutes: 
     return any(start_dt < item["end"] and end_dt > item["start"] for item in busy_items)
 
 
+def google_calendar_free_window_count(
+    calendar_result: dict,
+    start_day: date,
+    end_day: date,
+    duration_minutes: int = 120,
+    limit: int = 5,
+) -> int:
+    """Count policy-hour windows for panel-matching availability scoring."""
+    if not calendar_result.get("configured") or calendar_result.get("error"):
+        return 0
+    count = 0
+    current_day = start_day
+    while current_day <= end_day and count < limit:
+        if current_day.weekday() < 5:
+            for start_minutes in range(8 * 60, 18 * 60 - duration_minutes + 1, 30):
+                if not candidate_conflicts_google_busy(
+                    current_day,
+                    start_minutes,
+                    start_minutes + duration_minutes,
+                    calendar_result.get("busy", []),
+                ):
+                    count += 1
+                    break
+        current_day += timedelta(days=1)
+    return count
+
+
 def defense_availability_context(
     participants: list[dict],
     window_start: date,
@@ -17381,7 +17629,11 @@ def defense_availability_context(
     participant_faculty = {participant["faculty"].id: participant["faculty"] for participant in participants}
     google_busy = google_busy_by_faculty(participants, window_start, window_end)
     profile_blocks = {
-        faculty_id: faculty_calendar_blocks(faculty, window_start, window_end)
+        faculty_id: (
+            []
+            if google_busy.get(faculty_id, {}).get("configured")
+            else faculty_calendar_blocks(faculty, window_start, window_end)
+        )
         for faculty_id, faculty in participant_faculty.items()
     }
     rows = (
@@ -17408,6 +17660,22 @@ def defense_availability_context(
     current_day = window_start
     while current_day <= window_end:
         for faculty_id, faculty in participant_faculty.items():
+            calendar_result = google_busy.get(faculty_id, {})
+            if calendar_result.get("configured"):
+                # Once faculty-owned OAuth is connected, the local/dummy profile
+                # schedule is no longer consulted. Google busy periods become
+                # authoritative within the normal weekday defense window. If
+                # Google cannot be checked, fail closed and suggest no slot.
+                if not calendar_result.get("error") and current_day.weekday() < 5:
+                    slots_by_faculty[faculty_id].append({
+                        "date": current_day,
+                        "start": time(8, 0),
+                        "end": time(18, 0),
+                        "source": "google_calendar",
+                        "weekend_override": False,
+                    })
+                    dates.add(current_day)
+                continue
             profile = next(
                 (
                     item
@@ -17494,11 +17762,31 @@ def defense_availability_context(
                 "role": participant["role"],
                 "college": participant["faculty"].college,
                 "specialization": participant["faculty"].specialization,
-                "working_hours": faculty_working_hours(participant["faculty"]),
+                "availability_source": (
+                    "google_calendar"
+                    if google_busy.get(participant["faculty"].id, {}).get("configured")
+                    else "profile_schedule"
+                ),
+                "working_hours": (
+                    []
+                    if google_busy.get(participant["faculty"].id, {}).get("configured")
+                    else faculty_working_hours(participant["faculty"])
+                ),
                 "calendar_connected": google_busy.get(participant["faculty"].id, {}).get("configured", False),
                 "calendar_status": (
-                    google_busy.get(participant["faculty"].id, {}).get("error")
-                    or ("Google Calendar checked" if google_busy.get(participant["faculty"].id, {}).get("configured") else "Profile availability only")
+                    (
+                        f"{google_busy.get(participant['faculty'].id, {}).get('error')}; "
+                        "no times will be suggested until Google Calendar is reachable"
+                    )
+                    if (
+                        google_busy.get(participant["faculty"].id, {}).get("configured")
+                        and google_busy.get(participant["faculty"].id, {}).get("error")
+                    )
+                    else (
+                        "Google Calendar checked and used as the schedule source"
+                        if google_busy.get(participant["faculty"].id, {}).get("configured")
+                        else "Profile schedule used because Google Calendar is not connected"
+                    )
                 ),
                 "google_busy": [
                     busy
@@ -18960,22 +19248,46 @@ def recommend_panel(student: Student) -> list[dict]:
             PanelAssignment.faculty_id == faculty.id,
             PanelAssignment.student_id != student.id,
         ).count()
-        availability_rows = FacultyAvailability.query.filter(
-            FacultyAvailability.faculty_id == faculty.id,
-            FacultyAvailability.available_date >= date.today(),
-        ).all()
-        block_cache = {faculty.id: faculty_calendar_blocks(faculty, date.today(), date.today() + timedelta(days=90))}
-        availability_count = sum(
-            1
-            for slot in availability_rows
-            if not candidate_conflicts_profile_blocks(
+        calendar_connected = google_calendar_configured(faculty)
+        calendar_error = None
+        if calendar_connected:
+            calendar_window_end = date.today() + timedelta(days=28)
+            calendar_result = google_freebusy_lookup(
                 faculty,
-                slot.available_date,
-                slot.start_time.hour * 60 + slot.start_time.minute,
-                slot.end_time.hour * 60 + slot.end_time.minute,
-                block_cache,
+                date.today(),
+                calendar_window_end,
             )
-        )
+            availability_count = google_calendar_free_window_count(
+                calendar_result,
+                date.today(),
+                calendar_window_end,
+            )
+            calendar_error = calendar_result.get("error")
+            recurring_days = 0
+        else:
+            availability_rows = FacultyAvailability.query.filter(
+                FacultyAvailability.faculty_id == faculty.id,
+                FacultyAvailability.available_date >= date.today(),
+            ).all()
+            block_cache = {
+                faculty.id: faculty_calendar_blocks(
+                    faculty,
+                    date.today(),
+                    date.today() + timedelta(days=90),
+                )
+            }
+            availability_count = sum(
+                1
+                for slot in availability_rows
+                if not candidate_conflicts_profile_blocks(
+                    faculty,
+                    slot.available_date,
+                    slot.start_time.hour * 60 + slot.start_time.minute,
+                    slot.end_time.hour * 60 + slot.end_time.minute,
+                    block_cache,
+                )
+            )
+            recurring_days = sum(1 for item in faculty_working_hours(faculty) if item["enabled"])
         faculty_profile_text = faculty.specialization or ""
         faculty_tokens = set(matching_tokens(faculty_profile_text))
         faculty_phrase_text = faculty_profile_text.lower()
@@ -19013,7 +19325,6 @@ def recommend_panel(student: Student) -> list[dict]:
         )
         if not distinctive_matches and not matched_phrases and not rag_terms:
             specialization_score = min(specialization_score, 18)
-        recurring_days = sum(1 for item in faculty_working_hours(faculty) if item["enabled"])
         availability_score = min(30, availability_count * 6)
         if not availability_count and recurring_days:
             availability_score = 12
@@ -19023,9 +19334,19 @@ def recommend_panel(student: Student) -> list[dict]:
         suitability_score = min(20, workload_fit + active_profile_fit + specialization_fit)
         score = specialization_score + availability_score + suitability_score
         availability_status = (
-            "Available" if availability_count >= 3 else
-            "Limited availability" if availability_count or recurring_days else
-            "No availability recorded"
+            "Google Calendar unavailable"
+            if calendar_connected and calendar_error
+            else "Available via Google Calendar"
+            if calendar_connected and availability_count >= 3
+            else "Limited Google Calendar availability"
+            if calendar_connected and availability_count
+            else "No Google Calendar availability"
+            if calendar_connected
+            else "Available"
+            if availability_count >= 3
+            else "Limited availability"
+            if availability_count or recurring_days
+            else "No availability recorded"
         )
         reasons = []
         if rag_terms:
@@ -19044,6 +19365,7 @@ def recommend_panel(student: Student) -> list[dict]:
             "matched_keywords": rag_terms or matched_phrases or matched_keywords,
             "availability_status": availability_status,
             "availability_windows": availability_count,
+            "availability_source": "google_calendar" if calendar_connected else "profile_schedule",
             "workload": workload,
             "score_breakdown": {
                 "specialization": specialization_score,
@@ -21690,7 +22012,7 @@ def ensure_user_account_schema() -> None:
 
 
 def ensure_faculty_account_schema() -> None:
-    """Add faculty identity fields and connect every legacy profile to one login."""
+    """Add faculty identity/calendar fields and connect every legacy profile to one login."""
     AdviserAssignment.__table__.create(bind=db.engine, checkfirst=True)
     inspector = inspect(db.engine)
     if "faculty" not in inspector.get_table_names():
@@ -21699,6 +22021,12 @@ def ensure_faculty_account_schema() -> None:
     additions = {
         "email": "VARCHAR(160)",
         "eligible_roles": "TEXT",
+        "google_calendar_id": "VARCHAR(255)",
+        "google_calendar_email": "VARCHAR(160)",
+        "google_calendar_access_token": "TEXT",
+        "google_calendar_refresh_token": "TEXT",
+        "google_calendar_token_expires_at": "DATETIME",
+        "google_calendar_connected_at": "DATETIME",
     }
     for name, sql_type in additions.items():
         if name not in existing:

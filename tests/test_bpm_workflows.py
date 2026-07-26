@@ -3,9 +3,9 @@ import re
 import json
 import tempfile
 import unittest
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from openpyxl import load_workbook
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
@@ -65,6 +65,7 @@ from app import (  # noqa: E402
     enrollment_integrity_payload,
     enrollment_subject_states,
     ensure_authoritative_curricula,
+    google_calendar_free_window_count,
     get_active_term,
     ensure_workflow_demo_students,
     student_current_course_year,
@@ -3222,6 +3223,207 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             self.assertEqual(available_count, 4)
             self.assertFalse(any(slot["start"] == "13:00" for slot in partial["possible_slots"]))
+
+    def test_connected_google_calendar_replaces_dummy_profile_schedule(self):
+        target_day = date(2026, 7, 28)  # Tuesday
+        with app.app_context():
+            connected = Faculty(
+                name="Connected Calendar Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                active=True,
+                google_calendar_id="connected@example.test",
+                google_calendar_access_token="faculty-access-token",
+            )
+            fallback = Faculty(
+                name="Profile Schedule Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Statistics",
+                active=True,
+            )
+            db.session.add_all([connected, fallback])
+            db.session.flush()
+            # This disabled profile row would make the connected faculty
+            # unavailable if local dummy hours were still being consulted.
+            db.session.add(FacultyWorkingHour(
+                faculty_id=connected.id,
+                weekday=1,
+                start_time=time(8, 0),
+                end_time=time(17, 0),
+                enabled=False,
+            ))
+            db.session.flush()
+            db.session.expire(connected, ["working_hours"])
+            participants = [
+                {"faculty": connected, "role": "Panel Chair"},
+                {"faculty": fallback, "role": "Panel Member"},
+            ]
+            local_tz = timezone(timedelta(hours=8))
+            google_status = {
+                connected.id: {
+                    "configured": True,
+                    "busy": [{
+                        "start": datetime.combine(target_day, time(10, 0)).replace(tzinfo=local_tz),
+                        "end": datetime.combine(target_day, time(12, 0)).replace(tzinfo=local_tz),
+                    }],
+                    "error": None,
+                },
+                fallback.id: {"configured": False, "busy": [], "error": None},
+            }
+
+            with patch("app.google_busy_by_faculty", return_value=google_status), patch("app.faculty_calendar_blocks", return_value=[]):
+                availability = defense_availability_context(participants, target_day, target_day)
+
+            connected_payload = next(
+                item for item in availability["participants"]
+                if item["faculty_id"] == connected.id
+            )
+            self.assertEqual(connected_payload["availability_source"], "google_calendar")
+            self.assertEqual(connected_payload["working_hours"], [])
+            self.assertEqual(
+                [(slot["start"], slot["end"], slot["source"]) for slot in connected_payload["slots"]],
+                [("08:00", "18:00", "google_calendar")],
+            )
+            self.assertFalse(any(slot["start"] == "10:00" for slot in availability["possible_slots"]))
+            self.assertTrue(any(slot["start"] == "12:00" for slot in availability["possible_slots"]))
+
+    def test_connected_google_calendar_fails_closed_when_freebusy_is_unavailable(self):
+        target_day = date(2026, 7, 28)
+        with app.app_context():
+            faculty = Faculty(
+                name="Unavailable Google Calendar Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                active=True,
+                google_calendar_id="calendar@example.test",
+                google_calendar_access_token="faculty-access-token",
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            participants = [{"faculty": faculty, "role": "Panel Member"}]
+            google_status = {
+                faculty.id: {
+                    "configured": True,
+                    "busy": [],
+                    "error": "Google Calendar unavailable",
+                },
+            }
+            with patch("app.google_busy_by_faculty", return_value=google_status):
+                availability = defense_availability_context(participants, target_day, target_day)
+
+            self.assertEqual(availability["possible_slots"], [])
+            self.assertEqual(availability["participants"][0]["slots"], [])
+            self.assertIn("no times will be suggested", availability["participants"][0]["calendar_status"])
+
+    def test_panel_matching_google_availability_counts_free_days_and_fails_closed(self):
+        start_day = date(2026, 7, 27)  # Monday
+        local_tz = timezone(timedelta(hours=8))
+        result = {
+            "configured": True,
+            "error": None,
+            "busy": [{
+                "start": datetime.combine(start_day, time(8, 0)).replace(tzinfo=local_tz),
+                "end": datetime.combine(start_day, time(18, 0)).replace(tzinfo=local_tz),
+            }],
+        }
+        self.assertEqual(
+            google_calendar_free_window_count(result, start_day, start_day + timedelta(days=2)),
+            2,
+        )
+        result["error"] = "Google Calendar unavailable"
+        self.assertEqual(
+            google_calendar_free_window_count(result, start_day, start_day + timedelta(days=2)),
+            0,
+        )
+
+    def test_faculty_can_start_google_calendar_oauth_for_only_their_account(self):
+        with app.app_context():
+            faculty = Faculty(
+                name="OAuth Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                email="oauth-faculty@example.test",
+                active=True,
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            account = self._account("faculty", "oauth-login@example.test")
+            account.faculty_id = faculty.id
+            db.session.commit()
+            account_id = account.id
+            faculty_id = faculty.id
+
+        client = self._role_client(account_id, "faculty")
+        with patch.dict(os.environ, {
+            "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
+            "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
+            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/faculty-portal/google-calendar/callback",
+        }):
+            response = client.get("/api/faculty-portal/google-calendar/authorization")
+
+        self.assertEqual(response.status_code, 200, response.get_json())
+        authorization_url = response.get_json()["authorization_url"]
+        self.assertIn("accounts.google.com/o/oauth2/v2/auth", authorization_url)
+        self.assertIn("calendar.readonly", authorization_url)
+        with client.session_transaction() as oauth_session:
+            self.assertEqual(oauth_session["google_calendar_oauth_faculty_id"], faculty_id)
+            self.assertTrue(oauth_session["google_calendar_oauth_state"])
+
+    def test_google_calendar_oauth_callback_saves_faculty_owned_credentials(self):
+        with app.app_context():
+            faculty = Faculty(
+                name="OAuth Callback Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                email="oauth-callback@example.test",
+                active=True,
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            account = self._account("faculty", "oauth-callback-login@example.test")
+            account.faculty_id = faculty.id
+            db.session.commit()
+            account_id = account.id
+            faculty_id = faculty.id
+
+        client = self._role_client(account_id, "faculty")
+        with client.session_transaction() as oauth_session:
+            oauth_session["google_calendar_oauth_state"] = "expected-state"
+            oauth_session["google_calendar_oauth_faculty_id"] = faculty_id
+        calendar_response = MagicMock()
+        calendar_response.__enter__.return_value = calendar_response
+        calendar_response.read.return_value = json.dumps({
+            "id": "oauth-callback@gmail.com",
+            "primary": True,
+        }).encode("utf-8")
+        with patch.dict(os.environ, {
+            "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
+            "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
+            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/faculty-portal/google-calendar/callback",
+        }), patch("app.google_token_request", return_value={
+            "access_token": "faculty-access-token",
+            "refresh_token": "faculty-refresh-token",
+            "expires_in": 3600,
+        }), patch("app.urlopen", return_value=calendar_response):
+            response = client.get(
+                "/api/faculty-portal/google-calendar/callback"
+                "?state=expected-state&code=authorization-code"
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/faculty-portal?calendar=connected"))
+        with app.app_context():
+            stored = db.session.get(Faculty, faculty_id)
+            self.assertEqual(stored.google_calendar_id, "oauth-callback@gmail.com")
+            self.assertEqual(stored.google_calendar_email, "oauth-callback@gmail.com")
+            self.assertEqual(stored.google_calendar_access_token, "faculty-access-token")
+            self.assertEqual(stored.google_calendar_refresh_token, "faculty-refresh-token")
+            self.assertIsNotNone(stored.google_calendar_connected_at)
 
     def test_defense_suggestions_start_after_required_lead_time(self):
         reference = date(2026, 7, 23)
