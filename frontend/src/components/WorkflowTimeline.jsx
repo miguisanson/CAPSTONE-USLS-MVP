@@ -6,7 +6,7 @@ const WITHDRAWAL_STEPS = [
   "Dean reviews and approves or denies the request",
   "GS Staff tags the student as Withdrawn from the selected subject",
   "GS Staff exports the approved-withdrawals Excel list",
-  "GS Staff forwards the approved list to the Registrar",
+  "GS Staff emails the approved list and waits for Registrar acknowledgement",
 ];
 
 const GRADUATION_STEPS = [
@@ -18,7 +18,7 @@ const GRADUATION_STEPS = [
   "Dean Review",
   "Endorsement List Revised and Resubmitted",
   "Dean Approval",
-  "Endorsed List Exported (external handoff)",
+  "Endorsed List Exported — Manual Registrar Email Required",
 ];
 
 const LOA_STEPS = [
@@ -57,7 +57,7 @@ export function withdrawalTimelineSteps(status) {
     "Approved - Registrar Preparation": 3,
     "Subject Tagged - Registrar Preparation": 4,
     "Exported - Ready to Send": 5,
-    "Sent to Registrar": WITHDRAWAL_STEPS.length,
+    "Sent to Registrar": 5,
     "Withdrawn Confirmed": WITHDRAWAL_STEPS.length,
     Denied: 2,
     Returned: 0,

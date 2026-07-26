@@ -56,6 +56,7 @@ import StudentPicker from "../components/StudentPicker";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
+import ExportFollowUpModal from "../components/ExportFollowUpModal";
 import { formatDate } from "../lib/format";
 import { printDataTable } from "../lib/print";
 import { useAuth } from "../auth";
@@ -2567,10 +2568,10 @@ const WORKFLOW_GUIDES = {
   withdrawal: {
     purpose: "Withdraws a student from one enrolled subject before classes or during the first week, without changing program standing or unrelated classes.",
     submitter: "The student chooses an eligible enrolled subject and states the reason for withdrawing. No PDF upload is required.",
-    reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval returns to GS Staff for Excel export and Registrar handoff.",
-    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Excel list export", "Registrar handoff", "Penalty-free subject removal"],
+    reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval returns to GS Staff for Excel export followed by manual Registrar email.",
+    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Penalty-free subject removal", "Excel list export", "Manual email and acknowledgement outside the portal"],
     incomplete: "A Dean denial closes this subject request and leaves every enrollment unchanged. Messages and action comments remain in the case history.",
-    final: "Completed means the selected subject was removed with no grade or academic penalty; the student's other subjects and program standing remain active.",
+    final: "The portal ends at Excel export. GS Staff emails the file through the official channel and waits for Registrar acknowledgement outside the portal.",
   },
   practicum: {
     purpose: "Tracks the practicum MOA, placement, required hours, certificates, completion review, and Dean report for programs that require practicum.",
@@ -2586,7 +2587,7 @@ const WORKFLOW_GUIDES = {
     reviewers: "The Academic Coordinator checks coursework, the Research Coordinator validates completion evidence, and the Dean approves the endorsement list.",
     stages: ["Candidate review", "Requirements checks", "Batch preparation", "Dean endorsement", "Endorsement export"],
     incomplete: "Unusual case: if GS Staff finds incorrect details in the student PDF, staff returns Step 1 with a visible message and can require a replacement document. The prior PDF remains in history and cannot be reused.",
-    final: "Endorsed means the Dean-approved list was exported for the external graduation process.",
+    final: "Endorsed means the Dean-approved list was exported. The Dean emails the CSV and waits for Registrar acknowledgement outside the portal.",
   },
 };
 
@@ -3049,7 +3050,7 @@ const GRADUATION_BATCH_STAGES = [
   },
   {
     label: "Export Dean-approved list",
-    detail: "The approved candidates are ready for the recorded external Registrar export.",
+    detail: "The approved candidates are ready for CSV download and manual Registrar email.",
     currentStatuses: ["Dean Approved"],
     completeStatuses: [],
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
@@ -3526,8 +3527,8 @@ const WITHDRAWAL_BOARD_COLUMNS = [
   { label: "Dean Review", statuses: ["Dean Review"] },
   { label: "Returned for Clarification", statuses: ["Returned", "Returned for Clarification"] },
   { label: "Subject Tagging", statuses: ["Approved - Awaiting Subject Tag", "Approved - Registrar Preparation"] },
-  { label: "Registrar Preparation", statuses: ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send"] },
-  { label: "Sent to Registrar", statuses: ["Sent to Registrar", "Withdrawn Confirmed"] },
+  { label: "Excel Export / Manual Email", statuses: ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send"] },
+  { label: "Legacy Acknowledgement", statuses: ["Sent to Registrar", "Withdrawn Confirmed"] },
   { label: "Rejected / Cancelled", statuses: ["Denied", "Cancelled"] },
 ];
 
@@ -3564,7 +3565,7 @@ const GRADUATION_BOARD_COLUMNS = [
   },
   {
     label: "8 · Dean Approved and Ready for Export",
-    description: "Only approved and currently eligible candidates are available for the external Registrar CSV export.",
+    description: "Only approved and currently eligible candidates are available for CSV export and manual Registrar email.",
     statuses: ["Dean Approved"],
     empty: "No Dean-approved graduation batches are ready for export.",
   },
@@ -3994,7 +3995,16 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Practicum student submissions" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · GS Staff forwards submissions; the Academic Coordinator reviews MOAs, certificates, and hours`} icon={Briefcase} />
+      <SectionTitle title="Practicum student submissions" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Psychology and MSGC students only`} icon={Briefcase} />
+      <div className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-brand-900">
+        <Info className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" aria-hidden="true" />
+        <div>
+          <p className="text-sm font-bold">Program scope: Psychology and MSGC only</p>
+          <p className="mt-1 text-xs leading-relaxed text-brand-800">
+            {context.practicum_program_scope?.description || "This roster includes only Psychology programs and the Master of Science in Guidance and Counseling (MSGC)."} Students from every other program are excluded from the practicum roster and actions.
+          </p>
+        </div>
+      </div>
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
@@ -4011,7 +4021,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
         />
       ) : <WorkflowTable
         headers={["Student", "Eligibility", "MOA", "Documents", "Hours", "Coordinator", "Dean report", "Action"]}
-        empty="No practicum-program students found."
+        empty="No eligible Psychology or MSGC practicum students found."
         rows={filteredRows}
         render={(row) => {
           return (
@@ -4125,9 +4135,8 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   const [registrarOpen, setRegistrarOpen] = useState(false);
   const [registrarBusy, setRegistrarBusy] = useState("");
   const [registrarError, setRegistrarError] = useState("");
-  const [registrarReference, setRegistrarReference] = useState("");
   const [selectedRegistrarIds, setSelectedRegistrarIds] = useState(() => new Set());
-  const [downloadedRegistrarIds, setDownloadedRegistrarIds] = useState(() => new Set());
+  const [exportNotice, setExportNotice] = useState(null);
   const autoOpenedRegistrarSignature = useRef("");
   const reset = useDemoCaseReset("withdrawal", refetch);
   const rows = context.roster || [];
@@ -4156,12 +4165,16 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
     () => rows.filter((item) => item.dean_decision === "Approved" && ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send"].includes(item.status)),
     [rows],
   );
+  const pendingRegistrarRows = useMemo(
+    () => registrarRows.filter((item) => item.registrar_status !== "Exported - Ready to Send"),
+    [registrarRows],
+  );
   const selectedRegistrarRows = useMemo(
     () => registrarRows.filter((item) => selectedRegistrarIds.has(item.id)),
     [registrarRows, selectedRegistrarIds],
   );
   const selectedRegistrarReady = selectedRegistrarRows.length > 0 && selectedRegistrarRows.every(
-    (item) => item.registrar_status === "Exported - Ready to Send" || downloadedRegistrarIds.has(item.id),
+    (item) => item.registrar_status === "Exported - Ready to Send",
   );
 
   useEffect(() => {
@@ -4169,14 +4182,14 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
   }, [selectedCurrent]);
 
   useEffect(() => {
-    if (accountRole !== "staff" || !registrarRows.length) return;
-    const signature = registrarRows.map((item) => item.id).sort((a, b) => a - b).join("-");
+    if (accountRole !== "staff" || !pendingRegistrarRows.length) return;
+    const signature = pendingRegistrarRows.map((item) => item.id).sort((a, b) => a - b).join("-");
     if (autoOpenedRegistrarSignature.current === signature) return;
     autoOpenedRegistrarSignature.current = signature;
-    setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id)));
+    setSelectedRegistrarIds(new Set(pendingRegistrarRows.map((item) => item.id)));
     setRegistrarError("");
     setRegistrarOpen(true);
-  }, [accountRole, registrarRows]);
+  }, [accountRole, pendingRegistrarRows]);
 
   function openCase(item) {
     clearSubmitFeedback();
@@ -4205,12 +4218,13 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
     setRegistrarError("");
     try {
       const exported = await api.exportWithdrawalXlsx(applicationIds);
-      setDownloadedRegistrarIds((current) => {
-        const next = new Set(current);
-        applicationIds.forEach((id) => next.add(id));
-        return next;
+      setExportNotice({
+        filename: exported.filename,
+        count: exported.count,
       });
       setMessageNotice(`${exported.count} approved subject withdrawal${exported.count === 1 ? "" : "s"} exported as ${exported.filename}.`);
+      setRegistrarOpen(false);
+      setSelectedRegistrarIds(new Set());
       await refetch();
     } catch (error) {
       setRegistrarError(error.message || "Could not export the approved-withdrawals workbook.");
@@ -4219,39 +4233,19 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
     }
   }
 
-  async function forwardRegistrarWorkbook() {
-    const applicationIds = selectedRegistrarRows.map((item) => item.id);
-    if (!applicationIds.length) return;
-    setRegistrarBusy("send");
-    setRegistrarError("");
-    try {
-      const response = await api.forwardWithdrawalsToRegistrar(applicationIds, registrarReference);
-      setMessageNotice(response.message);
-      setRegistrarOpen(false);
-      setSelectedRegistrarIds(new Set());
-      setDownloadedRegistrarIds(new Set());
-      setRegistrarReference("");
-      await refetch();
-    } catch (error) {
-      setRegistrarError(error.message || "Could not record the Registrar handoff.");
-    } finally {
-      setRegistrarBusy("");
-    }
-  }
-
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted subject withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Student request → GS Staff → Dean → GS Staff subject tag → Excel export → Registrar; approved withdrawals carry no academic grade or penalty`} icon={LogOut} />
+      <SectionTitle title="Submitted subject withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Student request → GS Staff → Dean → GS Staff subject tag → Excel export → manual Registrar email; approved withdrawals carry no academic grade or penalty`} icon={LogOut} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       {accountRole === "staff" && registrarRows.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-emerald-900">{registrarRows.length} tagged withdrawal{registrarRows.length === 1 ? "" : "s"} waiting for Registrar handoff</p>
-            <p className="mt-0.5 text-xs text-emerald-800">Each selected subject already shows Withdrawn in Official Offered Subjects. Download the Excel workbook, then confirm the Registrar handoff.</p>
+            <p className="text-sm font-semibold text-emerald-900">{registrarRows.length} tagged withdrawal{registrarRows.length === 1 ? "" : "s"} ready for Excel export</p>
+            <p className="mt-0.5 text-xs text-emerald-800">Download the Excel workbook, email it to the Registrar through the official channel, and wait for acknowledgement.</p>
           </div>
           <button type="button" onClick={() => { setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id))); setRegistrarError(""); setRegistrarOpen(true); }} className="btn cursor-pointer bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">
-            <FileSpreadsheet className="h-4 w-4" /> Prepare Registrar handoff
+            <FileSpreadsheet className="h-4 w-4" /> Prepare Excel export
           </button>
         </div>
       )}
@@ -4336,36 +4330,28 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
         <WorkflowCaseModal
           id="withdrawal-registrar-handoff"
           title="Approved subject withdrawals"
-          subtitle={`${selectedRegistrarRows.length} selected · Excel list for Graduate School Staff to forward to the Registrar`}
+          subtitle={`${selectedRegistrarRows.length} selected · Export the Excel list for manual Registrar email`}
           status={selectedRegistrarReady ? "Exported - Ready to Send" : "Pending Excel Export"}
           onClose={() => { if (!registrarBusy) setRegistrarOpen(false); }}
           size="wide"
           footer={(
             <>
               <button type="button" disabled={Boolean(registrarBusy)} onClick={() => setRegistrarOpen(false)} className="btn-ghost cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
-              <button type="button" disabled={Boolean(registrarBusy) || !selectedRegistrarRows.length} onClick={exportRegistrarWorkbook} className="btn-ghost cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" disabled={Boolean(registrarBusy) || !selectedRegistrarRows.length} onClick={exportRegistrarWorkbook} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <Download className="h-4 w-4" /> {registrarBusy === "export" ? "Exporting…" : "Download Excel list"}
-              </button>
-              <button type="button" disabled={Boolean(registrarBusy) || !selectedRegistrarReady} onClick={forwardRegistrarWorkbook} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <Send className="h-4 w-4" /> {registrarBusy === "send" ? "Forwarding…" : "Confirm forwarded to Registrar"}
               </button>
             </>
           )}
         >
           <div className="space-y-4">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p className="text-sm font-semibold text-emerald-900">Registrar handoff sequence</p>
-              <ol className="mt-2 grid gap-2 text-xs font-semibold text-emerald-800 sm:grid-cols-3">
+              <p className="text-sm font-semibold text-emerald-900">Excel export sequence</p>
+              <ol className="mt-2 grid gap-2 text-xs font-semibold text-emerald-800 sm:grid-cols-2">
                 <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 1: Select approved students</li>
                 <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 2: Download the Excel list</li>
-                <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 3: Forward it and confirm the handoff</li>
               </ol>
             </div>
             {registrarError && <div role="alert"><ErrorNote message={registrarError} /></div>}
-            <label className="block">
-              <span className="field-label">Registrar reference / delivery note</span>
-              <Input value={registrarReference} onChange={(event) => setRegistrarReference(event.target.value)} placeholder="Optional: email subject, receiving office, or tracking reference" />
-            </label>
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
@@ -4401,9 +4387,18 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
                 </table>
               </div>
             </div>
-            {!selectedRegistrarReady && selectedRegistrarRows.length > 0 && <p className="text-xs font-semibold text-amber-700">Download the Excel list before confirming the Registrar handoff.</p>}
           </div>
         </WorkflowCaseModal>
+      )}
+      {exportNotice && (
+        <ExportFollowUpModal
+          id="withdrawal-export-follow-up"
+          title="Withdrawal Excel export complete"
+          filename={exportNotice.filename}
+          actorLabel="Graduate School Staff"
+          fileLabel="withdrawal update"
+          onClose={() => setExportNotice(null)}
+        />
       )}
       {messageRow && <WorkflowMessageModal slug="withdrawal" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
       {pendingAction && selectedCurrent && <WorkflowTransitionModal slug="withdrawal" student={selectedCurrent.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
@@ -4422,6 +4417,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
   const [stageGroup, setStageGroup] = useState(null);
   const [exportingBatchId, setExportingBatchId] = useState("");
   const [exportError, setExportError] = useState("");
+  const [exportNotice, setExportNotice] = useState(null);
   const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
   const [filters, setFilters] = useState({ query: "", program: "", status: "", course: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
@@ -4509,7 +4505,8 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     try {
       const endorsementIds = group.rows.map((row) => row.endorsement?.id).filter(Boolean);
       const exportResult = await api.exportGraduationCsv("", endorsementIds);
-      setMessageNotice(`${group.label} exported as ${exportResult.filename}. The file is ready for the external Registrar process.`);
+      setExportNotice({ filename: exportResult.filename, batchLabel: group.label });
+      setMessageNotice(`${group.label} exported as ${exportResult.filename}. The Dean must email the file to the Registrar and wait for acknowledgement.`);
       await refetch();
     } catch (error) {
       setExportError(error.message || "Could not export the Dean-approved graduation list.");
@@ -4648,6 +4645,16 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
       {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
       {stageGroup && <GraduationBatchStageModal group={stageGroup} onClose={() => setStageGroup(null)} />}
+      {exportNotice && (
+        <ExportFollowUpModal
+          id="graduation-export-follow-up"
+          title="Graduation CSV export complete"
+          filename={exportNotice.filename}
+          actorLabel="The Dean"
+          fileLabel="endorsed graduation list"
+          onClose={() => setExportNotice(null)}
+        />
+      )}
     </div>
   );
 }
@@ -4765,7 +4772,7 @@ function PracticumForm({ context, studentId, submit, submitting }) {
       <EmptyState
         icon={Briefcase}
         title="Practicum not required"
-        hint={`${selected.program_code} is not marked as a practicum-required program.`}
+        hint={`${selected.program_code} is outside the Psychology and MSGC practicum scope.`}
       />
     );
   }
@@ -5540,9 +5547,9 @@ function workflowGuidance(slug) {
     "defense-scheduling":
       "Opens only after panel matching. The date spread compares adviser and panel availability, respects weekday work hours, and shows weekends only when faculty recorded an explicit override.",
     practicum:
-      "Available only for programs marked with practicum requirements. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
+      "Available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
     withdrawal:
-      "Withdrawal applies to one subject before classes or during the first week. GS Staff forwards the student request to the Dean; approval returns to GS Staff for an Excel Registrar handoff, and the subject is removed without a grade or academic penalty.",
+      "Withdrawal applies to one subject before classes or during the first week. GS Staff forwards the student request to the Dean; approval returns to GS Staff for Excel export. GS Staff emails the file manually and waits for Registrar acknowledgement outside the portal.",
     graduation:
       "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and export.",
   };

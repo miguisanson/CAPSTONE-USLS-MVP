@@ -52,7 +52,7 @@ const STUDENT_LIFECYCLE_DEMOS = [
   {
     workflow: "practicum",
     title: "7 · Practicum",
-    description: "Prerequisites complete; ready to begin Practicum.",
+    description: "Psychology and MSGC students only; prerequisites complete.",
     icon: BriefcaseBusiness,
   },
   {

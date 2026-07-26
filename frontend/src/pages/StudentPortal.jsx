@@ -169,7 +169,7 @@ const REQUEST_GROUPS = [
         label: "Practicum",
         icon: Briefcase,
         lockedWhen: (data) => !data.student.program_has_practicum,
-        lockedReason: "Available only for programs with practicum requirements.",
+        lockedReason: "Practicum is available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students.",
       },
       { id: "graduation", label: "Graduation Endorsement", icon: GraduationCap },
     ],
@@ -1524,7 +1524,7 @@ function WithdrawalRequestForm({ data, onSaved }) {
   const deanApproved = existing?.dean_decision === "Approved";
   const subjectTagged = ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(status);
   const excelReady = ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(status);
-  const sentToRegistrar = ["Sent to Registrar", "Withdrawn Confirmed"].includes(status);
+  const registrarAcknowledged = status === "Withdrawn Confirmed";
   const selectedSubject = activeSubjects.find((item) => String(item.id) === String(form.subject_enrollment_id));
   const withdrawalSteps = withdrawalTimelineSteps(status);
 
@@ -1617,7 +1617,7 @@ function WithdrawalRequestForm({ data, onSaved }) {
       <StageCard number={3} title="Dean Reviews Request" state={denied ? "rejected" : deanPending ? "pending" : deanApproved ? "complete" : "locked"} helper={denied ? "The Dean denied this request. The subject remains enrolled and your record is unchanged." : deanPending ? "The Dean is reviewing the selected subject, request date, and eligibility window." : deanApproved ? "The Dean approved the request and returned it to Graduate School staff for subject tagging." : "Available after GS Staff forwards the request."} />
       <StageCard number={4} title="GS Staff Tags Subject as Withdrawn" state={subjectTagged ? "complete" : deanApproved ? "pending" : "locked"} helper={subjectTagged ? `${existing?.subject?.course_code || "The selected subject"} now shows Withdrawn in Official Offered Subjects, with no grade or academic penalty. Your other subjects and active program standing remain unchanged.` : deanApproved ? "Graduate School staff must tag you as Withdrawn from the selected subject before any Registrar Excel list can be prepared." : denied ? "This step does not open for a denied request." : "Available after Dean approval."} />
       <StageCard number={5} title="GS Staff Exports Approved Excel List" state={excelReady ? "complete" : subjectTagged ? "pending" : "locked"} helper={excelReady ? "Your tagged withdrawal was included in the Excel list for the Registrar." : subjectTagged ? "The official subject status is updated, so Graduate School staff can now prepare the Excel list." : "Available after GS Staff tags the selected subject as Withdrawn."} />
-      <StageCard number={6} title="GS Staff Forwards List to Registrar" state={sentToRegistrar ? "complete" : excelReady ? "pending" : "locked"} helper={sentToRegistrar ? "Graduate School staff recorded the Registrar handoff." : excelReady ? "The Excel list is ready for Graduate School staff to forward to the Registrar." : "Available after the approved list is exported."} />
+      <StageCard number={6} title="GS Staff Emails Update and Waits for Acknowledgement" state={registrarAcknowledged ? "complete" : excelReady ? "pending" : "locked"} helper={registrarAcknowledged ? "Registrar acknowledgement was recorded." : excelReady ? "Graduate School staff must email the downloaded Excel list through the official channel and wait for the Registrar's acknowledgement. The portal does not send this email." : "Available after the approved list is exported."} />
       {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} />}
       <WorkflowTimeline steps={withdrawalSteps} title="Detailed withdrawal timeline" />
     </form>
@@ -1627,6 +1627,7 @@ function WithdrawalRequestForm({ data, onSaved }) {
 function PracticumRequestForm({ data, onSaved }) {
   const existing = data.practicum_record;
   const eligibility = data.practicum_eligibility || {};
+  const scope = data.practicum_program_scope || eligibility.program_scope || {};
   const status = existing?.status || "Not Submitted";
   const latestReturn = (data.workflow_messages || []).find((message) => message.transaction_slug === "practicum" && message.recipient_role === "Student" && message.action_type === "return" && message.status === "Open");
   const newOrganizationRequired = status === "Not Accepted - New Organization Required";
@@ -1675,6 +1676,15 @@ function PracticumRequestForm({ data, onSaved }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <div className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-brand-900">
+        <Briefcase className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" aria-hidden="true" />
+        <div>
+          <p className="text-sm font-bold">Psychology and MSGC students only</p>
+          <p className="mt-1 text-xs leading-relaxed text-brand-800">
+            {scope.description || "Practicum is restricted to Psychology programs and the Master of Science in Guidance and Counseling (MSGC)."} Your program, {data.student.program_code} — {data.student.program_name}, is within this scope.
+          </p>
+        </div>
+      </div>
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current practicum stage</p><p className="mt-1 text-xs text-slate-500">Only the requirements due now can be edited. Completed submissions stay available below.</p></div><StatusBadge value={status} dot={false} /></div></div>
 
       <StageCard number={1} title="Eligibility Check / Pre-Practicum Requirements" state={eligibilityReady ? "complete" : "pending"} helper={existing ? "The eligibility gate was completed for this request. The values below continue to reflect the latest monitoring and research records." : "Automatically checked from your monitoring sheet and research milestones."}>
@@ -1765,7 +1775,8 @@ function GraduationRequestForm({ data, onSaved }) {
         <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">Monitoring eligibility recommendation</p><StatusBadge value={eligibility.status || (eligibility.eligible ? "Eligible" : "Needs verification")} dot={false} /></div>{missing.length ? <ul className="mt-2 space-y-1 text-xs text-slate-500">{missing.slice(0, 8).map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500">No missing requirements are currently flagged by the monitoring layer.</p>}</div>
       </StageCard>
       <StageCard number={4} title="Dean Endorsement" state={status === "Returned for Revision" ? "returned" : status === "Ready for Dean Review" ? "pending" : status === "Dean Approved" ? "complete" : "locked"} helper={status === "Returned for Revision" ? "The endorsement list was returned to staff for correction. Your own submission remains saved." : status === "Ready for Dean Review" ? "The prepared endorsement is awaiting Dean action." : "Available after eligibility is confirmed and staff prepares the endorsement."} />
-      <StageCard number={5} title="Endorsement Export" state={exported ? "complete" : status === "Dean Approved" ? "pending" : "locked"} helper={exported ? "The Dean-approved endorsed list has been exported for the external Registrar process." : status === "Dean Approved" ? "The Dean-approved list is ready for export." : "Available after Dean approval."} />
+      <StageCard number={5} title="Endorsement Export" state={exported ? "complete" : status === "Dean Approved" ? "pending" : "locked"} helper={exported ? "The Dean-approved endorsed list has been downloaded as a CSV file." : status === "Dean Approved" ? "The Dean-approved list is ready for export." : "Available after Dean approval."} />
+      <StageCard number={6} title="Dean Emails List and Waits for Acknowledgement" state={exported ? "pending" : "locked"} helper={exported ? "The Dean must email the downloaded CSV through the official channel and wait for the Registrar's acknowledgement. The portal does not send this email." : "Available after the endorsed list is exported."} />
     </form>
   );
 }

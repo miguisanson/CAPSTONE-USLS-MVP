@@ -163,7 +163,7 @@ TRANSACTIONS = [
         "title": "Practicum",
         "icon": "briefcase-business",
         "group": "Completion",
-        "short": "Track practicum MOA receipt, hours, certificates, completion report, and Dean review for practicum programs.",
+        "short": "Track practicum MOA receipt, hours, certificates, completion report, and Dean review for Psychology and MSGC students only.",
         "actor": "Student / GS Staff / Academic Coordinator / Dean",
         "data": "MOA status, practicum site, required/completed hours, certificates, document status, remarks, status report.",
     },
@@ -183,7 +183,7 @@ TRANSACTIONS = [
         "title": "Graduation Endorsement",
         "icon": "graduation-cap",
         "group": "Completion",
-        "short": "Review candidate eligibility across coursework, research, practicum, Dean endorsement, and external-process export.",
+        "short": "Review candidate eligibility across coursework, research, practicum, Dean endorsement, and CSV export for manual Registrar email.",
         "actor": "GS Staff / Academic Coordinator / Research Coordinator / Dean",
         "data": "Review semester, candidate, coursework/research/practicum status, missing items, endorsement status, and Dean notes.",
     },
@@ -1003,8 +1003,97 @@ def program_dict(program: Program) -> dict:
         "code": program.code,
         "name": program.name,
         "college": program.college,
-        "has_practicum": program.has_practicum,
+        "has_practicum": program_allows_practicum(program),
     }
+
+
+PRACTICUM_MSGC_CODE = "MSGC"
+PRACTICUM_PSYCHOLOGY_NAME_TOKEN = "psychology"
+PRACTICUM_SCOPE_LABEL = (
+    "Psychology and Master of Science in Guidance and Counseling (MSGC) students only"
+)
+
+
+def program_allows_practicum(program: Program | None) -> bool:
+    """Return the confirmed Graduate School practicum program scope."""
+    if not program:
+        return False
+    code = (program.code or "").strip().upper()
+    name = (program.name or "").strip().lower()
+    return code == PRACTICUM_MSGC_CODE or PRACTICUM_PSYCHOLOGY_NAME_TOKEN in name
+
+
+def practicum_program_scope() -> dict:
+    return {
+        "label": PRACTICUM_SCOPE_LABEL,
+        "description": (
+            "Practicum is restricted to students enrolled in a Psychology "
+            "program or the Master of Science in Guidance and Counseling (MSGC)."
+        ),
+        "allowed_program_codes": ["MAPSY", "DPSY", PRACTICUM_MSGC_CODE],
+    }
+
+
+def practicum_program_filter():
+    """SQL predicate matching the same policy used by route authorization."""
+    return or_(
+        func.upper(Program.code) == PRACTICUM_MSGC_CODE,
+        func.lower(Program.name).contains(PRACTICUM_PSYCHOLOGY_NAME_TOKEN),
+    )
+
+
+def scoped_practicum_records_query():
+    return (
+        PracticumRecord.query
+        .join(Student, Student.id == PracticumRecord.student_id)
+        .join(Program, Program.id == Student.program_id)
+        .filter(practicum_program_filter())
+    )
+
+
+def ensure_practicum_program_policy() -> int:
+    """Normalize legacy program metadata to the confirmed practicum scope."""
+    changed = 0
+    legacy_guidance = Program.query.filter(func.upper(Program.code) == "MAGC").first()
+    msgc = Program.query.filter(func.upper(Program.code) == PRACTICUM_MSGC_CODE).first()
+    if legacy_guidance and msgc and legacy_guidance.id != msgc.id:
+        msgc_has_records = bool(
+            Student.query.filter_by(program_id=msgc.id).first()
+            or Course.query.filter_by(program_id=msgc.id).first()
+        )
+        if not msgc_has_records:
+            db.session.delete(msgc)
+            db.session.flush()
+            msgc = None
+            changed += 1
+    if legacy_guidance and not msgc:
+        legacy_guidance.code = PRACTICUM_MSGC_CODE
+        legacy_guidance.name = "Master of Science in Guidance and Counseling"
+        msgc = legacy_guidance
+        changed += 1
+        for course in Course.query.filter_by(program_id=legacy_guidance.id).all():
+            if (course.code or "").upper().startswith("MAGC"):
+                replacement = f"{PRACTICUM_MSGC_CODE}{course.code[4:]}"
+                duplicate = Course.query.filter(
+                    Course.program_id == legacy_guidance.id,
+                    func.upper(Course.code) == replacement.upper(),
+                    Course.id != course.id,
+                ).first()
+                if not duplicate:
+                    course.code = replacement
+                    changed += 1
+    elif msgc:
+        expected_name = "Master of Science in Guidance and Counseling"
+        if msgc.name != expected_name:
+            msgc.name = expected_name
+            changed += 1
+
+    for program in Program.query.all():
+        allowed = program_allows_practicum(program)
+        if bool(program.has_practicum) != allowed:
+            program.has_practicum = allowed
+            changed += 1
+    return changed
 
 
 def term_ordinal(term: AcademicTerm) -> int | None:
@@ -1391,7 +1480,7 @@ def student_brief(student: Student) -> dict:
         "program_id": student.program_id,
         "program_code": student.program.code,
         "program_name": student.program.name,
-        "program_has_practicum": bool(student.program.has_practicum),
+        "program_has_practicum": program_allows_practicum(student.program),
         "college": student.program.college,
         "entry_year": student.entry_year,
         "academic_year_entry": student_academic_year_entry(student),
@@ -3737,9 +3826,9 @@ POLICY_SNIPPETS = [
     {"id": "graduation", "title": "Graduation Endorsement", "source": "GS Handbook — Graduation",
      "tags": ["graduation", "endorsement", "candidate", "registrar"],
      "text": "Graduation endorsement checks coursework, research, practicum (if applicable), and clearance completion, then compiles the candidate endorsement list for Dean approval and registrar hand-off."},
-    {"id": "practicum", "title": "Practicum / OJT (Program-dependent)", "source": "GS Handbook — Practicum",
+    {"id": "practicum", "title": "Practicum / OJT (Psychology and MSGC only)", "source": "GS Handbook — Practicum",
      "tags": ["practicum", "ojt", "hours", "moa", "certificate"],
-     "text": "Programs requiring practicum track the required hours, the MOA, and uploaded certificates as completion evidence."},
+     "text": "Practicum is available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students. The workflow tracks required hours, the MOA, and uploaded certificates as completion evidence."},
     {"id": "course-audit", "title": "Course Audit & Curriculum", "source": "AC Student Monitoring",
      "tags": ["course audit", "subjects", "curriculum", "completion", "missing"],
      "text": "Course audit maps completed, current, and missing subjects against the curriculum. Clearing all subjects signals readiness to move to proposal development."},
@@ -5690,6 +5779,7 @@ def register_routes(app: Flask) -> None:
                 "documents_by_gate": docs_by_gate,
                 "panel": [panel_assignment_dict(p) for p in panel],
                 "schedules": [schedule_request_dict(s) for s in schedules],
+                "practicum_program_scope": practicum_program_scope(),
                 "practicum_record": practicum_record_dict(practicum_record, include_student=False),
                 "practicum_eligibility": practicum_eligibility_result,
                 "practicum_timeline": practicum_timeline(practicum_record, practicum_eligibility_result),
@@ -5838,6 +5928,7 @@ def register_routes(app: Flask) -> None:
                 "documents_by_gate": docs_by_gate,
                 "panel": [panel_assignment_dict(item) for item in panel],
                 "schedules": [schedule_request_dict(s) for s in schedules],
+                "practicum_program_scope": practicum_program_scope(),
                 "practicum_record": practicum_record_dict(practicum_record, include_student=False),
                 "practicum_eligibility": practicum_eligibility_result,
                 "practicum_timeline": practicum_timeline(practicum_record, practicum_eligibility_result),
@@ -6127,6 +6218,13 @@ def register_routes(app: Flask) -> None:
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a PDF application file."}), 400
         if request_type == "practicum":
+            if not program_allows_practicum(student.program):
+                return jsonify({
+                    "error": (
+                        "Practicum is available only to Psychology and Master of "
+                        "Science in Guidance and Counseling (MSGC) students."
+                    )
+                }), 403
             record = latest_practicum_record(student.id)
             if not record and not practicum_eligibility(student)["eligible"]:
                 return jsonify({"error": "Practicum uploads are locked until the eligibility check is complete."}), 409
@@ -6474,8 +6572,13 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        if not student.program.has_practicum:
-            return jsonify({"error": "Practicum is available only for programs with practicum requirements."}), 400
+        if not program_allows_practicum(student.program):
+            return jsonify({
+                "error": (
+                    "Practicum is available only to Psychology and Master of "
+                    "Science in Guidance and Counseling (MSGC) students."
+                )
+            }), 403
 
         record = latest_practicum_record(student.id)
         eligibility = practicum_eligibility(student)
@@ -6816,86 +6919,6 @@ def register_routes(app: Flask) -> None:
                 "X-Exported-Count": str(len(applications)),
             },
         )
-
-    @app.route("/api/withdrawal/registrar-handoff", methods=["POST"])
-    @require_api_login("staff")
-    def withdrawal_registrar_handoff():
-        """Record GS Staff forwarding an exported withdrawal list to Registrar."""
-        data = request.get_json(silent=True) or {}
-        try:
-            application_ids = [int(value) for value in (data.get("application_ids") or [])]
-        except (TypeError, ValueError):
-            return jsonify({"error": "Withdrawal application IDs must be whole numbers."}), 400
-        if not application_ids:
-            return jsonify({"error": "Select at least one approved withdrawal request."}), 400
-
-        applications = approved_withdrawal_applications(application_ids)
-        if len(applications) != len(set(application_ids)):
-            return jsonify({
-                "error": "Every selected request must still be approved and awaiting Registrar handoff."
-            }), 409
-        not_exported = [
-            application.student.name
-            for application in applications
-            if application.registrar_status != "Exported - Ready to Send"
-        ]
-        if not_exported:
-            return jsonify({
-                "error": (
-                    "Download the approved-withdrawals Excel list before forwarding: "
-                    + ", ".join(not_exported)
-                )
-            }), 409
-
-        reference = (
-            str(data.get("registrar_reference") or "").strip()
-            or f"GS Registrar handoff {date.today().isoformat()}"
-        )
-        sent_at = now_utc()
-        actor = workflow_actor_label(current_account())
-        for application in applications:
-            previous_status = application.status
-            enrollment = application.subject_enrollment
-            if not enrollment or enrollment.status != "Withdrawn":
-                return jsonify({
-                    "error": (
-                        f"{application.student.name} has not yet been tagged as "
-                        "Withdrawn from the selected subject."
-                    )
-                }), 409
-            application.status = "Sent to Registrar"
-            application.registrar_status = "Sent - Awaiting Receipt"
-            application.registrar_reference = reference
-            application.registrar_sent_at = sent_at
-            application.completed_at = sent_at
-            application.updated_at = sent_at
-            resolve_standing_change_tasks(
-                application.student_id,
-                "Tag approved subject withdrawal",
-                "Graduate School Staff",
-            )
-            add_log(
-                "withdrawal",
-                application.student_id,
-                actor,
-                "Registrar handoff",
-                "Penalty-free subject withdrawal forwarded to Registrar",
-                "External Registrar",
-                withdrawal_notes(application),
-                previous_status=previous_status,
-                new_status=application.status,
-            )
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "count": len(applications),
-            "application_ids": [application.id for application in applications],
-            "message": (
-                f"Forwarded {len(applications)} approved subject withdrawal"
-                f"{'' if len(applications) == 1 else 's'} to the Registrar. "
-                "Each selected course was removed without an academic grade or penalty."
-            ),
-        })
 
     @app.route("/api/standing-changes/<slug>/<int:student_id>/registrar-report")
     @require_api_login("staff", "academic_coordinator")
@@ -7507,10 +7530,10 @@ def register_routes(app: Flask) -> None:
 
         stream = io.StringIO()
         writer = csv.writer(stream)
-        writer.writerow(["Graduate School Endorsed List for Registrar Handoff"])
+        writer.writerow(["Graduate School Endorsed List for Manual Registrar Email"])
         writer.writerow([
             "Batch", "Student ID", "Student Name", "Program", "Coursework Status", "Research Status",
-            "Endorsement Status", "Dean Approval Date", "Dean Remarks", "Registrar Handoff Status",
+            "Endorsement Status", "Dean Approval Date", "Dean Remarks", "Registrar Export Status",
         ])
         for item in rows:
             previous_status = item.endorsement_status
@@ -7522,9 +7545,9 @@ def register_routes(app: Flask) -> None:
                 item.student_id,
                 f"Dean · {account.full_name}",
                 "Approved endorsement CSV",
-                "Endorsed graduation list exported for Registrar handoff",
+                "Endorsed graduation list exported for manual Registrar email",
                 "Dean",
-                f"CSV exported and ready to attach for Registrar handoff. Previous Registrar status: {previous_registrar_status}.",
+                f"CSV exported and ready for the Dean to email manually. Previous Registrar status: {previous_registrar_status}.",
                 previous_status=previous_status,
                 new_status=item.endorsement_status,
             )
@@ -7550,94 +7573,6 @@ def register_routes(app: Flask) -> None:
                 "X-Exported-Count": str(len(rows)),
             },
         )
-
-    def graduation_registrar_handoff():
-        account = current_account()
-        recipient_email = (request.form.get("recipient_email") or "registrar@usls.edu.ph").strip()
-        comment = (request.form.get("comment") or "").strip()
-        if "@" not in recipient_email or recipient_email.startswith("@"):
-            return jsonify({"error": "Enter a valid Registrar email address."}), 400
-        endorsement_ids = [safe_int(value) for value in request.form.getlist("endorsement_ids") if safe_int(value)]
-        if not endorsement_ids:
-            raw_ids = request.form.get("endorsement_ids") or ""
-            try:
-                parsed_ids = json.loads(raw_ids) if raw_ids else []
-            except json.JSONDecodeError:
-                parsed_ids = []
-            endorsement_ids = [safe_int(value) for value in parsed_ids if safe_int(value)]
-        uploaded = request.files.get("file")
-        if not uploaded or not uploaded.filename:
-            return jsonify({"error": "Attach the exported endorsed list before sending it to the Registrar."}), 400
-        original_name = secure_filename(uploaded.filename) or "graduate-school-endorsed-list.csv"
-        if not original_name.lower().endswith((".csv", ".pdf", ".xlsx", ".xls")):
-            return jsonify({"error": "Attach the exported CSV or a PDF/Excel copy of the endorsed list."}), 400
-        file_bytes = uploaded.read()
-        if not file_bytes or len(file_bytes) > 25 * 1024 * 1024:
-            return jsonify({"error": "The attached endorsed list must be between 1 byte and 25 MB."}), 400
-        rows = (
-            GraduationEndorsement.query.filter(
-                GraduationEndorsement.id.in_(endorsement_ids),
-                GraduationEndorsement.endorsement_status == "Dean Approved",
-            )
-            .order_by(GraduationEndorsement.dean_decision_at.asc())
-            .all()
-        )
-        if not rows:
-            return jsonify({"error": "No Dean-approved graduation endorsements are ready for Registrar handoff."}), 400
-        not_exported = [item.student.name for item in rows if item.registrar_status != "Exported - Ready to Send"]
-        if not_exported:
-            return jsonify({"error": "Export the approved list before sending it to the Registrar: " + ", ".join(not_exported)}), 400
-
-        REQUEST_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-        suffix = Path(original_name).suffix or ".csv"
-        for item in rows:
-            previous_status = item.endorsement_status
-            previous_registrar_status = item.registrar_status
-            stored_name = f"{item.student_id}-graduation-registrar-handoff-{uuid4().hex}{suffix}"
-            (REQUEST_UPLOAD_ROOT / stored_name).write_bytes(file_bytes)
-            attachment = StudentRequestAttachment(
-                student_id=item.student_id,
-                request_type="graduation-registrar-handoff",
-                workflow_request_id=item.id,
-                workflow_stage="Registrar Handoff",
-                uploaded_by_user_id=account.id,
-                uploaded_by_name=account.full_name,
-                uploaded_by_role=ROLE_LABELS.get(account.role, account.role),
-                original_name=original_name,
-                stored_name=stored_name,
-                mime_type=uploaded.mimetype or "application/octet-stream",
-            )
-            db.session.add(attachment)
-            item.endorsement_status = "Sent to Registrar"
-            item.registrar_status = "Sent - Awaiting Receipt"
-            item.updated_at = now_utc()
-            add_log(
-                "graduation",
-                item.student_id,
-                f"Dean · {account.full_name}",
-                "Registrar handoff email",
-                "Endorsed graduation list sent to Registrar",
-                "External Registrar",
-                " ".join(
-                    part
-                    for part in [
-                        f"Sent to: {recipient_email}.",
-                        f"Attached file: {original_name}.",
-                        comment,
-                        f"Previous Registrar status: {previous_registrar_status}.",
-                    ]
-                    if part
-                ),
-                previous_status=previous_status,
-                new_status=item.endorsement_status,
-            )
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "count": len(rows),
-            "recipient_email": recipient_email,
-            "message": f"Sent the endorsed graduation list to {recipient_email} and recorded the Registrar handoff for {len(rows)} candidate(s).",
-        })
 
     # Faculty reference endpoint for panels and scheduling.
     @app.route("/api/faculty")
@@ -9541,6 +9476,13 @@ def register_routes(app: Flask) -> None:
 
         if case_type == "practicum":
             record = PracticumRecord.query.get_or_404(item_id)
+            if not program_allows_practicum(record.student.program):
+                return jsonify({
+                    "error": (
+                        "This student is outside the Psychology and MSGC "
+                        "practicum program scope."
+                    )
+                }), 403
             previous_status = record.status
             if decision in {"approve", "review"}:
                 record.status = "Dean Reviewed"
@@ -9599,7 +9541,7 @@ def register_routes(app: Flask) -> None:
                 next_owner = "Graduate School Staff"
                 add_task(
                     application.student_id,
-                    "Tag approved subject withdrawal and forward to Registrar",
+                    "Tag approved subject withdrawal and export the Registrar update",
                     "Graduate School Staff",
                     3,
                     60,
@@ -9773,9 +9715,9 @@ def register_routes(app: Flask) -> None:
                 endorsement.endorsement_status = "Dean Approved"
                 endorsement.registrar_status = "Pending Handoff"
                 endorsement.dean_decision_at = now_utc()
-                result = "Graduation endorsement approved by Dean; Registrar handoff is ready for export"
+                result = "Graduation endorsement approved by Dean; CSV is ready for export"
                 next_owner = "Dean"
-                add_task(endorsement.student_id, "Export and hand off endorsed list to Registrar", "Dean", 3, 40)
+                add_task(endorsement.student_id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
             elif decision == "return":
                 endorsement.endorsement_status = "Returned for Revision"
                 endorsement.dean_decision_at = now_utc()
@@ -10933,6 +10875,13 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         student_id = account.student_id if account.role == "student" else safe_int(data.get("student_id"))
         student = Student.query.get_or_404(student_id)
+        if slug == "practicum" and not program_allows_practicum(student.program):
+            return jsonify({
+                "error": (
+                    "Practicum messaging is restricted to Psychology and Master "
+                    "of Science in Guidance and Counseling (MSGC) students."
+                )
+            }), 403
         if account.role in ROLE_TRANSACTION_ACCESS and slug not in ROLE_TRANSACTION_ACCESS[account.role]:
             return jsonify({"error": "This workflow is not assigned to your role."}), 403
         recipient_role = (data.get("recipient_role") or "Graduate School Staff").strip()
@@ -11198,7 +11147,7 @@ def register_routes(app: Flask) -> None:
                     endorsement.registrar_status = "Pending Handoff"
                     next_owner = "Dean"
                     result = "Graduation candidate approved in Dean batch"
-                    add_task(student.id, "Export and hand off endorsed list to Registrar", "Dean", 3, 40)
+                    add_task(student.id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
                 elif action == "return":
                     if account.role == "dean" and (
                         not endorsement or endorsement.endorsement_status != "Ready for Dean Review"
@@ -11390,7 +11339,13 @@ def dashboard_stats(filters=None) -> dict:
     overdue_tasks = task_query.filter(Task.due_at < date.today(), Task.status != "Done").count()
     confirmed_schedules = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES)).count()
     needs_availability = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES)).count()
-    practicum_records = scoped(PracticumRecord).count()
+    practicum_records = (
+        scoped_practicum_records_query()
+        .filter(PracticumRecord.student_id.in_(student_ids))
+        .count()
+        if not empty
+        else 0
+    )
     withdrawal_requests = scoped(WithdrawalApplication).count()
     graduation_candidates = scoped(GraduationEndorsement).count()
 
@@ -11642,6 +11597,7 @@ def eligibility_item(
 def practicum_eligibility(student: Student) -> dict:
     """Compute practicum eligibility from centralized, replaceable source rules."""
     audit = compute_course_audit(student)
+    program_in_scope = program_allows_practicum(student.program)
     category_rows = {row["category"]: row for row in audit.get("by_category", [])}
     stage_known = student.current_stage in STAGES
     stage_index = STAGES.index(student.current_stage) if stage_known else None
@@ -11662,7 +11618,21 @@ def practicum_eligibility(student: Student) -> dict:
         for category in PRACTICUM_ELIGIBILITY_CONFIG["unit_requirements"]
     }
     total = audit.get("completed_units", 0)
-    checklist = []
+    checklist = [
+        eligibility_item(
+            "program_scope",
+            "Practicum program scope",
+            "Psychology program or MSGC",
+            f"{student.program.code} - {student.program.name}",
+            program_in_scope,
+            "student.program",
+            (
+                ""
+                if program_in_scope
+                else "Practicum is not offered to this program."
+            ),
+        )
+    ]
     for category, required in PRACTICUM_ELIGIBILITY_CONFIG["unit_requirements"].items():
         actual = unit_values[category]
         checklist.append(eligibility_item(
@@ -11704,7 +11674,7 @@ def practicum_eligibility(student: Student) -> dict:
 
     needs_verification = any(item["passed"] is None for item in checklist)
     eligible = bool(
-        student.program.has_practicum
+        program_in_scope
         and student.standing == "Active"
         and not needs_verification
         and all(item["passed"] is True for item in checklist)
@@ -11713,6 +11683,8 @@ def practicum_eligibility(student: Student) -> dict:
     return {
         "eligible": eligible,
         "status": status,
+        "program_in_scope": program_in_scope,
+        "program_scope": practicum_program_scope(),
         "basic_units_completed": unit_values["Basic"],
         "major_units_completed": unit_values["Major"],
         "cognate_units_completed": unit_values["Cognate"],
@@ -12221,7 +12193,7 @@ def graduation_eligibility(student: Student) -> dict:
         and research_progress["research_gates_complete"]
     )
 
-    practicum_required = bool(student.program.has_practicum)
+    practicum_required = program_allows_practicum(student.program)
     practicum_record = latest_practicum_record(student.id)
     practicum_complete = not practicum_required
     practicum_known = not practicum_required
@@ -12278,7 +12250,7 @@ def graduation_eligibility(student: Student) -> dict:
             "Completed" if practicum_required else "Not required",
             practicum_status,
             practicum_complete if practicum_known else None,
-            "program.has_practicum + practicum_record",
+            "confirmed practicum program scope + practicum_record",
             "Practicum completion needs verification." if not practicum_known else "",
         ),
         eligibility_item(
@@ -13027,7 +12999,8 @@ def workflow_approvals_payload() -> dict:
         pending.extend(workflow_approval_item(slug, item) for item in rows)
     pending.extend(
         workflow_approval_item("practicum", item)
-        for item in PracticumRecord.query.filter(PracticumRecord.status == "Report Sent to Dean")
+        for item in scoped_practicum_records_query()
+        .filter(PracticumRecord.status == "Report Sent to Dean")
         .order_by(PracticumRecord.updated_at.asc())
         .all()
     )
@@ -13080,7 +13053,8 @@ def workflow_approvals_payload() -> dict:
     )
     recent.extend(
         workflow_approval_item("practicum", item)
-        for item in PracticumRecord.query.filter(PracticumRecord.status == "Dean Reviewed")
+        for item in scoped_practicum_records_query()
+        .filter(PracticumRecord.status == "Dean Reviewed")
         .order_by(PracticumRecord.updated_at.desc())
         .limit(6)
         .all()
@@ -13093,7 +13067,7 @@ def workflow_approvals_payload() -> dict:
         overview.extend(workflow_approval_item(slug, item) for item in standing_recent[slug])
     overview.extend(
         workflow_approval_item("practicum", item)
-        for item in PracticumRecord.query.filter(
+        for item in scoped_practicum_records_query().filter(
             PracticumRecord.status.in_({
                 "Report Sent to Dean", "Dean Reviewed", "Additional Certificates Requested",
             })
@@ -13144,9 +13118,15 @@ def reports_payload(filters=None) -> dict:
         return query.filter(model.student_id.in_(student_ids)) if not empty else query.filter(False)
 
     dashboard = dashboard_stats(filters)
+    practicum_query = scoped_practicum_records_query()
+    practicum_query = (
+        practicum_query.filter(PracticumRecord.student_id.in_(student_ids))
+        if not empty
+        else practicum_query.filter(False)
+    )
     practicum_rows = [
         practicum_record_dict(item)
-        for item in by_students(PracticumRecord).order_by(PracticumRecord.updated_at.desc()).limit(150).all()
+        for item in practicum_query.order_by(PracticumRecord.updated_at.desc()).limit(150).all()
     ]
     withdrawal_rows = [
         withdrawal_application_dict(item)
@@ -13343,7 +13323,7 @@ def submitted_request_students(request_type: str) -> list[dict]:
 def practicum_roster_payload() -> list[dict]:
     students = (
         Student.query.join(Program)
-        .filter(Program.has_practicum.is_(True))
+        .filter(practicum_program_filter())
         .order_by(Student.last_name.asc(), Student.first_name.asc())
         .all()
     )
@@ -13447,6 +13427,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         "message_templates": WORKFLOW_MESSAGE_TEMPLATES,
         "message_recipients": list(WORKFLOW_RECIPIENTS),
         "deployment_policy_questions": DEPLOYMENT_POLICY_QUESTIONS,
+        "practicum_program_scope": practicum_program_scope(),
         "eligibility_config": PRACTICUM_ELIGIBILITY_CONFIG,
         "gate_requirements": {
             gate: required_documents_for_gate(gate)
@@ -15416,8 +15397,11 @@ def handle_defense_scheduling(data: MultiDict) -> int:
 
 def handle_practicum(data: MultiDict) -> int:
     student = Student.query.get_or_404(int(data["student_id"]))
-    if not student.program.has_practicum:
-        raise ValueError("Practicum is available only for programs with practicum requirements.")
+    if not program_allows_practicum(student.program):
+        raise ValueError(
+            "Practicum is available only to Psychology and Master of Science "
+            "in Guidance and Counseling (MSGC) students."
+        )
     record = latest_practicum_record(student.id)
     if not record:
         record = PracticumRecord(student_id=student.id)
@@ -18265,7 +18249,7 @@ def research_case_type(student: Student) -> str:
     name = student.program.name.lower()
     if "doctor" in name or "phd" in name:
         return "Dissertation"
-    if student.program.has_practicum:
+    if program_allows_practicum(student.program):
         return "Project Paper"
     return "Thesis"
 
@@ -20420,8 +20404,8 @@ def seed_maed_personas() -> None:
         request_file.workflow_request_id = application.id
         proof_file.workflow_request_id = application.id
 
-    # 0007: source-complete graduation candidate. Dynamic eligibility is backed
-    # by coursework, research, completion-evidence, and practicum records.
+    # 0007: source-complete MAED graduation candidate. MAED is outside the
+    # Psychology/MSGC practicum scope, so no practicum record is generated.
     isabel = by_num("2260007")
     if isabel:
         isabel.current_stage = "Final Defense"
@@ -20433,46 +20417,6 @@ def seed_maed_personas() -> None:
             isabel,
             "Inclusive Learning Strategies for Graduate Education",
         )
-        isabel_moa = attachment(
-            isabel,
-            "practicum",
-            f"Practicum_MOA_{isabel.student_number}.pdf",
-            "practicum-moa",
-            "MOA Verified",
-        )
-        isabel_completion = attachment(
-            isabel,
-            "practicum",
-            f"Practicum_Completion_Evidence_{isabel.student_number}.pdf",
-            "practicum-completion",
-            "Documents Verified",
-        )
-        isabel_practicum = PracticumRecord.query.filter_by(student_id=isabel.id).first()
-        if not isabel_practicum:
-            isabel_practicum = PracticumRecord(
-                student_id=isabel.id,
-                moa_status="Verified",
-                moa_uploaded=True,
-                practicum_site="USLS Center for Educational Practice",
-                supervisor_name="Dr. Ana Reyes",
-                required_hours=200,
-                completed_hours=200,
-                document_status="Verified",
-                certificate_count=2,
-                completion_status="Completed and accepted",
-                status="Dean Reviewed",
-                moa_attachment_id=isabel_moa.id,
-                certificate_attachment_id=isabel_completion.id,
-                report_sent_at=now_utc() - timedelta(days=20),
-                dean_reviewed_at=now_utc() - timedelta(days=15),
-                remarks="Official practicum completion verified for graduation.",
-            )
-            db.session.add(isabel_practicum)
-            db.session.flush()
-        isabel_practicum.moa_attachment_id = isabel_moa.id
-        isabel_practicum.certificate_attachment_id = isabel_completion.id
-        isabel_moa.workflow_request_id = isabel_practicum.id
-        isabel_completion.workflow_request_id = isabel_practicum.id
         endorsement = GraduationEndorsement.query.filter_by(student_id=isabel.id).first()
         graduation_request = attachment(
             isabel,
@@ -20506,79 +20450,25 @@ def seed_maed_personas() -> None:
                 "MAED monitoring and completion records",
                 "Included in graduation candidate list",
                 "Graduate School Staff",
-                "Coursework, research, post-defense evidence, and practicum are complete. "
+                "Coursework, research, and post-defense evidence are complete. "
                 "Candidate is ready to begin graduation endorsement review.",
                 previous_status="Not Listed",
                 new_status="For Review",
             )
 
-    # 0008: thesis complete; practicum is intentionally the only remaining
-    # graduation blocker at 120 of 200 hours.
+    # 0008: thesis-complete MAED student. MAED is outside the confirmed
+    # Psychology/MSGC practicum scope, so this persona has no practicum case.
     hector = by_num("2360008")
     if hector:
         hector.current_stage = "Final Defense"
         hector.standing = "Active"
         hector.enrollment_tag = "Enrolled"
         hector.risk_level = "On Track"
-        set_term_status(hector, "Practicum In Progress")
+        set_term_status(hector, "Completed")
         seed_completed_research(
             hector,
             "Reflective Practice Models for Graduate Educators",
         )
-        hector_moa = attachment(
-            hector,
-            "practicum",
-            f"Practicum_MOA_{hector.student_number}.pdf",
-            "practicum-moa",
-            "MOA Uploaded",
-        )
-        hector_progress = attachment(
-            hector,
-            "practicum",
-            f"Practicum_Progress_Certificate_{hector.student_number}.pdf",
-            "practicum-progress",
-            "Documents Under Review",
-        )
-        record = PracticumRecord.query.filter_by(student_id=hector.id).first()
-        if not record:
-            record = PracticumRecord(
-                student_id=hector.id,
-                moa_status="Uploaded",
-                moa_uploaded=True,
-                practicum_site="USLS Center for Educational Practice",
-                supervisor_name="Dr. Ana Reyes",
-                required_hours=200,
-                completed_hours=120,
-                document_status="Pending Review",
-                certificate_count=1,
-                completion_status="Pending",
-                status="Documents Under Review",
-                moa_attachment_id=hector_moa.id,
-                certificate_attachment_id=hector_progress.id,
-                remarks="Thesis is complete; practicum hours and evidence remain in progress.",
-            )
-            db.session.add(record)
-            db.session.flush()
-        record.moa_attachment_id = hector_moa.id
-        record.certificate_attachment_id = hector_progress.id
-        hector_moa.workflow_request_id = record.id
-        hector_progress.workflow_request_id = record.id
-        if not TransactionLog.query.filter_by(
-            transaction_slug="practicum",
-            student_id=hector.id,
-            result="Practicum documents under review",
-        ).first():
-            add_log(
-                "practicum",
-                hector.id,
-                "Academic Coordinator",
-                "Practicum documents",
-                "Practicum documents under review",
-                "Academic Coordinator",
-                "Research completion verified; practicum remains in progress (120/200 hours).",
-                previous_status="Practicum In Progress",
-                new_status="Documents Under Review",
-            )
 
     # 0009: readmission after an approved LOA, awaiting GS Staff review.
     readmission = by_num("2460009")
@@ -20693,13 +20583,13 @@ def seed_database(count: int = 350) -> None:
         ("MIT", "Master in Information Technology", "Engineering and Technology", False),
         ("MBA", "Master of Business Administration", "Business", False),
         ("DBA", "Doctor of Business Administration", "Business", False),
-        ("MAED", "Master of Arts in Education", "Education", True),
-        ("EDD", "Doctor of Education", "Education", True),
-        ("MSN", "Master of Science in Nursing", "Nursing", True),
-        ("MAN", "Master of Arts in Nursing", "Nursing", True),
+        ("MAED", "Master of Arts in Education", "Education", False),
+        ("EDD", "Doctor of Education", "Education", False),
+        ("MSN", "Master of Science in Nursing", "Nursing", False),
+        ("MAN", "Master of Arts in Nursing", "Nursing", False),
         ("MAPSY", "Master of Arts in Psychology", "Arts and Sciences", True),
         ("DPSY", "Doctor of Philosophy in Psychology", "Arts and Sciences", True),
-        ("MAGC", "Master of Arts in Guidance and Counseling", "Education", True),
+        ("MSGC", "Master of Science in Guidance and Counseling", "Education", True),
         ("MASS", "Master of Arts in Social Sciences", "Arts and Sciences", False),
     ]
     programs = []
@@ -20727,6 +20617,7 @@ def seed_database(count: int = 350) -> None:
     import_faculty_sheets()
     db.session.flush()
     import_program_monitoring_sheets()
+    ensure_practicum_program_policy()
     db.session.commit()
 
     seed_maed_personas()
@@ -20893,8 +20784,8 @@ WORKFLOW_DEMO_STUDENTS = {
         "first_name": "Andrea",
         "last_name": "Villanueva",
         "email": "practicum.andrea@usls.edu.ph",
-        "program_code": "MAED",
-        "ready_label": "Ready to begin the Practicum process",
+        "program_code": "MAPSY",
+        "ready_label": "Psychology student ready to begin the Practicum process",
     },
     "practicum-paolo": {
         "workflow": "practicum",
@@ -20902,8 +20793,8 @@ WORKFLOW_DEMO_STUDENTS = {
         "first_name": "Paolo",
         "last_name": "Ramirez",
         "email": "practicum.paolo@usls.edu.ph",
-        "program_code": "MAED",
-        "ready_label": "Ready to begin the Practicum process",
+        "program_code": "MSGC",
+        "ready_label": "MSGC student ready to begin the Practicum process",
     },
     "graduation-bianca": {
         "workflow": "graduation",
@@ -21122,11 +21013,12 @@ def workflow_demo_config_for_student(student: Student | None) -> tuple[str, dict
 
 def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> None:
     """Keep upstream requirements complete without resetting the active demo case."""
-    program = Program.query.filter_by(code="MAED").first()
-    if not program:
-        raise ValueError("The MAED demo curriculum is not available.")
-
     _, demo_config = workflow_demo_config_for_student(student)
+    program_code = (demo_config or {}).get("program_code", "MAED")
+    program = Program.query.filter(func.upper(Program.code) == program_code.upper()).first()
+    if not program:
+        raise ValueError(f"The {program_code} demo curriculum is not available.")
+
     is_withdrawal_demo = workflow == "withdrawal"
     is_research_demo = workflow == "research"
     is_enrollment_demo = workflow == "enrollment"
@@ -21179,6 +21071,20 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     student.risk_level = "Not Yet Assessed"
     student.adviser_name = student.adviser_name or "Dr. Liwayway Bautista"
     student.updated_at = now_utc()
+
+    if workflow == "practicum":
+        # Practicum demo identities changed from the retired MAED fixtures to
+        # their confirmed MAPSY/MSGC tracks. Remove only their obsolete
+        # cross-program course projections so the student portal stays coherent.
+        for record in (
+            CourseRecord.query.join(Course)
+            .filter(
+                CourseRecord.student_id == student.id,
+                Course.program_id != program.id,
+            )
+            .all()
+        ):
+            db.session.delete(record)
 
     active_course_code = (demo_config or {}).get("active_course_code", "")
     current_course_codes = set((demo_config or {}).get("current_course_codes", []))
@@ -21448,11 +21354,13 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
 
 
 def ensure_workflow_demo_students() -> list[Student]:
-    program = Program.query.filter_by(code="MAED").first()
-    if not program:
-        return []
     students = []
     for config in WORKFLOW_DEMO_STUDENTS.values():
+        program = Program.query.filter(
+            func.upper(Program.code) == config.get("program_code", "MAED").upper()
+        ).first()
+        if not program:
+            continue
         student = Student.query.filter_by(student_number=config["student_number"]).first()
         if not student:
             student = Student(
@@ -21469,6 +21377,10 @@ def ensure_workflow_demo_students() -> list[Student]:
             db.session.flush()
         student.first_name = config["first_name"]
         student.last_name = config["last_name"]
+        # Keep existing demo identities aligned with their configured program.
+        # This also migrates practicum personas created by older seeds where
+        # both Andrea and Paolo were still attached to MAED.
+        student.program_id = program.id
         if not config.get("preserve_student_email"):
             student.email = config["email"]
         existing_account = UserAccount.query.filter_by(
@@ -21510,7 +21422,7 @@ def workflow_demo_students_payload() -> list[dict]:
 
 
 def normalize_withdrawal_workflow_states() -> int:
-    """Migrate retired withdrawal states into the Registrar handoff workflow."""
+    """Migrate retired withdrawal states into the manual-email export workflow."""
     legacy_post_approval_statuses = {
         "Approved - Follow-through",
         "Coordinator Follow-through Complete",
@@ -21537,14 +21449,16 @@ def normalize_withdrawal_workflow_states() -> int:
         if application.requirement_status != "Not Applicable":
             application.requirement_status = "Not Applicable"
             updated += 1
-        if application.status == "Withdrawn Confirmed":
-            application.status = "Sent to Registrar"
-            application.registrar_status = "Sent - Awaiting Receipt"
-            application.registrar_sent_at = application.registrar_sent_at or application.completed_at or now_utc()
+        if application.status in {"Withdrawn Confirmed", "Sent to Registrar"}:
+            application.status = "Exported - Ready to Send"
+            application.registrar_status = "Exported - Ready to Send"
+            application.registrar_reference = None
+            application.registrar_sent_at = None
+            application.completed_at = None
             updated += 1
-        if application.status == "Sent to Registrar" and application.subject_enrollment:
+        if application.status == "Exported - Ready to Send" and application.subject_enrollment:
             application.withdrawal_scope = "Subject"
-            application.registrar_status = "Sent - Awaiting Receipt"
+            application.registrar_status = "Exported - Ready to Send"
             application.subject_enrollment.status = "Withdrawn"
             application.subject_enrollment.status_note = (
                 application.subject_enrollment.status_note
@@ -21624,6 +21538,7 @@ def normalize_immediate_standing_outcomes() -> int:
         GraduationEndorsement.endorsement_status.in_(["Sent to Registrar", "Registrar Received"])
     ).all():
         item.endorsement_status = "Dean Approved"
+        item.registrar_status = "Exported - Ready to Send"
         item.updated_at = now_utc()
         updated += 1
     return updated
@@ -21919,6 +21834,7 @@ with app.app_context():
     ensure_user_account_schema()
     ensure_faculty_account_schema()
     ensure_authoritative_curricula()
+    ensure_practicum_program_policy()
     ensure_course_year_consistency()
     ensure_delay_status_consistency()
 

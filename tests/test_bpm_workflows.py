@@ -66,6 +66,7 @@ from app import (  # noqa: E402
     enrollment_subject_states,
     ensure_authoritative_curricula,
     get_active_term,
+    ensure_workflow_demo_students,
     student_current_course_year,
     student_priority,
     sync_automatic_awol_statuses,
@@ -74,7 +75,9 @@ from app import (  # noqa: E402
     import_ac_monitoring,
     ensure_demo_accounts,
     panel_roles_for_student,
+    practicum_roster_payload,
     practicum_eligibility,
+    program_allows_practicum,
     required_documents_for_gate,
     research_requirement_presentation,
     resolve_source_flags_after_monitoring_upload,
@@ -103,7 +106,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         with app.app_context():
             db.drop_all()
             db.create_all()
-            self.program = Program(code="BPM", name="BPM Practicum Program", college="Graduate School", has_practicum=True)
+            self.program = Program(code="BPM", name="BPM Psychology Program", college="Graduate School", has_practicum=True)
             db.session.add(self.program)
             db.session.flush()
             self.course = Course(program_id=self.program.id, code="BPM-501", title="Completion Course", units=3, category="Major")
@@ -514,14 +517,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                     "registrar_reference": "Test Registrar delivery",
                 },
             )
-            self.assertEqual(handoff.status_code, 200, handoff.get_json())
+            self.assertIn(handoff.status_code, {404, 405})
             db.session.refresh(application)
             db.session.refresh(selected_enrollment)
             db.session.refresh(other_enrollment)
             db.session.refresh(selected_record)
             db.session.refresh(self.student)
-            self.assertEqual(application.status, "Sent to Registrar")
-            self.assertEqual(application.registrar_status, "Sent - Awaiting Receipt")
+            self.assertEqual(application.status, "Exported - Ready to Send")
+            self.assertEqual(application.registrar_status, "Exported - Ready to Send")
             self.assertEqual(selected_enrollment.status, "Withdrawn")
             self.assertEqual(other_enrollment.status, "Enrolled")
             self.assertEqual(selected_record.status, "Not Started")
@@ -2929,6 +2932,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 self.assertIsNone(portal_response.get_json()["withdrawal_application"])
 
         practicum_items = [item for item in items if item["workflow"] == "practicum"]
+        self.assertEqual(
+            {item["program_code"] for item in practicum_items},
+            {"MAPSY", "MSGC"},
+        )
         practicum_item = practicum_items[0]
         graduation_item = next(item for item in items if item["workflow"] == "graduation")
         withdrawal_item = next(item for item in items if item["workflow"] == "withdrawal")
@@ -2950,9 +2957,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 self.assertGreaterEqual(practicum_status["major_units_completed"], 9)
                 self.assertGreaterEqual(practicum_status["cognate_units_completed"], 6)
                 self.assertGreaterEqual(practicum_status["total_units_completed"], 21)
+                self.assertTrue(all(
+                    record.course.program_id == demo_student.program_id
+                    for record in CourseRecord.query.filter_by(student_id=demo_student.id).all()
+                ))
                 practicum_research = ResearchCase.query.filter_by(student_id=demo_student.id).one()
                 self.assertEqual(practicum_research.current_gate, "Completion Evidence")
                 self.assertEqual(practicum_research.status, "Verified Complete")
+
             self.assertTrue(graduation_eligibility(graduation_student)["eligible"])
             current_withdrawal_courses = [
                 record.course.code
@@ -3134,6 +3146,26 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 for record in CourseRecord.query.filter_by(student_id=research_student_id).all()
             ))
 
+    def test_existing_practicum_demo_students_migrate_to_configured_programs(self):
+        with app.app_context():
+            seed_database()
+            maed = Program.query.filter_by(code="MAED").one()
+            andrea = Student.query.filter_by(student_number="GS-2026-PRAC-01").one()
+            paolo = Student.query.filter_by(student_number="GS-2026-PRAC-02").one()
+            andrea.program_id = maed.id
+            paolo.program_id = maed.id
+            db.session.commit()
+
+            ensure_workflow_demo_students()
+            db.session.commit()
+            db.session.refresh(andrea)
+            db.session.refresh(paolo)
+
+            self.assertEqual(andrea.program.code, "MAPSY")
+            self.assertEqual(paolo.program.code, "MSGC")
+            self.assertTrue(practicum_eligibility(andrea)["eligible"])
+            self.assertTrue(practicum_eligibility(paolo)["eligible"])
+
     def test_defense_availability_uses_recurring_profile_hours_without_dated_rows(self):
         target_day = date(2026, 7, 28)  # Tuesday
         with app.app_context():
@@ -3208,7 +3240,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 student.student_number: student
                 for student in Student.query.filter_by(program_id=program.id).all()
             }
-            self.assertEqual(len(all_students), 29)
+            # The two Practicum demos now belong to MAPSY and MSGC, so they
+            # are intentionally absent from the MAED student count.
+            self.assertEqual(len(all_students), 27)
             students = {
                 student_number: student
                 for student_number, student in all_students.items()
@@ -3313,7 +3347,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertTrue(isabel_eligibility["eligible"])
             self.assertEqual(isabel_eligibility["coursework_status"], "Complete")
             self.assertEqual(isabel_eligibility["research_status"], "Complete")
-            self.assertEqual(isabel_eligibility["practicum_status"], "Dean Reviewed")
+            self.assertEqual(isabel_eligibility["practicum_status"], "Not Required")
             self.assertEqual(
                 GraduationEndorsement.query.filter_by(
                     student_id=isabel.id,
@@ -3323,10 +3357,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             hector = students["2360008"]
             hector_eligibility = graduation_eligibility(hector)
-            self.assertFalse(hector_eligibility["eligible"])
+            self.assertTrue(hector_eligibility["eligible"])
             self.assertEqual(hector_eligibility["missing_coursework"], [])
             self.assertEqual(hector_eligibility["missing_research_requirements"], [])
-            self.assertIn("120/200", hector_eligibility["missing_practicum_requirement"])
+            self.assertEqual(hector_eligibility["missing_practicum_requirement"], "")
+            self.assertEqual(hector_eligibility["practicum_status"], "Not Required")
             self.assertTrue(
                 hector_eligibility["research_progress"]["research_gates_complete"]
             )
@@ -3365,7 +3400,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             attachments = StudentRequestAttachment.query.order_by(
                 StudentRequestAttachment.id,
             ).all()
-            self.assertEqual(len(attachments), 7)
+            # MAED no longer receives the four practicum MOA/certificate
+            # fixtures previously attached to Isabel and Hector.
+            self.assertEqual(len(attachments), 3)
             for item in attachments:
                 path = REQUEST_UPLOAD_ROOT / item.stored_name
                 self.assertTrue(path.is_file(), item.original_name)
@@ -3554,6 +3591,64 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 409, response.get_json())
             self.assertIsNone(PracticumRecord.query.filter_by(student_id=self.student_id).first())
+
+    def test_practicum_is_restricted_to_psychology_and_msgc_programs(self):
+        with app.app_context():
+            out_of_scope_program = Program(
+                code="MAED-NP",
+                name="Master of Arts in Education",
+                college="Education",
+                has_practicum=True,
+            )
+            msgc_program = Program(
+                code="MSGC",
+                name="Master of Science in Guidance and Counseling",
+                college="Education",
+                has_practicum=True,
+            )
+            db.session.add_all([out_of_scope_program, msgc_program])
+            db.session.flush()
+            out_of_scope_student = Student(
+                student_number="GS-2026-NON-PRAC",
+                first_name="Outside",
+                last_name="Scope",
+                email="outside-practicum@example.test",
+                program_id=out_of_scope_program.id,
+                entry_year=2025,
+                current_stage="Final Defense",
+                standing="Active",
+            )
+            db.session.add(out_of_scope_student)
+            db.session.flush()
+            account = self._account("student", "outside-practicum-login@example.test")
+            account.student_id = out_of_scope_student.id
+            db.session.commit()
+
+            psychology_program = db.session.get(Program, self.program_id)
+            self.assertTrue(program_allows_practicum(psychology_program))
+            self.assertTrue(program_allows_practicum(msgc_program))
+            self.assertFalse(program_allows_practicum(out_of_scope_program))
+            self.assertFalse(practicum_eligibility(out_of_scope_student)["program_in_scope"])
+
+            portal = self._role_client(account.id, "student").get("/api/student-portal/context")
+            self.assertEqual(portal.status_code, 200, portal.get_json())
+            self.assertFalse(portal.get_json()["student"]["program_has_practicum"])
+            self.assertIn("Psychology", portal.get_json()["practicum_program_scope"]["label"])
+            self.assertIn("MSGC", portal.get_json()["practicum_program_scope"]["label"])
+
+            blocked = self._role_client(account.id, "student").post(
+                "/api/student-portal/requests/practicum",
+                json={"practicum_site": "Not allowed"},
+            )
+            self.assertEqual(blocked.status_code, 403, blocked.get_json())
+            self.assertIn("Psychology", blocked.get_json()["error"])
+
+            roster_ids = {
+                row["student"]["id"]
+                for row in practicum_roster_payload()
+            }
+            self.assertIn(self.student_id, roster_ids)
+            self.assertNotIn(out_of_scope_student.id, roster_ids)
 
     def test_student_can_upload_additional_practicum_pdf_without_replacing_history(self):
         with app.app_context():

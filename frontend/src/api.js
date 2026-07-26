@@ -126,14 +126,6 @@ export const api = {
     URL.revokeObjectURL(url);
     return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
   },
-  forwardWithdrawalsToRegistrar: (applicationIds, registrarReference = "") =>
-    request("/withdrawal/registrar-handoff", {
-      method: "POST",
-      body: JSON.stringify({
-        application_ids: applicationIds,
-        registrar_reference: registrarReference,
-      }),
-    }),
   transactionContext: (slug, params = {}) => {
     const qs = queryString(params);
     return request(`/transactions/${slug}/context${qs ? `?${qs}` : ""}`);

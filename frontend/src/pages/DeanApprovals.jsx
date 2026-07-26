@@ -9,6 +9,7 @@ import RoleSidebar from "../components/RoleSidebar";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
+import ExportFollowUpModal from "../components/ExportFollowUpModal";
 import { printDataTable } from "../lib/print";
 import { GraduationRoster } from "./WorkflowPage";
 
@@ -155,7 +156,7 @@ const DEAN_GRADUATION_BATCH_STAGES = [
   },
   {
     label: "Export endorsed list",
-    detail: "Dean-approved candidates are available as an external-process export.",
+    detail: "Dean-approved candidates are available as a CSV download for manual email to the Registrar.",
     currentStatuses: ["Dean Approved"],
     completeStatuses: ["Dean Approved"],
     attentionStatuses: ["Returned for Revision"],
@@ -336,6 +337,7 @@ export default function DeanApprovals() {
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
   const [pendingDecision, setPendingDecision] = useState(null);
   const [exportedGraduationBatches, setExportedGraduationBatches] = useState(() => new Set());
+  const [exportNotice, setExportNotice] = useState(null);
   const [selectedGraduationIds, setSelectedGraduationIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
   const [stageBatch, setStageBatch] = useState(null);
@@ -480,7 +482,8 @@ export default function DeanApprovals() {
     try {
       const result = await api.exportGraduationCsv(reviewWindow, endorsementIds);
       setExportedGraduationBatches((current) => new Set(current).add(batchLabel));
-      setMsg(`${batchLabel} exported as ${result.filename}. The file is ready for the external Registrar process.`);
+      setExportNotice({ filename: result.filename, batchLabel });
+      setMsg(`${batchLabel} exported as ${result.filename}. The Dean must email the file to the Registrar and wait for acknowledgement.`);
       await refetch();
     } catch (error) {
       setActErr(error.message || "Could not export the endorsed list.");
@@ -626,7 +629,7 @@ export default function DeanApprovals() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="font-display text-lg font-semibold text-ink">Approved graduation batches</p>
-                <p className="text-xs text-slate-500">Export the Dean-approved list for the external Registrar process.</p>
+                <p className="text-xs text-slate-500">Export the Dean-approved list, then email it to the Registrar and wait for acknowledgement.</p>
               </div>
               <StatusBadge value={`${approvedGraduation.length} approved`} dot={false} />
             </div>
@@ -827,6 +830,16 @@ export default function DeanApprovals() {
       {pendingDecision && <DeanDecisionModal pending={pendingDecision} busy={busy === `${pendingDecision.item.type}-${pendingDecision.item.id}`} onClose={() => setPendingDecision(null)} onConfirm={confirmWorkflowDecision} />}
       {batchOpen && selectedGraduation.length > 0 && <DeanGraduationBatchModal rows={selectedGraduation} onClose={() => setBatchOpen(false)} onSaved={batchSaved} />}
       {stageBatch && <DeanGraduationStageModal batch={stageBatch} onClose={() => setStageBatch(null)} />}
+      {exportNotice && (
+        <ExportFollowUpModal
+          id="dean-graduation-export-follow-up"
+          title="Graduation CSV export complete"
+          filename={exportNotice.filename}
+          actorLabel="The Dean"
+          fileLabel="endorsed graduation list"
+          onClose={() => setExportNotice(null)}
+        />
+      )}
       </div>
     </div>
   );
@@ -1034,7 +1047,7 @@ function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, reci
   const isBusy = busy === key;
   const standingChange = ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
   const decisionOnly = ["practicum", "withdrawal", "graduation"].includes(item.type);
-  const approveLabel = item.type === "practicum" ? "Mark reviewed" : standingChange || item.type === "withdrawal" ? "Approve" : "Approve & send";
+  const approveLabel = item.type === "practicum" ? "Mark reviewed" : standingChange || item.type === "withdrawal" ? "Approve" : "Approve and prepare for export";
   const returnLabel = "Return for revision";
   const timeline = standingChange
     ? null
