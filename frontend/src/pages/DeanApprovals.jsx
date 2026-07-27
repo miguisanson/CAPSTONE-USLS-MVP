@@ -126,6 +126,15 @@ function graduationBatchReadyToSend(batch, exportedBatchLabels) {
   return exportedBatchLabels.has(batch.label) || batch.rows.every((item) => graduationRegistrarStatus(item) === "Exported - Ready to Send");
 }
 
+function isReadyForDeanReview(item) {
+  const workflowStatus = item.workflow_status || item.status;
+  return (
+    (item.type === "practicum" && workflowStatus === "Report Sent to Dean")
+    || (item.type === "withdrawal" && workflowStatus === "Dean Review")
+    || (item.type === "graduation" && item.status === "Ready for Dean Review")
+  );
+}
+
 const DEAN_GRADUATION_BATCH_STAGES = [
   {
     label: "Compile graduation list",
@@ -591,11 +600,20 @@ export default function DeanApprovals() {
                 const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
                 const expanded = expandedGraduationBatches.has(batch.label);
                 return (
-                  <div key={batch.label} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-1.5">
+                  <div
+                    key={batch.label}
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", `graduation-batch:${batch.label}`);
+                    }}
+                    className="cursor-grab rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 transition-colors hover:border-emerald-500 active:cursor-grabbing"
+                  >
                     <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
                         <p className="text-xs text-slate-500">{batch.rows.length} candidate{batch.rows.length === 1 ? "" : "s"}</p>
+                        <span className="mt-1 inline-flex rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>
                       </div>
                       <p className="truncate text-xs text-slate-600"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -1177,9 +1195,18 @@ function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
   const boardRows = selectedRows.length ? rows.filter((item) => !(item.type === "graduation" && selectedIds.has(item.student?.id))) : rows;
   const renderCard = (item) => {
     const selectable = item.type === "graduation" && item.status === "Ready for Dean Review";
-    const readyToDrag = Boolean(item.has_submitted_documents);
+    const readyToDrag = isReadyForDeanReview(item);
     return (
-      <article key={`${item.type}-${item.id}`} draggable={readyToDrag} className={`rounded-xl border p-3 shadow-sm transition-colors ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+      <article
+        key={`${item.type}-${item.id}`}
+        draggable={readyToDrag}
+        onDragStart={(event) => {
+          if (!readyToDrag) return;
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", `dean-review:${item.type}:${item.id}`);
+        }}
+        className={`rounded-xl border p-3 shadow-sm transition-colors ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : "border-slate-200 bg-white hover:border-slate-300"}`}
+      >
         <div className="flex items-start gap-2">
           {selectable && <input type="checkbox" checked={selectedIds.has(item.student.id)} onChange={() => onToggle(item.student.id)} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${item.student.name} for Dean group action`} />}
           <div className="min-w-0 flex-1">
@@ -1188,7 +1215,12 @@ function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
             {item.type === "graduation" && <p className="mt-1 truncate text-xs font-semibold text-brand-700">{graduationBatchLabel(item)}</p>}
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-1.5"><StatusBadge value={item.workflow_status || item.status} dot={false} />{!readyToDrag && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}</div>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <StatusBadge value={item.workflow_status || item.status} dot={false} />
+          {readyToDrag
+            ? <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>
+            : !item.has_submitted_documents && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}
+        </div>
         <p className="mt-2 text-xs text-slate-500">{item.type} · updated {formatDate(item.last_activity_at || item.submitted_at)}</p>
         {item.messages?.length > 0 && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-800"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> {item.messages.length} visible message{item.messages.length === 1 ? "" : "s"}</p>}
         <button type="button" onClick={() => onOpen(item)} className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:ring-2 focus:ring-brand-500">View full request <Eye className="h-3.5 w-3.5" /></button>

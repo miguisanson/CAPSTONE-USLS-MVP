@@ -3758,6 +3758,18 @@ const GRADUATION_BOARD_COLUMNS = [
   },
 ];
 
+function practicumReadyForDeanReview(row) {
+  return row.record?.status === "Report Sent to Dean";
+}
+
+function withdrawalReadyForDeanReview(item) {
+  return item.status === "Dean Review";
+}
+
+function graduationReadyForDeanReview(group) {
+  return group.boardStatus === "Ready for Dean Review";
+}
+
 function WorkflowBoard({ columns, rows, getStatus, renderCard, empty, isDraggable = () => false, getDragId = () => "" }) {
   if (!rows.length) return <EmptyState title={empty} />;
   return (
@@ -3795,11 +3807,12 @@ function ViewModeToggle({ value, onChange }) {
 
 function PracticumBoardCard({ row, onOpen, onMessage }) {
   const record = row.record;
-  const ready = Boolean(row.has_submitted_documents);
+  const readyForDean = practicumReadyForDeanReview(row);
+  const ready = Boolean(row.has_submitted_documents) || readyForDean;
   const latestMessage = row.messages?.[0];
   return (
     <article key={row.student.id} className={`rounded-xl border p-3 shadow-sm transition-colors ${ready ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p></div>{!ready && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}</div>
+      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{row.student.name}</p><p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p></div>{readyForDean ? <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span> : !ready && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}</div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600"><span>{record?.practicum_site || "Site pending"}</span><span className="text-right">{record ? `${record.completed_hours}/${record.required_hours} hrs` : "No hours yet"}</span><span>{row.eligibility.status}</span><span className="text-right">Updated {formatDate(row.last_activity_at || record?.updated_at)}</span><span className="col-span-2">{record ? `Submitted ${formatDate(record.created_at)}` : "No practicum documents submitted"}</span></div>
       {row.messages?.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"><p className="text-[11px] font-bold uppercase tracking-wide text-amber-700">{row.messages.length} visible message{row.messages.length === 1 ? "" : "s"}</p><p className="mt-1 line-clamp-2 text-xs text-amber-900">{latestMessage?.comment || latestMessage?.template}</p></div>}
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
@@ -3809,9 +3822,10 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
 }
 
 function WithdrawalBoardCard({ item, onOpen, onMessage }) {
+  const readyForDean = withdrawalReadyForDeanReview(item);
   return (
     <article key={item.id} className="cursor-grab rounded-xl border border-emerald-300 bg-emerald-50 p-3 shadow-sm transition-colors hover:border-emerald-500 active:cursor-grabbing">
-      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} · {item.student.program_code}</p></div>{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
+      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} · {item.student.program_code}</p></div><div className="flex flex-wrap justify-end gap-1.5">{readyForDean && <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>}{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div></div>
       <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.reason || "No reason provided"}</p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Submitted {formatDate(item.created_at)}</span><span className="text-right">Updated {formatDate(item.updated_at)}</span><span className="col-span-2 font-semibold text-slate-700">{item.subject?.course_code || "Subject pending"} · {item.effective_term || item.subject?.term_label || "Semester pending"}</span></div>
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {item.next_action_owner || "Awaiting review"}</p>
@@ -3940,18 +3954,20 @@ function GraduationBatchRow({
   const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
   const canExpandStudents = Boolean(onToggleExpanded && onOpenStudent && onMessageStudent);
   const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
+  const readyForDean = graduationReadyForDeanReview(group);
+  const readyToDrag = applicationComplete || readyForDean;
   const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
   const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
   const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   return (
     <article
-      draggable={applicationComplete}
+      draggable={readyToDrag}
       onDragStart={(event) => {
-        if (!applicationComplete) return;
+        if (!readyToDrag) return;
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", `graduation-batch:${group.id}`);
       }}
-      className={`rounded-xl border px-3 py-1.5 transition-colors ${applicationComplete ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}
+      className={`rounded-xl border px-3 py-1.5 transition-colors ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}
     >
       <div className="space-y-3">
         <div className="min-w-0">
@@ -3973,6 +3989,7 @@ function GraduationBatchRow({
                 <span>·</span>
                 <span>{selectionLabel}</span>
                 <StatusBadge value={group.boardStatus} dot={false} />
+                {readyForDean && <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>}
                 {!applicationComplete && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Application document issue</span>}
                 {messageCount > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"><MessageSquare className="mr-1 inline h-3 w-3" />{messageCount} message{messageCount === 1 ? "" : "s"}</span>}
               </div>
@@ -4194,13 +4211,24 @@ function GraduationBatchOverviewSection({ groups, accountRole, onSelectBatch, on
           const currentStage = graduationBatchCurrentStage(group);
           const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
           const hiddenCount = group.rows.length - Math.min(group.rows.length, 4);
-          const readyToDrag = group.rows.every((row) => row.has_submitted_documents);
+          const readyForDean = graduationReadyForDeanReview(group);
+          const readyToDrag = group.rows.every((row) => row.has_submitted_documents) || readyForDean;
           return (
-            <div key={group.id} draggable={readyToDrag} className={`rounded-xl border px-3 py-2 ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 active:cursor-grabbing" : "border-slate-200 bg-slate-50/60"}`}>
+            <div
+              key={group.id}
+              draggable={readyToDrag}
+              onDragStart={(event) => {
+                if (!readyToDrag) return;
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", `graduation-batch:${group.id}`);
+              }}
+              className={`rounded-xl border px-3 py-2 ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 active:cursor-grabbing" : "border-slate-200 bg-slate-50/60"}`}
+            >
               <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{group.label}</p>
                   <p className="text-xs text-slate-500">{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"} · Updated {formatDate(group.updatedAt)}</p>
+                  {readyForDean && <span className="mt-1 inline-flex rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>}
                   {!readyToDrag && <span className="mt-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">Waiting for documents</span>}
                 </div>
                 <div className="min-w-0 text-xs text-slate-600">
@@ -4300,7 +4328,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
           columns={PRACTICUM_BOARD_COLUMNS}
           rows={filteredRows}
           getStatus={(row) => row.record?.status || "Not Submitted"}
-          isDraggable={(row) => Boolean(row.has_submitted_documents)}
+          isDraggable={(row) => Boolean(row.has_submitted_documents) || practicumReadyForDeanReview(row)}
           getDragId={(row) => row.student.id}
           empty="No recent practicum submissions match the filters."
           renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
