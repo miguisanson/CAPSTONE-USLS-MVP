@@ -9,6 +9,13 @@
       "env": { "FLASK_PORT": "5050" }
     },
     {
+      "name": "usls-gs-win",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["app.py"],
+      "port": 5050,
+      "env": { "FLASK_PORT": "5050" }
+    },
+    {
       "name": "usls-web",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
