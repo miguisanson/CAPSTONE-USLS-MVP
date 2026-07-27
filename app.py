@@ -21642,7 +21642,8 @@ WORKFLOW_DEMO_STUDENTS = {
         "email": "withdrawal.elena@usls.edu.ph",
         "program_code": "MAED",
         "active_course_code": "MAED-MAJ1",
-        "ready_label": "Active in MAED-MAJ1; ready to submit a Withdrawal request",
+        "active_course_codes": ["MAED-MAJ1", "MAED-MAJ3", "MAED-COG1"],
+        "ready_label": "Enrolled in three active subjects; ready to choose one for a Withdrawal request",
     },
     "withdrawal-joshua": {
         "workflow": "withdrawal",
@@ -21652,7 +21653,8 @@ WORKFLOW_DEMO_STUDENTS = {
         "email": "withdrawal.joshua@usls.edu.ph",
         "program_code": "MAED",
         "active_course_code": "MAED-MAJ2",
-        "ready_label": "Active in MAED-MAJ2; ready to submit a Withdrawal request",
+        "active_course_codes": ["MAED-MAJ2", "MAED-MAJ4", "MAED-COG2"],
+        "ready_label": "Enrolled in three active subjects; ready to choose one for a Withdrawal request",
     },
     "enrollment-clarissa": {
         "workflow": "enrollment",
@@ -21858,7 +21860,18 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     withdrawal_application = latest_withdrawal_application(student.id) if is_withdrawal_demo else None
     withdrawal_complete = bool(
         withdrawal_application
-        and withdrawal_application.status in {"Withdrawn Confirmed", "Sent to Registrar"}
+        and (
+            withdrawal_application.status in {
+                "Subject Tagged - Registrar Preparation",
+                "Exported - Ready to Send",
+                "Sent to Registrar",
+                "Withdrawn Confirmed",
+            }
+            or (
+                withdrawal_application.subject_enrollment
+                and withdrawal_application.subject_enrollment.status == "Withdrawn"
+            )
+        )
     )
     student.program_id = program.id
     student.entry_year = student.entry_year if is_research_demo else 2026 if (is_withdrawal_demo or is_new_demo) else 2024
@@ -21868,7 +21881,6 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     student.enrollment_tag = (
         "Completed" if workflow == "graduation"
         else "LOA" if is_readmission_demo
-        else "Not Enrolled" if is_withdrawal_demo and withdrawal_complete
         else "Not Enrolled" if (
             is_enrollment_demo
             or is_adjustments_demo
@@ -21907,6 +21919,17 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             db.session.delete(record)
 
     active_course_code = (demo_config or {}).get("active_course_code", "")
+    active_course_codes = set(
+        (demo_config or {}).get("active_course_codes")
+        or ([active_course_code] if active_course_code else [])
+    )
+    withdrawn_course_id = (
+        withdrawal_application.subject_enrollment.course_id
+        if withdrawal_complete
+        and withdrawal_application
+        and withdrawal_application.subject_enrollment
+        else None
+    )
     current_course_codes = set((demo_config or {}).get("current_course_codes", []))
     active_term = get_active_term() if is_withdrawal_demo else None
     demo_courses = monitoring_curriculum_courses(program)
@@ -21931,12 +21954,19 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             record.evidence_reference = "Requested MAED demo enrollment"
             record.resolved_at = None
         elif is_withdrawal_demo:
-            is_active_course = course.code == active_course_code
-            record.status = "Not Started" if is_active_course and withdrawal_complete else "Current" if is_active_course else "Not Started"
+            is_active_course = course.code in active_course_codes
+            is_withdrawn_course = is_active_course and course.id == withdrawn_course_id
+            record.status = "Withdrawn" if is_withdrawn_course else "Current" if is_active_course else "Not Started"
             record.grade_status = "No Grade"
             record.grade_value = None
-            record.term_label = active_term.label if is_active_course and active_term and not withdrawal_complete else None
-            record.evidence_reference = "Withdrawal demo active enrollment" if is_active_course and not withdrawal_complete else None
+            record.term_label = active_term.label if is_active_course and active_term else None
+            record.evidence_reference = (
+                "Approved early subject withdrawal; no academic record or grade impact."
+                if is_withdrawn_course
+                else "Withdrawal demo active enrollment"
+                if is_active_course
+                else None
+            )
             record.resolved_at = None
         elif is_new_demo:
             completed_count = 0
@@ -21964,56 +21994,72 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             record.resolved_at = record.resolved_at or now_utc()
         record.updated_at = now_utc()
 
-    # Subject withdrawal begins while the student is active in one selected
-    # class; completing it does not change the student's program standing.
+    # Subject withdrawal begins while the student is active in several classes.
+    # The student chooses one class, and completing the request preserves every
+    # other active subject and the student's enrolled program standing.
     if is_withdrawal_demo:
-        active_course = Course.query.filter_by(program_id=program.id, code=active_course_code).first()
-        if active_course and active_term:
+        active_courses = (
+            Course.query.filter(
+                Course.program_id == program.id,
+                Course.code.in_(active_course_codes),
+            )
+            .order_by(Course.id.asc())
+            .all()
+        )
+        default_enrollment = None
+        if active_courses and active_term:
             academic_year, semester = split_academic_term_label(active_term.label)
-            if academic_year and semester and not CurriculumOffering.query.filter_by(
-                program_id=program.id,
-                academic_year=academic_year,
-                semester=semester,
-                course_id=active_course.id,
-            ).first():
-                db.session.add(CurriculumOffering(
+            for active_course in active_courses:
+                if academic_year and semester and not CurriculumOffering.query.filter_by(
                     program_id=program.id,
                     academic_year=academic_year,
                     semester=semester,
                     course_id=active_course.id,
-                    added_by="Workflow demo baseline",
-                ))
-            enrollment = SubjectEnrollment.query.filter_by(
-                student_id=student.id,
-                course_id=active_course.id,
-                term_id=active_term.id,
-            ).first()
-            if not enrollment:
-                enrollment = SubjectEnrollment(
+                ).first():
+                    db.session.add(CurriculumOffering(
+                        program_id=program.id,
+                        academic_year=academic_year,
+                        semester=semester,
+                        course_id=active_course.id,
+                        added_by="Workflow demo baseline",
+                    ))
+                enrollment = SubjectEnrollment.query.filter_by(
                     student_id=student.id,
                     course_id=active_course.id,
                     term_id=active_term.id,
-                    source_reference="Withdrawal demo active enrollment",
+                ).first()
+                if not enrollment:
+                    enrollment = SubjectEnrollment(
+                        student_id=student.id,
+                        course_id=active_course.id,
+                        term_id=active_term.id,
+                        source_reference="Withdrawal demo active enrollment",
+                    )
+                    db.session.add(enrollment)
+                is_withdrawn_course = active_course.id == withdrawn_course_id
+                enrollment.status = "Withdrawn" if is_withdrawn_course else "Enrolled"
+                enrollment.status_note = (
+                    "Approved early subject withdrawal; no academic record or grade impact."
+                    if is_withdrawn_course
+                    else None
                 )
-                db.session.add(enrollment)
-            enrollment.status = "Withdrawn" if withdrawal_complete else "Enrolled"
-            enrollment.status_note = (
-                "Approved early subject withdrawal; no academic record or grade impact."
-                if withdrawal_complete
-                else None
+                enrollment.cancelled_at = (
+                    withdrawal_application.completed_at
+                    if is_withdrawn_course and withdrawal_application
+                    else None
+                )
+                enrollment.updated_at = now_utc()
+                if active_course.code == active_course_code:
+                    default_enrollment = enrollment
+            ensure_term_enrollment(
+                student,
+                active_term,
+                "Enrolled",
+                "Withdrawal demo active enrollment",
             )
-            enrollment.cancelled_at = withdrawal_application.completed_at if withdrawal_complete and withdrawal_application else None
-            enrollment.updated_at = now_utc()
-            if not withdrawal_complete:
-                ensure_term_enrollment(
-                    student,
-                    active_term,
-                    "Enrolled",
-                    "Withdrawal demo active enrollment",
-                )
-            if withdrawal_application and not withdrawal_application.subject_enrollment_id:
+            if withdrawal_application and not withdrawal_application.subject_enrollment_id and default_enrollment:
                 db.session.flush()
-                withdrawal_application.subject_enrollment_id = enrollment.id
+                withdrawal_application.subject_enrollment_id = default_enrollment.id
                 withdrawal_application.withdrawal_scope = "Subject"
                 withdrawal_application.effective_term = active_term.label
         return

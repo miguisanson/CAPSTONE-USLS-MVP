@@ -3594,8 +3594,15 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 .filter(Student.student_number.in_(["GS-2026-WD-01", "GS-2026-WD-02"]))
                 .all()
             )
-            self.assertEqual(len(withdrawal_demo_enrollments), 2)
+            self.assertEqual(len(withdrawal_demo_enrollments), 6)
             self.assertTrue(all(item.status == "Enrolled" for item in withdrawal_demo_enrollments))
+            withdrawal_enrollments_by_student = {}
+            for item in withdrawal_demo_enrollments:
+                withdrawal_enrollments_by_student.setdefault(item.student.student_number, []).append(item)
+            self.assertEqual(
+                {key: len(value) for key, value in withdrawal_enrollments_by_student.items()},
+                {"GS-2026-WD-01": 3, "GS-2026-WD-02": 3},
+            )
 
             expected_completed = {
                 "2560001": 0,
@@ -3633,7 +3640,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(grace.current_stage, "Coursework")
             self.assertEqual(
                 {item.course.code for item in curriculum_offerings_for_term(program, active_term)},
-                {"MAED-MAJ1", "MAED-MAJ2", "MAED-MAJ3", "MAED-MAJ4", "MAED-MAJ5"},
+                {
+                    "MAED-MAJ1", "MAED-MAJ2", "MAED-MAJ3", "MAED-MAJ4", "MAED-MAJ5",
+                    "MAED-COG1", "MAED-COG2",
+                },
             )
 
             benjamin = students["2460003"]

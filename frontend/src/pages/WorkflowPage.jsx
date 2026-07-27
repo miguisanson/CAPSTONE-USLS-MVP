@@ -3810,7 +3810,7 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
 
 function WithdrawalBoardCard({ item, onOpen, onMessage }) {
   return (
-    <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
+    <article key={item.id} className="cursor-grab rounded-xl border border-emerald-300 bg-emerald-50 p-3 shadow-sm transition-colors hover:border-emerald-500 active:cursor-grabbing">
       <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} · {item.student.program_code}</p></div>{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div>
       <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.reason || "No reason provided"}</p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Submitted {formatDate(item.created_at)}</span><span className="text-right">Updated {formatDate(item.updated_at)}</span><span className="col-span-2 font-semibold text-slate-700">{item.subject?.course_code || "Subject pending"} · {item.effective_term || item.subject?.term_label || "Semester pending"}</span></div>
@@ -3841,8 +3841,18 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, det
         const courseworkPanelId = `graduation-card-coursework-${row.student.id}`;
         const researchPanelId = `graduation-card-research-${row.student.id}`;
         const practicumPanelId = `graduation-card-practicum-${row.student.id}`;
+        const readyToDrag = Boolean(row.has_submitted_documents);
         return (
-          <li key={row.student.id} className={`rounded-lg px-3 py-2 ring-1 ${row.has_submitted_documents ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-slate-200"}`}>
+          <li
+            key={row.student.id}
+            draggable={readyToDrag}
+            onDragStart={(event) => {
+              if (!readyToDrag) return;
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", `graduation-student:${row.student.id}`);
+            }}
+            className={`rounded-lg px-3 py-2 ring-1 ${readyToDrag ? "cursor-grab bg-emerald-50 ring-emerald-200 active:cursor-grabbing" : "bg-white ring-slate-200"}`}
+          >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
@@ -3934,7 +3944,15 @@ function GraduationBatchRow({
   const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
   const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   return (
-    <article className={`rounded-xl border px-3 py-1.5 transition-colors ${applicationComplete ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}>
+    <article
+      draggable={applicationComplete}
+      onDragStart={(event) => {
+        if (!applicationComplete) return;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", `graduation-batch:${group.id}`);
+      }}
+      className={`rounded-xl border px-3 py-1.5 transition-colors ${applicationComplete ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}
+    >
       <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex min-w-0 items-start gap-2">
@@ -4103,7 +4121,16 @@ function GraduationCandidateStageSection({
           const completedCourses = row.eligibility?.completed_courses || [];
           const applicationFile = row.endorsement?.request_attachment;
           return (
-            <li key={row.student.id} className={`rounded-xl border p-3 ${selectable ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50/60"}`}>
+            <li
+              key={row.student.id}
+              draggable={Boolean(row.has_submitted_documents)}
+              onDragStart={(event) => {
+                if (!row.has_submitted_documents) return;
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", `graduation-student:${row.student.id}`);
+              }}
+              className={`rounded-xl border p-3 ${selectable ? "cursor-grab border-emerald-200 bg-emerald-50/70 active:cursor-grabbing" : "border-slate-200 bg-slate-50/60"}`}
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2.5">
                   {canCreateBatch && <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />}
@@ -4515,6 +4542,8 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
           columns={WITHDRAWAL_BOARD_COLUMNS}
           rows={filteredRows}
           getStatus={(item) => item.status}
+          isDraggable={(item) => Boolean(item.id)}
+          getDragId={(item) => item.id}
           empty="No recent withdrawal requests match the filters."
           renderCard={(item) => <WithdrawalBoardCard key={item.id} item={item} onOpen={() => openCase(item)} onMessage={() => setMessageRow(item)} />}
         />
