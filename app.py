@@ -11589,7 +11589,7 @@ def register_routes(app: Flask) -> None:
             "create_batch": "Create graduation batch",
             "compile_to_ac": "Compile graduation candidate list and send to Academic Coordinator",
             "check_coursework": "Check coursework completion",
-            "validate_research": "Validate research completion requirements",
+            "validate_research": "Validate research and practicum requirements",
             "mark_not_eligible": "List missing requirements and mark not eligible",
             "prepare_endorsement": "Prepare endorsement list",
             "send_to_dean": "Send endorsement list to Dean",
@@ -12723,6 +12723,9 @@ def graduation_eligibility(student: Student) -> dict:
             "id": row["course"].id,
             "code": row["course"].code,
             "title": row["course"].title,
+            "units": row["course"].units or 3,
+            "category": row["course"].category or "Core",
+            "term_label": row["record"].term_label if row["record"] else None,
         }
         for row in audit["completed"]
     ]
@@ -12784,6 +12787,22 @@ def graduation_eligibility(student: Student) -> dict:
         else:
             practicum_status = "Missing"
             missing_practicum = "No practicum record on file for a practicum-required program."
+    practicum_completion = {
+        "required": practicum_required,
+        "complete": practicum_complete,
+        "record_exists": practicum_record is not None,
+        "status": practicum_status if practicum_required else "Not Required",
+        "practicum_site": practicum_record.practicum_site if practicum_record else None,
+        "supervisor_name": practicum_record.supervisor_name if practicum_record else None,
+        "required_hours": (practicum_record.required_hours or 0) if practicum_record else 0,
+        "completed_hours": (practicum_record.completed_hours or 0) if practicum_record else 0,
+        "moa_status": practicum_record.moa_status if practicum_record else "Not Required" if not practicum_required else "Missing",
+        "document_status": practicum_record.document_status if practicum_record else "Not Required" if not practicum_required else "Missing",
+        "certificate_count": (practicum_record.certificate_count or 0) if practicum_record else 0,
+        "completion_status": practicum_record.completion_status if practicum_record else "Not Required" if not practicum_required else "Missing",
+        "report_sent_at": iso(practicum_record.report_sent_at) if practicum_record else None,
+        "dean_reviewed_at": iso(practicum_record.dean_reviewed_at) if practicum_record else None,
+    }
 
     open_tasks = Task.query.filter(
         Task.student_id == student.id,
@@ -12876,6 +12895,7 @@ def graduation_eligibility(student: Student) -> dict:
         "missing_coursework": missing_coursework,
         "missing_research_requirements": research_missing,
         "missing_practicum_requirement": missing_practicum,
+        "practicum_completion": practicum_completion,
         "completed_courses": completed_courses,
         "checklist": checklist,
         "research_progress": research_progress,

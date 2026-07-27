@@ -2887,10 +2887,10 @@ const GRADUATION_STAGE_ACTIONS = {
   },
   validate_research: {
     id: "validate_research",
-    label: "Validate research completion requirements",
+    label: "Validate research and practicum requirements",
     movement: "Research Coordinator → GS Staff",
     nextOwner: "Graduate School Staff",
-    commentLabel: "Optional research validation note",
+    commentLabel: "Optional research and practicum validation note",
   },
   mark_not_eligible: {
     id: "mark_not_eligible",
@@ -3331,11 +3331,56 @@ function GraduationRequirementBoxes({ row }) {
   );
 }
 
+function GraduationCompletedCourseworkView({ row, id }) {
+  const completedCourses = row.eligibility?.completed_courses || [];
+  const completedUnits = completedCourses.reduce((total, course) => total + Number(course.units || 0), 0);
+  return (
+    <section
+      id={id}
+      className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-3"
+      aria-label={`Completed coursework for ${row.student.name}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Coursework completed</p>
+          <p className="mt-0.5 text-xs text-slate-600">
+            {completedCourses.length} completed subject{completedCourses.length === 1 ? "" : "s"}
+            {completedUnits > 0 ? ` · ${completedUnits} units` : ""}
+          </p>
+        </div>
+        <StatusBadge value={row.eligibility?.coursework_status || "Needs verification"} dot={false} />
+      </div>
+      {completedCourses.length > 0 ? (
+        <ul className="mt-3 grid gap-2 md:grid-cols-2">
+          {completedCourses.map((course) => (
+            <li key={course.id || course.code} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-ink">{course.code}</p>
+                {course.units != null && <span className="shrink-0 text-xs font-semibold text-slate-500">{course.units} units</span>}
+              </div>
+              <p className="mt-0.5 text-xs leading-relaxed text-slate-700">{course.title}</p>
+              {(course.category || course.term_label) && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {[course.category, course.term_label].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-500">
+          No completed coursework records are available for this student.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function researchStageDetailLine(stage) {
   return `Requirements ${stage.requirements_complete}/${stage.requirements_total}; panel ${stage.panel?.assigned_count ?? 0}/${stage.panel?.required_count ?? 0}; schedule ${stage.schedule?.status || "Not scheduled"}; defense ${stage.defense?.status || "Not recorded"}`;
 }
 
-function GraduationResearchRequirementsView({ row }) {
+function GraduationResearchRequirementsView({ row, id }) {
   const progress = row.eligibility?.research_progress || {};
   const stages = progress.stages || [];
   const completion = progress.completion_evidence;
@@ -3347,11 +3392,19 @@ function GraduationResearchRequirementsView({ row }) {
     );
   }
   return (
-    <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Research requirements submitted</p>
-      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+    <section id={id} className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-3" aria-label={`Research completion details for ${row.student.name}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Research completion details</p>
+          <p className="mt-0.5 text-xs text-slate-600">
+            {progress.completed_stage_count ?? 0}/{progress.stage_count ?? stages.length} research stages complete
+          </p>
+        </div>
+        <StatusBadge value={row.eligibility?.research_status || "Needs verification"} dot={false} />
+      </div>
+      <div className="mt-3 grid gap-2 lg:grid-cols-2">
         {stages.map((stage) => (
-          <div key={stage.gate} className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+          <div key={stage.gate} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-ink">{stage.name}</p>
               <StatusBadge value={stage.complete ? "Complete" : "Incomplete"} dot={false} />
@@ -3360,7 +3413,7 @@ function GraduationResearchRequirementsView({ row }) {
           </div>
         ))}
         {completion && (
-          <div className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+          <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-ink">Completion Evidence</p>
               <StatusBadge value={completion.status || (completion.complete ? "Complete" : "Incomplete")} dot={false} />
@@ -3369,7 +3422,66 @@ function GraduationResearchRequirementsView({ row }) {
           </div>
         )}
       </div>
-    </div>
+    </section>
+  );
+}
+
+function GraduationPracticumCompletionView({ row, id }) {
+  const details = row.eligibility?.practicum_completion || {};
+  if (!details.required) {
+    return (
+      <section id={id} className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label={`Practicum completion details for ${row.student.name}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Practicum completion details</p>
+            <p className="mt-1 text-sm text-slate-700">This student’s program does not require practicum.</p>
+          </div>
+          <StatusBadge value="Not Required" dot={false} />
+        </div>
+      </section>
+    );
+  }
+  if (!details.record_exists) {
+    return (
+      <section id={id} className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3" aria-label={`Practicum completion details for ${row.student.name}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-red-700">Practicum completion details</p>
+            <p className="mt-1 text-sm text-red-800">No practicum record is on file for this required program.</p>
+          </div>
+          <StatusBadge value={details.status || "Missing"} dot={false} />
+        </div>
+      </section>
+    );
+  }
+  const detailItems = [
+    ["Hours completed", `${details.completed_hours || 0}/${details.required_hours || 0}`],
+    ["Practicum site", details.practicum_site || "Not recorded"],
+    ["Supervisor", details.supervisor_name || "Not recorded"],
+    ["MOA", details.moa_status || "Pending"],
+    ["Completion documents", details.document_status || "Pending"],
+    ["Certificate files", String(details.certificate_count || 0)],
+    ["Completion review", details.completion_status || "Pending"],
+    ["Final verification", details.dean_reviewed_at ? "Dean Reviewed" : details.report_sent_at ? "Report Sent to Dean" : "Not sent"],
+  ];
+  return (
+    <section id={id} className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-3" aria-label={`Practicum completion details for ${row.student.name}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Practicum completion details</p>
+          <p className="mt-0.5 text-xs text-slate-600">Hours, placement, documents, and final review status</p>
+        </div>
+        <StatusBadge value={details.status || "Needs verification"} dot={false} />
+      </div>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        {detailItems.map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-800">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
@@ -3395,6 +3507,7 @@ function GraduationBatchModal({ rows, accountRole, reviewWindows, defaultReviewW
     : stageAction;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [expandedDetailKeys, setExpandedDetailKeys] = useState(() => new Set());
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const batchName = graduationBatchName(form);
   const showBatchFields = action?.batchRequired || (action?.id === "send_to_dean" && selection.processableRows.some((row) => !row.endorsement?.batch_name));
@@ -3405,6 +3518,21 @@ function GraduationBatchModal({ rows, accountRole, reviewWindows, defaultReviewW
       ? graduationBatchActionLabel(action)
       : graduationSelectedActionLabel(action)
     : "Review selected candidates";
+  const showAllCompletionActions = (
+    ["prepare_endorsement", "send_to_dean"].includes(action?.id)
+    || stageAction?.id === "approve"
+  );
+  const showCourseworkActions = action?.id === "check_coursework" || showAllCompletionActions;
+  const showResearchPracticumActions = action?.id === "validate_research" || showAllCompletionActions;
+
+  function toggleDetail(studentId, detail) {
+    const key = `${studentId}:${detail}`;
+    setExpandedDetailKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
 
   async function confirm(event) {
     event.preventDefault();
@@ -3497,13 +3625,66 @@ function GraduationBatchModal({ rows, accountRole, reviewWindows, defaultReviewW
           <p className="text-sm font-semibold text-ink">Eligible candidates</p>
           <p className="mt-1 text-sm text-slate-600">{selection.processableRows.length} of {rows.length} selected candidate{rows.length === 1 ? " is" : "s are"} ready for this action.</p>
           <ul className="mt-3 grid gap-3 xl:grid-cols-2">
-            {rows.map((row) => (
-              <li key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                <p className="font-semibold text-ink">{row.student.name}</p>
-                <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
-                <GraduationRequirementBoxes row={row} />
-              </li>
-            ))}
+            {rows.map((row) => {
+              const courseworkOpen = expandedDetailKeys.has(`${row.student.id}:coursework`);
+              const researchOpen = expandedDetailKeys.has(`${row.student.id}:research`);
+              const practicumOpen = expandedDetailKeys.has(`${row.student.id}:practicum`);
+              const courseworkPanelId = `graduation-modal-coursework-${row.student.id}`;
+              const researchPanelId = `graduation-modal-research-${row.student.id}`;
+              const practicumPanelId = `graduation-modal-practicum-${row.student.id}`;
+              return (
+                <li key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink">{row.student.name}</p>
+                      <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {showCourseworkActions && (
+                        <button
+                          type="button"
+                          onClick={() => toggleDetail(row.student.id, "coursework")}
+                          className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs transition-colors"
+                          aria-expanded={courseworkOpen}
+                          aria-controls={courseworkPanelId}
+                        >
+                          <BookOpenCheck className="h-3.5 w-3.5" />
+                          {courseworkOpen ? "Hide coursework completed" : "View coursework completed"}
+                        </button>
+                      )}
+                      {showResearchPracticumActions && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleDetail(row.student.id, "research")}
+                            className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs transition-colors"
+                            aria-expanded={researchOpen}
+                            aria-controls={researchPanelId}
+                          >
+                            <FileCheck className="h-3.5 w-3.5" />
+                            {researchOpen ? "Hide research completion details" : "View research completion details"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleDetail(row.student.id, "practicum")}
+                            className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs transition-colors"
+                            aria-expanded={practicumOpen}
+                            aria-controls={practicumPanelId}
+                          >
+                            <Briefcase className="h-3.5 w-3.5" />
+                            {practicumOpen ? "Hide practicum completion details" : "View practicum completion details"}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <GraduationRequirementBoxes row={row} />
+                  {showCourseworkActions && courseworkOpen && <GraduationCompletedCourseworkView id={courseworkPanelId} row={row} />}
+                  {showResearchPracticumActions && researchOpen && <GraduationResearchRequirementsView id={researchPanelId} row={row} />}
+                  {showResearchPracticumActions && practicumOpen && <GraduationPracticumCompletionView id={practicumPanelId} row={row} />}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </form>
@@ -3639,11 +3820,29 @@ function WithdrawalBoardCard({ item, onOpen, onMessage }) {
   );
 }
 
-function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, compact = false }) {
+function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, detailMode = "", compact = false }) {
+  const [expandedDetailKeys, setExpandedDetailKeys] = useState(() => new Set());
+  const showCourseworkAction = ["coursework", "all-completion"].includes(detailMode);
+  const showResearchPracticumActions = ["research-practicum", "all-completion"].includes(detailMode);
+  function toggleDetail(studentId, detail) {
+    const key = `${studentId}:${detail}`;
+    setExpandedDetailKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
   return (
     <ul className="space-y-3">
-      {rows.map((row) => (
-        <li key={row.student.id} className={`rounded-lg px-3 py-2 ring-1 ${row.has_submitted_documents ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-slate-200"}`}>
+      {rows.map((row) => {
+        const courseworkOpen = expandedDetailKeys.has(`${row.student.id}:coursework`);
+        const researchOpen = expandedDetailKeys.has(`${row.student.id}:research`);
+        const practicumOpen = expandedDetailKeys.has(`${row.student.id}:practicum`);
+        const courseworkPanelId = `graduation-card-coursework-${row.student.id}`;
+        const researchPanelId = `graduation-card-research-${row.student.id}`;
+        const practicumPanelId = `graduation-card-practicum-${row.student.id}`;
+        return (
+          <li key={row.student.id} className={`rounded-lg px-3 py-2 ring-1 ${row.has_submitted_documents ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-slate-200"}`}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
@@ -3656,11 +3855,51 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, com
           {(onOpenStudent || onMessageStudent) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {onOpenStudent && <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2 py-1 text-xs"><Eye className="h-3.5 w-3.5" /> View</button>}
+              {showCourseworkAction && (
+                <button
+                  type="button"
+                  onClick={() => toggleDetail(row.student.id, "coursework")}
+                  className="btn-ghost cursor-pointer px-2 py-1 text-xs transition-colors"
+                  aria-expanded={courseworkOpen}
+                  aria-controls={courseworkPanelId}
+                >
+                  <BookOpenCheck className="h-3.5 w-3.5" />
+                  {courseworkOpen ? "Hide coursework completed" : "View coursework completed"}
+                </button>
+              )}
+              {showResearchPracticumActions && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => toggleDetail(row.student.id, "research")}
+                    className="btn-ghost cursor-pointer px-2 py-1 text-xs transition-colors"
+                    aria-expanded={researchOpen}
+                    aria-controls={researchPanelId}
+                  >
+                    <FileCheck className="h-3.5 w-3.5" />
+                    {researchOpen ? "Hide research completion details" : "View research completion details"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleDetail(row.student.id, "practicum")}
+                    className="btn-ghost cursor-pointer px-2 py-1 text-xs transition-colors"
+                    aria-expanded={practicumOpen}
+                    aria-controls={practicumPanelId}
+                  >
+                    <Briefcase className="h-3.5 w-3.5" />
+                    {practicumOpen ? "Hide practicum completion details" : "View practicum completion details"}
+                  </button>
+                </>
+              )}
               {row.endorsement && onMessageStudent && <button type="button" onClick={() => onMessageStudent(row)} className="btn cursor-pointer border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700 hover:border-red-300 hover:bg-red-100"><MessageSquare className="h-3.5 w-3.5" /> Message / Return</button>}
             </div>
           )}
+          {showCourseworkAction && courseworkOpen && <GraduationCompletedCourseworkView id={courseworkPanelId} row={row} />}
+          {showResearchPracticumActions && researchOpen && <GraduationResearchRequirementsView id={researchPanelId} row={row} />}
+          {showResearchPracticumActions && practicumOpen && <GraduationPracticumCompletionView id={practicumPanelId} row={row} />}
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
@@ -3743,7 +3982,27 @@ function GraduationBatchRow({
       </div>
       {canExpandStudents && expanded && (
         <div className="mt-2 border-t border-slate-100 pt-2">
-          <GraduationBatchStudentList rows={visibleRows} onOpenStudent={onOpenStudent} onMessageStudent={onMessageStudent} compact />
+          <GraduationBatchStudentList
+            rows={visibleRows}
+            onOpenStudent={onOpenStudent}
+            onMessageStudent={onMessageStudent}
+            detailMode={
+              accountRole === "academic_coordinator" && group.boardStatus === "Coursework Review"
+                ? "coursework"
+                : group.boardStatus === "Research Review"
+                  ? "research-practicum"
+                  : [
+                    "Eligibility Confirmed",
+                    "Endorsement Prepared",
+                    "Returned for Revision",
+                    "Ready for Dean Review",
+                    "Dean Approved",
+                  ].includes(group.boardStatus)
+                    ? "all-completion"
+                    : ""
+            }
+            compact
+          />
         </div>
       )}
     </article>

@@ -4297,6 +4297,36 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertTrue(roster_item["eligibility"]["eligible"])
             self.assertFalse(roster_item["application_submitted"])
             self.assertEqual(roster_item["application_status"], "Awaiting Student Application")
+            self.assertEqual(
+                roster_item["eligibility"]["completed_courses"],
+                [{
+                    "id": self.course_id,
+                    "code": "BPM-501",
+                    "title": "Completion Course",
+                    "units": 3,
+                    "category": "Major",
+                    "term_label": None,
+                }],
+            )
+            self.assertEqual(
+                roster_item["eligibility"]["practicum_completion"],
+                {
+                    "required": True,
+                    "complete": True,
+                    "record_exists": True,
+                    "status": "Dean Reviewed",
+                    "practicum_site": None,
+                    "supervisor_name": None,
+                    "required_hours": 200,
+                    "completed_hours": 200,
+                    "moa_status": "Pending Review",
+                    "document_status": "Verified",
+                    "certificate_count": 0,
+                    "completion_status": "Completed and accepted",
+                    "report_sent_at": None,
+                    "dean_reviewed_at": None,
+                },
+            )
 
             response = self._staff_client().post("/api/graduation/batch-actions", json={
                 "student_ids": [student.id],
