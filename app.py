@@ -4999,13 +4999,473 @@ def call_document_rag(question: str, snippets: list[dict], payload: dict | None,
     return response, citations
 
 
-def local_grounded_answer(question: str, student: Student | None, payload: dict | None, snippets: list[dict]) -> str:
+def _assistant_asks_portfolio(question: str) -> bool:
+    lowered = (question or "").lower()
+    return any(
+        phrase in lowered
+        for phrase in [
+            "delayed", "overdue", "at risk", "risk", "stalled", "which students",
+            "attention", "bottleneck", "escalate", "behind",
+        ]
+    )
+
+
+def _assistant_intent(question: str) -> str:
+    lowered = " ".join((question or "").lower().split())
+    if (
+        any(term in lowered for term in ["how many", "number of", "count"])
+        and any(term in lowered for term in ["graduate", "graduation"])
+        and any(term in lowered for term in ["next semester", "next term", "would", "could", "eligible", "ideally"])
+    ):
+        return "graduation_forecast"
+    if (
+        "earliest" in lowered
+        and any(term in lowered for term in ["entry", "enrolled", "academic record", "student record"])
+    ) or any(phrase in lowered for phrase in ["oldest student", "earliest student", "longest enrolled"]):
+        return "earliest_academic_entry"
+    if any(
+        phrase in lowered
+        for phrase in [
+            "preventing this student", "prevent this student", "blocking this student",
+            "holding this student back", "why is this student stuck",
+            "why can't this student progress", "why cannot this student progress",
+            "not progressing", "cannot advance", "can't advance", "move forward",
+            "progress blockers",
+        ]
+    ):
+        return "student_progress_blockers"
+    if (
+        any(term in lowered for term in ["graduate", "graduation", "finish the program", "complete the program"])
+        and any(term in lowered for term in ["when", "date", "how long", "expected", "estimate", "ready"])
+    ):
+        return "student_graduation"
+    if (
+        any(term in lowered for term in ["course audit", "coursework", "subject", "subjects", "proposal development"])
+        and any(term in lowered for term in ["eligible", "clear", "cleared", "move", "ready", "proposal development"])
+    ):
+        return "coursework_eligibility"
+    if _assistant_asks_portfolio(question):
+        return "student_attention"
+    if any(term in lowered for term in ["status", "pending", "where", "next", "owner", "summary", "doing", "standing"]):
+        return "student_status"
+    if any(
+        term in lowered
+        for term in [
+            "loa", "leave", "residency", "readmission", "eligible", "require",
+            "requirement", "form", "ethics", "panel", "schedule", "completion",
+            "graduat", "withdraw", "practicum", "policy", "rule", "handbook", "manual",
+        ]
+    ):
+        return "policy"
+    return "unknown"
+
+
+def _classify_assistant_intent_with_gemini(question: str, has_student: bool) -> str | None:
+    """Use Gemini only to classify an ambiguous question, never to query records."""
+    allowed = {
+        "earliest_academic_entry", "graduation_forecast", "student_progress_blockers",
+        "student_graduation", "coursework_eligibility", "student_attention",
+        "student_status", "policy", "unknown",
+    }
+    prompt = (
+        "Classify this Graduate School assistant question into exactly one label and return only the label:\n"
+        + "\n".join(sorted(allowed))
+        + f"\nA student record is {'selected' if has_student else 'not selected'}."
+        + f"\nQuestion: {question}"
+    )
+    try:
+        label = _gemini_generate(prompt).strip().lower()
+    except Exception:
+        return None
+    return label if label in allowed else None
+
+
+def _progress_blocker_report(student: Student, payload: dict) -> dict:
+    indicators = payload["indicators"]
+    audit = compute_course_audit(student)
+    exam = comprehensive_exam_eligibility(student)
+    findings: list[dict] = []
+
+    def add_finding(code: str, title: str, detail: str, action: str, owner: str, severity: str = "medium") -> None:
+        if any(item["code"] == code for item in findings):
+            return
+        findings.append({
+            "code": code, "title": title, "detail": detail, "action": action,
+            "owner": owner, "severity": severity,
+        })
+
+    if student.standing != "Active":
+        add_finding(
+            "standing", f"Standing is {student.standing}",
+            "The student is not currently recorded with Active standing.",
+            "Resolve the standing workflow before advancing the academic stage.",
+            "GS Staff", "high",
+        )
+    if indicators["missing_subjects"] > 0:
+        add_finding(
+            "coursework", "Coursework is incomplete",
+            f"{indicators['missing_subjects']} required subject(s) are missing or incomplete.",
+            "Resolve the course audit with the Academic Coordinator.",
+            "Academic Coordinator", "high",
+        )
+    elif student.current_stage in {"Admission", "Coursework", "Comprehensive Exam"}:
+        if not exam["eligible"]:
+            add_finding(
+                "exam_eligibility", "Comprehensive Exam eligibility is not cleared",
+                (
+                    f"{exam['completed_units']} of {exam['required_units']} qualifying units are recorded; "
+                    f"{exam['missing_subjects']} subject(s) remain."
+                ),
+                "Verify the comprehensive-exam eligibility audit.",
+                "Academic Coordinator", "high",
+            )
+        elif not exam["passed"]:
+            add_finding(
+                "comprehensive_exam", f"Comprehensive Exam is {exam['exam_status']}",
+                "Coursework is complete, but a passing Comprehensive Exam result is required before research progression.",
+                "Complete or record the authorized Comprehensive Exam result.",
+                "Academic Coordinator",
+                "high" if str(exam["exam_status"]).lower() == "failed" else "medium",
+            )
+        else:
+            add_finding(
+                "stage_handoff", "Academic stage has not advanced",
+                (
+                    f"Coursework and the Comprehensive Exam are cleared, but the record remains at "
+                    f"{student.current_stage}."
+                ),
+                "Verify the authorized handoff to Proposal Development.",
+                "Academic Coordinator", "medium",
+            )
+
+    for recommendation in payload["recommendations"]:
+        if recommendation["code"] == "coursework":
+            continue
+        add_finding(
+            recommendation["code"], recommendation["trigger"], recommendation["trigger"],
+            recommendation["recommendation"], recommendation["owner"], recommendation["severity"],
+        )
+
+    return {
+        "type": "grounded_record",
+        "heading": "Progress review",
+        "summary": (
+            f"{len(findings)} recorded blocker(s) need attention."
+            if findings else "No recorded blocker was found in the available workflow data."
+        ),
+        "facts": [
+            {"label": "Stage", "value": student.current_stage},
+            {"label": "Standing", "value": student.standing},
+            {"label": "Coursework", "value": f"{audit['completion_rate']}% complete"},
+            {"label": "Comprehensive Exam", "value": exam["exam_status"]},
+        ],
+        "findings": findings,
+    }
+
+
+def _graduation_report(student: Student) -> dict:
+    eligibility = graduation_eligibility(student)
+    endorsement = latest_graduation_endorsement(student.id)
+    findings: list[dict] = []
+    for item in eligibility["checklist"]:
+        if item["passed"] is True:
+            continue
+        findings.append({
+            "code": item["key"],
+            "title": item["label"],
+            "detail": f"Required: {item['required']}. Recorded: {item['actual']}.",
+            "action": item.get("note") or eligibility["next_action"],
+            "owner": eligibility["next_owner"],
+            "severity": "medium" if item["passed"] is None else "high",
+        })
+    if not findings and not eligibility["eligible"]:
+        findings.append({
+            "code": "graduation_review",
+            "title": "Graduation readiness is not cleared",
+            "detail": "The available graduation checks are not all complete.",
+            "action": eligibility["next_action"],
+            "owner": eligibility["next_owner"],
+            "severity": "medium",
+        })
+    batch_name = endorsement.batch_name if endorsement and endorsement.batch_name else "Not assigned"
+    return {
+        "type": "grounded_record",
+        "heading": "Graduation readiness",
+        "summary": (
+            "The database does not store an exact graduation or ceremony date. "
+            f"The student is currently {eligibility['status'].lower()} for graduation endorsement."
+        ),
+        "facts": [
+            {"label": "Readiness", "value": eligibility["status"]},
+            {"label": "Coursework", "value": eligibility["coursework_status"]},
+            {"label": "Research", "value": eligibility["research_status"]},
+            {"label": "Practicum", "value": eligibility["practicum_status"]},
+            {"label": "Graduation batch", "value": batch_name},
+        ],
+        "findings": findings,
+        "next_action": eligibility["next_action"],
+        "next_owner": eligibility["next_owner"],
+        "exact_date_known": False,
+    }
+
+
+def _graduation_forecast_report() -> dict:
+    active_term = get_active_term()
+    next_term = None
+    if active_term:
+        next_term = (
+            AcademicTerm.query
+            .filter(AcademicTerm.start_date > active_term.start_date)
+            .order_by(AcademicTerm.start_date.asc())
+            .first()
+        )
+    if not next_term:
+        next_term = (
+            AcademicTerm.query
+            .filter(AcademicTerm.start_date > date.today())
+            .order_by(AcademicTerm.start_date.asc())
+            .first()
+        )
+    students = (
+        Student.query
+        .filter(Student.standing == "Active", Student.current_stage != "Completed")
+        .order_by(Student.last_name.asc(), Student.first_name.asc())
+        .all()
+    )
+    eligible_students = []
+    needs_verification_students = []
+    blocked_students = []
+    requirement_counts: Counter = Counter()
+    requirement_owners: dict[str, Counter] = {}
+    for student in students:
+        eligibility = graduation_eligibility(student)
+        if eligibility["eligible"]:
+            eligible_students.append(student)
+            continue
+        for item in eligibility["checklist"]:
+            if item["passed"] is not True:
+                requirement_counts[item["label"]] += 1
+                requirement_owners.setdefault(item["label"], Counter())[eligibility["next_owner"]] += 1
+        if eligibility["needs_verification"]:
+            needs_verification_students.append(student)
+        else:
+            blocked_students.append(student)
+
+    term_label = next_term.label if next_term else "the next configured semester"
+    findings = [
+        {
+            "code": re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_"),
+            "title": label,
+            "detail": f"{count} assessed student(s) do not yet have this requirement verified as complete.",
+            "action": "Resolve or verify this requirement before graduation endorsement.",
+            "owner": (
+                requirement_owners[label].most_common(1)[0][0]
+                if requirement_owners.get(label) else "Graduate School Staff"
+            ),
+            "severity": "high" if count >= max(1, len(students) // 2) else "medium",
+        }
+        for label, count in requirement_counts.most_common(5)
+    ]
+    return {
+        "type": "grounded_record",
+        "heading": "Next-semester graduation forecast",
+        "summary": (
+            f"{len(eligible_students)} of {len(students)} active, not-yet-completed student(s) "
+            f"currently pass every graduation eligibility check and are the ideal candidates for {term_label}. "
+            "This is a readiness forecast from current records, not a guaranteed graduation date."
+        ),
+        "facts": [
+            {"label": "Target semester", "value": term_label},
+            {"label": "Students assessed", "value": str(len(students))},
+            {"label": "Eligible now", "value": str(len(eligible_students))},
+            {"label": "Needs verification", "value": str(len(needs_verification_students))},
+            {"label": "Blocked", "value": str(len(blocked_students))},
+        ],
+        "findings": findings,
+        "eligible_student_ids": [student.id for student in eligible_students],
+        "eligible_student_names": [student.name for student in eligible_students],
+        "assumption": (
+            "Counts active students who are not already completed and who currently pass coursework, "
+            "research, practicum, and completion-evidence checks."
+        ),
+    }
+
+
+def _earliest_academic_entry_report() -> dict:
+    earliest = (
+        Student.query
+        .order_by(Student.entry_year.asc(), Student.created_at.asc(), Student.id.asc())
+        .first()
+    )
+    if not earliest:
+        return {
+            "type": "grounded_record", "heading": "Earliest academic entry",
+            "summary": "There are no student records available.", "facts": [], "findings": [],
+        }
+    return {
+        "type": "grounded_record",
+        "heading": "Earliest academic entry",
+        "summary": (
+            "Student birth dates are not stored, so this does not identify the oldest person by age. "
+            f"The earliest academic entry on record is {earliest.name}, with entry year {earliest.entry_year}."
+        ),
+        "facts": [
+            {"label": "Student", "value": earliest.name},
+            {"label": "Student number", "value": earliest.student_number},
+            {"label": "Program", "value": earliest.program.code},
+            {"label": "Entry year", "value": str(earliest.entry_year)},
+            {"label": "Academic year entry", "value": earliest.academic_year_entry or "Not recorded"},
+        ],
+        "findings": [],
+        "student": student_brief(earliest),
+    }
+
+
+def _grounded_report_text(report: dict) -> str:
+    lines = [report["summary"]]
+    if report.get("facts"):
+        lines.extend(["", *[f"{item['label']}: {item['value']}" for item in report["facts"]]])
+    if report.get("findings"):
+        lines.extend(["", "Recorded blockers or requirements:"])
+        for index, item in enumerate(report["findings"], start=1):
+            lines.append(f"{index}. {item['title']}: {item['detail']}")
+            lines.append(f"   Next action: {item['action']} [{item['owner']}]")
+    elif report.get("next_action"):
+        lines.extend(["", f"Next action: {report['next_action']} [{report['next_owner']}]"])
+    return "\n".join(lines)
+
+
+def _database_report_for_intent(intent: str, student: Student | None, payload: dict | None) -> dict | None:
+    if intent == "earliest_academic_entry":
+        return _earliest_academic_entry_report()
+    if intent == "graduation_forecast":
+        return _graduation_forecast_report()
+    if intent in {"student_progress_blockers", "student_graduation"} and not student:
+        return {
+            "type": "grounded_record", "heading": "Select a student",
+            "summary": "Select a student record before asking this question.",
+            "facts": [], "findings": [],
+        }
+    if intent == "student_progress_blockers" and student and payload:
+        return _progress_blocker_report(student, payload)
+    if intent == "student_graduation" and student:
+        return _graduation_report(student)
+    return None
+
+
+def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
+    sources = {
+        "database-rules": (
+            "Live record · Verified rules",
+            "Calculated from authorized database records and deterministic workflow rules.", False,
+        ),
+        "policy-retrieval": (
+            "Policy library · Keyword retrieval",
+            "Retrieved from the curated local policy library without AI generation.", False,
+        ),
+        "document-rag": (
+            "Handbook RAG · Gemini",
+            "Generated by Gemini from retrieved handbook or guideline excerpts.", True,
+        ),
+        "document-rag-cache": (
+            "Handbook RAG · Gemini (cached)",
+            "Previously generated by Gemini from retrieved handbook or guideline excerpts.", True,
+        ),
+        "offline-fallback": (
+            "Policy fallback · Verified rules",
+            "The AI provider was unavailable, so deterministic local guidance was used.", False,
+        ),
+        "validation": (
+            "Safety guidance",
+            "A local safety rule handled this request; no AI or record change was used.", False,
+        ),
+    }
+    label, detail, ai_used = sources.get(
+        mode, ("Local assistant", "Answered by the local advisory assistant.", False)
+    )
+    if intent_ai_used and mode == "database-rules":
+        label = "Live record · Gemini interpreted"
+        detail = "Gemini classified the question only; verified database rules produced the answer."
+        ai_used = True
+    return {"label": label, "detail": detail, "ai_used": ai_used}
+
+
+def _attention_report(portfolio: dict, display_limit: int = 5) -> dict:
+    summary = portfolio.get("summary", {})
+    severity_counts = {
+        item["severity"]: item["count"] for item in summary.get("by_severity", [])
+    }
+    grouped: dict[int, dict] = {}
+    for item in portfolio.get("items", []):
+        student_id = item["student_id"]
+        if student_id not in grouped:
+            grouped[student_id] = {
+                "id": student_id, "name": item["student_name"],
+                "student_number": item["student_number"], "program_code": item["program_code"],
+                "stage": item["stage"], "severity": item["severity"], "issues": [],
+            }
+        grouped[student_id]["issues"].append({
+            "severity": item["severity"], "trigger": item["trigger"],
+            "recommendation": item["recommendation"], "owner": item["owner"],
+        })
+    students = list(grouped.values())[:display_limit]
+    return {
+        "type": "student_attention",
+        "summary": {
+            "students": summary.get("students_flagged", len(grouped)),
+            "follow_ups": summary.get("total", 0),
+            "high": severity_counts.get("high", 0),
+            "medium": severity_counts.get("medium", 0),
+            "low": severity_counts.get("low", 0),
+        },
+        "shown_students": len(students),
+        "students": students,
+    }
+
+
+def _attention_report_text(report: dict) -> str:
+    summary = report["summary"]
+    severity_parts = [
+        f"{summary[level]} {level}" for level in ("high", "medium", "low") if summary[level]
+    ]
+    lines = [
+        (
+            f"{summary['students']} students currently need attention across "
+            f"{summary['follow_ups']} follow-up item(s) ({', '.join(severity_parts)})."
+        ),
+        "",
+        f"Top {report['shown_students']} priority student(s):",
+    ]
+    for index, student in enumerate(report["students"], start=1):
+        lines.append(f"{index}. {student['name']} ({student['program_code']} - {student['stage']})")
+        for issue in student["issues"]:
+            lines.extend([
+                f"   Issue: {issue['trigger']}",
+                f"   Action: {issue['recommendation']}",
+                f"   Owner: {issue['owner']}",
+            ])
+    return "\n".join(lines)
+
+
+def local_grounded_answer(
+    question: str,
+    student: Student | None,
+    payload: dict | None,
+    snippets: list[dict],
+    attention_portfolio: dict | None = None,
+    database_report: dict | None = None,
+) -> str:
     """Offline, deterministic responder. Grounds answers in computed indicators + retrieved policy.
     Stands in for Google AI Studio so the feature is demonstrable without an API key."""
     q = (question or "").lower()
     out: list[str] = []
     ind = payload["indicators"] if payload else None
     recs = payload["recommendations"] if payload else []
+    intent = _assistant_intent(question)
+    database_report = database_report or _database_report_for_intent(intent, student, payload)
+
+    if database_report:
+        return _grounded_report_text(database_report)
 
     asks_status = any(w in q for w in ["status", "pending", "where", "next", "owner", "summary", "doing", "standing"])
     asks_policy = any(w in q for w in ["loa", "leave", "residency", "readmission", "eligible", "require", "requirement",
@@ -5013,8 +5473,7 @@ def local_grounded_answer(question: str, student: Student | None, payload: dict 
     asks_coursework_eligibility = student and any(
         w in q for w in ["course audit", "coursework", "subject", "subjects", "proposal development"]
     ) and any(w in q for w in ["eligible", "clear", "cleared", "move", "ready", "proposal development"])
-    asks_portfolio = any(w in q for w in ["delayed", "overdue", "at risk", "risk", "stalled", "which students",
-                                          "attention", "bottleneck", "escalate", "behind"])
+    asks_portfolio = _assistant_asks_portfolio(question)
     asks_oldest_record = (
         any(phrase in q for phrase in ["oldest student", "earliest student", "longest enrolled"])
         and any(word in q for word in ["record", "student", "enrolled"])
@@ -5063,16 +5522,8 @@ def local_grounded_answer(question: str, student: Student | None, payload: dict 
             out.append("No outstanding follow-ups are flagged for this student.")
 
     elif asks_portfolio:
-        port = portfolio_recommendations()
-        s = port["summary"]
-        severity_counts = {
-            item["severity"]: item["count"]
-            for item in s.get("by_severity", [])
-        }
-        out.append(f"{s['students_flagged']} student(s) currently need attention "
-                   f"({severity_counts.get('high', 0)} high, {severity_counts.get('medium', 0)} medium).")
-        for r in port["items"][:5]:
-            out.append(f"• {r['student_name']} ({r['program_code']}, {r['stage']}): {r['trigger']} → {r['recommendation']} [{r['owner']}]")
+        port = attention_portfolio or portfolio_recommendations()
+        out.append(_attention_report_text(_attention_report(port)))
 
     else:
         if snippets:
@@ -5141,6 +5592,7 @@ def assistant_validation_response(
     return {
         "answer": message,
         "mode": "validation",
+        "source": _assistant_source("validation"),
         "citations": [],
         "grounded": payload["indicators"] if payload else None,
         "recommendations": payload["recommendations"] if payload else [],
@@ -5201,13 +5653,26 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
     validation_message = assistant_validation_message(question)
     if validation_message:
         return assistant_validation_response(validation_message, student, payload)
-    snippets = retrieve_policy(question, k=3)
-
     # The assistant is advisory only: it retrieves policy snippets and explains
     # backend-computed facts. It never changes records or approves decisions.
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
-    mode = "local-fast"
+    intent = _assistant_intent(question)
+    intent_ai_used = False
+    if intent == "unknown" and api_key:
+        classified_intent = _classify_assistant_intent_with_gemini(question, bool(student))
+        if classified_intent and classified_intent != "unknown":
+            intent = classified_intent
+            intent_ai_used = True
+
+    database_intents = {
+        "earliest_academic_entry", "graduation_forecast", "student_progress_blockers",
+        "student_graduation", "coursework_eligibility", "student_attention", "student_status",
+    }
+    snippets = retrieve_policy(question, k=3) if intent in {"policy", "unknown"} else []
+    mode = "database-rules" if intent in database_intents else "policy-retrieval"
     rag_citations = []
+    attention_portfolio = portfolio_recommendations() if intent == "student_attention" else None
+    database_report = _database_report_for_intent(intent, student, payload)
     if api_key and assistant_requires_document_rag(question, student, snippets):
         try:
             cache_key = ("general-policy", " ".join(question.lower().split()))
@@ -5221,16 +5686,29 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
                 if not student:
                     _rag_cache_set(cache_key, (answer, rag_citations))
         except Exception:
-            answer = local_grounded_answer(question, student, payload, snippets)
+            answer = local_grounded_answer(
+                question, student, payload, snippets, attention_portfolio, database_report
+            )
             mode = "offline-fallback"
     else:
-        answer = local_grounded_answer(question, student, payload, snippets)
+        answer = local_grounded_answer(
+            question, student, payload, snippets, attention_portfolio, database_report
+        )
 
     policy_citations = [{"id": s["id"], "title": s["title"], "source": s["source"], "text": s["text"]} for s in snippets]
+    structured = None
+    if mode not in {"document-rag", "document-rag-cache"}:
+        structured = database_report or (
+            _attention_report(attention_portfolio) if attention_portfolio else None
+        )
     return {
         "answer": answer,
+        "structured": structured,
         "mode": mode,
-        "citations": rag_citations or policy_citations,
+        "source": _assistant_source(mode, intent_ai_used),
+        "citations": rag_citations or (
+            policy_citations if mode != "database-rules" else []
+        ),
         "grounded": payload["indicators"] if payload else None,
         "recommendations": payload["recommendations"] if payload else [],
         "student": student_brief(student) if student else None,

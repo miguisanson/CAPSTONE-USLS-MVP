@@ -1728,7 +1728,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 json={"question": "Explain the LOA and residency rule."},
             )
             self.assertEqual(fast.status_code, 200, fast.get_json())
-            self.assertEqual(fast.get_json()["mode"], "local-fast")
+            self.assertEqual(fast.get_json()["mode"], "policy-retrieval")
             document_rag.assert_not_called()
 
             guarded = client.post(
@@ -1753,7 +1753,21 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 json={"question": "Which students need attention right now?"},
             )
             self.assertEqual(attention.status_code, 200, attention.get_json())
-            self.assertIn("currently need attention", attention.get_json()["answer"])
+            attention_payload = attention.get_json()
+            self.assertIn("currently need attention", attention_payload["answer"])
+            self.assertEqual(attention_payload["structured"]["type"], "student_attention")
+            self.assertEqual(
+                attention_payload["structured"]["shown_students"],
+                len(attention_payload["structured"]["students"]),
+            )
+            self.assertGreaterEqual(
+                attention_payload["structured"]["summary"]["students"],
+                attention_payload["structured"]["shown_students"],
+            )
+            self.assertLessEqual(attention_payload["structured"]["shown_students"], 5)
+            for student in attention_payload["structured"]["students"]:
+                self.assertTrue(student["issues"])
+                self.assertIn(student["severity"], {"high", "medium", "low"})
 
             oldest = client.post(
                 "/api/assistant",
@@ -1784,6 +1798,117 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200, response.get_json())
             self.assertEqual(response.get_json()["mode"], "offline-fallback")
             self.assertTrue(response.get_json()["answer"])
+
+    def test_policy_assistant_routes_database_paraphrases_to_verified_reports(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.current_stage = "Coursework"
+            student.comprehensive_exam_status = "Not Taken"
+            db.session.add(CourseRecord(
+                student_id=student.id,
+                course_id=self.course_id,
+                status="Completed",
+            ))
+            earlier = Student(
+                student_number="GS-2018-EARLY",
+                first_name="Earlier",
+                last_name="Entry",
+                email="earlier@example.test",
+                program_id=self.program_id,
+                entry_year=2018,
+                academic_year_entry="18-19",
+                year_level="8",
+                current_stage="Coursework",
+                standing="Active",
+            )
+            db.session.add(earlier)
+            db.session.commit()
+
+        client = self._staff_client()
+        progress = client.post(
+            "/api/assistant",
+            json={
+                "question": "What is preventing this student from progressing?",
+                "student_id": self.student_id,
+            },
+        )
+        self.assertEqual(progress.status_code, 200, progress.get_json())
+        progress_payload = progress.get_json()
+        self.assertEqual(progress_payload["mode"], "database-rules")
+        self.assertEqual(progress_payload["structured"]["heading"], "Progress review")
+        self.assertIn(
+            "comprehensive_exam",
+            {item["code"] for item in progress_payload["structured"]["findings"]},
+        )
+        self.assertIn("Comprehensive Exam", progress_payload["answer"])
+        self.assertEqual(progress_payload["citations"], [])
+        self.assertFalse(progress_payload["source"]["ai_used"])
+
+        graduation = client.post(
+            "/api/assistant",
+            json={
+                "question": "When will this student graduate?",
+                "student_id": self.student_id,
+            },
+        )
+        self.assertEqual(graduation.status_code, 200, graduation.get_json())
+        graduation_payload = graduation.get_json()
+        self.assertEqual(graduation_payload["mode"], "database-rules")
+        self.assertFalse(graduation_payload["structured"]["exact_date_known"])
+        self.assertIn("does not store an exact graduation", graduation_payload["answer"])
+        self.assertTrue(graduation_payload["structured"]["findings"])
+
+        earliest = client.post(
+            "/api/assistant",
+            json={"question": "Which academic record has the earliest entry year?"},
+        )
+        self.assertEqual(earliest.status_code, 200, earliest.get_json())
+        earliest_payload = earliest.get_json()
+        self.assertEqual(earliest_payload["mode"], "database-rules")
+        self.assertEqual(earliest_payload["structured"]["heading"], "Earliest academic entry")
+        self.assertIn("Earlier Entry", earliest_payload["answer"])
+        self.assertIn("2018", earliest_payload["answer"])
+        self.assertNotIn("Title Defense", earliest_payload["answer"])
+
+    def test_policy_assistant_forecasts_next_semester_graduation_readiness(self):
+        with app.app_context():
+            db.session.add_all([
+                AcademicTerm(
+                    label="AY 2026-2027 1st Semester",
+                    start_date=date(2026, 8, 1),
+                    end_date=date(2026, 12, 20),
+                    is_active_planning_term=True,
+                ),
+                AcademicTerm(
+                    label="AY 2026-2027 2nd Semester",
+                    start_date=date(2027, 1, 10),
+                    end_date=date(2027, 5, 30),
+                ),
+            ])
+            db.session.commit()
+
+        ready = {
+            "eligible": True,
+            "needs_verification": False,
+            "next_owner": "Graduate School Staff",
+            "checklist": [],
+        }
+        with patch("app.graduation_eligibility", return_value=ready):
+            response = self._staff_client().post(
+                "/api/assistant",
+                json={"question": "How many students would ideally graduate next semester?"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.get_json())
+        payload = response.get_json()
+        self.assertEqual(payload["mode"], "database-rules")
+        self.assertEqual(payload["structured"]["heading"], "Next-semester graduation forecast")
+        facts = {item["label"]: item["value"] for item in payload["structured"]["facts"]}
+        self.assertEqual(facts["Target semester"], "AY 2026-2027 2nd Semester")
+        self.assertEqual(facts["Students assessed"], "1")
+        self.assertEqual(facts["Eligible now"], "1")
+        self.assertIn("readiness forecast", payload["answer"])
+        self.assertEqual(payload["citations"], [])
 
     def test_document_rag_prefers_semantic_vectors_and_keeps_lexical_fallback(self):
         from app import _retrieve_rag_document_chunks

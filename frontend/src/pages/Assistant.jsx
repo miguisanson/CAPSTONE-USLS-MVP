@@ -54,6 +54,8 @@ export default function Assistant() {
           citations: res.citations || [],
           grounded: res.grounded,
           recommendations: res.recommendations || [],
+          structured: res.structured || null,
+          source: res.source || null,
           student: res.student,
           mode: res.mode,
         },
@@ -92,7 +94,12 @@ export default function Assistant() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <div
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            className="flex-1 space-y-4 overflow-y-auto px-5 py-4"
+          >
             {messages.map((m, i) => (
               <Message key={i} m={m} />
             ))}
@@ -201,9 +208,26 @@ function Message({ m }) {
         <Bot className="h-4 w-4" />
       </span>
       <div className="min-w-0 max-w-[88%] space-y-2">
-        <div className={`rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed ${m.error ? "bg-red-50 text-red-700" : "bg-slate-50 text-ink"}`}>
-          {m.text}
-        </div>
+        {m.structured?.type === "student_attention" ? (
+          <AttentionReport report={m.structured} />
+        ) : m.structured?.type === "grounded_record" ? (
+          <GroundedRecordReport report={m.structured} />
+        ) : (
+          <div className={`whitespace-pre-line rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed ${m.error ? "bg-red-50 text-red-700" : "bg-slate-50 text-ink"}`}>
+            {m.text}
+          </div>
+        )}
+
+        {m.source && (
+          <div
+            title={m.source.detail}
+            aria-label={`Answer source: ${m.source.label}. ${m.source.detail}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+          >
+            {m.source.ai_used ? <Sparkles className="h-3 w-3 text-brand-600" /> : <Info className="h-3 w-3 text-slate-500" />}
+            {m.source.label}
+          </div>
+        )}
 
         {m.student && (
           <Link
@@ -234,6 +258,133 @@ function Message({ m }) {
         )}
       </div>
     </div>
+  );
+}
+
+function GroundedRecordReport({ report }) {
+  const severityClass = {
+    critical: "border-red-300 bg-red-50 text-red-800",
+    high: "border-red-200 bg-red-50 text-red-700",
+    medium: "border-amber-200 bg-amber-50 text-amber-700",
+    low: "border-sky-200 bg-sky-50 text-sky-700",
+  };
+
+  return (
+    <section
+      aria-label={report.heading}
+      className="overflow-hidden rounded-2xl rounded-tl-sm border border-slate-200 bg-white"
+    >
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="font-semibold text-ink">{report.heading}</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">{report.summary}</p>
+      </div>
+
+      {report.facts?.length > 0 && (
+        <dl className="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-2">
+          {report.facts.map((fact) => (
+            <div key={fact.label} className="bg-white px-4 py-2.5">
+              <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{fact.label}</dt>
+              <dd className="mt-0.5 text-xs font-semibold text-ink">{fact.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {report.findings?.length > 0 && (
+        <ol className="divide-y divide-slate-100 border-t border-slate-100">
+          {report.findings.map((finding, index) => (
+            <li key={`${finding.code}-${index}`} className="px-4 py-3 text-xs leading-relaxed">
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-semibold text-ink">{index + 1}. {finding.title}</p>
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[finding.severity] || severityClass.medium}`}>
+                  {finding.severity}
+                </span>
+              </div>
+              <p className="mt-1 text-slate-600">{finding.detail}</p>
+              <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-700">
+                <span className="font-semibold text-ink">Next action:</span> {finding.action}
+                <span className="mt-0.5 block text-slate-500">Owner: {finding.owner}</span>
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {report.next_action && report.findings?.length === 0 && (
+        <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-700">
+          <span className="font-semibold text-ink">Next action:</span> {report.next_action}
+          <span className="mt-0.5 block text-slate-500">Owner: {report.next_owner}</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AttentionReport({ report }) {
+  const { summary, students } = report;
+  const severityClass = {
+    high: "border-red-200 bg-red-50 text-red-700",
+    medium: "border-amber-200 bg-amber-50 text-amber-700",
+    low: "border-sky-200 bg-sky-50 text-sky-700",
+  };
+
+  return (
+    <section
+      aria-label="Students needing attention"
+      className="overflow-hidden rounded-2xl rounded-tl-sm border border-slate-200 bg-white"
+    >
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="font-semibold text-ink">Students needing attention</p>
+        <p className="mt-0.5 text-xs text-slate-600">
+          {summary.students} students · {summary.follow_ups} follow-up items · Showing {report.shown_students} highest priority
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Follow-up items by severity">
+          {["high", "medium", "low"].map((level) => summary[level] > 0 && (
+            <span
+              key={level}
+              className={`rounded-full border px-2 py-0.5 text-[11px] font-bold capitalize ${severityClass[level]}`}
+            >
+              {summary[level]} {level}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <ol className="divide-y divide-slate-100">
+        {students.map((student, index) => (
+          <li key={student.id} className="px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Link
+                  to={`/students/${student.id}`}
+                  className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                >
+                  {index + 1}. {student.name}
+                </Link>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {student.program_code} · {student.stage} · {student.student_number}
+                </p>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[student.severity]}`}>
+                {student.severity}
+              </span>
+            </div>
+            <div className="mt-2 space-y-2">
+              {student.issues.map((issue, issueIndex) => (
+                <div
+                  key={`${student.id}-${issueIndex}`}
+                  className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700"
+                >
+                  <p><span className="font-semibold text-ink">Issue:</span> {issue.trigger}</p>
+                  <p className="mt-1"><span className="font-semibold text-ink">Next action:</span> {issue.recommendation}</p>
+                  <p className="mt-1 text-slate-500"><span className="font-semibold text-slate-700">Owner:</span> {issue.owner}</p>
+                </div>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
