@@ -35,11 +35,16 @@ from app import (  # noqa: E402
     Program,
     ADVISER_APPROVAL_DOCUMENTS,
     ANALYTICS_REPORTS,
+    ACCESS_CONTROL_SPEC,
+    API_ROLE_REGISTRY,
+    ASSISTANT_REFERENCE_SET,
     CourseworkReport,
     OnboardingReview,
     StudentCurriculumTag,
     StudyPlanDraft,
     analytics_payload,
+    access_control_kpi,
+    policy_grounding_kpi,
     available_curriculum_versions,
     build_coursework_report,
     build_onboarding_review,
@@ -66,6 +71,7 @@ from app import (  # noqa: E402
     UserAccount,
     WorkflowMessage,
     WithdrawalApplication,
+    WORKFLOW_DEMO_STUDENTS,
     REQUEST_UPLOAD_ROOT,
     MONITORING_UPLOAD_ROOT,
     UPLOAD_ROOT,
@@ -3111,7 +3117,17 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 record.course.code
                 for record in CourseRecord.query.filter_by(student_id=withdrawal_student.id, status="Current").all()
             ]
-            self.assertEqual(current_withdrawal_courses, ["MAED-MAJ1"])
+            # The withdrawal demo student is deliberately enrolled in several
+            # active subjects, because a subject-level withdrawal is only
+            # meaningful when the student chooses one subject out of several.
+            # Assert against the configured baseline so this cannot go stale
+            # again if the demo scenario changes.
+            demo_config = WORKFLOW_DEMO_STUDENTS["withdrawal-elena"]
+            self.assertEqual(
+                sorted(current_withdrawal_courses),
+                sorted(demo_config["active_course_codes"]),
+            )
+            self.assertIn(demo_config["active_course_code"], current_withdrawal_courses)
             self.assertEqual(withdrawal_student.standing, "Active")
             self.assertEqual(withdrawal_student.enrollment_tag, "Enrolled")
             self.assertEqual(research_student.name, "Miguel Yu")
@@ -4991,6 +5007,44 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                                  json={"decision": "acknowledge", "remarks": "Noted."})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.get_json()["item"]["dean_decision"], "Acknowledged")
+
+    def test_all_nine_proposal_kpis_are_computed_in_order(self):
+        with app.app_context():
+            kpis = analytics_payload({})["kpis"]
+            self.assertEqual(len(kpis), 9, [k["kpi"] for k in kpis])
+            self.assertEqual(
+                [k["module"].split(" - ")[0] for k in kpis],
+                ["User and Access Management", "Audit Trail and Accountability",
+                 "Module 1", "Module 2", "Module 3", "Module 4",
+                 "Module 5", "Module 6", "Module 7"])
+            for item in kpis:
+                for field in ("kpi", "target", "value", "unit", "basis"):
+                    self.assertIn(field, item, item.get("kpi"))
+                self.assertIsInstance(item["value"], (int, float))
+
+    def test_access_control_kpi_detects_a_drifted_role_gate(self):
+        # The KPI compares an independent specification against what the
+        # endpoints actually registered, so it must fall if a gate changes.
+        with app.app_context():
+            self.assertEqual(access_control_kpi()["value"], 100.0)
+            endpoint = ACCESS_CONTROL_SPEC[0][1]
+            original = API_ROLE_REGISTRY[endpoint]
+            try:
+                API_ROLE_REGISTRY[endpoint] = frozenset({"student"})
+                drifted = access_control_kpi()
+                self.assertLess(drifted["value"], 100.0)
+                self.assertFalse(drifted["met"])
+                self.assertIn(ACCESS_CONTROL_SPEC[0][0], drifted["basis"])
+            finally:
+                API_ROLE_REGISTRY[endpoint] = original
+
+    def test_policy_grounding_kpi_uses_the_rule_without_a_model_call(self):
+        with app.app_context():
+            with patch("app._classify_assistant_intent_with_gemini") as gemini:
+                result = policy_grounding_kpi()
+            gemini.assert_not_called()
+            self.assertEqual(result["value"], 100.0, result["basis"])
+            self.assertEqual(len(ASSISTANT_REFERENCE_SET), 6)
 
 
 if __name__ == "__main__":

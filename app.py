@@ -3489,11 +3489,19 @@ def faculty_can_access_research_evidence(faculty_id: int, evidence: ResearchEvid
     )
 
 
+# Records the roles each protected endpoint was actually registered with, so the
+# access-control KPI can compare the running configuration against an
+# independently declared specification instead of restating the same rule.
+API_ROLE_REGISTRY: dict[str, frozenset] = {}
+
+
 def require_api_login(*roles):
     # Pass one or more roles; empty means "any signed-in account".
     allowed = {r for r in roles if r}
 
     def decorator(fn):
+        API_ROLE_REGISTRY[fn.__name__] = frozenset(allowed)
+
         @wraps(fn)
         def wrapper(*args, **kwargs):
             account = current_account()
@@ -14829,6 +14837,215 @@ def _report_is_valid(report) -> bool:
     )
 
 
+# ---------------------------------------------------------------------------
+# The remaining KPI measurements defined in the proposal (Tables 3.1-3.5).
+# Each is computed from the running system, not asserted.
+# ---------------------------------------------------------------------------
+
+# Table 3.1 - the access rule each protected area is SPECIFIED to enforce.
+# Written independently of the decorators; the KPI compares this against what
+# the endpoints were actually registered with, so a drifted decorator lowers it.
+ACCESS_CONTROL_SPEC = [
+    ("Monitoring sheet", "monitoring_grid", {"staff", "academic_coordinator"}),
+    ("Reports", "reports", {"staff", "academic_coordinator"}),
+    ("Analytics", "reports_analytics", {"staff", "academic_coordinator"}),
+    ("Students", "students_list", {"staff", "academic_coordinator"}),
+    ("Faculty", "faculty_list", {"staff", "academic_coordinator"}),
+    ("Monitoring sheet import", "student_handoff_import", {"staff"}),
+    ("Recommendations", "decision_support", {"staff"}),
+    ("Curriculum version tagging", "enrollment_curriculum_tag", {"staff", "academic_coordinator"}),
+    ("Study plan drafts", "enrollment_study_plans", {"staff", "academic_coordinator"}),
+    ("Dean workflow decision", "workflow_approval_decide", {"dean"}),
+    ("Dean onboarding decision", "onboarding_review_decision", {"dean"}),
+    ("Dean coursework decision", "coursework_report_decision", {"dean"}),
+]
+
+# Table 3.2 - the actions the system is defined to record in the audit trail.
+AUDITABLE_ACTIONS = [
+    "student-handoff", "enrollment", "course-adjustments", "research-gate",
+    "panel-matching", "defense-scheduling", "practicum", "graduation",
+    "leave-of-absence", "readmission", "awol", "withdrawal",
+]
+
+# Table 3.3 - the monitoring fields a student record is required to carry.
+REQUIRED_MONITORING_FIELDS = [
+    ("Lifecycle stage", lambda s: bool((s.current_stage or "").strip())),
+    ("Completion status", lambda s: bool((s.standing or "").strip())),
+    # Use the same derived accessor the screens use: the raw column may be blank
+    # on legacy rows while the marker is still available from the entry year.
+    ("AY / year-level markers", lambda s: bool(student_academic_year_entry(s))
+                                          and bool(str(s.year_level or "").strip())),
+    ("Curriculum tag", lambda s: s.id in _CURRICULUM_TAGGED),
+]
+
+_CURRICULUM_TAGGED: set[int] = set()
+
+# Table 3.8 - the reference set the Policy Assistant's routing rule is measured
+# against. Each question has one correct handling under the defined prototype
+# rule; the KPI runs the rule and counts exact matches. No model call is made,
+# so the measurement is deterministic and repeatable.
+ASSISTANT_REFERENCE_SET = [
+    ("What is the maximum leave of absence a student may file?", "policy"),
+    ("What is the maximum residency period for a master's student?", "policy"),
+    ("What are the requirements for the comprehensive examination?", "policy"),
+    ("What is the withdrawal policy for a subject?", "policy"),
+    ("Which students need attention right now?", "student_attention"),
+    ("What is blocking this student's progress?", "student_progress_blockers"),
+]
+
+
+def policy_grounding_kpi() -> dict:
+    """Table 3.8 - does the assistant route each reference question the way the
+    defined rule specifies?"""
+    matched, misses = 0, []
+    for question, expected in ASSISTANT_REFERENCE_SET:
+        try:
+            actual = _assistant_intent(question)
+        except Exception as exc:  # noqa: BLE001
+            actual = f"error: {exc}"
+        if actual == expected:
+            matched += 1
+        else:
+            misses.append(f"“{question[:38]}…” → {actual}, expected {expected}")
+    total = len(ASSISTANT_REFERENCE_SET)
+    return {
+        "module": "Module 6 - Policy and Case Guidance",
+        "kpi": "Policy-grounded response match rate",
+        "target": "100%",
+        "value": _percent(matched, total),
+        "unit": "%",
+        "basis": f"{matched} of {total} reference questions routed as the defined rule specifies"
+                 + (f"; mismatched: {'; '.join(misses)}" if misses else ""),
+        "met": matched == total,
+    }
+
+
+def access_control_kpi() -> dict:
+    """Table 3.1 - does every protected area enforce the specified roles?"""
+    passed, mismatches = 0, []
+    for label, endpoint, expected in ACCESS_CONTROL_SPEC:
+        actual = API_ROLE_REGISTRY.get(endpoint)
+        if actual is not None and set(actual) == expected:
+            passed += 1
+        else:
+            mismatches.append(f"{label} (expected {sorted(expected)}, got "
+                              f"{sorted(actual) if actual is not None else 'unregistered'})")
+    total = len(ACCESS_CONTROL_SPEC)
+    return {
+        "module": "User and Access Management",
+        "kpi": "Access control enforcement rate",
+        "target": "100%",
+        "value": _percent(passed, total),
+        "unit": "%",
+        "basis": f"{passed} of {total} role-permission cases enforce the specified roles"
+                 + (f"; mismatched: {'; '.join(mismatches)}" if mismatches else ""),
+        "met": passed == total,
+    }
+
+
+def audit_coverage_kpi(student_ids: list[int]) -> dict:
+    """Table 3.2 - does every auditable action produce a timestamped log entry?"""
+    covered, missing = 0, []
+    for slug in AUDITABLE_ACTIONS:
+        exists = (
+            TransactionLog.query.filter(
+                TransactionLog.transaction_slug == slug,
+                TransactionLog.created_at.isnot(None),
+                TransactionLog.actor_role.isnot(None),
+            ).first()
+            is not None
+        )
+        if exists:
+            covered += 1
+        else:
+            missing.append(slug)
+    total = len(AUDITABLE_ACTIONS)
+    return {
+        "module": "Audit Trail and Accountability",
+        "kpi": "Audit event coverage",
+        "target": "100%",
+        "value": _percent(covered, total),
+        "unit": "%",
+        "basis": f"{covered} of {total} auditable actions have timestamped log entries"
+                 + (f"; no entries yet for: {', '.join(missing)}" if missing else ""),
+        "met": covered == total,
+    }
+
+
+def monitoring_field_kpi(students: list[Student]) -> dict:
+    """Table 3.3 - do active records carry every required monitoring field?"""
+    active = [s for s in students if (s.current_stage or "") not in TERMINAL_STAGES]
+    global _CURRICULUM_TAGGED
+    _CURRICULUM_TAGGED = {
+        sid for (sid,) in db.session.query(StudentCurriculumTag.student_id)
+        .filter(StudentCurriculumTag.active.is_(True)).distinct().all()
+    }
+    complete, shortfall = 0, {}
+    for student in active:
+        missing = [name for name, check in REQUIRED_MONITORING_FIELDS if not check(student)]
+        if missing:
+            for name in missing:
+                shortfall[name] = shortfall.get(name, 0) + 1
+        else:
+            complete += 1
+    worst = sorted(shortfall.items(), key=lambda kv: -kv[1])[:3]
+    return {
+        "module": "Module 1 - Student Progress Management",
+        "kpi": "Required monitoring field completion rate",
+        "target": "100%",
+        "value": _percent(complete, len(active)),
+        "unit": "%",
+        "basis": f"{complete} of {len(active)} active records carry every required field"
+                 + (f"; most often missing: {', '.join(f'{k} ({v})' for k, v in worst)}" if worst else ""),
+        "met": complete == len(active) if active else None,
+    }
+
+
+def next_action_ownership_kpi(student_ids: list[int]) -> dict:
+    """Table 3.4 - does every active case name who acts next?"""
+    if not student_ids:
+        return {"module": "Module 2 - Case Status and Action Tracking",
+                "kpi": "Next-action ownership coverage", "target": "100%", "value": 0.0,
+                "unit": "%", "basis": "No cases in scope", "met": None}
+    latest: dict[tuple, TransactionLog] = {}
+    for entry in (TransactionLog.query
+                  .filter(TransactionLog.student_id.in_(student_ids))
+                  .order_by(TransactionLog.created_at.asc(), TransactionLog.id.asc()).all()):
+        latest[(entry.student_id, entry.transaction_slug)] = entry
+    owned = sum(1 for e in latest.values() if (e.next_owner or "").strip())
+    total = len(latest)
+    return {
+        "module": "Module 2 - Case Status and Action Tracking",
+        "kpi": "Next-action ownership coverage",
+        "target": "100%",
+        "value": _percent(owned, total),
+        "unit": "%",
+        "basis": f"{owned} of {total} active case(s) name the role that acts next",
+        "met": owned == total if total else None,
+    }
+
+
+def scheduling_completeness_kpi(student_ids: list[int]) -> dict:
+    """Table 3.5 - do scheduling cases carry both request and outcome timestamps?"""
+    if not student_ids:
+        return {"module": "Module 3 - Defense Scheduling Management",
+                "kpi": "Scheduling record completeness", "target": "at least 90%", "value": 0.0,
+                "unit": "%", "basis": "No scheduling cases in scope", "met": None}
+    rows = ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(student_ids)).all()
+    complete = sum(1 for r in rows if r.created_at is not None and r.confirmed_at is not None)
+    total = len(rows)
+    rate = _percent(complete, total)
+    return {
+        "module": "Module 3 - Defense Scheduling Management",
+        "kpi": "Scheduling record completeness",
+        "target": "at least 90%",
+        "value": rate,
+        "unit": "%",
+        "basis": f"{complete} of {total} scheduling case(s) carry both a request and an outcome timestamp",
+        "met": (rate >= 90.0) if total else None,
+    }
+
+
 def analytics_kpi_summary(payload: dict) -> list[dict]:
     """KPI measurements for the analytics and reporting modules, computed from
     the reports actually produced in this request rather than asserted."""
@@ -14907,7 +15124,22 @@ def analytics_payload(filters=None) -> dict:
         except Exception as exc:  # noqa: BLE001 - a failed report must not hide the rest
             app.logger.exception("Analytics report %s failed", key)
             payload[key] = {"count": 0, "rows": [], "columns": [], "error": str(exc)}
-    payload["kpis"] = analytics_kpi_summary(payload)
+    # All nine KPI measurements defined in the proposal, in proposal order.
+    kpis = [access_control_kpi(), audit_coverage_kpi(student_ids),
+            monitoring_field_kpi(students), next_action_ownership_kpi(student_ids),
+            scheduling_completeness_kpi(student_ids), policy_grounding_kpi()]
+    try:
+        kpis.extend(analytics_kpi_summary(payload))
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Analytics KPI summary failed")
+        kpis.append({"module": "Modules 4, 5 and 7", "kpi": "Analytics KPIs", "target": "-",
+                     "value": 0.0, "unit": "%", "basis": f"Could not compute: {exc}", "met": False})
+    # Present them in the order the proposal defines them (Tables 3.1 to 3.9).
+    order = ["User and Access", "Audit Trail", "Module 1", "Module 2", "Module 3",
+             "Module 4", "Module 5", "Module 6", "Module 7"]
+    kpis.sort(key=lambda k: next((i for i, name in enumerate(order)
+                                  if k["module"].startswith(name)), 99))
+    payload["kpis"] = kpis
     return payload
 
 
