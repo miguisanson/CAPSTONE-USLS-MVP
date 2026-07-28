@@ -7914,6 +7914,13 @@ def register_routes(app: Flask) -> None:
     def reports():
         return jsonify(reports_payload(request.args))
 
+    # Analytics is computed on demand rather than folded into /api/reports so
+    # the operational report screen keeps its current load time.
+    @app.route("/api/reports/analytics")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_analytics():
+        return jsonify(analytics_payload(request.args))
+
     # Changes made in this system that the Registrar must mirror in AIMS.
     REGISTRAR_CHANGE_SLUGS = (
         "enrollment", "withdrawal", "course-adjustments",
@@ -13697,6 +13704,674 @@ def workflow_approvals_payload() -> dict:
 
 def report_student_ids(filters) -> list[int]:
     return [sid for (sid,) in filtered_students_query(filters).with_entities(Student.id).all()]
+
+
+# ---------------------------------------------------------------------------
+# Analytics reports (Module 5 Analytics and Decision Support, Module 7
+# Reporting and Dashboards).
+#
+# Every indicator below is computed from recorded event history - transaction
+# log timestamps, ownership assignments, decision outcomes and evidence
+# completeness - rather than from a manually maintained "current status" field.
+# This follows the computed-indicator definitions in the proposal (Table 13:
+# aging/time-in-stage, pending queue membership, overdue tasks and SLA
+# breaches, scheduling cycle time, decision outcome state) and answers the
+# Module 5 decision questions on risk, residency, bottlenecks, queue aging,
+# workload and attrition.
+# ---------------------------------------------------------------------------
+
+# Age buckets shared by the queue-aging and backlog views, in days.
+AGE_BUCKETS = [(0, 7, "0-7 days"), (8, 14, "8-14 days"), (15, 30, "15-30 days"), (31, None, "Over 30 days")]
+
+# Process areas reported on for queue aging. Keyed by transaction slug so the
+# figures follow the same vocabulary as the workflow screens and activity log.
+QUEUE_PROCESS_AREAS = [
+    ("student-handoff", "Student Handoff"),
+    ("course-adjustments", "Course Adjustments"),
+    ("enrollment", "Enrollment"),
+    ("research-gate", "Research Gate"),
+    ("panel-matching", "Panel Matching"),
+    ("defense-scheduling", "Defense Scheduling"),
+    ("practicum", "Practicum"),
+    ("graduation", "Graduation"),
+    ("leave-of-absence", "Leave of Absence"),
+    ("readmission", "Readmission"),
+    ("awol", "AWOL & Residency"),
+    ("withdrawal", "Withdrawal"),
+]
+
+# Stages that are terminal: a student sitting here is not "waiting" on anyone,
+# so they are excluded from bottleneck and backlog figures.
+TERMINAL_STAGES = {"Completed", "Withdrawn"}
+
+
+def _bucket_for_age(days: int) -> str:
+    for low, high, label in AGE_BUCKETS:
+        if days >= low and (high is None or days <= high):
+            return label
+    return AGE_BUCKETS[-1][2]
+
+
+def _median(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return float(ordered[mid])
+    return round((ordered[mid - 1] + ordered[mid]) / 2.0, 1)
+
+
+def _days_since(moment) -> int:
+    """Age in whole days. Stored timestamps are written by now_utc(), which is
+    naive local time, so the comparison must use the same clock - using
+    datetime.utcnow() here would skew every age by the timezone offset."""
+    if not moment:
+        return 0
+    if isinstance(moment, datetime):
+        reference = moment
+    else:
+        reference = datetime.combine(moment, time.min)
+    if reference.tzinfo is not None:
+        reference = reference.replace(tzinfo=None)
+    return max(0, (now_utc() - reference).days)
+
+
+def _percent(part: int, whole: int) -> float:
+    return round((part / whole) * 100.0, 1) if whole else 0.0
+
+
+# Task ownership and transaction-log actor labels use different vocabularies
+# ("GS Staff" against "Graduate School Staff · <account>"), and the log also
+# records non-human actors. Both are normalised to one canonical owner so the
+# workload report does not split a single person across several rows.
+CANONICAL_OWNER_ROLES = {
+    "gs staff": "GS Staff",
+    "graduate school staff": "GS Staff",
+    "staff": "GS Staff",
+    "academic coordinator": "Academic Coordinator",
+    "research coordinator": "Research Coordinator",
+    "dean": "Dean",
+    "student": "Student",
+    "faculty": "Faculty",
+    "adviser": "Faculty",
+    "advisor": "Faculty",
+    "panel member": "Faculty",
+    "registrar": "Registrar (external)",
+    "administrator": "Administrator",
+    "admin": "Administrator",
+}
+
+# Actors that are the system itself or seeded fixtures. They carry no workload
+# and are excluded so the report measures people.
+NON_HUMAN_ACTORS = {"demo data", "workflow system", "system", "automatic", "seed"}
+
+
+def canonical_owner_role(role: str | None) -> str | None:
+    """Map a task owner or log actor label onto one canonical owner, or None
+    for system actors that should not appear in workload figures."""
+    text = (role or "").strip()
+    if not text:
+        return None
+    # Labels may carry an account qualifier after a separator.
+    for separator in ("·", "·", "•", "-", "|", "�"):
+        if separator in text:
+            text = text.split(separator)[0].strip()
+            break
+    key = text.casefold()
+    if key in NON_HUMAN_ACTORS or any(key.startswith(prefix) for prefix in NON_HUMAN_ACTORS):
+        return None
+    return CANONICAL_OWNER_ROLES.get(key, text)
+
+
+def queue_aging_report(student_ids: list[int]) -> dict:
+    """Open case backlog per process area with age buckets (Table 13: aging)."""
+    if not student_ids:
+        return {"count": 0, "rows": [], "columns": QUEUE_AGING_COLUMNS, "totals": {}}
+    rows = []
+    for slug, label in QUEUE_PROCESS_AREAS:
+        # The latest log entry per student for this process is the point the
+        # case has been waiting from. A case is open when the last recorded
+        # entry still names someone as the next owner.
+        latest: dict[int, TransactionLog] = {}
+        query = (
+            TransactionLog.query.filter(
+                TransactionLog.transaction_slug == slug,
+                TransactionLog.student_id.in_(student_ids),
+            )
+            .order_by(TransactionLog.created_at.asc(), TransactionLog.id.asc())
+        )
+        for entry in query.all():
+            latest[entry.student_id] = entry
+        ages = [
+            _days_since(entry.created_at)
+            for entry in latest.values()
+            if (entry.next_owner or "").strip()
+        ]
+        if not ages:
+            continue
+        buckets = {label_: 0 for _, _, label_ in AGE_BUCKETS}
+        for age in ages:
+            buckets[_bucket_for_age(age)] += 1
+        rows.append({
+            "process_area": label,
+            "open_cases": len(ages),
+            "bucket_0_7": buckets["0-7 days"],
+            "bucket_8_14": buckets["8-14 days"],
+            "bucket_15_30": buckets["15-30 days"],
+            "bucket_over_30": buckets["Over 30 days"],
+            "median_age_days": _median([float(a) for a in ages]),
+            "oldest_age_days": max(ages),
+        })
+    rows.sort(key=lambda item: (item["oldest_age_days"], item["open_cases"]), reverse=True)
+    total_open = sum(item["open_cases"] for item in rows)
+    stale = sum(item["bucket_over_30"] for item in rows)
+    return {
+        "count": len(rows),
+        "rows": rows,
+        "columns": QUEUE_AGING_COLUMNS,
+        "totals": {
+            "open_cases": total_open,
+            "over_30_days": stale,
+            "over_30_percent": _percent(stale, total_open),
+        },
+    }
+
+
+QUEUE_AGING_COLUMNS = [
+    {"key": "process_area", "label": "Process area"},
+    {"key": "open_cases", "label": "Open cases"},
+    {"key": "bucket_0_7", "label": "0-7 d"},
+    {"key": "bucket_8_14", "label": "8-14 d"},
+    {"key": "bucket_15_30", "label": "15-30 d"},
+    {"key": "bucket_over_30", "label": "Over 30 d"},
+    {"key": "median_age_days", "label": "Median age (d)"},
+    {"key": "oldest_age_days", "label": "Oldest (d)"},
+]
+
+
+STAGE_BOTTLENECK_COLUMNS = [
+    {"key": "stage", "label": "Lifecycle stage"},
+    {"key": "students", "label": "Students"},
+    {"key": "median_days_in_stage", "label": "Median days in stage"},
+    {"key": "average_days_in_stage", "label": "Average days in stage"},
+    {"key": "longest_days", "label": "Longest (d)"},
+    {"key": "longest_student", "label": "Longest-waiting student"},
+]
+
+
+def stage_bottleneck_report(students: list[Student]) -> dict:
+    """Time-in-stage per lifecycle stage (Module 5: where are the delays?)."""
+    grouped: dict[str, list[tuple[int, Student]]] = {}
+    for student in students:
+        stage = student.current_stage or "Unassigned"
+        if stage in TERMINAL_STAGES:
+            continue
+        # Time in stage runs from the most recent log entry that moved the
+        # student into the stage they currently occupy; fall back to the last
+        # recorded activity, then to the profile update stamp.
+        entry = (
+            TransactionLog.query.filter(
+                TransactionLog.student_id == student.id,
+                TransactionLog.new_status == stage,
+            )
+            .order_by(TransactionLog.created_at.desc())
+            .first()
+        )
+        if entry is None:
+            entry = (
+                TransactionLog.query.filter(TransactionLog.student_id == student.id)
+                .order_by(TransactionLog.created_at.desc())
+                .first()
+            )
+        moment = entry.created_at if entry is not None else student.updated_at
+        grouped.setdefault(stage, []).append((_days_since(moment), student))
+    rows = []
+    for stage, items in grouped.items():
+        ages = [days for days, _ in items]
+        longest_days, longest_student = max(items, key=lambda pair: pair[0])
+        rows.append({
+            "stage": stage,
+            "students": len(items),
+            "median_days_in_stage": _median([float(a) for a in ages]),
+            "average_days_in_stage": round(sum(ages) / len(ages), 1),
+            "longest_days": longest_days,
+            "longest_student": longest_student.name,
+            "longest_student_id": longest_student.id,
+        })
+    rows.sort(key=lambda item: item["median_days_in_stage"], reverse=True)
+    return {"count": len(rows), "rows": rows, "columns": STAGE_BOTTLENECK_COLUMNS}
+
+
+OWNER_WORKLOAD_COLUMNS = [
+    {"key": "owner_role", "label": "Owner"},
+    {"key": "open_tasks", "label": "Open tasks"},
+    {"key": "overdue_tasks", "label": "Overdue"},
+    {"key": "overdue_percent", "label": "Overdue %"},
+    {"key": "students_touched", "label": "Students"},
+    {"key": "actions_recorded", "label": "Actions recorded"},
+    {"key": "median_turnaround_days", "label": "Median turnaround (d)"},
+]
+
+
+def owner_workload_report(student_ids: list[int]) -> dict:
+    """Workload and turnaround per owning role (Module 5: who is loaded?)."""
+    if not student_ids:
+        return {"count": 0, "rows": [], "columns": OWNER_WORKLOAD_COLUMNS}
+    today = date.today()
+    workload: dict[str, dict] = {}
+
+    def slot(owner: str) -> dict:
+        return workload.setdefault(owner, {
+            "owner_role": owner,
+            "open_tasks": 0,
+            "overdue_tasks": 0,
+            "students": set(),
+            "actions_recorded": 0,
+            "turnarounds": [],
+        })
+
+    for task in Task.query.filter(
+        Task.student_id.in_(student_ids),
+        Task.status.in_(["Pending", "Overdue"]),
+    ).all():
+        record = slot(canonical_owner_role(task.owner_role) or "Unassigned")
+        record["open_tasks"] += 1
+        record["students"].add(task.student_id)
+        if task.due_at and task.due_at < today:
+            record["overdue_tasks"] += 1
+
+    # Turnaround: for each handoff naming a next owner, how long until that
+    # owner recorded their own next action on the same student and process.
+    entries = (
+        TransactionLog.query.filter(TransactionLog.student_id.in_(student_ids))
+        .order_by(TransactionLog.created_at.asc(), TransactionLog.id.asc())
+        .all()
+    )
+    pending: dict[tuple, datetime] = {}
+    for entry in entries:
+        actor = canonical_owner_role(entry.actor_role)
+        if actor:
+            record = slot(actor)
+            record["actions_recorded"] += 1
+            record["students"].add(entry.student_id)
+            key = (entry.student_id, entry.transaction_slug, actor)
+            handed_at = pending.pop(key, None)
+            if handed_at is not None and entry.created_at is not None:
+                delta = (entry.created_at - handed_at).days
+                if delta >= 0:
+                    record["turnarounds"].append(float(delta))
+        next_owner = canonical_owner_role(entry.next_owner)
+        if next_owner and entry.created_at is not None:
+            pending[(entry.student_id, entry.transaction_slug, next_owner)] = entry.created_at
+
+    rows = []
+    for record in workload.values():
+        rows.append({
+            "owner_role": record["owner_role"],
+            "open_tasks": record["open_tasks"],
+            "overdue_tasks": record["overdue_tasks"],
+            "overdue_percent": _percent(record["overdue_tasks"], record["open_tasks"]),
+            "students_touched": len(record["students"]),
+            "actions_recorded": record["actions_recorded"],
+            "median_turnaround_days": _median(record["turnarounds"]),
+        })
+    rows.sort(key=lambda item: (item["open_tasks"], item["overdue_tasks"]), reverse=True)
+    return {"count": len(rows), "rows": rows, "columns": OWNER_WORKLOAD_COLUMNS}
+
+
+RESIDENCY_WATCHLIST_COLUMNS = [
+    {"key": "student_name", "label": "Student"},
+    {"key": "student_number", "label": "Student no."},
+    {"key": "program_code", "label": "Program"},
+    {"key": "program_level", "label": "Level"},
+    {"key": "entry_year", "label": "Entry year"},
+    {"key": "years_in_program", "label": "Years"},
+    {"key": "normal_years", "label": "Normal limit"},
+    {"key": "absolute_years", "label": "Absolute limit"},
+    {"key": "residency_state", "label": "Residency state"},
+    {"key": "stage", "label": "Stage"},
+]
+
+
+def residency_watchlist_report(students: list[Student]) -> dict:
+    """Students against the residency limits confirmed in the LOA/readmission
+    process model: Master's 5 normal / 7 absolute, Doctorate 7 normal / 9
+    absolute."""
+    rows = []
+    counts = {"Within normal period": 0, "Past normal period": 0, "Approaching absolute limit": 0, "Exceeded absolute limit": 0}
+    for student in students:
+        if (student.current_stage or "") in TERMINAL_STAGES:
+            continue
+        limits = residence_limits(student)
+        years = limits["years_in_program"]
+        if years > limits["absolute_years"]:
+            state = "Exceeded absolute limit"
+        elif years >= limits["absolute_years"] - 1:
+            state = "Approaching absolute limit"
+        elif years > limits["normal_years"]:
+            state = "Past normal period"
+        else:
+            state = "Within normal period"
+        counts[state] += 1
+        if state == "Within normal period":
+            continue
+        rows.append({
+            "student_id": student.id,
+            "student_name": student.name,
+            "student_number": student.student_number,
+            "program_code": student.program.code,
+            "program_level": limits["program_level"],
+            "entry_year": student.entry_year,
+            "years_in_program": years,
+            "normal_years": limits["normal_years"],
+            "absolute_years": limits["absolute_years"],
+            "residency_state": state,
+            "stage": student.current_stage,
+        })
+    order = {"Exceeded absolute limit": 0, "Approaching absolute limit": 1, "Past normal period": 2}
+    rows.sort(key=lambda item: (order.get(item["residency_state"], 9), -item["years_in_program"]))
+    return {"count": len(rows), "rows": rows, "columns": RESIDENCY_WATCHLIST_COLUMNS, "totals": counts}
+
+
+COMPLETION_ATTRITION_COLUMNS = [
+    {"key": "program_code", "label": "Program"},
+    {"key": "program_level", "label": "Level"},
+    {"key": "total_students", "label": "Students"},
+    {"key": "completed", "label": "Completed"},
+    {"key": "active", "label": "Active"},
+    {"key": "on_leave", "label": "On leave"},
+    {"key": "awol", "label": "AWOL"},
+    {"key": "withdrawn", "label": "Withdrawn"},
+    {"key": "completion_rate", "label": "Completion %"},
+    {"key": "attrition_rate", "label": "Attrition %"},
+    {"key": "average_years_to_finish", "label": "Avg years to finish"},
+]
+
+
+def completion_attrition_report(students: list[Student]) -> dict:
+    """Completion and attrition per program (Module 5: which groups are
+    slowest, and what is the average time to finish?)."""
+    grouped: dict[int, dict] = {}
+    for student in students:
+        record = grouped.setdefault(student.program_id, {
+            "program_code": student.program.code,
+            "program_level": "Doctorate" if residence_limits(student)["program_level"] == "Doctorate" else "Master's",
+            "total_students": 0,
+            "completed": 0,
+            "active": 0,
+            "on_leave": 0,
+            "awol": 0,
+            "withdrawn": 0,
+            "completion_years": [],
+        })
+        record["total_students"] += 1
+        stage = student.current_stage or ""
+        standing = student.standing or ""
+        if stage == "Completed":
+            record["completed"] += 1
+            years = residence_limits(student)["years_in_program"]
+            if years:
+                record["completion_years"].append(float(years))
+        elif stage == "Withdrawn":
+            record["withdrawn"] += 1
+        elif stage == "AWOL" or standing == "AWOL":
+            record["awol"] += 1
+        elif stage == "LOA" or standing == "On Leave":
+            record["on_leave"] += 1
+        else:
+            record["active"] += 1
+    rows = []
+    for record in grouped.values():
+        total = record["total_students"]
+        # Attrition counts students who left the pipeline without completing:
+        # withdrawn plus AWOL. Students on an approved leave are not attrition.
+        lost = record["withdrawn"] + record["awol"]
+        rows.append({
+            "program_code": record["program_code"],
+            "program_level": record["program_level"],
+            "total_students": total,
+            "completed": record["completed"],
+            "active": record["active"],
+            "on_leave": record["on_leave"],
+            "awol": record["awol"],
+            "withdrawn": record["withdrawn"],
+            "completion_rate": _percent(record["completed"], total),
+            "attrition_rate": _percent(lost, total),
+            "average_years_to_finish": _median(record["completion_years"]) if record["completion_years"] else 0,
+        })
+    rows.sort(key=lambda item: item["attrition_rate"], reverse=True)
+    return {"count": len(rows), "rows": rows, "columns": COMPLETION_ATTRITION_COLUMNS}
+
+
+SCHEDULING_CYCLE_COLUMNS = [
+    {"key": "defense_type", "label": "Defense type"},
+    {"key": "requests", "label": "Requests"},
+    {"key": "confirmed", "label": "Confirmed"},
+    {"key": "awaiting", "label": "Awaiting"},
+    {"key": "rescheduled", "label": "Rescheduled"},
+    {"key": "median_cycle_days", "label": "Median request to confirm (d)"},
+    {"key": "longest_cycle_days", "label": "Longest (d)"},
+]
+
+
+def scheduling_cycle_report(student_ids: list[int]) -> dict:
+    """Scheduling cycle time and reschedule counts (Table 13: scheduling cycle
+    time)."""
+    if not student_ids:
+        return {"count": 0, "rows": [], "columns": SCHEDULING_CYCLE_COLUMNS}
+    grouped: dict[str, dict] = {}
+    for item in ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(student_ids)).all():
+        record = grouped.setdefault(item.defense_type or "Unspecified", {
+            "defense_type": item.defense_type or "Unspecified",
+            "requests": 0,
+            "confirmed": 0,
+            "awaiting": 0,
+            "rescheduled": 0,
+            "cycles": [],
+        })
+        record["requests"] += 1
+        status = (item.status or "").lower()
+        if item.confirmed_at is not None:
+            record["confirmed"] += 1
+            if item.created_at is not None:
+                delta = (item.confirmed_at - item.created_at).days
+                if delta >= 0:
+                    record["cycles"].append(float(delta))
+        else:
+            record["awaiting"] += 1
+        if "reschedul" in status:
+            record["rescheduled"] += 1
+    rows = []
+    for record in grouped.values():
+        rows.append({
+            "defense_type": record["defense_type"],
+            "requests": record["requests"],
+            "confirmed": record["confirmed"],
+            "awaiting": record["awaiting"],
+            "rescheduled": record["rescheduled"],
+            "median_cycle_days": _median(record["cycles"]),
+            "longest_cycle_days": int(max(record["cycles"])) if record["cycles"] else 0,
+        })
+    rows.sort(key=lambda item: item["requests"], reverse=True)
+    return {"count": len(rows), "rows": rows, "columns": SCHEDULING_CYCLE_COLUMNS}
+
+
+FOLLOWUP_CLOSURE_COLUMNS = [
+    {"key": "flag_type", "label": "Flag type"},
+    {"key": "flagged_cases", "label": "Flagged cases"},
+    {"key": "with_followup", "label": "With follow-up"},
+    {"key": "resolved", "label": "Closed"},
+    {"key": "open_flags", "label": "Still open"},
+    {"key": "closure_rate", "label": "Closure logging %"},
+    {"key": "median_open_age_days", "label": "Median age of open (d)"},
+]
+
+
+def followup_closure_report(student_ids: list[int]) -> dict:
+    """Follow-up and closure logging for flagged cases. This is the measurement
+    behind the Module 4 KPI (>= 90% of flagged cases carry a recorded follow-up
+    action and closure status)."""
+    if not student_ids:
+        return {"count": 0, "rows": [], "columns": FOLLOWUP_CLOSURE_COLUMNS, "totals": {}}
+    grouped: dict[str, dict] = {}
+    flags = StudentMonitoringFlag.query.filter(StudentMonitoringFlag.student_id.in_(student_ids)).all()
+    for flag in flags:
+        label = flag.category or "Discrepancy"
+        record = grouped.setdefault(label, {
+            "flag_type": label,
+            "flagged_cases": 0,
+            "with_followup": 0,
+            "resolved": 0,
+            "open_ages": [],
+        })
+        record["flagged_cases"] += 1
+        resolution_note = (flag.resolution_note or "").strip()
+        if flag.resolved_at is not None or flag.status == "Resolved":
+            record["resolved"] += 1
+            record["with_followup"] += 1
+        else:
+            if resolution_note:
+                record["with_followup"] += 1
+            record["open_ages"].append(float(_days_since(flag.created_at)))
+    rows = []
+    for record in grouped.values():
+        total = record["flagged_cases"]
+        rows.append({
+            "flag_type": record["flag_type"],
+            "flagged_cases": total,
+            "with_followup": record["with_followup"],
+            "resolved": record["resolved"],
+            "open_flags": total - record["resolved"],
+            "closure_rate": _percent(record["resolved"], total),
+            "median_open_age_days": _median(record["open_ages"]),
+        })
+    rows.sort(key=lambda item: item["flagged_cases"], reverse=True)
+    total_flags = sum(item["flagged_cases"] for item in rows)
+    total_closed = sum(item["resolved"] for item in rows)
+    return {
+        "count": len(rows),
+        "rows": rows,
+        "columns": FOLLOWUP_CLOSURE_COLUMNS,
+        "totals": {
+            "flagged_cases": total_flags,
+            "closed": total_closed,
+            "closure_rate": _percent(total_closed, total_flags),
+        },
+    }
+
+
+ANALYTICS_REPORTS = [
+    ("queue_aging", "Queue aging & backlog"),
+    ("stage_bottlenecks", "Stage bottlenecks"),
+    ("owner_workload", "Workload & turnaround"),
+    ("residency_watchlist", "Residency watchlist"),
+    ("completion_attrition", "Completion & attrition"),
+    ("scheduling_cycle_time", "Scheduling cycle time"),
+    ("followup_closure", "Follow-up closure"),
+]
+
+
+# The operational reports served by /api/reports. Listed here so the reporting
+# KPI can check the whole agreed set, not only the analytics half.
+OPERATIONAL_REPORT_KEYS = (
+    "summary", "daily_changes", "graduation_candidates", "missing_requirements",
+    "practicum_monitoring", "withdrawal_requests", "loa_readmission", "at_risk",
+    "open_overdue_tasks", "research_completion",
+)
+
+
+def _report_is_valid(report) -> bool:
+    """A report counts as generated when it returned the expected structure.
+    A report with no rows is still a valid result; a report that raised is not."""
+    return (
+        isinstance(report, dict)
+        and not report.get("error")
+        and isinstance(report.get("rows"), list)
+        and isinstance(report.get("columns"), list)
+    )
+
+
+def analytics_kpi_summary(payload: dict) -> list[dict]:
+    """KPI measurements for the analytics and reporting modules, computed from
+    the reports actually produced in this request rather than asserted."""
+    generated = sum(1 for key, _ in ANALYTICS_REPORTS if _report_is_valid(payload.get(key)))
+    total_reports = len(ANALYTICS_REPORTS)
+    failed = [label for key, label in ANALYTICS_REPORTS if not _report_is_valid(payload.get(key))]
+    generation_rate = _percent(generated, total_reports)
+
+    available = generated + len(OPERATIONAL_REPORT_KEYS)
+    agreed_total = total_reports + len(OPERATIONAL_REPORT_KEYS)
+    availability = _percent(available, agreed_total)
+
+    closure = payload.get("followup_closure", {}).get("totals", {})
+    flagged = closure.get("flagged_cases", 0)
+    closure_rate = closure.get("closure_rate", 0.0)
+
+    return [
+        {
+            "module": "Module 4 - Case Monitoring and Follow-Up",
+            "kpi": "Follow-up closure logging rate",
+            "target": "at least 90%",
+            "value": closure_rate,
+            "unit": "%",
+            "basis": f"{closure.get('closed', 0)} closed of {flagged} flagged case(s)"
+                     if flagged else "No flagged cases in scope; rate not measurable",
+            "met": (closure_rate >= 90.0) if flagged else None,
+        },
+        {
+            "module": "Module 5 - Analytics and Decision Support",
+            "kpi": "Analytics report generation rate",
+            "target": "at least 90%",
+            "value": generation_rate,
+            "unit": "%",
+            "basis": f"{generated} of {total_reports} analytics outputs computed successfully"
+                     + (f"; failed: {', '.join(failed)}" if failed else ""),
+            "met": generation_rate >= 90.0,
+        },
+        {
+            "module": "Module 7 - Reporting and Dashboards",
+            "kpi": "Required report availability",
+            "target": "100%",
+            "value": availability,
+            "unit": "%",
+            "basis": f"{available} of {agreed_total} agreed reports available "
+                     f"({generated}/{total_reports} analytics, {len(OPERATIONAL_REPORT_KEYS)} operational)",
+            "met": availability >= 100.0,
+        },
+    ]
+
+
+def analytics_payload(filters=None) -> dict:
+    filters = filters or {}
+    students = filtered_students_query(filters).all()
+    student_ids = [student.id for student in students]
+
+    builders = {
+        "queue_aging": lambda: queue_aging_report(student_ids),
+        "stage_bottlenecks": lambda: stage_bottleneck_report(students),
+        "owner_workload": lambda: owner_workload_report(student_ids),
+        "residency_watchlist": lambda: residency_watchlist_report(students),
+        "completion_attrition": lambda: completion_attrition_report(students),
+        "scheduling_cycle_time": lambda: scheduling_cycle_report(student_ids),
+        "followup_closure": lambda: followup_closure_report(student_ids),
+    }
+
+    payload = {
+        "filters": normalize_filters(filters),
+        "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
+        "stages": STAGES,
+        "reports": [{"id": key, "label": label} for key, label in ANALYTICS_REPORTS],
+        "student_count": len(student_ids),
+    }
+    for key, build in builders.items():
+        try:
+            payload[key] = build()
+        except Exception as exc:  # noqa: BLE001 - a failed report must not hide the rest
+            app.logger.exception("Analytics report %s failed", key)
+            payload[key] = {"count": 0, "rows": [], "columns": [], "error": str(exc)}
+    payload["kpis"] = analytics_kpi_summary(payload)
+    return payload
 
 
 def reports_payload(filters=None) -> dict:

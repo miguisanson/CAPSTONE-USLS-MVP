@@ -74,6 +74,10 @@ export const api = {
     const qs = queryString(params);
     return request(`/reports${qs ? `?${qs}` : ""}`);
   },
+  reportsAnalytics: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/reports/analytics${qs ? `?${qs}` : ""}`);
+  },
   dailyChanges: (date = "") => {
     const qs = queryString({ date });
     return request(`/reports/daily-changes${qs ? `?${qs}` : ""}`);

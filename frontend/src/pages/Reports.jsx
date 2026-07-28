@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { AlertTriangle, Download, FileText, GraduationCap, ListTodo, ClipboardCheck, Briefcase, LogOut, Activity, FlaskConical, RefreshCw, Printer, CheckSquare, Square } from "lucide-react";
+import { AlertTriangle, Download, FileText, GraduationCap, ListTodo, ClipboardCheck, Briefcase, LogOut, Activity, FlaskConical, RefreshCw, Printer, CheckSquare, Square, BarChart3, Clock, Users, CalendarClock, TrendingDown, Gauge, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from "../components/ui";
@@ -18,6 +18,21 @@ const REPORT_TABS = [
   { id: "open_overdue_tasks", label: "Open/overdue tasks", icon: ListTodo },
   { id: "research_completion", label: "Research completion", icon: FlaskConical },
 ];
+
+// Module 5 (Analytics and Decision Support) and Module 7 (Reporting and
+// Dashboards). These are computed from recorded event history and are fetched
+// separately so the operational reports above keep their load time.
+const ANALYTICS_TABS = [
+  { id: "queue_aging", label: "Queue aging & backlog", icon: Clock },
+  { id: "stage_bottlenecks", label: "Stage bottlenecks", icon: BarChart3 },
+  { id: "owner_workload", label: "Workload & turnaround", icon: Users },
+  { id: "residency_watchlist", label: "Residency watchlist", icon: ShieldCheck },
+  { id: "completion_attrition", label: "Completion & attrition", icon: TrendingDown },
+  { id: "scheduling_cycle_time", label: "Scheduling cycle time", icon: CalendarClock },
+  { id: "followup_closure", label: "Follow-up closure", icon: Gauge },
+];
+
+const ANALYTICS_IDS = new Set(ANALYTICS_TABS.map((tab) => tab.id));
 
 export default function Reports() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -37,6 +52,35 @@ export default function Reports() {
     [filters.program_id, filters.stage, filters.risk, filters.standing, filters.workflow_type]
   );
 
+  // Analytics is loaded only once an analytics tab is opened, and reloaded when
+  // the student filters change.
+  const analyticsWanted = ANALYTICS_IDS.has(active);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
+  const analyticsKey = `${filters.program_id}|${filters.stage}|${filters.risk}|${filters.standing}`;
+
+  useEffect(() => {
+    if (!analyticsWanted) return undefined;
+    let alive = true;
+    setAnalyticsLoading(true);
+    setAnalyticsError("");
+    api
+      .reportsAnalytics({
+        program_id: filters.program_id,
+        stage: filters.stage,
+        risk: filters.risk,
+        standing: filters.standing,
+      })
+      .then((res) => alive && setAnalytics(res))
+      .catch((err) => alive && setAnalyticsError(err.message || "Could not load analytics."))
+      .finally(() => alive && setAnalyticsLoading(false));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyticsWanted, analyticsKey]);
+
   function updateFilter(key, value) {
     if (key === "workflow_type") setActive(value || "summary");
     const next = new URLSearchParams(searchParams);
@@ -54,8 +98,12 @@ export default function Reports() {
   if (loading) return <Spinner label="Loading reports..." />;
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load reports" hint={error} />;
 
-  const activeTab = REPORT_TABS.find((tab) => tab.id === active) || REPORT_TABS[0];
-  const rows = active === "summary" ? [] : data?.[active]?.rows || [];
+  const activeTab =
+    REPORT_TABS.find((tab) => tab.id === active) ||
+    ANALYTICS_TABS.find((tab) => tab.id === active) ||
+    REPORT_TABS[0];
+  const rows = active === "summary" || analyticsWanted ? [] : data?.[active]?.rows || [];
+  const analyticsReport = analyticsWanted ? analytics?.[active] : null;
 
   return (
     <div className="space-y-5 animate-fade-up">
@@ -89,8 +137,43 @@ export default function Reports() {
         })}
       </div>
 
+      <div>
+        <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          Analytics &amp; decision support
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {ANALYTICS_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const selected = activeTab.id === tab.id;
+            const count = analytics?.[tab.id]?.count;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => chooseTab(tab.id)}
+                className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
+                  selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-brand-50"
+                }`}
+              >
+                <Icon className="h-4 w-4" /> {tab.label}
+                {count !== undefined ? ` · ${count}` : ""}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {active === "daily_changes" ? (
         <DailyChangesReport />
+      ) : analyticsWanted ? (
+        <AnalyticsPanel
+          tab={activeTab}
+          report={analyticsReport}
+          kpis={analytics?.kpis}
+          studentCount={analytics?.student_count}
+          loading={analyticsLoading}
+          error={analyticsError}
+        />
       ) : (
         <Card className="p-5">
           <SectionTitle
@@ -166,6 +249,116 @@ function SummaryReport({ summary }) {
       ))}
     </div>
   );
+}
+
+function AnalyticsPanel({ tab, report, kpis, studentCount, loading, error }) {
+  if (loading) return <Spinner label={`Computing ${tab.label.toLowerCase()}...`} />;
+  if (error) return <EmptyState icon={AlertTriangle} title="Could not load analytics" hint={error} />;
+  const rows = report?.rows || [];
+  const columns = report?.columns || [];
+  return (
+    <div className="space-y-5">
+      {kpis?.length ? <KpiStrip kpis={kpis} /> : null}
+      <Card className="p-5">
+        <SectionTitle
+          title={tab.label}
+          icon={tab.icon}
+          action={rows.length ? (
+            <button type="button" onClick={() => exportAnalyticsCsv(tab.id, columns, rows)} className="btn-ghost">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          ) : null}
+        />
+        <p className="-mt-1 mb-3 text-xs text-slate-500">
+          Computed from recorded event history for {studentCount ?? 0} student(s) matching the filters.
+        </p>
+        {report?.totals ? <TotalsRow totals={report.totals} /> : null}
+        {rows.length ? (
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {columns.map((col) => <th key={col.key} className="px-4 py-2.5">{col.label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={index} className="border-b border-slate-50 align-top">
+                    {columns.map((col) => (
+                      <td key={col.key} className="px-4 py-2.5 text-slate-600">
+                        {formatAnalyticsCell(row[col.key])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState icon={FileText} title="Nothing to report" hint="No records match the current filters." />
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function KpiStrip({ kpis }) {
+  return (
+    <Card className="p-5">
+      <SectionTitle title="Module KPI measurements" icon={Gauge} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {kpis.map((kpi) => {
+          const tone = kpi.met === null ? "text-slate-500" : kpi.met ? "text-emerald-600" : "text-amber-600";
+          return (
+            <div key={kpi.kpi} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{kpi.module}</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{kpi.kpi}</p>
+              <p className={`mt-2 font-display text-2xl font-semibold ${tone}`}>
+                {kpi.value}{kpi.unit}
+              </p>
+              <p className="text-xs text-slate-500">Target {kpi.target}</p>
+              <p className="mt-1 text-xs text-slate-400">{kpi.basis}</p>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function TotalsRow({ totals }) {
+  const entries = Object.entries(totals || {});
+  if (!entries.length) return null;
+  return (
+    <div className="mb-3 flex flex-wrap gap-2">
+      {entries.map(([key, value]) => (
+        <span key={key} className="rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700">
+          {key.replace(/_/g, " ")}: {formatAnalyticsCell(value)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function formatAnalyticsCell(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "number") return Number.isInteger(value) ? value : value.toFixed(1);
+  return String(value);
+}
+
+function exportAnalyticsCsv(type, columns, rows) {
+  const headers = columns.map((col) => col.label);
+  const lines = [headers.map(csvCell).join(",")];
+  rows.forEach((row) => {
+    lines.push(columns.map((col) => csvCell(row[col.key])).join(","));
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${type}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function ReportTable({ type, rows }) {

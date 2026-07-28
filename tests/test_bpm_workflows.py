@@ -34,6 +34,11 @@ from app import (  # noqa: E402
     PracticumRecord,
     Program,
     ADVISER_APPROVAL_DOCUMENTS,
+    ANALYTICS_REPORTS,
+    analytics_payload,
+    canonical_owner_role,
+    completion_attrition_report,
+    residency_watchlist_report,
     RESEARCH_DEFENSE_RESULT_ITEMS,
     RESEARCH_DEFENSE_SCHEDULE_ITEMS,
     RESEARCH_GATE_DEFENSE_TYPES,
@@ -4741,6 +4746,111 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(len({item.resolution_upload_id for item in resolved}), 1)
             correction_upload = db.session.get(MonitoringSheetUpload, resolved[0].resolution_upload_id)
             self.created_files.append(MONITORING_UPLOAD_ROOT / correction_upload.stored_name)
+
+    def test_owner_role_labels_are_canonicalised_and_system_actors_excluded(self):
+        # Task ownership and transaction-log actor labels use different
+        # vocabularies; the workload report must not split one person across
+        # several rows, and must not report the system as carrying load.
+        self.assertEqual(canonical_owner_role("Graduate School Staff"), "GS Staff")
+        self.assertEqual(canonical_owner_role("GS Staff"), "GS Staff")
+        self.assertEqual(canonical_owner_role("Graduate School Staff · Demo Account"), "GS Staff")
+        self.assertEqual(canonical_owner_role("academic coordinator"), "Academic Coordinator")
+        self.assertEqual(canonical_owner_role("Adviser"), "Faculty")
+        for system_actor in ("Demo Data", "Workflow System", "System · LOA RAG", ""):
+            self.assertIsNone(canonical_owner_role(system_actor), system_actor)
+
+    def test_analytics_reports_all_generate_and_kpis_are_measured(self):
+        with app.app_context():
+            payload = analytics_payload({})
+            for key, _label in ANALYTICS_REPORTS:
+                report = payload[key]
+                self.assertNotIn("error", report, f"{key} raised: {report.get('error')}")
+                self.assertIsInstance(report["rows"], list, key)
+                self.assertTrue(report["columns"], f"{key} declared no columns")
+                # Every declared column must be resolvable on every row.
+                for row in report["rows"]:
+                    for column in report["columns"]:
+                        self.assertIn(column["key"], row, f"{key} row missing {column['key']}")
+
+            kpis = {item["kpi"]: item for item in payload["kpis"]}
+            self.assertEqual(
+                kpis["Analytics report generation rate"]["value"], 100.0,
+                kpis["Analytics report generation rate"]["basis"],
+            )
+            self.assertEqual(kpis["Required report availability"]["value"], 100.0)
+            # With no flagged cases the closure rate is not measurable rather
+            # than being reported as a passing or failing figure.
+            self.assertIsNone(kpis["Follow-up closure logging rate"]["met"])
+
+    def test_analytics_generation_kpi_falls_when_a_report_fails(self):
+        # The generation-rate KPI must be a real measurement, not a constant.
+        with app.app_context():
+            with patch("app.queue_aging_report", side_effect=RuntimeError("boom")):
+                payload = analytics_payload({})
+            self.assertIn("error", payload["queue_aging"])
+            kpis = {item["kpi"]: item for item in payload["kpis"]}
+            generation = kpis["Analytics report generation rate"]
+            self.assertLess(generation["value"], 100.0)
+            self.assertFalse(generation["met"])
+            self.assertIn("Queue aging", generation["basis"])
+
+    def test_residency_watchlist_flags_students_past_their_limit(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            # A master's programme carries a 5-year normal and 7-year absolute
+            # residency limit; a doctoral programme 7 and 9.
+            student.entry_year = date.today().year - 8
+            db.session.commit()
+            report = residency_watchlist_report([student])
+            self.assertEqual(report["count"], 1)
+            row = report["rows"][0]
+            self.assertEqual(row["student_number"], "GS-2026-TEST")
+            self.assertEqual(row["years_in_program"], 8)
+            self.assertEqual(row["normal_years"], 5)
+            self.assertEqual(row["absolute_years"], 7)
+            self.assertEqual(row["residency_state"], "Exceeded absolute limit")
+
+            # A student inside the normal period is counted but not listed.
+            student.entry_year = date.today().year - 1
+            db.session.commit()
+            report = residency_watchlist_report([student])
+            self.assertEqual(report["count"], 0)
+            self.assertEqual(report["totals"]["Within normal period"], 1)
+
+    def test_completion_and_attrition_rates_are_computed_per_program(self):
+        with app.app_context():
+            program_id = self.program_id
+            entry = date.today().year - 3
+
+            def make(number, stage, standing="Active"):
+                item = Student(
+                    student_number=number, first_name="A", last_name=number,
+                    email=f"{number}@example.test", program_id=program_id,
+                    entry_year=entry, current_stage=stage, standing=standing,
+                )
+                db.session.add(item)
+                return item
+
+            students = [
+                make("C1", "Completed"), make("C2", "Completed"),
+                make("W1", "Withdrawn"), make("A1", "AWOL", "AWOL"),
+                make("L1", "LOA", "On Leave"), make("N1", "Coursework"),
+            ]
+            db.session.commit()
+            report = completion_attrition_report(students)
+            self.assertEqual(report["count"], 1)
+            row = report["rows"][0]
+            self.assertEqual(row["total_students"], 6)
+            self.assertEqual(row["completed"], 2)
+            self.assertEqual(row["withdrawn"], 1)
+            self.assertEqual(row["awol"], 1)
+            self.assertEqual(row["on_leave"], 1)
+            self.assertEqual(row["active"], 1)
+            self.assertEqual(row["completion_rate"], 33.3)
+            # Attrition counts withdrawn plus AWOL; an approved leave is not
+            # attrition.
+            self.assertEqual(row["attrition_rate"], 33.3)
+            self.assertEqual(row["average_years_to_finish"], 3)
 
 
 if __name__ == "__main__":
