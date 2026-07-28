@@ -3485,6 +3485,48 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             0,
         )
 
+    def test_faculty_calendar_authorization_returns_safe_preview_without_oauth_credentials(self):
+        with app.app_context():
+            faculty = Faculty(
+                name="Calendar Preview Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                email="calendar-preview@example.test",
+                active=True,
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            account = self._account("faculty", "calendar-preview-login@example.test")
+            account.faculty_id = faculty.id
+            db.session.commit()
+            account_id = account.id
+            faculty_id = faculty.id
+
+        client = self._role_client(account_id, "faculty")
+        with patch.dict(os.environ, {
+            "GOOGLE_CALENDAR_CLIENT_ID": "",
+            "GOOGLE_CALENDAR_CLIENT_SECRET": "",
+            "GOOGLE_CALENDAR_REDIRECT_URI": "",
+        }):
+            response = client.get("/api/faculty-portal/google-calendar/authorization")
+
+        self.assertEqual(response.status_code, 200, response.get_json())
+        payload = response.get_json()
+        self.assertEqual(payload["mode"], "preview")
+        self.assertFalse(payload["configured"])
+        self.assertEqual(payload["schedule_source"], "profile_schedule")
+        self.assertEqual(payload["calendar_url"], "https://calendar.google.com/calendar/u/0/r")
+        self.assertTrue(any("free and busy" in permission for permission in payload["permissions"]))
+        with client.session_transaction() as oauth_session:
+            self.assertNotIn("google_calendar_oauth_state", oauth_session)
+            self.assertNotIn("google_calendar_oauth_faculty_id", oauth_session)
+        with app.app_context():
+            stored = db.session.get(Faculty, faculty_id)
+            self.assertIsNone(stored.google_calendar_id)
+            self.assertIsNone(stored.google_calendar_access_token)
+            self.assertIsNone(stored.google_calendar_refresh_token)
+
     def test_faculty_can_start_google_calendar_oauth_for_only_their_account(self):
         with app.app_context():
             faculty = Faculty(
