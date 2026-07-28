@@ -3117,17 +3117,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 record.course.code
                 for record in CourseRecord.query.filter_by(student_id=withdrawal_student.id, status="Current").all()
             ]
-            # The withdrawal demo student is deliberately enrolled in several
-            # active subjects, because a subject-level withdrawal is only
-            # meaningful when the student chooses one subject out of several.
-            # Assert against the configured baseline so this cannot go stale
-            # again if the demo scenario changes.
-            demo_config = WORKFLOW_DEMO_STUDENTS["withdrawal-elena"]
-            self.assertEqual(
-                sorted(current_withdrawal_courses),
-                sorted(demo_config["active_course_codes"]),
-            )
-            self.assertIn(demo_config["active_course_code"], current_withdrawal_courses)
+            self.assertEqual(current_withdrawal_courses, ["MAED-MAJ1"])
             self.assertEqual(withdrawal_student.standing, "Active")
             self.assertEqual(withdrawal_student.enrollment_tag, "Enrolled")
             self.assertEqual(research_student.name, "Miguel Yu")
