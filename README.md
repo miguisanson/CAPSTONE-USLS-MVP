@@ -204,9 +204,18 @@ GOOGLE_CALENDAR_TIMEZONE=Asia/Manila
 ```
 
 Add the same redirect URI to the Google Cloud OAuth client's authorized redirect
-URIs and enable the Google Calendar API. The integration requests read-only
-calendar access and uses FreeBusy periods, so GS Staff can see that a time is
-blocked without seeing private event titles or descriptions.
+URIs and enable the Google Calendar API. The current availability integration
+requests read-only calendar access and uses FreeBusy periods, so GS Staff can
+see that a time is blocked without seeing private event titles or descriptions.
+The planned defense-event sync will request the additional permission needed to
+create, update, or remove only defense events scheduled through this system;
+unrelated classes, appointments, and personal events will remain unchanged.
+
+When OAuth credentials are not configured, the Faculty Portal presents a
+clearly labeled integration preview. Faculty can review how the calendar will
+be used and open Google Calendar in a separate tab, but the preview stores
+no token, does not mark the account connected, and leaves Panel Matching and
+Defense Scheduling on the existing profile schedule.
 
 The legacy `GOOGLE_CALENDAR_ACCESS_TOKEN` and `GOOGLE_CALENDAR_IDS_JSON`
 configuration remains supported for existing deployments. Faculty-owned OAuth

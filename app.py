@@ -8631,15 +8631,30 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "This faculty account is not linked to a faculty record yet."}), 400
         if not google_calendar_oauth_configured():
             return jsonify({
-                "error": (
-                    "Google Calendar OAuth is not configured. Add "
-                    "GOOGLE_CALENDAR_CLIENT_ID and GOOGLE_CALENDAR_CLIENT_SECRET on the server."
-                )
-            }), 503
+                "mode": "preview",
+                "configured": False,
+                "calendar_url": "https://calendar.google.com/calendar/u/0/r",
+                "title": "Connect Google Calendar",
+                "message": (
+                    "Preview the faculty consent flow while Google OAuth setup is pending. "
+                    "This preview does not connect an account or change scheduling data."
+                ),
+                "permissions": [
+                    "View free and busy times for defense scheduling",
+                    "Keep event names, descriptions, and guests private",
+                    (
+                        "Create, update, or remove only official defense events scheduled "
+                        "through this system; all other calendar events stay unchanged"
+                    ),
+                ],
+                "schedule_source": "profile_schedule",
+            })
         state = uuid4().hex
         session["google_calendar_oauth_state"] = state
         session["google_calendar_oauth_faculty_id"] = faculty.id
         return jsonify({
+            "mode": "oauth",
+            "configured": True,
             "authorization_url": google_calendar_authorization_url(state),
         })
 
