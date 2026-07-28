@@ -35,7 +35,17 @@ from app import (  # noqa: E402
     Program,
     ADVISER_APPROVAL_DOCUMENTS,
     ANALYTICS_REPORTS,
+    CourseworkReport,
+    OnboardingReview,
+    StudentCurriculumTag,
+    StudyPlanDraft,
     analytics_payload,
+    available_curriculum_versions,
+    build_coursework_report,
+    build_onboarding_review,
+    generate_study_plan_draft,
+    onboarding_checklist_state,
+    tag_student_curriculum,
     canonical_owner_role,
     completion_attrition_report,
     residency_watchlist_report,
@@ -4851,6 +4861,136 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             # attrition.
             self.assertEqual(row["attrition_rate"], 33.3)
             self.assertEqual(row["average_years_to_finish"], 3)
+
+    def test_curriculum_tagging_requires_a_rationale_when_versions_compete(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            program_id = self.program_id
+            # Publish two curriculum versions for this programme.
+            for year in ("2024-2025", "2025-2026"):
+                db.session.add(CurriculumOffering(
+                    program_id=program_id, course_id=self.course_id,
+                    academic_year=year, semester="1st Semester"))
+            db.session.commit()
+            self.assertEqual(available_curriculum_versions(student), ["2024-2025", "2025-2026"])
+
+            with self.assertRaises(ValueError) as ctx:
+                tag_student_curriculum(student, "2025-2026", "", None)
+            self.assertIn("Record the reason", str(ctx.exception))
+
+            # An unpublished version is refused outright.
+            with self.assertRaises(ValueError):
+                tag_student_curriculum(student, "1999-2000", "because", None)
+
+            tag = tag_student_curriculum(student, "2025-2026", "Entered under this curriculum.", None)
+            db.session.commit()
+            self.assertEqual(tag.curriculum_version, "2025-2026")
+            self.assertTrue(tag.active)
+
+            # Re-tagging retires the previous tag rather than leaving two active.
+            tag_student_curriculum(student, "2024-2025", "Corrected after review.", None)
+            db.session.commit()
+            active = StudentCurriculumTag.query.filter_by(student_id=student.id, active=True).all()
+            self.assertEqual(len(active), 1)
+            self.assertEqual(active[0].curriculum_version, "2024-2025")
+
+    def test_study_plan_draft_is_derived_from_the_curriculum_audit(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            draft = generate_study_plan_draft(student, "", None)
+            db.session.commit()
+            audit = compute_course_audit(student)
+            # Everything proposed must be a subject the student still requires.
+            outstanding = {row["course"].code for row in audit["missing"] + audit["incomplete"]}
+            proposed = [c for c in (draft.subject_codes or "").split("|") if c]
+            self.assertTrue(proposed, "expected at least one proposed subject")
+            for code in proposed:
+                self.assertIn(code, outstanding)
+            self.assertEqual(draft.remaining_count, len(outstanding))
+            self.assertEqual(draft.status, "Draft")
+
+    def test_onboarding_report_is_blocked_until_the_checklist_passes(self):
+        with app.app_context():
+            upload = MonitoringSheetUpload(
+                original_name="MAED.xlsx", stored_name="maed-test.xlsx", program_code="BPM",
+                row_count=1, subject_count=1, snapshot_json="{}", result_json="{}")
+            db.session.add(upload)
+            db.session.flush()
+            student = db.session.get(Student, self.student_id)
+            student.monitoring_upload_id = upload.id
+            # An unresolved validation issue must hold the gate shut.
+            db.session.add(MonitoringValidationIssue(
+                upload_id=upload.id, row_number=1, student_id=student.id,
+                issue_type="Mismatch", issue_summary="Name differs from the source workbook.",
+                status="Unresolved"))
+            db.session.commit()
+
+            review = build_onboarding_review(upload)
+            db.session.commit()
+            checklist = onboarding_checklist_state(upload)
+            self.assertFalse(all(item["passed"] for item in checklist))
+            self.assertEqual(review.unresolved_issue_count, 1)
+
+            response = self._staff_client().post(f"/api/onboarding/reviews/{review.id}/submit")
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("Validation issues resolved", response.get_json()["outstanding"])
+
+    def test_onboarding_completion_requires_the_dean(self):
+        with app.app_context():
+            upload = MonitoringSheetUpload(
+                original_name="MAED.xlsx", stored_name="maed-clean.xlsx", program_code="BPM",
+                row_count=1, subject_count=1, snapshot_json="{}", result_json="{}")
+            db.session.add(upload)
+            db.session.flush()
+            student = db.session.get(Student, self.student_id)
+            student.monitoring_upload_id = upload.id
+            db.session.commit()
+            review = build_onboarding_review(upload)
+            db.session.commit()
+            review_id = review.id
+
+            staff = self._staff_client()
+            self.assertEqual(staff.post(f"/api/onboarding/reviews/{review_id}/submit").status_code, 200)
+            # Staff cannot decide their own submission.
+            self.assertEqual(
+                staff.post(f"/api/onboarding/reviews/{review_id}/decision",
+                           json={"decision": "approve"}).status_code, 403)
+
+            dean = self._dean_client()
+            # Returning requires a reason.
+            self.assertEqual(
+                dean.post(f"/api/onboarding/reviews/{review_id}/decision",
+                          json={"decision": "return"}).status_code, 400)
+            response = dean.post(f"/api/onboarding/reviews/{review_id}/decision",
+                                 json={"decision": "approve", "remarks": "Verified."})
+            self.assertEqual(response.status_code, 200)
+            item = response.get_json()["item"]
+            self.assertEqual(item["status"], "Completed")
+            self.assertEqual(item["dean_decision"], "Approved")
+            self.assertIsNotNone(item["admission_completed_at"])
+
+    def test_coursework_report_reaches_the_dean_and_records_the_decision(self):
+        with app.app_context():
+            report = build_coursework_report(None, "AY 2026-2027 1st Semester", None)
+            db.session.commit()
+            report_id = report.id
+            self.assertGreaterEqual(report.students_reviewed, 1)
+
+            dean = self._dean_client()
+            # The Dean cannot decide a report that has not been sent.
+            self.assertEqual(
+                dean.post(f"/api/coursework/reports/{report_id}/decision",
+                          json={"decision": "acknowledge"}).status_code, 400)
+            # Nor generate one.
+            self.assertEqual(dean.post("/api/coursework/reports", json={}).status_code, 403)
+
+            self.assertEqual(
+                self._staff_client().post(f"/api/coursework/reports/{report_id}/send").status_code, 200)
+
+            response = dean.post(f"/api/coursework/reports/{report_id}/decision",
+                                 json={"decision": "acknowledge", "remarks": "Noted."})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["item"]["dean_decision"], "Acknowledged")
 
 
 if __name__ == "__main__":

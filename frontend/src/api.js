@@ -78,6 +78,34 @@ export const api = {
     const qs = queryString(params);
     return request(`/reports/analytics${qs ? `?${qs}` : ""}`);
   },
+  // BPMN 1 Admission — Dean onboarding gate
+  onboardingReviews: () => request("/onboarding/reviews"),
+  submitOnboardingReview: (id) =>
+    request(`/onboarding/reviews/${id}/submit`, { method: "POST", body: JSON.stringify({}) }),
+  decideOnboardingReview: (id, payload) =>
+    request(`/onboarding/reviews/${id}/decision`, { method: "POST", body: JSON.stringify(payload) }),
+
+  // BPMN 2 Enrollment — curriculum version tagging and the derived study plan
+  curriculumTag: (studentId) => request(`/enrollment/curriculum-tag/${studentId}`),
+  setCurriculumTag: (studentId, payload) =>
+    request(`/enrollment/curriculum-tag/${studentId}`, { method: "POST", body: JSON.stringify(payload) }),
+  studyPlans: () => request("/enrollment/study-plans"),
+  generateStudyPlan: (payload) =>
+    request("/enrollment/study-plans", { method: "POST", body: JSON.stringify(payload) }),
+  sendStudyPlan: (id) =>
+    request(`/enrollment/study-plans/${id}/send`, { method: "POST", body: JSON.stringify({}) }),
+  reviewStudyPlan: (id, payload) =>
+    request(`/enrollment/study-plans/${id}/review`, { method: "POST", body: JSON.stringify(payload) }),
+
+  // BPMN 4 Coursework — status report to the Dean
+  courseworkReports: () => request("/coursework/reports"),
+  generateCourseworkReport: (payload = {}) =>
+    request("/coursework/reports", { method: "POST", body: JSON.stringify(payload) }),
+  sendCourseworkReport: (id) =>
+    request(`/coursework/reports/${id}/send`, { method: "POST", body: JSON.stringify({}) }),
+  decideCourseworkReport: (id, payload) =>
+    request(`/coursework/reports/${id}/decision`, { method: "POST", body: JSON.stringify(payload) }),
+
   dailyChanges: (date = "") => {
     const qs = queryString({ date });
     return request(`/reports/daily-changes${qs ? `?${qs}` : ""}`);

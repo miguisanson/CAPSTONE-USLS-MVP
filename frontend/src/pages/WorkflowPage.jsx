@@ -60,6 +60,7 @@ import ExportFollowUpModal from "../components/ExportFollowUpModal";
 import { formatDate } from "../lib/format";
 import { printDataTable } from "../lib/print";
 import { useAuth } from "../auth";
+import { OnboardingGatePanel } from "../components/ProcessGates";
 import { Form1EndorsementQueue } from "./Form1Endorsements";
 
 const WORKFLOW_ROLE_LABELS = {
@@ -364,6 +365,12 @@ export default function WorkflowPage() {
               {slug === "readmission" && <ReadmissionForm {...formProps} />}
             </Card>
           )}
+
+          {/* BPMN 1 Admission: the onboarding report and the Dean's approval
+              gate that turns an import batch into a recorded admission completion. */}
+          {slug === "student-handoff" ? (
+            <div className="mt-5"><OnboardingGatePanel role={user?.role} /></div>
+          ) : null}
         </div>
 
         {/* Side rail */}

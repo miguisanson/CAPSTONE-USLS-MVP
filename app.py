@@ -568,6 +568,94 @@ class MonitoringSheetUpload(db.Model):
     uploaded_at = db.Column(db.DateTime, default=now_utc, nullable=False)
 
 
+class OnboardingReview(db.Model):
+    """Dean gate on an admission handoff batch (BPMN 1 Admission).
+
+    The import records the students; this record carries the onboarding report
+    to the Dean, holds the decision, and stamps admission completion. The batch
+    is the unit of review because the Dean reviews an onboarding report, not one
+    student at a time.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    upload_id = db.Column(db.Integer, db.ForeignKey("monitoring_sheet_upload.id"))
+    program_code = db.Column(db.String(30))
+    student_count = db.Column(db.Integer, default=0)
+    new_student_count = db.Column(db.Integer, default=0)
+    unresolved_issue_count = db.Column(db.Integer, default=0)
+    checklist_json = db.Column(db.Text)
+    status = db.Column(db.String(60), nullable=False, default="Draft")
+    submitted_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    submitted_at = db.Column(db.DateTime)
+    dean_decision = db.Column(db.String(40))
+    dean_decision_at = db.Column(db.DateTime)
+    dean_remarks = db.Column(db.Text)
+    admission_completed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+    upload = db.relationship("MonitoringSheetUpload")
+
+
+class StudentCurriculumTag(db.Model):
+    """Which curriculum version a student is being tracked against (BPMN 2).
+
+    A rationale is required whenever more than one version was available, so the
+    coordinator's choice between versions is recorded rather than implied.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    curriculum_version = db.Column(db.String(60), nullable=False)
+    available_versions = db.Column(db.String(220))
+    rationale = db.Column(db.Text)
+    tagged_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    tagged_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+
+    student = db.relationship("Student")
+
+
+class StudyPlanDraft(db.Model):
+    """Derived study plan for a student's next term (BPMN 2).
+
+    Generated from the curriculum against completed course records - never hand
+    entered - then sent to the Academic Coordinator for review.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    term_label = db.Column(db.String(60))
+    curriculum_version = db.Column(db.String(60))
+    subject_codes = db.Column(db.Text)
+    subject_count = db.Column(db.Integer, default=0)
+    remaining_count = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(60), nullable=False, default="Draft")
+    generated_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    generated_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+    sent_at = db.Column(db.DateTime)
+    reviewed_at = db.Column(db.DateTime)
+    coordinator_remarks = db.Column(db.Text)
+
+    student = db.relationship("Student")
+
+
+class CourseworkReport(db.Model):
+    """Coursework status report routed to the Dean (BPMN 4 Coursework)."""
+    id = db.Column(db.Integer, primary_key=True)
+    term_label = db.Column(db.String(60))
+    program_id = db.Column(db.Integer, db.ForeignKey("program.id"))
+    students_reviewed = db.Column(db.Integer, default=0)
+    completion_issue_count = db.Column(db.Integer, default=0)
+    missing_subject_count = db.Column(db.Integer, default=0)
+    detail_json = db.Column(db.Text)
+    status = db.Column(db.String(60), nullable=False, default="Draft")
+    generated_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    generated_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+    sent_at = db.Column(db.DateTime)
+    dean_decision = db.Column(db.String(40))
+    dean_decision_at = db.Column(db.DateTime)
+    dean_remarks = db.Column(db.Text)
+
+    program = db.relationship("Program")
+
+
 class MonitoringValidationIssue(db.Model):
     """A persistent, auditable exception discovered in one uploaded student row."""
     id = db.Column(db.Integer, primary_key=True)
@@ -7921,6 +8009,208 @@ def register_routes(app: Flask) -> None:
     def reports_analytics():
         return jsonify(analytics_payload(request.args))
 
+    # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
+    @app.route("/api/onboarding/reviews")
+    @require_api_login("staff", "academic_coordinator", "dean")
+    def onboarding_reviews():
+        uploads = MonitoringSheetUpload.query.order_by(MonitoringSheetUpload.uploaded_at.desc()).limit(12).all()
+        for upload in uploads:
+            build_onboarding_review(upload)
+        db.session.commit()
+        rows = (
+            OnboardingReview.query.order_by(OnboardingReview.created_at.desc()).limit(12).all()
+        )
+        return jsonify({"items": [onboarding_review_dict(item) for item in rows]})
+
+    @app.route("/api/onboarding/reviews/<int:review_id>/submit", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def onboarding_review_submit(review_id: int):
+        account = current_account()
+        review = OnboardingReview.query.get_or_404(review_id)
+        if review.status in {"Dean Review", "Completed"}:
+            return jsonify({"error": "This onboarding report has already been submitted."}), 400
+        checklist = onboarding_checklist_state(review.upload) if review.upload else []
+        review.checklist_json = json.dumps(checklist)
+        if not all(item["passed"] for item in checklist):
+            outstanding = [item["label"] for item in checklist if not item["passed"]]
+            return jsonify({
+                "error": "Resolve the onboarding checklist before sending the report to the Dean.",
+                "outstanding": outstanding,
+            }), 400
+        review.status = "Dean Review"
+        review.submitted_by_user_id = account.id
+        review.submitted_at = now_utc()
+        add_log("student-handoff", None, workflow_actor_label(account), "Admission handoff batch",
+                "Onboarding report sent to Dean", "Dean",
+                f"Batch {review.program_code} · {review.student_count} student(s).",
+                previous_status="Draft", new_status="Dean Review", visibility="internal")
+        db.session.commit()
+        return jsonify({"item": onboarding_review_dict(review)})
+
+    @app.route("/api/onboarding/reviews/<int:review_id>/decision", methods=["POST"])
+    @require_api_login("dean")
+    def onboarding_review_decision(review_id: int):
+        account = current_account()
+        data = request.get_json(silent=True) or {}
+        decision = (data.get("decision") or "").lower()
+        remarks = (data.get("remarks") or "").strip()
+        if decision not in {"approve", "return"}:
+            return jsonify({"error": "Decision must be approve or return."}), 400
+        if decision == "return" and not remarks:
+            return jsonify({"error": "Enter a reason before returning the onboarding report."}), 400
+        review = OnboardingReview.query.get_or_404(review_id)
+        if review.status != "Dean Review":
+            return jsonify({"error": "This onboarding report is not awaiting a Dean decision."}), 400
+        review.dean_decision = "Approved" if decision == "approve" else "Returned"
+        review.dean_decision_at = now_utc()
+        review.dean_remarks = remarks or None
+        if decision == "approve":
+            review.status = "Completed"
+            review.admission_completed_at = now_utc()
+            result, owner = "Onboarding approved by Dean; admission completion recorded", "Graduate School Staff"
+        else:
+            review.status = "Returned"
+            result, owner = "Onboarding report returned by Dean", "Graduate School Staff"
+        add_log("student-handoff", None, workflow_actor_label(account), "Admission handoff batch",
+                result, owner, remarks or "", previous_status="Dean Review",
+                new_status=review.status, visibility="internal")
+        db.session.commit()
+        return jsonify({"item": onboarding_review_dict(review)})
+
+    # ---- BPMN 2 Enrollment: curriculum version + study plan ---------------
+    @app.route("/api/enrollment/curriculum-tag/<int:student_id>", methods=["GET", "POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def enrollment_curriculum_tag(student_id: int):
+        account = current_account()
+        student = Student.query.get_or_404(student_id)
+        if request.method == "GET":
+            tag = active_curriculum_tag(student.id)
+            return jsonify({
+                "student": student_brief(student),
+                "available_versions": available_curriculum_versions(student),
+                "tag": curriculum_tag_dict(tag) if tag else None,
+            })
+        data = request.get_json(silent=True) or {}
+        try:
+            tag = tag_student_curriculum(student, data.get("curriculum_version"),
+                                         data.get("rationale"), account)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        add_log("enrollment", student.id, workflow_actor_label(account), "Curriculum version tagging",
+                f"Curriculum version tagged: {tag.curriculum_version}", "Academic Coordinator",
+                tag.rationale or "", new_status=tag.curriculum_version, visibility="internal")
+        db.session.commit()
+        return jsonify({"tag": curriculum_tag_dict(tag)})
+
+    @app.route("/api/enrollment/study-plans", methods=["GET", "POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def enrollment_study_plans():
+        account = current_account()
+        if request.method == "GET":
+            rows = StudyPlanDraft.query.order_by(StudyPlanDraft.generated_at.desc()).limit(60).all()
+            return jsonify({"items": [study_plan_dict(item) for item in rows]})
+        data = request.get_json(silent=True) or {}
+        student = Student.query.get_or_404(int(data.get("student_id") or 0))
+        term = get_active_term()
+        draft = generate_study_plan_draft(student, (data.get("term_label") or (term.label if term else "")), account)
+        db.session.flush()
+        add_log("enrollment", student.id, workflow_actor_label(account), "Study plan draft",
+                f"Study plan draft generated ({draft.subject_count} subject(s))",
+                "Academic Coordinator", f"{draft.remaining_count} subject(s) still required.",
+                new_status="Draft", visibility="internal")
+        db.session.commit()
+        return jsonify({"item": study_plan_dict(draft)})
+
+    @app.route("/api/enrollment/study-plans/<int:plan_id>/send", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def enrollment_study_plan_send(plan_id: int):
+        account = current_account()
+        draft = StudyPlanDraft.query.get_or_404(plan_id)
+        draft.status = "Sent to Academic Coordinator"
+        draft.sent_at = now_utc()
+        add_log("enrollment", draft.student_id, workflow_actor_label(account), "Study plan draft",
+                "Study plan draft sent to Academic Coordinator", "Academic Coordinator", "",
+                previous_status="Draft", new_status="Sent to Academic Coordinator", visibility="internal")
+        db.session.commit()
+        return jsonify({"item": study_plan_dict(draft)})
+
+    @app.route("/api/enrollment/study-plans/<int:plan_id>/review", methods=["POST"])
+    @require_api_login("academic_coordinator", "staff")
+    def enrollment_study_plan_review(plan_id: int):
+        account = current_account()
+        data = request.get_json(silent=True) or {}
+        draft = StudyPlanDraft.query.get_or_404(plan_id)
+        draft.status = "Reviewed"
+        draft.reviewed_at = now_utc()
+        draft.coordinator_remarks = (data.get("remarks") or "").strip() or None
+        add_log("enrollment", draft.student_id, workflow_actor_label(account), "Study plan draft",
+                "Study plan reviewed by Academic Coordinator", "Graduate School Staff",
+                draft.coordinator_remarks or "", previous_status="Sent to Academic Coordinator",
+                new_status="Reviewed", visibility="internal")
+        db.session.commit()
+        return jsonify({"item": study_plan_dict(draft)})
+
+    # ---- BPMN 4 Coursework: status report to the Dean ---------------------
+    @app.route("/api/coursework/reports", methods=["GET", "POST"])
+    @require_api_login("staff", "academic_coordinator", "dean")
+    def coursework_reports():
+        account = current_account()
+        if request.method == "GET":
+            rows = CourseworkReport.query.order_by(CourseworkReport.generated_at.desc()).limit(24).all()
+            return jsonify({"items": [coursework_report_dict(item) for item in rows]})
+        if account.role == "dean":
+            return jsonify({"error": "Only Graduate School staff generate the coursework report."}), 403
+        data = request.get_json(silent=True) or {}
+        term = get_active_term()
+        program_id = int(data["program_id"]) if data.get("program_id") else None
+        report = build_coursework_report(program_id, term.label if term else None, account)
+        db.session.flush()
+        add_log("course-adjustments", None, workflow_actor_label(account), "Coursework status report",
+                f"Coursework status report generated ({report.completion_issue_count} issue(s))",
+                "Academic Coordinator",
+                f"{report.students_reviewed} student(s) reviewed; {report.missing_subject_count} missing subject(s).",
+                new_status="Draft", visibility="internal")
+        db.session.commit()
+        return jsonify({"item": coursework_report_dict(report)})
+
+    @app.route("/api/coursework/reports/<int:report_id>/send", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def coursework_report_send(report_id: int):
+        account = current_account()
+        report = CourseworkReport.query.get_or_404(report_id)
+        report.status = "Dean Review"
+        report.sent_at = now_utc()
+        add_log("course-adjustments", None, workflow_actor_label(account), "Coursework status report",
+                "Coursework status report sent to Dean", "Dean", "",
+                previous_status="Draft", new_status="Dean Review", visibility="internal")
+        db.session.commit()
+        return jsonify({"item": coursework_report_dict(report)})
+
+    @app.route("/api/coursework/reports/<int:report_id>/decision", methods=["POST"])
+    @require_api_login("dean")
+    def coursework_report_decision(report_id: int):
+        account = current_account()
+        data = request.get_json(silent=True) or {}
+        decision = (data.get("decision") or "").lower()
+        remarks = (data.get("remarks") or "").strip()
+        if decision not in {"acknowledge", "return"}:
+            return jsonify({"error": "Decision must be acknowledge or return."}), 400
+        if decision == "return" and not remarks:
+            return jsonify({"error": "Enter a reason before returning the coursework report."}), 400
+        report = CourseworkReport.query.get_or_404(report_id)
+        if report.status != "Dean Review":
+            return jsonify({"error": "This report is not awaiting a Dean decision."}), 400
+        report.dean_decision = "Acknowledged" if decision == "acknowledge" else "Returned"
+        report.dean_decision_at = now_utc()
+        report.dean_remarks = remarks or None
+        report.status = "Reviewed by Dean" if decision == "acknowledge" else "Returned"
+        add_log("course-adjustments", None, workflow_actor_label(account), "Coursework status report",
+                f"Coursework report {report.dean_decision.lower()} by Dean", "Academic Coordinator",
+                remarks or "", previous_status="Dean Review", new_status=report.status,
+                visibility="internal")
+        db.session.commit()
+        return jsonify({"item": coursework_report_dict(report)})
+
     # Changes made in this system that the Registrar must mirror in AIMS.
     REGISTRAR_CHANGE_SLUGS = (
         "enrollment", "withdrawal", "course-adjustments",
@@ -13704,6 +13994,253 @@ def workflow_approvals_payload() -> dict:
 
 def report_student_ids(filters) -> list[int]:
     return [sid for (sid,) in filtered_students_query(filters).with_entities(Student.id).all()]
+
+
+# ---------------------------------------------------------------------------
+# BPMN 1 Admission - Dean onboarding gate
+# ---------------------------------------------------------------------------
+ONBOARDING_CHECKLIST = [
+    "Admission handoff recorded",
+    "Student profiles created from the import",
+    "Program assignment confirmed",
+    "Validation issues resolved",
+]
+
+
+def onboarding_checklist_state(upload: MonitoringSheetUpload) -> list[dict]:
+    """Derived, not ticked by hand: each item is computed from the import."""
+    students = Student.query.filter_by(monitoring_upload_id=upload.id).all()
+    unresolved = MonitoringValidationIssue.query.filter(
+        MonitoringValidationIssue.upload_id == upload.id,
+        MonitoringValidationIssue.status != "Resolved",
+    ).count()
+    with_program = sum(1 for s in students if s.program_id)
+    return [
+        {"label": ONBOARDING_CHECKLIST[0], "passed": bool(upload.row_count),
+         "detail": f"{upload.row_count} row(s) imported from {upload.original_name}"},
+        {"label": ONBOARDING_CHECKLIST[1], "passed": bool(students),
+         "detail": f"{len(students)} student record(s) linked to this import"},
+        {"label": ONBOARDING_CHECKLIST[2], "passed": bool(students) and with_program == len(students),
+         "detail": f"{with_program} of {len(students)} carry a program assignment"},
+        {"label": ONBOARDING_CHECKLIST[3], "passed": unresolved == 0,
+         "detail": "No unresolved validation issues" if unresolved == 0
+                   else f"{unresolved} unresolved validation issue(s)"},
+    ]
+
+
+def onboarding_review_dict(item: OnboardingReview) -> dict:
+    checklist = json.loads(item.checklist_json) if item.checklist_json else []
+    return {
+        "id": item.id,
+        "upload_id": item.upload_id,
+        "program_code": item.program_code,
+        "student_count": item.student_count,
+        "new_student_count": item.new_student_count,
+        "unresolved_issue_count": item.unresolved_issue_count,
+        "checklist": checklist,
+        "checklist_complete": all(c.get("passed") for c in checklist) if checklist else False,
+        "status": item.status,
+        "submitted_at": iso(item.submitted_at),
+        "dean_decision": item.dean_decision,
+        "dean_decision_at": iso(item.dean_decision_at),
+        "dean_remarks": item.dean_remarks,
+        "admission_completed_at": iso(item.admission_completed_at),
+        "source_file": item.upload.original_name if item.upload else None,
+    }
+
+
+def build_onboarding_review(upload: MonitoringSheetUpload) -> OnboardingReview:
+    review = OnboardingReview.query.filter_by(upload_id=upload.id).first()
+    if review is None:
+        review = OnboardingReview(upload_id=upload.id)
+        db.session.add(review)
+    students = Student.query.filter_by(monitoring_upload_id=upload.id).all()
+    checklist = onboarding_checklist_state(upload)
+    review.program_code = upload.program_code
+    review.student_count = len(students)
+    review.new_student_count = sum(1 for s in students if s.monitoring_new_student)
+    review.unresolved_issue_count = MonitoringValidationIssue.query.filter(
+        MonitoringValidationIssue.upload_id == upload.id,
+        MonitoringValidationIssue.status != "Resolved",
+    ).count()
+    review.checklist_json = json.dumps(checklist)
+    return review
+
+
+# ---------------------------------------------------------------------------
+# BPMN 2 Enrollment - curriculum version tagging and the derived study plan
+# ---------------------------------------------------------------------------
+def available_curriculum_versions(student: Student) -> list[str]:
+    """Curriculum versions available to this student's program.
+
+    A version is identified by the academic year the curriculum was published
+    under. Published offerings are the primary source; where a program has not
+    yet published offerings, the academic years the Graduate School operates
+    are offered as the candidate list so the coordinator still records an
+    explicit choice rather than leaving the student untagged.
+    """
+    rows = (
+        db.session.query(CurriculumOffering.academic_year)
+        .filter(CurriculumOffering.program_id == student.program_id)
+        .distinct()
+        .all()
+    )
+    versions = {(r[0] or "").strip() for r in rows if (r[0] or "").strip()}
+    if not versions:
+        for (label,) in db.session.query(AcademicTerm.label).distinct().all():
+            academic_year, _semester = split_academic_term_label(label or "")
+            if academic_year:
+                versions.add(academic_year)
+    return sorted(versions)
+
+
+def active_curriculum_tag(student_id: int) -> StudentCurriculumTag | None:
+    return (
+        StudentCurriculumTag.query.filter_by(student_id=student_id, active=True)
+        .order_by(StudentCurriculumTag.tagged_at.desc())
+        .first()
+    )
+
+
+def curriculum_tag_dict(item: StudentCurriculumTag) -> dict:
+    return {
+        "id": item.id,
+        "student_id": item.student_id,
+        "curriculum_version": item.curriculum_version,
+        "available_versions": (item.available_versions or "").split("|") if item.available_versions else [],
+        "rationale": item.rationale,
+        "tagged_at": iso(item.tagged_at),
+    }
+
+
+def tag_student_curriculum(student: Student, version: str, rationale: str,
+                           account: UserAccount | None) -> StudentCurriculumTag:
+    """Rationale is mandatory only when the coordinator had a genuine choice."""
+    versions = available_curriculum_versions(student)
+    version = (version or "").strip()
+    rationale = (rationale or "").strip()
+    if not version:
+        raise ValueError("Choose a curriculum version to tag.")
+    if versions and version not in versions:
+        raise ValueError(f"{version} is not a published curriculum version for this program.")
+    if len(versions) > 1 and not rationale:
+        raise ValueError(
+            "More than one curriculum version is published for this program. "
+            "Record the reason for choosing this version."
+        )
+    for previous in StudentCurriculumTag.query.filter_by(student_id=student.id, active=True).all():
+        previous.active = False
+    tag = StudentCurriculumTag(
+        student_id=student.id,
+        curriculum_version=version,
+        available_versions="|".join(versions),
+        rationale=rationale or None,
+        tagged_by_user_id=account.id if account else None,
+    )
+    db.session.add(tag)
+    return tag
+
+
+def generate_study_plan_draft(student: Student, term_label: str,
+                              account: UserAccount | None) -> StudyPlanDraft:
+    """Derived from the curriculum audit, never hand entered."""
+    audit = compute_course_audit(student)
+    # "missing" and "incomplete" are rows of {course, record, status}.
+    remaining = list(audit.get("missing", [])) + list(audit.get("incomplete", []))
+    codes = [row["course"].code for row in remaining if row.get("course")]
+    term = AcademicTerm.query.filter_by(label=term_label).first() if term_label else None
+    offered = {
+        offering.course.code
+        for offering in curriculum_offerings_for_term(student.program, term)
+        if offering.course
+    } if term else set()
+    # Propose what the student still needs AND the term actually offers; with no
+    # published offering yet, propose the next few remaining subjects.
+    proposed = [c for c in codes if c in offered] if offered else codes[:6]
+    tag = active_curriculum_tag(student.id)
+    draft = StudyPlanDraft(
+        student_id=student.id,
+        term_label=term_label,
+        curriculum_version=tag.curriculum_version if tag else None,
+        subject_codes="|".join(proposed),
+        subject_count=len(proposed),
+        remaining_count=len(codes),
+        generated_by_user_id=account.id if account else None,
+    )
+    db.session.add(draft)
+    return draft
+
+
+def study_plan_dict(item: StudyPlanDraft) -> dict:
+    return {
+        "id": item.id,
+        "student": student_brief(item.student) if item.student else None,
+        "term_label": item.term_label,
+        "curriculum_version": item.curriculum_version,
+        "subjects": (item.subject_codes or "").split("|") if item.subject_codes else [],
+        "subject_count": item.subject_count,
+        "remaining_count": item.remaining_count,
+        "status": item.status,
+        "generated_at": iso(item.generated_at),
+        "sent_at": iso(item.sent_at),
+        "reviewed_at": iso(item.reviewed_at),
+        "coordinator_remarks": item.coordinator_remarks,
+    }
+
+
+# ---------------------------------------------------------------------------
+# BPMN 4 Coursework - status report to the Dean
+# ---------------------------------------------------------------------------
+def build_coursework_report(program_id: int | None, term_label: str | None,
+                            account: UserAccount | None) -> CourseworkReport:
+    query = Student.query
+    if program_id:
+        query = query.filter(Student.program_id == program_id)
+    students = query.filter(~Student.current_stage.in_(["Completed", "Withdrawn"])).all()
+    detail, issues, missing_total = [], 0, 0
+    for student in students:
+        audit = compute_course_audit(student)
+        missing = audit.get("missing_count", 0) or 0
+        incomplete = [row["course"].code for row in audit.get("incomplete", []) if row.get("course")]
+        if missing or incomplete:
+            issues += 1
+            missing_total += missing
+            detail.append({
+                "student": student.name,
+                "student_number": student.student_number,
+                "program": student.program.code,
+                "missing_count": missing,
+                "incomplete": incomplete[:6],
+            })
+    report = CourseworkReport(
+        term_label=term_label,
+        program_id=program_id,
+        students_reviewed=len(students),
+        completion_issue_count=issues,
+        missing_subject_count=missing_total,
+        detail_json=json.dumps(detail[:200]),
+        generated_by_user_id=account.id if account else None,
+    )
+    db.session.add(report)
+    return report
+
+
+def coursework_report_dict(item: CourseworkReport) -> dict:
+    return {
+        "id": item.id,
+        "term_label": item.term_label,
+        "program": program_dict(item.program) if item.program else None,
+        "students_reviewed": item.students_reviewed,
+        "completion_issue_count": item.completion_issue_count,
+        "missing_subject_count": item.missing_subject_count,
+        "detail": json.loads(item.detail_json) if item.detail_json else [],
+        "status": item.status,
+        "generated_at": iso(item.generated_at),
+        "sent_at": iso(item.sent_at),
+        "dean_decision": item.dean_decision,
+        "dean_decision_at": iso(item.dean_decision_at),
+        "dean_remarks": item.dean_remarks,
+    }
 
 
 # ---------------------------------------------------------------------------

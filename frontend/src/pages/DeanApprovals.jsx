@@ -10,6 +10,7 @@ import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } fr
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import ExportFollowUpModal from "../components/ExportFollowUpModal";
+import { OnboardingGatePanel, CourseworkReportPanel } from "../components/ProcessGates";
 import { printDataTable } from "../lib/print";
 import { GraduationRoster } from "./WorkflowPage";
 
@@ -562,6 +563,15 @@ export default function DeanApprovals() {
             Review what the Graduate School submitted, then approve or return it. Your decision is recorded against your account.
           </p>
         </div>
+
+        {/* Gates the Dean owns that are not per-student cases: the admission
+            onboarding report (BPMN 1) and the coursework status report (BPMN 4). */}
+        {view === "overview" ? (
+          <div className="mb-5 space-y-5">
+            <OnboardingGatePanel role="dean" />
+            <CourseworkReportPanel role="dean" />
+          </div>
+        ) : null}
 
         <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} showAdvanced={view !== "graduation"} />
         {(view === "overview" || view === "graduation") && readyGraduation.length > 0 && (

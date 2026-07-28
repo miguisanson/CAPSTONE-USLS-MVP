@@ -1,10 +1,13 @@
 import { BookOpenCheck, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { Card } from "../components/ui";
+import { CourseworkReportPanel } from "../components/ProcessGates";
+import { useAuth } from "../auth";
 import CourseAdjustments from "./CourseAdjustments";
 import CourseOfferings from "./CourseOfferings";
 
 export default function CoursePlanning({ initialView = "adjustments" }) {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("view") || initialView;
   const view = requested === "offerings" ? "offerings" : "adjustments";
@@ -52,6 +55,9 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
       <div role="tabpanel">
         {view === "adjustments" ? <CourseAdjustments embedded /> : <CourseOfferings embedded />}
       </div>
+
+      {/* BPMN 4 Coursework: the status report the Academic Coordinator sends to the Dean. */}
+      {view === "adjustments" ? <CourseworkReportPanel role={user?.role} /> : null}
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { api } from "../api";
 import { useConfirm } from "../components/confirm";
 import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
 import HistoryDisclosure from "../components/HistoryDisclosure";
+import { StudyPlanPanel } from "../components/ProcessGates";
 import { formatDate } from "../lib/format";
 
 export default function Enrollment() {
@@ -602,6 +603,10 @@ export default function Enrollment() {
           onImport={importClassList}
         />
       )}
+
+      {/* BPMN 2 Enrollment: curriculum version tagging and the derived study
+          plan draft sent to the Academic Coordinator. */}
+      <StudyPlanPanel students={data?.students || []} />
     </div>
   );
 }
