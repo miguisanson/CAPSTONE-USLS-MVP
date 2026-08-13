@@ -27,6 +27,7 @@ import {
   UserX,
   CalendarRange,
   BookPlus,
+  LibraryBig,
 } from "lucide-react";
 import { useAuth } from "../auth";
 import { api } from "../api";
@@ -80,6 +81,7 @@ const NAV_GROUPS = [
       { to: "/activity", label: "Activity Log", icon: Activity },
       { to: "/decision-support", label: "Recommendations", icon: Lightbulb },
       { to: "/assistant", label: "Policy Assistant", icon: Bot },
+      { to: "/policy-documents", label: "Policy Documents", icon: LibraryBig, roles: ["staff", "admin"] },
     ],
   },
 ];
@@ -233,6 +235,7 @@ const BREADCRUMB_LABELS = {
   enrollment: "Enrollment",
   "course-adjustments": "Course Adjustments",
   "enrollment-class-list": "Enrollment Class List",
+  "policy-documents": "Policy Documents",
 };
 
 function Breadcrumb({ path }) {

@@ -31,7 +31,10 @@ assignments, schedule requests, tasks, and an activity trail):
 12. **Withdrawal & Graduation Endorsement** - closes approved withdrawals and validates graduation candidates before Dean approval and Registrar handoff.
 
 On top of the transactions: a **Dashboard** (transaction-derived KPIs + charts), a **Students**
-directory with a full lifecycle record view, a role-filtered **Work Queue**, and an **Activity Log**.
+directory with a full lifecycle record view, a role-filtered **Work Queue**, an **Activity Log**,
+and a staff-only **Policy Document Library**. GS Staff can add readable PDF or DOCX files, edit their library
+details, replace outdated versions, or remove them; changes automatically refresh the Policy
+Assistant's retrieval corpus.
 
 ## Tech Stack
 

@@ -323,6 +323,28 @@ export const api = {
   assistant: (question, studentId) =>
     request("/assistant", { method: "POST", body: JSON.stringify({ question, student_id: studentId || null }) }),
   assistantSuggestions: () => request("/assistant/suggestions"),
+  policyDocuments: () => request("/policy-documents"),
+  createPolicyDocument: async ({ file, title, description }) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("title", title || "");
+    form.append("description", description || "");
+    const res = await fetch(`${BASE}/policy-documents`, { method: "POST", body: form, credentials: "same-origin" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
+    return body;
+  },
+  updatePolicyDocument: (id, payload) =>
+    request(`/policy-documents/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  replacePolicyDocument: async (id, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/policy-documents/${id}/file`, { method: "PUT", body: form, credentials: "same-origin" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Replacement failed (${res.status})`);
+    return body;
+  },
+  deletePolicyDocument: (id) => request(`/policy-documents/${id}`, { method: "DELETE" }),
   loaPolicyReview: (payload) =>
     request("/leave-of-absence/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   readmissionPolicyReview: (payload) =>

@@ -3,6 +3,7 @@ import re
 import json
 import tempfile
 import unittest
+import zipfile
 from datetime import date, datetime, time, timedelta, timezone
 from io import BytesIO
 from unittest.mock import MagicMock, patch
@@ -31,6 +32,7 @@ from app import (  # noqa: E402
     MonitoringSheetUpload,
     MonitoringValidationIssue,
     PanelAssignment,
+    PolicyDocument,
     PracticumRecord,
     Program,
     ADVISER_APPROVAL_DOCUMENTS,
@@ -74,6 +76,7 @@ from app import (  # noqa: E402
     WORKFLOW_DEMO_STUDENTS,
     REQUEST_UPLOAD_ROOT,
     MONITORING_UPLOAD_ROOT,
+    POLICY_DOCUMENT_UPLOAD_ROOT,
     UPLOAD_ROOT,
     app,
     awol_residency_roster_payload,
@@ -106,6 +109,7 @@ from app import (  # noqa: E402
     seed_database,
     submitted_request_students,
     task_dict,
+    _targeted_local_rag_answer,
     workflow_approvals_payload,
     generate_password_hash,
 )
@@ -1706,6 +1710,26 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(change_request.get_json()["mode"], "student-guarded")
             self.assertIn("cannot change grades", change_request.get_json()["answer"])
 
+            retake_citation = {
+                "id": "retention-policy",
+                "title": "Graduate School Handbook",
+                "source": "handbook.pdf, p. 58",
+                "text": "Failure in any subject will mean no re-admission to the program.",
+            }
+            with patch(
+                "app.call_local_document_rag",
+                return_value=(retake_citation["text"], [retake_citation]),
+            ) as local_rag:
+                failed_subject = client.post(
+                    "/api/student-portal/assistant",
+                    json={"question": "How many times can I repeat a failed research subject?"},
+                )
+            self.assertEqual(failed_subject.status_code, 200, failed_subject.get_json())
+            self.assertEqual(failed_subject.get_json()["mode"], "student-document-rag-local")
+            self.assertIn("no re-admission", failed_subject.get_json()["answer"])
+            self.assertNotIn("Final Defense stage", failed_subject.get_json()["answer"])
+            local_rag.assert_called_once()
+
             too_long = client.post(
                 "/api/student-portal/assistant", json={"question": "a" * 1501}
             )
@@ -1737,6 +1761,20 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 )
                 self.assertEqual(handbook.status_code, 200, handbook.get_json())
                 self.assertEqual(handbook.get_json()["mode"], "student-document-rag")
+                self.assertEqual(document_rag.call_args.args[3].id, self.student_id)
+
+                document_rag.reset_mock()
+                academic_load = client.post(
+                    "/api/student-portal/assistant",
+                    json={
+                        "question": (
+                            "What is the normal academic load for part-time and full-time "
+                            "graduate students?"
+                        )
+                    },
+                )
+                self.assertEqual(academic_load.status_code, 200, academic_load.get_json())
+                self.assertEqual(academic_load.get_json()["mode"], "student-document-rag")
                 self.assertEqual(document_rag.call_args.args[3].id, self.student_id)
 
     def test_policy_assistant_uses_fast_path_and_guards_unsupported_requests(self):
@@ -1806,11 +1844,172 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(safe_error.status_code, 200, safe_error.get_json())
             self.assertIn("No records were changed", safe_error.get_json()["answer"])
 
+    def test_student_suggested_questions_use_their_matching_sources(self):
+        with app.app_context():
+            account = UserAccount(
+                email="student-suggestions@example.test",
+                full_name="Suggestion Student",
+                password_hash=generate_password_hash("test-password"),
+                role="student",
+                student_id=self.student_id,
+                active=True,
+            )
+            db.session.add(account)
+            db.session.commit()
+            client = self._role_client(account.id, "student")
+
+            status = client.post(
+                "/api/student-portal/assistant",
+                json={"question": "What should I do next based on my record?"},
+            )
+            self.assertEqual(status.status_code, 200, status.get_json())
+            self.assertEqual(status.get_json()["mode"], "student-fast")
+
+            enrollment = client.post(
+                "/api/student-portal/assistant",
+                json={"question": "Which subjects am I currently enrolled in?"},
+            )
+            self.assertEqual(enrollment.status_code, 200, enrollment.get_json())
+            self.assertEqual(enrollment.get_json()["mode"], "student-records")
+            self.assertNotIn("Final Defense stage", enrollment.get_json()["answer"])
+
+            policy_questions = [
+                "Explain the incomplete-grade re-enrollment rule.",
+                "What do I need before a research defense?",
+                "Explain the leave, AWOL, and residency rules for students.",
+                "How many times can I repeat a failed research subject?",
+            ]
+            citation = {
+                "id": "policy-source",
+                "title": "Uploaded policy document",
+                "source": "policy.pdf, p. 1",
+                "text": "Retrieved policy answer.",
+            }
+            with patch.dict(
+                os.environ,
+                {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
+            ), patch(
+                "app.call_local_document_rag",
+                return_value=(citation["text"], [citation]),
+            ) as local_rag:
+                for question in policy_questions:
+                    response = client.post(
+                        "/api/student-portal/assistant",
+                        json={"question": question},
+                    )
+                    self.assertEqual(response.status_code, 200, response.get_json())
+                    self.assertEqual(response.get_json()["mode"], "student-document-rag-local")
+                    self.assertEqual(response.get_json()["answer"], citation["text"])
+                    self.assertNotIn("Final Defense stage", response.get_json()["answer"])
+            self.assertEqual(local_rag.call_count, len(policy_questions))
+
+    def test_staff_can_manage_policy_assistant_pdf_and_docx_library(self):
+        client = self._staff_client()
+        denied = self._academic_client().get("/api/policy-documents")
+        self.assertEqual(denied.status_code, 403, denied.get_json())
+
+        invalid = client.post(
+            "/api/policy-documents",
+            data={"title": "Invalid", "file": (BytesIO(b"not a pdf"), "invalid.pdf")},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(invalid.status_code, 400, invalid.get_json())
+
+        with patch("app._inspect_policy_document", return_value=(4, 7, "application/pdf")):
+            created = client.post(
+                "/api/policy-documents",
+                data={
+                    "title": "Graduate Policy 2026",
+                    "description": "Current residency rules.",
+                    "file": (BytesIO(b"%PDF-1.7 test policy"), "graduate-policy.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+        self.assertEqual(created.status_code, 201, created.get_json())
+        item = created.get_json()["item"]
+        self.assertEqual(item["page_count"], 4)
+        self.assertEqual(item["chunk_count"], 7)
+        self.assertTrue(item["can_edit"])
+        with app.app_context():
+            document = db.session.get(PolicyDocument, item["id"])
+            self.created_files.append(POLICY_DOCUMENT_UPLOAD_ROOT / document.stored_name)
+
+        listing = client.get("/api/policy-documents")
+        self.assertEqual(listing.status_code, 200, listing.get_json())
+        self.assertTrue(any(row["id"] == item["id"] for row in listing.get_json()["items"]))
+        viewed = client.get(item["url"])
+        self.assertEqual(viewed.status_code, 200)
+        self.assertEqual(viewed.mimetype, "application/pdf")
+        viewed.close()
+
+        updated = client.patch(
+            f"/api/policy-documents/{item['id']}",
+            json={"title": "Graduate Policy 2026 Revised", "description": "Revised residency rules."},
+        )
+        self.assertEqual(updated.status_code, 200, updated.get_json())
+        self.assertEqual(updated.get_json()["item"]["title"], "Graduate Policy 2026 Revised")
+
+        with patch("app._inspect_policy_document", return_value=(6, 10, "application/pdf")):
+            replaced = client.put(
+                f"/api/policy-documents/{item['id']}/file",
+                data={"file": (BytesIO(b"%PDF-1.7 replacement"), "replacement.pdf")},
+                content_type="multipart/form-data",
+            )
+        self.assertEqual(replaced.status_code, 200, replaced.get_json())
+        self.assertEqual(replaced.get_json()["item"]["page_count"], 6)
+        with app.app_context():
+            document = db.session.get(PolicyDocument, item["id"])
+            self.created_files.append(POLICY_DOCUMENT_UPLOAD_ROOT / document.stored_name)
+
+        removed = client.delete(f"/api/policy-documents/{item['id']}")
+        self.assertEqual(removed.status_code, 200, removed.get_json())
+        with app.app_context():
+            self.assertIsNone(db.session.get(PolicyDocument, item["id"]))
+
+        docx_bytes = BytesIO()
+        with zipfile.ZipFile(docx_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(
+                "word/document.xml",
+                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                  <w:body><w:p><w:r><w:t>Graduate residency policy and procedures for enrolled students.</w:t></w:r></w:p></w:body>
+                </w:document>""",
+            )
+        docx_bytes.seek(0)
+        docx_created = client.post(
+            "/api/policy-documents",
+            data={
+                "title": "Residency Policy Word File",
+                "file": (docx_bytes, "residency-policy.docx"),
+            },
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(docx_created.status_code, 201, docx_created.get_json())
+        docx_item = docx_created.get_json()["item"]
+        self.assertEqual(docx_item["file_type"], "DOCX")
+        self.assertEqual(docx_item["page_count"], 0)
+        self.assertGreater(docx_item["chunk_count"], 0)
+        docx_viewed = client.get(docx_item["url"])
+        self.assertEqual(docx_viewed.status_code, 200)
+        self.assertEqual(
+            docx_viewed.mimetype,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        docx_viewed.close()
+        with app.app_context():
+            document = db.session.get(PolicyDocument, docx_item["id"])
+            self.created_files.append(POLICY_DOCUMENT_UPLOAD_ROOT / document.stored_name)
+        docx_removed = client.delete(f"/api/policy-documents/{docx_item['id']}")
+        self.assertEqual(docx_removed.status_code, 200, docx_removed.get_json())
+
     def test_policy_assistant_falls_back_when_document_rag_fails(self):
         client = self._staff_client()
         with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
             "app.call_document_rag",
             side_effect=RuntimeError("provider unavailable"),
+        ), patch(
+            "app.call_local_document_rag",
+            side_effect=RuntimeError("local index unavailable"),
         ):
             response = client.post(
                 "/api/assistant",
@@ -1819,6 +2018,51 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200, response.get_json())
             self.assertEqual(response.get_json()["mode"], "offline-fallback")
             self.assertTrue(response.get_json()["answer"])
+
+    def test_handbook_question_uses_local_document_rag_without_api_key(self):
+        client = self._staff_client()
+        citation = {
+            "id": "handbook-load",
+            "title": "Graduate School Handbook",
+            "source": "GRADUATE-SCHOOL-HANDBOOK-22-23.pdf, p. 52",
+            "text": "The normal load is six to nine units part-time and twelve units full-time.",
+        }
+        with patch.dict(
+            os.environ,
+            {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
+        ), patch(
+            "app.call_local_document_rag",
+            return_value=(citation["text"], [citation]),
+        ) as local_rag:
+            response = client.post(
+                "/api/assistant",
+                json={
+                    "question": (
+                        "According to the handbook, what is the normal academic load "
+                        "for part-time and full-time graduate students?"
+                    ),
+                },
+            )
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(response.get_json()["mode"], "document-rag-local")
+        self.assertEqual(response.get_json()["citations"][0]["source"], citation["source"])
+        self.assertIn("six to nine units", response.get_json()["answer"])
+        local_rag.assert_called_once()
+
+    def test_local_handbook_answer_selects_complete_inc_rule_without_chunk_dump(self):
+        answer = _targeted_local_rag_answer(
+            "How long do I have to remove an INC, and what happens after the deadline?",
+            [
+                "Incomplete Grades. Removal of the INC must be done within one (1) academic year. "
+                "A student who fails to comply after a year will automatically get a 3.0 for a "
+                "master's program or 2.0 for a doctorate and has to take the subject again. "
+                + ("Unrelated handbook material. " * 100)
+            ],
+        )
+        self.assertIn("one (1) academic year", answer)
+        self.assertIn("automatically get", answer)
+        self.assertNotIn("Unrelated handbook material", answer)
+        self.assertLess(len(answer), 500)
 
     def test_policy_assistant_routes_database_paraphrases_to_verified_reports(self):
         with app.app_context():
