@@ -22814,6 +22814,317 @@ def import_faculty_sheets() -> int:
     return created
 
 
+PANEL_MATCHING_DEMO_FACULTY = {
+    "Dr. Liwayway Bautista": {
+        "specialization": (
+            "Learning analytics dashboards, graduate student engagement, online learning "
+            "participation, and mixed-method educational research"
+        ),
+        "availability_windows": 5,
+    },
+    "Dr. Marlon Geronimo": {
+        "specialization": (
+            "Educational data mining, predictive modeling, machine learning, and student "
+            "performance forecasting"
+        ),
+        "availability_windows": 4,
+    },
+    "Dr. Patricia Salvador": {
+        "specialization": (
+            "Online pedagogy, learning management systems, curriculum development, and "
+            "instructional design"
+        ),
+        "availability_windows": 3,
+    },
+    "Dr. Teodoro Ramos": {
+        "specialization": (
+            "Mixed-method research design, survey instrument validation, quantitative analysis, "
+            "qualitative thematic coding, and statistical modeling"
+        ),
+        "availability_windows": 2,
+    },
+    "Dr. Adriana Santos": {
+        "specialization": (
+            "Health informatics, epidemiology, public health surveillance, nursing systems, "
+            "and clinical outcomes research"
+        ),
+        "availability_windows": 4,
+    },
+    "Dr. Benjamin Reyes": {
+        "specialization": (
+            "Financial technology adoption, accounting information systems, corporate finance, "
+            "business analytics, and risk modeling"
+        ),
+        "availability_windows": 3,
+    },
+    "Dr. Celeste Tan": {
+        "specialization": (
+            "Educational psychology, student well-being, academic motivation, behavioral research, "
+            "and qualitative interviewing"
+        ),
+        "availability_windows": 2,
+    },
+    "Dr. Daniel Uy": {
+        "specialization": (
+            "Industrial automation, energy optimization, engineering systems, predictive "
+            "maintenance, and data modeling"
+        ),
+        "availability_windows": 5,
+    },
+    "Dr. Angela Cruz": {
+        "specialization": (
+            "Strategic management, entrepreneurship, family business governance, organizational "
+            "innovation, and case-study research"
+        ),
+        "availability_windows": 4,
+    },
+    "Dr. Marco Villanueva": {
+        "specialization": (
+            "Supply chain analytics, operations research, quality systems, process optimization, "
+            "and simulation modeling"
+        ),
+        "availability_windows": 3,
+    },
+    "Dr. Teresa Lim": {
+        "specialization": (
+            "Digital marketing, consumer behavior, brand positioning, electronic commerce, and "
+            "market survey research"
+        ),
+        "availability_windows": 2,
+    },
+    "Dr. Paolo Navarro": {
+        "specialization": (
+            "Workforce planning, organizational behavior, leadership development, workplace "
+            "well-being, and employee retention"
+        ),
+        "availability_windows": 5,
+    },
+}
+
+
+def write_demo_pdf(root: Path, stored_name: str, title: str, details: str) -> None:
+    """Write a small, valid PDF so every seeded evidence row is downloadable."""
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / stored_name
+
+    def clean(value: str) -> str:
+        return (
+            value.encode("latin-1", "replace")
+            .decode("latin-1")
+            .replace("\\", "\\\\")
+            .replace("(", "\\(")
+            .replace(")", "\\)")
+        )
+
+    words = re.sub(r"\s+", " ", details).strip().split()
+    lines: list[str] = []
+    current: list[str] = []
+    for word in words:
+        if len(" ".join([*current, word])) > 84 and current:
+            lines.append(" ".join(current))
+            current = [word]
+        else:
+            current.append(word)
+    if current:
+        lines.append(" ".join(current))
+    lines = lines[:24]
+
+    commands = [
+        "BT",
+        "/F1 16 Tf",
+        "72 744 Td",
+        f"({clean(title)}) Tj",
+        "/F1 10 Tf",
+        "0 -28 Td",
+    ]
+    for index, line in enumerate(lines):
+        if index:
+            commands.append("0 -15 Td")
+        commands.append(f"({clean(line)}) Tj")
+    commands.append("ET")
+    stream = "\n".join(commands).encode("latin-1")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        f"<< /Length {len(stream)} >>\nstream\n".encode("ascii") + stream + b"\nendstream",
+    ]
+    payload = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(payload))
+        payload.extend(f"{index} 0 obj\n".encode("ascii"))
+        payload.extend(obj)
+        payload.extend(b"\nendobj\n")
+    xref_offset = len(payload)
+    payload.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    payload.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        payload.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    payload.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    path.write_bytes(bytes(payload))
+
+
+def panel_matching_demo_evidence_text(
+    student: Student,
+    document: DocumentCheck,
+    title: str,
+    file_number: int,
+) -> str:
+    """Return realistic, stage-specific manuscript text for the Miguel Yu demo."""
+    if student.student_number != "2260004":
+        return (
+            f"{title}. This verified MAED research document belongs to {student.name}. "
+            "The study examines graduate education, student engagement, inclusive "
+            "learning, reflective practice, curriculum design, evidence based teaching, "
+            "assessment, faculty support, research methods, data analysis, ethical "
+            "practice, academic progress, and meaningful learning outcomes. "
+            f"This is evidence item {file_number} for {document.item_name}."
+        )
+
+    concept_papers = [
+        (
+            "This concept paper investigates how learning analytics dashboards influence "
+            "graduate student engagement in online courses. Interaction traces, participation "
+            "patterns, and feedback use are examined through a mixed-method design."
+        ),
+        (
+            "This concept paper applies educational data mining and predictive modeling to "
+            "identify online graduate students at risk of disengagement. Participation logs "
+            "are compared with persistence and course performance indicators."
+        ),
+        (
+            "This concept paper evaluates how dashboard feedback can inform online pedagogy, "
+            "instructional design, and curriculum improvement. Interviews explore student "
+            "self-regulated learning and the usefulness of instructor feedback."
+        ),
+    ]
+    if document.gate == "Form 1 - Title Defense" and document.item_name == "Three concept papers":
+        body = concept_papers[min(file_number - 1, len(concept_papers) - 1)]
+    elif document.gate == "Form 4 - Proposal Defense Readiness" and document.item_name == "Proposal manuscript":
+        body = (
+            "The proposal uses a longitudinal mixed-method design to evaluate learning analytics "
+            "dashboards in online graduate courses. Clickstream interaction traces and survey "
+            "measures of student engagement will be analyzed using predictive regression, while "
+            "interviews will explain participation, feedback use, and self-regulated learning."
+        )
+    elif document.gate == "Final Defense" and document.item_name == "Final manuscript":
+        body = (
+            "The final manuscript reports a longitudinal mixed-method evaluation of learning "
+            "analytics dashboards in online graduate courses. Clickstream interaction traces, "
+            "participation patterns, feedback use, and student engagement were analyzed. "
+            "Predictive regression estimated whether dashboard use predicted persistence and "
+            "course performance, while interviews explained self-regulated learning. Validated "
+            "survey instruments and thematic coding connected the findings to instructional design."
+        )
+    else:
+        body = (
+            "This supporting research document records the completed academic review for a study "
+            "of learning analytics dashboards, online graduate student engagement, and mixed-method "
+            "educational research."
+        )
+    return (
+        f"{title}\n\n{body}\n\n"
+        f"Verified MAED demo evidence item {file_number} for {document.item_name}."
+    )
+
+
+def ensure_panel_matching_demo_data() -> dict[str, int]:
+    """Populate every seeded faculty profile and Miguel's stage-aware matching sources."""
+    changes = {
+        "faculty_profiles": 0,
+        "faculty_with_availability": 0,
+        "availability_windows": 0,
+        "evidence_files": 0,
+    }
+    student = Student.query.filter_by(student_number="2260004").first()
+    if not student:
+        return changes
+
+    first_slot_day = date.today() + timedelta(days=14)
+    slot_days = []
+    candidate_day = first_slot_day
+    while len(slot_days) < 8:
+        if candidate_day.weekday() < 5:
+            slot_days.append(candidate_day)
+        candidate_day += timedelta(days=1)
+
+    for faculty_name, profile in PANEL_MATCHING_DEMO_FACULTY.items():
+        faculty = Faculty.query.filter_by(name=faculty_name, active=True).first()
+        if not faculty:
+            continue
+        if faculty.specialization != profile["specialization"]:
+            faculty.specialization = profile["specialization"]
+            changes["faculty_profiles"] += 1
+
+        target_count = profile["availability_windows"]
+        current_count = FacultyAvailability.query.filter(
+            FacultyAvailability.faculty_id == faculty.id,
+            FacultyAvailability.available_date >= date.today(),
+        ).count()
+        for slot_day in slot_days:
+            if current_count >= target_count:
+                break
+            existing = FacultyAvailability.query.filter_by(
+                faculty_id=faculty.id,
+                available_date=slot_day,
+                start_time=time(8, 0),
+                end_time=time(9, 0),
+            ).first()
+            if existing:
+                continue
+            db.session.add(FacultyAvailability(
+                faculty_id=faculty.id,
+                available_date=slot_day,
+                start_time=time(8, 0),
+                end_time=time(9, 0),
+            ))
+            current_count += 1
+            changes["availability_windows"] += 1
+        if current_count:
+            changes["faculty_with_availability"] += 1
+
+    research_case = ResearchCase.query.filter_by(student_id=student.id).first()
+    title = research_case.title if research_case else "Learning Analytics for Graduate Student Engagement"
+    for document in DocumentCheck.query.filter_by(student_id=student.id).all():
+        presentation = research_requirement_presentation(document.gate, document.item_name)
+        evidence_files = (
+            ResearchEvidenceFile.query.filter_by(
+                student_id=student.id,
+                document_check_id=document.id,
+            )
+            .order_by(ResearchEvidenceFile.id.asc())
+            .all()
+        )
+        for file_number, evidence in enumerate(evidence_files, start=1):
+            if not evidence.stored_name.startswith("persona-2260004-research-"):
+                continue
+            extracted_text = panel_matching_demo_evidence_text(
+                student,
+                document,
+                title,
+                file_number,
+            )
+            stored_path = UPLOAD_ROOT / evidence.stored_name
+            needs_update = evidence.extracted_text != extracted_text or not stored_path.exists()
+            if not needs_update:
+                continue
+            evidence.extracted_text = extracted_text
+            write_demo_pdf(
+                UPLOAD_ROOT,
+                evidence.stored_name,
+                presentation["label"] if presentation else document.item_name,
+                extracted_text,
+            )
+            changes["evidence_files"] += 1
+    return changes
+
+
 def seed_maed_personas() -> None:
     """Create the policy-valid MAED workflow cohort from the monitoring sheet.
 
@@ -22825,73 +23136,6 @@ def seed_maed_personas() -> None:
 
     def by_num(number: str) -> Student | None:
         return Student.query.filter_by(student_number=number).first()
-
-    def write_demo_pdf(root: Path, stored_name: str, title: str, details: str) -> None:
-        """Write a small, valid PDF so every seeded evidence row is downloadable."""
-        root.mkdir(parents=True, exist_ok=True)
-        path = root / stored_name
-
-        def clean(value: str) -> str:
-            return (
-                value.encode("latin-1", "replace")
-                .decode("latin-1")
-                .replace("\\", "\\\\")
-                .replace("(", "\\(")
-                .replace(")", "\\)")
-            )
-
-        words = re.sub(r"\s+", " ", details).strip().split()
-        lines: list[str] = []
-        current: list[str] = []
-        for word in words:
-            if len(" ".join([*current, word])) > 84 and current:
-                lines.append(" ".join(current))
-                current = [word]
-            else:
-                current.append(word)
-        if current:
-            lines.append(" ".join(current))
-        lines = lines[:24]
-
-        commands = [
-            "BT",
-            "/F1 16 Tf",
-            "72 744 Td",
-            f"({clean(title)}) Tj",
-            "/F1 10 Tf",
-            "0 -28 Td",
-        ]
-        for index, line in enumerate(lines):
-            if index:
-                commands.append("0 -15 Td")
-            commands.append(f"({clean(line)}) Tj")
-        commands.append("ET")
-        stream = "\n".join(commands).encode("latin-1")
-        objects = [
-            b"<< /Type /Catalog /Pages 2 0 R >>",
-            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-            f"<< /Length {len(stream)} >>\nstream\n".encode("ascii") + stream + b"\nendstream",
-        ]
-        payload = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-        offsets = [0]
-        for index, obj in enumerate(objects, start=1):
-            offsets.append(len(payload))
-            payload.extend(f"{index} 0 obj\n".encode("ascii"))
-            payload.extend(obj)
-            payload.extend(b"\nendobj\n")
-        xref_offset = len(payload)
-        payload.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-        payload.extend(b"0000000000 65535 f \n")
-        for offset in offsets[1:]:
-            payload.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-        payload.extend(
-            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
-            f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
-        )
-        path.write_bytes(bytes(payload))
 
     def attachment(
         student: Student,
@@ -22974,13 +23218,11 @@ def seed_maed_personas() -> None:
                 if required_count > 1
                 else f"{presentation['label']}.pdf"
             )
-            extracted_text = (
-                f"{title}. This verified MAED research document belongs to {student.name}. "
-                "The study examines graduate education, student engagement, inclusive "
-                "learning, reflective practice, curriculum design, evidence based teaching, "
-                "assessment, faculty support, research methods, data analysis, ethical "
-                "practice, academic progress, and meaningful learning outcomes. "
-                f"This is evidence item {file_number} for {document.item_name}."
+            extracted_text = panel_matching_demo_evidence_text(
+                student,
+                document,
+                title,
+                file_number,
             )
             write_demo_pdf(
                 UPLOAD_ROOT,
@@ -23639,6 +23881,7 @@ def seed_database(count: int = 350) -> None:
     db.session.commit()
 
     seed_maed_personas()
+    ensure_panel_matching_demo_data()
     db.session.commit()
 
     sync_all_curricula()
@@ -24925,6 +25168,7 @@ if __name__ == "__main__":
         if Student.query.count() == 0:
             seed_database(seed_count)
         ensure_demo_accounts()
+        ensure_panel_matching_demo_data()
         seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases
         ensure_faculty_account_schema()
         ensure_workflow_activity_schema()

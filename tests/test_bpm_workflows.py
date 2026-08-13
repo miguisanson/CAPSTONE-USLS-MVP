@@ -25,6 +25,7 @@ from app import (  # noqa: E402
     DefenseVerdict,
     DocumentCheck,
     Faculty,
+    FacultyAvailability,
     FacultyCoursePreference,
     FacultyWorkingHour,
     Form1Endorsement,
@@ -89,6 +90,7 @@ from app import (  # noqa: E402
     enrollment_integrity_payload,
     enrollment_subject_states,
     ensure_authoritative_curricula,
+    ensure_panel_matching_demo_data,
     google_calendar_free_window_count,
     get_active_term,
     ensure_workflow_demo_students,
@@ -103,6 +105,7 @@ from app import (  # noqa: E402
     practicum_roster_payload,
     practicum_eligibility,
     program_allows_practicum,
+    recommend_panel,
     required_documents_for_gate,
     research_requirement_presentation,
     resolve_source_flags_after_monitoring_upload,
@@ -3728,6 +3731,131 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             google_calendar_free_window_count(result, start_day, start_day + timedelta(days=2)),
             0,
         )
+
+    def test_panel_matching_demo_populates_every_faculty_profile_idempotently(self):
+        with app.app_context():
+            program = Program.query.filter_by(code="BPM").one()
+            miguel = Student(
+                student_number="2260004",
+                first_name="Miguel",
+                last_name="Yu",
+                email="miguel-panel-fixture@example.test",
+                program_id=program.id,
+                entry_year=2022,
+                current_stage="Final Defense",
+                standing="Active",
+                enrollment_tag="Enrolled",
+                comprehensive_exam_status="Passed",
+                risk_level="On Track",
+            )
+            db.session.add(miguel)
+            faculty_names = [
+                "Dr. Liwayway Bautista",
+                "Dr. Marlon Geronimo",
+                "Dr. Patricia Salvador",
+                "Dr. Teodoro Ramos",
+                "Dr. Adriana Santos",
+                "Dr. Benjamin Reyes",
+                "Dr. Celeste Tan",
+                "Dr. Daniel Uy",
+                "Dr. Angela Cruz",
+                "Dr. Marco Villanueva",
+                "Dr. Teresa Lim",
+                "Dr. Paolo Navarro",
+            ]
+            for index, name in enumerate(faculty_names, start=1):
+                db.session.add(Faculty(
+                    name=name,
+                    college="Graduate School",
+                    role="Adviser / Panel",
+                    specialization=f"Generic expertise {index}",
+                    email=f"panel-roster-{index}@example.test",
+                    active=True,
+                ))
+            db.session.flush()
+            research_case = ResearchCase(
+                student_id=miguel.id,
+                case_type="Thesis",
+                title="Learning Analytics for Graduate Student Engagement",
+                current_gate="Final Defense",
+                status="Ready",
+            )
+            document = DocumentCheck(
+                student_id=miguel.id,
+                gate="Final Defense",
+                item_name="Final manuscript",
+                status="Complete",
+            )
+            db.session.add_all([research_case, document])
+            db.session.flush()
+            evidence = ResearchEvidenceFile(
+                student_id=miguel.id,
+                document_check_id=document.id,
+                original_name="Final manuscript.pdf",
+                stored_name="persona-2260004-research-final-defense-final-manuscript-1.pdf",
+                mime_type="application/pdf",
+                extracted_text="Repeated generic demo text",
+            )
+            db.session.add(evidence)
+            db.session.commit()
+
+            with patch("app.write_demo_pdf"):
+                changes = ensure_panel_matching_demo_data()
+                db.session.commit()
+                repeat_changes = ensure_panel_matching_demo_data()
+
+            self.assertEqual(changes, {
+                "faculty_profiles": 12,
+                "faculty_with_availability": 12,
+                "availability_windows": 42,
+                "evidence_files": 1,
+            })
+            self.assertEqual(repeat_changes, {
+                "faculty_profiles": 0,
+                "faculty_with_availability": 12,
+                "availability_windows": 0,
+                "evidence_files": 0,
+            })
+            roster = Faculty.query.filter(Faculty.name.in_(faculty_names)).order_by(Faculty.id).all()
+            self.assertEqual(len(roster), 12)
+            self.assertTrue(all(
+                not faculty.specialization.startswith("Generic expertise")
+                for faculty in roster
+            ))
+            self.assertTrue(all(
+                FacultyAvailability.query.filter_by(faculty_id=faculty.id).count() > 0
+                for faculty in roster
+            ))
+            self.assertIn("longitudinal mixed-method evaluation", evidence.extracted_text)
+
+            matching_profile = {
+                "query_text": evidence.extracted_text,
+                "keywords": [
+                    "learning analytics",
+                    "student engagement",
+                    "mixed-method",
+                    "predictive modeling",
+                    "instructional design",
+                    "survey instrument validation",
+                ],
+                "rag_faculty_matches": [],
+            }
+            with patch("app.research_matching_profile", return_value=matching_profile), patch.dict(
+                os.environ,
+                {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
+            ):
+                recommendations = recommend_panel(miguel)
+            self.assertEqual(len(recommendations), 12)
+            self.assertEqual(len({row["score"] for row in recommendations[:4]}), 4)
+            self.assertEqual(
+                {row["faculty"].name for row in recommendations[:4]},
+                {
+                    "Dr. Liwayway Bautista",
+                    "Dr. Marlon Geronimo",
+                    "Dr. Patricia Salvador",
+                    "Dr. Teodoro Ramos",
+                },
+            )
 
     def test_faculty_calendar_authorization_returns_safe_preview_without_oauth_credentials(self):
         with app.app_context():
