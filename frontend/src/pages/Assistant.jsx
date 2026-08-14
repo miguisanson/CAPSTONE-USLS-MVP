@@ -163,7 +163,11 @@ export default function Assistant() {
           </Card>
 
           <Card className="p-5">
-            <SectionTitle title="Try asking" icon={Sparkles} />
+            <SectionTitle
+              title="Example questions"
+              subtitle="Shortcuts only — you can type any question"
+              icon={Sparkles}
+            />
             <div className="space-y-2">
               {suggestions.map((q) => (
                 <button

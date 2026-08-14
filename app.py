@@ -6183,8 +6183,14 @@ def assistant_requires_document_rag(
     student: Student | None,
     snippets: list[dict],
 ) -> bool:
-    """Use document RAG only when the user explicitly asks to search source files."""
-    lowered = (question or "").lower()
+    """Route source-sensitive policy questions to the complete document library.
+
+    Suggested questions may be answered by the small curated policy corpus, but
+    users are not limited to those prompts. Free-form questions that ask for an
+    exact number, limit, or attempt count need the full handbook/protocol because
+    a related curated snippet may not contain the requested detail.
+    """
+    lowered = " ".join((question or "").lower().split())
     document_intent = any(
         phrase in lowered
         for phrase in [
@@ -6202,11 +6208,33 @@ def assistant_requires_document_rag(
             "what does the manual say",
         ]
     )
-    if not document_intent:
+    if document_intent:
+        return True
+
+    policy_domain_terms = [
+        "research", "adviser", "advisor", "thesis", "dissertation",
+        "subject", "course", "class", "grade", "exam", "retake", "repeat",
+        "form", "defense", "panel", "ethics", "residency", "leave of absence",
+        "loa", "readmission", "withdrawal", "graduation", "completion",
+    ]
+    if not any(term in lowered for term in policy_domain_terms):
         return False
+
+    # No curated match means the complete library is the only grounded source.
+    if not snippets:
+        return True
+
+    precision_phrases = [
+        "how many", "how often", "how long", "number of times", "maximum",
+        "minimum", "limit", "deadline", "within how many", "how soon",
+        "first retake", "second retake", "third retake", "last time",
+    ]
+    if any(phrase in lowered for phrase in precision_phrases):
+        return True
+
     # Student context is safe to include, but the query remains stateless and
     # therefore cannot leak a previous user's conversation into this answer.
-    return bool(snippets or student or document_intent)
+    return False
 
 
 def student_requires_document_rag(
