@@ -53,3 +53,14 @@ _handout/
 
 # Local reference copies of teammates branches (not part of the app)
 Other_Branches/
+
+# GSD Core install (reinstall: npx @opengsd/gsd-core@latest --claude --local).
+# Its working plans in .planning/ ARE committed.
+.claude/settings.local.json
+.claude/.gsd-profile
+.claude/.gsd-runtime
+.claude/agents/gsd-*
+.claude/commands/gsd-*
+.claude/gsd-*
+.claude/hooks/
+.claude/scripts/
