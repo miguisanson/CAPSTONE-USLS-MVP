@@ -1016,3 +1016,323 @@ class FacultyDashboardTests(CalendarDataBase):
         upcoming = body["upcoming_defenses"]
         self.assertEqual([item["defense"]["defense_type"] for item in upcoming], ["Proposal Defense"])
         self.assertEqual(upcoming[0]["my_role"], "Panel Chair")
+
+
+# ---------------------------------------------------------------------------
+# 4. Panel invitations
+# ---------------------------------------------------------------------------
+class PanelInvitationTests(CalendarDataBase):
+    def invitations(self, name):
+        response = self.faculty_client(name).get("/api/faculty-portal/panel-invitations")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return response.get_json()["invitations"]
+
+    def test_every_panel_seat_shows_up_as_an_invitation_for_that_faculty_member(self):
+        self.ready_for_title()
+        mine = self.invitations("Chair Person")
+        self.assertEqual(len(mine), 1)
+        self.assertEqual((mine[0]["status"], mine[0]["panel_role"], mine[0]["defense_type"]), ("Invited", "Panel Chair", "Title Defense"))
+        self.assertEqual(mine[0]["student"]["name"], "Research Student")
+        self.assertEqual(self.invitations("Spare Person"), [])
+
+    def test_a_faculty_member_can_accept(self):
+        self.ready_for_title()
+        invitation = self.invitations("Content Person")[0]
+        response = self.faculty_client("Content Person").post(
+            f"/api/faculty-portal/panel-invitations/{invitation['id']}/respond", json={"response": "accept"})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(self.invitations("Content Person")[0]["status"], "Accepted")
+        staff = self.staff().get(f"/api/panel-invitations?student_id={self.student_id}").get_json()
+        self.assertEqual({row["faculty_name"]: row["status"] for row in staff["invitations"]}["Content Person"], "Accepted")
+
+    def test_declining_needs_a_reason_and_raises_a_replacement_request(self):
+        self.ready_for_title()
+        invitation = self.invitations("Method Person")[0]
+        url = f"/api/faculty-portal/panel-invitations/{invitation['id']}/respond"
+        self.assertEqual(self.faculty_client("Method Person").post(url, json={"response": "decline"}).status_code, 400)
+        declined = self.faculty_client("Method Person").post(url, json={"response": "decline", "reason": "On research leave that month"})
+        self.assertEqual(declined.status_code, 200, declined.get_json())
+        with app.app_context():
+            tasks = Task.query.filter(Task.student_id == self.student_id, Task.title.like("Replace declined panelist%"), Task.status == "Pending").all()
+            self.assertEqual(len(tasks), 1)
+            self.assertEqual(tasks[0].owner_role, "Research Coordinator")
+        listing = self.research().get("/api/notifications").get_json()
+        self.assertTrue(any(item["kind"] == "panel_declined" for item in listing["items"]), listing)
+        # a declined seat is a hard conflict when booking
+        body = self.check().get_json()
+        self.assertTrue(any("declined" in item and "Method Person" in item for item in body["hard"]), body)
+        # replacing the member clears the request and the conflict
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Content Person", "Spare Person"]]
+        changed = self.staff().post("/api/transactions/defense-scheduling", json={
+            "student_id": self.student_id, "panel_faculty_ids": ids, "reassign_only": True, "panel_change_reason": "Method Person declined",
+        })
+        self.assertEqual(changed.status_code, 200, changed.get_json())
+        with app.app_context():
+            self.assertEqual(Task.query.filter(Task.student_id == self.student_id, Task.title.like("Replace declined panelist%"), Task.status == "Pending").count(), 0)
+        self.assertEqual(self.check().get_json()["hard"], [])
+        self.assertEqual(self.invitations("Spare Person")[0]["status"], "Invited")
+
+    def test_the_new_panelist_is_told_about_the_invitation(self):
+        self.ready_for_title()
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Content Person", "Spare Person"]]
+        self.staff().post("/api/transactions/defense-scheduling", json={
+            "student_id": self.student_id, "panel_faculty_ids": ids, "reassign_only": True, "panel_change_reason": "Rebalancing",
+        })
+        listing = self.faculty_client("Spare Person").get("/api/notifications").get_json()
+        self.assertTrue(any(item["kind"] == "panel_invited" for item in listing["items"]), listing)
+
+    def test_other_faculty_cannot_answer_an_invitation(self):
+        self.ready_for_title()
+        invitation = self.invitations("Method Person")[0]
+        response = self.faculty_client("Spare Person").post(
+            f"/api/faculty-portal/panel-invitations/{invitation['id']}/respond", json={"response": "accept"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_cannot_attend_on_a_confirmed_defense_asks_for_a_reschedule(self):
+        self.ready_for_proposal()
+        day = future_weekday(21)
+        schedule_id = self.book_proposal(day)
+        url = f"/api/faculty-portal/defense-schedules/{schedule_id}/cannot-attend"
+        self.assertEqual(self.faculty_client("Content Person").post(url, json={}).status_code, 400)
+        self.assertEqual(self.faculty_client("Spare Person").post(url, json={"reason": "x reason"}).status_code, 404)
+        response = self.faculty_client("Content Person").post(url, json={"reason": "Flight booked for that week"})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            self.assertEqual(Task.query.filter(Task.student_id == self.student_id, Task.title.like("Reschedule Proposal Defense%"), Task.status == "Pending").count(), 1)
+        event = [e for e in self.calendar(self.staff(), **self.window(day))["events"] if e["schedule_id"] == schedule_id][0]
+        self.assertTrue(any("Content Person" in note and "cannot attend" in note for note in event["attention"]), event)
+        listing = self.staff().get("/api/notifications").get_json()
+        self.assertTrue(any(item["kind"] == "cannot_attend" for item in listing["items"]), listing)
+
+    def test_the_adviser_can_also_say_they_cannot_attend(self):
+        self.ready_for_proposal()
+        schedule_id = self.book_proposal()
+        response = self.faculty_client("Adviser Person").post(
+            f"/api/faculty-portal/defense-schedules/{schedule_id}/cannot-attend", json={"reason": "Clinic duty that morning"})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            self.assertEqual(Task.query.filter(Task.student_id == self.student_id, Task.title.like("Reschedule Proposal Defense%"), Task.status == "Pending").count(), 1)
+
+    def test_a_reschedule_clears_the_reschedule_request(self):
+        self.ready_for_proposal()
+        schedule_id = self.book_proposal()
+        self.faculty_client("Content Person").post(
+            f"/api/faculty-portal/defense-schedules/{schedule_id}/cannot-attend", json={"reason": "Flight booked"})
+        new_day = future_weekday(28)
+        # the panelist who cannot attend is replaced, then the defense is moved
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Spare Person", "Method Person", "External Person"]]
+        self.staff().post("/api/transactions/defense-scheduling", json={
+            "student_id": self.student_id, "panel_faculty_ids": ids, "reassign_only": True, "panel_change_reason": "Content Person cannot attend",
+        })
+        ok = self.staff().post(f"/api/defense-schedules/{schedule_id}/reschedule", json={
+            "preferred_date": new_day.isoformat(), "selected_start": "13:00", "selected_end": "15:00", "mode": "Online",
+            "venue": "Zoom room B", "reason": "Panelist replaced", "requested_by": "Panel member",
+        })
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        with app.app_context():
+            self.assertEqual(Task.query.filter(Task.student_id == self.student_id, Task.title.like("Reschedule Proposal Defense%"), Task.status == "Pending").count(), 0)
+
+
+# ---------------------------------------------------------------------------
+# 5. Notifications and reminders
+# ---------------------------------------------------------------------------
+class NotificationTests(CalendarDataBase):
+    def feed(self, client):
+        response = client.get("/api/notifications")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return response.get_json()
+
+    def test_the_bell_needs_a_sign_in_and_starts_empty(self):
+        self.assertEqual(app.test_client().get("/api/notifications").status_code, 401)
+        body = self.feed(self.student())
+        self.assertEqual(body["items"], [])
+        self.assertEqual(body["unread_count"], 0)
+
+    def test_booking_a_defense_tells_the_student_the_adviser_and_the_panel(self):
+        self.ready_for_proposal()
+        day = future_weekday(21)
+        self.book_proposal(day)
+        for client in (self.student(), self.faculty_client("Chair Person"), self.faculty_client("Adviser Person"), self.faculty_client("External Person")):
+            items = self.feed(client)["items"]
+            self.assertTrue(any(item["kind"] == "defense_scheduled" and day.isoformat() in item["body"] for item in items), items)
+        self.assertEqual(self.feed(self.faculty_client("Spare Person"))["items"], [])
+        self.assertEqual(self.feed(self.other_student())["items"], [])
+
+    def test_a_reschedule_notice_carries_the_old_and_the_new_time_and_the_reason(self):
+        self.ready_for_proposal()
+        old_day, new_day = future_weekday(21), future_weekday(28)
+        schedule_id = self.book_proposal(old_day)
+        ok = self.staff().post(f"/api/defense-schedules/{schedule_id}/reschedule", json={
+            "preferred_date": new_day.isoformat(), "selected_start": "13:00", "selected_end": "15:00", "mode": "Online",
+            "venue": "Zoom room B", "reason": "The room is under repair", "requested_by": "GS Office",
+        })
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        items = self.feed(self.student())["items"]
+        notice = next(item for item in items if item["kind"] == "defense_rescheduled")
+        self.assertIn(old_day.isoformat(), notice["body"])
+        self.assertIn("09:00", notice["body"])
+        self.assertIn(new_day.isoformat(), notice["body"])
+        self.assertIn("13:00", notice["body"])
+        self.assertIn("The room is under repair", notice["body"])
+        chair = next(item for item in self.feed(self.faculty_client("Chair Person"))["items"] if item["kind"] == "defense_rescheduled")
+        self.assertIn(new_day.isoformat(), chair["body"])
+
+    def test_a_cancellation_notice_reaches_the_student(self):
+        self.ready_for_proposal()
+        schedule_id = self.book_proposal()
+        self.staff().post(f"/api/defense-schedules/{schedule_id}/cancel", json={"reason": "Panel unavailable", "requested_by": "Panel chair"})
+        items = self.feed(self.student())["items"]
+        self.assertTrue(any(item["kind"] == "defense_cancelled" and "Panel unavailable" in item["body"] for item in items), items)
+
+    def test_defense_reminders_are_generated_at_14_7_2_and_1_days_and_only_once(self):
+        self.ready_for_proposal()
+        day = future_weekday(28)
+        self.book_proposal(day)
+        with app.app_context():
+            counts = []
+            for offset in (20, 14, 14, 10, 7, 2, 1, 1, 0):
+                app_module.generate_reminders(today=day - timedelta(days=offset))
+                db.session.commit()
+                counts.append(app_module.Notification.query.filter_by(kind="defense_reminder").count())
+            # 5 people (student, adviser, chair, content, method, external = 6) per reminder day
+            per_day = 6
+            self.assertEqual(counts, [0, per_day, per_day, per_day, 2 * per_day, 3 * per_day, 4 * per_day, 4 * per_day, 4 * per_day])
+            reminder = app_module.Notification.query.filter_by(kind="defense_reminder").order_by(app_module.Notification.id).first()
+            self.assertIn("14", reminder.title)
+        body = self.feed(self.student())
+        self.assertTrue(any(item["kind"] == "defense_reminder" for item in body["items"]))
+
+    def test_opening_the_bell_generates_reminders_for_a_defense_tomorrow_without_duplicates(self):
+        self.ready_for_proposal()
+        with app.app_context():
+            tomorrow = date.today() + timedelta(days=1)
+            self.schedule(self.student_id, "Proposal Defense", day=tomorrow, names=FOUR)
+            db.session.commit()
+        first = self.feed(self.student())
+        second = self.feed(self.student())
+        reminders = [item for item in second["items"] if item["kind"] == "defense_reminder"]
+        self.assertEqual(len(reminders), 1)
+        self.assertEqual(len(first["items"]), len(second["items"]))
+
+    def test_a_panelist_with_no_availability_is_reminded(self):
+        self.ready_for_title(["Chair Person", "Content Person", "Unentered Person"])
+        body = self.feed(self.faculty_client("Unentered Person"))
+        self.assertTrue(any(item["kind"] == "availability_missing" for item in body["items"]), body)
+        self.assertEqual(len([i for i in self.feed(self.faculty_client("Unentered Person"))["items"] if i["kind"] == "availability_missing"]), 1)
+        self.assertFalse(any(item["kind"] == "availability_missing" for item in self.feed(self.faculty_client("Chair Person"))["items"]))
+
+    def test_an_adviser_is_reminded_when_a_signature_has_waited_three_days(self):
+        with app.app_context():
+            files = self.add_file(self.student_id, PROPOSAL, "Proposal manuscript")
+            files[0].uploaded_at = datetime.now() - timedelta(days=5)
+            db.session.commit()
+        body = self.feed(self.faculty_client("Adviser Person"))
+        self.assertTrue(any(item["kind"] == "signature_waiting" for item in body["items"]), body)
+        self.assertEqual(len([i for i in self.feed(self.faculty_client("Adviser Person"))["items"] if i["kind"] == "signature_waiting"]), 1)
+
+    def test_the_chair_is_told_when_a_verdict_is_due(self):
+        self.ready_for_proposal()
+        with app.app_context():
+            self.schedule(self.student_id, "Proposal Defense", day=date.today() - timedelta(days=1), names=FOUR)
+            db.session.commit()
+        items = self.feed(self.faculty_client("Chair Person"))["items"]
+        self.assertTrue(any(item["kind"] == "verdict_due" for item in items), items)
+        self.assertFalse(any(item["kind"] == "verdict_due" for item in self.feed(self.faculty_client("Content Person"))["items"]))
+
+    def test_reading_marks_a_notification_and_the_count_follows(self):
+        self.ready_for_proposal()
+        self.book_proposal()
+        body = self.feed(self.student())
+        self.assertGreaterEqual(body["unread_count"], 1)
+        first_id = body["items"][0]["id"]
+        self.assertEqual(self.student().post(f"/api/notifications/{first_id}/read", json={}).status_code, 200)
+        self.assertEqual(self.feed(self.student())["unread_count"], body["unread_count"] - 1)
+        self.assertEqual(self.other_student().post(f"/api/notifications/{first_id}/read", json={}).status_code, 404)
+        self.assertEqual(self.student().post("/api/notifications/read-all", json={}).status_code, 200)
+        self.assertEqual(self.feed(self.student())["unread_count"], 0)
+
+    def test_the_adviser_steps_notify_the_next_owner(self):
+        with app.app_context():
+            student = Student(
+                student_number="GS-NT-0001", first_name="Notify", last_name="Student", email="notify@example.test",
+                program_id=self.program_id, entry_year=2025, academic_year_entry="25-26", year_level="2",
+                current_stage="Proposal Development", standing="Active", comprehensive_exam_status="Passed",
+            )
+            db.session.add(student)
+            db.session.flush()
+            account_id = self._account("student", "notify-login@example.test", student_id=student.id).id
+            db.session.commit()
+        client = self.client(account_id, "student")
+        client.post("/api/student-portal/adviser/apply", json={"faculty_id": self.faculty_ids["Chair Person"]})
+        self.assertTrue(any(item["kind"] == "adviser_application" for item in self.feed(self.academic())["items"]))
+
+
+# ---------------------------------------------------------------------------
+# 6. Private calendar feed
+# ---------------------------------------------------------------------------
+class PrivateFeedTests(CalendarDataBase):
+    def create_feed(self, client):
+        response = client.post("/api/calendar-feed", json={})
+        self.assertEqual(response.status_code, 201, response.get_json())
+        return response.get_json()
+
+    def test_a_person_can_create_a_private_link_that_works_without_a_session(self):
+        self.ready_for_proposal()
+        day = future_weekday(21)
+        self.book_proposal(day)
+        self.assertIsNone(self.student().get("/api/calendar-feed").get_json()["feed"])
+        created = self.create_feed(self.student())
+        url = created["feed"]["url"]
+        self.assertTrue(url.startswith("/api/calendar/feed/") and url.endswith(".ics"))
+        anonymous = app.test_client().get(url)
+        self.assertEqual(anonymous.status_code, 200)
+        self.assertIn("text/calendar", anonymous.headers["Content-Type"])
+        body = anonymous.get_data(as_text=True)
+        self.assertIn("BEGIN:VCALENDAR", body)
+        self.assertIn(f"DTSTART;TZID=Asia/Manila:{day.strftime('%Y%m%d')}T090000", body)
+        self.assertIn("SUMMARY:Proposal Defense", body)
+        self.assertIn("SUMMARY:Due: ", body)  # deadlines ride in the same feed
+        self.assertEqual(self.student().get("/api/calendar-feed").get_json()["feed"]["url"], url)
+
+    def test_each_feed_holds_only_that_persons_calendar(self):
+        self.ready_for_proposal()
+        self.book_proposal()
+        other = app.test_client().get(self.create_feed(self.other_student())["feed"]["url"]).get_data(as_text=True)
+        self.assertNotIn("Proposal Defense", other)
+        chair = app.test_client().get(self.create_feed(self.faculty_client("Chair Person"))["feed"]["url"]).get_data(as_text=True)
+        self.assertIn("Proposal Defense", chair)
+        spare = app.test_client().get(self.create_feed(self.faculty_client("Spare Person"))["feed"]["url"]).get_data(as_text=True)
+        self.assertNotIn("Proposal Defense", spare)
+        staff = app.test_client().get(self.create_feed(self.staff())["feed"]["url"]).get_data(as_text=True)
+        self.assertIn("Proposal Defense", staff)
+
+    def test_regenerating_replaces_the_old_link_and_revoking_switches_it_off(self):
+        client = self.student()
+        first = self.create_feed(client)["feed"]["url"]
+        second = self.create_feed(client)["feed"]["url"]
+        self.assertNotEqual(first, second)
+        self.assertEqual(app.test_client().get(first).status_code, 404)
+        self.assertEqual(app.test_client().get(second).status_code, 200)
+        self.assertEqual(client.delete("/api/calendar-feed").status_code, 200)
+        self.assertEqual(app.test_client().get(second).status_code, 404)
+        self.assertIsNone(client.get("/api/calendar-feed").get_json()["feed"])
+
+    def test_unknown_tokens_and_disabled_accounts_get_nothing(self):
+        self.assertEqual(app.test_client().get("/api/calendar/feed/not-a-real-token.ics").status_code, 404)
+        url = self.create_feed(self.student())["feed"]["url"]
+        with app.app_context():
+            account = db.session.get(UserAccount, self.student_account_id)
+            account.active = False
+            db.session.commit()
+        self.assertEqual(app.test_client().get(url).status_code, 404)
+
+    def test_the_feed_needs_a_sign_in_to_manage(self):
+        self.assertEqual(app.test_client().post("/api/calendar-feed", json={}).status_code, 401)
+        self.assertEqual(app.test_client().get("/api/calendar-feed").status_code, 401)
+
+    def test_the_old_faculty_availability_feed_still_needs_a_session(self):
+        self.assertEqual(app.test_client().get(f"/api/faculty/{self.faculty_ids['Chair Person']}/calendar.ics").status_code, 401)
+
+
+if __name__ == "__main__":
+    unittest.main()

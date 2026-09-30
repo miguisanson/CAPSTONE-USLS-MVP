@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import random
 import re
+import secrets
 import shutil
 import sys
 import tempfile
@@ -15899,6 +15900,11 @@ def register_routes(app: Flask) -> None:
             f"{schedule.defense_type} schedule #{schedule.id} re-confirmed with the new panel", "Panel Chair",
             "Availability and conflicts were rechecked for the changed panel.",
         )
+        notify_schedule_people(
+            schedule, "defense_reconfirmed", f"The {schedule.defense_type} of {student.name} is confirmed again",
+            f"{defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)} with the new panel.",
+            f"defense_reconfirmed:{now_utc().strftime('%Y%m%d%H%M%S')}",
+        )
         db.session.commit()
         return jsonify({"ok": True, "message": "Schedule re-confirmed."})
 
@@ -16608,6 +16614,191 @@ def register_routes(app: Flask) -> None:
             body, mimetype="text/calendar",
             headers={"Content-Disposition": f'attachment; filename="defense-{schedule_id}.ics"'},
         )
+
+    # ---- panel invitations ----------------------------------------------------------------------
+    @app.route("/api/faculty-portal/panel-invitations")
+    @require_api_login("faculty")
+    def faculty_panel_invitations():
+        _account, faculty = signed_in_faculty()
+        if not faculty:
+            return jsonify(NO_FACULTY_RECORD[0]), NO_FACULTY_RECORD[1]
+        ensure_invitations_for_faculty(faculty)
+        db.session.commit()
+        rows = PanelInvitation.query.filter_by(faculty_id=faculty.id).order_by(PanelInvitation.invited_at.desc(), PanelInvitation.id.desc()).all()
+        items = []
+        for row in rows:
+            student = row.student
+            if not student or row.gate != current_panel_gate(student):
+                continue  # earlier stages are finished
+            if not PanelAssignment.query.filter_by(student_id=row.student_id, faculty_id=faculty.id, gate=row.gate).first():
+                continue  # no longer on the panel
+            items.append(panel_invitation_dict(row, include_schedule=True))
+        counts: dict[str, int] = {}
+        for item in items:
+            counts[item["status"]] = counts.get(item["status"], 0) + 1
+        return jsonify({"invitations": items, "counts": counts})
+
+    @app.route("/api/faculty-portal/panel-invitations/<int:invitation_id>/respond", methods=["POST"])
+    @require_api_login("faculty")
+    def faculty_panel_invitation_respond(invitation_id: int):
+        account, faculty = signed_in_faculty()
+        if not faculty:
+            return jsonify(NO_FACULTY_RECORD[0]), NO_FACULTY_RECORD[1]
+        row = PanelInvitation.query.filter_by(id=invitation_id, faculty_id=faculty.id).first()
+        if not row or not PanelAssignment.query.filter_by(student_id=row.student_id, faculty_id=faculty.id, gate=row.gate).first():
+            return jsonify({"error": "We could not find that invitation."}), 404
+        data = json_body()
+        response = str(data.get("response") or "").strip()
+        reason = re.sub(r"\s+", " ", str(data.get("reason") or "")).strip()[:500]
+        student = row.student
+        defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(row.gate, "defense")
+        if response == "accept":
+            row.status, row.reason, row.responded_at = "Accepted", None, now_utc()
+            close_research_tasks(row.student_id, prefix=f"Replace declined panelist: {faculty.name}")
+            add_log("defense-scheduling", student.id, f"{faculty.name} (Faculty Member)", row.gate,
+                    f"Panel invitation accepted ({row.panel_role})", "Research Coordinator", f"{faculty.name} accepted the {defense_type} panel seat.")
+        elif response == "decline":
+            if len(reason) < 3:
+                return jsonify({"error": "Give a short reason for declining; the coordinators see it."}), 400
+            row.status, row.reason, row.responded_at = "Declined", reason, now_utc()
+            ensure_open_task(student.id, f"Replace declined panelist: {faculty.name} ({defense_type})", "Research Coordinator", 2, 60)
+            notify_many(
+                accounts_for_roles("research_coordinator", "staff"), "panel_declined",
+                f"{faculty.name} declined the {defense_type} panel of {student.name}", f"Reason: {reason}. Replace the panelist or reschedule.",
+                link="/workflow/panel-matching", related_type="panel_invitation", related_id=row.id,
+                dedupe_key=f"panel_declined:{row.id}:{now_utc().strftime('%Y%m%d%H%M%S')}",
+            )
+            add_log("defense-scheduling", student.id, f"{faculty.name} (Faculty Member)", row.gate,
+                    f"Panel invitation declined ({row.panel_role})", "Research Coordinator", f"Reason: {reason}")
+        else:
+            return jsonify({"error": "Choose accept or decline."}), 400
+        db.session.commit()
+        return jsonify({"ok": True, "invitation": panel_invitation_dict(row, include_schedule=True)})
+
+    @app.route("/api/faculty-portal/defense-schedules/<int:schedule_id>/cannot-attend", methods=["POST"])
+    @require_api_login("faculty")
+    def faculty_cannot_attend(schedule_id: int):
+        """A panelist or the adviser cannot attend a booked defense: the coordinators get a reschedule request."""
+        _account, faculty = signed_in_faculty()
+        if not faculty:
+            return jsonify(NO_FACULTY_RECORD[0]), NO_FACULTY_RECORD[1]
+        schedule = db.session.get(ScheduleRequest, schedule_id)
+        if not schedule or faculty.id not in schedule_panel_ids(schedule):
+            return jsonify({"error": "We could not find that defense."}), 404
+        if schedule.status not in SLOT_HOLDING_DEFENSE_STATUSES:
+            return jsonify({"error": "That defense is not booked any more."}), 409
+        reason = re.sub(r"\s+", " ", str(json_body().get("reason") or "")).strip()[:500]
+        if len(reason) < 3:
+            return jsonify({"error": "Give the reason you cannot attend; the coordinators see it."}), 400
+        student = schedule.student
+        gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
+        role = defense_seat_role(schedule, faculty.id) or "Panel member"
+        if gate:
+            sync_panel_invitations(student, gate, notify=False)
+        invitation = PanelInvitation.query.filter_by(student_id=student.id, faculty_id=faculty.id, gate=gate).first() if gate else None
+        if invitation:
+            invitation.status, invitation.reason, invitation.responded_at = "Declined", f"Cannot attend the {schedule.preferred_date.isoformat()} defense: {reason}", now_utc()
+        ensure_open_task(student.id, f"Reschedule {schedule.defense_type}: {faculty.name} cannot attend", "Research Coordinator", 2, 60)
+        notify_many(
+            accounts_for_roles("research_coordinator", "staff"), "cannot_attend",
+            f"{faculty.name} cannot attend the {schedule.defense_type} of {student.name}",
+            f"{role}, {defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)}. Reason: {reason}",
+            link="/calendar", related_type="schedule_request", related_id=schedule.id,
+            dedupe_key=f"cannot_attend:{schedule.id}:{faculty.id}:{now_utc().strftime('%Y%m%d%H%M%S')}",
+        )
+        add_log("defense-scheduling", student.id, f"{faculty.name} (Faculty Member)", schedule.defense_type or "",
+                f"{role} cannot attend the {schedule.defense_type}", "Research Coordinator", f"Reason: {reason}")
+        db.session.commit()
+        return jsonify({"ok": True, "message": "The Research Coordinator was asked to reschedule or replace you."})
+
+    @app.route("/api/panel-invitations")
+    @require_api_login("staff", "research_coordinator", "academic_coordinator")
+    def panel_invitation_list():
+        student_id = request.args.get("student_id", type=int)
+        student = db.session.get(Student, student_id) if student_id else None
+        if student:
+            sync_panel_invitations(student, current_panel_gate(student), notify=False)
+            db.session.commit()
+        query = PanelInvitation.query
+        if student_id:
+            query = query.filter_by(student_id=student_id)
+        rows = query.order_by(PanelInvitation.id.desc()).limit(300).all()
+        return jsonify({"invitations": [panel_invitation_dict(row) for row in rows]})
+
+    # ---- notifications --------------------------------------------------------------------------
+    @app.route("/api/notifications")
+    @require_api_login()
+    def notifications_list():
+        account = current_account()
+        generate_reminders(account=account)
+        db.session.commit()
+        limit = min(max(request.args.get("limit", default=50, type=int), 1), 200)
+        query = Notification.query.filter_by(account_id=account.id)
+        if request.args.get("unread") in {"1", "true"}:
+            query = query.filter(Notification.read_at.is_(None))
+        rows = query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit).all()
+        unread = Notification.query.filter_by(account_id=account.id, read_at=None).count()
+        return jsonify({"items": [notification_dict(row) for row in rows], "unread_count": unread})
+
+    @app.route("/api/notifications/<int:notification_id>/read", methods=["POST"])
+    @require_api_login()
+    def notification_mark_read(notification_id: int):
+        account = current_account()
+        row = Notification.query.filter_by(id=notification_id, account_id=account.id).first()
+        if not row:
+            return jsonify({"error": "We could not find that notification."}), 404
+        if not row.read_at:
+            row.read_at = now_utc()
+            db.session.commit()
+        return jsonify({"ok": True})
+
+    @app.route("/api/notifications/read-all", methods=["POST"])
+    @require_api_login()
+    def notification_mark_all_read():
+        account = current_account()
+        for row in Notification.query.filter_by(account_id=account.id, read_at=None).all():
+            row.read_at = now_utc()
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    # ---- private calendar feed ------------------------------------------------------------------
+    @app.route("/api/calendar-feed")
+    @require_api_login()
+    def calendar_feed_get():
+        return jsonify({"feed": calendar_feed_dict(active_calendar_token(current_account()))})
+
+    @app.route("/api/calendar-feed", methods=["POST"])
+    @require_api_login()
+    def calendar_feed_create():
+        """Create (or replace) the private link. The old link stops working at once."""
+        account = current_account()
+        for row in CalendarToken.query.filter_by(account_id=account.id, revoked_at=None).all():
+            row.revoked_at = now_utc()
+        token = CalendarToken(account_id=account.id, token=secrets.token_urlsafe(32))
+        db.session.add(token)
+        db.session.commit()
+        return jsonify({"ok": True, "feed": calendar_feed_dict(token)}), 201
+
+    @app.route("/api/calendar-feed", methods=["DELETE"])
+    @require_api_login()
+    def calendar_feed_revoke():
+        account = current_account()
+        for row in CalendarToken.query.filter_by(account_id=account.id, revoked_at=None).all():
+            row.revoked_at = now_utc()
+        db.session.commit()
+        return jsonify({"ok": True, "feed": None})
+
+    @app.route("/api/calendar/feed/<token>.ics")
+    def calendar_feed_public(token: str):
+        """Subscribe-able feed. The secret in the address is the credential; there is no session."""
+        row = CalendarToken.query.filter_by(token=token, revoked_at=None).first()
+        account = db.session.get(UserAccount, row.account_id) if row else None
+        if not row or not account or not account.active:
+            return jsonify({"error": "This calendar link is not valid any more."}), 404
+        row.last_used_at = now_utc()
+        body = calendar_feed_for_account(account)
+        db.session.commit()
+        return Response(body, mimetype="text/calendar", headers={"Cache-Control": "private, max-age=300"})
 
     # <<CALENDAR-ROUTES-END>>
 
@@ -23773,6 +23964,12 @@ def flag_schedule_after_panel_change(student: Student, gate: str, actor: str, re
         f"{defense_type} panel changed; schedule #{schedule.id} needs re-confirmation", "Research Coordinator",
         schedule.conflict_reason,
     )
+    notify_schedule_people(
+        schedule, "panel_changed", f"The panel of the {defense_type} of {student.name} changed",
+        f"The booking {defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)} is on hold until "
+        f"the Graduate School re-confirms it. Reason: {reason or 'not recorded'}.",
+        "panel_changed",
+    )
     return schedule
 
 
@@ -23892,6 +24089,7 @@ def handle_panel_matching(data: MultiDict) -> int:
     )
     defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(matching_profile["gate"], "defense")
     ensure_open_task(student.id, f"Confirm assigned panel acceptance ({defense_type})", "Research Coordinator", 3, 30)
+    sync_panel_invitations(student, matching_profile["gate"])
     if had_panel:
         flag_schedule_after_panel_change(student, matching_profile["gate"], workflow_actor_label(account), change_reason)
     sync_research_progress(student)
@@ -23941,6 +24139,7 @@ def handle_defense_scheduling(data: MultiDict) -> int:
             + (f". Reason: {change_reason}" if change_reason else ""),
         )
         db.session.flush()
+        sync_panel_invitations(student, reassign_gate)
         if had_panel:
             flag_schedule_after_panel_change(student, reassign_gate, workflow_actor_label(account), change_reason)
         sync_research_progress(student)
@@ -24190,6 +24389,8 @@ def book_defense_schedule(
         + (f"; requested by {requested_by}: {change_reason}" if replaces else "")
         + (f"; override reason: {override_reason}" if override_reason else ""),
     )
+    close_research_tasks(student.id, prefix=f"Reschedule {defense_type}:")
+    notify_defense_booked(schedule, replaces, change_reason, requested_by)
     sync_research_progress(student)
     return schedule
 
@@ -24207,6 +24408,7 @@ def cancel_defense_schedule(schedule: ScheduleRequest, account: UserAccount, rea
         f"{schedule.defense_type} schedule #{schedule.id} cancelled", "Research Coordinator",
         f"Requested by {requested_by or 'not recorded'}. Reason: {reason}",
     )
+    notify_defense_cancelled(schedule, reason, requested_by)
 
 
 # ===========================================================================
@@ -24883,8 +25085,9 @@ def defense_attention(schedule: ScheduleRequest) -> list[str]:
         notes.append("Needs re-confirmation: the panel changed after booking.")
     gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
     if gate and schedule.status in SLOT_HOLDING_DEFENSE_STATUSES:
+        seated = schedule_panel_ids(schedule)
         for row in PanelInvitation.query.filter_by(student_id=schedule.student_id, gate=gate, status="Declined").all():
-            if row.faculty:
+            if row.faculty and row.faculty_id in seated:
                 notes.append(f"{row.faculty.name} cannot attend: {row.reason or 'no reason given'}.")
     return notes
 
@@ -25232,6 +25435,331 @@ def next_defense_event(scope: dict) -> dict | None:
         if schedule_in_scope(scope, schedule) and defense_start_datetime(schedule) >= now - timedelta(hours=3):
             return calendar_defense_event(schedule, scope, set())
     return None
+
+
+# ---- panel invitations ------------------------------------------------------------------------
+def panel_invitation_dict(row: PanelInvitation, include_schedule: bool = False) -> dict:
+    payload = {
+        "id": row.id,
+        "student": student_brief(row.student) if row.student else None,
+        "faculty_id": row.faculty_id,
+        "faculty_name": row.faculty.name if row.faculty else None,
+        "gate": row.gate,
+        "defense_type": RESEARCH_GATE_DEFENSE_TYPES.get(row.gate),
+        "panel_role": row.panel_role,
+        "status": row.status,
+        "invited_at": iso(row.invited_at),
+        "responded_at": iso(row.responded_at),
+        "reason": row.reason,
+    }
+    if include_schedule:
+        defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(row.gate)
+        schedule = (
+            ScheduleRequest.query.filter(
+                ScheduleRequest.student_id == row.student_id,
+                ScheduleRequest.defense_type == defense_type,
+                ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+            ).order_by(ScheduleRequest.id.desc()).first()
+        )
+        payload["schedule"] = schedule_request_dict(schedule) if schedule else None
+        payload["other_members"] = [
+            {"name": item.faculty.name, "role": item.panel_role}
+            for item in PanelAssignment.query.filter_by(student_id=row.student_id, gate=row.gate).all()
+            if item.faculty and item.faculty_id != row.faculty_id
+        ]
+    return payload
+
+
+def sync_panel_invitations(student: Student, gate: str, notify: bool = True) -> int:
+    """Make sure every seat on the current panel has an invitation; tell new members once."""
+    panel = active_panel_assignments(student, gate)
+    seated = {item.faculty_id for item in panel}
+    created = 0
+    for assignment in panel:
+        invitation = PanelInvitation.query.filter_by(student_id=student.id, faculty_id=assignment.faculty_id, gate=gate).first()
+        if invitation:
+            invitation.panel_role = assignment.panel_role
+            continue
+        carried = None
+        if gate == RESEARCH_GATE_FINAL:
+            carried = PanelInvitation.query.filter_by(
+                student_id=student.id, faculty_id=assignment.faculty_id, gate=RESEARCH_GATE_PROPOSAL, status="Accepted",
+            ).first()
+        invitation = PanelInvitation(
+            student_id=student.id, faculty_id=assignment.faculty_id, gate=gate, panel_role=assignment.panel_role,
+            status="Accepted" if carried else "Invited",
+            responded_at=now_utc() if carried else None,
+            reason="Carried over from the proposal defense panel" if carried else None,
+        )
+        db.session.add(invitation)
+        db.session.flush()
+        created += 1
+        if notify and not carried:
+            notify_many(
+                accounts_for_faculty(assignment.faculty_id), "panel_invited",
+                f"You are invited to the {RESEARCH_GATE_DEFENSE_TYPES.get(gate, 'defense')} panel of {student.name}",
+                f"Role: {assignment.panel_role}. Accept or decline in Panel Invitations.",
+                link="/faculty-portal/invitations", related_type="panel_invitation", related_id=invitation.id,
+                dedupe_key=f"panel_invited:{invitation.id}",
+            )
+    for invitation in PanelInvitation.query.filter_by(student_id=student.id, gate=gate, status="Declined").all():
+        if invitation.faculty_id not in seated and invitation.faculty:
+            close_research_tasks(student.id, prefix=f"Replace declined panelist: {invitation.faculty.name}")
+    return created
+
+
+def ensure_invitations_for_faculty(faculty: Faculty) -> None:
+    """Create the invitations a faculty member should have for seats on a student's current panel."""
+    for assignment in PanelAssignment.query.filter_by(faculty_id=faculty.id).all():
+        student = assignment.student
+        if not student:
+            continue
+        gate = current_panel_gate(student)
+        if assignment.gate == gate:
+            sync_panel_invitations(student, gate, notify=False)
+
+
+# ---- notifications about schedule changes -----------------------------------------------------
+def defense_slot_text(day: date, start: time | None, end: time | None) -> str:
+    return f"{day.isoformat()} {start.strftime('%H:%M') if start else '--:--'}-{end.strftime('%H:%M') if end else '--:--'} ({CALENDAR_TIMEZONE})"
+
+
+def schedule_people_accounts(schedule: ScheduleRequest) -> list[UserAccount]:
+    accounts = list(accounts_for_student(schedule.student_id))
+    for faculty_id in sorted(schedule_panel_ids(schedule)):
+        accounts.extend(accounts_for_faculty(faculty_id))
+    unique = {account.id: account for account in accounts}
+    return list(unique.values())
+
+
+def notify_schedule_people(schedule: ScheduleRequest, kind: str, title: str, body: str, dedupe: str, link_student: str = "/student/calendar") -> None:
+    for account in schedule_people_accounts(schedule):
+        link = link_student if account.role == "student" else "/faculty-portal/calendar"
+        notify_account(
+            account, kind, title, body, link=link, related_type="schedule_request", related_id=schedule.id,
+            dedupe_key=f"{dedupe}:{schedule.id}",
+        )
+
+
+def notify_defense_booked(schedule: ScheduleRequest, replaced: ScheduleRequest | None, reason: str, requested_by: str | None) -> None:
+    slot = defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)
+    where = f"{schedule.venue} ({schedule.mode})" if schedule.venue else schedule.mode
+    student = schedule.student
+    if replaced:
+        old = defense_slot_text(replaced.preferred_date, replaced.start_time, replaced.end_time)
+        notify_schedule_people(
+            schedule, "defense_rescheduled", f"{schedule.defense_type} of {student.name} was rescheduled",
+            f"Moved from {old} to {slot}. Venue: {where}. Reason: {reason or 'not recorded'}"
+            + (f" (asked by {requested_by})." if requested_by else "."),
+            "defense_rescheduled",
+        )
+    else:
+        notify_schedule_people(
+            schedule, "defense_scheduled", f"{schedule.defense_type} of {student.name} is scheduled",
+            f"{slot}. Venue: {where}.", "defense_scheduled",
+        )
+
+
+def notify_defense_cancelled(schedule: ScheduleRequest, reason: str, requested_by: str | None) -> None:
+    slot = defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)
+    notify_schedule_people(
+        schedule, "defense_cancelled", f"{schedule.defense_type} of {schedule.student.name} was cancelled",
+        f"The defense planned for {slot} was cancelled. Reason: {reason}"
+        + (f" (asked by {requested_by})." if requested_by else ".") + " A new date will be set.",
+        "defense_cancelled",
+    )
+
+
+# ---- reminders ----------------------------------------------------------------------------------
+def defense_reminder_thresholds() -> list[int]:
+    raw = str(rule_value("defense.reminder_days", "14,7,2,1"))
+    values = sorted({int(item) for item in re.findall(r"\d+", raw)})
+    return values or [1, 2, 7, 14]
+
+
+def generate_reminders(account: UserAccount | None = None, today: date | None = None) -> int:
+    """Create every reminder that is due. Idempotent (each notification has a dedupe key), so it can run
+    whenever someone opens the bell. With `account` only that person's reminders are made."""
+    today = today or manila_now().date()
+    thresholds = defense_reminder_thresholds()
+    created = 0
+
+    def wanted(target: UserAccount) -> bool:
+        return account is None or account.id == target.id
+
+    def add(target: UserAccount, *args, **kwargs) -> None:
+        nonlocal created
+        if wanted(target) and notify_account(target, *args, **kwargs):
+            created += 1
+
+    upcoming = ScheduleRequest.query.filter(
+        ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ScheduleRequest.preferred_date >= today,
+        ScheduleRequest.preferred_date <= today + timedelta(days=max(thresholds)),
+    ).all()
+    for schedule in upcoming:
+        if account is not None and account.role in ("student", "faculty") and not schedule_in_scope(calendar_scope(account), schedule):
+            continue
+        days_left = (schedule.preferred_date - today).days
+        bracket = min((t for t in thresholds if days_left <= t), default=None)
+        if bracket is None:
+            continue
+        slot = defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)
+        when = "today" if days_left == 0 else "tomorrow" if days_left == 1 else f"in {days_left} days"
+        for person in schedule_people_accounts(schedule):
+            note = (
+                f"Panel and adviser: the manuscript must already be with the panel (14-Day Rule). {slot}. Venue: {schedule.venue}."
+                if bracket == max(thresholds) and person.role == "faculty"
+                else f"{slot}. Venue: {schedule.venue}."
+            )
+            add(
+                person, "defense_reminder", f"Defense {when} ({bracket}-day reminder): {schedule.defense_type} of {schedule.student.name}",
+                note, link="/student/calendar" if person.role == "student" else "/faculty-portal/calendar",
+                related_type="schedule_request", related_id=schedule.id, due_on=schedule.preferred_date,
+                dedupe_key=f"defense_reminder:{schedule.id}:{bracket}",
+            )
+    # staff: what is on today
+    todays = [
+        item for item in ScheduleRequest.query.filter(
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES), ScheduleRequest.preferred_date == today,
+        ).order_by(ScheduleRequest.start_time).all()
+    ]
+    if todays:
+        for person in accounts_for_roles("staff", "research_coordinator"):
+            add(
+                person, "defenses_today", f"{len(todays)} defense{'s' if len(todays) != 1 else ''} today",
+                "; ".join(f"{item.start_time.strftime('%H:%M') if item.start_time else ''} {item.defense_type} - {item.student.name} ({item.venue})" for item in todays),
+                link="/calendar", related_type="schedule_request", dedupe_key=f"defenses_today:{today.isoformat()}", due_on=today,
+            )
+    # verdicts: the chair is reminded on the day; staff when it is overdue
+    started = ScheduleRequest.query.filter(
+        ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES), ScheduleRequest.preferred_date <= today,
+        ScheduleRequest.preferred_date >= today - timedelta(days=60),
+    ).all()
+    verdict_ids = {
+        sid for (sid,) in db.session.query(DefenseVerdict.schedule_request_id)
+        .filter(DefenseVerdict.schedule_request_id.in_([item.id for item in started] or [-1])).all()
+    }
+    for schedule in started:
+        if schedule.id in verdict_ids:
+            continue
+        due = next_working_day(schedule.preferred_date)
+        try:
+            seats = json.loads(schedule.panel_snapshot or "[]")
+        except (TypeError, json.JSONDecodeError):
+            seats = []
+        for seat in seats:
+            if (seat.get("role") or "").lower() in {"panel chair", "panel lead"}:
+                for person in accounts_for_faculty(seat.get("faculty_id")):
+                    add(
+                        person, "verdict_due", f"Verdict due by {due.isoformat()}: {schedule.defense_type} of {schedule.student.name}",
+                        "Submit the verdict and the consolidated comments within the first working day after the defense.",
+                        link="/faculty-portal/verdicts", related_type="schedule_request", related_id=schedule.id, due_on=due,
+                        dedupe_key=f"verdict_due:{schedule.id}",
+                    )
+        if today > due:
+            for person in accounts_for_roles("staff", "research_coordinator"):
+                add(
+                    person, "verdict_overdue", f"Verdict overdue: {schedule.defense_type} of {schedule.student.name}",
+                    f"The defense was on {schedule.preferred_date.isoformat()}; the verdict was due {due.isoformat()}.",
+                    link="/calendar", related_type="schedule_request", related_id=schedule.id,
+                    dedupe_key=f"verdict_overdue:{schedule.id}",
+                )
+    # faculty: availability not entered while seated on a panel, overdue requests, signatures waiting
+    for person in (accounts_for_roles("faculty") if account is None else ([account] if account.role == "faculty" else [])):
+        faculty = db.session.get(Faculty, person.faculty_id) if person.faculty_id else None
+        if not faculty:
+            continue
+        seats = PanelAssignment.query.filter_by(faculty_id=faculty.id).count() + len(advisee_student_ids(faculty))
+        if seats and not faculty_availability_entered(faculty):
+            add(
+                person, "availability_missing", "Please enter your availability",
+                "You sit on panels or advise students, but no availability is entered, so the Graduate School cannot check your time.",
+                link="/faculty-portal/availability", related_type="faculty", related_id=faculty.id,
+                dedupe_key=f"availability_missing:{faculty.id}",
+            )
+        overdue_days = int(rule_value("defense.availability_reminder_days", 3))
+        for request_row in AvailabilityRequest.query.filter_by(faculty_id=faculty.id, status="Open").all():
+            if request_row.created_at and (today - request_row.created_at.date()).days >= overdue_days:
+                add(
+                    person, "availability_request_overdue", "An availability request is still waiting for you",
+                    request_row.message or "Staff asked for your available dates for a defense.",
+                    link="/faculty-portal/availability", related_type="availability_request", related_id=request_row.id,
+                    dedupe_key=f"availability_request_overdue:{request_row.id}",
+                )
+        waiting_days = int(rule_value("research.signature_reminder_days", 3))
+        for student_id in advisee_student_ids(faculty):
+            for check in DocumentCheck.query.filter(
+                DocumentCheck.student_id == student_id, DocumentCheck.item_name.in_(ADVISER_APPROVAL_DOCUMENTS),
+            ).all():
+                files = sorted(check.evidence_files, key=lambda item: item.uploaded_at or now_utc())
+                latest = files[-1] if files else None
+                if not latest or not latest.uploaded_at or (today - latest.uploaded_at.date()).days < waiting_days:
+                    continue
+                if AdviserDocumentApproval.query.filter_by(evidence_file_id=latest.id).first():
+                    continue
+                student = db.session.get(Student, student_id)
+                add(
+                    person, "signature_waiting", f"Signature waiting: {check.item_name} of {student.name if student else 'a student'}",
+                    f"Uploaded {latest.uploaded_at.date().isoformat()}; it has been waiting {(today - latest.uploaded_at.date()).days} days.",
+                    link="/faculty-portal/signatures", related_type="evidence_file", related_id=latest.id,
+                    dedupe_key=f"signature_waiting:{latest.id}",
+                )
+    # students: ethics application and advising-contract deadlines
+    for student_account in (accounts_for_roles("student") if account is None else ([account] if account.role == "student" else [])):
+        if not student_account.student_id:
+            continue
+        scope = calendar_scope(student_account)
+        for item in calendar_deadlines(scope, today, today + timedelta(days=7)):
+            if item["done"] or item["kind"] not in ("ethics_due", "adviser_contract_due", "manuscript_to_panel"):
+                continue
+            add(
+                student_account, "deadline_soon", f"Due {item['date']}: {item['label']}", "",
+                link="/student/calendar", related_type=item["kind"], dedupe_key=f"deadline_soon:{item['id']}", due_on=parse_date(item["date"]),
+            )
+    return created
+
+
+def notification_dict(row: Notification) -> dict:
+    return {
+        "id": row.id, "kind": row.kind, "title": row.title, "body": row.body, "link": row.link,
+        "related_type": row.related_type, "related_id": row.related_id, "due_on": iso(row.due_on),
+        "created_at": iso(row.created_at), "read_at": iso(row.read_at),
+    }
+
+
+# ---- private calendar feed ---------------------------------------------------------------------
+def active_calendar_token(account: UserAccount) -> CalendarToken | None:
+    return CalendarToken.query.filter_by(account_id=account.id, revoked_at=None).order_by(CalendarToken.id.desc()).first()
+
+
+def calendar_feed_dict(row: CalendarToken | None) -> dict | None:
+    if not row:
+        return None
+    path = f"/api/calendar/feed/{row.token}.ics"
+    return {
+        "url": path,
+        "absolute_url": f"{request.url_root.rstrip('/')}{path}" if has_request_context() else path,
+        "created_at": iso(row.created_at),
+        "last_used_at": iso(row.last_used_at),
+    }
+
+
+def calendar_feed_for_account(account: UserAccount) -> str:
+    """Defenses and deadlines for one person, exactly what their calendar page shows."""
+    scope = calendar_scope(account)
+    today = date.today()
+    events = calendar_events(scope, today - timedelta(days=30), today + timedelta(days=200), {})
+    deadlines = [
+        item for item in calendar_deadlines(scope, today - timedelta(days=3), today + timedelta(days=200)) if not item["done"]
+    ]
+    blocks = [ics_defense_event(event) for event in events if event["kind"] == "defense"]
+    blocks += [ics_deadline_event(item) for item in deadlines]
+    return build_ics(
+        f"USLS Graduate School - {account.full_name}",
+        "Defenses and deadlines from the Graduate School platform. Private link: do not share it.",
+        blocks,
+    )
 
 
 # <<CALENDAR-HELPERS-END>>
