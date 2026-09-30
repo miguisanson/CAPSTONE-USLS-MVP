@@ -34014,48 +34014,10 @@ def ensure_panel_matching_demo_students() -> int:
         adviser = Faculty.query.filter_by(name=spec["adviser"], active=True).first()
         if not program or not adviser:
             continue
-        courses = monitoring_curriculum_courses(program)
-        if not courses:
-            ensure_monitoring_template_courses()
-            courses = monitoring_curriculum_courses(program)
-        if not courses:
+        student = _create_panel_demo_student(spec, program, adviser)
+        if student is None:
             continue
         created += 1
-        student = Student(
-            student_number=spec["student_number"],
-            first_name=spec["first_name"],
-            last_name=spec["last_name"],
-            email=f"{spec['first_name']}.{spec['last_name']}@student.usls.edu.ph".lower(),
-            program_id=program.id,
-            entry_year=2024,
-            academic_year_entry="24-25",
-            year_level="2",
-            current_stage="Proposal Development",
-            standing="Active",
-            enrollment_tag="Enrolled",
-            comprehensive_exam_status="Passed",
-            risk_level="On Track",
-            adviser_name=adviser.name,
-        )
-        db.session.add(student)
-        db.session.flush()
-        for course in courses:
-            db.session.add(CourseRecord(
-                student_id=student.id, course_id=course.id, status="Completed",
-                evidence_reference="Demo seed: coursework complete", grade_status="No Grade",
-            ))
-        db.session.add(AdviserAssignment(student_id=student.id, faculty_id=adviser.id, status="Active"))
-        db.session.add(ResearchCase(
-            student_id=student.id,
-            case_type=research_case_type(student),
-            title=spec["case_title"],
-            current_gate="Form 1 - Title Defense",
-            status="Missing Requirements",
-            adviser_name=adviser.name,
-        ))
-        db.session.flush()
-        _seed_panel_demo_research(student, spec, adviser)
-        sync_research_progress(student)
     # Panel matching opens only after the Academic Coordinator endorses Form 1 and the three
     # concept papers (Research Protocol). Every demo student has its three papers, so give each
     # one the demo endorsement if it is missing; nothing else about existing students changes.
@@ -34071,6 +34033,144 @@ def ensure_panel_matching_demo_students() -> int:
             ))
     db.session.flush()
     return created
+
+
+def _create_panel_demo_student(spec: dict, program: Program, adviser: Faculty) -> Student | None:
+    """One demo research student with completed coursework, an adviser, a research case and evidence.
+
+    Returns None when the program has no curriculum to complete. Used by the Panel Matching demo
+    students and by the upcoming-defense demo students.
+    """
+    courses = monitoring_curriculum_courses(program)
+    if not courses:
+        ensure_monitoring_template_courses()
+        courses = monitoring_curriculum_courses(program)
+    if not courses:
+        return None
+    student = Student(
+        student_number=spec["student_number"],
+        first_name=spec["first_name"],
+        last_name=spec["last_name"],
+        email=f"{spec['first_name']}.{spec['last_name']}@student.usls.edu.ph".lower(),
+        program_id=program.id,
+        entry_year=2024,
+        academic_year_entry="24-25",
+        year_level="2",
+        current_stage="Proposal Development",
+        standing="Active",
+        enrollment_tag="Enrolled",
+        comprehensive_exam_status="Passed",
+        risk_level="On Track",
+        adviser_name=adviser.name,
+    )
+    db.session.add(student)
+    db.session.flush()
+    for course in courses:
+        db.session.add(CourseRecord(
+            student_id=student.id, course_id=course.id, status="Completed",
+            evidence_reference="Demo seed: coursework complete", grade_status="No Grade",
+        ))
+    db.session.add(AdviserAssignment(student_id=student.id, faculty_id=adviser.id, status="Active"))
+    db.session.add(ResearchCase(
+        student_id=student.id,
+        case_type=research_case_type(student),
+        title=spec["case_title"],
+        current_gate="Form 1 - Title Defense",
+        status="Missing Requirements",
+        adviser_name=adviser.name,
+    ))
+    db.session.flush()
+    _seed_panel_demo_research(student, spec, adviser)
+    sync_research_progress(student)
+    return student
+
+
+def ensure_upcoming_defense_demo() -> int:
+    """Keep a few future defenses for the demo research students (demo mode only, idempotent).
+
+    Every seeded defense is in the past, so the calendars, the faculty dashboard and the
+    reminders would be empty. This creates three clearly marked demonstration students (student
+    numbers GS-2026-UD-xx, schedule note "Demo seed") with a panel, accepted invitations and a
+    Proposal Defense booked ahead, and on every start moves a demo defense that is about to
+    pass (and has no verdict) to a fresh date. Returns the number of records created or moved.
+    """
+    if not demo_mode_enabled():
+        return 0
+    if os.getenv("PANEL_MATCHING_DEMO_SEED", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return 0
+    from panel_demo_data import PANEL_MATCHING_DEMO_STUDENTS, UPCOMING_DEFENSE_DEMO
+
+    bases = {item["student_number"]: item for item in PANEL_MATCHING_DEMO_STUDENTS}
+    gate = RESEARCH_GATE_PROPOSAL
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES[gate]
+    today = date.today()
+    changed = 0
+    for item in UPCOMING_DEFENSE_DEMO:
+        base = bases.get(item["base"])
+        if not base:
+            continue
+        spec = {**base, **{key: item[key] for key in ("student_number", "first_name", "last_name", "case_title")}}
+        student = Student.query.filter_by(student_number=spec["student_number"]).first()
+        if student is None:
+            program = Program.query.filter_by(code=spec["program_code"]).first()
+            adviser = Faculty.query.filter_by(name=spec["adviser"], active=True).first()
+            if not program or not adviser:
+                continue
+            student = _create_panel_demo_student(spec, program, adviser)
+            if student is None:
+                continue
+            changed += 1
+        for faculty_name, role in spec["title_panel"]:
+            member = Faculty.query.filter_by(name=faculty_name).first()
+            if member and not PanelAssignment.query.filter_by(student_id=student.id, faculty_id=member.id, gate=gate).first():
+                db.session.add(PanelAssignment(
+                    student_id=student.id, faculty_id=member.id, gate=gate, panel_role=role,
+                    score=90, eligibility_note="Demo seed: panel for the upcoming defense",
+                ))
+        db.session.flush()
+        panel = active_panel_assignments(student, gate)
+        if not panel:
+            continue
+        defense_day = today + timedelta(days=item["days_ahead"])
+        while defense_day.weekday() >= 5:
+            defense_day += timedelta(days=1)
+        schedule = (
+            ScheduleRequest.query.filter(
+                ScheduleRequest.student_id == student.id,
+                ScheduleRequest.defense_type == defense_type,
+                ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+            ).order_by(ScheduleRequest.id.desc()).first()
+        )
+        if schedule is None:
+            db.session.add(ScheduleRequest(
+                student_id=student.id, preferred_date=defense_day, preferred_end_date=defense_day,
+                start_time=datetime.strptime(item["start"], "%H:%M").time(),
+                end_time=datetime.strptime(item["end"], "%H:%M").time(),
+                defense_type=defense_type, mode=item["mode"], venue=item["venue"], status="Scheduled",
+                matched_count=len(panel), required_forms_status="Complete",
+                panel_snapshot=json.dumps(panel_snapshot_for(panel)),
+                notes="Demo seed: upcoming proposal defense (demonstration data)",
+                confirmed_at=now_utc(), manuscript_received_on=defense_day - timedelta(days=16),
+            ))
+            changed += 1
+        elif (
+            schedule.preferred_date <= today
+            and schedule.status == "Scheduled"
+            and not DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first()
+            and (schedule.notes or "").startswith("Demo seed")
+        ):
+            schedule.preferred_date = schedule.preferred_end_date = defense_day
+            schedule.manuscript_received_on = defense_day - timedelta(days=16)
+            changed += 1
+        if sync_panel_invitations(student, gate, notify=False):
+            invitations = PanelInvitation.query.filter_by(student_id=student.id, gate=gate).order_by(PanelInvitation.id).all()
+            for position, invitation in enumerate(invitations):
+                if position < len(invitations) - 1:  # the last seat stays invited so the invitation screen has one to show
+                    invitation.status = "Accepted"
+                    invitation.responded_at = now_utc()
+        sync_research_progress(student)
+    db.session.flush()
+    return changed
 
 
 def _panel_demo_evidence(student: Student, gate: str, item_name: str, number: int, label: str, body: str, complete: bool) -> None:
@@ -36505,6 +36605,12 @@ def run_startup_tasks(seed_count: int | None = None) -> dict:
         print(f"The Operations Manual draft was not added to the policy library: {exc}")
     if demo_mode_enabled():
         ensure_panel_matching_demo_data()  # fabricated availability windows: demo data only
+        try:
+            ensure_upcoming_defense_demo()  # future defenses so the calendars are not empty
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001 - demo data must never block startup
+            db.session.rollback()
+            print(f"The upcoming-defense demo data was not seeded: {exc}")
     seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases
     ensure_faculty_account_schema()
     ensure_workflow_activity_schema()

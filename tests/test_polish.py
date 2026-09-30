@@ -21,6 +21,10 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 import app as appmod  # noqa: E402
 from app import (  # noqa: E402
     AcademicTerm,
+    DefenseVerdict,
+    PanelAssignment,
+    PanelInvitation,
+    ScheduleRequest,
     BusinessRule,
     BusinessRuleRevision,
     Course,
@@ -446,6 +450,108 @@ class BusinessRuleMetadataSyncTests(PolishBase):
             appmod.clear_business_rule_cache()
             self.assertEqual(appmod.final_defense_passing_score("Thesis"), 80)
             self.assertEqual(appmod.final_defense_passing_score("Dissertation"), 90)
+
+
+# =========================================================================== demo: upcoming defenses
+class UpcomingDefenseDemoTests(PolishBase):
+    NAMES = [
+        "Dr. Marco Villanueva", "Dr. Benjamin Reyes", "Dr. Teodoro Ramos", "Dr. Angela Cruz",
+        "Dr. Teresa Lim", "Dr. Paolo Navarro",
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.scratch = Path(tempfile.mkdtemp(dir=_TEST_ROOT))
+        for item in (
+            patch.object(appmod, "UPLOAD_ROOT", self.scratch / "research_evidence"),
+            patch.dict(os.environ, {"DEMO_MODE": "1", "PANEL_MATCHING_DEMO_SEED": "1"}),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
+        with app.app_context():
+            for code in ("MBA", "DBA"):
+                program = Program(code=code, name=f"Demo {code}", college="Graduate School")
+                db.session.add(program)
+                db.session.flush()
+                db.session.add(Course(program_id=program.id, code=f"{code}-501", title="Seminar", units=3, category="Major"))
+            for name in self.NAMES:
+                db.session.add(Faculty(
+                    name=name, college="Graduate School", role="Faculty", specialization="Demo", active=True,
+                    email=f"{name.split()[-1].lower()}@example.test",
+                    eligible_roles="Panel Chair,Content Specialist,Method Specialist,External Panel",
+                ))
+            db.session.commit()
+
+    def schedules(self):
+        return (
+            ScheduleRequest.query.join(Student, Student.id == ScheduleRequest.student_id)
+            .filter(Student.student_number.like("GS-2026-UD-%"), ScheduleRequest.defense_type == "Proposal Defense")
+            .order_by(ScheduleRequest.preferred_date).all()
+        )
+
+    def test_three_marked_demo_students_get_future_defenses_with_a_panel(self):
+        with app.app_context():
+            self.assertGreaterEqual(appmod.ensure_upcoming_defense_demo(), 3)
+            db.session.commit()
+            rows = self.schedules()
+            self.assertEqual(len(rows), 3)
+            for row in rows:
+                self.assertEqual(row.defense_type, "Proposal Defense")
+                self.assertEqual(row.status, "Scheduled")
+                self.assertGreater(row.preferred_date, self.today)
+                self.assertLess(row.preferred_date.weekday(), 5)
+                self.assertTrue(row.notes.startswith("Demo seed"))
+                gate = appmod.RESEARCH_GATE_PROPOSAL
+                panel = PanelAssignment.query.filter_by(student_id=row.student_id, gate=gate).all()
+                self.assertGreaterEqual(len(panel), 4)
+                statuses = sorted(i.status for i in PanelInvitation.query.filter_by(student_id=row.student_id, gate=gate).all())
+                self.assertEqual(statuses.count("Invited"), 1, statuses)
+                self.assertEqual(statuses.count("Accepted"), len(panel) - 1)
+
+    def test_running_it_again_changes_nothing_and_never_duplicates(self):
+        with app.app_context():
+            appmod.ensure_upcoming_defense_demo()
+            db.session.commit()
+            before = [(r.id, r.preferred_date) for r in self.schedules()]
+            self.assertEqual(appmod.ensure_upcoming_defense_demo(), 0)
+            db.session.commit()
+            self.assertEqual([(r.id, r.preferred_date) for r in self.schedules()], before)
+            self.assertEqual(Student.query.filter(Student.student_number.like("GS-2026-UD-%")).count(), 3)
+
+    def test_a_demo_defense_that_has_passed_is_moved_ahead_but_a_recorded_verdict_is_respected(self):
+        with app.app_context():
+            appmod.ensure_upcoming_defense_demo()
+            db.session.commit()
+            first, second, _third = self.schedules()
+            first.preferred_date = first.preferred_end_date = self.today - timedelta(days=3)
+            second.preferred_date = second.preferred_end_date = self.today - timedelta(days=3)
+            chair = PanelAssignment.query.filter_by(student_id=second.student_id).first()
+            db.session.add(DefenseVerdict(
+                student_id=second.student_id, schedule_request_id=second.id, panel_assignment_id=chair.id,
+                faculty_id=chair.faculty_id, gate=appmod.RESEARCH_GATE_PROPOSAL, defense_type="Proposal Defense",
+                chair_name="X", result="Passed", defense_date=second.preferred_date,
+            ))
+            first_id, second_id = first.id, second.id
+            db.session.commit()
+            self.assertEqual(appmod.ensure_upcoming_defense_demo(), 1)
+            db.session.commit()
+            self.assertGreater(db.session.get(ScheduleRequest, first_id).preferred_date, self.today)
+            self.assertLess(db.session.get(ScheduleRequest, second_id).preferred_date, self.today)
+
+    def test_nothing_is_seeded_outside_demo_mode(self):
+        with patch.dict(os.environ, {"DEMO_MODE": "0"}), app.app_context():
+            self.assertEqual(appmod.ensure_upcoming_defense_demo(), 0)
+            self.assertEqual(Student.query.filter(Student.student_number.like("GS-2026-UD-%")).count(), 0)
+
+    def test_the_staff_calendar_shows_them(self):
+        with app.app_context():
+            appmod.ensure_upcoming_defense_demo()
+            db.session.commit()
+        end = (self.today + timedelta(days=30)).isoformat()
+        response = self.client("staff").get(f"/api/calendar?start={self.today.isoformat()}&end={end}")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        names = {event["student_name"] for event in response.get_json()["events"]}
+        self.assertTrue({"Nico Barrientos", "Bea Salonga", "Gab Tolentino"} <= names, names)
 
 
 if __name__ == "__main__":
