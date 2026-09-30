@@ -1564,7 +1564,7 @@ function ResearchGateForm({ context, studentId, submit, submitting, result, subm
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-ink">Research Protocol Form 5.2 ethics clearance</p>
-              <p className="mt-1 text-xs text-slate-500">Preview the signed Ethics Office form, then record the clearance status and date before panel matching or scheduling can proceed.</p>
+              <p className="mt-1 text-xs text-slate-500">Opens after the proposal defense is passed. Preview Form 5.1 and the signed Ethics Office form (Form 5.2, due within one month of the defense), then record the clearance status and date. Ethics clearance is needed before the Final Defense.</p>
             </div>
             <StatusBadge value={requirements.find((item) => item.item_name === "Ethics clearance status and date")?.status_label || "Pending"} dot={false} />
           </div>
@@ -1680,7 +1680,14 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
   function onSubmit(e) {
     e.preventDefault();
     if (!profile.ready || !selectionComplete) return;
-    submit({ student_id: studentId, faculty_ids: selectedIds });
+    let panelChangeReason = "";
+    if (finalizedPanel.length > 0) {
+      // A panel already exists: replacing it needs a recorded reason (protocol: same panel unless changed with a reason).
+      const answer = window.prompt("A panel is already recorded for this stage. Why is it being changed? (recorded with the change; leave empty if nothing changed)");
+      if (answer === null) return;
+      panelChangeReason = answer.trim();
+    }
+    submit({ student_id: studentId, faculty_ids: selectedIds, panel_change_reason: panelChangeReason });
   }
 
   function selectFaculty(index, value) {
@@ -1851,7 +1858,7 @@ function PanelMatchingForm({ context, studentId, submit, submitting, refetch }) 
 // ---------------------------------------------------------------------------
 // Defense Scheduling
 // ---------------------------------------------------------------------------
-function DefenseSchedulingForm({ context, studentId, submit, submitting, result, submitError }) {
+function DefenseSchedulingForm({ context, studentId, submit, submitting, result, submitError, refetch }) {
   const availability = context.availability || {};
   const readiness = context.schedule_readiness || {};
   const participants = availability.participants || [];
@@ -1869,7 +1876,15 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
     source_reference: "",
     override_requirements: false,
     override_conflicts: false,
+    override_reason: "",
+    manuscript_received_on: "",
+    panel_change_reason: "",
+    reason: "",
+    requested_by: "GS Office",
   });
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
   const [window, setWindow] = useState({ start: "", end: "" });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const panel = context.assigned_panel || [];
@@ -1883,12 +1898,41 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
   const panelSelectionValid = chosenPanelIds.length === requiredPanelCount && new Set(chosenPanelIds).size === requiredPanelCount;
   function updatePanel() {
     if (!panelSelectionValid) return;
-    submit({ student_id: studentId, panel_faculty_ids: chosenPanelIds, reassign_only: true });
+    submit({ student_id: studentId, panel_faculty_ids: chosenPanelIds, reassign_only: true, panel_change_reason: form.panel_change_reason });
     setEditingPanel(false);
   }
-  const isFailedStageRetry = schedules.some(
-    (schedule) => schedule.defense_type === form.defense_type && schedule.defense_outcome === "Failed"
+  const schedulableTypes = context.schedulable_types || [];
+  const stageOutcome = context.verdict_outcome || null;
+  const activeSchedule = schedules.find((schedule) => schedule.is_active && schedule.defense_type === form.defense_type);
+  const flaggedSchedule = schedules.find((schedule) => schedule.needs_reconfirmation && schedule.defense_type === form.defense_type);
+  const isRetry = !activeSchedule && schedules.some(
+    (schedule) => schedule.defense_type === form.defense_type && ["Failed", "Provisional pass - re-defense required"].includes(schedule.defense_outcome)
   );
+  const usesManuscriptDate = form.defense_type !== "Title Defense";
+  const overrideNeedsReason = form.override_requirements || form.override_conflicts;
+  const leadReference = context.lead_reference || {};
+
+  async function runScheduleAction(action, successMessage) {
+    setActionBusy(true);
+    setActionError("");
+    setActionMessage("");
+    try {
+      await action();
+      setActionMessage(successMessage);
+      await refetch?.();
+    } catch (err) {
+      setActionError(err.message || "Could not complete that action.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  function cancelActiveSchedule(schedule) {
+    const reason = globalThis.prompt("Why is this defense being cancelled? (required, recorded with the schedule)");
+    if (!reason || !reason.trim()) return;
+    const requestedBy = globalThis.prompt("Who asked for the cancellation? (student, adviser, panel, GS office...)", "GS Office") || "";
+    runScheduleAction(() => api.cancelDefense(schedule.id, { reason: reason.trim(), requested_by: requestedBy.trim() }), "Defense cancelled. Book a new schedule when a date is agreed.");
+  }
 
   useEffect(() => {
     setWindow({
@@ -1901,11 +1945,12 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
       preferred_end_date: availability.window_end || "",
       selected_start: "",
       selected_end: "",
-      defense_type: readiness.stage || "Proposal Defense",
+      defense_type: context.defense_type || schedulableTypes[0] || readiness.stage || "Proposal Defense",
       override_requirements: false,
       override_conflicts: false,
+      override_reason: "",
     }));
-  }, [studentId, availability.window_start, availability.window_end, readiness.stage]);
+  }, [studentId, availability.window_start, availability.window_end, readiness.stage, context.defense_type]);
 
   useEffect(() => {
     setPanelEditIds(panel.map((member) => member.faculty_id));
@@ -1972,6 +2017,26 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
 
   function onSubmit(e) {
     e.preventDefault();
+    if (activeSchedule) {
+      runScheduleAction(
+        () => api.rescheduleDefense(activeSchedule.id, {
+          preferred_date: form.preferred_date,
+          selected_start: form.selected_start,
+          selected_end: form.selected_end,
+          mode: form.mode,
+          venue: form.venue,
+          constraints: form.constraints,
+          manuscript_received_on: form.manuscript_received_on,
+          override_requirements: form.override_requirements,
+          override_conflicts: form.override_conflicts,
+          override_reason: form.override_reason,
+          reason: form.reason,
+          requested_by: form.requested_by,
+        }),
+        "Defense rescheduled. The previous booking is kept in the history."
+      );
+      return;
+    }
     submit({ student_id: studentId, ...form, preferred_end_date: window.end || form.preferred_date });
   }
 
@@ -2008,6 +2073,22 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
         )}
       </section>
 
+      {stageOutcome && !stageOutcome.complete && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Last verdict: {stageOutcome.label}</p>
+          <p className="mt-1 text-xs">{stageOutcome.verdict?.follow_up}</p>
+        </div>
+      )}
+      {flaggedSchedule && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Needs re-confirmation: the panel changed after this defense was booked.</p>
+          <p className="mt-1 text-xs">{flaggedSchedule.conflict_reason}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" disabled={actionBusy} onClick={() => runScheduleAction(() => api.reconfirmDefense(flaggedSchedule.id), "Schedule re-confirmed.")} className="btn-primary cursor-pointer px-3 py-1.5 text-xs">Re-confirm with the new panel</button>
+            <button type="button" disabled={actionBusy} onClick={() => cancelActiveSchedule(flaggedSchedule)} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs">Cancel this booking</button>
+          </div>
+        </div>
+      )}
       <section aria-labelledby="panel-members-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><p id="panel-members-heading" className="text-sm font-semibold text-ink">Panel members</p><p className="text-xs text-slate-500">Matched panel is the default — you can reassign from the full faculty list</p></div>
@@ -2046,6 +2127,9 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
                 </label>
               ))}
             </div>
+            <Field label="Reason for changing the panel (required when a panel already exists; recorded, and a booked schedule must then be re-confirmed)">
+              <Input value={form.panel_change_reason} onChange={set("panel_change_reason")} placeholder="e.g. external panelist withdrew" />
+            </Field>
             {facultyDirectory.length === 0 && <p className="text-xs text-amber-700">No faculty with an active login are available to assign yet.</p>}
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={updatePanel} disabled={submitting || !panelSelectionValid} className="btn-primary cursor-pointer px-4 py-2 text-sm">{submitting ? "Updating…" : "Update panel"}</button>
@@ -2093,8 +2177,13 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
           <Input type="time" value={form.selected_end} min={form.selected_start} onChange={set("selected_end")} required />
         </Field>
         <Field label="Defense type" required>
-          <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={["Title Defense", "Proposal Defense", "Final Defense", "Public Final Defense"]} />
+          <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={schedulableTypes.length ? schedulableTypes : [form.defense_type]} />
         </Field>
+        {usesManuscriptDate && (
+          <Field label="Date the panel received the manuscript">
+            <Input type="date" value={form.manuscript_received_on} max={availability.today} onChange={set("manuscript_received_on")} />
+          </Field>
+        )}
         <Field label="Mode" required>
           <Select value={form.mode} onChange={set("mode")} placeholder="" options={["On-site", "Online", "Hybrid"]} />
         </Field>
@@ -2110,14 +2199,39 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
       </Field>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-700">
         <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-slate-400" />
-        <span><strong>Lead-time override:</strong> finalize despite lead-time warnings. Booked panelists, same-student overlaps, and unavailable panel windows cannot be overridden.</span>
+        <span><strong>Lead-time override:</strong> finalize despite lead-time warnings. Booked panelists, same-student overlaps, unavailable panel windows, and slots in the past cannot be overridden.</span>
       </label>
+      {overrideNeedsReason && (
+        <Field label="Reason for the staff override (required, recorded with the schedule)" required>
+          <Textarea value={form.override_reason} onChange={set("override_reason")} placeholder="Why is the override justified?" />
+        </Field>
+      )}
+      {leadReference.label && (
+        <p className="text-xs text-slate-500">Lead time ({leadReference.days} days) is counted from {leadReference.label}{leadReference.date ? `: ${shortDate(leadReference.date)}` : ""}.</p>
+      )}
+      {activeSchedule && (
+        <div className="grid grid-cols-1 gap-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 sm:grid-cols-2">
+          <p className="text-sm font-semibold text-blue-900 sm:col-span-2">This stage is already booked for {shortDate(activeSchedule.preferred_date)}. Saving will reschedule it: the old record is kept and linked.</p>
+          <Field label="Reason for rescheduling" required>
+            <Input value={form.reason} onChange={set("reason")} placeholder="e.g. panelist unavailable" required />
+          </Field>
+          <Field label="Requested by" required>
+            <Select value={form.requested_by} onChange={set("requested_by")} placeholder="" options={context.change_requesters || ["GS Office"]} />
+          </Field>
+          <div className="sm:col-span-2">
+            <button type="button" disabled={actionBusy} onClick={() => cancelActiveSchedule(activeSchedule)} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs">Cancel this booking instead</button>
+          </div>
+        </div>
+      )}
       <Field label="Source reference">
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
-      <button type="submit" disabled={submitting || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements)} className="btn-primary w-full sm:w-auto">
-        {submitting ? "Saving..." : isFailedStageRetry ? "Finalize reschedule" : "Set defense schedule"}
+      <button type="submit" disabled={submitting || actionBusy || !schedulableTypes.length || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements) || (overrideNeedsReason && !form.override_reason.trim()) || (activeSchedule && !form.reason.trim())} className="btn-primary w-full sm:w-auto">
+        {submitting || actionBusy ? "Saving..." : activeSchedule ? "Reschedule defense" : isRetry ? "Book the re-defense" : "Set defense schedule"}
       </button>
+      {!schedulableTypes.length && <p className="text-xs font-semibold text-amber-700">No defense can be booked at this stage right now{stageOutcome && !stageOutcome.complete ? ` (${stageOutcome.label})` : ""}.</p>}
+      {actionMessage && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-4 w-4" /> {actionMessage}</div>}
+      <ErrorNote message={actionError} />
       <WorkflowSubmitFeedback result={result} error={submitError} />
       {schedules.length > 0 && <ScheduleHistory schedules={schedules} />}
     </form>
@@ -2378,6 +2492,9 @@ function ScheduleHistory({ schedules }) {
                 <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
                 <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
                 {schedule.display_conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.display_conflict_reason}</p>}
+                {schedule.rescheduled_from_id && <p className="mt-1 text-xs text-slate-500">Rescheduled from booking #{schedule.rescheduled_from_id}{schedule.requested_by ? ` · requested by ${schedule.requested_by}` : ""}</p>}
+                {schedule.change_reason && <p className="mt-1 text-xs text-slate-500">Reason: {schedule.change_reason}</p>}
+                {schedule.override_reason && <p className="mt-1 text-xs text-slate-500">Override reason: {schedule.override_reason}</p>}
                 {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
               </div>
               <StatusBadge value={schedule.display_status || schedule.status} />
@@ -5864,11 +5981,11 @@ function workflowGuidance(slug) {
     "course-audit":
       "Run at the end of the semester. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":
-      "Reads the student's stored PDF evidence for the selected gate. Staff can evaluate existing files and adviser revisions, but cannot manually mark an absent document as received.",
+      "Reads the student's stored PDF evidence for the selected gate. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict (pass, minor or major revisions, deferral, failure) and the stage completes only when its follow-up is done. Staff cannot manually mark an absent document as received.",
     "panel-matching":
-      "Reads the body text of all three uploaded concept papers, extracts significant keywords, then ranks faculty expertise with availability, college fit, and current panel load. Research titles and filenames are excluded.",
+      "Opens after the Academic Coordinator has endorsed Form 1. The Research Coordinator nominates the panel: the system reads the uploaded papers, ranks faculty expertise with availability and current panel load, and the panel size follows the paper type (the external panelist joins from the proposal defense). The student's adviser cannot sit on the panel. The proposal panel carries to the final defense unless changed with a reason.",
     "defense-scheduling":
-      "Opens only after panel matching. The date spread compares adviser and panel availability, respects weekday work hours, and shows weekends only when faculty recorded an explicit override.",
+      "Opens only after panel matching. GS staff and the Research Coordinator book the defense for the student's current stage only. Title defense needs 14 days after the Form 1 endorsement; proposal and final need 14 days after the panel received the manuscript. Past slots are refused, an override needs a recorded reason, and a booking is moved or cancelled with a reason instead of being overwritten.",
     practicum:
       "Available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
     withdrawal:

@@ -366,6 +366,29 @@ export const api = {
     request(`/faculty-portal/adviser-approvals/${evidenceId}`, { method: "POST", body: JSON.stringify(payload) }),
   submitDefenseVerdict: (scheduleId, payload) =>
     request(`/faculty-portal/defense-verdicts/${scheduleId}`, { method: "POST", body: JSON.stringify(payload) }),
+  correctDefenseVerdict: (verdictId, payload) =>
+    request(`/faculty-portal/defense-verdicts/${verdictId}/correction`, { method: "POST", body: JSON.stringify(payload) }),
+  confirmDefenseRevisions: (verdictId, payload = {}) =>
+    request(`/faculty-portal/defense-verdicts/${verdictId}/confirm-revisions`, { method: "POST", body: JSON.stringify(payload) }),
+  submitDefenseRevisions: async (verdictId, { note, file } = {}) => {
+    const form = new FormData();
+    if (note) form.append("note", note);
+    if (file) form.append("file", file);
+    const res = await fetch(`${BASE}/student-portal/defense-verdicts/${verdictId}/revisions`, {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+    return body;
+  },
+  rescheduleDefense: (scheduleId, payload) =>
+    request(`/defense-schedules/${scheduleId}/reschedule`, { method: "POST", body: JSON.stringify(payload) }),
+  cancelDefense: (scheduleId, payload) =>
+    request(`/defense-schedules/${scheduleId}/cancel`, { method: "POST", body: JSON.stringify(payload) }),
+  reconfirmDefense: (scheduleId) =>
+    request(`/defense-schedules/${scheduleId}/reconfirm`, { method: "POST", body: JSON.stringify({}) }),
   submitStudentRequest: (type, payload) =>
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
   withdrawStudentLoaRequest: () =>

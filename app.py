@@ -140,8 +140,8 @@ TRANSACTIONS = [
         "title": "Research Gate Readiness",
         "icon": "file-check",
         "group": "Research",
-        "short": "Check Form 1, Form 4, or completion evidence and set readiness or revision state.",
-        "actor": "Student / Adviser / Research Coordinator",
+        "short": "Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.",
+        "actor": "Student / Academic Coordinator / Adviser / Research Coordinator / Panel Chair",
         "data": "Form gate, required evidence, missing documents, decision result, next owner, milestone status.",
     },
     {
@@ -150,8 +150,8 @@ TRANSACTIONS = [
         "title": "Panel Matching",
         "icon": "users",
         "group": "Research",
-        "short": "Recommend panel members using specialization, availability, workload, and eligibility notes.",
-        "actor": "Research Coordinator / Academic Coordinator",
+        "short": "Nominate panel members (after the Academic Coordinator's endorsement of Form 1) using specialization, availability, workload, and eligibility notes.",
+        "actor": "Research Coordinator (nominates) / Academic Coordinator (recommends)",
         "data": "Specialization need, availability reference, workload count, recommended panel, eligibility notes.",
     },
     {
@@ -160,8 +160,8 @@ TRANSACTIONS = [
         "title": "Defense Scheduling",
         "icon": "calendar-check",
         "group": "Research",
-        "short": "Match available dates across student, adviser, and panel, then confirm or flag scheduling.",
-        "actor": "Research Coordinator / Panel / Adviser / Student",
+        "short": "Match available dates across student, adviser, and panel, then book, reschedule, or cancel the defense with a recorded reason.",
+        "actor": "GS Staff / Research Coordinator (book) / Panel / Adviser / Student",
         "data": "Preferred date, availability responses, constraints, final schedule, mode, venue/link, status.",
     },
     {
@@ -1030,6 +1030,13 @@ class ScheduleRequest(db.Model):
     notes = db.Column(db.String(260))
     created_at = db.Column(db.DateTime, default=now_utc)
     confirmed_at = db.Column(db.DateTime)
+    # Reschedule / cancel / override trail (additive columns, see ensure_schedule_request_schema).
+    rescheduled_from_id = db.Column(db.Integer)
+    change_reason = db.Column(db.Text)
+    requested_by = db.Column(db.String(80))
+    cancelled_at = db.Column(db.DateTime)
+    override_reason = db.Column(db.Text)
+    manuscript_received_on = db.Column(db.Date)
 
     student = db.relationship("Student")
 
@@ -1051,6 +1058,20 @@ class DefenseVerdict(db.Model):
     remarks = db.Column(db.Text)
     defense_date = db.Column(db.Date, nullable=False)
     submitted_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+    # Follow-up after the verdict (additive columns, see ensure_research_role_workflow_schema).
+    revision_status = db.Column(db.String(30))
+    revision_note = db.Column(db.Text)
+    revisions_submitted_at = db.Column(db.DateTime)
+    revisions_confirmed_by = db.Column(db.String(160))
+    revisions_confirmed_at = db.Column(db.DateTime)
+    revision_confirm_note = db.Column(db.Text)
+    evaluation_score = db.Column(db.Float)
+    selected_title = db.Column(db.String(220))
+    original_result = db.Column(db.String(60))
+    correction_reason = db.Column(db.Text)
+    corrected_by = db.Column(db.String(160))
+    corrected_at = db.Column(db.DateTime)
+    reset_log = db.Column(db.Text)
 
     student = db.relationship("Student")
     schedule = db.relationship("ScheduleRequest")
@@ -2145,6 +2166,21 @@ def defense_verdict_dict(verdict: DefenseVerdict | None) -> dict | None:
         "remarks": verdict.remarks,
         "defense_date": iso(verdict.defense_date),
         "submitted_at": iso(verdict.submitted_at),
+        "label": verdict_label_for_gate(verdict.result, verdict.gate),
+        "effect": verdict_effect(verdict),
+        "complete": verdict_is_complete(verdict),
+        "follow_up": (RESEARCH_VERDICTS.get(normalize_verdict_result(verdict.result) or "") or {}).get("summary"),
+        "revision_status": verdict.revision_status,
+        "revision_note": verdict.revision_note,
+        "revisions_submitted_at": iso(verdict.revisions_submitted_at),
+        "revisions_confirmed_by": verdict.revisions_confirmed_by,
+        "revisions_confirmed_at": iso(verdict.revisions_confirmed_at),
+        "selected_title": verdict.selected_title,
+        "evaluation_score": verdict.evaluation_score,
+        "original_result": verdict.original_result,
+        "correction_reason": verdict.correction_reason,
+        "corrected_by": verdict.corrected_by,
+        "corrected_at": iso(verdict.corrected_at),
     }
 
 
@@ -2201,15 +2237,7 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
     outcome = latest_defense_outcome(req.student, gate, req.id) if gate and req.student else None
     display_status = req.status
     display_conflict_reason = req.conflict_reason
-    if req.status == "Rescheduled" and req.defense_type:
-        older_same_stage_schedule = ScheduleRequest.query.filter(
-            ScheduleRequest.student_id == req.student_id,
-            ScheduleRequest.defense_type == req.defense_type,
-            ScheduleRequest.created_at < req.created_at,
-        ).first()
-        if not older_same_stage_schedule:
-            display_status = "Scheduled"
-    if outcome and outcome["result"] in {"Passed", "Passed with revisions"}:
+    if outcome and outcome["complete"]:
         display_status = "Finished"
         if display_conflict_reason in {
             "Superseded by a staff-approved reschedule.",
@@ -2217,9 +2245,7 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
         }:
             display_conflict_reason = None
     elif outcome:
-        display_status = outcome["result"]
-    elif req.status == "Cancelled" and display_conflict_reason == "Superseded by a staff-approved reschedule.":
-        display_conflict_reason = "Superseded by a staff-approved schedule update."
+        display_status = outcome["label"]
     return {
         "id": req.id,
         "preferred_date": iso(req.preferred_date),
@@ -2241,6 +2267,14 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
         "notes": req.notes,
         "created_at": iso(req.created_at),
         "confirmed_at": iso(req.confirmed_at),
+        "rescheduled_from_id": req.rescheduled_from_id,
+        "change_reason": req.change_reason,
+        "requested_by": req.requested_by,
+        "cancelled_at": iso(req.cancelled_at),
+        "override_reason": req.override_reason,
+        "manuscript_received_on": iso(req.manuscript_received_on),
+        "needs_reconfirmation": req.status == RECONFIRM_DEFENSE_STATUS,
+        "is_active": req.status in ACTIVE_DEFENSE_STATUSES,
     }
 
 
@@ -3433,9 +3467,12 @@ BACKOFFICE_ROLES = {
     "admin",
 }
 
+# Protocol: the Academic Coordinator endorses Form 1 (research-gate) and recommends panel
+# members; the Research Coordinator nominates the panel and informs panel and student of the
+# date; the GS office coordinates the schedule with the panel.
 ROLE_TRANSACTION_ACCESS = {
     "academic_coordinator": {"course-audit", "research-gate", "panel-matching", "practicum", "graduation", "awol"},
-    "research_coordinator": {"research-gate", "graduation"},
+    "research_coordinator": {"research-gate", "panel-matching", "defense-scheduling", "graduation"},
 }
 
 REQUEST_ATTACHMENT_WORKFLOWS = {
@@ -6940,6 +6977,8 @@ def register_routes(app: Flask) -> None:
                 "course_records": [course_record_dict(record) for record in course_records],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
+                "defense_follow_up": student_defense_follow_up(student, research_progress["gate"]),
+                "research_vocabulary": RESEARCH_VOCABULARY,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
                 "documents_by_gate": docs_by_gate,
                 "panel": [panel_assignment_dict(p) for p in panel],
@@ -7089,6 +7128,8 @@ def register_routes(app: Flask) -> None:
                 "course_records": [course_record_dict(record) for record in course_records],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
+                "defense_follow_up": student_defense_follow_up(student, research_progress["gate"]),
+                "research_vocabulary": RESEARCH_VOCABULARY,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
                 "documents_by_gate": docs_by_gate,
                 "panel": [panel_assignment_dict(item) for item in panel],
@@ -7173,7 +7214,7 @@ def register_routes(app: Flask) -> None:
         if data.get("submitted_package"):
             notes.append(f"Student notes/package reference: {data.get('submitted_package')}.")
 
-        add_task(student.id, f"Review student {gate} application", "Research Coordinator", 3, 55)
+        ensure_open_task(student.id, f"Review student {gate} application", "Research Coordinator", 3, 55)
         add_log(
             "research-gate",
             student.id,
@@ -7238,8 +7279,13 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": f"This upload belongs to {progress['stage']}, the automatically detected current stage."}), 400
         if item_name not in required_documents_for_gate(gate):
             return jsonify({"error": "Choose a valid requirement for this gate."}), 400
-        if gate == "Form 1 - Title Defense" and item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and active_panel_assignments(student, gate):
+        title_item = gate == "Form 1 - Title Defense" and item_name in {"Form 1 - Application for Title Defense", "Three concept papers"}
+        if title_item and title_uploads_locked(student):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
+        if gate == RESEARCH_GATE_PROPOSAL and item_name in POST_DEFENSE_REQUIREMENTS:
+            opened = latest_defense_outcome(student, gate)
+            if not (opened and opened["complete"]):
+                return jsonify({"error": "Form 5.1 and the ethics review open after the proposal defense is passed (and any revisions are confirmed)."}), 409
         presentation = research_requirement_presentation(gate, item_name)
         if not presentation or presentation["source_type"] != "student_upload":
             return jsonify({"error": "This requirement is completed by staff or by the system and does not accept a student upload."}), 400
@@ -7247,6 +7293,10 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Choose a PDF file to upload."}), 400
         replaced_paths: list[Path] = []
         try:
+            if title_item and active_panel_assignments(student, gate):
+                # Only reachable after a disapproved title: a new set of titles needs a new panel match.
+                clear_panel_for_research_gate(student, gate)
+                revoke_form1_endorsement(student.id)
             if item_name == "Three concept papers":
                 revoke_form1_endorsement(student.id)
             evidence = store_research_evidence(student, gate, item_name, uploaded)
@@ -7277,7 +7327,7 @@ def register_routes(app: Flask) -> None:
                 if parsed_title:
                     sync_research_progress(student, parsed_title)
             research_case, _progress = sync_research_progress(student)
-            add_task(student.id, f"Review submitted {item_name}", "Research Coordinator", 3, 35)
+            ensure_open_task(student.id, f"Review submitted {item_name}", "Research Coordinator", 3, 35)
             add_log(
                 "research-gate",
                 student.id,
@@ -7310,12 +7360,12 @@ def register_routes(app: Flask) -> None:
         presentation = research_requirement_presentation(doc.gate, doc.item_name)
         if not presentation or presentation["source_type"] != "student_upload":
             return jsonify({"error": "Only student-uploaded research evidence can be removed from the student view."}), 400
-        if doc.gate == "Form 1 - Title Defense" and active_panel_assignments(student, doc.gate):
+        if doc.gate == "Form 1 - Title Defense" and title_uploads_locked(student):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
 
-        stored_path = UPLOAD_ROOT / evidence.stored_name
         original_name = evidence.original_name
-        db.session.delete(evidence)
+        # Signed evidence is archived, never deleted: the adviser's signature points at the file.
+        stored_path = retire_research_evidence(evidence)
         db.session.flush()
         remaining = (
             ResearchEvidenceFile.query.filter_by(
@@ -7362,7 +7412,8 @@ def register_routes(app: Flask) -> None:
             + "Panel Matching was cleared for this stage.",
         )
         db.session.commit()
-        stored_path.unlink(missing_ok=True)
+        if stored_path:
+            stored_path.unlink(missing_ok=True)
         return jsonify({
             "ok": True,
             "message": "Upload removed. The Academic Coordinator must endorse the completed title-defense package again, and Panel Matching must be rerun.",
@@ -8339,11 +8390,19 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        if not active_panel_assignments(student):
+        _case, stage_progress = sync_research_progress(student)
+        expected_type = RESEARCH_GATE_DEFENSE_TYPES.get(stage_progress["gate"])
+        defense_type = (data.get("defense_type") or expected_type or "").strip()
+        if not expected_type:
+            return jsonify({"error": "All of your research defenses are complete; there is no defense left to schedule."}), 400
+        if defense_type != expected_type:
+            return jsonify({
+                "error": f"You are at the {stage_progress['stage']} stage, so you can request a {expected_type} only."
+            }), 400
+        if not active_panel_assignments(student, stage_progress["gate"]):
             return jsonify({"error": "Panel matching must be completed before requesting a defense schedule."}), 400
         source = (data.get("venue") or "").strip()
         preferred_date = (data.get("preferred_date") or "").strip()
-        defense_type = data.get("defense_type", "Proposal Defense")
         notes = [
             f"Student requested scheduling support for {defense_type}.",
             f"Preferred date: {preferred_date or 'Not specified'}.",
@@ -8354,7 +8413,7 @@ def register_routes(app: Flask) -> None:
         if data.get("constraints"):
             notes.append(f"Constraints: {data.get('constraints')}.")
 
-        add_task(student.id, f"Review student {defense_type} schedule request", "Research Coordinator", 4, 45)
+        ensure_open_task(student.id, f"Review student {defense_type} schedule request", "Research Coordinator", 4, 45)
         add_log(
             "defense-scheduling",
             student.id,
@@ -8373,7 +8432,9 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
-        if doc.gate == "Form 1 - Title Defense" and doc.item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and active_panel_assignments(student, doc.gate):
+        if doc.gate.endswith("(archived)"):
+            return jsonify({"error": "This is superseded evidence kept for the record; upload to the current requirement instead."}), 400
+        if doc.gate == "Form 1 - Title Defense" and doc.item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and title_uploads_locked(student):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
@@ -8385,7 +8446,7 @@ def register_routes(app: Flask) -> None:
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
             return jsonify({"error": str(exc)}), 400
-        add_task(student.id, f"Review submitted {doc.item_name}", "Research Coordinator", 3, 35)
+        ensure_open_task(student.id, f"Review submitted {doc.item_name}", "Research Coordinator", 3, 35)
         add_log(
             "research-gate",
             student.id,
@@ -9112,9 +9173,24 @@ def register_routes(app: Flask) -> None:
             )
             defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(assignment.gate)
             schedule = (
-                ScheduleRequest.query.filter_by(student_id=student.id, defense_type=defense_type)
-                .order_by(ScheduleRequest.created_at.desc())
+                ScheduleRequest.query.filter(
+                    ScheduleRequest.student_id == student.id,
+                    ScheduleRequest.defense_type == defense_type,
+                    ScheduleRequest.status.notin_([CANCELLED_DEFENSE_STATUS, RESCHEDULED_DEFENSE_STATUS]),
+                )
+                .order_by(ScheduleRequest.id.desc())
                 .first()
+            )
+            is_chair = assignment.panel_role.lower() in {"panel chair", "panel lead"}
+            schedule_verdict = (
+                DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first() if schedule else None
+            )
+            can_submit = bool(
+                schedule
+                and is_chair
+                and not schedule_verdict
+                and schedule.status in ACTIVE_DEFENSE_STATUSES
+                and defense_start_datetime(schedule) <= manila_now()
             )
             documents = []
             for doc in DocumentCheck.query.filter_by(student_id=student.id, gate=assignment.gate).all():
@@ -9136,10 +9212,23 @@ def register_routes(app: Flask) -> None:
                 "gate": assignment.gate,
                 "documents": documents,
                 "defense": schedule_request_dict(schedule) if schedule else None,
-                "can_submit_verdict": bool(
-                    schedule
-                    and assignment.panel_role.lower() in {"panel chair", "panel lead"}
-                    and not DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first()
+                "can_submit_verdict": can_submit,
+                "verdict_options": verdict_options_for_gate(assignment.gate),
+                "verdict_blocked_reason": (
+                    "The panel changed after booking: the schedule must be re-confirmed first."
+                    if schedule and is_chair and not schedule_verdict and schedule.status == RECONFIRM_DEFENSE_STATUS
+                    else "The defense has not started yet."
+                    if schedule and is_chair and not schedule_verdict and schedule.status in ACTIVE_DEFENSE_STATUSES and not can_submit
+                    else None
+                ),
+                "can_correct_verdict": bool(
+                    schedule_verdict and is_chair and not verdict_is_acted_on(schedule_verdict)
+                ),
+                "can_confirm_revisions": bool(
+                    schedule_verdict
+                    and is_chair
+                    and verdict_effect(schedule_verdict) in REVISION_EFFECTS
+                    and schedule_verdict.revision_status == REVISION_SUBMITTED
                 ),
             })
         advisees = []
@@ -9171,10 +9260,16 @@ def register_routes(app: Flask) -> None:
                         "url": f"/api/research-evidence/{evidence.id}/file",
                         "approval": adviser_approval_dict(approval),
                     })
+            revision_reviews = [
+                defense_verdict_dict(verdict)
+                for verdict in DefenseVerdict.query.filter_by(student_id=student.id).all()
+                if verdict_effect(verdict) == "revise" and verdict.revision_status in (REVISION_AWAITING, REVISION_SUBMITTED)
+            ]
             advisees.append({
                 "student": student_brief(student),
                 "documents": pending_documents,
                 "pending_count": sum(not item["approval"] for item in pending_documents),
+                "revision_reviews": revision_reviews,
             })
         upcoming = (
             FacultyAvailability.query.filter(
@@ -9337,6 +9432,48 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "message": "Document signed successfully.", "approval": adviser_approval_dict(approval)})
 
+    def panel_chair_assignment(faculty: Faculty | None, student_id: int, gate: str | None) -> PanelAssignment | None:
+        if not faculty or not gate:
+            return None
+        assignment = PanelAssignment.query.filter_by(
+            faculty_id=faculty.id, student_id=student_id, gate=gate
+        ).first()
+        if assignment and assignment.panel_role.lower() in {"panel chair", "panel lead"}:
+            return assignment
+        return None
+
+    def allowed_verdict_or_error(result: str, gate: str):
+        definition = RESEARCH_VERDICTS.get(result or "")
+        if not definition:
+            return jsonify({"error": "Choose a valid defense verdict."}), 400
+        if gate not in definition["gates"]:
+            offered = ", ".join(option["label"] for option in verdict_options_for_gate(gate))
+            return jsonify({"error": f"{result} is not a possible outcome of this defense. Choose one of: {offered}."}), 400
+        return None
+
+    def evaluation_score_or_error(data, result: str, gate: str, student: Student):
+        """Protocol Form 7: below 85 (thesis / project paper) or 90 (dissertation) means the
+        panel cannot record a plain pass at the closed-door final defense."""
+        raw = data.get("evaluation_score")
+        if raw in (None, ""):
+            return None, None
+        try:
+            score = float(raw)
+        except (TypeError, ValueError):
+            return None, (jsonify({"error": "The evaluation score must be a number."}), 400)
+        if score < 0 or score > 100:
+            return None, (jsonify({"error": "The evaluation score must be between 0 and 100."}), 400)
+        if gate == RESEARCH_GATE_FINAL and result in (VERDICT_PASSED, VERDICT_MINOR):
+            threshold = FINAL_DEFENSE_PASSING_SCORE["Dissertation" if research_case_type(student) == "Dissertation" else "Thesis"]
+            if score < threshold:
+                return None, (jsonify({
+                    "error": (
+                        f"A score of {score:g} is below {threshold} (Form 7). The protocol treats this as a "
+                        "provisional pass with major revisions, not a pass."
+                    )
+                }), 400)
+        return score, None
+
     @app.route("/api/faculty-portal/defense-verdicts/<int:schedule_id>", methods=["POST"])
     @require_api_login("faculty")
     def faculty_defense_verdict(schedule_id: int):
@@ -9351,17 +9488,31 @@ def register_routes(app: Flask) -> None:
         ).first()
         if not assignment or assignment.panel_role.lower() not in {"panel chair", "panel lead"}:
             return jsonify({"error": "Only the assigned panel chair or panel lead can submit this verdict."}), 403
+        if schedule.status == RECONFIRM_DEFENSE_STATUS:
+            return jsonify({"error": "The panel changed after this defense was booked. The schedule must be re-confirmed before a verdict can be recorded."}), 400
         if schedule.status not in ACTIVE_DEFENSE_STATUSES:
             return jsonify({"error": "A verdict can be submitted only for a confirmed scheduled defense."}), 400
         if DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first():
             return jsonify({"error": "A verdict has already been submitted for this defense schedule."}), 409
+        start = defense_start_datetime(schedule)
+        if start > manila_now():
+            return jsonify({
+                "error": (
+                    "A verdict cannot be recorded before the defense starts "
+                    f"({start.strftime('%Y-%m-%d %H:%M')} Manila time)."
+                )
+            }), 400
         data = request_payload()
-        result = (data.get("result") or "").strip()
-        allowed_results = {"Passed", "Passed with revisions", "Deferred", "Failed", "For resubmission"}
-        if result not in allowed_results:
-            return jsonify({"error": "Choose a valid defense verdict."}), 400
+        result = normalize_verdict_result(data.get("result"))
+        error = allowed_verdict_or_error(result, gate)
+        if error:
+            return error
         student = schedule.student
+        score, score_error = evaluation_score_or_error(data, result, gate, student)
+        if score_error:
+            return score_error
         research_case = ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+        selected_title = (data.get("selected_title") or "").strip()[:220] if result == VERDICT_PASSED and gate == RESEARCH_GATE_TITLE else ""
         verdict = DefenseVerdict(
             student_id=student.id,
             schedule_request_id=schedule.id,
@@ -9369,21 +9520,18 @@ def register_routes(app: Flask) -> None:
             faculty_id=faculty.id,
             gate=gate,
             defense_type=schedule.defense_type,
-            research_title=research_case.title if research_case else None,
+            research_title=selected_title or (research_case.title if research_case else None),
             chair_name=faculty.name,
             result=result,
             remarks=(data.get("remarks") or "").strip() or None,
             defense_date=schedule.preferred_date,
             submitted_at=now_utc(),
+            evaluation_score=score,
+            selected_title=selected_title or None,
         )
         db.session.add(verdict)
         db.session.flush()
-        next_owner = "Research Coordinator" if result == "Passed" else "Student"
-        if result in {"Failed", "For resubmission"}:
-            reset_research_gate_after_failed_defense(student, gate)
-            add_task(student.id, f"Resubmit {schedule.defense_type} requirements", "Student", 5, 45)
-        elif result in {"Passed with revisions", "Deferred"}:
-            add_task(student.id, f"Resolve {schedule.defense_type} verdict conditions", "Student", 5, 40)
+        next_owner = apply_verdict_effects(student, schedule, verdict)
         add_log(
             "research-gate", student.id, f"Panel Chair · {faculty.name}", gate,
             f"{schedule.defense_type}: {result}", next_owner,
@@ -9391,7 +9539,140 @@ def register_routes(app: Flask) -> None:
         )
         sync_research_progress(student)
         db.session.commit()
-        return jsonify({"ok": True, "message": "Defense verdict submitted.", "verdict": defense_verdict_dict(verdict)})
+        return jsonify({
+            "ok": True,
+            "message": "Defense verdict submitted.",
+            "verdict": defense_verdict_dict(verdict),
+            "next_owner": next_owner,
+            "follow_up": RESEARCH_VERDICTS[result]["summary"],
+        })
+
+    @app.route("/api/faculty-portal/defense-verdicts/<int:verdict_id>/correction", methods=["POST"])
+    @require_api_login("faculty")
+    def faculty_defense_verdict_correction(verdict_id: int):
+        """The chair may correct a wrongly entered verdict until it is acted on, with a reason."""
+        account = current_account()
+        faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
+        verdict = DefenseVerdict.query.get_or_404(verdict_id)
+        if not (verdict.faculty_id == (faculty.id if faculty else 0) or panel_chair_assignment(faculty, verdict.student_id, verdict.gate)):
+            return jsonify({"error": "Only the panel chair who submitted this verdict can correct it."}), 403
+        data = request_payload()
+        reason = (data.get("reason") or "").strip()
+        if len(reason) < 5:
+            return jsonify({"error": "Explain why the verdict is being corrected."}), 400
+        result = normalize_verdict_result(data.get("result"))
+        error = allowed_verdict_or_error(result, verdict.gate)
+        if error:
+            return error
+        if result == normalize_verdict_result(verdict.result):
+            return jsonify({"error": f"The recorded verdict is already {result}."}), 400
+        if verdict_is_acted_on(verdict):
+            return jsonify({"error": "This verdict can no longer be corrected: the student or staff have already acted on it."}), 409
+        student = verdict.student
+        score, score_error = evaluation_score_or_error(data, result, verdict.gate, student)
+        if score_error:
+            return score_error
+        previous = verdict.result
+        revert_verdict_effects(verdict, verdict.schedule)
+        verdict.original_result = verdict.original_result or previous
+        verdict.result = result
+        if data.get("remarks") not in (None, ""):
+            verdict.remarks = str(data.get("remarks")).strip() or None
+        if score is not None:
+            verdict.evaluation_score = score
+        selected_title = (data.get("selected_title") or "").strip()[:220]
+        verdict.selected_title = selected_title or (verdict.selected_title if result == VERDICT_PASSED else None)
+        verdict.corrected_by = faculty.name if faculty else None
+        verdict.corrected_at = now_utc()
+        verdict.correction_reason = reason
+        next_owner = apply_verdict_effects(student, verdict.schedule, verdict)
+        add_log(
+            "research-gate", student.id, f"Panel Chair · {faculty.name if faculty else 'Chair'}", verdict.gate,
+            f"{verdict.defense_type}: verdict corrected from {previous} to {result}", next_owner,
+            f"Schedule #{verdict.schedule_request_id}. Reason: {reason}",
+        )
+        sync_research_progress(student)
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Verdict corrected.", "verdict": defense_verdict_dict(verdict), "next_owner": next_owner})
+
+    @app.route("/api/faculty-portal/defense-verdicts/<int:verdict_id>/confirm-revisions", methods=["POST"])
+    @require_api_login("faculty")
+    def faculty_confirm_defense_revisions(verdict_id: int):
+        """Minor revisions: the research adviser (or the chair) confirms. Major revisions without a
+        re-defense: the panel chair confirms the panel's approval. Then the stage completes."""
+        account = current_account()
+        faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
+        verdict = DefenseVerdict.query.get_or_404(verdict_id)
+        effect = verdict_effect(verdict)
+        if effect not in REVISION_EFFECTS:
+            return jsonify({"error": "This verdict does not require revisions."}), 400
+        chair = panel_chair_assignment(faculty, verdict.student_id, verdict.gate)
+        adviser = bool(faculty and faculty_is_adviser_for_student(faculty.id, verdict.student_id))
+        if not (chair or (effect == "revise" and adviser)):
+            who = "the assigned panel chair" if effect == "panel_revise" else "the student's research adviser or the panel chair"
+            return jsonify({"error": f"Only {who} can confirm these revisions."}), 403
+        if verdict.revision_status == REVISION_CONFIRMED:
+            return jsonify({"error": "These revisions are already confirmed."}), 409
+        if verdict.revision_status != REVISION_SUBMITTED:
+            return jsonify({"error": "The student has not submitted the revisions yet."}), 409
+        data = request_payload()
+        student = verdict.student
+        verdict.revision_status = REVISION_CONFIRMED
+        verdict.revisions_confirmed_by = faculty.name
+        verdict.revisions_confirmed_at = now_utc()
+        verdict.revision_confirm_note = (data.get("note") or "").strip() or None
+        after_defense_cleared(student, verdict.gate, verdict)
+        add_log(
+            "research-gate", student.id, f"{'Panel Chair' if chair else 'Research Adviser'} · {faculty.name}", verdict.gate,
+            f"{verdict.defense_type}: revisions confirmed", "Research Coordinator",
+            f"Revisions after '{verdict.result}' confirmed by {faculty.name}. {verdict.revision_confirm_note or ''}".strip(),
+        )
+        sync_research_progress(student)
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Revisions confirmed. The stage is complete.", "verdict": defense_verdict_dict(verdict)})
+
+    @app.route("/api/student-portal/defense-verdicts/<int:verdict_id>/revisions", methods=["POST"])
+    @require_api_login("student")
+    def student_submit_defense_revisions(verdict_id: int):
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        verdict = DefenseVerdict.query.filter_by(id=verdict_id, student_id=student.id).first_or_404()
+        if verdict_effect(verdict) not in REVISION_EFFECTS:
+            return jsonify({"error": "This defense outcome does not require a revised manuscript."}), 400
+        if verdict.revision_status == REVISION_CONFIRMED:
+            return jsonify({"error": "The revisions for this defense were already confirmed."}), 409
+        data = request_payload()
+        note = (data.get("note") or "").strip()
+        uploaded = request.files.get("file")
+        if not note and not (uploaded and uploaded.filename):
+            return jsonify({"error": "Attach the revised manuscript or describe what you revised."}), 400
+        try:
+            if uploaded and uploaded.filename:
+                revised_item = "Revised manuscript after defense"
+                revised_doc = DocumentCheck.query.filter_by(
+                    student_id=student.id, gate=verdict.gate, item_name=revised_item
+                ).first()
+                if not revised_doc:
+                    revised_doc = DocumentCheck(
+                        student_id=student.id, gate=verdict.gate, item_name=revised_item, status="Missing"
+                    )
+                    db.session.add(revised_doc)
+                    db.session.flush()
+                store_research_evidence(student, verdict.gate, revised_item, uploaded, revised_doc)
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        verdict.revision_status = REVISION_SUBMITTED
+        verdict.revision_note = note or verdict.revision_note
+        verdict.revisions_submitted_at = now_utc()
+        confirmer = "Panel Chair" if verdict_effect(verdict) == "panel_revise" else "Research Adviser"
+        add_log(
+            "research-gate", student.id, "Student", verdict.gate,
+            f"{verdict.defense_type}: revisions submitted", confirmer,
+            f"Student submitted the revised manuscript after '{verdict.result}'. {note}".strip(),
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"Revisions submitted. The {confirmer.lower()} will confirm them.", "verdict": defense_verdict_dict(verdict)})
 
     @app.route("/api/faculty/<int:faculty_id>/calendar.ics")
     def faculty_calendar_feed(faculty_id: int):
@@ -12512,6 +12793,86 @@ def register_routes(app: Flask) -> None:
             }
         )
 
+    def schedule_change_fields(data: MultiDict):
+        """Reason and requester are mandatory for every reschedule / cancel."""
+        reason = (data.get("reason") or "").strip()
+        requested_by = (data.get("requested_by") or "").strip()
+        if len(reason) < 3:
+            return None, None, (jsonify({"error": "Give the reason for the change; it is recorded with the schedule."}), 400)
+        return reason, requested_by, None
+
+    @app.route("/api/defense-schedules/<int:schedule_id>/reschedule", methods=["POST"])
+    @require_api_login("staff", "research_coordinator")
+    def defense_schedule_reschedule(schedule_id: int):
+        """Move a booked (or deferred) defense. The old record is kept, linked and marked Rescheduled."""
+        schedule = ScheduleRequest.query.get_or_404(schedule_id)
+        data = request_payload()
+        reason, requested_by, error = schedule_change_fields(data)
+        if error:
+            return error
+        if not requested_by:
+            return jsonify({"error": "Say who asked for the change (student, adviser, panel, GS office...)."}), 400
+        if schedule.status not in SLOT_HOLDING_DEFENSE_STATUSES + (DEFERRED_DEFENSE_STATUS,):
+            return jsonify({"error": f"A {schedule.status.lower()} defense cannot be rescheduled."}), 409
+        account = current_account()
+        payload = MultiDict(data)
+        payload["student_id"] = str(schedule.student_id)
+        payload["defense_type"] = schedule.defense_type
+        try:
+            require_research_prerequisite(schedule.student)
+            require_active_standing(schedule.student)
+            book_defense_schedule(schedule.student, payload, account, replaces=schedule)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "message": "Defense rescheduled. The previous booking is kept in the history."})
+
+    @app.route("/api/defense-schedules/<int:schedule_id>/cancel", methods=["POST"])
+    @require_api_login("staff", "research_coordinator")
+    def defense_schedule_cancel(schedule_id: int):
+        schedule = ScheduleRequest.query.get_or_404(schedule_id)
+        data = request_payload()
+        reason, requested_by, error = schedule_change_fields(data)
+        if error:
+            return error
+        if schedule.status not in SLOT_HOLDING_DEFENSE_STATUSES:
+            return jsonify({"error": f"A {schedule.status.lower()} defense cannot be cancelled."}), 409
+        cancel_defense_schedule(schedule, current_account(), reason, requested_by)
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Defense cancelled. A new booking is needed before the defense can take place."})
+
+    @app.route("/api/defense-schedules/<int:schedule_id>/reconfirm", methods=["POST"])
+    @require_api_login("staff", "research_coordinator")
+    def defense_schedule_reconfirm(schedule_id: int):
+        """After a panel change the booking is on hold until the new panel's availability is rechecked."""
+        schedule = ScheduleRequest.query.get_or_404(schedule_id)
+        if schedule.status != RECONFIRM_DEFENSE_STATUS:
+            return jsonify({"error": "This schedule does not need re-confirmation."}), 409
+        student = schedule.student
+        gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
+        panel = active_panel_assignments(student, gate)
+        problems = schedule_slot_problems(student, schedule, panel)
+        account = current_account()
+        if problems:
+            schedule.conflict_reason = (
+                f"Re-confirmation refused on {date.today().isoformat()}: " + "; ".join(problems)
+                + ". Change the panel again or reschedule."
+            )
+            db.session.commit()
+            return jsonify({"error": "The new panel cannot attend the booked time: " + "; ".join(problems), "problems": problems}), 400
+        schedule.status = "Scheduled"
+        schedule.panel_snapshot = json.dumps(panel_snapshot_for(panel))
+        schedule.conflict_reason = None
+        close_research_tasks(student.id, f"Re-confirm {schedule.defense_type} schedule after panel change")
+        add_log(
+            "defense-scheduling", student.id, workflow_actor_label(account), schedule.defense_type or "",
+            f"{schedule.defense_type} schedule #{schedule.id} re-confirmed with the new panel", "Panel Chair",
+            "Availability and conflicts were rechecked for the changed panel.",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Schedule re-confirmed."})
+
     @app.route("/api/transactions/<slug>/messages", methods=["POST"])
     @require_api_login(*BACKOFFICE_ROLES, "dean", "student")
     def transaction_message(slug: str):
@@ -13055,7 +13416,12 @@ def dashboard_stats(filters=None) -> dict:
         .group_by(ScheduleRequest.status)
         .all()
     )
-    schedule_distribution = [{"status": s, "count": n} for s, n in schedule_rows]
+    # A booked defense that can still take place is shown as "Confirmed" (legacy card label).
+    distribution_counts: dict[str, int] = {}
+    for status_value, count in schedule_rows:
+        label = "Confirmed" if status_value in ACTIVE_DEFENSE_STATUSES else status_value
+        distribution_counts[label] = distribution_counts.get(label, 0) + count
+    schedule_distribution = [{"status": label, "count": count} for label, count in distribution_counts.items()]
 
     workflow_rows = [
         {"workflow": "Practicum", "count": practicum_records},
@@ -13152,7 +13518,10 @@ def dashboard_drilldown_payload(filters) -> dict:
         }
     if kind == "schedule":
         requests = (
-            ScheduleRequest.query.filter(ScheduleRequest.status == value, ScheduleRequest.student_id.in_(scoped_ids))
+            ScheduleRequest.query.filter(
+                ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES if value == "Confirmed" else (value,)),
+                ScheduleRequest.student_id.in_(scoped_ids),
+            )
             .order_by(ScheduleRequest.preferred_date.asc())
             .limit(150)
             .all()
@@ -13160,7 +13529,9 @@ def dashboard_drilldown_payload(filters) -> dict:
         rows = []
         for item in requests:
             case = ResearchCase.query.filter_by(student_id=item.student_id).order_by(ResearchCase.opened_at.desc()).first()
-            panel_gate = case.current_gate if case else "Form 1 - Title Defense"
+            panel_gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(item.defense_type or "") or (
+                case.current_gate if case else "Form 1 - Title Defense"
+            )
             panel = (
                 PanelAssignment.query.filter_by(student_id=item.student_id, gate=panel_gate)
                 .order_by(PanelAssignment.score.desc())
@@ -13169,16 +13540,21 @@ def dashboard_drilldown_payload(filters) -> dict:
             rows.append({
                 "id": item.id,
                 "student": student_brief(item.student),
-                "defense_type": case.current_gate if case else "Defense",
+                "defense_type": item.defense_type or (case.current_gate if case else "Defense"),
                 "adviser": item.student.adviser_name,
                 "panel": [assignment.faculty.name for assignment in panel if assignment.faculty],
                 "status": item.status,
                 "date": iso(item.preferred_date),
-                "time": None,
+                "time": (
+                    f"{item.start_time.strftime('%H:%M')}-{item.end_time.strftime('%H:%M')}"
+                    if item.start_time and item.end_time else None
+                ),
                 "venue": item.venue,
                 "missing_action": (
                     "Collect panel/adviser availability" if item.status in PENDING_DEFENSE_STATUSES
-                    else "Confirm the revised date with participants" if item.status == "Rescheduled"
+                    else "Re-confirm the schedule with the new panel" if item.status == RECONFIRM_DEFENSE_STATUS
+                    else "Reschedule the deferred defense" if item.status == DEFERRED_DEFENSE_STATUS
+                    else "Replaced by a newer booking" if item.status == RESCHEDULED_DEFENSE_STATUS
                     else "No action needed"
                 ),
             })
@@ -13678,9 +14054,9 @@ def graduation_research_progress(student: Student, research_case: ResearchCase |
     schedules_by_type = {}
     for schedule in ScheduleRequest.query.filter(
         ScheduleRequest.student_id == student.id,
-        ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+        ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES + (HELD_DEFENSE_STATUS,)),
         ScheduleRequest.defense_type.in_(RESEARCH_GATE_DEFENSE_TYPES.values()),
-    ).order_by(ScheduleRequest.confirmed_at.desc(), ScheduleRequest.created_at.desc()).all():
+    ).order_by(ScheduleRequest.id.desc()).all():
         schedules_by_type.setdefault(schedule.defense_type, schedule)
 
     outcomes_by_gate = {}
@@ -13689,7 +14065,8 @@ def graduation_research_progress(student: Student, research_case: ResearchCase |
         DefenseVerdict.gate.in_(gates),
     ).order_by(DefenseVerdict.submitted_at.desc()).all():
         outcomes_by_gate.setdefault(verdict.gate, {
-            "result": verdict.result,
+            "result": normalize_verdict_result(verdict.result) or verdict.result,
+            "complete": verdict_is_complete(verdict),
             "recorded_at": iso(verdict.submitted_at),
         })
     if len(outcomes_by_gate) < len(gates):
@@ -13706,10 +14083,10 @@ def graduation_research_progress(student: Student, research_case: ResearchCase |
         ).order_by(TransactionLog.created_at.desc()).all():
             outcomes_by_gate.setdefault(log.source_reference, {
                 "result": "Passed" if log.result.endswith(": Passed") else "Failed",
+                "complete": log.result.endswith(": Passed"),
                 "recorded_at": iso(log.created_at),
             })
 
-    required_panel_count = len(panel_roles_for_student(student))
     legacy_verified = bool(
         research_case
         and research_case.current_gate == "Completion Evidence"
@@ -13719,12 +14096,13 @@ def graduation_research_progress(student: Student, research_case: ResearchCase |
     for stage_name, gate in RESEARCH_STAGE_SEQUENCE:
         required_items = required_documents_for_gate(gate)
         panel_count = panels_by_gate.get(gate, 0)
+        required_panel_count = len(panel_roles_for_student(student, gate))
         schedule = schedules_by_type.get(RESEARCH_GATE_DEFENSE_TYPES[gate])
         outcome = outcomes_by_gate.get(gate)
         requirement_count = len(required_items)
         panel_complete = panel_count >= required_panel_count
         schedule_complete = schedule is not None
-        defense_complete = bool(outcome and outcome["result"] == "Passed")
+        defense_complete = bool(outcome and outcome["complete"])
         schedule_item = RESEARCH_DEFENSE_SCHEDULE_ITEMS[gate]
         result_item = RESEARCH_DEFENSE_RESULT_ITEMS[gate]
 
@@ -13736,6 +14114,10 @@ def graduation_research_progress(student: Student, research_case: ResearchCase |
             if item_name == result_item:
                 return defense_complete
             document = documents_by_gate.get(gate, {}).get(item_name)
+            if item_name == FORM_5_1_ITEM and not document:
+                # Records from before v5.1 have no Form 5.1 row; a cleared ethics review covers it.
+                ethics = documents_by_gate.get(gate, {}).get("Ethics Clearance")
+                return bool(ethics and ethics.status in {"Complete", "Verified Complete"})
             return bool(document and document.status in {"Complete", "Verified Complete"})
 
         complete_requirement_count = sum(requirement_complete(item) for item in required_items)
@@ -16293,7 +16675,10 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             )
 
     if selected_student:
-        context["panel_roles"] = panel_roles_for_student(selected_student)
+        context["panel_roles"] = panel_roles_for_student(
+            selected_student,
+            current_panel_gate(selected_student) if slug in {"research-gate", "panel-matching", "defense-scheduling"} else None,
+        )
         context["research_case_type"] = research_case_type(selected_student)
         if slug == "course-audit":
             context["course_audit"] = course_audit_dict(compute_course_audit(selected_student))
@@ -16312,6 +16697,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             research_case, progress = sync_research_progress(selected_student)
             context["research_case"] = research_case_dict(research_case)
             context["research_progress"] = progress
+            context["research_vocabulary"] = RESEARCH_VOCABULARY
             context["current_milestone"] = progress["milestone"]
             context["form1_endorsement"] = form1_endorsement_dict(
                 Form1Endorsement.query.filter_by(student_id=selected_student.id).first()
@@ -16321,7 +16707,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             context["panel_status"] = {
                 "status": (
                     "Final panel selected"
-                    if len(final_panel) >= len(panel_roles_for_student(selected_student))
+                    if len(final_panel) >= len(panel_roles_for_student(selected_student, progress["gate"]))
                     else "Recommended panel available"
                     if matching_profile["ready"]
                     else "Not yet generated"
@@ -16368,11 +16754,12 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             # Full defense-eligible faculty list so staff can reassign the panel from
             # this screen (not just accept the matched panel).
             context["faculty_directory"] = defense_faculty_directory()
-            context["panel_roles"] = panel_roles_for_student(selected_student)
+            context["panel_roles"] = panel_roles_for_student(selected_student, progress["gate"])
             requirements = progress["milestone"]["requirements"]
             schedule_blockers = [
                 item for item in requirements
-                if item["source_type"] not in {"system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result"}
+                if item["source_type"] not in SCHEDULE_SYSTEM_SOURCES
+                and item["item_name"] not in POST_DEFENSE_REQUIREMENTS
             ]
             context["schedule_readiness"] = {
                 "stage": progress["stage"],
@@ -16387,9 +16774,22 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             }
             participants = defense_participants(selected_student, assignments) if assignments else []
             today = date.today()
-            lead_days = defense_lead_days(progress["stage"])
-            window_start = earliest_defense_date(progress["stage"], today)
+            stage_defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(progress["gate"])
+            lead_days = defense_lead_days(stage_defense_type or progress["stage"])
+            window_start, lead_reference, lead_reference_label = student_earliest_defense_date(
+                selected_student, stage_defense_type or progress["stage"]
+            )
             window_end = window_start + timedelta(days=60)
+            stage_outcome = latest_defense_outcome(selected_student, progress["gate"])
+            context["defense_type"] = stage_defense_type
+            context["schedulable_types"] = (
+                [stage_defense_type]
+                if stage_defense_type and not (stage_outcome and (stage_outcome["complete"] or stage_outcome["effect"] in REVISION_EFFECTS))
+                else []
+            )
+            context["verdict_outcome"] = stage_outcome
+            context["lead_reference"] = {"date": iso(lead_reference), "label": lead_reference_label, "days": lead_days}
+            context["change_requesters"] = list(SCHEDULE_CHANGE_REQUESTERS)
             context["availability"] = defense_availability_context(
                 participants,
                 window_start,
@@ -16399,6 +16799,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 "today": iso(today),
                 "lead_days": lead_days,
                 "earliest_schedule_date": iso(window_start),
+                "now": manila_now().strftime("%Y-%m-%dT%H:%M"),
             })
             for slot in context["availability"]["possible_slots"]:
                 conflicts = defense_schedule_conflicts(
@@ -16408,15 +16809,15 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     parse_time(slot["start"]),
                     parse_time(slot["end"]),
                     "",
-                    progress["stage"],
+                    stage_defense_type or progress["stage"],
                 )
                 slot["conflicts"] = conflicts
                 slot["conflict_free"] = not conflicts
             context["schedules"] = [
                 schedule_request_dict(s)
                 for s in ScheduleRequest.query.filter_by(student_id=selected_student.id)
-                .order_by(ScheduleRequest.created_at.desc())
-                .limit(6)
+                .order_by(ScheduleRequest.id.desc())
+                .limit(12)
                 .all()
             ]
         if slug == "practicum":
@@ -17809,6 +18210,12 @@ def handle_research_gate(data: MultiDict) -> int:
         account = require_workflow_actor("research_coordinator")
         if gate != "Form 4 - Proposal Defense Readiness":
             raise ValueError("Ethics clearance is recorded during the Proposal Defense stage.")
+        outcome = latest_defense_outcome(student, gate)
+        if not (outcome and outcome["complete"]):
+            raise ValueError("The ethics review opens after the proposal defense is passed and any revisions are confirmed.")
+        form_5_1 = DocumentCheck.query.filter_by(student_id=student.id, gate=gate, item_name=FORM_5_1_ITEM).first()
+        if not form_5_1 or not form_5_1.evidence_files:
+            raise ValueError("Preview the uploaded Form 5.1 Technical Review Certificate before recording the ethics clearance.")
         allowed_statuses = {"Cleared", "Returned", "Not cleared"}
         if ethics_clearance_status not in allowed_statuses:
             raise ValueError("Choose Cleared, Returned, or Not cleared for the ethics clearance status.")
@@ -17834,7 +18241,9 @@ def handle_research_gate(data: MultiDict) -> int:
             record_doc.updated_at = now_utc()
         next_owner = "Research Coordinator" if ethics_clearance_status == "Cleared" else "Student"
         if ethics_clearance_status != "Cleared":
-            add_task(student.id, "Resolve ethics clearance form", "Student", 5, 45)
+            ensure_open_task(student.id, "Resolve ethics clearance form", "Student", 5, 45)
+        else:
+            close_research_tasks(student.id, "Resolve ethics clearance form", ETHICS_APPLICATION_TASK)
         add_log(
             "research-gate",
             student.id,
@@ -17854,10 +18263,15 @@ def handle_research_gate(data: MultiDict) -> int:
     submitted_items = set()
     missing_items = []
     states = {}
+    locked_items = set()
     for doc in checks:
         presentation = research_requirement_presentation(gate, doc.item_name)
         state = research_requirement_state(student, gate, doc.item_name, doc)
         states[doc.item_name] = state
+        if (state.get("status_label") or "").startswith("Opens after"):
+            # Form 5.1 / ethics before the proposal defense is passed: not reviewable yet, not missing either.
+            locked_items.add(doc.item_name)
+            continue
         present = (
             presentation["source_type"] == "staff"
             and research_student_uploads_ready(student, gate)
@@ -17896,8 +18310,15 @@ def handle_research_gate(data: MultiDict) -> int:
         next_owner = "Research Coordinator"
 
     research_case.status = result
+    close_research_tasks(
+        student.id,
+        f"Review student {gate} application",
+        *[f"Review submitted {item}" for item in required_items],
+    )
 
     for item in required_items:
+        if item in locked_items:
+            continue
         status = "Missing" if item in missing_items else "Complete"
         existing = next(doc for doc in checks if doc.item_name == item)
         if item == "Ethics Clearance" and item not in missing_items:
@@ -17910,7 +18331,7 @@ def handle_research_gate(data: MultiDict) -> int:
         existing.updated_at = now_utc()
 
     if result in ["Missing Requirements", "Revisions Required", "Returned", "Pending Staff Action", "Pending Academic Coordinator Endorsement"]:
-        add_task(student.id, f"Resolve {gate} requirements", next_owner, 5, 45)
+        ensure_open_task(student.id, f"Resolve {gate} requirements", next_owner, 5, 45)
     sync_research_progress(student)
     recompute_risk(student)
 
@@ -17928,17 +18349,196 @@ def handle_research_gate(data: MultiDict) -> int:
     return student.id
 
 
+SCHEDULING_ROLES = ("staff", "research_coordinator", "admin")
+PANEL_NOMINATION_ROLES = ("staff", "research_coordinator")
+SCHEDULE_SYSTEM_SOURCES = {
+    "system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result",
+}
+SCHEDULE_CHANGE_REQUESTERS = (
+    "Student", "Research adviser", "Panel chair", "Panel member", "GS Office", "Research Coordinator", "Other",
+)
+
+
+def require_active_standing(student: Student) -> None:
+    if (student.standing or "") != "Active":
+        raise ValueError(
+            "Only active students can move through panel matching and defense scheduling; "
+            f"this student's standing is {student.standing or 'not recorded'}."
+        )
+
+
+def student_adviser_faculty_ids(student: Student) -> set[int]:
+    ids = {
+        row.faculty_id
+        for row in AdviserAssignment.query.filter_by(student_id=student.id, status="Active").all()
+    }
+    if student.adviser_name:
+        ids.update(faculty.id for faculty in Faculty.query.filter_by(name=student.adviser_name).all())
+    return ids
+
+
+def validate_panel_selection(student: Student, gate: str, faculty_ids: list[int], reason: str = "") -> list[Faculty]:
+    """Protocol checks for a panel about to be saved. Returns the chosen faculty in role order.
+
+    The adviser can never be chair or member of their own advisee's panel; the size
+    follows the paper type and stage; replacing an existing panel needs a reason.
+    """
+    roles = panel_roles_for_student(student, gate)
+    if len(faculty_ids) != len(roles) or len(set(faculty_ids)) != len(faculty_ids):
+        raise ValueError(f"Select {len(roles)} different faculty members for the defense panel.")
+    adviser_ids = student_adviser_faculty_ids(student)
+    chosen = []
+    for faculty_id in faculty_ids:
+        faculty = Faculty.query.filter_by(id=faculty_id, active=True).first()
+        if not faculty:
+            raise ValueError("One of the selected faculty members is no longer active.")
+        if faculty.id in adviser_ids:
+            raise ValueError(
+                f"{faculty.name} is this student's research adviser and cannot also be a panel chair or member "
+                "for the same student."
+            )
+        if not UserAccount.query.filter_by(faculty_id=faculty.id, role="faculty", active=True).first():
+            raise ValueError(f"{faculty.name} does not have an active faculty login account yet.")
+        chosen.append(faculty)
+    existing = active_panel_assignments(student, gate)
+    if existing:
+        previous = {assignment.panel_role: assignment.faculty_id for assignment in existing}
+        proposed = {roles[index]: chosen[index].id for index in range(len(roles))}
+        if previous != proposed and not (reason or "").strip():
+            raise ValueError(
+                "Give the reason for changing the panel; it is recorded with the change "
+                "(the same panel carries from proposal to final unless a reason is recorded)."
+            )
+    return chosen
+
+
+def panel_snapshot_for(panel: list[PanelAssignment]) -> list[dict]:
+    return [
+        {
+            "faculty_id": assignment.faculty_id,
+            "name": assignment.faculty.name,
+            "role": assignment.panel_role,
+            "department": assignment.faculty.college,
+            "specialization": assignment.faculty.specialization,
+        }
+        for assignment in panel
+        if assignment.faculty
+    ]
+
+
+def slot_availability(participants: list[dict], day: date, start: time, end: time) -> tuple[int, list[str]]:
+    """How many participants are free for the whole slot, and who is not."""
+    context = defense_availability_context(participants, day, day)
+    free = 0
+    unavailable = []
+    for participant in context["participants"]:
+        covered = any(
+            slot["date"] == day.isoformat()
+            and parse_time(slot["start"]) <= start
+            and parse_time(slot["end"]) >= end
+            for slot in participant["slots"]
+        ) and not any(
+            busy["date"] == day.isoformat()
+            and parse_time(busy["start"]) < end
+            and parse_time(busy["end"]) > start
+            for busy in participant.get("google_busy", [])
+        )
+        if covered:
+            free += 1
+        else:
+            unavailable.append(participant["name"])
+    return free, unavailable
+
+
+def schedule_slot_problems(student: Student, schedule: ScheduleRequest, panel: list[PanelAssignment]) -> list[str]:
+    """Re-run the availability and conflict checks for an existing booking and its current panel."""
+    if not schedule.start_time or not schedule.end_time:
+        return ["The booking has no start and end time."]
+    participants = defense_participants(student, panel)
+    _free, unavailable = slot_availability(participants, schedule.preferred_date, schedule.start_time, schedule.end_time)
+    problems = [
+        f"{name} is not available {schedule.start_time.strftime('%H:%M')}-{schedule.end_time.strftime('%H:%M')} on {schedule.preferred_date.isoformat()}"
+        for name in unavailable
+    ]
+    problems.extend(
+        defense_schedule_conflicts(
+            student, panel, schedule.preferred_date, schedule.start_time, schedule.end_time,
+            schedule.venue or "", schedule.defense_type,
+        )
+    )
+    return problems
+
+
+def flag_schedule_after_panel_change(student: Student, gate: str, actor: str, reason: str) -> ScheduleRequest | None:
+    """A panel change after booking invalidates the booking until it is re-confirmed."""
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    schedule = (
+        ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.defense_type == defense_type,
+            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+        )
+        .order_by(ScheduleRequest.id.desc())
+        .first()
+    )
+    if not schedule:
+        return None
+    panel = active_panel_assignments(student, gate)
+    schedule.panel_snapshot = json.dumps(panel_snapshot_for(panel))
+    problems = schedule_slot_problems(student, schedule, panel)
+    schedule.status = RECONFIRM_DEFENSE_STATUS
+    recheck = "; ".join(problems) if problems else "the new panel is free at the booked time"
+    schedule.conflict_reason = (
+        f"Panel changed by {actor} on {date.today().isoformat()}: {reason or 'no reason recorded'}. "
+        f"Availability recheck: {recheck}. Re-confirm the schedule or reschedule it."
+    )
+    ensure_open_task(student.id, f"Re-confirm {defense_type} schedule after panel change", "Research Coordinator", 2, 50)
+    add_log(
+        "defense-scheduling", student.id, actor, gate,
+        f"{defense_type} panel changed; schedule #{schedule.id} needs re-confirmation", "Research Coordinator",
+        schedule.conflict_reason,
+    )
+    return schedule
+
+
+def carry_panel_forward(student: Student, gate: str) -> int:
+    """Protocol: the same panel that heard the proposal sits in the closed-door final defense."""
+    if gate != RESEARCH_GATE_FINAL:
+        return 0
+    if PanelAssignment.query.filter_by(student_id=student.id, gate=RESEARCH_GATE_FINAL).first():
+        return 0
+    proposal_panel = PanelAssignment.query.filter_by(student_id=student.id, gate=RESEARCH_GATE_PROPOSAL).all()
+    for assignment in proposal_panel:
+        db.session.add(PanelAssignment(
+            student_id=student.id, faculty_id=assignment.faculty_id, gate=RESEARCH_GATE_FINAL,
+            panel_role=assignment.panel_role, score=assignment.score,
+            eligibility_note="Carried over from the proposal defense panel (same panel at the final defense)",
+        ))
+    return len(proposal_panel)
+
+
 def handle_panel_matching(data: MultiDict) -> int:
-    # Finalization is a staff decision. The system supplies the ranked shortlist,
-    # while the submitted faculty ids preserve any staff adjustments.
+    # Finalization is the Research Coordinator's nomination (GS staff may also do it).
+    # The system supplies the ranked shortlist, while the submitted faculty ids
+    # preserve any adjustments.
     student = Student.query.get_or_404(int(data["student_id"]))
-    account = require_workflow_actor("staff", "academic_coordinator")
+    account = require_workflow_actor(*PANEL_NOMINATION_ROLES)
     require_research_prerequisite(student)
+    require_active_standing(student)
+    gate = current_panel_gate(student)
+    if gate == RESEARCH_GATE_TITLE:
+        endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first()
+        if not (endorsement and endorsement.status == "Endorsed" and concept_paper_package_ready(student.id)):
+            raise ValueError(
+                "Panel matching opens only after the Academic Coordinator has endorsed Form 1 and the three concept "
+                "papers."
+            )
     matching_profile = research_matching_profile(student)
     if not matching_profile["ready"]:
         raise ValueError(matching_profile.get("blocked_reason") or "Panel matching requires readable research manuscript body text.")
     recommendations = recommend_panel(student)
-    required_roles = panel_roles_for_student(student)
+    required_roles = panel_roles_for_student(student, matching_profile["gate"])
+    adviser_ids = student_adviser_faculty_ids(student)
     selected_ids = []
     for value in data.getlist("faculty_ids"):
         try:
@@ -17948,7 +18548,9 @@ def handle_panel_matching(data: MultiDict) -> int:
         if faculty_id not in selected_ids:
             selected_ids.append(faculty_id)
     if not selected_ids:
-        selected_ids = [row["faculty"].id for row in recommendations[: len(required_roles)]]
+        selected_ids = [
+            row["faculty"].id for row in recommendations if row["faculty"].id not in adviser_ids
+        ][: len(required_roles)]
     if len(selected_ids) != len(required_roles):
         raise ValueError(f"Select {len(required_roles)} different faculty members before finalizing the panel.")
 
@@ -17960,12 +18562,13 @@ def handle_panel_matching(data: MultiDict) -> int:
             raise ValueError("One of the selected faculty members is no longer eligible for panel assignment.")
         selected_rows.append(row)
 
+    change_reason = (data.get("panel_change_reason") or "").strip()
+    validate_panel_selection(student, matching_profile["gate"], selected_ids, change_reason)
+    had_panel = bool(active_panel_assignments(student, matching_profile["gate"]))
     clear_panel_for_research_gate(student, matching_profile["gate"])
     for index, row in enumerate(selected_rows):
         # Panel selection grants access through the assignment and reuses the
         # faculty's already-created general login.
-        if not UserAccount.query.filter_by(faculty_id=row["faculty"].id, role="faculty", active=True).first():
-            raise ValueError(f"{row['faculty'].name} does not have an active faculty login account yet.")
         db.session.add(
             PanelAssignment(
                 student_id=student.id,
@@ -17973,7 +18576,7 @@ def handle_panel_matching(data: MultiDict) -> int:
                 gate=matching_profile["gate"],
                 panel_role=required_roles[index],
                 score=row["score"],
-                eligibility_note=row["note"],
+                eligibility_note=(f"{row['note']} Changed: {change_reason}" if had_panel and change_reason else row["note"])[:220],
             )
         )
 
@@ -17991,16 +18594,22 @@ def handle_panel_matching(data: MultiDict) -> int:
             ]
         ),
     )
-    add_task(student.id, "Confirm assigned panel acceptance", "Research Coordinator", 3, 30)
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(matching_profile["gate"], "defense")
+    ensure_open_task(student.id, f"Confirm assigned panel acceptance ({defense_type})", "Research Coordinator", 3, 30)
+    if had_panel:
+        flag_schedule_after_panel_change(student, matching_profile["gate"], workflow_actor_label(account), change_reason)
     sync_research_progress(student)
     return student.id
 
 
 def handle_defense_scheduling(data: MultiDict) -> int:
-    # Staff makes the final decision; the system requires an explicit override
-    # when Research Gate, calendar, lead-time, or defense-record checks warn.
+    # GS staff / the Research Coordinator book the schedule. The system enforces the
+    # protocol (stage, panel, lead times, no past slots); a warning can be overridden
+    # only with a recorded reason.
     student = Student.query.get_or_404(int(data["student_id"]))
+    account = require_workflow_actor(*SCHEDULING_ROLES)
     require_research_prerequisite(student)
+    require_active_standing(student)
 
     # Optional panel reassignment from the Defense Scheduling screen: staff may pick
     # faculty from the full directory (not just the matched panel). This reassigns the
@@ -18014,114 +18623,163 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         if fid not in reassign_ids:
             reassign_ids.append(fid)
     if reassign_ids:
-        reassign_actor = require_workflow_actor("staff", "academic_coordinator")
         _, reassign_progress = sync_research_progress(student)
         reassign_gate = reassign_progress["gate"]
-        reassign_roles = panel_roles_for_student(student)
-        if len(reassign_ids) != len(reassign_roles):
-            raise ValueError(f"Select {len(reassign_roles)} different faculty members for the defense panel.")
+        reassign_roles = panel_roles_for_student(student, reassign_gate)
+        change_reason = (data.get("panel_change_reason") or data.get("reason") or "").strip()
+        chosen_faculty = validate_panel_selection(student, reassign_gate, reassign_ids, change_reason)
         prior_scores = {a.faculty_id: a.score for a in active_panel_assignments(student, reassign_gate)}
-        chosen_faculty = []
-        for fid in reassign_ids:
-            faculty = Faculty.query.filter_by(id=fid, active=True).first()
-            if not faculty:
-                raise ValueError("One of the selected faculty members is no longer active.")
-            if not UserAccount.query.filter_by(faculty_id=faculty.id, role="faculty", active=True).first():
-                raise ValueError(f"{faculty.name} does not have an active faculty login account yet.")
-            chosen_faculty.append(faculty)
+        had_panel = bool(prior_scores)
         clear_panel_for_research_gate(student, reassign_gate)
         for index, faculty in enumerate(chosen_faculty):
             db.session.add(PanelAssignment(
                 student_id=student.id, faculty_id=faculty.id, gate=reassign_gate,
                 panel_role=reassign_roles[index], score=prior_scores.get(faculty.id, 0),
-                eligibility_note="Reassigned via Defense Scheduling"))
+                eligibility_note=(f"Reassigned via Defense Scheduling. {change_reason}".strip())[:220]))
         add_log(
-            "panel-matching", student.id, workflow_actor_label(reassign_actor),
+            "panel-matching", student.id, workflow_actor_label(account),
             data.get("source_reference", ""),
             f"Defense panel reassigned to {len(chosen_faculty)} member(s) from Defense Scheduling",
             "Research Coordinator",
-            "; ".join(f"{reassign_roles[i]}: {f.name}" for i, f in enumerate(chosen_faculty)),
+            "; ".join(f"{reassign_roles[i]}: {f.name}" for i, f in enumerate(chosen_faculty))
+            + (f". Reason: {change_reason}" if change_reason else ""),
         )
+        db.session.flush()
+        if had_panel:
+            flag_schedule_after_panel_change(student, reassign_gate, workflow_actor_label(account), change_reason)
         sync_research_progress(student)
         if str(data.get("reassign_only", "")).lower() in {"1", "true", "yes", "on"}:
             return student.id
 
+    book_defense_schedule(student, data, account)
+    return student.id
+
+
+def book_defense_schedule(
+    student: Student,
+    data: MultiDict,
+    account: UserAccount,
+    replaces: ScheduleRequest | None = None,
+) -> ScheduleRequest:
+    """Create a booking (or a reschedule of `replaces`) after every protocol check."""
+    research_case, progress = sync_research_progress(student)
+    gate = progress["gate"]
+    expected_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    defense_type = (data.get("defense_type") or expected_type or "").strip()
+    if defense_type == "Public Final Defense":
+        raise ValueError(
+            "Public Final Defense cannot be booked here: it has no panel or verdict step in this system yet. "
+            "Book the Title, Proposal or Final Defense."
+        )
+    if defense_type not in SCHEDULABLE_DEFENSE_TYPES:
+        raise ValueError("Choose the Title, Proposal or Final Defense.")
+    if not expected_type:
+        raise ValueError("All of this student's research defenses are complete; there is no defense left to schedule.")
+    if defense_type != expected_type:
+        raise ValueError(
+            f"This student is at the {progress['stage']} stage, so only a {expected_type} can be scheduled "
+            f"({defense_type} does not match the research stage)."
+        )
+    outcome = latest_defense_outcome(student, gate)
+    if outcome and outcome["complete"]:
+        raise ValueError(f"The {defense_type} already has a passing result; there is nothing more to schedule at this stage.")
+    if outcome and outcome["effect"] in REVISION_EFFECTS:
+        raise ValueError(
+            f"The panel asked for revisions after the {defense_type}; they are confirmed by the "
+            f"{'panel chair' if outcome['effect'] == 'panel_revise' else 'research adviser'}, not by a new defense."
+        )
+
     preferred_date = parse_date(data["preferred_date"])
     preferred_end_date = parse_date(data.get("preferred_end_date") or data["preferred_date"])
-    defense_type = data.get("defense_type", "Title Defense")
     mode = data["mode"]
     venue = data.get("venue", "")
+    selected_start = parse_time(data.get("selected_start"))
+    selected_end = parse_time(data.get("selected_end"))
+    if not selected_start or not selected_end:
+        raise ValueError("Select a start and end time from the shared availability.")
+    if selected_end <= selected_start:
+        raise ValueError("Defense end time must be later than the start time.")
+    if preferred_end_date < preferred_date:
+        raise ValueError("Preferred date window end cannot be before the selected defense date.")
+    if datetime.combine(preferred_date, selected_start) <= manila_now():
+        raise ValueError("That date and time is already in the past. Choose a future slot.")
+
     override_requirements = str(data.get("override_requirements", "")).lower() in {"1", "true", "yes", "on"}
     override_conflicts = str(data.get("override_conflicts", "")).lower() in {"1", "true", "yes", "on"}
-    research_case, progress = sync_research_progress(student)
-    missing_requirements = [
-        item["label"]
+    override_reason = (data.get("override_reason") or "").strip()
+
+    blocking = [
+        item
         for item in progress["milestone"]["requirements"]
         if item["status"] != "Complete"
-        and item["source_type"] not in {"system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result"}
+        and item["source_type"] not in SCHEDULE_SYSTEM_SOURCES
+        and item["source_type"] != "system_panel"
+        and item["item_name"] not in POST_DEFENSE_REQUIREMENTS
     ]
-    ethics_pending = [
-        item["label"]
-        for item in progress["milestone"]["requirements"]
-        if item["item_name"] in {"Ethics Clearance", "Ethics clearance status and date"}
-        and item["status"] != "Complete"
-    ]
-    if ethics_pending:
-        raise ValueError("The Research Coordinator must review and record the Research Protocol Form 5.2 ethics clearance before Defense Scheduling.")
+    if any(item["source_type"] == "coordinator_endorsement" for item in blocking):
+        raise ValueError(
+            "The Academic Coordinator must endorse Form 1 and the three concept papers before a title defense "
+            "can be scheduled. This cannot be overridden."
+        )
+    missing_requirements = [item["label"] for item in blocking]
     if missing_requirements and not override_requirements:
         raise ValueError(
             "Research Gate requirements are still pending: "
             + ", ".join(missing_requirements)
             + ". Review them or confirm the staff override."
         )
-    panel = active_panel_assignments(student, progress["gate"])
+    panel = active_panel_assignments(student, gate)
     if not panel:
         raise ValueError("Complete Panel Matching before creating a defense schedule.")
-    panel_ids = [assignment.faculty_id for assignment in panel]
-    participants = defense_participants(student, panel)
-    required_panel_count = len(panel_roles_for_student(student))
-    if len(panel_ids) < required_panel_count:
+    required_panel_count = len(panel_roles_for_student(student, gate))
+    if len(panel) < required_panel_count:
         raise ValueError(
-            f"Panel Matching is incomplete: {len(panel_ids)} of {required_panel_count} required panelists are selected."
+            f"Panel Matching is incomplete: {len(panel)} of {required_panel_count} required panelists are selected."
         )
+    adviser_ids = student_adviser_faculty_ids(student)
+    if any(assignment.faculty_id in adviser_ids for assignment in panel):
+        raise ValueError("The student's research adviser cannot also sit on the panel. Change the panel first.")
+    existing = (
+        ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.defense_type == defense_type,
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        )
+        .order_by(ScheduleRequest.id.desc())
+        .first()
+    )
+    if existing and not replaces:
+        raise ValueError(
+            f"A {defense_type} is already booked for {existing.preferred_date.isoformat()}. "
+            "Use Reschedule (with a reason) to move it, or Cancel it first."
+        )
+    participants = defense_participants(student, panel)
+
+    received_raw = (data.get("manuscript_received_on") or "").strip() if isinstance(data.get("manuscript_received_on"), str) else ""
+    received_on = parse_date(received_raw) if received_raw else None
+    if received_on and received_on > date.today():
+        raise ValueError("The date the panel received the manuscript cannot be in the future.")
+    if defense_type == "Title Defense":
+        received_on = None
+    earliest, _reference, reference_label = student_earliest_defense_date(student, defense_type, received_on)
     lead_days = defense_lead_days(defense_type)
-    lead_ok = preferred_date >= earliest_defense_date(defense_type)
-    selected_start = parse_time(data.get("selected_start"))
-    selected_end = parse_time(data.get("selected_end"))
-    if preferred_end_date < preferred_date:
-        raise ValueError("Preferred date window end cannot be before the selected defense date.")
-    if selected_start and selected_end and selected_end <= selected_start:
-        raise ValueError("Defense end time must be later than the start time.")
-    selected_window_ok = False
-    matched_count = 0
-    if selected_start and selected_end and participants:
-        day_context = defense_availability_context(participants, preferred_date, preferred_date)
-        matched_count = sum(
-            1
-            for participant in day_context["participants"]
-            if any(
-                slot["date"] == preferred_date.isoformat()
-                and parse_time(slot["start"]) <= selected_start
-                and parse_time(slot["end"]) >= selected_end
-                for slot in participant["slots"]
-            )
-            and not any(
-                busy["date"] == preferred_date.isoformat()
-                and parse_time(busy["start"]) < selected_end
-                and parse_time(busy["end"]) > selected_start
-                for busy in participant.get("google_busy", [])
-            )
-        )
-        selected_window_ok = matched_count == len(participants)
+    lead_ok = preferred_date >= earliest
+
+    matched_count, unavailable = slot_availability(participants, preferred_date, selected_start, selected_end) if participants else (0, [])
+    selected_window_ok = matched_count == len(participants)
 
     status_reason = []
     availability_conflict = ""
     if not lead_ok:
-        status_reason.append(f"{defense_type} needs at least {lead_days} days lead time")
-    if not selected_start or not selected_end:
-        status_reason.append("select a shared start and end time")
-    elif not selected_window_ok:
-        availability_conflict = f"only {matched_count} of {len(participants)} participants share that time"
+        status_reason.append(
+            f"{defense_type} needs at least {lead_days} days after {reference_label}; "
+            f"the earliest date is {earliest.isoformat()}"
+        )
+    if not selected_window_ok:
+        availability_conflict = (
+            f"only {matched_count} of {len(participants)} participants share that time"
+            + (f" (not available: {', '.join(unavailable)})" if unavailable else "")
+        )
         status_reason.append(availability_conflict)
     conflicts = defense_schedule_conflicts(
         student, panel, preferred_date, selected_start, selected_end, venue, defense_type
@@ -18142,38 +18800,21 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         raise ValueError(
             "Schedule warning: " + " ".join(status_reason) + " Confirm the schedule override to finalize anyway."
         )
-    time_label = (
-        f"{selected_start.strftime('%I:%M %p')}-{selected_end.strftime('%I:%M %p')}"
-        if selected_start and selected_end
-        else "time not selected"
-    )
-    previous_schedule = (
-        ScheduleRequest.query.filter_by(student_id=student.id, defense_type=defense_type)
-        .order_by(ScheduleRequest.created_at.desc())
+    if (status_reason or missing_requirements) and not override_reason:
+        raise ValueError("Record the reason for the staff override before continuing.")
+
+    time_label = f"{selected_start.strftime('%I:%M %p')}-{selected_end.strftime('%I:%M %p')}"
+    requested_by = (data.get("requested_by") or "").strip() or ("GS Office" if replaces else None)
+    change_reason = (data.get("reason") or "").strip() if replaces else ""
+    link_to = replaces or (
+        ScheduleRequest.query.filter_by(student_id=student.id, defense_type=defense_type, status=DEFERRED_DEFENSE_STATUS)
+        .order_by(ScheduleRequest.id.desc())
         .first()
     )
-    gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(defense_type)
-    latest_outcome = latest_defense_outcome(student, gate) if gate else None
-    is_failed_stage_retry = bool(previous_schedule and latest_outcome and latest_outcome["result"] == "Failed")
-    action_label = "Rescheduled" if is_failed_stage_retry else "Scheduled"
-    if previous_schedule and previous_schedule.status in ACTIVE_DEFENSE_STATUSES:
-        previous_schedule.status = "Cancelled"
-        previous_schedule.conflict_reason = (
-            "Superseded by a staff-approved reschedule after a failed defense."
-            if is_failed_stage_retry
-            else "Superseded by a staff-approved schedule update."
-        )
-    panel_snapshot = [
-        {
-            "faculty_id": assignment.faculty_id,
-            "name": assignment.faculty.name,
-            "role": assignment.panel_role,
-            "department": assignment.faculty.college,
-            "specialization": assignment.faculty.specialization,
-        }
-        for assignment in panel
-        if assignment.faculty
-    ]
+    action_label = "Rescheduled" if replaces else "Scheduled"
+    if replaces and replaces.status in SLOT_HOLDING_DEFENSE_STATUSES:
+        replaces.status = RESCHEDULED_DEFENSE_STATUS
+        replaces.conflict_reason = f"Replaced by a rescheduled booking on {date.today().isoformat()}: {change_reason}"
     schedule = ScheduleRequest(
         student_id=student.id,
         preferred_date=preferred_date,
@@ -18183,9 +18824,9 @@ def handle_defense_scheduling(data: MultiDict) -> int:
         defense_type=defense_type,
         mode=mode,
         venue=venue,
-        status=action_label,
+        status="Scheduled",
         matched_count=matched_count,
-        panel_snapshot=json.dumps(panel_snapshot),
+        panel_snapshot=json.dumps(panel_snapshot_for(panel)),
         required_forms_status="Complete" if not missing_requirements else "Staff override",
         conflict_reason="; ".join(status_reason) if status_reason else None,
         notes=(
@@ -18194,22 +18835,50 @@ def handle_defense_scheduling(data: MultiDict) -> int:
             f"{data.get('constraints', '')}"
         )[:260],
         confirmed_at=now_utc(),
+        rescheduled_from_id=link_to.id if link_to else None,
+        change_reason=change_reason or None,
+        requested_by=requested_by,
+        override_reason=override_reason or None,
+        manuscript_received_on=received_on,
     )
     db.session.add(schedule)
-    next_owner = "Panel Chair"
-
+    db.session.flush()
+    close_research_tasks(
+        student.id,
+        f"Review student {defense_type} schedule request",
+        f"Reschedule deferred {defense_type}",
+        f"Reschedule cancelled {defense_type}",
+        f"Re-confirm {defense_type} schedule after panel change",
+    )
     add_log(
         "defense-scheduling",
         student.id,
-        "Research Coordinator",
+        workflow_actor_label(account),
         data.get("source_reference", ""),
         f"{defense_type} schedule {action_label}; {matched_count}/{len(participants)} participant match(es)",
-        next_owner,
+        "Panel Chair",
         f"{preferred_date.isoformat()} {time_label}; {mode}; {venue}; "
-        f"{'; '.join(status_reason) if status_reason else 'lead time and availability passed'}",
+        f"{'; '.join(status_reason) if status_reason else 'lead time and availability passed'}"
+        + (f"; requested by {requested_by}: {change_reason}" if replaces else "")
+        + (f"; override reason: {override_reason}" if override_reason else ""),
     )
     sync_research_progress(student)
-    return student.id
+    return schedule
+
+
+def cancel_defense_schedule(schedule: ScheduleRequest, account: UserAccount, reason: str, requested_by: str) -> None:
+    student = schedule.student
+    schedule.status = CANCELLED_DEFENSE_STATUS
+    schedule.cancelled_at = now_utc()
+    schedule.change_reason = reason
+    schedule.requested_by = requested_by or schedule.requested_by
+    schedule.conflict_reason = f"Cancelled on {date.today().isoformat()}: {reason}"
+    ensure_open_task(student.id, f"Reschedule cancelled {schedule.defense_type}", "Research Coordinator", 3, 50)
+    add_log(
+        "defense-scheduling", student.id, workflow_actor_label(account), schedule.defense_type or "",
+        f"{schedule.defense_type} schedule #{schedule.id} cancelled", "Research Coordinator",
+        f"Requested by {requested_by or 'not recorded'}. Reason: {reason}",
+    )
 
 
 def handle_practicum(data: MultiDict) -> int:
@@ -19566,8 +20235,9 @@ def replace_research_evidence_files(doc: DocumentCheck, keep_evidence: ResearchE
         ResearchEvidenceFile.id != keep_evidence.id,
     ).all()
     for old_file in old_files:
-        replaced_paths.append(UPLOAD_ROOT / old_file.stored_name)
-        db.session.delete(old_file)
+        removed = retire_research_evidence(old_file)
+        if removed:
+            replaced_paths.append(removed)
     doc.evidence_reference = keep_evidence.original_name
     doc.updated_at = now_utc()
     db.session.flush()
@@ -19968,6 +20638,15 @@ def active_panel_assignments(student: Student, gate: str | None = None) -> list[
     )
 
 
+def title_uploads_locked(student: Student) -> bool:
+    """Title uploads lock once a panel is matched, unless the title was disapproved
+    (then a new set of three titles is needed and the old panel match no longer applies)."""
+    if not active_panel_assignments(student, RESEARCH_GATE_TITLE):
+        return False
+    outcome = latest_defense_outcome(student, RESEARCH_GATE_TITLE)
+    return not (outcome and not outcome["complete"] and outcome["effect"] in RESUBMIT_EFFECTS)
+
+
 def clear_panel_for_research_gate(student: Student, gate: str | None = None) -> int:
     gate = gate or current_panel_gate(student)
     return PanelAssignment.query.filter_by(student_id=student.id, gate=gate).delete()
@@ -20025,8 +20704,142 @@ def defense_participants(student: Student, assignments: list[PanelAssignment]) -
     return participants
 
 
-ACTIVE_DEFENSE_STATUSES = ("Confirmed", "Scheduled", "Rescheduled")
+# ---------------------------------------------------------------------------
+# Research vocabulary: the ONE place that defines verdict words, schedule
+# statuses and the follow-up each verdict leads to. The frontend reads these
+# values from the API (`verdict_options`, `research_vocabulary`) instead of
+# keeping its own copies. Ground truth: the GS research protocol.
+# ---------------------------------------------------------------------------
+RESEARCH_GATE_TITLE = "Form 1 - Title Defense"
+RESEARCH_GATE_PROPOSAL = "Form 4 - Proposal Defense Readiness"
+RESEARCH_GATE_FINAL = "Final Defense"
+
+VERDICT_PASSED = "Passed"  # Title: "Approved"
+VERDICT_MINOR = "Passed with minor revisions"
+VERDICT_REDEFENSE = "Provisional pass - re-defense required"
+VERDICT_PANEL_APPROVAL = "Provisional pass - revisions for panel approval"
+VERDICT_DEFERRED = "Deferred"
+VERDICT_FAILED = "Failed"  # Title: "Disapproved"
+# Words written by earlier versions of the app; accepted on input, migrated at startup.
+LEGACY_VERDICT_ALIASES = {
+    "Passed with revisions": VERDICT_MINOR,
+    "For resubmission": VERDICT_FAILED,
+}
+
+_ALL_RESEARCH_GATES = (RESEARCH_GATE_TITLE, RESEARCH_GATE_PROPOSAL, RESEARCH_GATE_FINAL)
+_DEFENSE_GATES = (RESEARCH_GATE_PROPOSAL, RESEARCH_GATE_FINAL)
+
+# effect: complete (stage done) | revise (adviser confirms revisions) |
+# panel_revise (panel chair confirms revisions) | redefense / resubmit (same
+# protocol again, evidence superseded) | reschedule (defense did not take place).
+RESEARCH_VERDICTS = {
+    VERDICT_PASSED: {
+        "label": "Passed", "title_label": "Approved", "effect": "complete", "gates": _ALL_RESEARCH_GATES,
+        "summary": "The stage is complete.",
+    },
+    VERDICT_MINOR: {
+        "label": "Passed with minor revisions", "effect": "revise", "gates": _DEFENSE_GATES,
+        "summary": "The student submits the revised manuscript; the research adviser confirms it and the stage completes.",
+    },
+    VERDICT_PANEL_APPROVAL: {
+        "label": "Provisional pass - revisions for panel approval", "effect": "panel_revise", "gates": _DEFENSE_GATES,
+        "summary": "Major revisions without a re-defense: the student submits the revised manuscript and the panel chair confirms the panel's approval (14-Day Rule).",
+    },
+    VERDICT_REDEFENSE: {
+        "label": "Provisional pass - re-defense required", "effect": "redefense", "gates": _DEFENSE_GATES,
+        "summary": "Re-defense following the same protocol: the student resubmits, the adviser re-signs, the defense is scheduled again.",
+    },
+    VERDICT_DEFERRED: {
+        "label": "Deferred", "effect": "reschedule", "gates": _ALL_RESEARCH_GATES,
+        "summary": "The defense did not take place; the Research Coordinator reschedules it. Nothing is reset.",
+    },
+    VERDICT_FAILED: {
+        "label": "Failed", "title_label": "Disapproved", "effect": "resubmit", "gates": _ALL_RESEARCH_GATES,
+        "summary": "Resubmission: at the Title stage a new set of three titles, otherwise a re-defense following the same protocol.",
+    },
+}
+# business rule: final defense passing score (protocol Form 7; below this the panel cannot record a plain pass)
+FINAL_DEFENSE_PASSING_SCORE = {"Thesis": 85, "Dissertation": 90}
+REVISION_EFFECTS = ("revise", "panel_revise")
+RESUBMIT_EFFECTS = ("redefense", "resubmit")
+REVISION_AWAITING = "Awaiting revisions"
+REVISION_SUBMITTED = "Revisions submitted"
+REVISION_CONFIRMED = "Revisions confirmed"
+
+# Schedule statuses. Active = a defense that is booked and can still take place.
+ACTIVE_DEFENSE_STATUSES = ("Confirmed", "Scheduled")  # "Confirmed" is the legacy word for "Scheduled"
+RECONFIRM_DEFENSE_STATUS = "Needs Re-confirmation"  # panel changed after booking
+HELD_DEFENSE_STATUS = "Held"  # the defense took place and a verdict was recorded
+DEFERRED_DEFENSE_STATUS = "Deferred"
+CANCELLED_DEFENSE_STATUS = "Cancelled"
+RESCHEDULED_DEFENSE_STATUS = "Rescheduled"  # replaced by a newer record (linked by rescheduled_from_id)
+SLOT_HOLDING_DEFENSE_STATUSES = ACTIVE_DEFENSE_STATUSES + (RECONFIRM_DEFENSE_STATUS,)
 PENDING_DEFENSE_STATUSES = ("Needs Availability", "Pending scheduling")
+
+RESEARCH_VOCABULARY = {
+    "verdicts": [{"value": key, **{k: v for k, v in value.items() if k != "gates"}} for key, value in RESEARCH_VERDICTS.items()],
+    "schedule_statuses": [
+        "Scheduled", RECONFIRM_DEFENSE_STATUS, HELD_DEFENSE_STATUS, DEFERRED_DEFENSE_STATUS,
+        RESCHEDULED_DEFENSE_STATUS, CANCELLED_DEFENSE_STATUS,
+    ],
+    "revision_statuses": [REVISION_AWAITING, REVISION_SUBMITTED, REVISION_CONFIRMED],
+    "stage_statuses": [
+        "Missing Requirements", "Awaiting Review", "Pending Staff Action", "Revisions Pending",
+        "Revisions Submitted - Awaiting Confirmation", "Re-defense Required", "Resubmission Required",
+        "Defense Deferred", "Complete",
+    ],
+}
+
+# Philippines time has no daylight saving; used wherever "now" must mean Manila.
+MANILA_TZ = timezone(timedelta(hours=8))
+
+
+def manila_now() -> datetime:
+    return datetime.now(MANILA_TZ).replace(tzinfo=None)
+
+
+def normalize_verdict_result(value) -> str | None:
+    """Return the canonical verdict word, or None when the word is unknown."""
+    text_value = (value or "").strip() if isinstance(value, str) else ""
+    text_value = LEGACY_VERDICT_ALIASES.get(text_value, text_value)
+    return text_value if text_value in RESEARCH_VERDICTS else None
+
+
+def verdict_label_for_gate(result: str, gate: str | None) -> str:
+    definition = RESEARCH_VERDICTS.get(normalize_verdict_result(result) or "", {})
+    if gate == RESEARCH_GATE_TITLE and definition.get("title_label"):
+        return definition["title_label"]
+    return definition.get("label", result)
+
+
+def verdict_options_for_gate(gate: str | None) -> list[dict]:
+    return [
+        {
+            "value": key,
+            "label": verdict_label_for_gate(key, gate),
+            "effect": value["effect"],
+            "summary": value["summary"],
+        }
+        for key, value in RESEARCH_VERDICTS.items()
+        if gate in value["gates"]
+    ]
+
+
+def verdict_effect(verdict) -> str | None:
+    result = normalize_verdict_result(getattr(verdict, "result", None))
+    return RESEARCH_VERDICTS[result]["effect"] if result else None
+
+
+def verdict_is_complete(verdict) -> bool:
+    """True when this verdict finishes its stage (a pass, or revisions confirmed)."""
+    effect = verdict_effect(verdict)
+    if effect == "complete":
+        return True
+    return effect in REVISION_EFFECTS and verdict.revision_status == REVISION_CONFIRMED
+
+
+def defense_start_datetime(schedule: ScheduleRequest) -> datetime:
+    return datetime.combine(schedule.preferred_date, schedule.start_time or time(0, 0))
 
 
 def schedule_panel_ids(schedule: ScheduleRequest) -> set[int]:
@@ -20065,7 +20878,7 @@ def defense_schedule_conflicts(
     conflicts = []
     candidates = ScheduleRequest.query.filter(
         ScheduleRequest.preferred_date == day,
-        ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+        ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
     ).all()
     for schedule in candidates:
         if schedule.student_id == student.id and schedule.defense_type == defense_type:
@@ -20548,7 +21361,7 @@ RESEARCH_MILESTONES = {
     "Form 4 - Proposal Defense Readiness": {
         "label": "Proposal Defense Readiness",
         "short_label": "Proposal Defense",
-        "description": "Submit the adviser-signed proposal manuscript, adviser-signed endorsements, ethics clearance, and consultation evidence. Panel matching and scheduling open only after the Research Coordinator records the ethics clearance.",
+        "description": "Submit the adviser-signed proposal manuscript, adviser-signed endorsements, and consultation evidence. After the proposal defense is passed, submit Form 5.1 and the ethics review (Form 5.2, within one month); ethics clearance is needed before the Final Defense.",
     },
     "Final Defense": {
         "label": "Final Defense Readiness",
@@ -20569,6 +21382,9 @@ RESEARCH_GATE_DEFENSE_TYPES = {
 }
 
 RESEARCH_DEFENSE_TYPES_TO_GATES = {value: key for key, value in RESEARCH_GATE_DEFENSE_TYPES.items()}
+# Every selectable type has a gate, a panel and a verdict path. "Public Final Defense" is
+# deliberately absent: it has none of them yet, so a booking could never be concluded.
+SCHEDULABLE_DEFENSE_TYPES = tuple(RESEARCH_GATE_DEFENSE_TYPES.values())
 
 RESEARCH_DEFENSE_RESULT_ITEMS = {
     "Form 1 - Title Defense": "Title defense result",
@@ -20607,7 +21423,28 @@ ADVISER_APPROVAL_DOCUMENTS = {
     "Final manuscript",
 }
 
+# Protocol: after the proposal defense come Form 5.1 (Technical Review Certificate) and
+# Form 5.2 (ethics review, within one month). They are needed before the final stage.
+FORM_5_1_ITEM = "Form 5.1 - Technical Review Certificate"
+ETHICS_RECORD_ITEM = "Ethics clearance status and date"
+POST_DEFENSE_REQUIREMENTS = {FORM_5_1_ITEM, "Ethics Clearance", ETHICS_RECORD_ITEM}
+ETHICS_APPLICATION_WINDOW_DAYS = 30  # business rule: ethics application window after the proposal defense
+
+
+def student_ethics_cleared(student: Student) -> bool:
+    clearance = DocumentCheck.query.filter_by(
+        student_id=student.id, gate=RESEARCH_GATE_PROPOSAL, item_name="Ethics Clearance"
+    ).first()
+    return bool(clearance and clearance.status == "Complete")
+
+
 RESEARCH_REQUIREMENTS = {
+    FORM_5_1_ITEM: {
+        "label": "Form 5.1 Technical Review Certificate",
+        "description": "Released by the panel chair after the panel approves the revised proposal manuscript. Upload it after the proposal defense.",
+        "source_type": "student_upload",
+        "required_file_count": 1,
+    },
     "Form 1 - Application for Title Defense": {
         "label": "Form 1 application",
         "description": "The completed application for title defense.",
@@ -20634,7 +21471,7 @@ RESEARCH_REQUIREMENTS = {
     },
     "Title defense result": {
         "label": "Title defense result",
-        "description": "Recorded by GS Staff after the scheduled title defense.",
+        "description": "Recorded by the panel chair after the scheduled title defense.",
         "source_type": "system_defense_result",
         "required_file_count": 0,
     },
@@ -20664,7 +21501,7 @@ RESEARCH_REQUIREMENTS = {
     },
     "Ethics clearance status and date": {
         "label": "Ethics clearance status and date",
-        "description": "Recorded by the Research Coordinator after previewing the signed ethics clearance.",
+        "description": "Recorded by the Research Coordinator after previewing the signed ethics clearance (Form 5.2).",
         "source_type": "ethics_clearance_record",
         "required_file_count": 0,
     },
@@ -20688,7 +21525,7 @@ RESEARCH_REQUIREMENTS = {
     },
     "Proposal defense result": {
         "label": "Proposal defense result",
-        "description": "Recorded by GS Staff after the scheduled proposal defense.",
+        "description": "Recorded by the panel chair after the scheduled proposal defense; revisions, if any, are confirmed before the stage completes.",
         "source_type": "system_defense_result",
         "required_file_count": 0,
     },
@@ -20712,7 +21549,7 @@ RESEARCH_REQUIREMENTS = {
     },
     "Final defense result": {
         "label": "Final defense result",
-        "description": "Recorded by GS Staff after the scheduled final defense.",
+        "description": "Recorded by the panel chair after the scheduled final defense; revisions, if any, are confirmed before the stage completes.",
         "source_type": "system_defense_result",
         "required_file_count": 0,
     },
@@ -20838,6 +21675,14 @@ def research_requirement_state(
             return {"status": "Complete", "status_label": "Completed prerequisite"}
     source_type = presentation["source_type"]
     files = doc.evidence_files if doc else []
+    if student and gate == RESEARCH_GATE_PROPOSAL and item_name in POST_DEFENSE_REQUIREMENTS:
+        # Protocol: Form 5.1 and the ethics review (Form 5.2) come AFTER the proposal defense.
+        if item_name == FORM_5_1_ITEM and not files and student_ethics_cleared(student):
+            return {"status": "Complete", "status_label": "Covered by the cleared ethics review"}
+        if item_name != ETHICS_RECORD_ITEM and not files:
+            defense_outcome = latest_defense_outcome(student, gate)
+            if not (defense_outcome and defense_outcome["complete"]):
+                return {"status": "Pending", "status_label": "Opens after the proposal defense is passed"}
     if source_type == "student_upload":
         enough_files = len(files) >= presentation["required_file_count"]
         if not enough_files:
@@ -20866,7 +21711,7 @@ def research_requirement_state(
             "status_label": clearance.evidence_reference if complete and clearance.evidence_reference else "Pending Research Coordinator record",
         }
     if source_type == "system_panel":
-        complete = bool(student) and len(active_panel_assignments(student, gate)) >= len(panel_roles_for_student(student))
+        complete = bool(student) and len(active_panel_assignments(student, gate)) >= len(panel_roles_for_student(student, gate))
         return {"status": "Complete" if complete else "Pending", "status_label": "Completed" if complete else "Pending panel matching"}
     if source_type == "coordinator_endorsement":
         endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first() if student else None
@@ -20882,14 +21727,30 @@ def research_requirement_state(
         return {"status": "Complete" if complete else "Pending", "status_label": "Completed" if complete else "Pending confirmed schedule"}
     if source_type == "system_defense_result":
         outcome = latest_defense_outcome(student, gate) if student else None
-        if outcome and outcome["result"] == "Passed":
-            return {"status": "Complete", "status_label": "Passed"}
-        if outcome:
-            label = outcome["result"]
-            if outcome["result"] in {"Failed", "For resubmission"}:
-                label += " - resubmit requirements"
-            return {"status": "Pending", "status_label": label}
         schedule_complete = bool(student and active_schedule_for_gate(student, gate))
+        if outcome and outcome["complete"]:
+            return {
+                "status": "Complete",
+                "status_label": "Passed after revisions" if outcome["revision_status"] == REVISION_CONFIRMED else "Passed",
+                "outcome": outcome,
+            }
+        if outcome:
+            effect = outcome["effect"]
+            if effect in REVISION_EFFECTS:
+                label = (
+                    f"{outcome['label']} - revisions submitted, awaiting confirmation"
+                    if outcome["revision_status"] == REVISION_SUBMITTED
+                    else f"{outcome['label']} - revisions due"
+                )
+            elif schedule_complete:
+                label = "Awaiting defense result"
+            elif effect == "reschedule":
+                label = "Deferred - reschedule the defense"
+            elif effect == "redefense":
+                label = "Re-defense required - resubmit and reschedule"
+            else:
+                label = f"{outcome['label']} - resubmit requirements"
+            return {"status": "Pending", "status_label": label, "outcome": outcome}
         return {
             "status": "Pending",
             "status_label": "Awaiting defense result" if schedule_complete else "Pending confirmed schedule",
@@ -20926,6 +21787,7 @@ def research_milestone_payload(student: Student, gate: str) -> dict:
             "file_count": len(files),
             "status": state["status"],
             "status_label": state["status_label"],
+            "outcome": state.get("outcome"),
             "template_url": f"/api/research-gate/template?student_id={student.id}&gate={quote_plus(gate)}&item_name={quote_plus(item_name)}",
             "files": [
                 {
@@ -20969,8 +21831,28 @@ def research_stage_status(milestone: dict) -> str:
     requirements = milestone["requirements"]
     if milestone["overall_complete"]:
         return "Complete"
-    if any(item["source_type"] == "system_defense_result" and item["status_label"].startswith("Failed") for item in requirements):
-        return "Defense Failed - Resubmit Requirements"
+    result_item = next((item for item in requirements if item["source_type"] == "system_defense_result"), None)
+    outcome = result_item.get("outcome") if result_item else None
+    if outcome and not outcome.get("complete"):
+        effect = outcome.get("effect")
+        rebooked = any(
+            item["status"] == "Complete" and item["source_type"].startswith("system_") and item["source_type"].endswith("_schedule")
+            for item in requirements
+        )
+        if effect in REVISION_EFFECTS:
+            return (
+                "Revisions Submitted - Awaiting Confirmation"
+                if outcome.get("revision_status") == REVISION_SUBMITTED
+                else "Revisions Pending"
+            )
+        if not rebooked:
+            if effect == "reschedule":
+                return "Defense Deferred"
+            resubmission_open = any(item["status"] == "Missing" for item in requirements if item["student_upload"])
+            if effect == "redefense" and resubmission_open:
+                return "Re-defense Required"
+            if effect == "resubmit" and resubmission_open:
+                return "Resubmission Required"
     if any(item["status"] == "Missing" for item in requirements if item["student_upload"]):
         return "Missing Requirements"
     if any(item["status"] == "Submitted" for item in requirements):
@@ -21007,6 +21889,74 @@ def detected_research_progress(student: Student) -> dict:
         "stages": stages,
         "milestone": milestone,
     }
+
+
+def close_satisfied_research_tasks(student: Student, progress: dict) -> int:
+    """Close the research tasks whose step has been completed, so finished work
+    does not sit in the Work Queue as overdue. Runs on every research sync."""
+    open_tasks = Task.query.filter(
+        Task.student_id == student.id, Task.status.in_(["Pending", "Overdue"])
+    ).all()
+    if not open_tasks:
+        return 0
+    complete_gates = {stage["gate"] for stage in progress["stages"] if stage["complete"]}
+    current_gate = progress["gate"]
+    requirements = progress["milestone"]["requirements"]
+    requirement_by_name = {item["item_name"]: item for item in requirements}
+    pending_work = [
+        item for item in requirements
+        if item["status"] != "Complete"
+        and item["source_type"] not in SCHEDULE_SYSTEM_SOURCES
+        and item["item_name"] not in POST_DEFENSE_REQUIREMENTS
+    ]
+    uploads_missing = any(item["student_upload"] and item["status"] == "Missing" for item in requirements)
+    booked_now = bool(active_schedule_for_gate(student, current_gate))
+    panel_now = bool(active_panel_assignments(student, current_gate))
+    ethics_done = student_ethics_cleared(student)
+    flagged_types = {
+        row.defense_type
+        for row in ScheduleRequest.query.filter_by(student_id=student.id, status=RECONFIRM_DEFENSE_STATUS).all()
+    }
+    closed = 0
+    for task in open_tasks:
+        title = task.title
+        done = False
+        for gate, defense_type in RESEARCH_GATE_DEFENSE_TYPES.items():
+            gate_done = gate in complete_gates
+            on_gate = gate == current_gate
+            if title == f"Review student {gate} application":
+                done = gate_done or (on_gate and research_milestone_reviewed_after_submission(student, gate))
+            elif title == f"Resolve {gate} requirements":
+                done = gate_done or (on_gate and not pending_work)
+            elif title.startswith("Review submitted ") and title[len("Review submitted "):] in required_documents_for_gate(gate):
+                item = requirement_by_name.get(title[len("Review submitted "):]) if on_gate else None
+                done = gate_done or bool(item and item["status"] == "Complete")
+            elif title == f"Review student {defense_type} schedule request":
+                done = gate_done or (on_gate and booked_now)
+            elif title == f"Confirm assigned panel acceptance ({defense_type})":
+                done = gate_done or (on_gate and booked_now)
+            elif title == f"Reschedule deferred {defense_type}" or title == f"Reschedule cancelled {defense_type}":
+                done = gate_done or (on_gate and booked_now)
+            elif title == f"Re-confirm {defense_type} schedule after panel change":
+                done = defense_type not in flagged_types
+            elif title == f"Resubmit {defense_type} requirements":
+                done = gate_done or (on_gate and not uploads_missing)
+            elif title == f"Resolve {defense_type} verdict conditions":
+                outcome = latest_defense_outcome(student, gate)
+                done = gate_done or not outcome or outcome["complete"] or outcome["effect"] not in REVISION_EFFECTS
+            else:
+                continue
+            break
+        else:
+            if title == "Confirm assigned panel acceptance":
+                # Older tasks do not name the stage: stale once the stage moved on or a booking exists.
+                done = booked_now or not panel_now
+            elif title in ("Resolve ethics clearance form", ETHICS_APPLICATION_TASK):
+                done = ethics_done
+        if done:
+            task.status = "Done"
+            closed += 1
+    return closed
 
 
 def sync_research_progress(student: Student, submitted_title: str = "") -> tuple[ResearchCase, dict]:
@@ -21078,6 +22028,8 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
     }[progress["stage"]]
     if student.standing == "Active" and student.current_stage != "Completed":
         student.current_stage = lifecycle_stage
+    carry_panel_forward(student, progress["gate"])
+    close_satisfied_research_tasks(student, progress)
     return research_case, progress
 
 
@@ -21093,16 +22045,18 @@ def required_documents_for_gate(gate: str) -> list[str]:
             "Title defense result",
         ]
     if gate == "Form 4 - Proposal Defense Readiness":
+        # Protocol order: defense first, then Form 5.1 and the ethics review (Form 5.2).
         return [
             "Proposal manuscript",
-            "Ethics Clearance",
-            "Ethics clearance status and date",
             "Recommended panel set",
             "Form 4 - Endorsement for Proposal Defense",
             "Form 4.1 Statistical Consultation Form or qualitative exemption",
             "Adviser e-signature/endorsement",
             "Agreed defense schedule in Form 4",
             "Proposal defense result",
+            FORM_5_1_ITEM,
+            "Ethics Clearance",
+            ETHICS_RECORD_ITEM,
         ]
     if gate == "Final Defense":
         return [
@@ -21174,10 +22128,15 @@ def latest_defense_outcome(student: Student, gate: str, schedule_id: int | None 
     verdict_query = DefenseVerdict.query.filter_by(student_id=student.id, gate=gate)
     if schedule_id:
         verdict_query = verdict_query.filter_by(schedule_request_id=schedule_id)
-    verdict = verdict_query.order_by(DefenseVerdict.submitted_at.desc()).first()
+    verdict = verdict_query.order_by(DefenseVerdict.submitted_at.desc(), DefenseVerdict.id.desc()).first()
     if verdict:
+        result = normalize_verdict_result(verdict.result) or verdict.result
         return {
-            "result": verdict.result,
+            "result": result,
+            "label": verdict_label_for_gate(result, gate),
+            "effect": verdict_effect(verdict),
+            "complete": verdict_is_complete(verdict),
+            "revision_status": verdict.revision_status,
             "defense_type": verdict.defense_type,
             "gate": verdict.gate,
             "recorded_at": iso(verdict.submitted_at),
@@ -21198,8 +22157,14 @@ def latest_defense_outcome(student: Student, gate: str, schedule_id: int | None 
     )
     if not log:
         return None
+    passed = log.result.endswith(": Passed")
+    legacy_result = VERDICT_PASSED if passed else VERDICT_FAILED
     return {
-        "result": "Passed" if log.result.endswith(": Passed") else "Failed",
+        "result": legacy_result,
+        "label": verdict_label_for_gate(legacy_result, gate),
+        "effect": "complete" if passed else "resubmit",
+        "complete": passed,
+        "revision_status": None,
         "defense_type": defense_type,
         "gate": gate,
         "recorded_at": iso(log.created_at),
@@ -21209,51 +22174,237 @@ def latest_defense_outcome(student: Student, gate: str, schedule_id: int | None 
 
 
 def active_schedule_for_gate(student: Student, gate: str) -> ScheduleRequest | None:
+    """The defense booking that counts for this stage right now.
+
+    A held defense whose verdict sends the student back (failed / re-defense)
+    no longer counts: the stage needs a new booking.
+    """
     defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
     if not student or not defense_type:
         return None
-    return (
+    schedule = (
         ScheduleRequest.query.filter(
             ScheduleRequest.student_id == student.id,
-            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES + (HELD_DEFENSE_STATUS,)),
             ScheduleRequest.defense_type == defense_type,
         )
-        .order_by(ScheduleRequest.confirmed_at.desc(), ScheduleRequest.created_at.desc())
+        .order_by(ScheduleRequest.id.desc())
+        .first()
+    )
+    if schedule and schedule.status == HELD_DEFENSE_STATUS:
+        verdict = DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first()
+        if verdict and verdict_effect(verdict) in RESUBMIT_EFFECTS:
+            return None
+    return schedule
+
+
+def research_archive_check(student_id: int, doc: DocumentCheck) -> DocumentCheck:
+    """Parking place for superseded evidence. Rows keep their file, their
+    adviser signature and their upload date; they just stop counting for the
+    live requirement. The renamed gate/item keeps every name-based lookup
+    (concept-paper counts, adviser queue, stage detection) from seeing them."""
+    archive_gate = f"{doc.gate} (archived)"
+    archive_item = f"{doc.item_name} (archived)"
+    archive = DocumentCheck.query.filter_by(student_id=student_id, gate=archive_gate, item_name=archive_item).first()
+    if not archive:
+        archive = DocumentCheck(student_id=student_id, gate=archive_gate, item_name=archive_item, status="Superseded")
+        db.session.add(archive)
+        db.session.flush()
+    return archive
+
+
+def archive_research_evidence(evidence: ResearchEvidenceFile) -> dict:
+    """Move one evidence row to the archive. Returns an undo record."""
+    doc = evidence.document_check
+    record = {"evidence_id": evidence.id, "from_check_id": doc.id}
+    evidence.document_check = research_archive_check(evidence.student_id, doc)
+    return record
+
+
+def supersede_research_gate_evidence(student: Student, gate: str) -> dict:
+    """Reset a gate for resubmission WITHOUT deleting anything.
+
+    Student uploads are archived (keeping adviser signatures and history);
+    staff/system items go back to Missing. Returns a log that
+    restore_superseded_research_evidence can undo.
+    """
+    log = {"files": [], "docs": []}
+    for doc in DocumentCheck.query.filter_by(student_id=student.id, gate=gate).all():
+        presentation = research_requirement_presentation(gate, doc.item_name)
+        if not presentation:
+            continue
+        log["docs"].append({"check_id": doc.id, "status": doc.status, "reference": doc.evidence_reference})
+        if presentation["source_type"] == "student_upload":
+            for evidence in list(doc.evidence_files):
+                log["files"].append(archive_research_evidence(evidence))
+        doc.status = "Missing"
+        doc.evidence_reference = None
+        doc.updated_at = now_utc()
+    return log
+
+
+def restore_superseded_research_evidence(log_text: str | None) -> None:
+    try:
+        log = json.loads(log_text or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return
+    for entry in log.get("files", []):
+        evidence = db.session.get(ResearchEvidenceFile, entry.get("evidence_id"))
+        origin = db.session.get(DocumentCheck, entry.get("from_check_id"))
+        if evidence and origin:
+            evidence.document_check = origin
+    for entry in log.get("docs", []):
+        doc = db.session.get(DocumentCheck, entry.get("check_id"))
+        if doc:
+            doc.status = entry.get("status") or doc.status
+            doc.evidence_reference = entry.get("reference")
+            doc.updated_at = now_utc()
+
+
+def retire_research_evidence(evidence: ResearchEvidenceFile) -> Path | None:
+    """Remove a student's upload from the live requirement.
+
+    Signed evidence is never deleted: it is archived so the adviser's signature
+    (which points at the file) and the history survive. Unsigned evidence is
+    deleted and its path returned so the caller can remove the file after commit.
+    """
+    signed = AdviserDocumentApproval.query.filter_by(evidence_file_id=evidence.id).first()
+    if signed:
+        archive_research_evidence(evidence)
+        return None
+    path = UPLOAD_ROOT / evidence.stored_name
+    db.session.delete(evidence)
+    return path
+
+
+def verdict_is_acted_on(verdict: DefenseVerdict) -> bool:
+    """A verdict can be corrected only until the student or GS staff build on it."""
+    if verdict.revision_status in (REVISION_SUBMITTED, REVISION_CONFIRMED):
+        return True
+    later_schedule = ScheduleRequest.query.filter(
+        ScheduleRequest.student_id == verdict.student_id,
+        ScheduleRequest.defense_type == verdict.defense_type,
+        ScheduleRequest.id > verdict.schedule_request_id,
+    ).first()
+    if later_schedule:
+        return True
+    gates = [gate for _name, gate in RESEARCH_PORTAL_STAGE_SEQUENCE]
+    if verdict.gate not in gates:
+        return False
+    started = gates[gates.index(verdict.gate):]
+    return bool(
+        ResearchEvidenceFile.query.join(DocumentCheck)
+        .filter(
+            ResearchEvidenceFile.student_id == verdict.student_id,
+            DocumentCheck.gate.in_(started),
+            ResearchEvidenceFile.uploaded_at > verdict.submitted_at,
+        )
         .first()
     )
 
 
-def reset_research_gate_after_failed_defense(student: Student, gate: str) -> list[str]:
-    removed_paths = []
-    docs = DocumentCheck.query.filter_by(student_id=student.id, gate=gate).all()
-    for doc in docs:
-        presentation = research_requirement_presentation(gate, doc.item_name)
-        if not presentation:
-            continue
-        if presentation["source_type"] == "student_upload":
-            for evidence in list(doc.evidence_files):
-                removed_paths.append(evidence.stored_name)
-                db.session.delete(evidence)
-            doc.status = "Missing"
-            doc.evidence_reference = None
-        elif presentation["source_type"] in {"staff", "coordinator_endorsement", "system_title_schedule", "system_proposal_schedule", "system_final_schedule", "system_defense_result"}:
-            doc.status = "Missing"
-            doc.evidence_reference = None
-        doc.updated_at = now_utc()
-    clear_panel_for_research_gate(student, gate)
-    if gate == "Form 1 - Title Defense":
-        revoke_form1_endorsement(student.id)
-    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
-    if defense_type:
-        active_schedules = ScheduleRequest.query.filter(
-            ScheduleRequest.student_id == student.id,
-            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
-            ScheduleRequest.defense_type == defense_type,
-        ).all()
-        for schedule in active_schedules:
-            schedule.status = "Failed"
-            schedule.conflict_reason = "Defense marked failed; student must resubmit this Research Gate stage."
-    return removed_paths
+def student_defense_follow_up(student: Student, gate: str) -> dict | None:
+    """What the student must do after the latest verdict of the current stage (None when nothing)."""
+    outcome = latest_defense_outcome(student, gate)
+    if not outcome or outcome["complete"]:
+        return None
+    effect = outcome["effect"]
+    definition = RESEARCH_VERDICTS.get(outcome["result"], {})
+    return {
+        "verdict": outcome["verdict"],
+        "effect": effect,
+        "label": outcome["label"],
+        "summary": definition.get("summary"),
+        "can_submit_revisions": bool(
+            effect in REVISION_EFFECTS and outcome["revision_status"] != REVISION_CONFIRMED and outcome["verdict"]
+        ),
+        "confirmed_by_role": "Panel Chair" if effect == "panel_revise" else "Research Adviser" if effect == "revise" else None,
+    }
+
+
+def close_research_tasks(student_id: int, *titles: str, prefix: str | None = None) -> int:
+    """Mark matching open tasks Done; returns how many were closed."""
+    query = Task.query.filter(Task.student_id == student_id, Task.status.in_(["Pending", "Overdue"]))
+    closed = 0
+    for task in query.all():
+        if task.title in titles or (prefix and task.title.startswith(prefix)):
+            task.status = "Done"
+            closed += 1
+    return closed
+
+
+def ensure_open_task(student_id: int, title: str, owner: str, days: int, priority: int = 20) -> Task:
+    """Like add_task but never creates a duplicate open task."""
+    return ensure_task(student_id, title, owner, date.today() + timedelta(days=days), priority)
+
+
+ETHICS_APPLICATION_TASK = "Submit Form 5.1 and the ethics review application (Form 5.2)"
+
+
+def after_defense_cleared(student: Student, gate: str, verdict: DefenseVerdict) -> None:
+    """Hook run when a verdict completes its stage (pass, or revisions confirmed)."""
+    defense_type = verdict.defense_type
+    close_research_tasks(
+        student.id,
+        f"Resubmit {defense_type} requirements",
+        f"Resolve {defense_type} verdict conditions",
+        f"Reschedule deferred {defense_type}",
+    )
+    if gate == RESEARCH_GATE_PROPOSAL:
+        # Protocol: the ethics review application (Form 5.2, with Form 5.1) is due within one month.
+        ensure_task(
+            student.id, ETHICS_APPLICATION_TASK, "Student",
+            (verdict.defense_date or date.today()) + timedelta(days=ETHICS_APPLICATION_WINDOW_DAYS), 45,
+        )
+
+
+def apply_verdict_effects(student: Student, schedule: ScheduleRequest, verdict: DefenseVerdict) -> str:
+    """Put the student, the schedule and the task list into the state the verdict leads to.
+    Returns the next owner."""
+    gate = verdict.gate
+    defense_type = verdict.defense_type
+    effect = verdict_effect(verdict)
+    schedule.conflict_reason = None
+    if effect == "reschedule":
+        schedule.status = DEFERRED_DEFENSE_STATUS
+        schedule.conflict_reason = "Defense deferred by the panel chair; it must be rescheduled."
+        ensure_open_task(student.id, f"Reschedule deferred {defense_type}", "Research Coordinator", 3, 50)
+        return "Research Coordinator"
+    schedule.status = HELD_DEFENSE_STATUS
+    if effect in RESUBMIT_EFFECTS:
+        verdict.reset_log = json.dumps(supersede_research_gate_evidence(student, gate))
+        ensure_open_task(student.id, f"Resubmit {defense_type} requirements", "Student", 5, 45)
+        return "Student"
+    if effect in REVISION_EFFECTS:
+        verdict.revision_status = REVISION_AWAITING
+        ensure_open_task(student.id, f"Resolve {defense_type} verdict conditions", "Student", 14, 40)
+        return "Student"
+    verdict.revision_status = None
+    if gate == RESEARCH_GATE_TITLE and verdict.selected_title:
+        # The panel selected one of the three titles; that is the title of the study from now on.
+        sync_research_progress(student, verdict.selected_title)
+    after_defense_cleared(student, gate, verdict)
+    return "Research Coordinator"
+
+
+def revert_verdict_effects(verdict: DefenseVerdict, schedule: ScheduleRequest) -> None:
+    """Undo apply_verdict_effects so a wrongly entered verdict can be corrected."""
+    if verdict.reset_log:
+        restore_superseded_research_evidence(verdict.reset_log)
+        verdict.reset_log = None
+    schedule.status = "Scheduled"
+    schedule.conflict_reason = None
+    verdict.revision_status = None
+    verdict.revision_note = None
+    verdict.revisions_submitted_at = None
+    defense_type = verdict.defense_type
+    close_research_tasks(
+        verdict.student_id,
+        f"Resubmit {defense_type} requirements",
+        f"Resolve {defense_type} verdict conditions",
+        f"Reschedule deferred {defense_type}",
+        ETHICS_APPLICATION_TASK,
+    )
 
 
 def research_case_type(student: Student) -> str:
@@ -21266,29 +22417,68 @@ def research_case_type(student: Student) -> str:
     return "Thesis"
 
 
-def panel_roles_for_student(student: Student) -> list[str]:
-    # Required roles are derived from the case type, then used by panel matching
-    # and defense scheduling.
+# business rule: panel composition by paper type (protocol, Title Defense section)
+PANEL_ROLES_BY_PAPER_TYPE = {
+    "Project Paper": ["Panel Chair", "Content Specialist", "Method Specialist"],
+    "Thesis": ["Panel Chair", "Content Specialist", "Method Specialist"],
+    "Dissertation": ["Panel Chair", "Content Specialist 1", "Content Specialist 2", "Method Specialist"],
+}
+# business rule: the external panelist joins from the proposal defense onward (not at the title defense)
+EXTERNAL_PANEL_ROLE = "External Panel"
+PAPER_TYPES_WITH_EXTERNAL_PANEL = ("Thesis", "Dissertation")
+
+
+def panel_roles_for_student(student: Student, gate: str | None = None) -> list[str]:
+    """Panel roles for a student's paper type and stage.
+
+    Project paper: chair + content + method (3). Thesis: + external from the
+    proposal defense = 4. Dissertation: chair + 2 content + method, + external
+    from the proposal defense = 5. gate=None means the full panel.
+    """
     case_type = research_case_type(student)
-    if case_type == "Project Paper":
-        return ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
-    if case_type == "Dissertation":
-        return ["Panel Chair", "Content Specialist 1", "Content Specialist 2", "Method Specialist", "External Panel"]
-    return ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
+    roles = list(PANEL_ROLES_BY_PAPER_TYPE[case_type])
+    if case_type in PAPER_TYPES_WITH_EXTERNAL_PANEL and gate != RESEARCH_GATE_TITLE:
+        roles.append(EXTERNAL_PANEL_ROLE)
+    return roles
+
+
+# business rule: Form 1 endorsed at least 2 weeks before the title defense
+TITLE_ENDORSEMENT_LEAD_DAYS = 14
+# business rule: 14-Day Rule, panel receives the manuscript at least 14 days before the proposal/final defense
+MANUSCRIPT_LEAD_DAYS = 14
+# business rule: public final defense application at least 5 days before the preferred schedule
+PUBLIC_DEFENSE_POSTING_DAYS = 5
 
 
 def defense_lead_days(defense_type: str) -> int:
     # Lead-time rule used by scheduling confirmation.
     if defense_type == "Title Defense":
-        return 0
+        return TITLE_ENDORSEMENT_LEAD_DAYS
     if defense_type == "Public Final Defense":
-        return 5
-    return 14
+        return PUBLIC_DEFENSE_POSTING_DAYS
+    return MANUSCRIPT_LEAD_DAYS
 
 
 def earliest_defense_date(defense_type: str, reference_date: date | None = None) -> date:
-    """First date that satisfies the defense type's scheduling notice."""
+    """First date that satisfies the defense type's notice, counted from
+    reference_date (the Form 1 endorsement date for a title defense, the date
+    the panel received the manuscript for proposal/final; default today)."""
     return (reference_date or date.today()) + timedelta(days=defense_lead_days(defense_type))
+
+
+def student_earliest_defense_date(
+    student: Student, defense_type: str, manuscript_received_on: date | None = None
+) -> tuple[date, date, str]:
+    """(earliest allowed date, reference date, what the reference is) for one student."""
+    today = date.today()
+    if defense_type == "Title Defense":
+        endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first()
+        reference = endorsement.endorsed_at.date() if endorsement and endorsement.endorsed_at else today
+        label = "the Academic Coordinator endorsed Form 1"
+    else:
+        reference = manuscript_received_on or today
+        label = "the panel received the manuscript" if manuscript_received_on else "today (no manuscript receipt date recorded)"
+    return max(today, earliest_defense_date(defense_type, reference)), reference, label
 
 
 def onboarding_requirements() -> list[str]:
@@ -22129,6 +23319,12 @@ def ensure_schedule_request_schema() -> None:
         "panel_snapshot": "TEXT",
         "required_forms_status": "VARCHAR(40)",
         "conflict_reason": "TEXT",
+        "rescheduled_from_id": "INTEGER",
+        "change_reason": "TEXT",
+        "requested_by": "VARCHAR(80)",
+        "cancelled_at": "DATETIME",
+        "override_reason": "TEXT",
+        "manuscript_received_on": "DATE",
     }
     for name, sql_type in additions.items():
         if name not in existing:
@@ -22702,9 +23898,60 @@ def ensure_research_evidence_schema() -> None:
 
 
 def ensure_research_role_workflow_schema() -> None:
-    """Create additive adviser-approval and chair-verdict tables."""
+    """Create additive adviser-approval and chair-verdict tables, add the
+    follow-up columns, and migrate old verdict/status words to the vocabulary."""
     AdviserDocumentApproval.__table__.create(bind=db.engine, checkfirst=True)
     DefenseVerdict.__table__.create(bind=db.engine, checkfirst=True)
+    inspector = inspect(db.engine)
+    existing = {column["name"] for column in inspector.get_columns("defense_verdict")}
+    additions = {
+        "revision_status": "VARCHAR(30)",
+        "revision_note": "TEXT",
+        "revisions_submitted_at": "DATETIME",
+        "revisions_confirmed_by": "VARCHAR(160)",
+        "revisions_confirmed_at": "DATETIME",
+        "revision_confirm_note": "TEXT",
+        "evaluation_score": "FLOAT",
+        "selected_title": "VARCHAR(220)",
+        "original_result": "VARCHAR(60)",
+        "correction_reason": "TEXT",
+        "corrected_by": "VARCHAR(160)",
+        "corrected_at": "DATETIME",
+        "reset_log": "TEXT",
+    }
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE defense_verdict ADD COLUMN {name} {sql_type}"))
+    db.session.commit()
+    migrate_research_vocabulary()
+
+
+def migrate_research_vocabulary() -> None:
+    """Idempotent: move rows written with older words onto the current vocabulary."""
+    for old_word, new_word in LEGACY_VERDICT_ALIASES.items():
+        for verdict in DefenseVerdict.query.filter_by(result=old_word).all():
+            verdict.result = new_word
+            if new_word == VERDICT_MINOR and not verdict.revision_status:
+                # These students were stranded before; they can now submit revisions.
+                verdict.revision_status = REVISION_AWAITING
+    # A schedule that already has a verdict is no longer "Scheduled"; it was held (or deferred).
+    for verdict in DefenseVerdict.query.all():
+        schedule = verdict.schedule
+        if not schedule or schedule.status in (HELD_DEFENSE_STATUS, DEFERRED_DEFENSE_STATUS):
+            continue
+        if schedule.status in ACTIVE_DEFENSE_STATUSES + (RESCHEDULED_DEFENSE_STATUS, "Failed"):
+            schedule.status = DEFERRED_DEFENSE_STATUS if verdict_effect(verdict) == "reschedule" else HELD_DEFENSE_STATUS
+    # Old code used "Rescheduled" for the CURRENT booking of a stage; now it marks a record that
+    # was replaced. Keep it only where a newer record for the same stage exists.
+    for schedule in ScheduleRequest.query.filter_by(status=RESCHEDULED_DEFENSE_STATUS).all():
+        newer = ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == schedule.student_id,
+            ScheduleRequest.defense_type == schedule.defense_type,
+            ScheduleRequest.id > schedule.id,
+        ).first()
+        if not newer:
+            schedule.status = "Scheduled"
+    db.session.commit()
 
 
 def ensure_curriculum_offering_schema() -> None:
@@ -25053,7 +26300,8 @@ def ensure_faculty_account_schema() -> None:
         faculty.email = faculty.email.strip().lower()
         if not faculty.eligible_roles:
             faculty.eligible_roles = default_roles
-        primary = ensure_faculty_user_account(faculty, "DemoPass123!", reset_password=True)
+        # Only a NEW account gets the initial password; never overwrite one a person has chosen.
+        primary = ensure_faculty_user_account(faculty, "DemoPass123!")
         for duplicate in UserAccount.query.filter(
             UserAccount.faculty_id == faculty.id,
             UserAccount.role == "faculty",
