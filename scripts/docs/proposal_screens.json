@@ -1,0 +1,96 @@
+{
+ "_note": "Wording for Section 5.10 (Screen Specifications). The screen lists themselves are read from frontend/src/components/portalNav.jsx (Dean, student and faculty portal pages) by sync_proposal_screens.py; this file supplies the sentence for each page and the text of the staff-side screens added since the first version of the proposal. A page in the navigation without a line here is reported and gets the placeholder 'Description pending.'",
+ "new_staff_entries": [
+  {
+   "key": "policy-documents",
+   "title": "Policy Documents",
+   "after": "Academic Semesters",
+   "text": "The policy documents screen is the library behind the policy assistant, and it is open to Graduate School staff and the administrator. Staff upload a policy document (PDF or Word) with a title, a category (Handbook, Research Protocol, Operations Manual, Memo, Form or Other) and an effective date, and mark it draft, active or archived. A document can be replaced by a new version while the earlier versions are kept and can still be downloaded, and a test question shows what the assistant would retrieve from the uploaded documents. An answer that relies on a draft document is flagged as awaiting validation."
+  },
+  {
+   "key": "business-rules",
+   "title": "Business Rules",
+   "after": "Policy Documents",
+   "text": "The business rules screen shows the register described in Section 5.14. Each rule appears in plain language with its value and unit, the policy document and page it comes from, whether the portal enforces it or only documents it (with the reason), and its status. Graduate School staff and the administrator can change a value; the change needs a reason and is kept in a revision history. The Academic Coordinator, the Research Coordinator, the Dean and faculty members open the same register to read it."
+  },
+  {
+   "key": "form1-endorsements",
+   "title": "Form 1 Endorsements",
+   "after": "Business Rules",
+   "text": "The Form 1 endorsement screen is the Academic Coordinator's queue of students who have submitted Form 1 (the application for title defense) together with the three concept papers. The coordinator reviews the submission and endorses it with a drawn signature. Panel matching for the title defense opens only after the endorsement, and the lead time before the title defense is counted from it."
+  },
+  {
+   "key": "defense-calendar",
+   "title": "Defense Calendar",
+   "after": "Form 1 Endorsements",
+   "text": "The defense calendar is open to Graduate School staff, the Academic Coordinator and the Research Coordinator. It lists every defense with its stage, status, panel and venue, together with the protocol deadlines, over a date range that can be filtered, and it flags a finished defense that has no verdict as overdue. A defense opens in Defense Scheduling, where it is rescheduled. The Dean has the same calendar as a read-only page, and students and faculty see only their own events (Tables 23.1 to 23.3). A notification bell in the top bar of every screen shows the in-app notifications of the signed-in account."
+  },
+  {
+   "key": "adviser-appointments",
+   "title": "Adviser Appointments",
+   "after": "Defense Calendar",
+   "text": "The adviser appointments screen carries the appointment of a research adviser as the protocol defines it (Section 5.3.5). Each application shows its stage: applied on Form 3, noted by the Academic Coordinator, under deliberation after it is forwarded to the Dean, appointed, accepted or declined by the nominated adviser, or not approved. The Academic Coordinator adds the note, the Research Coordinator and staff forward the application and confirm receipt of Forms 3.2 and 3.3, and the Dean decides. The candidate list shows each faculty member's number of advisees against the limit of five, which only the Dean can exceed, with a recorded exception. Staff and the Research Coordinator can also record an adviser who was appointed outside the portal."
+  }
+ ],
+ "portal_tables": {
+  "dean": {
+   "after": "The Dean signs in to a dedicated portal",
+   "caption": "Table 23.1. Pages of the Dean portal"
+  },
+  "student": {
+   "after": "The student portal presents the student",
+   "caption": "Table 23.2. Pages of the student portal"
+  },
+  "faculty": {
+   "after": "The faculty portal presents the assignments",
+   "caption": "Table 23.3. Pages of the faculty portal"
+  }
+ },
+ "portal_pages": {
+  "/dean": "Decisions waiting on the Dean, by process, how long they have waited, and recent decisions.",
+  "/dean/approvals": "Everything waiting on the Dean, grouped by process; a case opens to show its files, history and messages before the Dean decides.",
+  "/dean/approvals/course-adjustments": "Course offering plans submitted by the Academic Coordinator, to approve or return for revision.",
+  "/dean/approvals/leave": "Leave of absence, readmission and AWOL return requests forwarded by staff, decided one at a time or as a batch.",
+  "/dean/approvals/withdrawal": "Subject withdrawal requests forwarded for decision; approved requests continue to staff for tagging and the Registrar list.",
+  "/dean/approvals/practicum": "Practicum completion reports sent to the Dean for final review.",
+  "/dean/approvals/graduation": "Endorsement lists prepared by staff, to approve or return, then exported for the Registrar.",
+  "/dean/gate-reports": "The admission onboarding report and the coursework status report sent to the Dean for a decision.",
+  "/dean/analytics": "Where decisions stand across every process: pending load, recent outcomes and load by program.",
+  "/dean/activity": "Recent decisions recorded against the Dean account, newest first, each with its stage history.",
+  "/dean/assistant": "The policy assistant, limited to policy answers.",
+  "/dean/business-rules": "The business rules register, for reading.",
+  "/student": "Where the student stands in the lifecycle and what to do next.",
+  "/student/progress": "Lifecycle stage, requirement status and curriculum, read from the monitoring record.",
+  "/student/enrollment": "Selection of the published subjects the student takes this semester; subjects already on the record stay locked.",
+  "/student/research": "Upload of research milestone files, their submission for review, and the defense results.",
+  "/student/defense-schedule": "Request for a defense schedule once a panel is assigned, and the booked date.",
+  "/student/practicum": "Practicum requirements and evidence, shown only for programs that require a practicum.",
+  "/student/graduation": "Graduation eligibility checklist and the application for endorsement.",
+  "/student/requests": "Every request the student can file, with its current status.",
+  "/student/requests/leave-of-absence": "Leave of absence request, checked against the rules when filed, and its stage.",
+  "/student/requests/readmission": "Readmission request and its stage.",
+  "/student/requests/awol-return": "Return from AWOL request.",
+  "/student/requests/withdrawal": "Subject withdrawal request against one enrolled subject, inside the withdrawal window.",
+  "/student/messages": "Clarification requests and staff replies about the student's active requests.",
+  "/student/documents": "Admission and general records and the files the student has submitted.",
+  "/student/activity": "Every submission, decision and hand-off on the record, with who owns the next step.",
+  "/student/assistant": "The policy assistant, for the manual, procedures and the student's own record.",
+  "/student/profile": "Identity and enrollment details as recorded by the Graduate School.",
+  "/faculty-portal": "The faculty member's advisees, panel assignments and defense schedule at a glance.",
+  "/faculty-portal/advisees": "Students the faculty member advises, their stage and the documents awaiting a signature, with adviser requests to accept or decline, consent to a change of adviser, and the count against the limit of five.",
+  "/faculty-portal/signatures": "Review and in-system signature of the exact manuscript version an advisee uploaded.",
+  "/faculty-portal/panels": "Students whose panel the faculty member sits on, with the papers for the assigned stage.",
+  "/faculty-portal/defenses": "Defenses scheduled for the faculty member's panels.",
+  "/faculty-portal/verdicts": "The panel chair records the verdict of a scheduled defense; revisions are confirmed here.",
+  "/faculty-portal/classes": "Class rosters for the subjects assigned to the faculty member.",
+  "/faculty-portal/availability": "Weekly working hours and dated entries (not available, or available only at stated hours), availability requests from the Graduate School, and the optional Google Calendar connection.",
+  "/faculty-portal/assistant": "The policy assistant, limited to policy answers.",
+  "/faculty-portal/business-rules": "The business rules register, for reading.",
+  "/dean/adviser-appointments": "Adviser applications forwarded by the Research Coordinator, which the Dean appoints (Form 3.1) or returns with a reason.",
+  "/dean/calendar": "Every scheduled defense with its panel, venue and deadlines, for reading.",
+  "/student/adviser": "Nomination of a research adviser (Form 3), the steps of the appointment, a request to change adviser, and the record that Forms 3.2 and 3.3 were sent.",
+  "/student/calendar": "The next defense with a countdown, the next deadlines, a calendar, and the private calendar link.",
+  "/faculty-portal/invitations": "Panel invitations waiting, accepted and declined, each to accept, decline with a reason, or report that the member cannot attend.",
+  "/faculty-portal/calendar": "Defenses sat on or advised, advisee deadlines, the member's entered availability and busy times, and the private calendar link."
+ }
+}
