@@ -20,7 +20,7 @@ Running (worktrees under `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`):
 
 | Branch | Job | Based on |
 |---|---|---|
-| `pkt/loa` | LOA + Readmission rebuild (case table, real drag-and-drop board, Graduation board too) | 7a8e6e7 |
+| `pkt/loa` | **FINISHED, NOT MERGED YET** — LOA + Readmission rebuild; its own gate 279/279 green. Merge next (expect conflicts in app.py around task_dict, run_startup_tasks, reports_payload, loa_policy_review — see its note `.planning/PACKET_LOA_STATE.md` on that branch; academic's note: keep `max(0, ((years_in_program(student) or 1) - 1) * 3)` for LOA minimum residency) | 7a8e6e7 |
 | `pkt/calendar` | Availability editor, adviser appointment, calendars, invitations, notifications, private .ics | 5cd57d2 |
 | `pkt/docs2` | Business Rules section in the proposal + Operations Manual synced with the code | 5cd57d2 |
 
@@ -30,6 +30,13 @@ three monitoring 409 stub routes now that portal CRUD exists); walkthrough rewri
 re-walked in the live app with fresh screenshots; proposal ch. 5–6 + appendix
 inventories regenerated from code; re-run `scripts/docs/add_business_rules_section.py`
 and `scripts/docs/build_proposal.py`; README/CHANGELOG; final gate, live check, push.
+
+## Session stopped 2026-10-01 at the usage limit
+
+The main session hit its usage limit here. `pkt/calendar` and `pkt/docs2` were still
+running in their worktrees and will commit on their branches when done; nothing of
+theirs is merged. Resume with `/continue_CAPSTONE-USLS-MVP`: merge `pkt/loa`, then
+`pkt/calendar`, then `pkt/docs2` (full gate after each), then the 'Left after those' list.
 
 ## If this session died
 
