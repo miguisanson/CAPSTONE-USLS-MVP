@@ -5,7 +5,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorNote } from "../components/ui";
 
-const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
+const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/dean", student: "/student", faculty: "/faculty-portal" };
 
 const STUDENT_LIFECYCLE_DEMOS = [
   {
