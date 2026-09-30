@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,7 +41,7 @@ from opsmanual.p_research import ADVISER, COMPLETION, FINAL, PROPOSAL, SCHEDULIN
 OUT_DIR = ROOT / "Documents" / "CAPSTONE_ONLY"
 STEM = front.FILE_STEM
 SOFFICE = Path("E:/LibreOffice/program/soffice.exe")
-LO_PROFILE = "file:///E:/Temp/claude/lo-profile-opsman"
+LO_PROFILE = os.environ.get("OPSMAN_LO_PROFILE", "file:///E:/Temp/claude/lo-profile-opsman")
 
 PROCESSES = [
     ADMISSION, ENROLLMENT, OFFERING, WITHDRAWAL, DROPPING, LOA, READMISSION, AWOL, RESIDENCY,
@@ -98,7 +99,7 @@ CH6_INTRO = (
     "The group could not answer the following questions from the sources. Each states where the sources conflict, "
     "where they are silent, or where practice differs from the Handbook, gives the options the group can see, "
     "and leaves a blank for the Graduate School's answer. Where a question affects rules, the rule numbers are listed. "
-    "Until a question is answered, the platform follows the Handbook."
+    "Until a question is answered, the platform follows the Handbook. Where that ruling has already settled what the platform does (for example the withdrawal window and fees, the length of a leave, or whether a leave counts toward maximum residence), the list of sources says how the platform now works; the question stays open so that the Graduate School can confirm the rule or choose another."
 )
 
 CH7_INTRO = (
@@ -588,7 +589,7 @@ def build_docx(path: Path, toc_pages: dict[str, int] | None) -> None:
     r = hp.add_run("USLS Graduate School Operations Manual")
     r.font.size = Pt(8.5)
     r.font.color.rgb = RGBColor.from_string(GREY)
-    r = hp.add_run("\tDRAFT v0.1 for validation")
+    r = hp.add_run(f"\tDRAFT v{front.VERSION} for validation")
     r.font.size = Pt(8.5)
     r.bold = True
     r.font.color.rgb = RGBColor.from_string("C00000")
@@ -629,7 +630,7 @@ def build_docx(path: Path, toc_pages: dict[str, int] | None) -> None:
     para("How the Graduate School carries out the student lifecycle: roles, records, procedures and business rules", style="CoverSub")
     doc.add_paragraph()
     doc.add_paragraph()
-    box(front.COVER_MARK, fill="FDE9E7", border="C00000", size=12, bold_lead="DRAFT v0.1")
+    box(front.COVER_MARK, fill="FDE9E7", border="C00000", size=12, bold_lead=f"DRAFT v{front.VERSION}")
     doc.add_paragraph()
     para(f"Version {front.VERSION}  |  {front.DOC_DATE}", style="CoverSub")
     para("Prepared by the capstone group CAP-IT1 (Graduate Student Lifecycle Monitoring and Analytics Platform)", style="CoverSub")
@@ -884,7 +885,7 @@ def build_docx(path: Path, toc_pages: dict[str, int] | None) -> None:
             zoom.set(qn("w:percent"), "100")
 
     cp = doc.core_properties
-    cp.title = front.TITLE + " (DRAFT v0.1 for validation)"
+    cp.title = front.TITLE + f" (DRAFT v{front.VERSION} for validation)"
     cp.subject = "Operations manual draft for validation by the Graduate School"
     cp.author = "Capstone group CAP-IT1"
     cp.comments = front.COVER_MARK

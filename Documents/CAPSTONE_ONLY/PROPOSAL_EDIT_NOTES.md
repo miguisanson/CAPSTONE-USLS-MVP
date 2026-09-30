@@ -111,13 +111,15 @@ LIST OF TABLES headings got `pageBreakBefore` so they still start on a new page 
    - "Gemini" now appears in the document (was zero times).
 
 Deliberately NOT touched (a later helper does these, then re-runs the script): route/table counts ("119
-routes", "35 tables"), the Business Rules section, screenshots.
+routes", "35 tables"; the code now also has the `business_rule` and `business_rule_revision` tables and more
+routes), screenshots. The Business Rules section has since been added (section 5 below).
 
 ### Still contradictory - for the later helper
-- The seven-day withdrawal window ("before classes begin or during the first seven calendar days",
-  "penalty-free") is still stated in Ch.4 section 4.2.5.7, Ch.5 section 5.3.12 and section 5.10.17 (screen
-  text). The new Ch.1 text says second week with the 10%/20% charge. Those three paragraphs describe the code;
-  change them together with the withdrawal window in `app.py` (the handbook wins).
+- RESOLVED in the business-rules revision (section 5): the seven-day withdrawal window ("before classes begin or
+  during the first seven calendar days", "penalty-free") in Ch.4 section 4.2.5.7, Ch.5 section 5.3.12 and the
+  screen text of 5.10.17, and the leave-of-absence rule text in 5.3.10 and the LOA screen paragraph in 5.10 (number
+  of prior leaves, "term that has not already begun"). They now say what the code does (window to the end of the
+  second week, fee tiers shown as information, up to two semesters per request and four in total).
 - The images Figure 1.10 (withdrawal BPMN), Figure 4 and Figure 6 / Appendix P are pictures; I could not edit
   them. Figure 1.10 may still show an "exit" end event; Figures 4 and 6 show the originally proposed stack
   (the text now says so).
@@ -126,6 +128,13 @@ routes", "35 tables"), the Business Rules section, screenshots.
   examples of RAG tools were left alone (they are not claims about this system).
 - Noticed, not changed: two different captions are both numbered "Table 5."; the body's Table 2 differs from the
   old list of tables; figure numbering mixes "Figure 1." with "Figure 1.1".
+- Noticed in the business-rules revision, NOT changed (Chapter 5 and the appendices were written before the rule
+  changes and may lag the code in places): 5.3.1 says the system provides "no manual student creation" (the
+  portal can now add one student by hand, staff or Academic Coordinator); Ch.1 scope text, Table 1 and the module
+  tables (Appendix K/I copies) still speak of "residency pause" tracking, although the clock is never paused now;
+  5.3.6 and 5.3.7 describe panel matching and the lead time in general terms that predate the 14-day title rule.
+  Section 5.14 and Appendix AA are correct as of the catalog and the manual; the older module paragraphs need one
+  careful pass against the code.
 
 ## 2. What the owner must do once in Word
 1. Open the file. Word asks "This document contains fields that may refer to other files. Update the fields in
@@ -183,4 +192,81 @@ wording fixes are the `EDITS` / `INSERTS` tables at the top of `paginate_proposa
 already applied and the script stops with an error if an expected sentence disappeared (for example after
 someone rewrote it).
 `measure_proposal_pages.py` (PDF -> labels.json) and `build_proposal.py` (driver) are in the same folder.
+The business-rules sections and Appendix AA are inserted by `add_business_rules_section.py`, which must run
+BEFORE `build_proposal.py` (section 5).
 The helper only needs `pymupdf` (in the project venv) and LibreOffice for the measuring pass.
+
+## 5. Business rules section and Operations Manual appendix (added later)
+
+Panel requirement: "Document Existing Business Rules/Policies and Proposed Business Rules/Policies (if any)" and
+"Policies in the operations manual should be included".
+
+### What was added (script `scripts/docs/add_business_rules_section.py`)
+| Where | What | Tables |
+|-------|------|--------|
+| Chapter 4, new **4.5 Existing Business Rules and Policies** (after 4.4.4) | Intro, 4.5.1 Sources and Labels, 4.5.2 Existing Rules by Process (19 processes from admission to the Registrar handoff, lifecycle order, one Heading 4 and one table each). 190 rules from `operations_manual_rules.json`: 168 Official (Handbook page / Protocol section), 22 Practice (consultations, clearly labelled). A short answer to the panel's "can a student drop on Day 1" question sits above the withdrawal table. | Table 20.1 (labels) and Tables 20.2-20.20 |
+| Chapter 5, new **5.14 Proposed Business Rules and Policies** (after 5.13.4) | Intro (register, enforced vs documented only, status, editing with a reason and history, Handbook alignment), 5.14.1 summary, 5.14.2 rules by process (12 register groups, 59 rules from `business_rules_catalog.py`: 36 enforced, 23 documented only with the reason, 7 "Needs review" = awaiting Graduate School validation), 5.14.3 the 40 further Proposed rules of the manual (no official source), 5.14.4 the 7 register values awaiting validation. | Tables 25.1-25.15 |
+| New **Appendix AA. Graduate School Operations Manual (Draft for Validation)** (after Appendix Z) | Short description (contents, version 0.2, 230 rules, draft awaiting validation by the Dean and Associate Dean) and the file names in `Documents/CAPSTONE_ONLY`. The 91-page manual is NOT pasted in. | none |
+
+Decisions and reasons:
+- **Split, not one combined section.** The document already separates "The Existing System" (Ch.4) from "The
+  Proposed System" (Ch.5), and the panel used the same two words. Existing rules therefore sit at the end of Ch.4
+  and proposed rules at the end of Ch.5, each cross-referring to the other and to Appendix AA. Both are appended
+  at the END of their chapter (4.5 and 5.14) so no existing section number, cross-reference or table number
+  changes.
+- **Table numbers 20.1-20.20 and 25.1-25.15.** The captions in Ch.4-6 are typed, sequential (16-33). Inserting
+  new whole numbers would have forced renumbering Tables 21-33 and every "Table n" reference in the text. The
+  document already uses decimal sub-numbers (3.1-3.9, 15.1-15.2), so the new tables follow the last table of the
+  chapter (Table 20 and Table 25) with .1, .2 ... Captions are Heading 5 above the table, like every other
+  caption, so `paginate_proposal.py` puts them in the List of Tables with page labels by itself (35 new lines).
+- Per-process headings are Heading 4, so the table of contents (Heading 1-3) only gains 4.5, 4.5.1, 4.5.2, 5.14 and
+  its four subsections, and Appendix AA.
+- Table format copies the document's own tables (style `Table28`, black single borders, grey `d9d9d9` header
+  row that repeats on each page, Times New Roman; 9 pt because the rule tables are wide; rows do not split
+  across pages). The status/treatment cell is lightly shaded (Official green, Practice yellow, Enforced green,
+  Documented only grey, Needs review yellow) and always also carries the word.
+- Wording fixes (in `EDITS` of `paginate_proposal.py`, same mechanism as section 1): 4.2.5.7, 5.3.12 and 5.10.17
+  (withdrawal), 5.3.10 and the LOA screen paragraph (leave of absence). Each says what the code now does.
+- The figures in the section (59 / 36 / 23 / 7; 168 / 22 / 40; 44 open questions) are computed from the
+  catalog, the JSON and `opsmanual/questions.py`, never typed.
+
+### Operations Manual brought in line with the platform (draft v0.2, same revision)
+The "How the platform supports this process" paragraph and the "Difference between the platform and the rule"
+paragraph of all 19 process chapters were rewritten from the current code (`rule_value(...)` uses in `app.py` and
+the workflows behind them), and every statement is either what the platform does or is marked as left to people.
+Where the platform now follows the Handbook the text says so (withdrawal window and fee tiers, leave of up to
+two semesters per request and four in total, leave counted in maximum residence, no pause of the residency clock,
+academic-year count, project paper panel of three, 14-day lead time for the title defense, 20% absence gate for
+a drop, first-week window for adding and changing subjects, load of 12 units). Rules that describe the platform
+(ENR-13, WD-14, DRP-09, DRP-10, LOA-13, AWL-05, RES-11, CEX-13, TTL-11, TTL-12, ADV-17, ADV-18, PRP-13, SCH-09)
+were reworded; all are Proposed, so the counts (168 / 22 / 40) did not change. Open questions OQ-01 to OQ-12,
+OQ-14, OQ-16, OQ-17, OQ-20, OQ-23, OQ-28, OQ-38, OQ-42 and OQ-43 carry a "Platform now" line; OQ-01, OQ-09,
+OQ-10 and OQ-38 also carry the ruling that the Handbook is in force. The questions stay open for the Graduate
+School's confirmation. The change log has a v0.2 row. The manual (.docx, .md, .pdf, 91 pages) and
+`operations_manual_rules.json` were regenerated.
+
+### Re-running (idempotent)
+```
+PY=E:/Temp/claude/opsman-venv/Scripts/python.exe     # needs lxml; the manual builder also needs python-docx + PyMuPDF
+# 1. only if the manual or the catalog changed: regenerate the manual and the rules JSON
+OPSMAN_LO_PROFILE=file:///E:/Temp/claude/lo-profile-docs2 $PY scripts/docs/build_operations_manual.py --pdf
+# 2. insert / replace the three blocks (markers BizRulesExisting_*, BizRulesProposed_*, BizRulesAppendix_*)
+$PY scripts/docs/add_business_rules_section.py "IN.docx" "MID.docx"
+# 3. recalculate TOC, List of Tables and page labels (LibreOffice measures the pages)
+$PY scripts/docs/build_proposal.py "MID.docx" "OUT.docx" --profile file:///E:/Temp/claude/lo-profile-docs2
+```
+Step 2 removes its own blocks first, so running it on its own output gives the same document; steps 2+3 on the
+delivered file give byte-identical `document.xml`, `styles.xml`, `numbering.xml` and `settings.xml`.
+`build_proposal.py` still defaults to the profile `lo-profile-docs`; pass `--profile` when another session may be
+using it.
+
+### Verified (this machine)
+- `validate.py --original` on the result: "All validations PASSED!" (paragraphs 7480 -> 9296).
+- All XML parts re-parsed; 539 unique bookmark ids and names, every bookmark end matches, all 471 TOC /
+  list-of-tables hyperlinks have a bookmark; 12 sections kept; 35 new tables, each with a repeating header row.
+- LibreOffice render: 415 pages (371 before), 471/471 headings and captions located, second pass identical
+  ("labels stable"). Looked at: first page of 4.5, Table 20.1, the withdrawal table (20.5), a page of CEX rules,
+  the TOC page with 4.5 and 5.14, the List of Tables pages with Tables 20.x and 25.x, the first pages of 5.14,
+  Tables 25.1, 25.5, 25.13-25.15, and the Appendix AA page and its TOC line (`A-110`).
+- Not verifiable without Word: the same limits as in section 3 (chapter-page numbers such as `4-15` come from
+  Word's `chapStyle`; LibreOffice shows `15`).

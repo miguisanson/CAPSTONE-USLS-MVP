@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-VERSION = "0.1"
+VERSION = "0.2"
 DOC_DATE = "2026-10-01"
 TITLE = "University of St. La Salle Graduate School Operations Manual"
 COVER_MARK = (
-    "DRAFT v0.1 — prepared by the capstone group for validation by the Graduate "
+    "DRAFT v0.2 — prepared by the capstone group for validation by the Graduate "
     "School; not an official USLS document until approved"
 )
 FILE_STEM = "USLS GS Operations Manual - DRAFT for Validation"
@@ -206,7 +206,7 @@ SIGNOFF_HEADER = ["Reviewer name", "Position", "Date", "Signature", "Remarks"]
 SIGNOFF_ROWS = 8
 CHANGELOG_HEADER = ["Version", "Date", "Changed by", "Summary of change", "Approved by"]
 CHANGELOG = [
-    ["0.1", DOC_DATE, "Capstone group CAP-IT1", "First draft prepared from the Handbook 2022-2023, the Research Protocol AY 2024-2025, the office workbooks and the group's July 2026 consultation notes. Submitted for validation.", "Not yet approved"],
-    ["", "", "", "", ""],
+    ["0.1", "2026-10-01", "Capstone group CAP-IT1", "First draft prepared from the Handbook 2022-2023, the Research Protocol AY 2024-2025, the office workbooks and the group's July 2026 consultation notes. Submitted for validation.", "Not yet approved"],
+    ["0.2", DOC_DATE, "Capstone group CAP-IT1", "Platform paragraphs and the open questions brought in line with the platform as it now runs, after the ruling that the Handbook 2022-2023 is in force: subject withdrawal window and fees, length of a leave of absence, leave counted toward maximum residence, panel sizes, lead times, load, drop rule, first-week window for adding and changing subjects. Rules that describe the platform were reworded where they no longer matched. No Official or Practice rule changed.", "Not yet approved"],
     ["", "", "", "", ""],
 ]
