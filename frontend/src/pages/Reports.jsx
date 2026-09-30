@@ -441,10 +441,10 @@ function WithdrawalTable({ rows }) {
     <tr key={row.id} className="border-b border-slate-50">
       <StudentCell student={row.student} />
       <td className="px-4 py-2.5 text-slate-600"><span className="font-semibold text-ink">{row.subject?.course_code || "—"}</span><span className="block text-xs">{row.effective_term || "—"}</span></td>
-      <td className="px-4 py-2.5 text-xs text-slate-600">{row.withdrawal_window?.status || "—"}<span className="block">Deadline: {row.withdrawal_window?.deadline || "—"}</span></td>
+      <td className="px-4 py-2.5 text-xs text-slate-600">{row.withdrawal_window?.status || "—"}<span className="block">Deadline: {row.withdrawal_window?.deadline || "—"}</span><span className="block">Fee: {row.withdrawal_window?.fee_percent != null ? `${row.withdrawal_window.fee_percent}% of term` : "—"}</span></td>
       <td className="px-4 py-2.5"><StatusBadge value={row.dean_decision} dot={false} /></td>
       <td className="px-4 py-2.5"><StatusBadge value={row.registrar_status} dot={false} /></td>
-      <td className="px-4 py-2.5 text-xs font-semibold text-emerald-700">{row.academic_record_effect || "No grade / no penalty"}</td>
+      <td className="px-4 py-2.5 text-xs font-semibold text-emerald-700">{row.academic_record_effect || "—"}</td>
       <td className="px-4 py-2.5"><StatusBadge value={row.status} dot={false} /></td>
     </tr>
   )} />;

@@ -24,6 +24,7 @@ import Form1Endorsements from "./pages/Form1Endorsements";
 import FacultyPortal from "./pages/FacultyPortal";
 import TermSettings from "./pages/TermSettings";
 import PolicyDocuments from "./pages/PolicyDocuments";
+import BusinessRules from "./pages/BusinessRules";
 
 // Where each role lands by default.
 function homeFor(user) {
@@ -93,6 +94,7 @@ export default function App() {
                 <Route path="/decision-support" element={<DecisionSupport />} />
                 <Route path="/assistant" element={<Assistant />} />
                 <Route path="/policy-documents" element={<RoleOnly user={user} roles={["staff", "admin"]}><PolicyDocuments /></RoleOnly>} />
+                <Route path="/business-rules" element={<BusinessRules />} />
                 <Route path="/workflow/:slug" element={<WorkflowPage />} />
                 <Route
                   path="/form1-endorsements"

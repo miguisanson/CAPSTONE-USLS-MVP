@@ -62,6 +62,20 @@ import { printDataTable } from "../lib/print";
 import { useAuth } from "../auth";
 import { OnboardingGatePanel } from "../components/ProcessGates";
 import { Form1EndorsementQueue } from "./Form1Endorsements";
+import PolicyRules from "../components/PolicyRules";
+
+// Which business-rules process each workflow screen applies.
+const RULE_PROCESS_BY_SLUG = {
+  "leave-of-absence": "loa",
+  readmission: "readmission",
+  awol: "awol_residency",
+  withdrawal: "withdrawal",
+  "research-gate": "research",
+  "panel-matching": "defense",
+  "defense-scheduling": "defense",
+  practicum: "practicum",
+  graduation: "graduation",
+};
 
 const WORKFLOW_ROLE_LABELS = {
   staff: "Graduate School Staff",
@@ -278,6 +292,8 @@ export default function WorkflowPage() {
           )}
         </div>
       </Card>
+
+      <PolicyRules process={RULE_PROCESS_BY_SLUG[slug]} />
 
       {slug !== "defense-scheduling" && result && (
         <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800 animate-fade-up">
@@ -2573,10 +2589,10 @@ const WORKFLOW_GUIDES = {
     final: "A decided return updates the student standing; residency remains a separate active, no-subject enrollment record.",
   },
   withdrawal: {
-    purpose: "Withdraws a student from one enrolled subject before classes or during the first week, without changing program standing or unrelated classes.",
+    purpose: "Withdraws a student from one enrolled subject until the end of the second week of classes (10% of the term is charged in the first week, 20% in the second), without changing program standing or unrelated classes.",
     submitter: "The student chooses an eligible enrolled subject and states the reason for withdrawing. No PDF upload is required.",
     reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval returns to GS Staff for Excel export followed by manual Registrar email.",
-    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Penalty-free subject removal", "Excel list export", "Manual email and acknowledgement outside the portal"],
+    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Subject removal", "Excel list export", "Manual email and acknowledgement outside the portal"],
     incomplete: "A Dean denial closes this subject request and leaves every enrollment unchanged. Messages and action comments remain in the case history.",
     final: "The portal ends at Excel export. GS Staff emails the file through the official channel and waits for Registrar acknowledgement outside the portal.",
   },
@@ -4556,7 +4572,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Submitted subject withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Student request → GS Staff → Dean → GS Staff subject tag → Excel export → manual Registrar email; approved withdrawals carry no academic grade or penalty`} icon={LogOut} />
+      <SectionTitle title="Submitted subject withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Student request → GS Staff → Dean → GS Staff subject tag → Excel export → manual Registrar email; a fee of 10% (first week) or 20% (second week) of the term applies and is settled with the Business Office`} icon={LogOut} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       {accountRole === "staff" && registrarRows.length > 0 && (
@@ -4630,7 +4646,8 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
               <Detail label="Official offered-subject status" value={["Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(selectedCurrent?.status || selectedItem.status) ? "Withdrawn" : "Awaiting GS Staff tag"} />
               <Detail label="Semester" value={selectedItem.effective_term || selectedItem.subject?.term_label || "Pending"} />
               <Detail label="Eligibility window" value={selectedItem.withdrawal_window?.status || "Not recorded"} />
-              <Detail label="Academic record effect" value={selectedItem.academic_record_effect || "No academic record / no grade impact"} />
+              <Detail label="Academic record effect" value={selectedItem.academic_record_effect || "Recorded as Withdrawn; any grade mark is applied by the Registrar"} />
+              <Detail label="Fee consequence (information only)" value={selectedItem.withdrawal_window?.fee_consequence || "Not recorded"} />
             </div>
             <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
             <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
@@ -4679,7 +4696,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-ink">Tagged withdrawn students</p>
-                  <p className="text-xs text-slate-500">Every selected subject already shows Withdrawn in Official Offered Subjects, with no academic grade or penalty.</p>
+                  <p className="text-xs text-slate-500">Every selected subject already shows Withdrawn in Official Offered Subjects. Fees are settled with the Business Office.</p>
                 </div>
                 <button type="button" onClick={() => setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id)))} className="btn-ghost cursor-pointer px-3 py-1.5">Select all</button>
               </div>
@@ -4702,7 +4719,7 @@ function WithdrawalRoster({ context, submit, submitting, refreshing, result, sub
                         <td className="px-4 py-3"><p className="font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p></td>
                         <td className="px-4 py-3"><p className="font-semibold text-slate-700">{item.subject?.course_code || "Subject pending"}</p><p className="text-xs text-slate-500">{item.subject?.course_title || "No title"}</p></td>
                         <td className="px-4 py-3 text-xs text-slate-600"><p className="font-semibold">{item.effective_term || item.subject?.term_label || "Not recorded"}</p><p>Deadline: {item.withdrawal_window?.deadline || "Not recorded"}</p></td>
-                        <td className="px-4 py-3 text-xs font-semibold text-emerald-700">No grade / no penalty</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-emerald-700">{item.withdrawal_window?.fee_percent != null ? `${item.withdrawal_window.fee_percent}% of term (${item.withdrawal_window.fee_tier})` : "Fee not stated"}</td>
                         <td className="px-4 py-3"><StatusBadge value={item.registrar_status || "Pending Excel Export"} dot={false} /></td>
                       </tr>
                     ))}
@@ -5872,7 +5889,7 @@ function workflowGuidance(slug) {
     practicum:
       "Available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
     withdrawal:
-      "Withdrawal applies to one subject before classes or during the first week. GS Staff forwards the student request to the Dean; approval returns to GS Staff for Excel export. GS Staff emails the file manually and waits for Registrar acknowledgement outside the portal.",
+      "Withdrawal applies to one subject and is allowed until the end of the second week of classes (Handbook p. 49). GS Staff forwards the student request to the Dean; approval returns to GS Staff for Excel export. GS Staff emails the file manually and waits for Registrar acknowledgement outside the portal.",
     graduation:
       "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and export.",
   };

@@ -403,10 +403,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
     def test_withdrawal_approval_sequence_and_denial_branch(self):
         with app.app_context():
             self.student = db.session.get(Student, self.student_id)
+            # Dates are relative to today so the first-week fee tier never expires.
             term = AcademicTerm(
                 label="AY 2026-2027 1st Semester",
-                start_date=date(2026, 8, 1),
-                end_date=date(2026, 12, 15),
+                start_date=date.today() - timedelta(days=3),
+                end_date=date.today() + timedelta(days=117),
             )
             other_course = Course(
                 program_id=self.program_id,
@@ -499,7 +500,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(application.status, "Subject Tagged - Registrar Preparation")
             self.assertEqual(application.registrar_status, "Pending Excel Export")
             self.assertEqual(selected_enrollment.status, "Withdrawn")
-            self.assertIn("no academic grade", selected_enrollment.status_note)
+            self.assertIn("withdrawal window", selected_enrollment.status_note)
+            self.assertIn("fee consequence", selected_enrollment.status_note)
             self.assertEqual(other_enrollment.status, "Enrolled")
             self.assertEqual(selected_record.status, "Not Started")
             self.assertIsNone(selected_record.term_label)
@@ -533,7 +535,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             workbook = load_workbook(BytesIO(report.data))
             sheet = workbook["Approved Withdrawals"]
             self.assertEqual(sheet["E4"].value, "BPM-501")
-            self.assertEqual(sheet["O4"].value, "No academic record / no grade impact")
+            self.assertIn("Withdrawn in the enrollment ledger", sheet["O4"].value)
+            self.assertEqual(sheet["Q4"].value, "First week")
+            self.assertEqual(sheet["R4"].value, 10)
             db.session.refresh(application)
             self.assertEqual(application.status, "Exported - Ready to Send")
             self.assertEqual(selected_enrollment.status, "Withdrawn")
@@ -2366,6 +2370,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "subject_enrollment_id": enrollment.id,
                 "status": "Dropped",
                 "effective_date": "2026-09-15",
+                "unexcused_absence_percent": 25,
                 "note": "Student stopped attending after the official change period.",
             }
             staff_response = self._staff_client().patch(
@@ -2450,10 +2455,12 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 current_stage="Coursework",
                 standing="Active",
             )
+            # Handbook 2022-2023 p. 49: withdrawal is allowed until the end of the second week
+            # (14 calendar days), so "late" now means more than 14 days after classes began.
             late_term = AcademicTerm(
                 label="Closed Withdrawal Window",
-                start_date=date.today() - timedelta(days=8),
-                end_date=date.today() + timedelta(days=112),
+                start_date=date.today() - timedelta(days=15),
+                end_date=date.today() + timedelta(days=105),
             )
             db.session.add_all([late_student, late_term])
             db.session.flush()
@@ -2472,18 +2479,19 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "/api/student-portal/requests/withdrawal",
                 json={
                     "subject_enrollment_id": late_enrollment.id,
-                    "reason": "Too late for the penalty-free window",
+                    "reason": "Too late for the withdrawal window",
                 },
             )
             self.assertEqual(late_response.status_code, 409, late_response.get_json())
-            self.assertIn("first seven calendar days", late_response.get_json()["error"])
+            self.assertIn("second week", late_response.get_json()["error"])
+            self.assertIn("Graduate School Handbook 2022-2023, p. 49", late_response.get_json()["error"])
 
     def test_enrollment_workspace_uses_monitoring_status_for_subject_eligibility(self):
         with app.app_context():
             term = AcademicTerm(
                 label="AY 2026-2027 1st Semester",
-                start_date=date(2026, 8, 1),
-                end_date=date(2026, 12, 15),
+                start_date=date.today() - timedelta(days=3),  # first week: adding is still allowed (Handbook p. 49)
+                end_date=date.today() + timedelta(days=117),
             )
             enrolled_course = Course(
                 program_id=self.program_id,
@@ -4006,7 +4014,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def test_defense_suggestions_start_after_required_lead_time(self):
         reference = date(2026, 7, 23)
-        self.assertEqual(earliest_defense_date("Title Defense", reference), date(2026, 7, 23))
+        # Research Protocol: the title defense application is made at least 2 weeks ahead.
+        self.assertEqual(earliest_defense_date("Title Defense", reference), date(2026, 8, 6))
         self.assertEqual(earliest_defense_date("Public Final Defense", reference), date(2026, 7, 28))
         self.assertEqual(earliest_defense_date("Proposal Defense", reference), date(2026, 8, 6))
         self.assertEqual(earliest_defense_date("Final Defense", reference), date(2026, 8, 6))
@@ -4261,10 +4270,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def test_workflow_clarification_can_be_returned_and_answered(self):
         with app.app_context():
+            # Relative to today: a fixed date made this test fail once the withdrawal window passed.
             term = AcademicTerm(
                 label="AY 2026-2027 Term 1",
-                start_date=date(2026, 8, 1),
-                end_date=date(2026, 12, 15),
+                start_date=date.today() - timedelta(days=3),
+                end_date=date.today() + timedelta(days=117),
             )
             db.session.add(term)
             db.session.flush()

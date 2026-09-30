@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Card } from "../components/ui";
 import { CourseworkReportPanel } from "../components/ProcessGates";
 import { useAuth } from "../auth";
+import PolicyRules from "../components/PolicyRules";
 import CourseAdjustments from "./CourseAdjustments";
 import CourseOfferings from "./CourseOfferings";
 
@@ -51,6 +52,8 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
           </div>
         </div>
       </Card>
+
+      <PolicyRules process="course_adjustment" title="Adding or changing a subject: rules applied" />
 
       <div role="tabpanel">
         {view === "adjustments" ? <CourseAdjustments embedded /> : <CourseOfferings embedded />}

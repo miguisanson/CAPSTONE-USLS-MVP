@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Printer } from "lucide-react";
+import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Printer, Scale } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
@@ -13,6 +13,7 @@ import ExportFollowUpModal from "../components/ExportFollowUpModal";
 import { OnboardingGatePanel, CourseworkReportPanel } from "../components/ProcessGates";
 import { printDataTable } from "../lib/print";
 import { GraduationRoster } from "./WorkflowPage";
+import BusinessRules from "./BusinessRules";
 
 const DEAN_NAV_GROUPS = [
   {
@@ -39,6 +40,7 @@ const DEAN_NAV_GROUPS = [
     label: "Monitoring & Support",
     items: [
       { id: "reports", label: "Reports / Analytics", icon: BarChart3 },
+      { id: "rules", label: "Business Rules", icon: Scale },
     ],
   },
 ];
@@ -516,6 +518,28 @@ export default function DeanApprovals() {
     setSelectedGraduationIds(new Set());
     setBatchOpen(false);
     await refetch();
+  }
+
+  // The Dean reads the business rules here (read-only); staff and admin edit them.
+  if (view === "rules") {
+    return (
+      <div className="min-h-screen bg-canvas lg:flex">
+        <RoleSidebar roleLabel="Dean Portal" groups={DEAN_NAV_GROUPS} active={view} onChange={setView} />
+        <div className="min-w-0 flex-1">
+          <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white"><Gavel className="h-5 w-5" /></span>
+            <div className="flex-1">
+              <p className="font-display text-[15px] font-semibold text-ink">Dean · Business Rules</p>
+              <p className="text-[11px] text-slate-400">{user?.full_name}</p>
+            </div>
+            <button type="button" onClick={logout} className="btn-ghost cursor-pointer"><LogOut className="h-4 w-4" /> Sign out</button>
+          </header>
+          <main className="mx-auto w-full max-w-[1600px] px-4 py-6 lg:px-8">
+            <BusinessRules />
+          </main>
+        </div>
+      </div>
+    );
   }
 
   if (view === "graduation") {

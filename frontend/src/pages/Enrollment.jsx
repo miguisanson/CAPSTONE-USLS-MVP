@@ -22,8 +22,13 @@ import { api } from "../api";
 import { useConfirm } from "../components/confirm";
 import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
 import HistoryDisclosure from "../components/HistoryDisclosure";
+import PolicyRules from "../components/PolicyRules";
 import { StudyPlanPanel } from "../components/ProcessGates";
 import { formatDate } from "../lib/format";
+
+// Conflicts that come from a business rule (add/change window, academic load): the
+// coordinator decides each one; they are never resolved automatically.
+const RULE_FLAG_KINDS = new Set(["add_window_closed", "change_window_closed", "over_load"]);
 
 export default function Enrollment() {
   const confirm = useConfirm();
@@ -39,6 +44,8 @@ export default function Enrollment() {
   const [result, setResult] = useState(null);
   const [statusEdit, setStatusEdit] = useState(null);
   const [classListPreview, setClassListPreview] = useState(null);
+  const [ruleReview, setRuleReview] = useState(null);
+  const [ruleDecisions, setRuleDecisions] = useState({});
 
   const programId = searchParams.get("program_id") || "";
   const termId = searchParams.get("term_id") || "";
@@ -129,12 +136,13 @@ export default function Enrollment() {
     setResult(null);
   }
 
-  async function confirmEnrollment() {
+  async function confirmEnrollment(decisions = null) {
     if (!data?.selected_student) return;
     setBusy("save");
     setError("");
     setPreview(null);
     setResult(null);
+    if (!decisions) setRuleReview(null);
     try {
       const review = await api.previewEnrollment({
         student_id: data.selected_student.id,
@@ -145,10 +153,17 @@ export default function Enrollment() {
         setPreview(review);
         return;
       }
+      const ruleFlags = (review.conflicts || []).filter((conflict) => RULE_FLAG_KINDS.has(conflict.kind));
+      if (ruleFlags.length && !decisions) {
+        // A business rule is involved: show it and let the coordinator decide.
+        setRuleReview({ flags: ruleFlags, load: review.load });
+        setRuleDecisions(Object.fromEntries(ruleFlags.map((flag) => [flag.id, flag.options.some((option) => option.value === "exclude") ? "exclude" : ""])));
+        return;
+      }
       const automaticResolutions = Object.fromEntries(
         (review.conflicts || [])
           .filter((conflict) => conflict.options?.length)
-          .map((conflict) => [conflict.id, conflict.options[0].value])
+          .map((conflict) => [conflict.id, (decisions && decisions[conflict.id]) || conflict.options[0].value])
       );
       const response = await api.saveEnrollment({
         student_id: data.selected_student.id,
@@ -158,8 +173,9 @@ export default function Enrollment() {
         source_reference: sourceReference,
         confirmed: true,
       });
+      setRuleReview(null);
       await load();
-      setResult({ ...response, automatic_conflicts: review.conflicts || [] });
+      setResult({ ...response, automatic_conflicts: (review.conflicts || []).filter((conflict) => !RULE_FLAG_KINDS.has(conflict.kind)) });
     } catch (err) {
       setError(err.message || "Could not confirm enrollment.");
     } finally {
@@ -228,6 +244,7 @@ export default function Enrollment() {
       status: "",
       effectiveDate: new Date().toISOString().slice(0, 10),
       note: "",
+      unexcusedAbsencePercent: "",
     });
     setError("");
     setResult(null);
@@ -242,6 +259,10 @@ export default function Enrollment() {
       setError("Add a coordinator note before saving the subject status.");
       return;
     }
+    if (statusEdit.unexcusedAbsencePercent === "" || Number.isNaN(Number(statusEdit.unexcusedAbsencePercent))) {
+      setError("Enter the student's unexcused absences as a percentage of the class hours.");
+      return;
+    }
 
     setBusy("subject-status");
     setError("");
@@ -250,6 +271,7 @@ export default function Enrollment() {
         subject_enrollment_id: statusEdit.enrollmentId,
         status: statusEdit.status,
         effective_date: statusEdit.effectiveDate,
+        unexcused_absence_percent: Number(statusEdit.unexcusedAbsencePercent),
         note: statusEdit.note.trim(),
       });
       await load();
@@ -290,6 +312,11 @@ export default function Enrollment() {
             <BookOpenCheck className="h-4 w-4" /> Offering list
           </Link>
         </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <PolicyRules process="enrollment" title="Enrollment and academic load: rules applied" />
+        <PolicyRules process="course_adjustment" title="Adding or changing a subject: rules applied" />
       </div>
 
       <Card className="p-5">
@@ -490,6 +517,16 @@ export default function Enrollment() {
               </Card>
 
               {preview && <ConflictNotice preview={preview} />}
+              {ruleReview && (
+                <RuleFlagPanel
+                  review={ruleReview}
+                  decisions={ruleDecisions}
+                  setDecisions={setRuleDecisions}
+                  busy={busy === "save"}
+                  onCancel={() => setRuleReview(null)}
+                  onSave={() => confirmEnrollment(ruleDecisions)}
+                />
+              )}
             </div>
 
             <div className="space-y-5">
@@ -552,7 +589,7 @@ export default function Enrollment() {
                 <div className="mt-4 grid gap-2">
                   <button
                     type="button"
-                    onClick={confirmEnrollment}
+                    onClick={() => confirmEnrollment()}
                     disabled={!dirty || busy}
                     className="btn-primary w-full"
                   >
@@ -901,6 +938,24 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
             </label>
           </div>
 
+          <PolicyRules process="dropping" title="When a subject can be dropped" defaultOpen />
+
+          <label className="block">
+            <span className="field-label">Unexcused absences (% of class hours)</span>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              value={edit.unexcusedAbsencePercent}
+              onChange={(event) => setEdit((current) => ({ ...current, unexcusedAbsencePercent: event.target.value }))}
+              className="field-input"
+              placeholder="e.g. 25"
+              required
+            />
+            <span className="mt-1 block text-xs text-slate-500">A subject is dropped by the professor only when unexcused absences are more than the limit shown above. To leave a subject earlier, the student files a Subject Withdrawal.</span>
+          </label>
+
           <label className="block">
             <span className="field-label">Coordinator note</span>
             <textarea
@@ -915,7 +970,7 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
 
           <ErrorNote message={error} />
           <p className="text-xs leading-relaxed text-slate-500">
-            Dropping is recorded here by the Academic Coordinator. Penalty-free withdrawal before classes or during the first week must be initiated by the student in the Withdrawal workflow.
+            Dropping is recorded here by the Academic Coordinator. A withdrawal, allowed until the end of the second week of classes, must be initiated by the student in the Withdrawal workflow.
           </p>
         </div>
 
@@ -926,7 +981,7 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
           <button
             type="button"
             onClick={onSave}
-            disabled={!edit.status || !edit.effectiveDate || !edit.note.trim() || busy}
+            disabled={!edit.status || !edit.effectiveDate || !edit.note.trim() || edit.unexcusedAbsencePercent === "" || busy}
             className="btn-primary cursor-pointer"
           >
             {busy ? "Saving..." : `Save ${edit.status || "status"}`}
@@ -1042,6 +1097,44 @@ function ConflictNotice({ preview }) {
             </div>
           ))}
         </div>
+    </Card>
+  );
+}
+
+function RuleFlagPanel({ review, decisions, setDecisions, busy, onCancel, onSave }) {
+  const ready = review.flags.every((flag) => decisions[flag.id]);
+  return (
+    <Card className="border-amber-200 bg-amber-50/50 p-5" role="alert">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-800">
+          <AlertTriangle className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink">A business rule applies to this change</h2>
+          <p className="mt-1 text-sm text-slate-600">Nothing was saved yet. Decide each item below, then save. An exception is recorded on the enrollment.</p>
+        </div>
+      </div>
+      <div className="mt-4 space-y-3">
+        {review.flags.map((flag) => (
+          <div key={flag.id} className="rounded-xl border border-amber-200 bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{flag.line}</p>
+            <p className="mt-1 text-sm font-medium text-slate-800">{flag.message}</p>
+            <select
+              value={decisions[flag.id] || ""}
+              onChange={(event) => setDecisions((current) => ({ ...current, [flag.id]: event.target.value }))}
+              className="field-input mt-3 cursor-pointer"
+              aria-label={`Decision for ${flag.line}`}
+            >
+              <option value="">Choose what to do</option>
+              {flag.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" onClick={onCancel} disabled={busy} className="btn-ghost cursor-pointer">Cancel, change the selection</button>
+        <button type="button" onClick={onSave} disabled={!ready || busy} className="btn-primary cursor-pointer">{busy ? "Saving…" : "Save with these decisions"}</button>
+      </div>
     </Card>
   );
 }

@@ -345,6 +345,12 @@ export const api = {
     return body;
   },
   deletePolicyDocument: (id) => request(`/policy-documents/${id}`, { method: "DELETE" }),
+  businessRules: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/business-rules${qs ? `?${qs}` : ""}`);
+  },
+  updateBusinessRule: (id, payload) =>
+    request(`/business-rules/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   loaPolicyReview: (payload) =>
     request("/leave-of-absence/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   readmissionPolicyReview: (payload) =>

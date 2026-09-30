@@ -871,7 +871,7 @@ def caption_scenario_5(
     )
 
     captions = [
-        "Subject Withdrawal student form with the eligible enrolled subject and penalty-free deadline.",
+        "Subject Withdrawal student form with the eligible enrolled subject, its deadline and the fee consequence.",
         "Subject Withdrawal submitted stage and the next GS Staff handoff.",
         "Withdrawal Requests staff queue with the submitted case ready for review.",
         "Withdrawal Requests staff detail before forwarding to the Dean.",
