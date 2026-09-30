@@ -26,6 +26,8 @@ import { FacultyProvider, FacultyRoutes } from "./pages/faculty/FacultyRoutes";
 import TermSettings from "./pages/TermSettings";
 import PolicyDocuments from "./pages/PolicyDocuments";
 import BusinessRules from "./pages/BusinessRules";
+import AdviserAppointments from "./pages/AdviserAppointments";
+import CalendarPage from "./components/calendar/CalendarPage";
 
 // Where each role lands by default.
 function homeFor(user) {
@@ -116,6 +118,11 @@ export default function App() {
                 <Route path="/assistant" element={<Assistant />} />
                 <Route path="/policy-documents" element={<RoleOnly user={user} roles={["staff", "admin"]}><PolicyDocuments /></RoleOnly>} />
                 <Route path="/business-rules" element={<BusinessRules />} />
+                <Route
+                  path="/calendar"
+                  element={<CalendarPage scope="staff" title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in Defense Scheduling." />}
+                />
+                <Route path="/adviser-appointments" element={<AdviserAppointments role={user?.role} />} />
                 <Route path="/workflow/:slug" element={<WorkflowPage />} />
                 <Route
                   path="/form1-endorsements"

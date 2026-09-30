@@ -12068,10 +12068,17 @@ def register_routes(app: Flask) -> None:
                 "defense": schedule_request_dict(schedule),
                 "my_role": defense_seat_role(schedule, faculty.id),
             })
+        adviser_inbox, adviser_consents = faculty_adviser_inbox(faculty)
+        open_invitations = faculty_open_invitations(faculty)
+        db.session.commit()
         return jsonify({
             "faculty": faculty_profile_dict(faculty, include_calendar_events=True),
             "panels": panels,
             "upcoming_defenses": upcoming_defenses[:20],
+            "counts": {
+                "pending_invitations": len(open_invitations),
+                "pending_adviser_requests": len(adviser_inbox) + len(adviser_consents),
+            },
             "advisees": advisees,
             "panel_count": len(panels),
             "terms": [term_dict(term) for term in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
@@ -16439,17 +16446,7 @@ def register_routes(app: Flask) -> None:
         _account, faculty = signed_in_faculty()
         if not faculty:
             return jsonify(NO_FACULTY_RECORD[0]), NO_FACULTY_RECORD[1]
-        inbox = [
-            row for row in AdviserAppointment.query.filter_by(faculty_id=faculty.id, adviser_response="Pending")
-            .order_by(AdviserAppointment.id.desc()).all()
-            if (row.kind != "Change" and row.status == ADVISER_STATUS_APPOINTED)
-            or (row.kind == "Change" and row.status == ADVISER_STATUS_APPLIED)
-        ]
-        consents = []
-        for row in AdviserAppointment.query.filter_by(kind="Change", status=ADVISER_STATUS_APPLIED, current_adviser_consent="Pending").all():
-            previous = db.session.get(AdviserAppointment, row.replaces_id) if row.replaces_id else None
-            if previous and previous.faculty_id == faculty.id:
-                consents.append(row)
+        inbox, consents = faculty_adviser_inbox(faculty)
         advisees = student_active_advisee_rows(faculty.id)
         return jsonify({
             "inbox": [adviser_appointment_dict(row, "faculty") for row in inbox],
@@ -25773,6 +25770,35 @@ def calendar_feed_for_account(account: UserAccount) -> str:
         "Defenses and deadlines from the Graduate School platform. Private link: do not share it.",
         blocks,
     )
+
+
+def faculty_adviser_inbox(faculty: Faculty) -> tuple[list[AdviserAppointment], list[AdviserAppointment]]:
+    """(appointments waiting for this faculty member's answer, change requests waiting for their consent)."""
+    inbox = [
+        row for row in AdviserAppointment.query.filter_by(faculty_id=faculty.id, adviser_response="Pending")
+        .order_by(AdviserAppointment.id.desc()).all()
+        if (row.kind != "Change" and row.status == ADVISER_STATUS_APPOINTED)
+        or (row.kind == "Change" and row.status == ADVISER_STATUS_APPLIED)
+    ]
+    consents = []
+    for row in AdviserAppointment.query.filter_by(kind="Change", status=ADVISER_STATUS_APPLIED, current_adviser_consent="Pending").all():
+        previous = db.session.get(AdviserAppointment, row.replaces_id) if row.replaces_id else None
+        if previous and previous.faculty_id == faculty.id:
+            consents.append(row)
+    return inbox, consents
+
+
+def faculty_open_invitations(faculty: Faculty) -> list[PanelInvitation]:
+    """Invitations on a student's current panel that this faculty member has not answered yet."""
+    ensure_invitations_for_faculty(faculty)
+    rows = []
+    for row in PanelInvitation.query.filter_by(faculty_id=faculty.id, status="Invited").all():
+        student = row.student
+        if student and row.gate == current_panel_gate(student) and PanelAssignment.query.filter_by(
+            student_id=row.student_id, faculty_id=faculty.id, gate=row.gate,
+        ).first():
+            rows.append(row)
+    return rows
 
 
 # <<CALENDAR-HELPERS-END>>

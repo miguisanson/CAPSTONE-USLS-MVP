@@ -444,6 +444,77 @@ export const api = {
     if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
     return body;
   },
+  // ---- calendar, availability, adviser appointment, invitations, notifications, private feed ----
+  calendar: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/calendar${qs ? `?${qs}` : ""}`);
+  },
+  studentResearchCalendar: () => request("/student-portal/research-calendar"),
+  facultyAvailability: () => request("/faculty-portal/availability"),
+  saveFacultyWorkingHours: (hours) =>
+    request("/faculty-portal/availability/working-hours", { method: "PUT", body: JSON.stringify({ hours }) }),
+  addAvailabilityException: (payload) =>
+    request("/faculty-portal/availability/exceptions", { method: "POST", body: JSON.stringify(payload) }),
+  deleteAvailabilityException: (id) =>
+    request(`/faculty-portal/availability/exceptions/${id}`, { method: "DELETE" }),
+  answerAvailabilityRequest: (id) =>
+    request(`/faculty-portal/availability/requests/${id}/answer`, { method: "POST", body: JSON.stringify({}) }),
+  requestPanelAvailability: (payload) =>
+    request("/availability-requests", { method: "POST", body: JSON.stringify(payload) }),
+  availabilityRequests: (studentId) => {
+    const qs = queryString({ student_id: studentId });
+    return request(`/availability-requests${qs ? `?${qs}` : ""}`);
+  },
+  checkDefenseSlot: (payload) =>
+    request("/defense-schedules/check", { method: "POST", body: JSON.stringify(payload) }),
+  studentAdviser: () => request("/student-portal/adviser"),
+  applyForAdviser: (payload) =>
+    request("/student-portal/adviser/apply", { method: "POST", body: JSON.stringify(payload) }),
+  requestAdviserChange: (payload) =>
+    request("/student-portal/adviser/change", { method: "POST", body: JSON.stringify(payload) }),
+  withdrawAdviserApplication: (id) =>
+    request(`/student-portal/adviser/${id}/withdraw`, { method: "POST", body: JSON.stringify({}) }),
+  submitAdviserContract: (id, note = "") =>
+    request(`/student-portal/adviser/${id}/contract`, { method: "POST", body: JSON.stringify({ note }) }),
+  adviserAppointments: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/adviser-appointments${qs ? `?${qs}` : ""}`);
+  },
+  noteAdviserApplication: (id, note = "") =>
+    request(`/adviser-appointments/${id}/note`, { method: "POST", body: JSON.stringify({ note }) }),
+  forwardAdviserApplication: (id) =>
+    request(`/adviser-appointments/${id}/forward`, { method: "POST", body: JSON.stringify({}) }),
+  decideAdviserAppointment: (id, payload) =>
+    request(`/adviser-appointments/${id}/decision`, { method: "POST", body: JSON.stringify(payload) }),
+  receiveAdviserContract: (id) =>
+    request(`/adviser-appointments/${id}/contract-received`, { method: "POST", body: JSON.stringify({}) }),
+  recordAdviserAppointment: (payload) =>
+    request("/adviser-appointments/record", { method: "POST", body: JSON.stringify(payload) }),
+  facultyAdviserRequests: () => request("/faculty-portal/adviser-requests"),
+  respondAdviserRequest: (id, payload) =>
+    request(`/faculty-portal/adviser-requests/${id}/respond`, { method: "POST", body: JSON.stringify(payload) }),
+  consentAdviserChange: (id, payload) =>
+    request(`/faculty-portal/adviser-requests/${id}/consent`, { method: "POST", body: JSON.stringify(payload) }),
+  facultyPanelInvitations: () => request("/faculty-portal/panel-invitations"),
+  respondPanelInvitation: (id, payload) =>
+    request(`/faculty-portal/panel-invitations/${id}/respond`, { method: "POST", body: JSON.stringify(payload) }),
+  cannotAttendDefense: (scheduleId, payload) =>
+    request(`/faculty-portal/defense-schedules/${scheduleId}/cannot-attend`, { method: "POST", body: JSON.stringify(payload) }),
+  panelInvitations: (studentId) => {
+    const qs = queryString({ student_id: studentId });
+    return request(`/panel-invitations${qs ? `?${qs}` : ""}`);
+  },
+  notifications: (params = {}) => {
+    const qs = queryString(params);
+    return request(`/notifications${qs ? `?${qs}` : ""}`);
+  },
+  markNotificationRead: (id) =>
+    request(`/notifications/${id}/read`, { method: "POST", body: JSON.stringify({}) }),
+  markAllNotificationsRead: () =>
+    request("/notifications/read-all", { method: "POST", body: JSON.stringify({}) }),
+  calendarFeed: () => request("/calendar-feed"),
+  createCalendarFeed: () => request("/calendar-feed", { method: "POST", body: JSON.stringify({}) }),
+  revokeCalendarFeed: () => request("/calendar-feed", { method: "DELETE" }),
   submitStudentDocument: async (documentId, file) => {
     const form = new FormData();
     form.append("file", file);

@@ -1401,5 +1401,19 @@ class ExistingDataTests(CalendarBase):
         self.assertTrue(all(item["availability_entered"] in (True, False) for item in context["faculty_directory"]))
 
 
+class FacultyBadgeCountTests(AdviserBase):
+    def test_the_faculty_context_counts_what_waits_for_an_answer(self):
+        self.ready_for_title()
+        body = self.faculty_client("Chair Person").get("/api/faculty-portal/context").get_json()
+        self.assertEqual(body["counts"], {"pending_invitations": 1, "pending_adviser_requests": 0})
+        self.walk_to_appointed("Chair Person")
+        body = self.faculty_client("Chair Person").get("/api/faculty-portal/context").get_json()
+        self.assertEqual(body["counts"]["pending_adviser_requests"], 1)
+        invitation = self.faculty_client("Chair Person").get("/api/faculty-portal/panel-invitations").get_json()["invitations"][0]
+        self.faculty_client("Chair Person").post(f"/api/faculty-portal/panel-invitations/{invitation['id']}/respond", json={"response": "accept"})
+        body = self.faculty_client("Chair Person").get("/api/faculty-portal/context").get_json()
+        self.assertEqual(body["counts"]["pending_invitations"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
