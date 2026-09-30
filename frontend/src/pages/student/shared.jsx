@@ -1,6 +1,8 @@
 import { Component, useEffect, useState } from "react";
 import {
   AlertTriangle,
+  CalendarClock,
+  CalendarPlus,
   CheckCircle2,
   FileUp,
   Eye,
@@ -8,9 +10,10 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "../../api";
-import { Card, EmptyState, ErrorNote, StatusBadge } from "../../components/ui";
+import { Card, EmptyState, ErrorNote, SectionTitle, StatusBadge } from "../../components/ui";
 import { Field } from "../../components/forms";
 import { formatDate } from "../../lib/format";
+import { parseDay } from "../../components/calendar/CalendarView";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 
 export const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
@@ -265,5 +268,95 @@ export function SubmitState({ busy, error, message, label, disabled = false, dis
       </button>
       {disabledHint && <p className="text-xs font-medium text-slate-500">{disabledHint}</p>}
     </div>
+  );
+}
+
+// ---- dates and defense schedules (Philippine time, never converted) ----
+
+// "Mon, Oct 5, 2026" from a YYYY-MM-DD (or naive datetime) string, read as a local date.
+export function fmtDay(value, long = false) {
+  if (!value) return "Not set";
+  const day = parseDay(value);
+  if (Number.isNaN(day.getTime())) return String(value);
+  return day.toLocaleDateString(undefined, long
+    ? { weekday: "long", month: "long", day: "numeric", year: "numeric" }
+    : { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+
+// "in 3 days" / "tomorrow" / "today" / "2 days ago" from a whole number of days.
+export function daysPhrase(days) {
+  if (days === null || days === undefined) return "";
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  if (days === -1) return "yesterday";
+  return days > 0 ? `in ${days} days` : `${Math.abs(days)} days ago`;
+}
+
+export function timeRange(start, end) {
+  if (!start) return "Time not set";
+  return end ? `${start}-${end}` : start;
+}
+
+// Statuses in which a booking is alive: a new request must not be filed on top of it.
+export const LIVE_SCHEDULE_STATUSES = ["Scheduled", "Confirmed", "Needs Re-confirmation"];
+export function isLiveSchedule(schedule) {
+  return Boolean(schedule?.is_active) || LIVE_SCHEDULE_STATUSES.includes(schedule?.status);
+}
+
+const SCHEDULE_STATUS_NOTE = {
+  Held: "This defense took place.",
+  Deferred: "Waiting for the Research Coordinator to set a new date.",
+  "Needs Re-confirmation": "Your panel changed. The Research Coordinator will confirm the date again.",
+  Rescheduled: "Replaced by a newer schedule.",
+  Cancelled: "This booking was cancelled.",
+};
+
+// One card per defense schedule with the real facts (used on the dashboard and the Defense Schedule page).
+export function StudentSchedulePanel({ schedules = [], title = "Schedule requests" }) {
+  return (
+    <Card className="p-6">
+      <SectionTitle title={title} icon={CalendarClock} />
+      {schedules.length ? (
+        <ul className="space-y-3">
+          {schedules.map((schedule) => {
+            const status = schedule.display_status || schedule.status;
+            const reason = schedule.display_conflict_reason || schedule.change_reason || schedule.conflict_reason;
+            const note = SCHEDULE_STATUS_NOTE[schedule.status];
+            const panel = schedule.panelists || [];
+            return (
+              <li key={schedule.id} className="rounded-xl border border-slate-100 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"}</p>
+                    <p className="text-sm text-slate-700">{fmtDay(schedule.preferred_date)}</p>
+                  </div>
+                  <StatusBadge value={status} dot={false} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {timeRange(schedule.start_time, schedule.end_time)} (Philippine time) - {schedule.mode || "Mode not set"} - {schedule.venue || "Venue or link not set yet"}
+                </p>
+                {panel.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+                    {panel.map((seat) => (
+                      <li key={`${seat.faculty_id}-${seat.role}`}><span className="font-semibold text-ink">{seat.name}</span> - {seat.role}</li>
+                    ))}
+                  </ul>
+                )}
+                {note && <p className="mt-2 text-xs font-semibold text-slate-600">{note}</p>}
+                {reason && <p className="mt-1 text-xs text-amber-800">{reason}</p>}
+                {(schedule.attention || []).map((line) => <p key={line} className="mt-1 text-xs font-semibold text-amber-800">{line}</p>)}
+                {schedule.ics_url && isLiveSchedule(schedule) && (
+                  <a href={schedule.ics_url} download className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline">
+                    <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" /> Add to calendar (.ics)
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <EmptyState title="No schedule requests" />
+      )}
+    </Card>
   );
 }

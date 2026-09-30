@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { StudentGate, StudentPortalProvider } from "./StudentPortalContext";
 import StudentOverview from "./StudentOverview";
 import StudentProgress from "./StudentProgress";
+import StudentAdviserPage from "./StudentAdviserPage";
+import StudentCalendarPage from "./StudentCalendarPage";
 import { StudentDefensePage, StudentRequestCenter, StudentRequestPage, StudentResearchPage } from "./StudentRequestPages";
 import {
   StudentActivityPage,
@@ -23,7 +25,9 @@ export function StudentRoutes() {
         <Route path="progress" element={<StudentProgress />} />
         <Route path="enrollment" element={<StudentEnrollmentPage />} />
         <Route path="research" element={<StudentResearchPage />} />
+        <Route path="adviser" element={<StudentAdviserPage />} />
         <Route path="defense-schedule" element={<StudentDefensePage />} />
+        <Route path="calendar" element={<StudentCalendarPage />} />
         <Route path="practicum" element={<StudentRequestPage id="practicum" />} />
         <Route path="graduation" element={<StudentRequestPage id="graduation" />} />
         <Route path="requests" element={<StudentRequestCenter />} />

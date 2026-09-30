@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Card, PageHeader, SectionTitle, StatusBadge } from "../../components/ui";
 import { useStudentPortal } from "./StudentPortalContext";
-import { STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel } from "./shared";
+import { STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel, StudentSchedulePanel, isLiveSchedule } from "./shared";
 import { ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
 import PolicyRules from "../../components/PolicyRules";
 
@@ -33,7 +33,6 @@ const STUDENT_RULE_PROCESS_BY_VIEW = {
 };
 import { AwolReturnRequestForm, LoaRequestForm, ReadmissionRequestForm, WithdrawalRequestForm } from "./RequestForms";
 import { GraduationRequestForm, PracticumRequestForm } from "./CompletionForms";
-import { SchedulePanel } from "./Panels";
 import { REQUEST_GROUPS, STUDENT_REQUEST_PATHS, findRequestItem, lockedReasonFor } from "./requestMeta";
 import { leaveRequestStatus } from "./LeaveCaseCards";
 
@@ -48,7 +47,7 @@ const REQUEST_PAGES = {
     title: "Defense Schedule",
     description: "Request a defense date once your panel is matched. The Research Coordinator confirms a time shared by your adviser and panel.",
     icon: CalendarCheck,
-    render: (data, onSaved) => <ScheduleRequestForm studentId={data.student.id} onSaved={onSaved} />,
+    render: (data, onSaved) => <ScheduleRequestForm data={data} onSaved={onSaved} />,
   },
   loa: {
     title: "Leave of Absence",
@@ -95,7 +94,10 @@ function requestStatus(id, data) {
     case "research":
       return data.research_progress?.status || data.research_case?.status || "Not started";
     case "schedule":
-      return data.schedules?.[0]?.status || "No request";
+      {
+      const current = (data.schedules || []).find(isLiveSchedule) || data.schedules?.[0];
+      return current?.display_status || current?.status || "No request";
+    }
     case "loa":
       return data.leave_overview
         ? leaveRequestStatus(data, "loa")
@@ -197,7 +199,7 @@ export function StudentDefensePage() {
       aside={
         <div className="grid gap-5 lg:grid-cols-2">
           <AdviserPanelCard data={data} />
-          <SchedulePanel schedules={data.schedules || []} />
+          <StudentSchedulePanel schedules={data.schedules || []} />
         </div>
       }
     />

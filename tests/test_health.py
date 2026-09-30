@@ -46,6 +46,8 @@ PUBLIC_API_ROUTES = {
     ("GET", "/api/auth/config"),
     ("POST", "/api/auth/login"),
     ("POST", "/api/auth/logout"),
+    # Private calendar feed: the secret token in the address is the credential (unknown token -> 404).
+    ("GET", "/api/calendar/feed/<token>.ics"),
 }
 # Demo conveniences: public while DEMO_MODE is on, 404 while it is off.
 DEMO_API_ROUTES = {

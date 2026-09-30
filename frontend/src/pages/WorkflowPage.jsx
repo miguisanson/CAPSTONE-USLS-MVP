@@ -59,6 +59,9 @@ import HistoryDisclosure from "../components/HistoryDisclosure";
 import ExportFollowUpModal from "../components/ExportFollowUpModal";
 import StageBoard from "../components/StageBoard";
 import { formatDate } from "../lib/format";
+import SlotCheck, { useSlotCheck } from "../components/scheduling/SlotCheck";
+import AvailabilityRequestPanel, { InvitationChip } from "../components/scheduling/AvailabilityRequestPanel";
+import { availabilityLabel, isAvailabilityEntered } from "../components/scheduling/dates";
 import { printDataTable } from "../lib/print";
 import { useAuth } from "../auth";
 import { OnboardingGatePanel } from "../components/ProcessGates";
@@ -1765,6 +1768,18 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
   const usesManuscriptDate = form.defense_type !== "Title Defense";
   const overrideNeedsReason = form.override_requirements || form.override_conflicts;
   const leadReference = context.lead_reference || {};
+  const invitations = context.panel_invitations || [];
+  // Live warnings for the chosen slot: hard ones block, soft ones need the override box and a reason.
+  const check = useSlotCheck({
+    studentId,
+    date: form.preferred_date,
+    start: form.selected_start,
+    end: form.selected_end,
+    defenseType: form.defense_type,
+    venue: form.venue,
+    manuscriptReceivedOn: usesManuscriptDate ? form.manuscript_received_on : "",
+  });
+  const softWithoutOverride = check.needsOverride && !form.override_conflicts;
 
   async function runScheduleAction(action, successMessage) {
     setActionBusy(true);
@@ -1995,18 +2010,25 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
         {panel.length ? <div className="grid gap-3 sm:grid-cols-2">
           {panel.map((member) => {
             const participant = participants.find((item) => item.faculty_id === member.faculty_id);
+            const invitation = invitations.find((item) => item.faculty_id === member.faculty_id);
             return <div key={member.id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{member.faculty_name}</p><p className="text-xs font-semibold text-brand-700">{member.panel_role}</p></div><StatusBadge value={participant?.calendar_status || "Profile only"} /></div>
+              <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{member.faculty_name}</p><p className="text-xs font-semibold text-brand-700">{member.panel_role}</p></div><StatusBadge value={isAvailabilityEntered(participant) ? "Entered" : "Not entered"} dot={false} /></div>
               <p className="mt-3 text-xs text-slate-500">{member.college || "Department not recorded"}</p>
               <p className="mt-1 text-sm text-slate-700">{member.specialization || "Specialization not recorded"}</p>
+              <p className="mt-1 text-xs text-slate-500">{availabilityLabel(participant)}</p>
+              <InvitationChip invitation={invitation} />
             </div>;
           })}
         </div> : <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">No final panel is available. Complete Panel Matching before scheduling.</div>}
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-        <span>Monday-Friday use faculty working hours. Profile commitments and Google Calendar busy times are removed.</span>
-        <Link to="/faculty" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+        <span>Availability comes only from what each person entered (weekly hours and dates) or their connected Google Calendar. Nobody is assumed free. All times are Philippine time.</span>
+        <span className="flex flex-wrap items-center gap-3">
+          <Link to="/calendar" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">Open the defense calendar <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+          <Link to="/faculty" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+        </span>
       </div>
+      <AvailabilityRequestPanel context={context} studentId={studentId} refetch={refetch} />
       <AvailabilityWorkspace
         availability={availability}
         participants={participants}
@@ -2051,9 +2073,10 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
       <Field label="Scheduling constraints">
         <Textarea value={form.constraints} onChange={set("constraints")} placeholder="e.g. external panel only available afternoons" />
       </Field>
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-700">
+      <SlotCheck check={check} />
+      <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 text-sm ${softWithoutOverride ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
         <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-slate-400" />
-        <span><strong>Lead-time override:</strong> finalize despite lead-time warnings. Booked panelists, same-student overlaps, unavailable panel windows, and slots in the past cannot be overridden.</span>
+        <span><strong>Warning override:</strong> finalize despite the warnings (before the lead time, or a panelist who has not entered availability) and record why. Double-booked panelists or rooms, people outside their entered hours, a declined invitation, and slots in the past cannot be overridden.</span>
       </label>
       {overrideNeedsReason && (
         <Field label="Reason for the staff override (required, recorded with the schedule)" required>
@@ -2080,7 +2103,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
       <Field label="Source reference">
         <Input value={form.source_reference} onChange={set("source_reference")} />
       </Field>
-      <button type="submit" disabled={submitting || actionBusy || !schedulableTypes.length || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements) || (overrideNeedsReason && !form.override_reason.trim()) || (activeSchedule && !form.reason.trim())} className="btn-primary w-full sm:w-auto">
+      <button type="submit" disabled={submitting || actionBusy || !schedulableTypes.length || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements) || (overrideNeedsReason && !form.override_reason.trim()) || (activeSchedule && !form.reason.trim()) || check.blocked || softWithoutOverride} className="btn-primary w-full sm:w-auto">
         {submitting || actionBusy ? "Saving..." : activeSchedule ? "Reschedule defense" : isRetry ? "Book the re-defense" : "Set defense schedule"}
       </button>
       {!schedulableTypes.length && <p className="text-xs font-semibold text-amber-700">No defense can be booked at this stage right now{stageOutcome && !stageOutcome.complete ? ` (${stageOutcome.label})` : ""}.</p>}
@@ -2204,12 +2227,12 @@ function AvailabilityWorkspace({
                       <p className="font-semibold text-ink">{participant.name}</p>
                       <p className="mt-0.5 text-xs font-normal text-slate-500">{participant.role} · {participant.college}</p>
                       <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        participant.calendar_connected
+                        participant.calendar_connected || isAvailabilityEntered(participant)
                           ? "bg-green-50 text-green-700 ring-1 ring-green-100"
-                          : "bg-slate-100 text-slate-500"
+                          : "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
                       }`}>
-                        {participant.calendar_connected ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                        {participant.calendar_status || (participant.calendar_connected ? "Google checked" : "Profile only")}
+                        {participant.calendar_connected || isAvailabilityEntered(participant) ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                        {availabilityLabel(participant)}
                       </span>
                     </th>
                   ))}
@@ -2247,7 +2270,7 @@ function AvailabilityWorkspace({
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-xs font-medium text-slate-400">Unavailable</span>
+                              <span className={`text-xs font-medium ${isAvailabilityEntered(participant) ? "text-slate-400" : "text-amber-700"}`}>{isAvailabilityEntered(participant) ? "Unavailable" : "Not entered"}</span>
                             )}
                           </td>
                         );
@@ -2258,7 +2281,7 @@ function AvailabilityWorkspace({
               </tbody>
             </table>
             {visibleDates.length === 0 && (
-              <div className="p-8 text-center text-sm text-slate-500">No availability was recorded inside this date window.</div>
+              <div className="p-8 text-center text-sm text-slate-500">No availability was entered inside this date window.</div>
             )}
           </div>
         </div>
@@ -2300,8 +2323,11 @@ function AvailabilityWorkspace({
                       {index === 0 ? "Earliest option - " : ""}{shortDate(slot.date)}
                     </span>
                     <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-                      <Clock3 className="h-3.5 w-3.5" /> {timeRange(slot.start, slot.end)} - all {slot.matched_count} available
+                      <Clock3 className="h-3.5 w-3.5" /> {timeRange(slot.start, slot.end)} - all {slot.matched_count} who entered availability are free
                     </span>
+                    {(slot.missing_availability || []).length > 0 && (
+                      <span className="mt-0.5 block text-xs font-semibold text-amber-700">Not checked: {slot.missing_availability.join(", ")} (availability not entered)</span>
+                    )}
                   </span>
                   <span className={`h-4 w-4 rounded-full border-2 ${selected ? "border-brand-600 bg-brand-600 ring-2 ring-white" : "border-slate-300"}`} />
                 </button>
@@ -2310,7 +2336,9 @@ function AvailabilityWorkspace({
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
-            No conflict-free overlap appears in this window. Revise the dates, choose a different panel window, or collect updated availability from the adviser and panel.
+            {(availability.missing_availability || []).length > 0
+              ? `No overlap can be suggested yet: ${availability.missing_availability.join(", ")} ${availability.missing_availability.length === 1 ? "has" : "have"} not entered availability. Use "Ask for availability" above, or pick a time yourself and confirm the warning.`
+              : "No conflict-free overlap appears in this window. Revise the dates, choose a different panel window, or ask the adviser and panel to enter more dates."}
           </div>
         )}
       </div>
@@ -2326,7 +2354,7 @@ function AvailabilityWorkspace({
               <Clock3 className="h-4 w-4" /> {timeRange(form.selected_start, form.selected_end)}
             </span>
             <span className="inline-flex items-center gap-2">
-              <UserRoundCheck className="h-4 w-4" /> All participants available
+              <UserRoundCheck className="h-4 w-4" /> Checked against the availability people entered
             </span>
           </div>
         </div>
@@ -2350,6 +2378,8 @@ function ScheduleHistory({ schedules }) {
                 {schedule.change_reason && <p className="mt-1 text-xs text-slate-500">Reason: {schedule.change_reason}</p>}
                 {schedule.override_reason && <p className="mt-1 text-xs text-slate-500">Override reason: {schedule.override_reason}</p>}
                 {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
+                {(schedule.attention || []).map((line) => <p key={line} className="mt-1 text-xs font-semibold text-amber-800">{line}</p>)}
+                {schedule.ics_url && schedule.is_active && <a href={schedule.ics_url} download className="mt-1 inline-block text-xs font-semibold text-brand-700 hover:underline">Add to calendar (.ics)</a>}
               </div>
               <StatusBadge value={schedule.display_status || schedule.status} />
             </div>

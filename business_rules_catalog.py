@@ -440,8 +440,15 @@ BUSINESS_RULE_CATALOG = [
         "One change of research adviser only",
         "A student may request only one change of research adviser, before the proposal defense.",
         1, "int", "requests", PROTOCOL, "Request for Change of Research Adviser", None,
-        enforced=False,
-        reason="Not tracked by the system yet; the Research Coordinator enforces it.",
+        document="protocol",
+    ),
+    _rule(
+        "research.adviser_contract_days", "research",
+        "Advising contract forms within 5 days of Form 3.1",
+        "Once the research adviser is appointed, the student emails Form 3.2 (Research Timetable) and "
+        "Form 3.3 (Thesis/Dissertation Advising Contract) to the GS Research Coordinator within 5 days "
+        "of receiving Form 3.1. The adviser tracker shows the due date and flags it when it is overdue.",
+        5, "int", "days", PROTOCOL, "Designation of the Research Adviser - II. Advising Contract", None,
         document="protocol",
     ),
     # ---- Defense scheduling and panels --------------------------------------
@@ -589,11 +596,31 @@ BUSINESS_RULE_CATALOG = [
         "Faculty: at most five advisees per semester",
         "A faculty member can be assigned at most five active advisees per semester; more only with "
         "the approval of the Dean. The Research Protocol (Designation of the Research Adviser) "
-        "says the same.",
+        "says the same. The adviser appointment blocks a sixth advisee unless the Dean records an "
+        "exception with a note.",
         5, "int", "advisees", HANDBOOK,
         "Project Paper, Thesis & Dissertation - Adviser", "59",
-        enforced=False,
-        reason="The advisee count is not checked by the system yet; the Dean approves exceptions.",
+    ),
+    _rule(
+        "defense.reminder_days", "defense",
+        "Defense reminders: 14, 7, 2 and 1 day before",
+        "The student, the adviser and the panel get an in-app reminder this many days before a "
+        "confirmed defense (the first is also the 14-Day Rule check that the panel has the manuscript).",
+        "14,7,2,1", "text", "days", PROTOTYPE,
+    ),
+    _rule(
+        "research.signature_reminder_days", "research",
+        "Adviser signature waiting: remind after 3 days",
+        "An adviser is reminded when an advisee's manuscript or endorsement has waited for their "
+        "signature this many days.",
+        3, "int", "days", PROTOTYPE,
+    ),
+    _rule(
+        "defense.availability_reminder_days", "defense",
+        "Panelist with no availability: remind within 3 days of the request",
+        "A panelist whose availability is still not entered this many days after staff asked for it "
+        "is reminded again.",
+        3, "int", "days", PROTOTYPE,
     ),
 ]
 
