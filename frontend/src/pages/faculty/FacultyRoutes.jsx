@@ -2,9 +2,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Assistant from "../Assistant";
 import BusinessRules from "../BusinessRules";
 import { FacultyGate, FacultyProvider } from "./FacultyContext";
+import CalendarPage from "../../components/calendar/CalendarPage";
+import FacultyAvailabilityEditor from "./FacultyAvailabilityEditor";
+import FacultyInvitationsPage from "./FacultyInvitationsPage";
 import {
   FacultyAdviseesPage,
-  FacultyAvailabilityPage,
   FacultyClassesPage,
   FacultyDashboard,
   FacultyDefensesPage,
@@ -27,7 +29,12 @@ export function FacultyRoutes() {
         <Route path="defenses" element={<FacultyDefensesPage />} />
         <Route path="verdicts" element={<FacultyVerdictsPage />} />
         <Route path="classes" element={<FacultyClassesPage />} />
-        <Route path="availability" element={<FacultyAvailabilityPage />} />
+        <Route path="availability" element={<FacultyAvailabilityEditor />} />
+        <Route path="invitations" element={<FacultyInvitationsPage />} />
+        <Route
+          path="calendar"
+          element={<CalendarPage scope="faculty" title="My calendar" description="Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times." />}
+        />
         <Route path="assistant" element={<Assistant policyOnly />} />
         <Route path="business-rules" element={<BusinessRules />} />
         <Route path="*" element={<Navigate to="/faculty-portal" replace />} />

@@ -11,6 +11,8 @@ import {
   ClipboardCheck,
   FileCheck,
   CalendarCheck,
+  CalendarDays,
+  UserRoundCheck,
   Menu,
   X,
   GraduationCap,
@@ -33,6 +35,7 @@ import {
 import { useAuth } from "../auth";
 import { api } from "../api";
 import { PORTAL_NAV, PORTAL_FOOTERS, findNavItem, usePortalNav } from "./portalNav";
+import NotificationBell from "./NotificationBell";
 
 // Ordered top-to-bottom to follow the graduate lifecycle, so a new staff user
 // moves down the list step by step instead of hunting between pages.
@@ -68,6 +71,13 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Calendar & Advising",
+    items: [
+      { to: "/calendar", label: "Defense Calendar", icon: CalendarDays },
+      { to: "/adviser-appointments", label: "Adviser Appointments", icon: UserRoundCheck },
+    ],
+  },
+  {
     label: "Standalone Processes",
     items: [
       { to: "/workflow/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
@@ -100,9 +110,9 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
+  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/calendar", "/adviser-appointments", "/work-queue", "/assistant", "/business-rules"]),
   // Protocol: the Research Coordinator nominates the panel and informs panel and student of the date.
-  research_coordinator: new Set(["/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
+  research_coordinator: new Set(["/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/calendar", "/adviser-appointments", "/work-queue", "/assistant", "/business-rules"]),
 };
 
 function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {
@@ -250,6 +260,7 @@ export default function Layout({ children }) {
             <span className="hidden rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex">
               {user?.full_name || "Graduate School Staff"} · {user?.program || ROLE_LABELS[user?.role] || "Staff"}
             </span>
+            <NotificationBell />
             <button
               type="button"
               onClick={logout}

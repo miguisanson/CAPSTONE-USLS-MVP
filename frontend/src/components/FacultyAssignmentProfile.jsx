@@ -10,6 +10,10 @@ export default function FacultyAssignmentProfile({ faculty, onClose }) {
   const load = faculty.teaching_load_units || 0;
   const limit = faculty.teaching_load_limit || 24;
   const cv = faculty.cv_profile;
+  const updatedDate = faculty.availability_updated_at ? new Date(faculty.availability_updated_at) : null;
+  const updatedLabel = updatedDate && !Number.isNaN(updatedDate.getTime())
+    ? updatedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "";
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(null);
   const [ragError, setRagError] = useState("");
@@ -145,7 +149,11 @@ export default function FacultyAssignmentProfile({ faculty, onClose }) {
             </ProfileFact>
           )}
 
-          <ProfileFact icon={Clock3} label="Profile availability">
+          <ProfileFact icon={Clock3} label="Availability">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <StatusBadge value={faculty.availability_status || (faculty.availability_entered ? "Entered" : "Not entered")} dot={false} />
+              {faculty.availability_entered && updatedLabel && <span className="text-xs text-slate-500">updated {updatedLabel}</span>}
+            </div>
             {hours.length ? (
               <div className="grid gap-2 sm:grid-cols-2">
                 {hours.map((item) => (
@@ -154,7 +162,14 @@ export default function FacultyAssignmentProfile({ faculty, onClose }) {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-sm text-slate-500">No recurring availability recorded.</p>}
+            ) : (
+              <p className="text-sm text-slate-500">
+                {faculty.availability_entered
+                  ? "No weekly hours entered. Free dates may still be set in the faculty portal."
+                  : "Not entered - the faculty member enters it in their portal."}
+              </p>
+            )}
+            {hours.length > 0 && <p className="mt-2 text-xs text-slate-400">Philippine time.</p>}
           </ProfileFact>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">

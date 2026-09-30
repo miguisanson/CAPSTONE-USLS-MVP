@@ -1,10 +1,11 @@
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  AlertTriangle,
   BookOpenCheck,
-  CalendarCheck,
-  CalendarCheck2,
   CalendarClock,
+  CalendarDays,
   Clock3,
+  Download,
   FileCheck,
   FileSignature,
   FileText,
@@ -15,7 +16,8 @@ import {
 import { Card, EmptyState, PageHeader, SectionTitle, StatCard, StatusBadge } from "../../components/ui";
 import { formatDate } from "../../lib/format";
 import FacultyResearchWorkspace from "../../components/FacultyResearchWorkspace";
-import { useFaculty } from "./FacultyContext";
+import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
+import { FacultyAdviserPanel } from "./FacultyAdviserPanel";
 import { FacultyCalendarConnection } from "./FacultyCalendar";
 import { FacultyClasses } from "./FacultyClasses";
 
@@ -52,10 +54,12 @@ export function FacultyDashboard() {
   const advisees = data.advisees || [];
   const pendingSignatures = advisees.reduce((sum, row) => sum + (row.pending_count || 0), 0);
   const verdictsDue = panels.filter((panel) => panel.can_submit_verdict);
-  const upcoming = panels
-    .filter((panel) => panel.defense)
-    .sort((left, right) => new Date(left.defense.preferred_date || 0) - new Date(right.defense.preferred_date || 0))
-    .slice(0, 5);
+  // The server already keeps only future defenses that are still booked.
+  const upcoming = (data.upcoming_defenses || []).slice(0, 5);
+  const availabilityMissing = faculty?.availability_entered === false;
+  const pendingInvitations = data.counts?.pending_invitations || 0;
+  const pendingAdviserRequests = data.counts?.pending_adviser_requests || 0;
+  const hasAction = pendingSignatures > 0 || verdictsDue.length > 0 || availabilityMissing || pendingInvitations > 0 || pendingAdviserRequests > 0;
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -82,15 +86,21 @@ export function FacultyDashboard() {
             />
             {upcoming.length ? (
               <ul className="space-y-2.5">
-                {upcoming.map((panel) => (
-                  <li key={`${panel.student.id}-${panel.gate}-${panel.panel_role}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 p-3">
+                {upcoming.map((item) => (
+                  <li key={item.defense.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 p-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">{panel.student.name}</p>
-                      <p className="text-xs text-slate-500">{panel.defense.defense_type} · {defenseTime(panel.defense)}{panel.defense.mode ? ` · ${panel.defense.mode}` : ""}</p>
+                      <p className="text-sm font-semibold text-ink">{item.student.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatDay(item.defense.preferred_date)} · {formatTimeRange(item.defense.start_time, item.defense.end_time)} Philippine time
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {item.defense.defense_type}
+                        {item.defense.venue ? ` · ${item.defense.venue}` : item.defense.mode ? ` · ${item.defense.mode}` : ""}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <StatusBadge value={panel.panel_role} dot={false} />
-                      <StatusBadge value={panel.defense.display_status || panel.defense.status} dot={false} />
+                      <StatusBadge value={item.my_role} dot={false} />
+                      <StatusBadge value={item.defense.display_status || item.defense.status} dot={false} />
                     </div>
                   </li>
                 ))}
@@ -101,8 +111,26 @@ export function FacultyDashboard() {
           </Card>
           <Card className="p-6">
             <SectionTitle title="What needs your action" icon={FileCheck} />
-            {pendingSignatures || verdictsDue.length ? (
+            {hasAction ? (
               <ul className="space-y-2.5">
+                {availabilityMissing && (
+                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p className="flex items-start gap-2 text-sm font-semibold text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> You have not entered your availability yet. Staff cannot book defenses with you until you do.</p>
+                    <Link to="/faculty-portal/availability" className="btn-primary px-3 py-1.5 text-xs">Enter your availability</Link>
+                  </li>
+                )}
+                {pendingInvitations > 0 && (
+                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-blue-900">{pendingInvitations} panel invitation{pendingInvitations === 1 ? "" : "s"} waiting for your answer.</p>
+                    <Link to="/faculty-portal/invitations" className="btn-primary px-3 py-1.5 text-xs">Answer invitations</Link>
+                  </li>
+                )}
+                {pendingAdviserRequests > 0 && (
+                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-blue-900">{pendingAdviserRequests} adviser request{pendingAdviserRequests === 1 ? "" : "s"} waiting for your answer.</p>
+                    <Link to="/faculty-portal/advisees" className="btn-primary px-3 py-1.5 text-xs">Open requests</Link>
+                  </li>
+                )}
                 {pendingSignatures > 0 && (
                   <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                     <p className="text-sm font-semibold text-amber-900">{pendingSignatures} advisee document{pendingSignatures === 1 ? "" : "s"} waiting for your signature.</p>
@@ -117,7 +145,7 @@ export function FacultyDashboard() {
                 )}
               </ul>
             ) : (
-              <EmptyState icon={FileCheck} title="You are all caught up" hint="No signatures or verdicts are waiting on you." />
+              <EmptyState icon={FileCheck} title="You are all caught up" hint="No signatures, verdicts, invitations or adviser requests are waiting on you." />
             )}
           </Card>
         </div>
@@ -141,6 +169,7 @@ export function FacultyAdviseesPage() {
         icon={Users}
         actions={<Link to="/faculty-portal/signatures" className="btn-ghost"><FileSignature className="h-4 w-4" /> Signatures</Link>}
       />
+      <FacultyAdviserPanel />
       <Card className="p-6">
         {advisees.length ? (
           <div className="overflow-x-auto">
@@ -214,7 +243,12 @@ export function FacultyDefensesPage() {
         title="Defense Schedule"
         description="Defenses scheduled for the panels you sit on. Keep your availability current so staff can confirm dates."
         icon={CalendarClock}
-        actions={<Link to="/faculty-portal/availability" className="btn-ghost"><Clock3 className="h-4 w-4" /> My availability</Link>}
+        actions={
+          <>
+            <Link to="/faculty-portal/calendar" className="btn-ghost"><CalendarDays className="h-4 w-4" /> Open my calendar</Link>
+            <Link to="/faculty-portal/availability" className="btn-ghost"><Clock3 className="h-4 w-4" /> My availability</Link>
+          </>
+        }
       />
       <Card className="p-6">
         {rows.length ? (
@@ -228,6 +262,7 @@ export function FacultyDefensesPage() {
                   <th className="px-3 py-2">Mode / venue</th>
                   <th className="px-3 py-2">My role</th>
                   <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Calendar</th>
                 </tr>
               </thead>
               <tbody>
@@ -235,10 +270,26 @@ export function FacultyDefensesPage() {
                   <tr key={`${panel.student.id}-${panel.gate}-${panel.panel_role}`} className="border-b border-slate-50 last:border-0">
                     <td className="px-3 py-3"><p className="font-semibold text-ink">{panel.student.name}</p><p className="text-xs text-slate-400">{panel.research_title || "Research title pending"}</p></td>
                     <td className="px-3 py-3 text-slate-600">{panel.defense.defense_type}</td>
-                    <td className="px-3 py-3 text-slate-600">{defenseTime(panel.defense)}</td>
+                    <td className="px-3 py-3 text-slate-600">{defenseTime(panel.defense)}<span className="block text-xs text-slate-400">Philippine time</span></td>
                     <td className="px-3 py-3 text-slate-600">{panel.defense.mode || "-"}{panel.defense.venue ? <span className="block text-xs text-slate-400">{panel.defense.venue}</span> : null}</td>
                     <td className="px-3 py-3"><StatusBadge value={panel.panel_role} dot={false} /></td>
-                    <td className="px-3 py-3"><StatusBadge value={panel.defense.display_status || panel.defense.status} dot={false} /></td>
+                    <td className="px-3 py-3">
+                      <StatusBadge value={panel.defense.display_status || panel.defense.status} dot={false} />
+                      {(panel.defense.attention || []).map((note) => (
+                        <p key={note} className="mt-1.5 flex max-w-[16rem] items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {note}
+                        </p>
+                      ))}
+                    </td>
+                    <td className="px-3 py-3">
+                      {panel.defense.ics_url ? (
+                        <a href={panel.defense.ics_url} download className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline">
+                          <Download className="h-3.5 w-3.5" aria-hidden="true" /> Add to calendar
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">Not available</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -274,69 +325,6 @@ export function FacultyClassesPage() {
       <Card className="p-6">
         <FacultyClasses subjects={data.subjects || []} terms={data.terms || []} />
       </Card>
-    </div>
-  );
-}
-
-export function FacultyAvailabilityPage() {
-  const { data } = useFaculty();
-  const { faculty } = data;
-  const availability = data.availability || [];
-  return (
-    <div className="space-y-5 animate-fade-up">
-      <PageHeader
-        title="Availability & Calendar"
-        description="The busy periods and availability windows staff use when scheduling your defenses."
-        icon={CalendarCheck}
-      />
-      <CalendarNotice />
-      <div className="grid gap-5 lg:grid-cols-12">
-        <Card className="p-6 lg:col-span-8">
-          <SectionTitle
-            title={faculty?.calendar?.connected ? "My connected calendar" : "My availability"}
-            subtitle={
-              faculty?.calendar?.connected
-                ? "Google Calendar busy periods that are excluded from defense scheduling"
-                : "Upcoming profile windows used for defense scheduling"
-            }
-            icon={Clock3}
-          />
-          {faculty?.calendar?.connected ? (
-            (faculty.calendar_events || []).length === 0 ? (
-              <EmptyState
-                icon={CalendarCheck2}
-                title="No busy periods in the next five weeks"
-                hint={faculty.calendar_event_status || "Your Google Calendar is connected and will be checked again when staff review defense dates."}
-              />
-            ) : (
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {(faculty.calendar_events || []).map((event, i) => (
-                  <div key={`${event.date}-${event.start}-${i}`} className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-                    <CalendarClock className="h-4 w-4 text-amber-700" />
-                    <span className="font-semibold text-ink">{formatDate(event.date)}</span>
-                    <span className="ml-auto text-slate-600">{event.start} – {event.end}</span>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : availability.length === 0 ? (
-            <EmptyState icon={Clock3} title="No availability recorded" hint="Connect Google Calendar or ask the Graduate School office to maintain profile availability." />
-          ) : (
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {availability.map((slot, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                  <CalendarClock className="h-4 w-4 text-brand-600" />
-                  <span className="font-semibold text-ink">{formatDate(slot.date)}</span>
-                  <span className="ml-auto text-slate-500">{slot.start} – {slot.end}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-        <div className="lg:col-span-4">
-          <FacultyCalendarConnection calendar={faculty?.calendar} />
-        </div>
-      </div>
     </div>
   );
 }

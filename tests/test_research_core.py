@@ -132,7 +132,7 @@ class ResearchCoreBase(unittest.TestCase):
         db.session.flush()
         return account
 
-    def _faculty(self, name):
+    def _faculty(self, name, hours=True):
         faculty = Faculty(
             name=name, college="Graduate School", role="Faculty", specialization="Research",
             email=f"{name.split()[0].lower()}@example.test", active=True,
@@ -140,6 +140,15 @@ class ResearchCoreBase(unittest.TestCase):
         )
         db.session.add(faculty)
         db.session.flush()
+        if hours:
+            # Availability is never assumed: a faculty member who has not entered hours is
+            # "not entered", so the fixture enters Monday-Friday 8-17 the way a person would.
+            from app import FacultyWorkingHour
+
+            for weekday in range(5):
+                db.session.add(FacultyWorkingHour(
+                    faculty_id=faculty.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0), enabled=True,
+                ))
         self._account("faculty", f"login-{name.split()[0].lower()}@example.test", faculty_id=faculty.id)
         return faculty
 
@@ -787,6 +796,8 @@ class SchedulingRuleTests(ResearchCoreBase):
         schedule_id = self.booked()
         with app.app_context():
             day = db.session.get(ScheduleRequest, schedule_id).preferred_date
+            # The spare member's entered hours are replaced by a single early-morning window.
+            FacultyWorkingHour.query.filter_by(faculty_id=self.faculty_ids["Spare Person"]).delete()
             db.session.add(FacultyWorkingHour(
                 faculty_id=self.faculty_ids["Spare Person"], weekday=day.weekday(),
                 start_time=time(7, 0), end_time=time(8, 0), enabled=True))
