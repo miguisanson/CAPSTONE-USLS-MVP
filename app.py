@@ -416,6 +416,9 @@ class UserAccount(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"))
     faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"))
     active = db.Column(db.Boolean, default=True)
+    # True for an account whose initial password was generated for it: the holder must
+    # choose their own password at first sign-in before anything else works.
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=now_utc)
 
     student = db.relationship("Student")
@@ -2811,6 +2814,41 @@ def task_dict(task: Task) -> dict:
     }
 
 
+def plan_publish_task_items(owner: str = "", status: str = "") -> list[dict]:
+    """Work-queue items for offering plans the Dean approved and nobody has published yet.
+
+    A plan belongs to a program, not to one student, so it cannot be a Task row; it is listed
+    beside the task rows and disappears by itself once the plan is published or reopened.
+    Only the Academic Coordinator can publish, so that role owns the item.
+    """
+    if owner and owner != "Academic Coordinator":
+        return []
+    items = []
+    approved_plans = (
+        CourseOfferingPlan.query.filter_by(status="Approved").order_by(CourseOfferingPlan.approved_at.asc()).all()
+    )
+    for plan in approved_plans:
+        approved_on = (plan.approved_at or plan.updated_at or now_utc()).date()
+        due = approved_on + timedelta(days=3)
+        overdue = due < date.today()
+        if status == "Overdue" and not overdue:
+            continue
+        items.append({
+            "id": f"plan-{plan.id}",
+            "student_id": None,
+            "student_name": None,
+            "title": f"Publish the approved offering plan: {plan.program.code} {plan.term_label}",
+            "owner_role": "Academic Coordinator",
+            "due_at": iso(due),
+            "status": "Overdue" if overdue else "Pending",
+            "priority": 55,
+            "overdue": overdue,
+            "action_url": "/course-adjustments",
+            "action_label": "Open Course Adjustments",
+        })
+    return items
+
+
 def course_offering_dict(offering: CourseOffering) -> dict:
     return {
         "id": offering.id,
@@ -3463,6 +3501,30 @@ def enrollment_subject_states(
     return states
 
 
+def active_enrollment_count_for_offering(offering: CurriculumOffering, term: AcademicTerm | None = None) -> int:
+    """Students with an active enrollment in this official offering's subject and semester."""
+    if term is None:
+        term = next(
+            (
+                item for item in AcademicTerm.query.all()
+                if split_academic_term_label(item.label) == (offering.academic_year, offering.semester)
+            ),
+            None,
+        )
+    if term is None:
+        return 0
+    return (
+        SubjectEnrollment.query.join(Student, Student.id == SubjectEnrollment.student_id)
+        .filter(
+            SubjectEnrollment.course_id == offering.course_id,
+            Student.program_id == offering.program_id,
+            SubjectEnrollment.term_id == term.id,
+            SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES),
+        )
+        .count()
+    )
+
+
 def curriculum_offerings_for_term(program: Program, term: AcademicTerm) -> list[CurriculumOffering]:
     academic_year, semester = split_academic_term_label(term.label)
     if not academic_year or not semester:
@@ -3675,6 +3737,33 @@ def enrollment_conflict_options(kind: str) -> list[dict]:
     return options.get(kind, [])
 
 
+# Standings and enrollment tags that may not receive subject enrollment. One list,
+# used by every enrollment path (student portal, Academic Coordinator, class-list import).
+ENROLLMENT_BLOCKING_STANDINGS = {"AWOL", "On Leave", "Withdrawn", "Graduated", "Completed"}
+ENROLLMENT_BLOCKING_TAGS = {"LOA", "AWOL", "Withdrawn", "Completed"}
+
+
+def student_enrollment_block_reason(student: Student, term: AcademicTerm | None = None) -> str | None:
+    """Why this student may not be enrolled in subjects right now, or None.
+
+    The single guard for every enrollment path. AWOL, On Leave, Withdrawn (from the
+    program) and Graduated students are blocked until their standing is resolved by
+    its own workflow (return from AWOL, readmission, ...).
+    """
+    standing = (student.standing or "").strip()
+    tag = (student.enrollment_tag or "").strip()
+    if standing in ENROLLMENT_BLOCKING_STANDINGS or tag in ENROLLMENT_BLOCKING_TAGS:
+        return (
+            f"{student.name} is {standing} / {tag} and cannot receive subject enrollment until "
+            "that standing is resolved."
+        )
+    if term is not None and student.id:
+        term_row = TermEnrollment.query.filter_by(student_id=student.id, term_id=term.id).first()
+        if term_row is not None and (term_row.status or "") == "LOA":
+            return f"{student.name} is on leave of absence for {term.label} and cannot receive subject enrollment."
+    return None
+
+
 def enrollment_preview_payload(
     student: Student,
     term: AcademicTerm,
@@ -3698,21 +3787,14 @@ def enrollment_preview_payload(
         if state["is_current"]
     }
     conflicts = []
-    if student.standing in {"Withdrawn", "Graduated", "Completed"} or student.enrollment_tag in {
-        "LOA",
-        "AWOL",
-        "Withdrawn",
-        "Completed",
-    }:
+    standing_block = student_enrollment_block_reason(student, term)
+    if standing_block:
         conflicts.append({
             "id": "standing-block",
             "kind": "standing_block",
             "severity": "blocking",
             "line": "Student profile · Standing / enrollment",
-            "message": (
-                f"{student.name} is {student.standing} / {student.enrollment_tag} and cannot "
-                "receive subject enrollment until that standing is resolved."
-            ),
+            "message": standing_block,
             "options": enrollment_conflict_options("standing_block"),
         })
     for course_id in unknown_ids:
@@ -4132,6 +4214,7 @@ def account_dict(account: UserAccount) -> dict:
         "role": account.role,
         "student_id": account.student_id,
         "faculty_id": account.faculty_id,
+        "must_change_password": bool(account.must_change_password),
     }
 
 
@@ -4325,6 +4408,11 @@ def require_api_login(*roles):
             # all staff-side screens. (Ownership visibility is tightened later.)
             if allowed and account.role not in allowed and account.role != "admin":
                 return jsonify({"error": "This account cannot access that area."}), 403
+            if account.must_change_password:
+                return jsonify({
+                    "error": "Choose your own password before you continue.",
+                    "must_change_password": True,
+                }), 403
             return fn(*args, **kwargs)
 
         return wrapper
@@ -4936,7 +5024,7 @@ def loa_policy_review(student: Student, request_data: dict | None = None) -> dic
     effective_start = (request_data.get("effective_start") or "").strip()
     effective_end = (request_data.get("effective_end") or "").strip()
     application_reference = (request_data.get("application_reference") or request_data.get("source_reference") or request_data.get("attachment") or "").strip()
-    completed_terms = max(0, int((date.today().year - (student.entry_year or date.today().year)) * 3))
+    completed_terms = max(0, ((years_in_program(student) or 1) - 1) * 3)
     min_completed = rule_value("loa.min_completed_semesters", 1)
     start_term = AcademicTerm.query.filter_by(label=effective_start).first() if effective_start else None
     end_term = AcademicTerm.query.filter_by(label=effective_end).first() if effective_end else None
@@ -5362,9 +5450,9 @@ def residence_limits(student: Student) -> dict:
     level = "doctorate" if doctoral else "master"
     normal = rule_value(f"residency.{level}_normal_years", 7 if doctoral else 5)
     absolute = rule_value(f"residency.{level}_absolute_years", 9 if doctoral else 7)
-    # The clock runs on calendar years since entry. Leave of absence is NOT
-    # subtracted: the handbook limits include time on leave (residency.includes_loa).
-    years = max(0, date.today().year - int(student.entry_year or date.today().year))
+    # One shared count (years_in_program). Leave of absence is NOT subtracted: the
+    # handbook limits include time on leave (residency.includes_loa).
+    years = years_in_program(student) or 0
     return {
         "program_level": "Doctorate" if doctoral else "Master's",
         "years_in_program": years,
@@ -8581,6 +8669,37 @@ def register_routes(app: Flask) -> None:
         session.clear()
         return no_store(jsonify({"ok": True}))
 
+    @app.route("/api/auth/change-password", methods=["POST"])
+    def auth_change_password():
+        """Let a signed-in account choose its own password. Required at first sign-in for an
+        account created with a generated initial password."""
+        account = current_account()
+        if not account:
+            return no_store(jsonify({"error": "Please sign in to continue."})), 401
+        body = request.get_json(silent=True) or {}
+        current_password = str(body.get("current_password") or "")
+        new_password = str(body.get("new_password") or "")
+        client_ip = request.remote_addr or ""
+        wait = LOGIN_THROTTLE.retry_after(account.email, client_ip)
+        if wait:
+            return no_store(jsonify({
+                "error": f"Too many failed attempts. Try again in {max(1, (wait + 59) // 60)} minute(s).",
+            })), 429
+        if not check_password_hash(account.password_hash, current_password):
+            LOGIN_THROTTLE.record_failure(account.email, client_ip)
+            return no_store(jsonify({"error": "The current password is not correct."})), 400
+        if len(new_password) < 10:
+            return no_store(jsonify({"error": "Choose a password of at least 10 characters."})), 400
+        if new_password == current_password:
+            return no_store(jsonify({"error": "Choose a password different from the current one."})), 400
+        if new_password == SIM_STUDENT_PASSWORD or new_password.lower() == account.email.lower():
+            return no_store(jsonify({"error": "That password is too easy to guess. Choose another."})), 400
+        account.password_hash = generate_password_hash(new_password)
+        account.must_change_password = False
+        db.session.commit()
+        LOGIN_THROTTLE.record_success(account.email)
+        return no_store(jsonify({"ok": True, "user": account_dict(account)}))
+
     # Shared reference data used to render filters, dropdowns, and workflow cards.
     @app.route("/api/meta")
     @require_api_login()
@@ -9446,6 +9565,15 @@ def register_routes(app: Flask) -> None:
         invalid = requested_ids - set(curriculum_by_id)
         if invalid:
             return jsonify({"error": "Every selected subject must belong to your curriculum."}), 409
+        # The same guard the Academic Coordinator's enrollment uses: AWOL, On Leave,
+        # Withdrawn and Graduated students cannot enroll themselves.
+        standing_block = student_enrollment_block_reason(student, term)
+        if standing_block:
+            return jsonify({"error": standing_block}), 409
+        if term.end_date and term.end_date < date.today():
+            return jsonify({
+                "error": f"{term.label} has already ended. Ask the Academic Coordinator to record a past semester."
+            }), 409
         offered_ids = {
             item.course_id for item in curriculum_offerings_for_term(student.program, term)
         }
@@ -9480,6 +9608,29 @@ def register_routes(app: Flask) -> None:
                     "error": adjustment_window_message(codes, term, adjustment_window, False)
                     + " Ask the Academic Coordinator to record it."
                 }), 409
+
+        if new_ids:
+            # Same conflict rules as the Academic Coordinator's preview. A student cannot
+            # grant themselves an exception, so anything the coordinator could only save
+            # "with a documented exception" is refused here.
+            preview = enrollment_preview_payload(student, term, requested_ids)
+            for conflict in preview["conflicts"]:
+                course_scoped = conflict.get("course_id")
+                if course_scoped is not None and course_scoped not in new_ids:
+                    continue
+                if conflict["kind"] in {"status_not_eligible", "program_mismatch", "already_completed", "standing_block"}:
+                    return jsonify({"error": conflict["message"]}), 409
+                if conflict["kind"] == "active_other_term":
+                    return jsonify({
+                        "error": conflict["message"] + " Ask the Academic Coordinator to move it to this semester."
+                    }), 409
+                if conflict["kind"] == "over_load":
+                    return jsonify({
+                        "error": conflict["message"].replace(
+                            "Enroll only with a documented exception.",
+                            "Ask the Academic Coordinator to record an approved overload.",
+                        )
+                    }), 409
 
         added = []
         for course_id in sorted(requested_ids - set(active_by_course)):
@@ -10608,7 +10759,8 @@ def register_routes(app: Flask) -> None:
         if status == "Overdue":
             query = query.filter(Task.due_at < date.today(), Task.status != "Done")
         tasks = query.order_by(Task.priority.desc(), Task.due_at.asc()).limit(100).all()
-        return jsonify({"items": [task_dict(t) for t in tasks]})
+        items = plan_publish_task_items(owner, status) + [task_dict(t) for t in tasks]
+        return jsonify({"items": items})
 
     # Human-facing audit feed; generated seed history is hidden for clarity.
     @app.route("/api/activity")
@@ -11598,61 +11750,26 @@ def register_routes(app: Flask) -> None:
             ],
         })
 
+    # Retired (audit CO-04): these endpoints changed the OFFICIAL offering list with no Dean plan
+    # and, for delete, no enrolled-student check. The list changes only through the Dean-approved
+    # Course Adjustments plan or the Academic Coordinator's Course Offering Setup (both guarded).
+    def retired_offering_endpoint():
+        return jsonify({
+            "error": (
+                "This endpoint was retired. Offerings change through the Course Adjustments plan "
+                "(Dean approval) or Course Offering Setup."
+            )
+        }), 410
+
     @app.route("/api/curriculum-planning/offerings", methods=["POST"])
     @require_api_login("staff", "academic_coordinator")
     def curriculum_offering_add():
-        data = request.get_json(silent=True) or {}
-        program = Program.query.get_or_404(int(data.get("program_id") or 0))
-        term_id = data.get("term_id")
-        selected_term = AcademicTerm.query.get(int(term_id)) if term_id else None
-        academic_year = (data.get("academic_year") or "").strip()
-        semester = (data.get("semester") or "").strip()
-        if selected_term:
-            parsed_ay, parsed_semester = split_academic_term_label(selected_term.label)
-            academic_year = parsed_ay or academic_year
-            semester = parsed_semester or semester
-        course_ids = [int(c) for c in (data.get("course_ids") or []) if c]
-        account = current_account()
-        if not academic_year or not semester:
-            return jsonify({"error": "Academic year and semester are required."}), 400
-        if not course_ids:
-            return jsonify({"error": "Select at least one subject to add."}), 400
-        added = 0
-        for course_id in course_ids:
-            course = Course.query.get(course_id)
-            if not course or course.program_id != program.id:
-                continue
-            exists = CurriculumOffering.query.filter_by(
-                program_id=program.id,
-                academic_year=academic_year,
-                semester=semester,
-                course_id=course_id,
-            ).first()
-            if exists:
-                continue
-            db.session.add(CurriculumOffering(
-                program_id=program.id,
-                academic_year=academic_year,
-                semester=semester,
-                course_id=course_id,
-                added_by=account.full_name if account else None,
-            ))
-            added += 1
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "added": added,
-            "message": f"Added {added} subject(s) to the {semester} offering list.",
-        })
+        return retired_offering_endpoint()
 
     @app.route("/api/curriculum-planning/offerings/<int:offering_id>", methods=["DELETE"])
     @require_api_login("staff", "academic_coordinator")
     def curriculum_offering_delete(offering_id: int):
-        offering = CurriculumOffering.query.get_or_404(offering_id)
-        course_code = offering.course.code if offering.course else "Subject"
-        db.session.delete(offering)
-        db.session.commit()
-        return jsonify({"ok": True, "message": f"Removed {course_code} from the offering list."})
+        return retired_offering_endpoint()
 
     @app.route("/api/curriculum-planning/subjects", methods=["POST"])
     @require_api_login("staff", "academic_coordinator")
@@ -11711,75 +11828,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/curriculum-planning/generate", methods=["POST"])
     @require_api_login("staff", "academic_coordinator")
     def curriculum_planning_generate():
-        data = request.get_json(silent=True) or {}
-        program = Program.query.get_or_404(int(data.get("program_id") or 0))
-        scope = data.get("scope") or "active"
-        term_id = data.get("term_id")
-        term = AcademicTerm.query.get(int(term_id)) if term_id else get_active_term()
-        academic_year, semester = split_academic_term_label(term.label if term else "")
-        query = Student.query.filter_by(program_id=program.id)
-        if scope == "active":
-            query = query.filter(Student.standing == "Active")
-        students = query.order_by(Student.last_name, Student.first_name).all()
-        courses = Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter()).order_by(Course.code).all()
-        created = 0
-        offerings_created = 0
-        touched_students = 0
-        for student in students:
-            existing = {rec.course_id for rec in CourseRecord.query.filter_by(student_id=student.id).all()}
-            added_for_student = 0
-            for course in courses:
-                if course.id in existing:
-                    continue
-                db.session.add(
-                    CourseRecord(
-                        student_id=student.id,
-                        course_id=course.id,
-                        status="Missing",
-                        evidence_reference="Curriculum planning generation",
-                    )
-                )
-                created += 1
-                added_for_student += 1
-            if added_for_student:
-                touched_students += 1
-                recompute_risk(student)
-        # Edit this value to change the minimum demand for automatic inclusion.
-        AUTO_OFFER_DEMAND_THRESHOLD = 1
-        if term and academic_year and semester:
-            for demand_row in course_demand_rows(program, term):
-                if demand_row["demand_count"] < AUTO_OFFER_DEMAND_THRESHOLD:
-                    continue
-                course_id = demand_row["course"]["id"]
-                exists = CurriculumOffering.query.filter_by(
-                    program_id=program.id, academic_year=academic_year,
-                    semester=semester, course_id=course_id,
-                ).first()
-                if not exists:
-                    db.session.add(CurriculumOffering(
-                        program_id=program.id, academic_year=academic_year,
-                        semester=semester, course_id=course_id,
-                        added_by="RAG demand recommendation",
-                    ))
-                    offerings_created += 1
-        add_log(
-            "curriculum-planning",
-            None,
-            "Academic Coordinator",
-            "Curriculum Planning",
-            f"Generated curriculum plan rows for {touched_students} student(s)",
-            "Academic Coordinator",
-            f"Program {program.code}; {created} missing subject row(s) created from {len(courses)} curriculum subject(s).",
-        )
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "message": f"Generated {created} curriculum row(s) and added {offerings_created} demand-qualified subject(s).",
-            "created": created,
-            "offerings_created": offerings_created,
-            "students": touched_students,
-            "data": curriculum_planning_payload(program),
-        })
+        return retired_offering_endpoint()
 
     # ---- Enrollment (student-to-subject, per academic semester) ----------
     @app.route("/api/enrollment")
@@ -12285,6 +12334,14 @@ def register_routes(app: Flask) -> None:
             return jsonify({
                 "error": "This enrollment is missing its student, subject, or semester."
             }), 409
+        if term.start_date and term.end_date and not (term.start_date <= effective_date <= term.end_date):
+            return jsonify({
+                "error": (
+                    f"The effective date must fall inside {term.label} "
+                    f"({term.start_date.isoformat()} to {term.end_date.isoformat()}); "
+                    f"{effective_date.isoformat()} does not."
+                )
+            }), 400
 
         previous_status = enrollment.status
         source_reference = "Academic Coordinator enrollment status update"
@@ -12316,6 +12373,34 @@ def register_routes(app: Flask) -> None:
             f"Academic Coordinator note: {note}"
         )
         record.updated_at = changed_at
+
+        # A withdrawal request for this same subject that nobody has decided yet is moot once
+        # the subject is dropped; close it so the Dean is not asked to approve something that
+        # can no longer be applied.
+        for pending in WithdrawalApplication.query.filter(
+            WithdrawalApplication.subject_enrollment_id == enrollment.id,
+            WithdrawalApplication.status.in_(
+                ["Submitted to GS Staff", "Dean Review", "Returned", "Returned for Clarification"]
+            ),
+        ).all():
+            previous_application_status = pending.status
+            pending.status = "Denied"
+            pending.dean_decision = "Denied"
+            pending.decided_at = changed_at
+            pending.staff_remarks = "\n".join(part for part in [
+                pending.staff_remarks,
+                f"Closed automatically: the Academic Coordinator recorded {course.code} as Dropped "
+                f"effective {effective_date.isoformat()}.",
+            ] if part)
+            resolve_standing_change_tasks(student.id, "withdrawal", "Graduate School Staff")
+            resolve_standing_change_tasks(student.id, "withdrawal", "Dean")
+            add_log(
+                "withdrawal", student.id, "Workflow System", source_reference,
+                f"Withdrawal request closed: {course.code} was dropped",
+                "Student",
+                f"The subject was recorded Dropped effective {effective_date.isoformat()} before the request was decided.",
+                previous_status=previous_application_status, new_status=pending.status,
+            )
 
         remaining_active = SubjectEnrollment.query.filter(
             SubjectEnrollment.student_id == student.id,
@@ -12406,87 +12491,25 @@ def register_routes(app: Flask) -> None:
 
         preview_rows = []
         counts = {"ready": 0, "warning": 0, "error": 0}
-        file_faculty_by_offering: dict[int, int] = {}
+        seen_faculty: dict[int, int] = {}
         for source_index, row in enumerate(rows, start=1):
-            sid = class_list_value(row, "STUDENTID", "IDNUMBER", "IDNO", "ID")
-            code = class_list_value(row, "SUBJECTCODE", "CODE", "SUBJECT")
-            faculty_value = class_list_value(row, "FACULTY", "FACULTYNAME", "INSTRUCTOR")
-            first_name = class_list_value(row, "FIRSTNAME", "FIRST NAME")
-            last_name = class_list_value(row, "LASTNAME", "LAST NAME")
-            program_value = class_list_value(row, "PROGRAM", "PROGRAMCODE")
-            if not sid and not code and not faculty_value:
+            item = evaluate_class_list_row(row, term, academic_year, semester, seen_faculty)
+            if item is None:
                 continue
-
-            status = "ready"
-            message = "Ready to import"
-            student = Student.query.filter_by(student_number=sid).first() if sid else None
-            course = None
-            offered = None
-            faculty = None
-            if not sid:
-                status, message = "error", "Student ID is required."
-            elif not student:
-                status, message = "error", "Student was not found."
-            else:
-                first_name = student.first_name
-                last_name = student.last_name
-                program_value = student.program.code if student.program else program_value
-            if status == "ready" and not code:
-                status, message = "error", "Subject code is required."
-            if status == "ready":
-                course = Course.query.filter_by(program_id=student.program_id, code=code).first()
-                if not course:
-                    status, message = "error", "Subject is not in this student's program."
-            if status == "ready":
-                offered = CurriculumOffering.query.filter_by(
-                    program_id=student.program_id,
-                    academic_year=academic_year,
-                    semester=semester,
-                    course_id=course.id,
-                ).first()
-                if not offered:
-                    status, message = "error", "Subject is not officially offered this semester."
-            if status == "ready" and not faculty_value:
-                status, message = "error", "Faculty is required."
-            if status == "ready":
-                faculty = Faculty.query.filter(
-                    Faculty.active.is_(True),
-                    or_(
-                        func.lower(Faculty.name) == faculty_value.lower(),
-                        func.lower(Faculty.email) == faculty_value.lower(),
-                    ),
-                ).first()
-                if not faculty:
-                    status, message = "error", "Faculty was not found or is inactive."
-                elif faculty.college != student.program.college:
-                    status, message = "error", f"Faculty must belong to {student.program.college}."
-            if status == "ready":
-                previous_faculty = file_faculty_by_offering.get(offered.id)
-                if previous_faculty and previous_faculty != faculty.id:
-                    status, message = "error", "Conflicting faculty for the same offered subject."
-                else:
-                    file_faculty_by_offering[offered.id] = faculty.id
-            if status == "ready":
-                record = CourseRecord.query.filter_by(
-                    student_id=student.id,
-                    course_id=course.id,
-                ).first()
-                if record and record.status == "Completed":
-                    status, message = "error", "Already completed; review is required before import."
-                elif record and record.status in ("Enrolled", "Current"):
-                    status, message = "warning", "Already enrolled; no duplicate will be created."
-
-            counts[status] += 1
+            counts[item["status"]] += 1
+            faculty = item["faculty"]
             preview_rows.append({
                 "row": source_index,
-                "student_id": sid,
-                "first_name": first_name,
-                "last_name": last_name,
-                "program": program_value,
-                "subject_code": code,
-                "faculty": faculty.name if faculty else faculty_value,
-                "status": status,
-                "message": message,
+                "student_id": item["sid"],
+                "first_name": item["first_name"],
+                "last_name": item["last_name"],
+                "program": item["program"],
+                "subject_code": item["code"],
+                "faculty": faculty.name if faculty else item["faculty_value"],
+                "enrollment_status": item["desired"],
+                "effective_date": iso(item["effective_date"]) if item["effective_date"] else None,
+                "status": item["status"],
+                "message": item["message"],
             })
 
         return jsonify({
@@ -12505,10 +12528,13 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator")
     def enrollment_class_list_import():
         # Sir Eddie (2026-07-21): the coordinator tags students as enrolled by uploading a
-        # class list (or by searching a student). This bulk-tags every matched student to the
-        # named subject as Enrolled for the given semester and assigns the faculty named in
-        # the file to that official offering. It only tags subjects that are officially
-        # offered, and every change is logged. Grades are never touched here.
+        # class list (or by searching a student). Every row is judged by the same function the
+        # preview uses: the file's Enrollment Status (Enrolled / Dropped) and effective date are
+        # honoured, rows for another semester are refused, students who are AWOL / on leave /
+        # withdrawn are refused by the shared enrollment guard, and a subject recorded Dropped
+        # in the semester is never silently re-enrolled. Faculty named in the file is only ever
+        # used to fill an offering that has none; it never replaces the approved faculty.
+        # Grades are never touched here.
         file = request.files.get("file")
         if not file or not file.filename:
             return jsonify({"error": "Choose a class list .csv or .xlsx file."}), 400
@@ -12528,108 +12554,84 @@ def register_routes(app: Flask) -> None:
                 "error": "The class list must include a FACULTY column."
             }), 400
 
-        tagged, not_found, not_offered, no_subject, already = 0, [], [], 0, 0
-        no_faculty, invalid_faculty, faculty_conflicts, completed = 0, [], [], []
-        faculty_assignments = 0
-        file_faculty_by_offering: dict[int, int] = {}
+        skipped: dict[str, list[str]] = {}
+        tagged = dropped = already = faculty_assignments = 0
+        faculty_mismatches: list[str] = []
+        seen_faculty: dict[int, int] = {}
+        touched_students: dict[int, Student] = {}
         actor = workflow_actor_label(current_account()) if current_account() else "Academic Coordinator"
         for row in rows:
-            sid = class_list_value(row, "STUDENTID", "IDNUMBER", "IDNO", "ID")
-            code = class_list_value(row, "SUBJECTCODE", "CODE", "SUBJECT")
-            faculty_value = class_list_value(row, "FACULTY", "FACULTYNAME", "INSTRUCTOR")
-            if not sid and not code:
+            item = evaluate_class_list_row(row, term, academic_year, semester, seen_faculty)
+            if item is None:
                 continue
-            if not code:
-                no_subject += 1
+            label = f"{item['sid'] or '(blank ID)'}:{item['code']}" if item["code"] else (item["sid"] or "(blank ID)")
+            if item["status"] == "error" or (item["reason"] == "already_dropped" and item["desired"] == "Dropped"):
+                skipped.setdefault(item["reason"], []).append(label)
                 continue
-            if not faculty_value:
-                no_faculty += 1
-                continue
-            student = Student.query.filter_by(student_number=sid).first()
-            if not student:
-                not_found.append(sid or "(blank ID)")
-                continue
-            course = Course.query.filter_by(program_id=student.program_id, code=code).first()
-            if not course:
-                not_offered.append(f"{sid}:{code}")
-                continue
-            offered = CurriculumOffering.query.filter_by(
-                program_id=student.program_id, academic_year=academic_year,
-                semester=semester, course_id=course.id,
-            ).first()
-            if not offered:
-                not_offered.append(f"{code} (not offered this semester)")
-                continue
-            faculty = Faculty.query.filter(
-                Faculty.active.is_(True),
-                or_(
-                    func.lower(Faculty.name) == faculty_value.lower(),
-                    func.lower(Faculty.email) == faculty_value.lower(),
-                ),
-            ).first()
-            if not faculty:
-                invalid_faculty.append(f"{sid}:{faculty_value} (not found)")
-                continue
-            if faculty.college != student.program.college:
-                invalid_faculty.append(
-                    f"{sid}:{faculty.name} ({faculty.college}; expected {student.program.college})"
-                )
-                continue
-            record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
-            if record and record.status == "Completed":
-                completed.append(f"{sid}:{code}")
-                continue
-            previous_file_faculty = file_faculty_by_offering.get(offered.id)
-            if previous_file_faculty and previous_file_faculty != faculty.id:
-                faculty_conflicts.append(f"{code}:{faculty.name}")
-                continue
-            file_faculty_by_offering[offered.id] = faculty.id
-            if offered.assigned_faculty_id != faculty.id:
-                offered.assigned_faculty_id = faculty.id
+            if item["reason"] == "faculty_mismatch":
+                faculty_mismatches.append(f"{item['code']}:{item['faculty'].name}")
+            if item["fill_faculty"]:
+                item["offered"].assigned_faculty_id = item["faculty"].id
+                item["offered"].updated_at = now_utc()
                 faculty_assignments += 1
-            if record and record.status in ("Enrolled", "Current"):
+            if item["already_enrolled"]:
                 already += 1
                 continue
-            previous = record.status if record else "Missing"
-            if not record:
-                record = CourseRecord(student_id=student.id, course_id=course.id)
-                db.session.add(record)
-            record.status = "Enrolled"
-            record.term_label = term.label
-            record.evidence_reference = f"Class list import ({file.filename})"
-            record.updated_at = now_utc()
-            sync_subject_enrollment_from_course_record(student, course, term.label, "Enrolled", "Class list import")
-            add_log("enrollment", student.id, actor, "Class list import",
-                    f"Tagged {student.name} as Enrolled in {course.code} for {term.label}.",
-                    "Academic Coordinator",
-                    f"Bulk enrollment tag from uploaded class list. {previous} -> Enrolled.",
-                    previous_status=previous, new_status="Enrolled")
-            tagged += 1
+            outcome = apply_class_list_row(item, term, file.filename, actor)
+            touched_students[item["student"].id] = item["student"]
+            if outcome == "dropped":
+                dropped += 1
+            else:
+                tagged += 1
+        for student in touched_students.values():
+            student.updated_at = now_utc()
+            recompute_risk(student)
         db.session.commit()
+
+        def count(reason: str) -> int:
+            return len(skipped.get(reason, []))
+
+        not_found = skipped.get("not_found", []) + skipped.get("no_student", [])
+        not_offered = skipped.get("not_offered", [])
+        blocked = skipped.get("blocked_standing", [])
         return jsonify({
             "ok": True,
             "term": term.label,
             "tagged": tagged,
+            "dropped": dropped,
             "already_enrolled": already,
             "not_found_count": len(not_found),
             "not_offered_count": len(not_offered),
-            "rows_without_subject": no_subject,
-            "rows_without_faculty": no_faculty,
-            "invalid_faculty_count": len(invalid_faculty),
-            "faculty_conflict_count": len(faculty_conflicts),
-            "completed_subject_count": len(completed),
+            "rows_without_subject": count("no_subject"),
+            "rows_without_faculty": count("no_faculty"),
+            "invalid_faculty_count": count("invalid_faculty"),
+            "faculty_conflict_count": count("faculty_conflict"),
+            "completed_subject_count": count("completed"),
+            "blocked_standing_count": len(blocked),
+            "term_mismatch_count": count("term_mismatch"),
+            "already_dropped_count": count("already_dropped"),
+            "other_semester_count": count("active_other_term"),
+            "unsupported_status_count": count("unsupported_status"),
+            "bad_date_count": count("bad_date"),
             "faculty_assignments": faculty_assignments,
+            "faculty_mismatch_count": len(faculty_mismatches),
             "sample_not_found": not_found[:8],
             "sample_not_offered": not_offered[:8],
-            "sample_invalid_faculty": invalid_faculty[:8],
-            "sample_faculty_conflicts": faculty_conflicts[:8],
-            "sample_completed_subjects": completed[:8],
+            "sample_invalid_faculty": skipped.get("invalid_faculty", [])[:8],
+            "sample_faculty_conflicts": skipped.get("faculty_conflict", [])[:8],
+            "sample_completed_subjects": skipped.get("completed", [])[:8],
+            "sample_blocked_standing": blocked[:8],
+            "sample_faculty_mismatches": faculty_mismatches[:8],
             "message": (
-                f"Tagged {tagged} student-subject enrollment(s) for {term.label}. "
+                f"Tagged {tagged} student-subject enrollment(s) and recorded {dropped} drop(s) for {term.label}. "
                 f"{already} already enrolled, {len(not_found)} student(s) not found, "
                 f"{len(not_offered)} subject(s) not offered or unknown, "
-                f"{len(completed)} completed subject row(s) needed review and were skipped, and "
-                f"{faculty_assignments} faculty assignment(s) applied."
+                f"{count('completed')} completed subject row(s) needed review and were skipped, "
+                f"{len(blocked)} row(s) refused because the student is on leave, AWOL or withdrawn, "
+                f"{count('term_mismatch')} row(s) were for another semester, "
+                f"{count('already_dropped')} row(s) conflicted with a subject already dropped, "
+                f"{faculty_assignments} faculty assignment(s) applied and "
+                f"{len(faculty_mismatches)} faculty difference(s) left for the Dean-approved plan."
             ),
         })
 
@@ -12819,8 +12821,12 @@ def register_routes(app: Flask) -> None:
             )
         if not target_term:
             return jsonify({"error": "Select an academic year and semester first."}), 400
+        # The reference is the semester just before the target, never a later one.
         reference_term = (
-            AcademicTerm.query.filter(AcademicTerm.id != target_term.id)
+            AcademicTerm.query.filter(
+                AcademicTerm.id != target_term.id,
+                AcademicTerm.start_date < target_term.start_date,
+            )
             .order_by(AcademicTerm.start_date.desc())
             .first()
         )
@@ -12830,6 +12836,19 @@ def register_routes(app: Flask) -> None:
             .order_by(CourseOfferingPlan.created_at.desc())
             .first()
         )
+        if action == "draft" and plan and plan.status not in ("Draft", "Returned"):
+            # A draft save must never reset a plan the Dean is deciding on, or one that is
+            # approved or published, and must never wipe its offerings. Reopen it first.
+            return jsonify({
+                "error": (
+                    f"This plan is {plan.status}. Saving a draft would discard it, so it is not allowed. "
+                    + (
+                        "It is with the Dean for a decision."
+                        if plan.status == "Submitted"
+                        else "Use Reopen to start a new draft from it."
+                    )
+                )
+            }), 409
         if plan:
             plan.target_term_id = target_term.id
             if reference_term:
@@ -12976,14 +12995,34 @@ def register_routes(app: Flask) -> None:
                 offering.course_id for offering in plan.offerings if offering.status == "Offered"
             }
             removed_count = 0
-            for existing_offering in CurriculumOffering.query.filter_by(
-                program_id=program.id,
-                academic_year=academic_year,
-                semester=semester,
-            ).all():
-                if existing_offering.course_id not in offered_course_ids:
-                    db.session.delete(existing_offering)
-                    removed_count += 1
+            to_remove = [
+                existing_offering
+                for existing_offering in CurriculumOffering.query.filter_by(
+                    program_id=program.id,
+                    academic_year=academic_year,
+                    semester=semester,
+                ).all()
+                if existing_offering.course_id not in offered_course_ids
+            ]
+            # Same guard as the manual offering delete: an offering that still has enrolled
+            # students is never removed by publishing.
+            still_enrolled = []
+            for existing_offering in to_remove:
+                enrolled_now = active_enrollment_count_for_offering(existing_offering, target_term)
+                if enrolled_now:
+                    code = existing_offering.course.code if existing_offering.course else f"subject {existing_offering.course_id}"
+                    still_enrolled.append(f"{code} ({enrolled_now} student(s))")
+            if still_enrolled:
+                return jsonify({
+                    "error": (
+                        "Cannot publish: the plan leaves out subjects that students are already enrolled in: "
+                        + ", ".join(still_enrolled)
+                        + ". Keep them offered in the plan or move those students first."
+                    )
+                }), 409
+            for existing_offering in to_remove:
+                db.session.delete(existing_offering)
+                removed_count += 1
             published_count = 0
             for offering in plan.offerings:
                 if offering.status != "Offered":
@@ -13022,6 +13061,10 @@ def register_routes(app: Flask) -> None:
             # coordinator can fix a mistake or add follow-up offerings, then resubmit.
             if not plan:
                 return jsonify({"error": "There is no offering plan to revise yet."}), 400
+            if plan.status == "Submitted":
+                return jsonify({
+                    "error": "The plan is with the Dean for a decision. It can be reopened once the Dean has decided."
+                }), 409
             plan.status = "Draft"
             result = "Offering plan reopened as a new draft for revision"
         else:
@@ -13085,8 +13128,11 @@ def register_routes(app: Flask) -> None:
             plan.approved_at = now_utc()
             plan.approved_by = account.full_name
             result = "Offering plan approved by Dean"
-            next_owner = "Graduate School Staff"
+            # Only the Academic Coordinator can publish the approved plan.
+            next_owner = "Academic Coordinator"
         elif decision in ("return", "reject"):
+            if not note:
+                return jsonify({"error": "Enter a comment explaining what to revise before returning the plan."}), 400
             plan.status = "Returned"
             for offering in plan.offerings:
                 if offering.assigned_faculty_id:
@@ -13835,7 +13881,12 @@ def register_routes(app: Flask) -> None:
         payload = monitoring_record_payload(student, can_edit=True)
         payload.update({
             "ok": True,
-            "account": {"email": login.email, "created": True, "password": SIM_STUDENT_PASSWORD},
+            "account": {
+                "email": login.email,
+                "created": True,
+                "password": getattr(login, "initial_password", None) or demo_password_hint(),
+                "must_change_password": bool(login.must_change_password),
+            },
             "message": f"{student.name} was added to the {student.program.code} monitoring sheet.",
         })
         return jsonify(payload), 201
@@ -14657,7 +14708,15 @@ def register_routes(app: Flask) -> None:
             db.session.flush()
             result = import_ac_monitoring(parsed, upload=upload)
             result["upload_id"] = upload.id
-            upload.result_json = json.dumps(result, ensure_ascii=False)
+            # The one-time passwords are shown in this response only, never stored.
+            stored_result = {
+                **result,
+                "accounts": [
+                    {key: value for key, value in item.items() if key != "password"}
+                    for item in result.get("accounts", [])
+                ],
+            }
+            upload.result_json = json.dumps(stored_result, ensure_ascii=False)
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
@@ -14955,19 +15014,34 @@ def register_routes(app: Flask) -> None:
         message = "Saved. The student record, queue, and monitoring indicators were updated."
         if slug in {"leave-of-absence", "readmission"}:
             message = "Forwarded to the Dean. An approved decision will update the student's standing immediately."
+        created_login = None
         if slug == "student-handoff" and student_id:
             account = UserAccount.query.filter_by(student_id=student_id, role="student", active=True).first()
             if account:
+                issued = [
+                    item for item in getattr(_flask_g, "new_student_credentials", [])
+                    if item["email"] == account.email
+                ]
+                password = issued[0]["password"] if issued else demo_password_hint()
+                created_login = {
+                    "email": account.email,
+                    "password": password,
+                    "must_change_password": bool(account.must_change_password),
+                }
                 message = f"Saved. Student portal account created: {account.email}" + (
-                    f" / {demo_password_hint()}." if demo_password_hint() else "."
+                    f" / {password}. This password is shown only once; the student must change it at first sign-in."
+                    if password and account.must_change_password
+                    else f" / {password}." if password
+                    else "."
                 )
-        return jsonify(
-            {
-                "ok": True,
-                "student_id": student_id,
-                "message": message,
-            }
-        )
+        payload = {
+            "ok": True,
+            "student_id": student_id,
+            "message": message,
+        }
+        if created_login:
+            payload["account"] = created_login
+        return jsonify(payload)
 
     @app.route("/api/transactions/<slug>/messages", methods=["POST"])
     @require_api_login(*BACKOFFICE_ROLES, "dean", "student")
@@ -16023,7 +16097,8 @@ def apply_approved_subject_withdrawal(application: WithdrawalApplication) -> Non
             term_enrollment.confirmed_at = changed_at
         if application.student.enrollment_tag == "Enrolled":
             application.student.enrollment_tag = "Not Enrolled"
-    application.student.standing = "Active"
+    # A subject withdrawal only tags the subject and the semester row. It never decides the
+    # student's standing (a student on leave stays on leave).
     application.updated_at = changed_at
 
 
@@ -19297,6 +19372,272 @@ def class_list_has_faculty_header(rows: list[dict]) -> bool:
     return bool(normalized_headers.intersection({"FACULTY", "FACULTYNAME", "INSTRUCTOR"}))
 
 
+# ---- Class-list import: one evaluation shared by the preview and the import ----
+CLASS_LIST_PLACEHOLDER_FACULTY = {"to be confirmed", "tbc", "tba", "to be announced", "n/a", "na", "-", "none"}
+CLASS_LIST_ENROLL_STATUSES = {"", "enrolled", "current"}
+CLASS_LIST_DROP_STATUSES = {"dropped", "drop"}
+
+
+def _class_list_normalized_year(text: str) -> str:
+    """'2025-2026', 'AY 2025-2026' or '25-26' -> '2025-2026' ('' when unreadable)."""
+    match = re.search(r"(\d{2,4})\s*-\s*(\d{2,4})", text or "")
+    if not match:
+        return ""
+    start = int(match.group(1))
+    start = start + 2000 if start < 100 else start
+    return f"{start}-{start + 1}"
+
+
+def _class_list_file_term(year_text: str, term_text: str) -> tuple[str, str]:
+    """The (academic year, semester) a class-list row claims, normalized like a term label."""
+    year = _class_list_normalized_year(year_text)
+    cleaned = (term_text or "").strip()
+    if cleaned and not re.search(r"sem|term", cleaned, flags=re.IGNORECASE):
+        cleaned = f"{cleaned} Semester"
+    _, semester = split_academic_term_label(f"{year} {cleaned}") if cleaned else ("", "")
+    return year, semester
+
+
+def _class_list_date(text: str) -> date | None:
+    value = (text or "").strip()
+    if not value:
+        return None
+    for pattern in ("%Y-%m-%d", "%m/%d/%Y", "%d-%b-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(value[:10] if pattern == "%Y-%m-%d" else value, pattern).date()
+        except ValueError:
+            continue
+    raise ValueError(value)
+
+
+def evaluate_class_list_row(row: dict, term: AcademicTerm, academic_year: str, semester: str, seen_faculty: dict) -> dict | None:
+    """Decide what one class-list row means. Shared by the preview and the import so they
+    always agree. Returns None for an empty row. `reason` names the skip counter."""
+    sid = class_list_value(row, "STUDENTID", "IDNUMBER", "IDNO", "ID")
+    code = class_list_value(row, "SUBJECTCODE", "CODE", "SUBJECT")
+    faculty_value = class_list_value(row, "FACULTY", "FACULTYNAME", "INSTRUCTOR")
+    status_value = class_list_value(row, "ENROLLMENTSTATUS", "STATUS")
+    date_value = class_list_value(row, "STATUSEFFECTIVEDATE", "EFFECTIVEDATE")
+    file_year = class_list_value(row, "ACADEMICYEAR", "AY", "SCHOOLYEAR")
+    file_term = class_list_value(row, "TERM", "SEMESTER")
+    remarks = class_list_value(row, "REMARKS", "NOTE", "NOTES")
+    if not sid and not code and not faculty_value:
+        return None
+    result = {
+        "status": "ready", "message": "Ready to import", "reason": "", "sid": sid, "code": code,
+        "faculty_value": faculty_value, "first_name": class_list_value(row, "FIRSTNAME", "FIRST NAME"),
+        "last_name": class_list_value(row, "LASTNAME", "LAST NAME"),
+        "program": class_list_value(row, "PROGRAM", "PROGRAMCODE"),
+        "student": None, "course": None, "offered": None, "faculty": None, "existing": None,
+        "desired": "Enrolled", "effective_date": None, "remarks": remarks,
+        "approved_faculty": None, "fill_faculty": False, "already_enrolled": False,
+    }
+
+    def fail(reason: str, message: str, status: str = "error") -> dict:
+        result.update({"status": status, "reason": reason, "message": message})
+        return result
+
+    if not sid:
+        return fail("no_student", "Student ID is required.")
+    student = Student.query.filter_by(student_number=sid).first()
+    if not student:
+        return fail("not_found", "Student was not found.")
+    result.update({
+        "student": student, "first_name": student.first_name, "last_name": student.last_name,
+        "program": student.program.code if student.program else result["program"],
+    })
+    # The file's own semester must be the semester it is imported into.
+    if file_year or file_term:
+        year, sem = _class_list_file_term(file_year, file_term)
+        if (file_year and year != academic_year) or (file_term and sem != semester):
+            named = " ".join(part for part in (file_year, file_term) if part)
+            return fail(
+                "term_mismatch",
+                f"This row is for {named}, but the list is being imported into {term.label}. "
+                "Choose the matching semester or correct the file.",
+            )
+    if not code:
+        return fail("no_subject", "Subject code is required.")
+    course = Course.query.filter_by(program_id=student.program_id, code=code).first()
+    if not course:
+        return fail("not_offered", "Subject is not in this student's program.")
+    result["course"] = course
+    offered = CurriculumOffering.query.filter_by(
+        program_id=student.program_id, academic_year=academic_year, semester=semester, course_id=course.id,
+    ).first()
+    if not offered:
+        return fail("not_offered", "Subject is not officially offered this semester.")
+    result["offered"] = offered
+    status_key = status_value.strip().lower()
+    if status_key in CLASS_LIST_DROP_STATUSES:
+        result["desired"] = "Dropped"
+    elif status_key not in CLASS_LIST_ENROLL_STATUSES:
+        return fail(
+            "unsupported_status",
+            f"Status '{status_value}' is not handled by the class list. A withdrawal goes through the "
+            "Withdrawal workflow and completion comes from the monitoring sheet.",
+        )
+    try:
+        effective = _class_list_date(date_value)
+    except ValueError:
+        return fail("bad_date", f"Status effective date '{date_value}' is not a valid date (use YYYY-MM-DD).")
+    if effective and term.start_date and term.end_date and not (term.start_date <= effective <= term.end_date):
+        return fail(
+            "bad_date",
+            f"Status effective date {effective.isoformat()} is outside {term.label} "
+            f"({term.start_date.isoformat()} to {term.end_date.isoformat()}).",
+        )
+    result["effective_date"] = effective
+    if not faculty_value:
+        return fail("no_faculty", "Faculty is required.")
+    faculty = None
+    if faculty_value.strip().lower() not in CLASS_LIST_PLACEHOLDER_FACULTY:
+        faculty = Faculty.query.filter(
+            Faculty.active.is_(True),
+            or_(
+                func.lower(Faculty.name) == faculty_value.lower(),
+                func.lower(Faculty.email) == faculty_value.lower(),
+            ),
+        ).first()
+        if not faculty:
+            return fail("invalid_faculty", "Faculty was not found or is inactive.")
+        if faculty.college != student.program.college:
+            return fail("invalid_faculty", f"Faculty must belong to {student.program.college}.")
+        previous = seen_faculty.get(offered.id)
+        if previous and previous != faculty.id:
+            return fail("faculty_conflict", "Conflicting faculty for the same offered subject.")
+        seen_faculty[offered.id] = faculty.id
+    result["faculty"] = faculty
+    record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+    if record and record.status == "Completed":
+        return fail("completed", "Already completed; review is required before import.")
+    existing = SubjectEnrollment.query.filter_by(
+        student_id=student.id, course_id=course.id, term_id=term.id
+    ).first()
+    result["existing"] = existing
+    if result["desired"] == "Enrolled":
+        block = student_enrollment_block_reason(student, term)
+        if block:
+            return fail("blocked_standing", block)
+        if existing and existing.status in {"Dropped", "Withdrawn"}:
+            return fail(
+                "already_dropped",
+                f"Already recorded {existing.status} for {term.label}; it cannot be silently re-enrolled. "
+                "The Academic Coordinator re-enrolls it from the Enrollment screen if that is intended.",
+            )
+        other_active = SubjectEnrollment.query.filter(
+            SubjectEnrollment.student_id == student.id,
+            SubjectEnrollment.course_id == course.id,
+            SubjectEnrollment.term_id != term.id,
+            SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES),
+        ).first()
+        if other_active:
+            return fail(
+                "active_other_term",
+                f"Already {other_active.status.lower()} in {other_active.term.label}; the same subject cannot "
+                "be active in two semesters.",
+            )
+        if faculty and offered.assigned_faculty_id and offered.assigned_faculty_id != faculty.id:
+            approved = db.session.get(Faculty, offered.assigned_faculty_id)
+            result["approved_faculty"] = approved
+            result.update({
+                "status": "warning", "reason": "faculty_mismatch",
+                "message": (
+                    f"The list names {faculty.name}, but the approved faculty for this offering is "
+                    f"{approved.name if approved else 'another faculty member'}. The student is enrolled; "
+                    "the approved faculty is kept."
+                ),
+            })
+        elif faculty and not offered.assigned_faculty_id:
+            result["fill_faculty"] = True
+        if existing and existing.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
+            result["already_enrolled"] = True
+            if result["status"] == "ready":
+                result.update({"status": "warning", "reason": "already_enrolled",
+                               "message": "Already enrolled; no duplicate will be created."})
+        return result
+    # Dropped row
+    if existing and existing.status in {"Dropped", "Withdrawn"}:
+        return fail("already_dropped", f"Already recorded {existing.status}; nothing to change.", "warning")
+    effective_text = f" effective {effective.isoformat()}" if effective else ""
+    result["message"] = f"Will be recorded as Dropped{effective_text}"
+    return result
+
+
+def apply_class_list_row(item: dict, term: AcademicTerm, filename: str, actor: str) -> str:
+    """Write one evaluated class-list row. Returns 'enrolled' or 'dropped'."""
+    student, course = item["student"], item["course"]
+    effective = item["effective_date"]
+    effective_at = datetime.combine(effective, time.min) if effective else None
+    record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+    if item["desired"] == "Dropped":
+        ledger = item["existing"]
+        if not ledger:
+            ledger = SubjectEnrollment(student_id=student.id, course_id=course.id, term_id=term.id)
+            db.session.add(ledger)
+        previous = ledger.status if ledger.id else "Missing"
+        changed_at = now_utc()
+        ledger.status = "Dropped"
+        ledger.source_reference = f"Class list import ({filename})"[:160]
+        ledger.status_note = item["remarks"] or f"Dropped per class list import ({filename})."
+        ledger.status_changed_at = changed_at
+        ledger.cancelled_at = effective_at or changed_at
+        ledger.updated_at = changed_at
+        if not record:
+            record = CourseRecord(student_id=student.id, course_id=course.id)
+            db.session.add(record)
+        record.status = "Dropped"
+        record.term_label = term.label
+        record.evidence_reference = f"Class list import ({filename})"
+        record.remarks = "Dropped" + (f" effective {effective.isoformat()}" if effective else "") + " per class list import."
+        record.updated_at = changed_at
+        db.session.flush()
+        remaining_active = SubjectEnrollment.query.filter(
+            SubjectEnrollment.student_id == student.id,
+            SubjectEnrollment.term_id == term.id,
+            SubjectEnrollment.id != ledger.id,
+            SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES),
+        ).count()
+        if not remaining_active:
+            term_row = TermEnrollment.query.filter_by(student_id=student.id, term_id=term.id).first()
+            if term_row:
+                term_row.status = "Confirmed"
+                term_row.source_reference = "Class list import"
+                term_row.confirmed_at = changed_at
+            if student.enrollment_tag == "Enrolled":
+                student.enrollment_tag = "Not Enrolled"
+        add_log("enrollment", student.id, actor, "Class list import",
+                f"{course.code} recorded as Dropped for {term.label}.", "Student",
+                f"From the uploaded class list. {previous} -> Dropped."
+                + (f" Effective {effective.isoformat()}." if effective else ""),
+                previous_status=previous, new_status="Dropped")
+        return "dropped"
+    previous = record.status if record else "Missing"
+    if not record:
+        record = CourseRecord(student_id=student.id, course_id=course.id)
+        db.session.add(record)
+    record.status = "Enrolled"
+    record.term_label = term.label
+    record.evidence_reference = f"Class list import ({filename})"
+    record.updated_at = now_utc()
+    ledger = sync_subject_enrollment_from_course_record(student, course, term.label, "Enrolled", "Class list import")
+    if ledger is not None:
+        # Keep the source file's name with the enrollment (walkthrough: retain the class list reference).
+        ledger.source_reference = f"Class list import ({filename})"[:160]
+        if effective_at and not item["existing"]:
+            ledger.enrolled_at = effective_at
+    if student.enrollment_tag != "Enrolled":
+        student.enrollment_tag = "Enrolled"
+    if student.current_stage == "Admission":
+        student.current_stage = "Coursework"
+    add_log("enrollment", student.id, actor, "Class list import",
+            f"Tagged {student.name} as Enrolled in {course.code} for {term.label}.",
+            "Academic Coordinator",
+            f"Bulk enrollment tag from uploaded class list. {previous} -> Enrolled.",
+            previous_status=previous, new_status="Enrolled")
+    return "enrolled"
+
+
 def _entry_year_from_ay(ay: str) -> int:
     """'23-24' -> 2023, '2023-2024' -> 2023, fallback to current year."""
     m = re.search(r"(\d{2,4})", ay or "")
@@ -19315,11 +19656,28 @@ def academic_year_start(term: AcademicTerm | None = None) -> int:
     return today.year if today.month >= 6 else today.year - 1
 
 
-def student_current_course_year(student: Student, term: AcademicTerm | None = None) -> int | None:
+def academic_year_start_on(day: date) -> int:
+    """The calendar year in which the academic year containing `day` began (June rollover)."""
+    return day.year if day.month >= 6 else day.year - 1
+
+
+def years_in_program(student: Student, as_of: date | None = None, term: AcademicTerm | None = None) -> int | None:
+    """THE one count of a student's years in the program (course year and residency).
+
+    The entry academic year is year 1, and the count steps up at the academic-year boundary
+    (June), not on 1 January. It is never reduced by leave of absence: the handbook's maximum
+    residence includes time on leave (rule residency.includes_loa). `term` measures up to that
+    semester's academic year; otherwise up to `as_of`, which defaults to today.
+    """
     entry_year = int(student.entry_year or _entry_year_from_ay(student.academic_year_entry or "") or 0)
     if not entry_year:
         return None
-    return max(1, academic_year_start(term) - entry_year + 1)
+    start = academic_year_start(term) if term is not None else academic_year_start_on(as_of or date.today())
+    return max(1, start - entry_year + 1)
+
+
+def student_current_course_year(student: Student, term: AcademicTerm | None = None) -> int | None:
+    return years_in_program(student, term=term or get_active_term())
 
 
 def student_academic_year_entry(student: Student) -> str:
@@ -19686,6 +20044,31 @@ def _create_monitoring_validation_issue(upload, row, student, discrepancies, cou
     return issue
 
 
+# NOTE-column wording -> (standing, lifecycle stage, enrollment tag). Checked in this order.
+SHEET_NOTE_STANDINGS = [
+    (re.compile(r"\bawol\b|absent without (official )?leave", re.IGNORECASE), ("AWOL", "AWOL", "AWOL")),
+    (re.compile(r"\bloa\b|leave of absence|\bon leave\b", re.IGNORECASE), ("On Leave", "LOA", "LOA")),
+    (
+        re.compile(
+            r"withdr\w+ from (the )?(program|school|university|graduate school)|dropped out|\btransferred\b|^\s*withdrawn\s*$",
+            re.IGNORECASE,
+        ),
+        ("Withdrawn", "Withdrawn", "Withdrawn"),
+    ),
+]
+
+
+def standing_from_sheet_note(note: str | None) -> tuple[str, str, str] | None:
+    """The (standing, stage, tag) a monitoring-sheet NOTE says the student is in, or None."""
+    text_value = (note or "").strip()
+    if not text_value:
+        return None
+    for pattern, outcome in SHEET_NOTE_STANDINGS:
+        if pattern.search(text_value):
+            return outcome
+    return None
+
+
 def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, overwrite_completed=False, upload=None):
     student_number = str(row.get("idno") or "").strip()
     first_name = clean_person_name(row.get("first_name", ""))
@@ -19707,7 +20090,7 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
     student.program_id = program.id
     student.entry_year = _entry_year_from_ay(ay_entry)
     student.academic_year_entry = ay_entry
-    course_year = max(1, (academic_year_start(term) if term else date.today().year) - student.entry_year + 1)
+    course_year = years_in_program(student, term=term) or 1
     student.year_level = str(course_year or row.get("year") or "")
     if row.get("comprehensive_exam_passed"):
         student.comprehensive_exam_status = "Passed"
@@ -19717,8 +20100,27 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
     incoming_stage = _stage_from_sheet(row.get("milestones", {}), completed, bool(row.get("comprehensive_exam_passed")))
     current_index = STAGES.index(student.current_stage) if student.current_stage in STAGES else 0
     incoming_index = STAGES.index(incoming_stage) if incoming_stage in STAGES else 0
-    if is_new or incoming_index >= current_index:
+    # A student who is on leave, AWOL or withdrawn keeps the stage their own workflow set;
+    # an upload only refreshes the stage of someone in good standing.
+    if is_new or (student.standing == "Active" and incoming_index >= current_index):
         student.current_stage = incoming_stage
+    # The NOTE column can say the student is on leave / AWOL / withdrawn. For a NEW student
+    # that is the imported standing (recorded with its source text). For an existing Active
+    # student it is only reported, never applied: a change of standing has its own workflow.
+    note_standing = standing_from_sheet_note(row.get("note"))
+    standing_imported = None
+    standing_review = None
+    if note_standing and is_new:
+        student.standing, student.current_stage, student.enrollment_tag = note_standing
+        standing_imported = {
+            "student_number": student_number, "name": f"{first_name} {last_name}",
+            "note": str(row.get("note") or "").strip(), "standing": note_standing[0],
+        }
+    elif note_standing and student.standing == "Active":
+        standing_review = {
+            "student_number": student_number, "name": f"{first_name} {last_name}",
+            "note": str(row.get("note") or "").strip(), "suggested_standing": note_standing[0],
+        }
     if is_new:
         student.monitoring_new_student = True
         student.monitoring_imported_at = now_utc()
@@ -19761,12 +20163,26 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
                 rec.source_user = rec.source_at = rec.source_reason = None
                 rec.removed_at = rec.removed_by = rec.removal_reason = rec.removed_status = None
 
-    if is_new and term:
+    if is_new and term and not standing_imported:
         db.session.add(TermEnrollment(student_id=student.id, term_id=term.id, status="Confirmed", source_reference="AC Student Monitoring import"))
         for item in onboarding_requirements():
             db.session.add(DocumentCheck(student_id=student.id, gate="Admission Handoff", item_name=item, status="Complete", evidence_reference="AC Student Monitoring import"))
-    if is_new:
-        ensure_student_account(student, student.email)
+    account = ensure_student_account(student, student.email) if is_new else None
+    if standing_imported:
+        add_log(
+            "student-handoff",
+            student.id,
+            "GS Staff",
+            f"Monitoring upload #{upload.id}" if upload else "AC Student Monitoring import",
+            f"Standing imported from the monitoring sheet: {standing_imported['standing']}",
+            "Academic Coordinator",
+            (
+                f'Standing taken from the NOTE column of the uploaded sheet: "{standing_imported["note"]}". '
+                "This is an imported value, not a decision made in this system; if it needs a decision, "
+                "use the leave of absence, AWOL or withdrawal workflow."
+            ),
+            visibility="internal",
+        )
     resolved_flags = resolve_source_flags_after_monitoring_upload(student, upload)
     if resolved_flags:
         add_log(
@@ -19789,7 +20205,31 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
         "subject_changes": subject_changes,
         "completed": completed,
         "resolved_flags": resolved_flags,
+        "initial_password": getattr(account, "initial_password", None) if account else None,
+        "must_change_password": bool(account.must_change_password) if account else False,
+        "standing_imported": standing_imported,
+        "standing_review": standing_review,
     }
+
+
+def accounts_message(created_accounts: list[dict]) -> str:
+    """Sentence about the student logins an import created. Passwords are never put in
+    this text: in demo mode it is the shared demo password, otherwise each one-time
+    password is listed in the `accounts` array of the response, shown once."""
+    if not created_accounts:
+        return ""
+    if any(item.get("must_change_password") for item in created_accounts):
+        return (
+            f" {len(created_accounts)} new student portal account(s) created. Each has its own initial password, "
+            "listed below and shown only now; give it to the student, who must change it at first sign-in."
+        )
+    hint = demo_password_hint()
+    if len(created_accounts) == 1:
+        return (
+            f" Portal login for {created_accounts[0]['name']}: {created_accounts[0]['email']}"
+            + (f" / {hint}." if hint else ".")
+        )
+    return f" {len(created_accounts)} new student portal account(s) created" + (f" (password: {hint})." if hint else ".")
 
 
 def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = None) -> dict:
@@ -19823,6 +20263,8 @@ def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = No
     created, updated, skipped, sample, conflicts, duplicates = 0, 0, 0, [], [], []
     validation_issues: list[MonitoringValidationIssue] = []
     created_accounts = []
+    standing_from_note = []
+    standing_needs_review = []
     subject_changes = 0
     students_changed = 0
     id_counts = Counter(str(row.get("idno") or "").strip() for row in parsed["rows"] if row.get("idno"))
@@ -19864,9 +20306,19 @@ def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = No
         subject_changes += row_subject_changes
         if row_subject_changes:
             students_changed += 1
+        if applied.get("standing_imported"):
+            standing_from_note.append(applied["standing_imported"])
+        if applied.get("standing_review"):
+            standing_needs_review.append(applied["standing_review"])
         if applied["is_new"]:
             created += 1
-            created_accounts.append({"name": student.name, "email": student.email, "password": demo_password_hint()})
+            created_accounts.append({
+                "name": student.name,
+                "student_number": student.student_number,
+                "email": student.email,
+                "password": applied.get("initial_password") or demo_password_hint(),
+                "must_change_password": applied.get("must_change_password", False),
+            })
         elif row_subject_changes or existing_before.get("academic_year_entry") != student.academic_year_entry:
             updated += 1
         else:
@@ -19915,17 +20367,22 @@ def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = No
         "unresolved_count": len(validation_issues),
         "sample": sample,
         "accounts": created_accounts,
+        "standing_from_note": standing_from_note,
+        "standing_needs_review": standing_needs_review,
         "message": f"Imported {created} new student(s) and refreshed AY/YR for {updated} student(s) "
                    f"from the {program.code} monitoring sheet ({skipped} already in system or "
                    f"needing verification, {len(conflicts)} conflict(s))."
                    + (
-                       f" Portal login for {created_accounts[0]['name']}: {created_accounts[0]['email']}"
-                       + (f" / {demo_password_hint()}." if demo_password_hint() else ".")
-                       if len(created_accounts) == 1
-                       else f" {len(created_accounts)} new student portal account(s) created"
-                       + (f" (password: {demo_password_hint()})." if demo_password_hint() else ".")
-                       if created_accounts
-                       else ""
+                       f" {len(standing_from_note)} new student(s) came in on leave, AWOL or withdrawn (from the NOTE column)."
+                       if standing_from_note else ""
+                   )
+                   + (
+                       f" {len(standing_needs_review)} existing student(s) have a NOTE that suggests a different standing; "
+                       "nothing was changed, use the matching workflow if it is right."
+                       if standing_needs_review else ""
+                   )
+                   + (
+                       accounts_message(created_accounts)
                    ),
     }
 
@@ -20246,7 +20703,7 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
         adviser_name=_monitoring_clean(data.get("adviser_name"), 120) or None,
         monitoring_new_student=True,
     )
-    student.year_level = str(max(1, (academic_year_start(term) if term else date.today().year) - entry_year + 1))
+    student.year_level = str(years_in_program(student, term=term) or 1)
     db.session.add(student)
     db.session.flush()
     if term:
@@ -25290,17 +25747,42 @@ def automatic_faculty_assignment(
     return faculty
 
 
-def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> list[dict]:
-    # Planning is based on every active monitored student in the program. Do not
-    # require a TermEnrollment in the target semester: an upcoming semester has no
-    # enrollment rows yet, and that is precisely when this demand is needed.
-    demand: dict[int, dict] = {}
-    student_query = Student.query.filter_by(
-        program_id=program.id,
-        standing="Active",
-        enrollment_tag="Enrolled",
+PLANNING_ENROLLMENT_TAGS = ("Enrolled", "Not Enrolled", "Residency")
+PLANNING_EXCLUDED_STAGES = ("Completed", "Withdrawn", "Withdrawal In Progress", "LOA", "AWOL")
+
+
+def planning_student_clauses() -> list:
+    """The filter clauses that define 'will need subjects' (shared, so no report can drift)."""
+    return [
+        Student.standing == "Active",
+        Student.enrollment_tag.in_(PLANNING_ENROLLMENT_TAGS),
+        Student.current_stage.notin_(PLANNING_EXCLUDED_STAGES),
+    ]
+
+
+def students_expected_for_planning(program: Program, term: AcademicTerm | None = None) -> list[Student]:
+    """Everyone who will need subjects next term: the ONE definition behind course demand,
+    the subject-needs report and offering demand.
+
+    Active students whose tag says Enrolled, Not Enrolled (readmitted, between terms, dropped
+    their only subject) or Residency. Students who are on leave, AWOL, withdrawn or graduated
+    are not counted. `term` is accepted so a later rule can add students whose leave ends
+    before that term (their leave dates are kept by the leave-of-absence workflow).
+    """
+    return (
+        Student.query.filter(Student.program_id == program.id, *planning_student_clauses())
+        .order_by(Student.last_name, Student.first_name)
+        .all()
     )
-    students = student_query.distinct().order_by(Student.last_name).all()
+
+
+def course_demand_rows(program: Program, term: AcademicTerm | None = None) -> list[dict]:
+    # Planning is based on every student who will need subjects (see
+    # students_expected_for_planning). Do not require a TermEnrollment in the target
+    # semester: an upcoming semester has no enrollment rows yet, and that is precisely
+    # when this demand is needed.
+    demand: dict[int, dict] = {}
+    students = students_expected_for_planning(program, term)
     for student in students:
         semester = student_semester_subjects(student, term)
         student_courses = [
@@ -25373,15 +25855,7 @@ def subject_needs_report_payload(
     Completed and currently enrolled subjects are excluded from offering need.
     All other recorded outcomes count as subject demand.
     """
-    students = (
-        Student.query.filter_by(
-            program_id=program.id,
-            standing="Active",
-            enrollment_tag="Enrolled",
-        )
-        .order_by(Student.last_name, Student.first_name)
-        .all()
-    )
+    students = students_expected_for_planning(program, term)
     rows_by_course: dict[int, dict] = {}
     curriculum = monitoring_curriculum_courses(program)
     course_ids = {course.id for course in curriculum}
@@ -25462,7 +25936,7 @@ def subject_needs_report_payload(
         "term": term_dict(term) if term else None,
         "generated_at": iso(now_utc()),
         "basis": (
-            "Active monitored students in the selected program. Official completion and "
+            "Every active student in the selected program who will need subjects (enrolled, not yet enrolled, readmitted or in residency). Official completion and "
             "the latest semester enrollment status are considered. Completed, taken, and "
             "current subjects are excluded; all other subjects count as offering need."
         ),
@@ -25580,7 +26054,7 @@ def compute_offering_demand() -> list[dict]:
     # Planning helper: counts which missing subjects appear most often among
     # active students, useful for course offering discussions.
     demand: dict[int, dict] = {}
-    students = Student.query.filter(Student.enrollment_tag == "Enrolled").limit(500).all()
+    students = Student.query.filter(*planning_student_clauses()).limit(500).all()
     for student in students:
         audit = compute_course_audit(student)
         for row in audit["missing"][:4]:
@@ -28353,19 +28827,47 @@ def unique_student_email(first_name: str, last_name: str, student_number: str = 
         suffix += 1
 
 
-def ensure_student_account(student: Student, email: str, password: str = SIM_STUDENT_PASSWORD) -> UserAccount:
+def new_student_initial_password() -> tuple[str, bool]:
+    """(initial password, must change it at first sign-in) for a newly created student login.
+
+    DEMO_MODE on: the shared demo password, so the presenter's demo keeps working.
+    DEMO_MODE off: a random password nobody else knows; the staff member who created the
+    account is shown it once and the student must replace it at first sign-in.
+    """
+    if demo_mode_enabled():
+        return SIM_STUDENT_PASSWORD, False
+    import secrets
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(12)), True
+
+
+def ensure_student_account(student: Student, email: str, password: str | None = None) -> UserAccount:
     # Idempotently link (or create) a student-portal account so a handed-off student
     # can sign in to upload concept papers and file LOA / withdrawal requests.
+    # A NEW account gets new_student_initial_password() unless a password is passed; its
+    # plain value is left on `account.initial_password` (in memory only) so the caller can
+    # show it once. Existing accounts keep whatever password they have.
     email = (email or student.email or "").strip().lower()
     account = UserAccount.query.filter_by(email=email).first()
     if not account:
+        must_change = False
+        if password is None:
+            password, must_change = new_student_initial_password()
         account = UserAccount(
             email=email,
             full_name=f"{student.name} (Student)",
             password_hash=generate_password_hash(password),
             role="student",
             active=True,
+            must_change_password=must_change,
         )
+        account.initial_password = password
+        if has_request_context():
+            # Whoever created the account is shown this once, in this response only.
+            credentials = getattr(_flask_g, "new_student_credentials", None)
+            if credentials is None:
+                credentials = _flask_g.new_student_credentials = []
+            credentials.append({"email": email, "password": password, "must_change_password": must_change})
         db.session.add(account)
     account.student_id = student.id
     account.full_name = f"{student.name} (Student)"
@@ -29124,6 +29626,9 @@ def ensure_user_account_schema() -> None:
     existing = {column["name"] for column in inspector.get_columns("user_account")}
     if "faculty_id" not in existing:
         db.session.execute(text("ALTER TABLE user_account ADD COLUMN faculty_id INTEGER"))
+        db.session.commit()
+    if "must_change_password" not in existing:
+        db.session.execute(text("ALTER TABLE user_account ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0"))
         db.session.commit()
 
 

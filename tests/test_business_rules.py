@@ -775,10 +775,15 @@ class BusinessRulesTests(unittest.TestCase):
             self.assertEqual((limits["normal_years"], limits["absolute_years"]), (5, 7))
             self.assertTrue(limits["includes_loa"])
             self.assertEqual(limits["citation"], "Graduate School Handbook 2022-2023, p. 55")
+            # Residency years are counted in academic years (entry academic year = year 1) by the
+            # one shared function years_in_program; the exact number depends on the calendar, so
+            # the test pins the rule: being on leave never changes it.
+            before_leave = residence_limits(student)["years_in_program"]
+            self.assertGreaterEqual(before_leave, 1)
             student.enrollment_tag = "LOA"
             student.standing = "On Leave"
             db.session.commit()
-            self.assertEqual(residence_limits(student)["years_in_program"], 1)  # clock keeps running on leave
+            self.assertEqual(residence_limits(student)["years_in_program"], before_leave)  # clock keeps running on leave
         self._set_rule("residency.master_normal_years", 6, "Test: extended normal residence")
         self._set_rule("residency.master_absolute_years", 8, "Test: extended absolute residence")
         with app.app_context():

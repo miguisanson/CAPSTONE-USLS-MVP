@@ -5288,7 +5288,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student = db.session.get(Student, self.student_id)
             # A master's programme carries a 5-year normal and 7-year absolute
             # residency limit; a doctoral programme 7 and 9.
-            student.entry_year = date.today().year - 8
+            # Years are counted in academic years (the entry academic year is year 1; one shared
+            # function, years_in_program), so eight years means entering seven academic years ago.
+            today = date.today()
+            academic_year_start = today.year if today.month >= 6 else today.year - 1
+            student.entry_year = academic_year_start - 7
             db.session.commit()
             report = residency_watchlist_report([student])
             self.assertEqual(report["count"], 1)
@@ -5300,7 +5304,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(row["residency_state"], "Exceeded absolute limit")
 
             # A student inside the normal period is counted but not listed.
-            student.entry_year = date.today().year - 1
+            student.entry_year = academic_year_start - 1
             db.session.commit()
             report = residency_watchlist_report([student])
             self.assertEqual(report["count"], 0)
@@ -5309,7 +5313,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
     def test_completion_and_attrition_rates_are_computed_per_program(self):
         with app.app_context():
             program_id = self.program_id
-            entry = date.today().year - 3
+            today = date.today()
+            entry = (today.year if today.month >= 6 else today.year - 1) - 2  # three academic years
 
             def make(number, stage, standing="Active"):
                 item = Student(
