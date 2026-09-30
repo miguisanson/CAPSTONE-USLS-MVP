@@ -3622,6 +3622,15 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 db.session.add(member)
                 faculty.append(member)
             db.session.flush()
+            # Availability is never assumed: each member has entered Monday-Friday 8-17.
+            for member in faculty:
+                for weekday in range(5):
+                    db.session.add(FacultyWorkingHour(
+                        faculty_id=member.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0), enabled=True,
+                    ))
+            db.session.flush()
+            for member in faculty:
+                db.session.expire(member, ["working_hours"])
             participants = [
                 {"faculty": member, "role": "Panel Member"}
                 for member in faculty

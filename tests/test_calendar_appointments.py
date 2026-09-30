@@ -1415,5 +1415,30 @@ class FacultyBadgeCountTests(AdviserBase):
         self.assertEqual(body["counts"]["pending_invitations"], 0)
 
 
+class AdviserRoleEligibilityTests(AdviserBase):
+    def test_a_faculty_member_not_marked_as_an_adviser_gets_a_warning(self):
+        """R03: eligible_roles was stored but never used."""
+        with app.app_context():
+            faculty = db.session.get(Faculty, self.faculty_ids["Content Person"])
+            faculty.eligible_roles = json.dumps(["Panel Member"])
+            db.session.commit()
+        appointment_id = self.apply("Content Person").get_json()["appointment"]["id"]
+        body = self.academic().get("/api/adviser-appointments").get_json()["appointments"][0]
+        self.assertEqual(body["id"], appointment_id)
+        self.assertTrue(any("Faculty Adviser" in item for item in body["warnings"]), body["warnings"])
+
+
+class FacultyAvailabilityFeedTests(CalendarBase):
+    def test_the_staff_availability_feed_lists_real_hours_with_a_time_zone(self):
+        chair = self.staff().get(f"/api/faculty/{self.faculty_ids['Chair Person']}/calendar.ics")
+        self.assertEqual(chair.status_code, 200)
+        body = chair.get_data(as_text=True)
+        self.assertIn("TZID:Asia/Manila", body)
+        self.assertIn("DTSTART;TZID=Asia/Manila:", body)
+        self.assertIn("SUMMARY:Chair Person available", body)
+        empty = self.staff().get(f"/api/faculty/{self.faculty_ids['Unentered Person']}/calendar.ics").get_data(as_text=True)
+        self.assertNotIn("BEGIN:VEVENT", empty)
+
+
 if __name__ == "__main__":
     unittest.main()

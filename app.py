@@ -24761,6 +24761,8 @@ def adviser_eligibility_warnings(student: Student, faculty: Faculty) -> list[str
                 f"No PhD degree or PhD units are recorded for {faculty.name}; the protocol requires at least PhD units "
                 "for master's advisees."
             )
+    if "Faculty Adviser" not in faculty_eligible_roles(faculty):
+        warnings.append(f"{faculty.name} is not marked as a Faculty Adviser in their profile; check that they may advise.")
     count = adviser_active_count(faculty.id)
     if count >= adviser_max_advisees():
         warnings.append(f"{faculty.name} already has {count} active advisees (the limit is {adviser_max_advisees()}).")
@@ -26601,7 +26603,7 @@ def faculty_day_availability(faculty: Faculty, day: date, bundle: dict | None = 
     row = bundle["hours"].get(day.weekday())
     if row and row.enabled:
         windows = [(row.start_time, row.end_time)]
-    elif bundle["connected"] and not bundle["hours"] and day.weekday() < 5:
+    elif bundle["connected"] and not any(item.enabled for item in bundle["hours"].values()) and day.weekday() < 5:
         windows = [GOOGLE_ASSUMED_HOURS]
     available = [
         item for item in bundle["exceptions"]
@@ -26875,45 +26877,30 @@ def calendar_text(value: str | None) -> str:
 
 
 def faculty_calendar_ics(faculty: Faculty) -> str:
-    slots = (
-        FacultyAvailability.query.filter(
-            FacultyAvailability.faculty_id == faculty.id,
-            FacultyAvailability.available_date >= date.today(),
-        )
-        .order_by(FacultyAvailability.available_date, FacultyAvailability.start_time)
-        .limit(60)
-        .all()
-    )
-    now_stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//USLS Graduate School//Faculty Availability//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        f"X-WR-CALNAME:{calendar_text(f'{faculty.name} Availability')}",
-        f"X-WR-CALDESC:{calendar_text('Faculty availability windows used for defense scheduling.')}",
-    ]
-    for slot in slots:
-        start_dt = datetime.combine(slot.available_date, slot.start_time)
-        end_dt = datetime.combine(slot.available_date, slot.end_time)
-        stamp = f"{slot.id}-{faculty.id}@usls-gs-demo"
-        lines.extend(
-            [
+    """One faculty member's entered availability for the next 45 days (staff-side feed).
+
+    Built from what the person entered (weekly hours + dated exceptions), with the Asia/Manila zone.
+    Someone who has entered nothing produces an empty calendar, never an assumed one.
+    """
+    bundle = faculty_availability_bundle(faculty)
+    today = date.today()
+    blocks = []
+    for offset in range(46):
+        day = today + timedelta(days=offset)
+        for index, (start, end) in enumerate(faculty_day_availability(faculty, day, bundle)["windows"]):
+            blocks.append([
                 "BEGIN:VEVENT",
-                f"UID:{stamp}",
-                f"DTSTAMP:{now_stamp}",
-                f"DTSTART:{start_dt.strftime('%Y%m%dT%H%M%S')}",
-                f"DTEND:{end_dt.strftime('%Y%m%dT%H%M%S')}",
-                f"SUMMARY:{calendar_text(f'{faculty.name} availability')}",
+                f"UID:availability-{faculty.id}-{day.isoformat()}-{index}@usls-gs",
+                f"DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
+                f"DTSTART;TZID={CALENDAR_TIMEZONE}:{datetime.combine(day, start).strftime('%Y%m%dT%H%M%S')}",
+                f"DTEND;TZID={CALENDAR_TIMEZONE}:{datetime.combine(day, end).strftime('%Y%m%dT%H%M%S')}",
+                f"SUMMARY:{calendar_text(f'{faculty.name} available')}",
                 f"DESCRIPTION:{calendar_text(f'Specialization: {faculty.specialization}')}",
                 "STATUS:CONFIRMED",
                 "TRANSP:TRANSPARENT",
                 "END:VEVENT",
-            ]
-        )
-    lines.append("END:VCALENDAR")
-    return "\r\n".join(lines) + "\r\n"
+            ])
+    return build_ics(f"{faculty.name} Availability", "Faculty availability used for defense scheduling.", blocks)
 
 
 def ensure_research_document_checks(student_id: int, gate: str) -> list[DocumentCheck]:
@@ -28523,7 +28510,7 @@ def defense_availability_context(
                     "date": current_day,
                     "start": window_start_time,
                     "end": window_end_time,
-                    "source": "google_calendar" if bundles[faculty_id]["connected"] and not bundles[faculty_id]["hours"] else "working_hours",
+                    "source": "google_calendar" if bundles[faculty_id]["connected"] and not any(item.enabled for item in bundles[faculty_id]["hours"].values()) else "working_hours",
                     "weekend_override": current_day.weekday() >= 5,
                 })
                 dates.add(current_day)
