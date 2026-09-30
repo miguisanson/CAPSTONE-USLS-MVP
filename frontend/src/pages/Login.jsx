@@ -15,7 +15,7 @@ const DEMO = {
   faculty: { email: "liwayway.bautista@usls.edu.ph", password: "DemoPass123!" },
 };
 
-const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
+const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/dean", student: "/student", faculty: "/faculty-portal" };
 const LABEL = { staff: "Staff", dean: "Dean", student: "Student" };
 const STAFF_ACCOUNTS = [
   { role: "staff", label: "GS Staff", detail: "Intake and records" },

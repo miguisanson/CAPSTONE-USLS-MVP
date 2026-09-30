@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { statusClass } from "../lib/format";
 
 export function StatusBadge({ value, dot = true, className = "" }) {
@@ -92,5 +93,77 @@ export function Pill({ children, tone = "slate" }) {
     <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide ${tones[tone] || tones.slate}`}>
       {children}
     </span>
+  );
+}
+
+// Shared page header: every role's pages open with the same title / short
+// description / primary-action block so the product reads as one system.
+export function PageHeader({ title, description, icon: Icon, actions = null, badge = null }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        {Icon && (
+          <span className="mt-0.5 hidden h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700 sm:grid">
+            <Icon className="h-6 w-6" strokeWidth={2} />
+          </span>
+        )}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-2xl font-semibold text-ink">{title}</h1>
+            {badge}
+          </div>
+          {description && <p className="mt-1 max-w-3xl text-sm text-slate-500">{description}</p>}
+        </div>
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+const STAT_TONES = {
+  brand: "bg-brand-50 text-brand-700",
+  amber: "bg-amber-50 text-amber-700",
+  red: "bg-red-50 text-red-700",
+  blue: "bg-blue-50 text-blue-700",
+  slate: "bg-slate-100 text-slate-600",
+};
+
+// KPI tile used on the Student, Dean and Faculty dashboards. Pass `to` to make
+// the whole tile a link to the page where the figure can be acted on.
+export function StatCard({ icon: Icon, label, value, sub, tone = "brand", to }) {
+  const body = (
+    <div className={`card h-full p-5 transition-colors ${to ? "hover:border-brand-200 hover:bg-brand-50/30" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="mt-2 font-display text-3xl font-semibold text-ink">{value}</p>
+          {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
+        </div>
+        {Icon && (
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${STAT_TONES[tone] || STAT_TONES.brand}`}>
+            <Icon className="h-5 w-5" />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+  if (!to) return body;
+  return (
+    <Link to={to} className="block h-full cursor-pointer rounded-2xl">
+      {body}
+    </Link>
+  );
+}
+
+export function InlineNotice({ tone = "info", children }) {
+  const tones = {
+    info: "border-brand-200 bg-brand-50 text-brand-800",
+    warn: "border-amber-200 bg-amber-50 text-amber-800",
+    error: "border-red-200 bg-red-50 text-red-700",
+  };
+  return (
+    <div role={tone === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${tones[tone] || tones.info}`}>
+      {children}
+    </div>
   );
 }

@@ -17,11 +17,11 @@ import EnrollmentClassList from "./pages/EnrollmentClassList";
 import Enrollment from "./pages/Enrollment";
 import DecisionSupport from "./pages/DecisionSupport";
 import Assistant from "./pages/Assistant";
-import StudentPortal from "./pages/StudentPortal";
-import DeanApprovals from "./pages/DeanApprovals";
+import { StudentPortalProvider, StudentRoutes } from "./pages/student/StudentRoutes";
+import { DeanProvider, DeanRoutes } from "./pages/dean/DeanRoutes";
 import Login from "./pages/Login";
 import Form1Endorsements from "./pages/Form1Endorsements";
-import FacultyPortal from "./pages/FacultyPortal";
+import { FacultyProvider, FacultyRoutes } from "./pages/faculty/FacultyRoutes";
 import TermSettings from "./pages/TermSettings";
 import PolicyDocuments from "./pages/PolicyDocuments";
 
@@ -30,7 +30,7 @@ function homeFor(user) {
   if (!user) return "/login";
   if (user.role === "student") return "/student";
   if (user.role === "faculty") return "/faculty-portal";
-  if (user.role === "dean") return "/approvals";
+  if (user.role === "dean") return "/dean";
   if (user.role === "academic_coordinator") return "/monitoring-sheet";
   if (user.role === "research_coordinator") return "/workflow/research-gate";
   return "/";
@@ -45,27 +45,44 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Role portals: student, dean and faculty use the same Layout shell as the
+          staff side; only the navigation items differ (see components/portalNav.jsx).
+          Each provider wraps the Layout so the sidebar can show action badges. */}
       <Route
-        path="/student"
+        path="/student/*"
         element={
           <RoleOnly user={user} role="student">
-            <StudentPortal />
+            <StudentPortalProvider>
+              <Layout>
+                <StudentRoutes />
+              </Layout>
+            </StudentPortalProvider>
           </RoleOnly>
         }
       />
       <Route
-        path="/approvals"
+        path="/dean/*"
         element={
           <RoleOnly user={user} role="dean">
-            <DeanApprovals />
+            <DeanProvider>
+              <Layout>
+                <DeanRoutes />
+              </Layout>
+            </DeanProvider>
           </RoleOnly>
         }
       />
+      {/* Old Dean URL, kept so bookmarks and saved links still work. */}
+      <Route path="/approvals" element={<Navigate to="/dean/approvals" replace />} />
       <Route
-        path="/faculty-portal"
+        path="/faculty-portal/*"
         element={
           <RoleOnly user={user} role="faculty">
-            <FacultyPortal />
+            <FacultyProvider>
+              <Layout>
+                <FacultyRoutes />
+              </Layout>
+            </FacultyProvider>
           </RoleOnly>
         }
       />
