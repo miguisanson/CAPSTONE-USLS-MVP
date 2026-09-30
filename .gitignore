@@ -65,3 +65,6 @@ Other_Branches/
 .claude/gsd-*
 .claude/hooks/
 .claude/scripts/
+
+# Runtime copy of the Operations Manual draft seeded into the policy library at startup
+uploads/policy_documents/*Operations*Manual*
