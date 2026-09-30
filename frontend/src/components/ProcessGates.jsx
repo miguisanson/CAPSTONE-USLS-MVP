@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Send, FileSpreadsheet, GraduationCap, ClipboardList, RefreshCw } from "lucide-react";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { Card, EmptyState, SectionTitle, Spinner } from "./ui";
 
 /* Panels for the process steps the BPMN models require but that previously had
@@ -149,6 +150,9 @@ export function StudyPlanPanel({ students = [] }) {
   const [rationale, setRationale] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [reviewRemarks, setReviewRemarks] = useState({});
+  const { user } = useAuth();
+  const role = user?.role;
 
   const load = useCallback(() => {
     api.studyPlans().then((res) => setPlans(res.items || [])).catch((e) => setMsg({ tone: "error", text: e.message }));
@@ -252,13 +256,48 @@ export function StudyPlanPanel({ students = [] }) {
                     <td className="px-4 py-2.5 text-slate-600">{p.curriculum_version || "—"}</td>
                     <td className="px-4 py-2.5 text-slate-600">{p.subjects.join(", ") || "—"}</td>
                     <td className="px-4 py-2.5 text-slate-600">{p.remaining_count}</td>
-                    <td className="px-4 py-2.5"><Pill>{p.status}</Pill></td>
+                    <td className="px-4 py-2.5">
+                      <Pill>{p.status}</Pill>
+                      {p.coordinator_remarks ? (
+                        <p className="mt-1.5 max-w-xs rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-normal normal-case text-slate-600">
+                          <span className="font-bold">Coordinator:</span> {p.coordinator_remarks}
+                        </p>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-2.5">
                       {p.status === "Draft" ? (
                         <button type="button" className="btn-ghost" disabled={busy}
                           onClick={() => act(() => api.sendStudyPlan(p.id))}>
                           <Send className="h-4 w-4" /> Send to AC
                         </button>
+                      ) : null}
+                      {p.status === "Returned for Revision" && role === "staff" ? (
+                        <button type="button" className="btn-ghost" disabled={busy}
+                          onClick={() => act(() => api.sendStudyPlan(p.id))}>
+                          <Send className="h-4 w-4" /> Send to AC again
+                        </button>
+                      ) : null}
+                      {p.status === "Sent to Academic Coordinator" && role === "academic_coordinator" ? (
+                        <div className="space-y-2">
+                          <input
+                            value={reviewRemarks[p.id] || ""}
+                            onChange={(e) => setReviewRemarks((r) => ({ ...r, [p.id]: e.target.value }))}
+                            placeholder="Remarks (required to return)"
+                            className="field-input min-w-[200px]"
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" className="btn-primary" disabled={busy}
+                              onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "approve", remarks: (reviewRemarks[p.id] || "").trim() }))}>
+                              Approve plan
+                            </button>
+                            <button type="button" className="btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
+                              disabled={busy || !(reviewRemarks[p.id] || "").trim()}
+                              title={(reviewRemarks[p.id] || "").trim() ? "" : "Write a comment to return the plan"}
+                              onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "return", remarks: (reviewRemarks[p.id] || "").trim() }))}>
+                              Return with comment
+                            </button>
+                          </div>
+                        </div>
                       ) : null}
                     </td>
                   </tr>

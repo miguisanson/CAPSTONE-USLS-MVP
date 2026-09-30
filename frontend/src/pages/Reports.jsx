@@ -8,7 +8,7 @@ import { printDataTable } from "../lib/print";
 
 const REPORT_TABS = [
   { id: "summary", label: "Dashboard summary", icon: FileText },
-  { id: "daily_changes", label: "Daily changes (Registrar)", icon: RefreshCw },
+  { id: "daily_changes", label: "Daily changes", icon: RefreshCw },
   { id: "graduation_candidates", label: "Graduation candidates", icon: GraduationCap },
   { id: "missing_requirements", label: "Missing requirements", icon: ClipboardCheck },
   { id: "practicum_monitoring", label: "Practicum monitoring", icon: Briefcase },
@@ -33,6 +33,7 @@ const ANALYTICS_TABS = [
 ];
 
 const ANALYTICS_IDS = new Set(ANALYTICS_TABS.map((tab) => tab.id));
+const PAGED_TABS = new Set(REPORT_TABS.filter((tab) => !["summary", "daily_changes"].includes(tab.id)).map((tab) => tab.id));
 
 export default function Reports() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,9 +48,11 @@ export default function Reports() {
     }),
     [searchParams]
   );
+  const [page, setPage] = useState(1);
+  const pagedTab = PAGED_TABS.has(active) ? active : "";
   const { data, loading, error } = useApi(
-    () => api.reports(filters),
-    [filters.program_id, filters.stage, filters.risk, filters.standing, filters.workflow_type]
+    () => api.reports({ ...filters, tab: pagedTab, page: pagedTab && page > 1 ? page : "" }),
+    [filters.program_id, filters.stage, filters.risk, filters.standing, filters.workflow_type, pagedTab, page]
   );
 
   // Analytics is loaded only once an analytics tab is opened, and reloaded when
@@ -82,6 +85,7 @@ export default function Reports() {
   }, [analyticsWanted, analyticsKey]);
 
   function updateFilter(key, value) {
+    setPage(1);
     if (key === "workflow_type") setActive(value || "summary");
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
@@ -90,19 +94,21 @@ export default function Reports() {
   }
 
   function chooseTab(id) {
+    setPage(1);
     setActive(id);
     if (id === "summary") updateFilter("workflow_type", "");
     else updateFilter("workflow_type", id);
   }
 
-  if (loading) return <Spinner label="Loading reports..." />;
+  if (loading && !data) return <Spinner label="Loading reports..." />;
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load reports" hint={error} />;
 
   const activeTab =
     REPORT_TABS.find((tab) => tab.id === active) ||
     ANALYTICS_TABS.find((tab) => tab.id === active) ||
     REPORT_TABS[0];
-  const rows = active === "summary" || analyticsWanted ? [] : data?.[active]?.rows || [];
+  const tabData = PAGED_TABS.has(active) ? data?.[active] : null;
+  const rows = active === "summary" || analyticsWanted ? [] : tabData?.rows || [];
   const analyticsReport = analyticsWanted ? analytics?.[active] : null;
 
   return (
@@ -182,10 +188,34 @@ export default function Reports() {
             action={active !== "summary" && rows.length ? <button type="button" onClick={() => exportCsv(active, rows)} className="btn-ghost"><Download className="h-4 w-4" /> Export CSV</button> : null}
           />
           {active === "summary" ? <SummaryReport summary={data.summary} /> : <ReportTable type={active} rows={rows} />}
+          {tabData && tabData.count > 0 && (
+            <ReportPager data={tabData} busy={loading} onPage={(next) => setPage(next)} />
+          )}
         </Card>
       )}
     </div>
   );
+}
+
+function ReportPager({ data, busy, onPage }) {
+  const pageSize = data.page_size || rowsPerPageFallback(data);
+  const current = data.page || 1;
+  const pages = data.pages || Math.max(1, Math.ceil(data.count / pageSize));
+  const from = (current - 1) * pageSize + 1;
+  const to = Math.min(data.count, (current - 1) * pageSize + (data.rows || []).length);
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-slate-500">Showing <span className="font-semibold text-ink">{from}-{to}</span> of <span className="font-semibold text-ink">{data.count}</span></p>
+      <div className="flex gap-2">
+        <button type="button" disabled={busy || current <= 1} onClick={() => onPage(current - 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+        <button type="button" disabled={busy || current >= pages} onClick={() => onPage(current + 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+      </div>
+    </div>
+  );
+}
+
+function rowsPerPageFallback(data) {
+  return Math.max(1, (data.rows || []).length);
 }
 
 function ReportFilters({ data, filters, updateFilter, clear }) {
@@ -207,7 +237,7 @@ function ReportFilters({ data, filters, updateFilter, clear }) {
         </Select>
         <Select label="Standing" value={filters.standing} onChange={(value) => updateFilter("standing", value)}>
           <option value="">All standings</option>
-          {["Active", "On Leave", "Withdrawn", "Completed"].map((standing) => <option key={standing} value={standing}>{standing}</option>)}
+          {["Active", "On Leave", "AWOL", "Withdrawn"].map((standing) => <option key={standing} value={standing}>{standing}</option>)}
         </Select>
         <Select label="Workflow" value={filters.workflow_type} onChange={(value) => updateFilter("workflow_type", value)}>
           <option value="">All workflows</option>
@@ -437,14 +467,14 @@ function PracticumTable({ rows }) {
 }
 
 function WithdrawalTable({ rows }) {
-  return <BaseTable headers={["Student", "Subject / semester", "Window", "Dean", "Registrar", "Academic record", "Status"]} rows={rows} render={(row) => (
+  return <BaseTable headers={["Student", "Subject / semester", "Window", "Dean", "Sent to Registrar", "Academic record", "Status"]} rows={rows} render={(row) => (
     <tr key={row.id} className="border-b border-slate-50">
       <StudentCell student={row.student} />
       <td className="px-4 py-2.5 text-slate-600"><span className="font-semibold text-ink">{row.subject?.course_code || "—"}</span><span className="block text-xs">{row.effective_term || "—"}</span></td>
       <td className="px-4 py-2.5 text-xs text-slate-600">{row.withdrawal_window?.status || "—"}<span className="block">Deadline: {row.withdrawal_window?.deadline || "—"}</span></td>
       <td className="px-4 py-2.5"><StatusBadge value={row.dean_decision} dot={false} /></td>
       <td className="px-4 py-2.5"><StatusBadge value={row.registrar_status} dot={false} /></td>
-      <td className="px-4 py-2.5 text-xs font-semibold text-emerald-700">{row.academic_record_effect || "No grade / no penalty"}</td>
+      <td className="px-4 py-2.5 text-xs font-semibold text-emerald-700">{row.academic_record_effect || "No penalty"}</td>
       <td className="px-4 py-2.5"><StatusBadge value={row.status} dot={false} /></td>
     </tr>
   )} />;
@@ -557,7 +587,7 @@ function DailyChangesReport() {
   }
 
   function exportChangesCsv() {
-    const headers = ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Reflected in AIMS"];
+    const headers = ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Sent to Registrar"];
     const lines = [headers.join(",")];
     items.forEach((item) => {
       lines.push([
@@ -569,16 +599,16 @@ function DailyChangesReport() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `registrar-changes-${date}.csv`;
+    a.download = `daily-changes-${date}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   function printChanges() {
     printDataTable({
-      title: "Registrar update list — changes to apply in AIMS",
+      title: "Daily changes list",
       subtitle: `Date: ${date}`,
-      columns: ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Reflected"],
+      columns: ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Sent"],
       rows: items.map((item) => [
         item.time ? new Date(item.time).toLocaleTimeString() : "",
         item.change_type, item.student_name, item.student_number, item.program_code,
@@ -590,8 +620,8 @@ function DailyChangesReport() {
   return (
     <Card className="p-5">
       <SectionTitle
-        title="Daily changes for the Registrar"
-        subtitle="Every change made in this system on the selected date. Use it to mirror updates into AIMS, then tick each one as reflected."
+        title="Daily changes"
+        subtitle="Every change made in this system on the selected date. Export or print the list for the Registrar, then mark each change as sent."
         icon={RefreshCw}
         action={
           <div className="flex flex-wrap items-center gap-2">
@@ -604,8 +634,8 @@ function DailyChangesReport() {
 
       <div className="mt-3 grid grid-cols-3 gap-3">
         <MiniStat label="Changes today" value={summary.total} />
-        <MiniStat label="Reflected in AIMS" value={summary.reflected} tone="green" />
-        <MiniStat label="Pending" value={summary.pending} tone="amber" />
+        <MiniStat label="Sent to Registrar" value={summary.reflected} tone="green" />
+        <MiniStat label="Not yet sent" value={summary.pending} tone="amber" />
       </div>
 
       {error && <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">{error}</div>}
@@ -624,7 +654,7 @@ function DailyChangesReport() {
                 <th className="px-4 py-2.5">Student</th>
                 <th className="px-4 py-2.5">Change</th>
                 <th className="px-4 py-2.5">By</th>
-                <th className="px-4 py-2.5 text-right">Reflected in AIMS</th>
+                <th className="px-4 py-2.5 text-right">Sent to Registrar</th>
               </tr>
             </thead>
             <tbody>
@@ -638,7 +668,7 @@ function DailyChangesReport() {
                   <td className="px-4 py-2.5 text-right">
                     <button type="button" onClick={() => toggleReflected(item)} disabled={busyId === item.id} className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors ${item.reflected_in_aims ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
                       {item.reflected_in_aims ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                      {item.reflected_in_aims ? "Reflected" : "Mark reflected"}
+                      {item.reflected_in_aims ? "Sent" : "Mark as sent"}
                     </button>
                   </td>
                 </tr>

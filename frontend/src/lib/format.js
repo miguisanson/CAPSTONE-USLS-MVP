@@ -49,7 +49,6 @@ const STATUS_STYLES = {
   "Pending Excel Export": "bg-amber-50 text-amber-700 ring-amber-200",
   "Exported - Ready to Send": "bg-blue-50 text-blue-700 ring-blue-200",
   "Sent - Awaiting Receipt": "bg-violet-50 text-violet-700 ring-violet-200",
-  "Sent to Registrar": "bg-violet-50 text-violet-700 ring-violet-200",
   "Awaiting Implementation": "bg-amber-50 text-amber-700 ring-amber-200",
   Implemented: "bg-brand-50 text-brand-700 ring-brand-200",
   "Requirements Pending": "bg-amber-50 text-amber-700 ring-amber-200",

@@ -40,7 +40,9 @@ export const api = {
     }),
   meta: () => request("/meta"),
   adminTerms: () => request("/admin/terms"),
+  createTerm: (payload) => request("/admin/terms", { method: "POST", body: JSON.stringify(payload) }),
   updateTerm: (id, payload) => request(`/admin/terms/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  setActiveTerm: (id) => request(`/admin/terms/${id}/set-active`, { method: "PATCH", body: JSON.stringify({}) }),
   deleteTerm: (id, payload) => request(`/admin/terms/${id}`, { method: "DELETE", body: JSON.stringify(payload) }),
   addNextTerm: () => request("/admin/terms/add-next", { method: "POST", body: JSON.stringify({}) }),
   dashboard: (params = {}) => {
@@ -56,6 +58,8 @@ export const api = {
     return request(`/students${qs ? `?${qs}` : ""}`);
   },
   faculty: () => request("/faculty"),
+  createFaculty: (payload) => request("/faculty", { method: "POST", body: JSON.stringify(payload) }),
+  updateFaculty: (id, payload) => request(`/faculty/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   facultyProfile: (facultyId) => request(`/faculty/${facultyId}`),
   saveFacultyPreferences: (facultyId, courseIds) =>
     request(`/faculty/${facultyId}/preferences`, {
@@ -204,8 +208,6 @@ export const api = {
     const qs = queryString(params);
     return request(`/monitoring/class-list${qs ? `?${qs}` : ""}`);
   },
-  saveCompreExam: (payload) =>
-    request("/monitoring/compre-exam", { method: "POST", body: JSON.stringify(payload) }),
   monitoringUploads: () => request("/monitoring/uploads"),
   resolveMonitoringIssue: (issueId, payload) =>
     request(`/monitoring/issues/${issueId}/resolve`, {
@@ -225,23 +227,6 @@ export const api = {
     if (!res.ok) throw new Error(body.error || `Corrected workbook upload failed (${res.status})`);
     return body;
   },
-  curriculumPlanning: (params = {}) => {
-    const actual = typeof params === "string" || typeof params === "number" ? { program_id: params } : params;
-    const qs = queryString(actual);
-    return request(`/curriculum-planning${qs ? `?${qs}` : ""}`);
-  },
-  curriculumOfferings: (params = {}) => {
-    const qs = queryString(params);
-    return request(`/curriculum-planning/offerings${qs ? `?${qs}` : ""}`);
-  },
-  addCurriculumOfferings: (payload) =>
-    request("/curriculum-planning/offerings", { method: "POST", body: JSON.stringify(payload) }),
-  deleteCurriculumOffering: (id) =>
-    request(`/curriculum-planning/offerings/${id}`, { method: "DELETE" }),
-  generateCurriculum: (payload) =>
-    request("/curriculum-planning/generate", { method: "POST", body: JSON.stringify(payload) }),
-  createCurriculumSubject: (payload) =>
-    request("/curriculum-planning/subjects", { method: "POST", body: JSON.stringify(payload) }),
   enrollment: (params = {}) => {
     const qs = queryString(params);
     return request(`/enrollment${qs ? `?${qs}` : ""}`);
@@ -301,17 +286,10 @@ export const api = {
     request("/course-adjustments/plan", { method: "POST", body: JSON.stringify(payload) }),
   facultyCvRag: (facultyId, question) =>
     request(`/faculty/${facultyId}/cv-rag`, { method: "POST", body: JSON.stringify({ question }) }),
-  courseAuditSubjects: (programId) =>
-    request(`/course-audit/subjects${programId ? `?program_id=${programId}` : ""}`),
   courseAuditRoster: (courseId, term = "") =>
     request(`/course-audit/roster?course_id=${courseId}${term ? `&term=${encodeURIComponent(term)}` : ""}`),
-  saveCourseAudit: (payload) =>
-    request("/course-audit/roster", { method: "POST", body: JSON.stringify(payload) }),
-  removeStudent: (studentId, payload = {}) =>
-    request(`/students/${studentId}/remove`, { method: "POST", body: JSON.stringify(payload) }),
   flagMonitoringIssue: (studentId, payload = {}) =>
     request(`/students/${studentId}/flag-issue`, { method: "POST", body: JSON.stringify(payload) }),
-  monitoringFlags: (studentId) => request(`/students/${studentId}/flags`),
   monitoringConflicts: (params = {}) => {
     const qs = queryString(params);
     return request(`/monitoring/conflicts${qs ? `?${qs}` : ""}`);
@@ -384,18 +362,6 @@ export const api = {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
-    return body;
-  },
-  parseTitleDefense: async (file) => {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(`${BASE}/student-portal/title-defense/parse`, {
-      method: "POST",
-      body: form,
-      credentials: "same-origin",
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || `Could not read the file (${res.status})`);
     return body;
   },
   deleteResearchEvidence: (evidenceId) =>

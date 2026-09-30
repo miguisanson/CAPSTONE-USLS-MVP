@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness, Building2, CalendarDays, ChevronLeft,
-  ChevronRight, ExternalLink, FileSearch, Link2, Mail, Search, UsersRound, X, BookOpenCheck, Save,
+  ChevronRight, ExternalLink, FileSearch, Link2, Mail, Pencil, Plus, Search, UsersRound, X, BookOpenCheck, Save,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { useApi } from "../hooks";
-import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
+import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
 import { initials } from "../lib/format";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 
+const FACULTY_ROLE_OPTIONS = ["Faculty Adviser", "Panel Member", "Panel Chair", "Academic Coordinator", "Research Coordinator"];
+
 export default function Faculty() {
+  const { user } = useAuth();
+  const canManage = ["staff", "academic_coordinator"].includes(user?.role);
   const { data, loading, error, refetch } = useApi(() => api.faculty(), []);
+  const [notice, setNotice] = useState("");
+  const [formFor, setFormFor] = useState(null); // null = closed, "new" = add form, faculty object = edit form
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("All departments");
@@ -60,10 +67,14 @@ export default function Faculty() {
 
   return (
     <div className="space-y-5 animate-fade-up">
-      <header>
-        <h1 className="font-display text-2xl font-semibold text-ink">Faculty Profiles</h1>
-        <p className="mt-1 text-sm text-slate-500">Search the faculty directory, then open a profile to review expertise, login email, panel load, and weekly availability.</p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-ink">Faculty Profiles</h1>
+          <p className="mt-1 text-sm text-slate-500">Search the faculty directory, then open a profile to review expertise, login email, panel load, and weekly availability.</p>
+        </div>
+        {canManage && <button type="button" onClick={() => { setNotice(""); setFormFor("new"); }} className="btn-primary shrink-0 cursor-pointer"><Plus className="h-4 w-4" /> Add faculty</button>}
       </header>
+      {notice && <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{notice}</div>}
 
       <Card className="p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -108,6 +119,7 @@ export default function Faculty() {
                     <th className="px-3 py-3">Account</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-5 py-3 text-right">Panel load</th>
+                    {canManage && <th className="px-5 py-3 text-right">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -128,6 +140,7 @@ export default function Faculty() {
                       <td className="px-3 py-3"><StatusBadge value={item.account?.active ? "Active login" : "No account"} dot={false} /></td>
                       <td className="px-3 py-3"><StatusBadge value={item.active ? "Active" : "Inactive"} dot={false} /></td>
                       <td className="px-5 py-3 text-right"><span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{item.panel_load}</span></td>
+                      {canManage && <td className="px-5 py-3 text-right"><button type="button" onClick={(event) => { event.stopPropagation(); setNotice(""); setFormFor(item); }} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Edit</button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -137,7 +150,106 @@ export default function Faculty() {
         )}
       </Card>
 
+      {formFor && <FacultyFormModal faculty={formFor === "new" ? null : formFor} onClose={() => setFormFor(null)} onSaved={async (message) => { setFormFor(null); setNotice(message); await refetch(); }} />}
       {selected && <FacultyProfileModal faculty={selected} courses={data?.courses || []} onSaved={refetch} onClose={closeFaculty} />}
+    </div>
+  );
+}
+
+function FacultyFormModal({ faculty, onClose, onSaved }) {
+  const isNew = !faculty;
+  const [form, setForm] = useState(() => ({
+    full_name: faculty?.name || "",
+    department: faculty?.college || "",
+    specialization: faculty?.specialization || "",
+    email: faculty?.email || "",
+    status: faculty ? (faculty.active ? "Active" : "Inactive") : "Active",
+    password: "",
+    eligible_roles: faculty?.eligible_roles || ["Faculty Adviser", "Panel Member", "Panel Chair"],
+  }));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const toggleRole = (role) => set("eligible_roles", form.eligible_roles.includes(role) ? form.eligible_roles.filter((item) => item !== role) : [...form.eligible_roles, role]);
+
+  useEffect(() => {
+    const closeOnEscape = (event) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+    if (!form.full_name.trim() || !form.department.trim() || !form.specialization.trim() || !form.email.trim()) {
+      setError("Enter the name, department, specialization, and email.");
+      return;
+    }
+    if (!form.eligible_roles.length) {
+      setError("Choose at least one role this faculty member can take.");
+      return;
+    }
+    if (isNew && form.password.length < 8) {
+      setError("The temporary password must be at least 8 characters.");
+      return;
+    }
+    if (!isNew && form.password && form.password.length < 8) {
+      setError("The new password must be at least 8 characters.");
+      return;
+    }
+    const payload = {
+      full_name: form.full_name.trim(),
+      department: form.department.trim(),
+      specialization: form.specialization.trim(),
+      email: form.email.trim(),
+      status: form.status,
+      eligible_roles: form.eligible_roles,
+    };
+    setBusy(true);
+    try {
+      let res;
+      if (isNew) res = await api.createFaculty({ ...payload, temporary_password: form.password });
+      else res = await api.updateFaculty(faculty.id, form.password ? { ...payload, new_password: form.password } : payload);
+      await onSaved(res.message || (isNew ? "Faculty member added." : "Faculty member updated."));
+    } catch (err) {
+      setError(err.message || "Could not save the faculty member.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="faculty-form-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <Card className="max-h-[94vh] w-full max-w-2xl overflow-y-auto shadow-2xl">
+        <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <h2 id="faculty-form-title" className="text-lg font-semibold text-ink">{isNew ? "Add faculty" : `Edit ${faculty.name}`}</h2>
+            <button type="button" onClick={onClose} className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block"><span className="field-label">Full name</span><input className="field-input" value={form.full_name} onChange={(event) => set("full_name", event.target.value)} /></label>
+            <label className="block"><span className="field-label">Department</span><input className="field-input" value={form.department} onChange={(event) => set("department", event.target.value)} /></label>
+            <label className="block sm:col-span-2"><span className="field-label">Specialization</span><textarea className="field-input" rows={2} value={form.specialization} onChange={(event) => set("specialization", event.target.value)} /></label>
+            <label className="block"><span className="field-label">Email (also the login)</span><input type="email" className="field-input" value={form.email} onChange={(event) => set("email", event.target.value)} /></label>
+            <label className="block"><span className="field-label">Status</span><select className="field-input cursor-pointer" value={form.status} onChange={(event) => set("status", event.target.value)}><option>Active</option><option>Inactive</option></select></label>
+            <label className="block sm:col-span-2"><span className="field-label">{isNew ? "Temporary password (at least 8 characters)" : "New password (leave blank to keep the current one)"}</span><input type="password" autoComplete="new-password" className="field-input" value={form.password} onChange={(event) => set("password", event.target.value)} /></label>
+          </div>
+          <div>
+            <span className="field-label">Roles this person can take</span>
+            <div className="mt-1 grid gap-2 sm:grid-cols-2">
+              {FACULTY_ROLE_OPTIONS.map((role) => (
+                <label key={role} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-brand-50">
+                  <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.eligible_roles.includes(role)} onChange={() => toggleRole(role)} />{role}
+                </label>
+              ))}
+            </div>
+          </div>
+          <ErrorNote message={error} />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="btn-ghost cursor-pointer">Cancel</button>
+            <button type="submit" disabled={busy} className="btn-primary cursor-pointer"><Save className="h-4 w-4" />{busy ? "Saving..." : isNew ? "Add faculty" : "Save changes"}</button>
+          </div>
+        </form>
+      </Card>
     </div>
   );
 }

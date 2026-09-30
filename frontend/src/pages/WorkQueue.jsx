@@ -7,7 +7,9 @@ import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
 import { formatDate, relativeDays } from "../lib/format";
 import { useAuth } from "../auth";
 
-const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student", "Panel Chair", "Adviser"];
+const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
+const PAGE_SIZE = 50;
+const CONFLICT_ROLES = ["staff", "academic_coordinator"];
 const ACCOUNT_OWNER = {
   staff: "Graduate School Staff",
   academic_coordinator: "Academic Coordinator",
@@ -17,7 +19,12 @@ const ACCOUNT_OWNER = {
 export default function WorkQueue() {
   const { user } = useAuth();
   const [tab, setTab] = useState("tasks");
-  const conflicts = useApi(() => api.monitoringConflicts({ status: "Open" }), []);
+  const canSeeConflicts = CONFLICT_ROLES.includes(user?.role);
+  // Research Coordinators cannot read conflicts (the server refuses), so do not ask.
+  const conflicts = useApi(
+    () => (canSeeConflicts ? api.monitoringConflicts({ status: "Open" }) : Promise.resolve({ items: [], summary: {} })),
+    [canSeeConflicts],
+  );
   const openConflicts = conflicts.data?.summary?.open_total ?? 0;
 
   return (
@@ -31,10 +38,10 @@ export default function WorkQueue() {
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200">
         <TabButton active={tab === "tasks"} onClick={() => setTab("tasks")} icon={ListTodo}>Tasks</TabButton>
-        <TabButton active={tab === "conflicts"} onClick={() => setTab("conflicts")} icon={Flag} badge={openConflicts}>Conflicts</TabButton>
+        {canSeeConflicts && <TabButton active={tab === "conflicts"} onClick={() => setTab("conflicts")} icon={Flag} badge={openConflicts}>Conflicts</TabButton>}
       </div>
 
-      {tab === "tasks" ? <TasksPanel user={user} /> : <ConflictsPanel state={conflicts} />}
+      {tab === "tasks" || !canSeeConflicts ? <TasksPanel user={user} /> : <ConflictsPanel state={conflicts} />}
     </div>
   );
 }
@@ -62,13 +69,21 @@ function TasksPanel({ user }) {
   const [owner, setOwner] = useState(searchParams.get("owner") || (user?.role === "staff" ? "" : ACCOUNT_OWNER[user?.role] || ""));
   const [status, setStatus] = useState(searchParams.get("status") || "");
   const [query, setQuery] = useState("");
-  const { data, loading, error } = useApi(() => api.tasks({ owner, status }), [owner, status]);
+  const [page, setPage] = useState(1);
+  const { data, loading, error } = useApi(() => api.tasks({ owner, status, page, page_size: PAGE_SIZE }), [owner, status, page]);
+  const total = data?.total ?? (data?.items || []).length;
+  const currentPage = data?.page || page;
+  const pageSize = data?.page_size || PAGE_SIZE;
+  const pages = data?.pages || Math.max(1, Math.ceil(total / pageSize));
+  const from = total ? (currentPage - 1) * pageSize + 1 : 0;
+  const to = Math.min(total, (currentPage - 1) * pageSize + (data?.items || []).length);
   const filtered = (data?.items || []).filter((task) => `${task.title} ${task.student_name || ""} ${task.owner_role}`.toLowerCase().includes(query.toLowerCase()));
 
   function updateFilter(next) {
     const merged = { owner, status, ...next };
     setOwner(merged.owner || "");
     setStatus(merged.status || "");
+    setPage(1);
     const params = {};
     if (merged.owner) params.owner = merged.owner;
     if (merged.status) params.status = merged.status;
@@ -113,7 +128,7 @@ function TasksPanel({ user }) {
                     <td className="px-5 py-3 font-semibold text-ink">{task.title}</td>
                     <td className="px-3 py-3 text-slate-600">{task.owner_role}</td>
                     <td className="px-3 py-3">
-                      {task.student_id && user?.role === "staff" ? (
+                      {task.student_id && CONFLICT_ROLES.includes(user?.role) ? (
                         <Link to={`/students/${task.student_id}`} className="font-semibold text-brand-700 hover:underline">{task.student_name}</Link>
                       ) : task.student_id ? (
                         <span className="font-semibold text-ink">{task.student_name}</span>
@@ -137,6 +152,16 @@ function TasksPanel({ user }) {
           </div>
         )}
       </Card>
+
+      {!loading && !error && total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-500">Showing <span className="font-semibold text-ink">{from}-{to}</span> of <span className="font-semibold text-ink">{total}</span></p>
+          <div className="flex gap-2">
+            <button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+            <button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -202,7 +227,7 @@ function ConflictsPanel({ state }) {
                     {item.system_generated && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">System</span>}
                   </div>
                   <p className="mt-1 text-sm font-medium text-slate-700">
-                    {user?.role === "staff" ? (
+                    {CONFLICT_ROLES.includes(user?.role) ? (
                       <Link to={`/students/${item.student_id}`} className="text-brand-700 hover:underline">{item.student_name}</Link>
                     ) : (
                       <span>{item.student_name}</span>

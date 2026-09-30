@@ -777,7 +777,7 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
     const labels = {
       "leave-of-absence": "Leave of Absence",
       readmission: "Readmission",
-      "course-audit": "Course Audit / Grades",
+      "course-audit": "Course Audit",
       awol: "AWOL / Residency",
       practicum: "Practicum",
       withdrawal: "Withdrawal",
@@ -873,7 +873,7 @@ function StudentInbox({ data, onSaved, onOpenRequest }) {
           <option value="all">All workflows</option>
           <option value="leave-of-absence">Leave of Absence</option>
           <option value="readmission">Readmission</option>
-          <option value="course-audit">Course Audit / Grades</option>
+          <option value="course-audit">Course Audit</option>
           <option value="awol">AWOL / Residency</option>
           <option value="practicum">Practicum</option>
           <option value="withdrawal">Withdrawal</option>
