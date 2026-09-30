@@ -688,6 +688,100 @@ class ResidencyEnrollment(db.Model):
     term = db.relationship("AcademicTerm")
 
 
+class LeaveCase(db.Model):
+    """One Leave of Absence, leave extension or Readmission request.
+
+    The status lives here (see ``leave_workflow.py`` for the allowed moves). Period,
+    reason, checklist and dates are columns, not text inside a log row. Logs, messages
+    and tasks are kept as the narrative but never decide where the case is.
+    """
+
+    __tablename__ = "leave_case"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, index=True)
+    kind = db.Column(db.String(20), nullable=False)  # LOA | LOA_EXTENSION | READMISSION
+    status = db.Column(db.String(40), nullable=False, default="Submitted", index=True)
+    # Leave period (for a readmission: the leave being ended). Labels are kept as
+    # the student saw them in case a semester is later renamed.
+    start_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
+    end_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
+    target_term_id = db.Column(db.Integer, db.ForeignKey("academic_term.id"))
+    start_label = db.Column(db.String(80))
+    end_label = db.Column(db.String(80))
+    target_label = db.Column(db.String(80))
+    reason_category = db.Column(db.String(120))
+    reason_text = db.Column(db.Text)
+    return_intent = db.Column(db.Text)
+    checklist_json = db.Column(db.Text)  # {"item": true/false} as ticked by the student
+    staff_checks_json = db.Column(db.Text)  # {"item": true/false} as verified by staff
+    linked_case_id = db.Column(db.Integer, db.ForeignKey("leave_case.id"))
+    prior_stage = db.Column(db.String(60))
+    prior_enrollment_tag = db.Column(db.String(20))
+    eligibility_result = db.Column(db.String(40))
+    staff_notes = db.Column(db.Text)
+    dean_remarks = db.Column(db.Text)
+    policy_json = db.Column(db.Text)  # the policy check as it stood when staff forwarded
+    batch_name = db.Column(db.String(120))
+    submitted_at = db.Column(db.DateTime)
+    forwarded_at = db.Column(db.DateTime)
+    decided_at = db.Column(db.DateTime)
+    started_at = db.Column(db.DateTime)
+    closed_at = db.Column(db.DateTime)
+    closed_reason = db.Column(db.String(160))
+    awol_proposed_at = db.Column(db.DateTime)
+    return_reminded_at = db.Column(db.DateTime)
+    registrar_status = db.Column(db.String(40), nullable=False, default="Not Ready")
+    registrar_exported_at = db.Column(db.DateTime)
+    registrar_sent_at = db.Column(db.DateTime)
+    registrar_acknowledged_at = db.Column(db.DateTime)
+    source = db.Column(db.String(30), nullable=False, default="portal")  # portal | migrated | demo
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    student = db.relationship("Student")
+    start_term = db.relationship("AcademicTerm", foreign_keys=[start_term_id])
+    end_term = db.relationship("AcademicTerm", foreign_keys=[end_term_id])
+    target_term = db.relationship("AcademicTerm", foreign_keys=[target_term_id])
+    linked_case = db.relationship("LeaveCase", remote_side=[id], foreign_keys=[linked_case_id])
+
+
+class LeaveCaseEvent(db.Model):
+    """One move of a leave case: who, from which status to which, and why."""
+
+    __tablename__ = "leave_case_event"
+
+    id = db.Column(db.Integer, primary_key=True)
+    case_id = db.Column(db.Integer, db.ForeignKey("leave_case.id"), nullable=False, index=True)
+    from_status = db.Column(db.String(40))
+    to_status = db.Column(db.String(40), nullable=False)
+    action = db.Column(db.String(40), nullable=False)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    actor_role = db.Column(db.String(80))
+    actor_name = db.Column(db.String(160))
+    comment = db.Column(db.Text)
+    log_id = db.Column(db.Integer)  # the activity-log row written for this move
+    created_at = db.Column(db.DateTime, default=now_utc)
+
+    case = db.relationship("LeaveCase", backref=db.backref("events", lazy=True, order_by="LeaveCaseEvent.id"))
+
+
+class LeaveExportLog(db.Model):
+    """One Registrar list handed off by staff (who, which cases, which file)."""
+
+    __tablename__ = "leave_export_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(40), nullable=False)
+    file_name = db.Column(db.String(200), nullable=False)
+    file_format = db.Column(db.String(10), nullable=False, default="csv")
+    case_ids_json = db.Column(db.Text, nullable=False, default="[]")
+    case_count = db.Column(db.Integer, nullable=False, default=0)
+    exported_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    exported_by_name = db.Column(db.String(160))
+    exported_at = db.Column(db.DateTime, default=now_utc)
+
+
 # Monitoring copy of a student's subject status against the program curriculum.
 class CourseRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -2744,6 +2838,8 @@ def workflow_messages_for(
 
 
 def workflow_case_meta(slug: str, student_id: int) -> dict:
+    if slug in LEAVE_SLUGS:
+        return leave_case_meta(latest_leave_case(student_id, slug))
     record = workflow_case_record(slug, student_id)
     request_id = record.id if record else None
     log_query = TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
@@ -2796,6 +2892,12 @@ def task_dict(task: Task) -> dict:
     elif any(value in task.title.lower() for value in ["awol", "refresher", "re-enroll courses after maximum residence"]):
         action_url = "/workflow/awol"
         action_label = "Open AWOL & Residency"
+    elif "readmission" in task.title.lower() or "readmitted" in task.title.lower():
+        action_url = "/workflow/readmission"
+        action_label = "Open Readmission"
+    elif "leave of absence" in task.title.lower() or "leave extension" in task.title.lower() or "leave is ending" in task.title.lower() or "leave ended" in task.title.lower():
+        action_url = "/workflow/leave-of-absence"
+        action_label = "Open Leave of Absence"
     return {
         "id": task.id,
         "student_id": task.student_id,
@@ -4817,40 +4919,6 @@ def loa_period_semesters(period_text: str) -> int | None:
     return positions[end_term.id] - positions[start_term.id] + 1
 
 
-def prior_loa_semesters(student: Student) -> int:
-    """Semesters of leave the Dean already approved for this student (renewals count)."""
-    total = 0
-    approved_logs = (
-        TransactionLog.query.filter_by(
-            transaction_slug="leave-of-absence",
-            student_id=student.id,
-            result="LOA approved by Dean",
-        )
-        .order_by(TransactionLog.created_at.asc(), TransactionLog.id.asc())
-        .all()
-    )
-    for approved in approved_logs:
-        semesters = loa_period_semesters(
-            request_notes_value(approved.notes, "Requested semester period")
-        )
-        if semesters is None:
-            forwarded = (
-                TransactionLog.query.filter(
-                    TransactionLog.transaction_slug == "leave-of-absence",
-                    TransactionLog.student_id == student.id,
-                    TransactionLog.result == "LOA request forwarded to Dean",
-                    TransactionLog.id < approved.id,
-                )
-                .order_by(TransactionLog.id.desc())
-                .first()
-            )
-            semesters = loa_period_semesters(
-                request_notes_value(forwarded.notes, "Requested semester period") if forwarded else ""
-            )
-        total += max(semesters or 1, 1)
-    return total
-
-
 def loa_policy_citations() -> list[dict]:
     """The LOA rule in plain words, built from the register so text and code agree."""
     snippet = next((item for item in POLICY_SNIPPETS if item["id"] == "loa-residency"), {})
@@ -4871,8 +4939,12 @@ def loa_policy_citations() -> list[dict]:
     }]
 
 
-def loa_filing_check(start_term: AcademicTerm | None) -> dict:
-    """Is today a date on which a leave starting in this semester may be filed?"""
+def loa_filing_check(start_term: AcademicTerm | None, as_of: date | None = None) -> dict:
+    """Is the filing date one on which a leave starting in this semester may be filed?
+
+    ``as_of`` is the date the request was submitted; it defaults to today. Checking a
+    correct request again later must not flip it to "Fail" just because time passed.
+    """
     blackout = rule_value("loa.no_filing_days_before_term_end", 14)
     source = rule_citation("loa.no_filing_days_before_term_end")
     w_source = rule_citation("loa.second_half_marks_w")
@@ -4882,7 +4954,7 @@ def loa_filing_check(start_term: AcademicTerm | None) -> dict:
             "status": "Needs Review",
             "detail": "A valid start semester is required to check the filing date.",
         }
-    today = date.today()
+    today = as_of or date.today()
     if start_term.end_date < today:
         return {
             "label": "Filing date",
@@ -4930,7 +5002,13 @@ def loa_policy_review(student: Student, request_data: dict | None = None) -> dic
     max_total = rule_value("loa.max_total_semesters", 4)
     period_source = rule_citation("loa.max_period_semesters")
     total_source = rule_citation("loa.max_total_semesters")
-    prior_semesters = prior_loa_semesters(student)
+    exclude_case_id = safe_int(request_data.get("exclude_case_id"), 0) or None
+    prior_semesters = leave_approved_semesters(student, exclude_case_id=exclude_case_id)
+    as_of_text = (request_data.get("as_of") or "").strip()
+    try:
+        as_of = date.fromisoformat(as_of_text[:10]) if as_of_text else None
+    except ValueError:
+        as_of = None
     reason_category = (request_data.get("reason_category") or "").strip()
     reason = (request_data.get("reason_remarks") or request_data.get("reason") or "").strip()
     effective_start = (request_data.get("effective_start") or "").strip()
@@ -4985,7 +5063,7 @@ def loa_policy_review(student: Student, request_data: dict | None = None) -> dic
                 f"all leave together cannot pass {max_total} semesters ({total_source})."
             ),
         },
-        loa_filing_check(start_term),
+        loa_filing_check(start_term, as_of),
         {
             "label": "Minimum residency",
             "status": "Pass" if completed_terms >= min_completed else "Needs Review",
@@ -5081,6 +5159,2063 @@ def readmission_policy_review(student: Student, request_data: dict | None = None
         "missing_requirements": missing,
         "citations": snippets,
     }
+
+
+# ---------------------------------------------------------------------------
+# Leave of Absence, leave extension and Readmission cases
+# ---------------------------------------------------------------------------
+# One row per request (LeaveCase). The status, period, reason and checklist live on
+# the row; the activity log and messages are the story, never the source of truth.
+# The allowed moves are in leave_workflow.py and are applied by leave_case_apply().
+from leave_workflow import (  # noqa: E402
+    ACTIVE_LEAVE_STATUSES,
+    APPROVED_LEAVE_STATUSES,
+    KIND_EXTENSION,
+    KIND_LABELS,
+    KIND_LOA,
+    KIND_READMISSION,
+    KINDS_FOR_SLUG,
+    LEAVE_SLUGS,
+    OPEN_STATUSES,
+    SLUG_FOR_KIND,
+    SLUG_LOA,
+    SLUG_READMISSION,
+    STATUS_BY_KEY,
+    TERMINAL_STATUSES,
+)
+import leave_workflow as _lw  # noqa: E402
+
+LEAVE_STAFF = "Graduate School Staff"
+LEAVE_ELIGIBILITY_RESULTS = {"Eligible", "Eligible to Return", "Needs Review", "Not Eligible", "Pending Requirements"}
+LEAVE_MAX_SEMESTERS_CLOSED_LABEL = "Leave of Absence"
+
+
+class LeaveError(ValueError):
+    """A refused move, with the HTTP status the API should answer with."""
+
+    def __init__(self, message: str, status: int = 400):
+        super().__init__(message)
+        self.status = status
+
+
+def leave_term(label: str | None) -> AcademicTerm | None:
+    label = (label or "").strip()
+    return AcademicTerm.query.filter_by(label=label).first() if label else None
+
+
+def leave_semester_count(start_term: AcademicTerm | None, end_term: AcademicTerm | None) -> int | None:
+    if not start_term or not end_term:
+        return None
+    positions = loa_term_position_map()
+    return positions[end_term.id] - positions[start_term.id] + 1
+
+
+def leave_case_semesters(case: LeaveCase) -> int:
+    """Semesters the leave covers (at least one; old records without terms count as one)."""
+    count = leave_semester_count(case.start_term, case.end_term)
+    if count is None:
+        count = loa_period_semesters(f"{case.start_label or ''} to {case.end_label or ''}")
+    return max(count or 1, 1)
+
+
+def leave_covered_terms(case: LeaveCase) -> list[AcademicTerm]:
+    if not case.start_term or not case.end_term:
+        return []
+    return [
+        term for term in AcademicTerm.query.order_by(AcademicTerm.start_date.asc(), AcademicTerm.id.asc()).all()
+        if case.start_term.start_date <= term.start_date <= case.end_term.start_date
+    ]
+
+
+def leave_start_date(case: LeaveCase) -> date | None:
+    return case.start_term.start_date if case.start_term else None
+
+
+def leave_end_date(case: LeaveCase) -> date | None:
+    return case.end_term.end_date if case.end_term else None
+
+
+def leave_family_cases(student_id: int, slug: str | None = None, kinds=None) -> list[LeaveCase]:
+    kinds = tuple(kinds or (KINDS_FOR_SLUG[slug] if slug else _lw.KINDS))
+    return (
+        LeaveCase.query.filter(LeaveCase.student_id == student_id, LeaveCase.kind.in_(kinds))
+        .order_by(LeaveCase.id.desc())
+        .all()
+    )
+
+
+def latest_leave_case(student_id: int, slug: str | None = None, kinds=None) -> LeaveCase | None:
+    kinds = tuple(kinds or (KINDS_FOR_SLUG[slug] if slug else _lw.KINDS))
+    return (
+        LeaveCase.query.filter(LeaveCase.student_id == student_id, LeaveCase.kind.in_(kinds))
+        .order_by(LeaveCase.id.desc())
+        .first()
+    )
+
+
+def open_leave_case(student_id: int, kinds) -> LeaveCase | None:
+    return (
+        LeaveCase.query.filter(
+            LeaveCase.student_id == student_id,
+            LeaveCase.kind.in_(tuple(kinds)),
+            LeaveCase.status.in_(OPEN_STATUSES),
+        )
+        .order_by(LeaveCase.id.desc())
+        .first()
+    )
+
+
+def active_leave_case(student_id: int) -> LeaveCase | None:
+    return (
+        LeaveCase.query.filter(
+            LeaveCase.student_id == student_id,
+            LeaveCase.kind == KIND_LOA,
+            LeaveCase.status.in_(ACTIVE_LEAVE_STATUSES),
+        )
+        .order_by(LeaveCase.id.desc())
+        .first()
+    )
+
+
+def leave_approved_semesters(student: Student, exclude_case_id: int | None = None) -> int:
+    """Semesters of leave already approved (extensions are part of their leave)."""
+    adopt_legacy_leave_logs(student.id)
+    total = 0
+    for case in LeaveCase.query.filter(
+        LeaveCase.student_id == student.id,
+        LeaveCase.kind == KIND_LOA,
+        LeaveCase.status.in_(APPROVED_LEAVE_STATUSES),
+    ).all():
+        if exclude_case_id and case.id == exclude_case_id:
+            continue
+        total += leave_case_semesters(case)
+    return total
+
+
+def prior_loa_semesters(student: Student) -> int:
+    """Semesters of leave the Dean already approved for this student (renewals count)."""
+    return leave_approved_semesters(student)
+
+
+def leave_checklist_state(case: LeaveCase) -> list[dict]:
+    """The readmission checklist item by item: what the student ticked and staff verified."""
+    try:
+        ticked = json.loads(case.checklist_json or "{}")
+    except (TypeError, ValueError):
+        ticked = {}
+    try:
+        checked = json.loads(case.staff_checks_json or "{}")
+    except (TypeError, ValueError):
+        checked = {}
+    return [
+        {"item": item, "checked": bool(ticked.get(item)), "confirmed": bool(checked.get(item))}
+        for item in readmission_requirements()
+    ]
+
+
+def leave_student_brief(student: Student) -> dict:
+    return {
+        "id": student.id,
+        "name": student.name,
+        "student_number": student.student_number,
+        "program_code": student.program.code if student.program else "",
+        "program_name": student.program.name if student.program else "",
+        "standing": student.standing,
+        "enrollment_tag": student.enrollment_tag,
+        "current_stage": student.current_stage,
+        "entry_year": student.entry_year,
+        "search_label": student_search_label(student),
+    }
+
+
+def leave_actor(account: UserAccount | None) -> dict:
+    if account is None:
+        return {"user_id": None, "role": "Workflow System", "name": "Workflow System", "log_actor": "Workflow System"}
+    return {
+        "user_id": account.id,
+        "role": ROLE_LABELS.get(account.role, account.role),
+        "name": account.full_name,
+        "log_actor": "Student" if account.role == "student" else workflow_actor_label(account),
+    }
+
+
+# ---- tasks, notices and the activity trail -------------------------------------------
+LEAVE_TASKS = {
+    KIND_LOA: {
+        "review": "Review student Leave of Absence application",
+        "decide": "Decide Leave of Absence request",
+        "revise": "Revise Leave of Absence application",
+        "registrar": "Send the approved Leave of Absence to the Registrar",
+        "denied": "Tell the student about the denied Leave of Absence",
+        "return_due": "Follow up with a student whose leave is ending",
+        "awol": "Confirm AWOL for a student whose leave ended",
+        "file_return": "File your readmission request before your leave ends",
+    },
+    KIND_EXTENSION: {
+        "review": "Review student Leave of Absence extension request",
+        "decide": "Decide Leave of Absence extension request",
+        "revise": "Revise Leave of Absence extension request",
+        "registrar": "Send the approved leave extension to the Registrar",
+        "denied": "Tell the student about the denied leave extension",
+    },
+    KIND_READMISSION: {
+        "review": "Review student readmission request",
+        "decide": "Decide readmission request",
+        "revise": "Revise readmission request",
+        "registrar": "Send the approved readmission to the Registrar",
+        "denied": "Tell the student about the denied readmission request",
+        "enroll": "Review readmitted student study plan and enrollment",
+    },
+}
+LEAVE_WORK_STAGES = ("review", "decide", "revise")
+LEAVE_OWNER_LABELS = ("Graduate School Staff", "GS Staff")
+
+
+def leave_close_tasks(case: LeaveCase, stages=LEAVE_WORK_STAGES, kinds=None) -> None:
+    titles = {
+        LEAVE_TASKS[kind][stage]
+        for kind in (kinds or (case.kind,))
+        for stage in stages
+        if stage in LEAVE_TASKS.get(kind, {})
+    }
+    if not titles:
+        return
+    for task in Task.query.filter(
+        Task.student_id == case.student_id,
+        Task.status.in_(["Pending", "Overdue"]),
+        Task.title.in_(titles),
+    ).all():
+        task.status = "Done"
+
+
+def leave_open_task(case: LeaveCase, stage: str, owner: str, days: int = 3, priority: int = 55) -> None:
+    title = LEAVE_TASKS[case.kind][stage]
+    ensure_task(case.student_id, title, owner, date.today() + timedelta(days=days), priority)
+
+
+def leave_notice(
+    case: LeaveCase,
+    account: UserAccount | None,
+    title: str,
+    text: str,
+    previous_status: str | None,
+    new_status: str | None,
+    *,
+    recipient: str = "Student",
+    action_type: str = "notice",
+    status: str = "Sent",
+    visibility: str | None = None,
+) -> WorkflowMessage:
+    message = workflow_message_record(
+        SLUG_FOR_KIND[case.kind], case.student, account, recipient, title, text, action_type,
+        previous_status or "", new_status or "",
+        visibility=visibility or ("student_visible" if recipient == "Student" else "internal"),
+        status=status,
+    )
+    message.workflow_request_id = case.id
+    return message
+
+
+def leave_log(
+    case: LeaveCase,
+    result: str,
+    next_owner: str,
+    notes: str,
+    previous_status: str | None,
+    new_status: str,
+    *,
+    account: UserAccount | None,
+    action: str,
+    comment: str = "",
+    source: str | None = None,
+    visibility: str = "student_visible",
+) -> TransactionLog:
+    actor = leave_actor(account)
+    log = add_log(
+        SLUG_FOR_KIND[case.kind], case.student_id, actor["log_actor"],
+        source or f"{KIND_LABELS[case.kind]} case #{case.id}", result, next_owner or "", notes or "",
+        previous_status=previous_status, new_status=new_status, visibility=visibility,
+    )
+    log.workflow_request_id = case.id
+    db.session.flush()
+    db.session.add(LeaveCaseEvent(
+        case_id=case.id, from_status=previous_status, to_status=new_status, action=action,
+        actor_user_id=actor["user_id"], actor_role=actor["role"], actor_name=actor["name"],
+        comment=(comment or "").strip() or None, log_id=log.id,
+    ))
+    return log
+
+
+def leave_period_text(case: LeaveCase) -> str:
+    start = case.start_term.label if case.start_term else (case.start_label or "")
+    end = case.end_term.label if case.end_term else (case.end_label or "")
+    if start and end and start != end:
+        return f"{start} to {end}"
+    return start or end or "Not recorded"
+
+
+def leave_target_label(case: LeaveCase) -> str:
+    return case.target_term.label if case.target_term else (case.target_label or "")
+
+
+def leave_case_summary_notes(case: LeaveCase) -> str:
+    """A short plain-language summary written to the activity log."""
+    if case.kind == KIND_READMISSION:
+        parts = [f"Return semester: {leave_target_label(case) or 'Not recorded'}.", f"Leave being ended: {leave_period_text(case)}."]
+        if case.return_intent:
+            parts.append(f"Intention: {case.return_intent}")
+    else:
+        parts = [f"Requested period: {leave_period_text(case)}.", f"Semesters: {leave_case_semesters(case)}."]
+        if case.reason_category:
+            parts.append(f"Reason: {case.reason_category}.")
+        if case.reason_text:
+            parts.append(case.reason_text)
+    return "\n".join(parts)
+
+
+# ---- the policy check (advisory: it never decides anything) --------------------------
+def leave_policy_review(case: LeaveCase) -> dict:
+    student = case.student
+    as_of = (case.submitted_at or now_utc()).date()
+    if case.kind == KIND_READMISSION:
+        ticked = [row["item"] for row in leave_checklist_state(case) if row["checked"]]
+        review = readmission_policy_review(student, {
+            "readmission_items": ticked,
+            "target_return_term": leave_target_label(case),
+            "previous_loa_period": leave_period_text(case) if (case.start_label or case.start_term_id) else "",
+            "application_reference": "Student portal readmission request",
+        })
+        checks = list(review["checks"])
+        linked = case.linked_case
+        if linked:
+            checks.append({
+                "label": "Linked leave of absence",
+                "status": "Pass" if linked.status in ACTIVE_LEAVE_STATUSES else "Needs Review",
+                "detail": f"{leave_period_text(linked)} · {STATUS_BY_KEY.get(linked.status, {}).get('label', linked.status)}.",
+            })
+        else:
+            checks.append({
+                "label": "Linked leave of absence",
+                "status": "Needs Review",
+                "detail": "No leave case is on file; the student stated the previous leave period themselves. Confirm it with the Registrar record.",
+            })
+        end_date = leave_end_date(linked) if linked else None
+        target = case.target_term
+        if target and end_date:
+            if target.start_date > end_date:
+                checks.append({
+                    "label": "Return semester after the leave",
+                    "status": "Pass",
+                    "detail": f"The return semester starts {target.start_date.isoformat()}, after the leave ends ({end_date.isoformat()}).",
+                })
+            else:
+                checks.append({
+                    "label": "Return semester after the leave",
+                    "status": "Needs Review",
+                    "detail": (
+                        f"Early return: the leave was approved until {end_date.isoformat()} but the student asks to come "
+                        f"back in {target.label}. The Dean decides whether the leave ends early."
+                    ),
+                })
+        if case.staff_checks_json is not None:
+            confirmed = [row for row in leave_checklist_state(case) if row["confirmed"]]
+            checks.append({
+                "label": "Checklist verified by staff",
+                "status": "Pass" if len(confirmed) == len(readmission_requirements()) else "Needs Review",
+                "detail": f"Staff verified {len(confirmed)} of {len(readmission_requirements())} checklist item(s).",
+            })
+        needs = [row for row in checks if row["status"] in {"Needs Review", "Fail"}]
+        review = {
+            **review,
+            "checks": checks,
+            "recommendation": "Needs Review" if needs else "Eligible to Return",
+            "suggested_dean_action": "Return for Revision" if needs else "Approve",
+        }
+        return review
+
+    review = loa_policy_review(student, {
+        "reason_category": case.reason_category or "",
+        "reason_remarks": case.reason_text or "",
+        "effective_start": case.start_term.label if case.start_term else (case.start_label or ""),
+        "effective_end": case.end_term.label if case.end_term else (case.end_label or ""),
+        "application_reference": "Student portal Leave of Absence application",
+        "as_of": as_of.isoformat(),
+        "exclude_case_id": case.id,
+    })
+    if case.kind == KIND_EXTENSION:
+        parent = case.linked_case
+        checks = list(review["checks"])
+        parent_end = leave_end_date(parent) if parent else None
+        checks.append({
+            "label": "Extends a current leave",
+            "status": "Pass" if parent and parent.status in ACTIVE_LEAVE_STATUSES else "Needs Review",
+            "detail": (
+                f"Current leave: {leave_period_text(parent)} ({parent.status})."
+                if parent else "No current leave is linked to this extension."
+            ),
+        })
+        if parent and case.start_term and parent.end_term:
+            follows = leave_semester_count(parent.end_term, case.start_term) == 2
+            checks.append({
+                "label": "Starts right after the leave",
+                "status": "Pass" if follows else "Needs Review",
+                "detail": (
+                    "The extension begins the semester after the current leave ends."
+                    if follows else f"The current leave ends {parent_end.isoformat() if parent_end else 'on an unknown date'}; an extension must follow it directly."
+                ),
+            })
+        needs = [row for row in checks if row["status"] == "Fail"]
+        more = [row for row in checks if row["status"] == "Needs Review"]
+        review = {
+            **review,
+            "checks": checks,
+            "recommendation": "Not Eligible" if needs else "Needs Review" if more else "Eligible",
+            "suggested_dean_action": "Deny" if needs else "Return for Revision" if more else "Approve",
+        }
+    return review
+
+
+# ---- a student files or re-sends a request -------------------------------------------
+def leave_standing_block(student: Student) -> str | None:
+    """Why this student cannot file a new leave request, in plain words (None = may file)."""
+    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        return (
+            "Your record is marked AWOL. File a Return from AWOL request instead; "
+            "a Leave of Absence cannot be filed after leaving without one."
+        )
+    if student.standing in {"Withdrawn", "Graduated", "Completed"} or student.enrollment_tag in {"Completed", "Withdrawn"}:
+        return f"A Leave of Absence cannot be filed while your record is marked {student.standing or student.enrollment_tag}."
+    return None
+
+
+def leave_case_fields_from_payload(data, kind: str) -> dict:
+    """Validated fields for a LOA or extension request (raises LeaveError)."""
+    start_label = (data.get("effective_start") or "").strip()
+    end_label = (data.get("effective_end") or "").strip()
+    reason_category = (data.get("reason_category") or "").strip()
+    reason_text = (data.get("reason_remarks") or "").strip()
+    if reason_category not in LOA_ALLOWED_REASONS:
+        raise LeaveError("Choose one of the allowed Leave of Absence reasons.")
+    if not reason_text:
+        raise LeaveError("Explain the circumstances for this Leave of Absence request.")
+    start_term = leave_term(start_label)
+    end_term = leave_term(end_label)
+    if not start_term or not end_term:
+        raise LeaveError("Choose valid start and end semesters.")
+    duration = leave_semester_count(start_term, end_term)
+    max_period = rule_value("loa.max_period_semesters", 2)
+    if duration < 1 or duration > max_period:
+        raise LeaveError(
+            f"A Leave of Absence may be approved for up to {max_period} consecutive "
+            f"semesters at a time ({rule_citation('loa.max_period_semesters')}); "
+            "a longer stay is asked for as an extension."
+        )
+    return {
+        "start_term": start_term, "end_term": end_term, "duration": duration,
+        "reason_category": reason_category, "reason_text": reason_text,
+    }
+
+
+def leave_submit_new(case: LeaveCase, account: UserAccount | None, filing_note: str = "") -> None:
+    """The first submission of a new case: log, notice and the staff task."""
+    case.status = "Submitted"
+    case.submitted_at = now_utc()
+    db.session.add(case)
+    db.session.flush()
+    label = "Leave of Absence" if case.kind != KIND_READMISSION else "readmission"
+    if case.kind == KIND_READMISSION:
+        result = "Readmission request submitted"
+        source = "Structured readmission portal form"
+    elif case.kind == KIND_EXTENSION:
+        result = "LOA extension request submitted"
+        source = "Structured LOA portal form"
+    else:
+        result = "LOA application submitted"
+        source = "Structured LOA portal form"
+    notes = leave_case_summary_notes(case)
+    if filing_note:
+        notes += f"\nFiling date check: {filing_note}"
+    notes += "\nFiled through the student portal form."
+    leave_log(
+        case, result, LEAVE_STAFF, notes, None, "Submitted",
+        account=account, action="submit", source=source,
+    )
+    leave_open_task(case, "review", LEAVE_STAFF, 3, 55)
+    leave_notice(
+        case, account, f"Your {label} request was submitted",
+        "Graduate School staff will check it and send it to the Dean. You will get a notice at every step.",
+        None, "Submitted",
+    )
+
+
+def leave_file_loa(student: Student, data, account: UserAccount | None) -> LeaveCase:
+    """File, or send again, a Leave of Absence or a leave extension."""
+    adopt_legacy_leave_logs(student.id)
+    blocked = leave_standing_block(student)
+    if blocked:
+        raise LeaveError(blocked, 409)
+    returned = (
+        LeaveCase.query.filter(
+            LeaveCase.student_id == student.id,
+            LeaveCase.kind.in_((KIND_LOA, KIND_EXTENSION)),
+            LeaveCase.status == "Returned",
+        )
+        .order_by(LeaveCase.id.desc())
+        .first()
+    )
+    active = active_leave_case(student.id)
+    if returned:
+        kind = returned.kind
+    elif active or student.standing == "On Leave":
+        kind = KIND_EXTENSION
+    else:
+        kind = KIND_LOA
+    if not returned:
+        open_case = open_leave_case(student.id, (KIND_LOA, KIND_EXTENSION))
+        if open_case:
+            raise LeaveError(
+                f"A {KIND_LABELS[open_case.kind]} request is already in progress "
+                f"({STATUS_BY_KEY[open_case.status]['label'].lower()}). Wait for the decision or withdraw it first.",
+                409,
+            )
+    fields = leave_case_fields_from_payload(data, kind)
+    start_term, end_term, duration = fields["start_term"], fields["end_term"], fields["duration"]
+    max_total = rule_value("loa.max_total_semesters", 4)
+    filing_note = ""
+    parent = None
+    if kind == KIND_EXTENSION:
+        if returned:
+            parent = returned.linked_case
+        else:
+            parent = active
+        if not parent or parent.status not in ACTIVE_LEAVE_STATUSES:
+            raise LeaveError(
+                "You are on leave but no approved leave is on file to extend. Contact Graduate School staff, "
+                "or file a readmission request when you are ready to return.",
+                409,
+            )
+        parent_end = leave_end_date(parent)
+        if parent_end and parent_end < date.today():
+            raise LeaveError(
+                "Your leave has already ended, so it can no longer be extended. File a readmission request "
+                "or contact Graduate School staff.",
+                409,
+            )
+        other_extension = LeaveCase.query.filter(
+            LeaveCase.linked_case_id == parent.id,
+            LeaveCase.kind == KIND_EXTENSION,
+            LeaveCase.status.in_(("Approved",) + OPEN_STATUSES),
+            LeaveCase.id != (returned.id if returned else 0),
+        ).first()
+        if other_extension:
+            raise LeaveError(
+                "A leave may be renewed only once "
+                f"({rule_citation('loa.max_total_semesters')}). This leave already has an extension.",
+                409,
+            )
+        if parent.end_term and leave_semester_count(parent.end_term, start_term) != 2:
+            raise LeaveError(
+                f"An extension starts the semester right after your leave ends ({leave_period_text(parent)}).",
+            )
+        already = leave_approved_semesters(student)
+    else:
+        already = leave_approved_semesters(student, exclude_case_id=returned.id if returned else None)
+    if already + duration > max_total:
+        raise LeaveError(
+            f"{already} semester(s) of leave were already approved and this request "
+            f"adds {duration}. A leave may be renewed for at most another year, so all leave "
+            f"together cannot pass {max_total} semesters ({rule_citation('loa.max_total_semesters')})."
+        )
+    if kind == KIND_LOA:
+        filing = loa_filing_check(start_term)
+        if filing["status"] == "Fail":
+            raise LeaveError(filing["detail"])
+        filing_note = filing["detail"]
+    case = returned
+    if case is None:
+        case = LeaveCase(student_id=student.id, kind=kind, source="portal")
+        if parent:
+            case.linked_case_id = parent.id
+    case.start_term_id, case.end_term_id = start_term.id, end_term.id
+    case.start_label, case.end_label = start_term.label, end_term.label
+    case.reason_category, case.reason_text = fields["reason_category"], fields["reason_text"]
+    if returned:
+        leave_case_apply(case, "resubmit", account, comment="", data={"filing_note": filing_note})
+    else:
+        leave_submit_new(case, account, filing_note)
+    return case
+
+
+def leave_file_readmission(student: Student, data, account: UserAccount | None) -> LeaveCase:
+    """File, or send again, a readmission request."""
+    adopt_legacy_leave_logs(student.id)
+    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        raise LeaveError(
+            "Your record is marked AWOL. Use the Return from AWOL request; readmission is only for students on leave.",
+            409,
+        )
+    active = active_leave_case(student.id)
+    on_leave = student.standing == "On Leave" or student.enrollment_tag == "LOA" or student.current_stage == "LOA"
+    returned = (
+        LeaveCase.query.filter_by(student_id=student.id, kind=KIND_READMISSION, status="Returned")
+        .order_by(LeaveCase.id.desc()).first()
+    )
+    if not returned:
+        open_case = open_leave_case(student.id, (KIND_READMISSION,))
+        if open_case:
+            raise LeaveError(
+                "A readmission request is already in progress "
+                f"({STATUS_BY_KEY[open_case.status]['label'].lower()}). Wait for the decision or withdraw it first.",
+                409,
+            )
+    if active and active.status == "Leave Scheduled":
+        raise LeaveError(
+            "Your leave has not started yet. Cancel the leave instead of asking to be readmitted.", 409,
+        )
+    if not (active or on_leave):
+        raise LeaveError(
+            "Readmission is for students who are on an approved leave of absence. You are not on leave.", 409,
+        )
+    target_label = (data.get("target_return_term") or "").strip()
+    target = leave_term(target_label)
+    if not target or target.start_date <= date.today():
+        raise LeaveError("Choose a valid future return semester.")
+    return_intent = (data.get("return_intent") or "").strip()
+    if not return_intent:
+        raise LeaveError("Enter your intention and readiness to resume studies.")
+    submitted = set(data.getlist("readmission_items")) if hasattr(data, "getlist") else set(data.get("readmission_items") or [])
+    requirements = readmission_requirements()
+    missing = [item for item in requirements if item not in submitted]
+    if missing:
+        raise LeaveError("Complete the readmission checklist: " + ", ".join(missing))
+    start_label = end_label = ""
+    start_term = end_term = None
+    if active:
+        start_term, end_term = active.start_term, active.end_term
+        start_label = active.start_label or (start_term.label if start_term else "")
+        end_label = active.end_label or (end_term.label if end_term else "")
+    else:
+        start_label = (data.get("previous_loa_start") or "").strip()
+        end_label = (data.get("previous_loa_end") or "").strip()
+        start_term, end_term = leave_term(start_label), leave_term(end_label)
+        if not start_term or not end_term or end_term.start_date < start_term.start_date:
+            raise LeaveError("Choose a valid previous LOA start and end semester.")
+    case = returned
+    if case is None:
+        case = LeaveCase(student_id=student.id, kind=KIND_READMISSION, source="portal")
+    case.linked_case_id = active.id if active else None
+    case.start_term_id = start_term.id if start_term else None
+    case.end_term_id = end_term.id if end_term else None
+    case.start_label, case.end_label = start_label or None, end_label or None
+    case.target_term_id, case.target_label = target.id, target.label
+    case.return_intent = return_intent
+    case.checklist_json = json.dumps({item: True for item in requirements})
+    case.staff_checks_json = None
+    if returned:
+        leave_case_apply(case, "resubmit", account, comment="")
+    else:
+        leave_submit_new(case, account)
+    return case
+
+
+# ---- old log rows become cases (safe to run again) ------------------------------------
+def _legacy_note(notes: str | None, *labels: str) -> str:
+    for label in labels:
+        value = request_notes_value(notes, label)
+        if value:
+            return value
+    return ""
+
+
+def _legacy_case_fields(slug: str, notes: str | None, case: LeaveCase) -> None:
+    """Copy whatever structured values an old log row carried into the case columns."""
+    if slug == SLUG_LOA:
+        period = _legacy_note(notes, "Requested period", "Requested semester period")
+        start, end = _lw.split_period(period)
+        if start and not case.start_label:
+            case.start_label, case.end_label = start, end
+        category = _legacy_note(notes, "Reason category")
+        if category and not case.reason_category:
+            case.reason_category = category
+        reason = _legacy_note(notes, "Reason/remarks")
+        if reason and not case.reason_text:
+            case.reason_text = reason
+    else:
+        target = _legacy_note(notes, "Target return semester", "Target return term", "Return semester")
+        if target and not case.target_label:
+            case.target_label = target
+        period = _legacy_note(notes, "Previous LOA period", "Previous leave semester")
+        start, end = _lw.split_period(period)
+        if not start:
+            start = _legacy_note(notes, "Previous LOA start")
+            end = _legacy_note(notes, "Previous LOA end") or start
+        if start and not case.start_label:
+            case.start_label, case.end_label = start, end
+        intent = _legacy_note(notes, "Return intention")
+        if intent and not case.return_intent:
+            case.return_intent = intent
+        counted = re.search(r"Checklist submitted:\s*(\d+)", notes or "")
+        if counted and not case.checklist_json and int(counted.group(1)) >= len(readmission_requirements()):
+            case.checklist_json = json.dumps({item: True for item in readmission_requirements()})
+    eligibility = _legacy_note(notes, "Eligibility result")
+    if eligibility and not case.eligibility_result:
+        case.eligibility_result = eligibility
+    staff_notes = _legacy_note(notes, "Staff notes")
+    if staff_notes and not case.staff_notes:
+        case.staff_notes = staff_notes
+    case.start_term_id = case.start_term_id or (leave_term(case.start_label).id if leave_term(case.start_label) else None)
+    case.end_term_id = case.end_term_id or (leave_term(case.end_label).id if leave_term(case.end_label) else None)
+    case.target_term_id = case.target_term_id or (leave_term(case.target_label).id if leave_term(case.target_label) else None)
+
+
+def _adopt_student_logs(slug: str, student: Student, logs: list[TransactionLog]) -> int:
+    created = 0
+    primary = KINDS_FOR_SLUG[slug][0]
+    current: LeaveCase | None = None
+    made: list[LeaveCase] = []
+
+    def event(case: LeaveCase, log: TransactionLog, from_status: str | None, to_status: str, action: str) -> None:
+        db.session.add(LeaveCaseEvent(
+            case_id=case.id, from_status=from_status, to_status=to_status, action=action,
+            actor_role=log.actor_role, actor_name=log.actor_role, comment=None, log_id=log.id,
+            created_at=log.created_at,
+        ))
+        log.workflow_request_id = case.id
+
+    for log in logs:
+        name = _lw.legacy_event_name(slug, log.result, log.new_status)
+        if not name:
+            continue
+        if name == "submitted":
+            if current is not None and current.status == "Returned":
+                _legacy_case_fields(slug, log.notes, current)
+                event(current, log, "Returned", "Submitted", "resubmit")
+                current.status = "Submitted"
+                current.submitted_at = log.created_at
+                continue
+            current = LeaveCase(
+                student_id=student.id, kind=primary, status="Submitted", source="migrated",
+                submitted_at=log.created_at, created_at=log.created_at,
+            )
+            _legacy_case_fields(slug, log.notes, current)
+            db.session.add(current)
+            db.session.flush()
+            event(current, log, None, "Submitted", "submit")
+            made.append(current)
+            created += 1
+            continue
+        # Any later step: act on the case being built, else start one from this row.
+        if current is None or current.status in TERMINAL_STATUSES or (
+            current.status in ACTIVE_LEAVE_STATUSES and name in {"forwarded", "returned", "withdrawn"}
+        ):
+            current = LeaveCase(
+                student_id=student.id, kind=primary, status="Submitted", source="migrated",
+                submitted_at=log.created_at, created_at=log.created_at,
+            )
+            _legacy_case_fields(slug, log.notes, current)
+            db.session.add(current)
+            db.session.flush()
+            made.append(current)
+            created += 1
+            previous = None
+        else:
+            previous = current.status
+        _legacy_case_fields(slug, log.notes, current)
+        if name == "forwarded":
+            to_status = "Dean Review"
+            current.forwarded_at = log.created_at
+        elif name == "approved":
+            current.decided_at = log.created_at
+            to_status = "Approved" if slug == SLUG_READMISSION else "Closed"
+            current.registrar_status = "Pending Handoff"
+        elif name == "denied":
+            to_status = "Denied"
+            current.decided_at = log.created_at
+        elif name == "returned":
+            to_status = "Returned"
+        else:  # withdrawn
+            to_status = "Withdrawn"
+        current.status = to_status
+        event(current, log, previous, to_status, name)
+    if not made:
+        db.session.flush()
+        return created
+    db.session.flush()
+    on_leave_now = (
+        student.standing == "On Leave" or student.enrollment_tag == "LOA" or student.current_stage == "LOA"
+    )
+    if slug == SLUG_LOA:
+        approved = [case for case in made if case.decided_at and case.status == "Closed"]
+        if approved and on_leave_now:
+            last = approved[-1]
+            later_readmission = LeaveCase.query.filter(
+                LeaveCase.student_id == student.id, LeaveCase.kind == KIND_READMISSION,
+                LeaveCase.status == "Approved", LeaveCase.decided_at >= last.decided_at,
+            ).first()
+            if not later_readmission and not any(
+                c.status in ACTIVE_LEAVE_STATUSES for c in LeaveCase.query.filter_by(student_id=student.id, kind=KIND_LOA).all()
+                if c.id != last.id
+            ):
+                last.status = "On Leave"
+                last.started_at = last.decided_at
+        for case in approved:
+            if case.status == "Closed":
+                case.closed_at = case.decided_at
+                case.closed_reason = "Earlier leave (imported history)"
+    else:
+        for case in made:
+            if case.status in {"Approved"} or case.decided_at:
+                continue
+    # A readmission links to the leave it ends (the newest approved leave before it).
+    for case in made:
+        if slug != SLUG_READMISSION or case.linked_case_id:
+            continue
+        candidate = (
+            LeaveCase.query.filter(
+                LeaveCase.student_id == student.id, LeaveCase.kind == KIND_LOA,
+                LeaveCase.decided_at.isnot(None), LeaveCase.status.in_(APPROVED_LEAVE_STATUSES),
+            )
+            .order_by(LeaveCase.id.desc())
+            .first()
+        )
+        if candidate:
+            case.linked_case_id = candidate.id
+            if case.status == "Approved" and candidate.status in ACTIVE_LEAVE_STATUSES:
+                candidate.status = "Closed"
+                candidate.closed_at = case.decided_at or now_utc()
+                candidate.closed_reason = "Readmitted (imported history)"
+    # Point the old messages at the case they belonged to.
+    legacy_ids = {log.id for log in logs}
+    made_sorted = sorted(made, key=lambda item: item.submitted_at or item.created_at or now_utc())
+    for message in WorkflowMessage.query.filter_by(student_id=student.id, transaction_slug=slug).all():
+        if message.workflow_request_id is not None and message.workflow_request_id not in legacy_ids:
+            continue
+        chosen = made_sorted[0]
+        for case in made_sorted:
+            if (case.submitted_at or case.created_at) and message.created_at and (case.submitted_at or case.created_at) <= message.created_at:
+                chosen = case
+        message.workflow_request_id = chosen.id
+    # Other old rows (messages written as log entries, report exports) pointed at the old request id too.
+    for other in TransactionLog.query.filter_by(student_id=student.id, transaction_slug=slug).all():
+        if _lw.legacy_event_name(slug, other.result, other.new_status):
+            continue  # already attached to its case above
+        if other.workflow_request_id is not None and other.workflow_request_id not in legacy_ids:
+            continue
+        chosen = made_sorted[0]
+        for case in made_sorted:
+            if (case.submitted_at or case.created_at) and other.created_at and (case.submitted_at or case.created_at) <= other.created_at:
+                chosen = case
+        other.workflow_request_id = chosen.id
+    # A leave whose Registrar report was already generated under the old system is not "pending".
+    exported_result = {SLUG_LOA: "LOA decision report exported", SLUG_READMISSION: "Readmission decision report exported"}[slug]
+    already_exported = TransactionLog.query.filter_by(
+        student_id=student.id, transaction_slug=slug, result=exported_result,
+    ).first() is not None
+    for case in made:
+        if case.registrar_status == "Pending Handoff" and already_exported:
+            case.registrar_status = "Exported - Ready to Send"
+            case.registrar_exported_at = case.decided_at
+    db.session.flush()
+    return created
+
+
+def adopt_legacy_leave_logs(student_id: int | None = None, commit: bool = False) -> int:
+    """Turn old log-only Leave / Readmission history into case rows. Returns cases made.
+
+    Safe to repeat: a log row that already has a case event is skipped. Student
+    standing is never changed here; the old approval already did that. Read paths
+    pass ``commit=True`` so the new case ids stay the same on the next request.
+    """
+    created = 0
+    covered = {
+        row[0] for row in db.session.query(LeaveCaseEvent.log_id).filter(LeaveCaseEvent.log_id.isnot(None)).all()
+    }
+    for slug in LEAVE_SLUGS:
+        query = TransactionLog.query.filter(
+            TransactionLog.transaction_slug == slug,
+            TransactionLog.student_id.isnot(None),
+            TransactionLog.actor_role != "Demo Data",
+        )
+        if student_id:
+            query = query.filter(TransactionLog.student_id == student_id)
+        logs = [
+            item for item in query.order_by(TransactionLog.student_id, TransactionLog.id).all()
+            if item.id not in covered and _lw.legacy_event_name(slug, item.result, item.new_status)
+        ]
+        grouped: dict[int, list[TransactionLog]] = {}
+        for item in logs:
+            grouped.setdefault(item.student_id, []).append(item)
+        for sid, rows in grouped.items():
+            student = db.session.get(Student, sid)
+            if student:
+                created += _adopt_student_logs(slug, student, rows)
+    if created:
+        db.session.flush()
+        if commit:
+            db.session.commit()
+    return created
+
+
+# ---- what a move does to the student's own record -------------------------------------
+LEAVE_TERM_SOURCE = "Approved leave of absence"
+ACADEMIC_COORDINATOR_LABEL = "Academic Coordinator"
+
+
+def leave_title(case: LeaveCase) -> str:
+    return "Readmission" if case.kind == KIND_READMISSION else "Leave of Absence"
+
+
+def leave_result_text(case: LeaveCase, step: str) -> str:
+    """The wording written to the activity log (kept compatible with older entries)."""
+    loa = {
+        "submitted": "LOA application submitted",
+        "resubmitted": "LOA application resubmitted",
+        "forwarded": "LOA request forwarded to Dean",
+        "approved": "LOA approved by Dean",
+        "denied": "LOA denied by Dean",
+        "returned_dean": "LOA returned by Dean for revision",
+        "withdrawn": "LOA application withdrawn by student",
+    }
+    extension = {
+        "submitted": "LOA extension request submitted",
+        "resubmitted": "LOA extension request resubmitted",
+        "forwarded": "LOA extension request forwarded to Dean",
+        "approved": "LOA extension approved by Dean",
+        "denied": "LOA extension denied by Dean",
+        "returned_dean": "LOA extension returned by Dean for revision",
+        "withdrawn": "LOA extension request withdrawn by student",
+    }
+    readmission = {
+        "submitted": "Readmission request submitted",
+        "resubmitted": "Readmission request resubmitted",
+        "forwarded": "Readmission request forwarded to Dean",
+        "approved": "Readmission approved by Dean",
+        "denied": "Readmission denied by Dean",
+        "returned_dean": "Readmission returned by Dean for revision",
+        "withdrawn": "Readmission request withdrawn by student",
+    }
+    table = {KIND_LOA: loa, KIND_EXTENSION: extension, KIND_READMISSION: readmission}[case.kind]
+    return table[step]
+
+
+def leave_mark_subjects_withdrawn(case: LeaveCase, filed_second_half: bool) -> list[str]:
+    """Close the subjects the student is taking in the semesters the leave covers.
+
+    Handbook p. 53: a leave filed in the second half of a semester marks the enrolled
+    courses W and gives no refund. The Registrar applies the actual mark; here the
+    subject row is closed and the monitoring copy goes back to "not started", the same
+    way an approved subject withdrawal does.
+    """
+    term_ids = [term.id for term in leave_covered_terms(case)]
+    if not term_ids:
+        return []
+    closed: list[str] = []
+    changed_at = now_utc()
+    note = (
+        "Marked W: leave of absence filed in the second half of the semester (handbook p. 53); "
+        "no refund of tuition and fees. The Registrar applies the mark."
+        if filed_second_half else
+        "Closed because the student is on leave of absence from this semester."
+    )
+    for enrollment in SubjectEnrollment.query.filter(
+        SubjectEnrollment.student_id == case.student_id,
+        SubjectEnrollment.term_id.in_(term_ids),
+        SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES),
+    ).all():
+        enrollment.status = "Withdrawn"
+        enrollment.source_reference = LEAVE_TERM_SOURCE
+        enrollment.status_note = note
+        enrollment.status_changed_at = changed_at
+        enrollment.cancelled_at = changed_at
+        enrollment.updated_at = changed_at
+        record = CourseRecord.query.filter_by(student_id=case.student_id, course_id=enrollment.course_id).first()
+        if record and (
+            (enrollment.term and record.term_label == enrollment.term.label)
+            or record.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
+        ):
+            record.status = "Not Started"
+            record.term_label = None
+            record.evidence_reference = None
+            record.grade_value = None
+            record.grade_status = "No Grade"
+            record.resolved_at = None
+            record.remarks = None
+            record.updated_at = changed_at
+        if enrollment.course:
+            closed.append(enrollment.course.code)
+    return closed
+
+
+def leave_apply_start(case: LeaveCase, *, today: date | None = None) -> list[str]:
+    """The leave begins: remember the stage, go On Leave, record each covered semester."""
+    today = today or date.today()
+    student = case.student
+    if student.current_stage not in {"LOA", "AWOL", "Withdrawn"}:
+        case.prior_stage = student.current_stage
+    if student.enrollment_tag not in {"LOA", "AWOL"}:
+        case.prior_enrollment_tag = student.enrollment_tag
+    student.standing = "On Leave"
+    student.current_stage = "LOA"
+    student.enrollment_tag = "LOA"
+    student.updated_at = now_utc()
+    start = leave_start_date(case)
+    submitted = (case.submitted_at or now_utc()).date()
+    filed_second_half = False
+    if case.start_term and start and submitted >= start:
+        length = max((case.start_term.end_date - start).days, 1)
+        filed_second_half = (submitted - start).days * 2 > length
+    closed = leave_mark_subjects_withdrawn(case, filed_second_half)
+    for term in leave_covered_terms(case):
+        ensure_term_enrollment(student, term, "LOA", LEAVE_TERM_SOURCE)
+    case.started_at = now_utc()
+    recompute_risk(student)
+    return closed
+
+
+def leave_end_leave_for_readmission(case: LeaveCase, linked: LeaveCase | None) -> None:
+    """A readmission was approved: the student is active again, the leave is closed."""
+    student = case.student
+    prior = (linked.prior_stage if linked and linked.prior_stage else None) or case.prior_stage
+    student.standing = "Active"
+    student.current_stage = prior if prior and prior not in {"LOA", "AWOL", "Withdrawn", "Admission"} else "Coursework"
+    student.enrollment_tag = "Not Enrolled"
+    student.updated_at = now_utc()
+    target = case.target_term
+    if linked:
+        early = bool(target and linked.end_term and target.start_date <= linked.end_term.end_date)
+        linked.status = "Closed"
+        linked.closed_at = now_utc()
+        linked.closed_reason = (
+            f"Early return: readmitted for {leave_target_label(case)}" if early
+            else f"Readmitted for {leave_target_label(case) or 'the return semester'}"
+        )
+        linked.awol_proposed_at = None
+        db.session.add(LeaveCaseEvent(
+            case_id=linked.id, from_status="On Leave", to_status="Closed", action="close",
+            actor_role="Workflow System", actor_name="Workflow System",
+            comment=linked.closed_reason,
+        ))
+        leave_close_tasks(linked, stages=("return_due", "awol", "file_return", "registrar"), kinds=(KIND_LOA,))
+    if target:
+        # Leave rows from the return semester onward no longer apply.
+        for row in TermEnrollment.query.filter(
+            TermEnrollment.student_id == student.id,
+            TermEnrollment.status == "LOA",
+            TermEnrollment.source_reference == LEAVE_TERM_SOURCE,
+        ).all():
+            if row.term and row.term.start_date >= target.start_date:
+                db.session.delete(row)
+    recompute_risk(student)
+
+
+def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: str = "") -> AwolCase:
+    """Staff confirmed that the leave ended with no return: the student is AWOL."""
+    student = case.student
+    student.standing = "AWOL"
+    student.current_stage = "AWOL"
+    student.enrollment_tag = "AWOL"
+    student.updated_at = now_utc()
+    end_date = leave_end_date(case)
+    detail = (
+        f"The leave of absence ({leave_period_text(case)}) ended "
+        f"{end_date.isoformat() if end_date else 'without a recorded end date'} and no readmission was approved."
+    )
+    awol = latest_awol_case(student.id)
+    if not awol or awol.status not in {"AWOL Declared", "Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"}:
+        awol = AwolCase(student_id=student.id)
+        db.session.add(awol)
+    awol.status = awol.status if awol.status in {"Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"} else "AWOL Declared"
+    awol.awol_effective_date = awol.awol_effective_date or ((end_date + timedelta(days=1)) if end_date else date.today())
+    awol.last_enrolled_term = awol.last_enrolled_term or case.end_label or (case.end_term.label if case.end_term else None)
+    awol.detection_source = "Leave of absence ended without a return"
+    awol.automatically_flagged_at = awol.automatically_flagged_at or now_utc()
+    awol.policy_classification = awol.policy_classification or "Awaiting structured return declaration"
+    awol.dean_decision = awol.dean_decision or "Not Submitted"
+    awol.updated_at = now_utc()
+    flag, created = ensure_monitoring_flag(
+        student, "AWOL policy alert", detail, source="Leave of absence", source_reference=f"Leave case #{case.id}",
+        account=account,
+    )
+    ensure_task(student.id, "Review automatic AWOL policy alert", "Academic Coordinator", date.today(), 85)
+    add_log(
+        "awol", student.id, leave_actor(account)["log_actor"], f"Leave case #{case.id}",
+        "Student marked AWOL after a leave that ended with no return", "Academic Coordinator",
+        f"{detail} {comment}".strip(), previous_status="Return Due", new_status="AWOL Declared",
+        visibility="internal",
+    )
+    recompute_risk(student)
+    return awol
+
+
+# ---- the guarded transition engine -----------------------------------------------------
+def leave_resolved_target(case: LeaveCase, move: dict) -> str:
+    target = move["to"]
+    if target != "*approved*":
+        return target
+    if case.kind == KIND_LOA:
+        start = leave_start_date(case)
+        return "Leave Scheduled" if (start and start > date.today()) else "On Leave"
+    return "Approved"
+
+
+def leave_available_actions(case: LeaveCase, role: str) -> list[dict]:
+    """The moves this role may make on this case now (what the screens offer)."""
+    actions = []
+    for move in _lw.transitions_from(case.status, case.kind, role):
+        if move["roles"] == frozenset({"system"}):
+            continue
+        actions.append({
+            "action": move["action"],
+            "label": move["label"],
+            "to": leave_resolved_target(case, move),
+            "needs_comment": move["needs_comment"],
+            "tone": move["tone"],
+            "batch": move["batch"],
+        })
+    return actions
+
+
+def _leave_merge_notes(existing: str | None, *parts: str) -> str:
+    """Append notes, skipping text that is already there (a form may send back what it was shown)."""
+    current = (existing or "").strip()
+    for part in parts:
+        part = (part or "").strip()
+        if part and part not in current:
+            current = f"{current}\n{part}" if current else part
+    return current
+
+
+def _leave_resolve_returns(case: LeaveCase) -> None:
+    for message in WorkflowMessage.query.filter(
+        WorkflowMessage.transaction_slug == SLUG_FOR_KIND[case.kind],
+        WorkflowMessage.student_id == case.student_id,
+        WorkflowMessage.recipient_role == "Student",
+        WorkflowMessage.action_type == "return",
+        WorkflowMessage.status == "Open",
+        or_(WorkflowMessage.workflow_request_id == case.id, WorkflowMessage.workflow_request_id.is_(None)),
+    ).all():
+        message.status = "Responded"
+        message.resolved_at = now_utc()
+
+
+def _leave_h_start_review(case, account, comment, data, move):
+    previous = case.status
+    case.status = "Staff Review"
+    leave_log(
+        case, f"Staff started reviewing the {leave_title(case)} request", LEAVE_STAFF,
+        "Graduate School staff started checking the request against the handbook rules.",
+        previous, "Staff Review", account=account, action="start_review", comment=comment,
+    )
+    return {"message": "Review started."}
+
+
+def _leave_h_forward(case, account, comment, data, move):
+    previous = case.status
+    eligibility = (data.get("eligibility_result") or data.get("eligibility_status") or "").strip()
+    if eligibility and eligibility not in LEAVE_ELIGIBILITY_RESULTS and eligibility != "Checked":
+        raise LeaveError("Choose a valid eligibility result.")
+    if case.kind == KIND_READMISSION:
+        # Staff verify each checklist item. An item that is not listed was NOT verified,
+        # so the request reaches the Dean flagged "Needs Review" instead of passing by default.
+        if hasattr(data, "getlist"):
+            confirmed = set(data.getlist("confirmed_items")) | set(data.getlist("readmission_items"))
+        else:
+            confirmed = set(data.get("confirmed_items") or []) | set(data.get("readmission_items") or [])
+        unknown = sorted(confirmed - set(readmission_requirements()))
+        if unknown:
+            raise LeaveError("Unknown readmission checklist item: " + ", ".join(unknown))
+        case.staff_checks_json = json.dumps({item: item in confirmed for item in readmission_requirements()})
+    review = leave_policy_review(case)
+    result_label = eligibility if eligibility and eligibility != "Checked" else review["recommendation"]
+    case.eligibility_result = result_label
+    staff_notes = (data.get("staff_notes") or "").strip()
+    case.staff_notes = _leave_merge_notes(case.staff_notes, staff_notes, comment)
+    case.policy_json = json.dumps({
+        "recommendation": review["recommendation"],
+        "suggested_dean_action": review.get("suggested_dean_action"),
+        "summary": review["summary"],
+        "checks": review["checks"],
+        "checked_at": iso(now_utc()),
+    })
+    case.forwarded_at = now_utc()
+    batch_name = (data.get("batch_name") or "").strip()
+    if batch_name:
+        case.batch_name = batch_name[:120]
+    case.status = "Dean Review"
+    leave_close_tasks(case)
+    leave_open_task(case, "decide", "Dean", 3, 60)
+    notes = [
+        f"Eligibility result: {result_label}.",
+        f"Policy check: {review['recommendation']}. {review['summary']}",
+    ]
+    if staff_notes or comment:
+        notes.append(f"Staff notes: {' '.join(part for part in [staff_notes, comment] if part)}")
+    leave_log(
+        case, leave_result_text(case, "forwarded"), "Dean", "\n".join(notes),
+        previous, "Dean Review", account=account, action="forward", comment=comment,
+    )
+    leave_notice(
+        case, account, f"Your {leave_title(case)} request is with the Dean",
+        "Graduate School staff checked your request and sent it to the Dean for a decision.",
+        previous, "Dean Review",
+    )
+    if comment:
+        leave_notice(case, account, "Note from Graduate School staff", comment, previous, "Dean Review",
+                     recipient="Dean", action_type="forward", status="Sent", visibility="internal")
+    return {"message": "Forwarded to the Dean."}
+
+
+def _leave_h_return(case, account, comment, data, move):
+    previous = case.status
+    by_dean = leave_actor(account)["role"] == "Dean"
+    case.status = "Returned"
+    if by_dean:
+        case.dean_remarks = comment
+        case.decided_at = now_utc()
+    leave_close_tasks(case)
+    leave_open_task(case, "revise", "Student", 5, 40)
+    result = leave_result_text(case, "returned_dean") if by_dean else f"{leave_title(case)} returned for clarification"
+    message = leave_notice(
+        case, account, f"{leave_title(case)} returned for clarification", comment, previous, "Returned",
+        action_type="return", status="Open",
+    )
+    leave_log(
+        case, result, "Student", comment, previous, "Returned", account=account, action="return", comment=comment,
+    )
+    return {"message": "Returned to the student with your comment.", "workflow_message": message}
+
+
+def _leave_h_deny(case, account, comment, data, move):
+    previous = case.status
+    case.status = "Denied"
+    case.dean_remarks = comment
+    case.decided_at = now_utc()
+    leave_close_tasks(case)
+    leave_open_task(case, "denied", LEAVE_STAFF, 3, 50)
+    leave_notice(
+        case, account, f"Your {leave_title(case)} request was denied",
+        f"{comment}\nGraduate School staff will contact you about what you can do next. You may file a new request "
+        "once the reason for the denial is addressed.",
+        previous, "Denied",
+    )
+    leave_log(
+        case, leave_result_text(case, "denied"), LEAVE_STAFF, comment, previous, "Denied",
+        account=account, action="deny", comment=comment,
+    )
+    return {"message": "Denied. Staff will follow up with the student."}
+
+
+def _leave_h_approve(case, account, comment, data, move):
+    previous = case.status
+    student = case.student
+    if student.standing in {"AWOL", "Withdrawn", "Graduated"}:
+        raise LeaveError(f"The student's record is now {student.standing}; this request can no longer be approved.", 409)
+    result = leave_result_text(case, "approved")
+    extra = ""
+    if case.kind == KIND_LOA:
+        target = leave_resolved_target(case, move)
+        case.decided_at = now_utc()
+        case.dean_remarks = comment or None
+        case.registrar_status = "Pending Handoff"
+        if target == "On Leave":
+            closed = leave_apply_start(case)
+            extra = (
+                f" Subjects closed for the leave: {', '.join(closed)}." if closed else ""
+            )
+        case.status = target
+        leave_close_tasks(case)
+        leave_open_task(case, "registrar", LEAVE_STAFF, 3, 50)
+        start = leave_start_date(case)
+        if target == "Leave Scheduled":
+            text = (
+                f"Your leave of absence ({leave_period_text(case)}) is approved. It begins when "
+                f"{case.start_term.label if case.start_term else 'the first semester'} starts"
+                f"{' on ' + start.isoformat() if start else ''}. You can cancel it before then."
+            )
+        else:
+            text = (
+                f"Your leave of absence ({leave_period_text(case)}) is approved and has started. "
+                "Your enrollment is closed until a readmission is approved."
+            )
+        notes = f"Requested period: {leave_period_text(case)}.{extra}" + (f"\n{comment}" if comment else "")
+        next_owner = LEAVE_STAFF if target == "Leave Scheduled" else "Student"
+    elif case.kind == KIND_EXTENSION:
+        parent = case.linked_case
+        if not parent or parent.status not in ACTIVE_LEAVE_STATUSES:
+            raise LeaveError("The leave this extension belongs to is no longer active, so it cannot be approved.", 409)
+        parent.end_term_id, parent.end_label = case.end_term_id, case.end_label
+        if parent.status == "Return Due":
+            parent.status = "On Leave"
+            parent.awol_proposed_at = None
+            parent.return_reminded_at = None
+        if parent.status == "On Leave":
+            for term in leave_covered_terms(parent):
+                ensure_term_enrollment(student, term, "LOA", LEAVE_TERM_SOURCE)
+        db.session.add(LeaveCaseEvent(
+            case_id=parent.id, from_status=parent.status, to_status=parent.status, action="extended",
+            actor_user_id=account.id if account else None, actor_role=leave_actor(account)["role"],
+            actor_name=leave_actor(account)["name"], comment=f"Extended until {leave_period_text(parent)}",
+        ))
+        leave_close_tasks(parent, stages=("return_due", "awol", "file_return"), kinds=(KIND_LOA,))
+        case.status = "Approved"
+        case.decided_at = now_utc()
+        case.dean_remarks = comment or None
+        case.registrar_status = "Pending Handoff"
+        leave_close_tasks(case)
+        leave_open_task(case, "registrar", LEAVE_STAFF, 3, 50)
+        text = f"Your leave is extended. It now runs {leave_period_text(parent)}."
+        notes = f"Extension period: {leave_period_text(case)}. Leave now: {leave_period_text(parent)}." + (f"\n{comment}" if comment else "")
+        next_owner = LEAVE_STAFF
+    else:
+        linked = case.linked_case or active_leave_case(student.id)
+        on_leave = student.standing == "On Leave" or student.enrollment_tag == "LOA" or student.current_stage == "LOA"
+        if not (linked or on_leave):
+            raise LeaveError("The student is not on leave, so a readmission cannot be approved.", 409)
+        case.decided_at = now_utc()
+        case.dean_remarks = comment or None
+        case.registrar_status = "Pending Handoff"
+        if linked and not case.linked_case_id:
+            case.linked_case_id = linked.id
+        leave_end_leave_for_readmission(case, linked)
+        case.status = "Approved"
+        leave_close_tasks(case)
+        leave_open_task(case, "enroll", ACADEMIC_COORDINATOR_LABEL, 5, 45)
+        leave_open_task(case, "registrar", LEAVE_STAFF, 3, 50)
+        text = (
+            f"Your readmission is approved. You are active again for {leave_target_label(case) or 'the return semester'}. "
+            "The Academic Coordinator will plan your subjects; enrollment is a separate step."
+        )
+        notes = f"Return semester: {leave_target_label(case) or 'Not recorded'}." + (f"\n{comment}" if comment else "")
+        next_owner = ACADEMIC_COORDINATOR_LABEL
+    leave_notice(case, account, f"Your {leave_title(case)} request was approved", text, previous, case.status)
+    if comment:
+        leave_notice(case, account, "Dean's comment", comment, previous, case.status, action_type="note", status="Sent")
+    leave_log(
+        case, result, next_owner, notes, previous, case.status, account=account, action="approve", comment=comment,
+    )
+    return {"message": result}
+
+
+def _leave_h_resubmit(case, account, comment, data, move):
+    previous = case.status
+    case.status = "Submitted"
+    case.submitted_at = now_utc()
+    _leave_resolve_returns(case)
+    leave_close_tasks(case)
+    leave_open_task(case, "review", LEAVE_STAFF, 3, 55)
+    notes = leave_case_summary_notes(case)
+    filing_note = (data.get("filing_note") or "").strip() if data else ""
+    if filing_note:
+        notes += f"\nFiling date check: {filing_note}"
+    leave_log(
+        case, leave_result_text(case, "resubmitted"), LEAVE_STAFF, notes, previous, "Submitted",
+        account=account, action="resubmit", source="Structured LOA portal form" if case.kind != KIND_READMISSION else "Structured readmission portal form",
+    )
+    leave_notice(
+        case, account, f"Your {leave_title(case)} request was sent again",
+        "Graduate School staff will look at your corrections.", previous, "Submitted",
+    )
+    return {"message": "Sent again for review."}
+
+
+def _leave_h_withdraw(case, account, comment, data, move):
+    previous = case.status
+    case.status = "Withdrawn"
+    case.closed_at = now_utc()
+    case.closed_reason = "Withdrawn by the student"
+    _leave_resolve_returns(case)
+    leave_close_tasks(case, stages=tuple(LEAVE_TASKS[case.kind].keys()))
+    leave_log(
+        case, leave_result_text(case, "withdrawn"), "", "The student withdrew the request before a Dean decision. No standing was changed.",
+        previous, "Withdrawn", account=account, action="withdraw", comment=comment,
+    )
+    leave_notice(
+        case, account, f"{leave_title(case)} request withdrawn",
+        "The student withdrew this request before the Dean decided. No standing was changed.",
+        previous, "Withdrawn", recipient=LEAVE_STAFF, visibility="internal",
+    )
+    return {"message": "Your request was withdrawn. You may file a new one."}
+
+
+def _leave_h_cancel(case, account, comment, data, move):
+    previous = case.status
+    by_staff = move["action"] == "revoke"
+    case.status = "Cancelled"
+    case.closed_at = now_utc()
+    case.closed_reason = (comment or ("Cancelled by the student before it started" if not by_staff else "Revoked by staff before it started"))[:160]
+    sent = case.registrar_status in {"Exported - Ready to Send", "Sent to Registrar", "Acknowledged"}
+    leave_close_tasks(case, stages=tuple(LEAVE_TASKS[case.kind].keys()))
+    if sent:
+        ensure_task(case.student_id, "Tell the Registrar the approved leave was cancelled", LEAVE_STAFF,
+                    date.today() + timedelta(days=2), 60)
+    else:
+        case.registrar_status = "Not Ready"
+    text = (
+        "Your approved leave of absence was cancelled before it started. You remain an active student."
+        + (f" Reason: {comment}" if comment else "")
+    )
+    leave_notice(case, account, "Your leave of absence was cancelled", text, previous, "Cancelled")
+    leave_log(
+        case, "Approved leave cancelled before it started", LEAVE_STAFF,
+        (comment or "The leave was cancelled before its first semester began. The student's standing was not changed.")
+        + (" The Registrar was already told; staff must inform them." if sent else ""),
+        previous, "Cancelled", account=account, action=move["action"], comment=comment,
+    )
+    return {"message": "The leave was cancelled. The student stays active."}
+
+
+def _leave_h_start_leave(case, account, comment, data, move):
+    previous = case.status
+    today = (data or {}).get("today") or date.today()
+    closed = leave_apply_start(case, today=today)
+    case.status = "On Leave"
+    leave_notice(
+        case, account, "Your leave of absence has started",
+        f"Your leave ({leave_period_text(case)}) began. Your enrollment is closed until a readmission is approved."
+        + (f" Subjects closed: {', '.join(closed)}." if closed else ""),
+        previous, "On Leave",
+    )
+    leave_log(
+        case, "Leave of absence started", "Student",
+        "The first semester of the leave began. Student is now On Leave." + (f" Subjects closed: {', '.join(closed)}." if closed else ""),
+        previous, "On Leave", account=account, action="start_leave", comment=comment,
+    )
+    return {"message": "The leave has started.", "closed_subjects": closed}
+
+
+def _leave_h_mark_return_due(case, account, comment, data, move):
+    previous = case.status
+    case.status = "Return Due"
+    case.return_reminded_at = now_utc()
+    end = leave_end_date(case)
+    leave_open_task(case, "file_return", "Student", 14, 45)
+    leave_open_task(case, "return_due", LEAVE_STAFF, 7, 50)
+    leave_notice(
+        case, account, "Your leave of absence is ending",
+        f"Your leave ends {end.isoformat() if end else 'soon'}. Open Readmission and file your request so you can "
+        "enroll again. If you need more time, ask for an extension before the leave ends.",
+        previous, "Return Due",
+    )
+    leave_log(
+        case, "Leave is ending: return due", "Student",
+        f"The leave ends {end.isoformat() if end else 'on the recorded date'}. The student was reminded to file a readmission request.",
+        previous, "Return Due", account=account, action="mark_return_due", comment=comment,
+    )
+    return {"message": "Marked return due."}
+
+
+def _leave_h_confirm_awol(case, account, comment, data, move):
+    previous = case.status
+    case.status = "Expired"
+    case.closed_at = now_utc()
+    case.closed_reason = "Leave ended with no return; student confirmed AWOL"
+    leave_close_tasks(case, stages=("return_due", "awol", "file_return", "registrar"), kinds=(KIND_LOA,))
+    leave_declare_awol(case, account, comment)
+    leave_notice(
+        case, account, "Your leave of absence ended without a return",
+        "Your record is now marked AWOL because the leave ended and no readmission was approved. "
+        "Open Return from AWOL to write your intention to return.",
+        previous, "Expired",
+    )
+    leave_log(
+        case, "Leave ended with no return: student confirmed AWOL", LEAVE_STAFF,
+        comment or "Staff confirmed the leave ended without a return.", previous, "Expired",
+        account=account, action="confirm_awol", comment=comment,
+    )
+    return {"message": "The student is now AWOL. The Return from AWOL process applies."}
+
+
+def _leave_h_close(case, account, comment, data, move):
+    previous = case.status
+    case.status = "Closed"
+    case.closed_at = now_utc()
+    case.closed_reason = (comment or (data or {}).get("reason") or "Leave completed")[:160]
+    leave_log(case, "Leave closed", "", case.closed_reason, previous, "Closed", account=account, action="close",
+              comment=comment, visibility="internal")
+    return {"message": "Closed."}
+
+
+LEAVE_HANDLERS = {
+    "start_review": _leave_h_start_review,
+    "forward": _leave_h_forward,
+    "return": _leave_h_return,
+    "deny": _leave_h_deny,
+    "approve": _leave_h_approve,
+    "resubmit": _leave_h_resubmit,
+    "withdraw": _leave_h_withdraw,
+    "cancel": _leave_h_cancel,
+    "revoke": _leave_h_cancel,
+    "start_leave": _leave_h_start_leave,
+    "mark_return_due": _leave_h_mark_return_due,
+    "confirm_awol": _leave_h_confirm_awol,
+    "close": _leave_h_close,
+}
+
+
+def leave_case_apply(case: LeaveCase, action: str, account: UserAccount | None, *, comment: str = "", data=None,
+                     system: bool = False) -> dict:
+    """The one place a case changes status. Checks status, role and required comment first."""
+    data = data if data is not None else {}
+    comment = (comment or "").strip()
+    role = "system" if (system or account is None) else _lw.role_key(account.role)
+    move = _lw.find_transition(case.status, action, case.kind, role)
+    if move is None:
+        known = [item for item in _lw.TRANSITIONS if item["action"] == action and case.kind in item["kinds"]]
+        if not known:
+            raise LeaveError("That step does not exist for this kind of request.", 400)
+        if not any(role in item["roles"] for item in known):
+            raise LeaveError("Your role cannot do this step on a leave request.", 403)
+        label = STATUS_BY_KEY.get(case.status, {}).get("label", case.status)
+        raise LeaveError(f"This request is \"{label}\"; that step is not available now.", 409)
+    if move["needs_comment"] and not comment:
+        raise LeaveError("Enter a comment or reason before doing this.", 400)
+    result = LEAVE_HANDLERS[action](case, account, comment, data, move)
+    case.updated_at = now_utc()
+    return result
+
+
+# ---- dates move cases along (run at start-up, at sign-in, and from the staff screen) -----
+def sync_leave_cases(today: date | None = None, commit: bool = False) -> dict:
+    """Start leaves that begin today, mark leaves that are ending, propose AWOL when overdue.
+
+    Safe to repeat. AWOL is only ever *proposed* here; a staff member confirms it.
+    """
+    today = today or date.today()
+    due_days = int(rule_value("leave.return_due_days", 30) or 30)
+    grace_days = int(rule_value("leave.return_grace_days", 14) or 14)
+    summary = {"started": 0, "return_due": 0, "awol_proposed": 0, "adopted": adopt_legacy_leave_logs()}
+    for case in LeaveCase.query.filter(LeaveCase.kind == KIND_LOA, LeaveCase.status == "Leave Scheduled").all():
+        start = leave_start_date(case)
+        if start and start <= today:
+            leave_case_apply(case, "start_leave", None, system=True, data={"today": today})
+            summary["started"] += 1
+    for case in LeaveCase.query.filter(LeaveCase.kind == KIND_LOA, LeaveCase.status == "On Leave").all():
+        end = leave_end_date(case)
+        if end and today >= end - timedelta(days=due_days):
+            leave_case_apply(case, "mark_return_due", None, system=True)
+            summary["return_due"] += 1
+    for case in LeaveCase.query.filter(LeaveCase.kind == KIND_LOA, LeaveCase.status == "Return Due").all():
+        end = leave_end_date(case)
+        if not end or today <= end + timedelta(days=grace_days) or case.awol_proposed_at:
+            continue
+        if open_leave_case(case.student_id, (KIND_READMISSION,)):
+            continue  # a return is already being processed
+        case.awol_proposed_at = now_utc()
+        leave_open_task(case, "awol", LEAVE_STAFF, 2, 70)
+        leave_notice(
+            case, None, "Leave ended with no return",
+            f"The leave ended {end.isoformat()} and no readmission was filed. Confirm whether the student is AWOL.",
+            case.status, case.status, recipient=LEAVE_STAFF, visibility="internal",
+        )
+        leave_log(
+            case, "Leave ended with no return: AWOL proposed", LEAVE_STAFF,
+            f"The leave ended {end.isoformat()} and the student has not come back. Staff must confirm AWOL or follow up.",
+            case.status, case.status, account=None, action="propose_awol", visibility="internal",
+        )
+        summary["awol_proposed"] += 1
+    if commit:
+        db.session.commit()
+    return summary
+
+
+# ---- what the screens receive -------------------------------------------------------------
+def leave_case_brief(case: LeaveCase) -> dict:
+    return {
+        "id": case.id,
+        "kind": case.kind,
+        "kind_label": KIND_LABELS[case.kind],
+        "status": case.status,
+        "status_label": STATUS_BY_KEY.get(case.status, {}).get("label", case.status),
+        "period_text": leave_period_text(case) if case.kind != KIND_READMISSION else leave_target_label(case),
+        "decided_at": iso(case.decided_at),
+        "created_at": iso(case.created_at),
+    }
+
+
+def leave_case_messages(case: LeaveCase, student_visible_only: bool = False) -> list[dict]:
+    slug = SLUG_FOR_KIND[case.kind]
+    latest = latest_leave_case(case.student_id, slug)
+    query = WorkflowMessage.query.filter(
+        WorkflowMessage.transaction_slug == slug,
+        WorkflowMessage.student_id == case.student_id,
+    )
+    if latest and latest.id == case.id:
+        query = query.filter(or_(WorkflowMessage.workflow_request_id == case.id, WorkflowMessage.workflow_request_id.is_(None)))
+    else:
+        query = query.filter(WorkflowMessage.workflow_request_id == case.id)
+    if student_visible_only:
+        query = query.filter(WorkflowMessage.visibility == "student_visible")
+    return [
+        workflow_message_dict(item)
+        for item in query.order_by(WorkflowMessage.created_at.desc(), WorkflowMessage.id.desc()).limit(40).all()
+    ]
+
+
+def leave_case_history(case: LeaveCase, student_visible_only: bool = False) -> list[dict]:
+    query = TransactionLog.query.filter(
+        TransactionLog.transaction_slug == SLUG_FOR_KIND[case.kind],
+        TransactionLog.student_id == case.student_id,
+        TransactionLog.workflow_request_id == case.id,
+    )
+    if student_visible_only:
+        query = query.filter(or_(TransactionLog.visibility.is_(None), TransactionLog.visibility != "internal"))
+    return [
+        log_dict(item)
+        for item in query.order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc()).limit(60).all()
+    ]
+
+
+def leave_case_meta(case: LeaveCase | None) -> dict:
+    """Same shape as workflow_case_meta() so older callers keep working."""
+    if case is None:
+        return {"request_id": None, "next_action_owner": None, "last_activity_at": None,
+                "unresolved_messages": 0, "messages": [], "history": []}
+    history = leave_case_history(case)
+    messages = leave_case_messages(case)
+    return {
+        "request_id": case.id,
+        "next_action_owner": _lw.next_owner(case.kind, case.status) or None,
+        "last_activity_at": history[0]["created_at"] if history else iso(case.updated_at),
+        "unresolved_messages": sum(1 for item in messages if item["status"] == "Open"),
+        "messages": messages,
+        "history": history,
+    }
+
+
+def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) -> dict:
+    student = case.student
+    kind = case.kind
+    info = STATUS_BY_KEY.get(case.status, {})
+    today = date.today()
+    start, end = leave_start_date(case), leave_end_date(case)
+    active_window = case.status in {"On Leave", "Return Due"}
+    events = list(case.events)
+    reached = {event.to_status for event in events}
+    linked = case.linked_case
+    payload = {
+        "id": case.id,
+        "kind": kind,
+        "kind_label": KIND_LABELS[kind],
+        "slug": SLUG_FOR_KIND[kind],
+        "status": case.status,
+        "status_label": info.get("label", case.status),
+        "status_tone": info.get("tone", "info"),
+        "owner": _lw.next_owner(kind, case.status),
+        "student": leave_student_brief(student),
+        "period": {
+            "start_label": case.start_term.label if case.start_term else (case.start_label or ""),
+            "end_label": case.end_term.label if case.end_term else (case.end_label or ""),
+            "start_date": iso(start),
+            "end_date": iso(end),
+            "semesters": leave_case_semesters(case) if (case.start_term_id or case.start_label) else None,
+            "text": leave_period_text(case),
+        },
+        "target_term": leave_target_label(case) or None,
+        "target_start_date": iso(case.target_term.start_date) if case.target_term else None,
+        "reason_category": case.reason_category,
+        "reason_text": case.reason_text,
+        "return_intent": case.return_intent,
+        "checklist": leave_checklist_state(case) if kind == KIND_READMISSION else [],
+        "linked_case": leave_case_brief(linked) if linked else None,
+        "eligibility_result": case.eligibility_result,
+        "staff_notes": case.staff_notes,
+        "dean_remarks": case.dean_remarks,
+        "batch_name": case.batch_name,
+        "prior_stage": case.prior_stage,
+        "prior_enrollment_tag": case.prior_enrollment_tag,
+        "submitted_at": iso(case.submitted_at),
+        "forwarded_at": iso(case.forwarded_at),
+        "decided_at": iso(case.decided_at),
+        "started_at": iso(case.started_at),
+        "closed_at": iso(case.closed_at),
+        "closed_reason": case.closed_reason,
+        "days_until_end": (end - today).days if (end and case.status in {"Leave Scheduled", "On Leave", "Return Due"}) else None,
+        "overdue_days": max((today - end).days, 0) if (end and active_window) else 0,
+        # Only a live proposal: not once staff confirmed it, and not while a return is being processed.
+        "awol_proposed": bool(
+            case.awol_proposed_at
+            and case.status in {"On Leave", "Return Due"}
+            and not open_leave_case(case.student_id, (KIND_READMISSION,))
+        ),
+        "awol_proposed_at": iso(case.awol_proposed_at),
+        "registrar": {
+            "status": case.registrar_status,
+            "exported_at": iso(case.registrar_exported_at),
+            "sent_at": iso(case.registrar_sent_at),
+            "acknowledged_at": iso(case.registrar_acknowledged_at),
+        },
+        "actions": leave_available_actions(case, role),
+        "editable": _lw.role_key(role) == "student" and case.status == "Returned",
+        "timeline": _lw.timeline_steps(kind, case.status, reached),
+        "source": case.source,
+        "created_at": iso(case.created_at),
+        "updated_at": iso(case.updated_at),
+        "unresolved_messages": WorkflowMessage.query.filter(
+            WorkflowMessage.transaction_slug == SLUG_FOR_KIND[kind],
+            WorkflowMessage.student_id == case.student_id,
+            WorkflowMessage.workflow_request_id == case.id,
+            WorkflowMessage.status == "Open",
+        ).count(),
+    }
+    if not detail:
+        return payload
+    student_view = _lw.role_key(role) == "student"
+    try:
+        snapshot = json.loads(case.policy_json) if case.policy_json else None
+    except (TypeError, ValueError):
+        snapshot = None
+    payload["policy_snapshot"] = snapshot
+    if not student_view:
+        payload["policy_review"] = leave_policy_review(case)
+        limits = residence_limits(student)
+        payload["student_summary"] = {
+            "years_in_program": limits["years_in_program"],
+            "normal_years": limits["normal_years"],
+            "absolute_years": limits["absolute_years"],
+            "program_level": limits["program_level"],
+            "approved_leave_semesters": leave_approved_semesters(student, exclude_case_id=case.id),
+            "max_leave_semesters": rule_value("loa.max_total_semesters", 4),
+        }
+    payload["earlier_cases"] = [
+        leave_case_brief(item)
+        for item in LeaveCase.query.filter(LeaveCase.student_id == case.student_id, LeaveCase.id != case.id)
+        .order_by(LeaveCase.id.desc()).limit(12).all()
+    ]
+    payload["events"] = [
+        {
+            "id": event.id,
+            "from_status": event.from_status,
+            "to_status": event.to_status,
+            "action": event.action,
+            "actor_role": event.actor_role,
+            "actor_name": event.actor_name,
+            "comment": event.comment,
+            "created_at": iso(event.created_at),
+        }
+        for event in events
+    ]
+    payload["messages"] = leave_case_messages(case, student_visible_only=student_view)
+    payload["history"] = leave_case_history(case, student_visible_only=student_view)
+    payload["files"] = [
+        attachment_dict(item)
+        for item in StudentRequestAttachment.query.filter_by(
+            student_id=case.student_id, request_type=SLUG_FOR_KIND[kind]
+        ).order_by(StudentRequestAttachment.uploaded_at.desc()).all()
+    ]
+    return payload
+
+
+def leave_vocabulary() -> dict:
+    payload = _lw.vocabulary_payload()
+    payload["eligibility_results"] = sorted(LEAVE_ELIGIBILITY_RESULTS)
+    payload["readmission_requirements"] = readmission_requirements()
+    payload["rules"] = {
+        "max_period_semesters": rule_value("loa.max_period_semesters", 2),
+        "max_total_semesters": rule_value("loa.max_total_semesters", 4),
+        "return_due_days": int(rule_value("leave.return_due_days", 30) or 30),
+        "return_grace_days": int(rule_value("leave.return_grace_days", 14) or 14),
+    }
+    return payload
+
+
+def leave_student_overview(student: Student) -> dict:
+    """What the student's pages need: their cases and what they may file now."""
+    adopt_legacy_leave_logs(student.id, commit=True)
+    cases = leave_family_cases(student.id)
+    active = active_leave_case(student.id)
+    today = date.today()
+    blocked = leave_standing_block(student)
+    open_loa = open_leave_case(student.id, (KIND_LOA, KIND_EXTENSION))
+    open_read = open_leave_case(student.id, (KIND_READMISSION,))
+    on_leave = student.standing == "On Leave" or student.enrollment_tag == "LOA" or student.current_stage == "LOA"
+
+    can_loa = {"allowed": True, "reason": ""}
+    can_ext = {"allowed": False, "reason": "You can ask for more time only while you are on an approved leave."}
+    can_read = {"allowed": False, "reason": "Readmission is for students on an approved leave of absence."}
+    if blocked:
+        can_loa = {"allowed": False, "reason": blocked}
+    elif open_loa and open_loa.status != "Returned":
+        can_loa = {"allowed": False, "reason": f"A {KIND_LABELS[open_loa.kind].lower()} request is already in progress ({STATUS_BY_KEY[open_loa.status]['label'].lower()})."}
+    elif active or on_leave:
+        can_loa = {"allowed": False, "reason": "You are already on leave. Ask for an extension to stay longer, or file a readmission request to return."}
+    if active and active.status in {"Leave Scheduled", "On Leave", "Return Due"} and not open_loa:
+        end = leave_end_date(active)
+        used = leave_approved_semesters(student)
+        max_total = rule_value("loa.max_total_semesters", 4)
+        already_extended = LeaveCase.query.filter(
+            LeaveCase.linked_case_id == active.id, LeaveCase.kind == KIND_EXTENSION,
+            LeaveCase.status.in_(("Approved",) + OPEN_STATUSES),
+        ).first()
+        if end and end < today:
+            can_ext = {"allowed": False, "reason": "Your leave has already ended, so it can no longer be extended."}
+        elif already_extended:
+            can_ext = {"allowed": False, "reason": "A leave can be renewed only once, and this one already was."}
+        elif used >= max_total:
+            can_ext = {"allowed": False, "reason": f"You have used the {max_total} semesters of leave the handbook allows."}
+        else:
+            can_ext = {"allowed": True, "reason": "", "parent_case_id": active.id, "remaining_semesters": max_total - used}
+    elif open_loa and open_loa.kind == KIND_EXTENSION and open_loa.status == "Returned":
+        can_ext = {"allowed": True, "reason": "", "parent_case_id": open_loa.linked_case_id}
+    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        can_read = {"allowed": False, "reason": "Your record is marked AWOL. Use Return from AWOL instead."}
+    elif open_read and open_read.status != "Returned":
+        can_read = {"allowed": False, "reason": f"A readmission request is already in progress ({STATUS_BY_KEY[open_read.status]['label'].lower()})."}
+    elif active and active.status == "Leave Scheduled":
+        can_read = {"allowed": False, "reason": "Your leave has not started yet. Cancel the leave if you do not want it."}
+    elif active or on_leave:
+        end = leave_end_date(active) if active else None
+        can_read = {
+            "allowed": True, "reason": "",
+            "linked_case_id": active.id if active else None,
+            "leave_end": iso(end),
+            "leave_period": leave_period_text(active) if active else None,
+        }
+    banner = None
+    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        banner = {"tone": "bad", "title": "Your record is marked AWOL",
+                  "text": "You cannot enroll until a return request is approved. Open Return from AWOL to start."}
+    elif active and active.status == "Return Due":
+        end = leave_end_date(active)
+        banner = {"tone": "warn", "title": "Your leave is ending",
+                  "text": f"Your leave ends {end.isoformat() if end else 'soon'}. File a readmission request to come back, or ask for an extension."}
+    elif active and active.status == "On Leave" or (on_leave and not active):
+        banner = {"tone": "info", "title": "You are on leave of absence",
+                  "text": "Your enrollment is closed until a readmission is approved."}
+    elif active and active.status == "Leave Scheduled":
+        start = leave_start_date(active)
+        banner = {"tone": "info", "title": "Your leave is scheduled",
+                  "text": f"It starts {start.isoformat() if start else 'when the semester begins'}. You can cancel it before then."}
+    terms = AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
+    loa_options = []
+    for term in terms:
+        if term.end_date < today:
+            continue
+        check = loa_filing_check(term)
+        loa_options.append({
+            "label": term.label, "start_date": iso(term.start_date), "end_date": iso(term.end_date),
+            "state": "Running" if term.start_date <= today else "Upcoming",
+            "filing_status": check["status"], "filing_detail": check["detail"],
+        })
+    return {
+        "cases": [leave_case_dict(item, role="student", detail=True) for item in cases[:12]],
+        "can_file": {"loa": can_loa, "extension": can_ext, "readmission": can_read},
+        "banner": banner,
+        "loa_semester_options": loa_options[:6],
+        "return_semester_options": [term.label for term in terms if term.start_date > today][:6],
+        "active_case_id": active.id if active else None,
+        "rules": leave_vocabulary()["rules"],
+    }
+
+
+def submitted_request_students(request_type: str) -> list[dict]:
+    """One row per leave or readmission case (newest change first), for staff rosters."""
+    adopt_legacy_leave_logs(commit=True)
+    rows: list[dict] = []
+    kinds = KINDS_FOR_SLUG[request_type]
+    for case in (
+        LeaveCase.query.filter(LeaveCase.kind.in_(kinds))
+        .order_by(LeaveCase.updated_at.desc(), LeaveCase.id.desc())
+        .all()
+    ):
+        student = case.student
+        if not student:
+            continue
+        brief = student_brief(student)
+        rows.append({
+            **leave_case_dict(case),
+            **leave_case_meta(case),
+            **brief,
+            "student": brief,
+            "case_id": case.id,
+            "request_label": leave_period_text(case) if case.kind != KIND_READMISSION else (leave_target_label(case) or "Readmission request"),
+            "effective_start": case.start_term.label if case.start_term else (case.start_label or ""),
+            "effective_end": case.end_term.label if case.end_term else (case.end_label or ""),
+            "reason_remarks": case.reason_text,
+            "target_return_term": leave_target_label(case),
+            "previous_loa_period": leave_period_text(case) if case.kind == KIND_READMISSION else "",
+            "status": case.status,
+        })
+    return rows
+
+
+def leave_batch_apply(case_ids: list[int], action: str, account: UserAccount, comment: str = "", batch_name: str = "") -> dict:
+    """Apply one move to several cases. Each row is checked on its own; refusals are listed."""
+    updated, skipped = [], []
+    for case_id in case_ids:
+        case = db.session.get(LeaveCase, case_id)
+        if not case:
+            skipped.append({"case_id": case_id, "student_name": "", "reason": "Request not found"})
+            continue
+        try:
+            leave_case_apply(case, action, account, comment=comment, data={"batch_name": batch_name})
+            updated.append({"case_id": case.id, "student_id": case.student_id, "student_name": case.student.name})
+        except LeaveError as exc:
+            skipped.append({"case_id": case.id, "student_id": case.student_id, "student_name": case.student.name, "reason": str(exc)})
+    return {"updated": updated, "skipped": skipped}
+
+
+# ---- Registrar handoff (list export, sent, acknowledged) --------------------------------
+LEAVE_REGISTRAR_STATUSES = ["Not Ready", "Pending Handoff", "Exported - Ready to Send", "Sent to Registrar", "Acknowledged"]
+LEAVE_REGISTRAR_HEADERS = [
+    "Request", "Student ID", "Student name", "Program", "Leave from", "Leave until", "Return semester",
+    "Reason", "Dean decision date", "Dean remarks", "Endorsement for the Registrar", "Handoff status",
+]
+
+
+def leave_registrar_row(case: LeaveCase) -> list:
+    student = case.student
+    if case.kind == KIND_READMISSION:
+        endorsement = (
+            "The Dean endorses the student's written intention to return: "
+            + (case.return_intent or "No text recorded.")
+        )
+    elif case.kind == KIND_EXTENSION:
+        endorsement = "The Dean approved a one-time extension of the approved leave."
+    else:
+        endorsement = "The Dean approved the written request for leave of absence."
+    return [
+        KIND_LABELS[case.kind],
+        student.student_number,
+        student.name,
+        student.program.code if student.program else "",
+        (case.start_term.label if case.start_term else case.start_label) or "",
+        (case.end_term.label if case.end_term else case.end_label) or "",
+        leave_target_label(case),
+        " - ".join(part for part in [case.reason_category, case.reason_text] if part),
+        iso(case.decided_at) or "",
+        case.dean_remarks or "",
+        endorsement,
+        case.registrar_status,
+    ]
+
+
+def leave_registrar_rows(case: LeaveCase) -> list[list]:
+    return [LEAVE_REGISTRAR_HEADERS, leave_registrar_row(case)]
+
+
+def leave_registrar_eligible(slug: str, case_ids: list[int] | None = None) -> list[LeaveCase]:
+    """Dean-approved cases of this process that still belong on a Registrar list."""
+    query = LeaveCase.query.filter(
+        LeaveCase.kind.in_(KINDS_FOR_SLUG[slug]),
+        LeaveCase.decided_at.isnot(None),
+        LeaveCase.status.in_(APPROVED_LEAVE_STATUSES),
+        LeaveCase.registrar_status.in_(("Pending Handoff", "Exported - Ready to Send")),
+    )
+    if case_ids:
+        query = query.filter(LeaveCase.id.in_(case_ids))
+    return query.order_by(LeaveCase.decided_at.asc(), LeaveCase.id.asc()).all()
+
+
+def leave_registrar_workbook(slug: str, cases: list[LeaveCase]) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    title_text = "Approved Leaves of Absence" if slug == SLUG_LOA else "Approved Readmissions"
+    sheet.title = title_text[:31]
+    width = len(LEAVE_REGISTRAR_HEADERS)
+    sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=width)
+    title = sheet["A1"]
+    title.value = f"USLS Graduate School {title_text}"
+    title.font = Font(name="Arial", size=14, bold=True, color="FFFFFF")
+    title.fill = PatternFill("solid", fgColor="166534")
+    title.alignment = Alignment(horizontal="center")
+    sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=width)
+    note = sheet["A2"]
+    note.value = (
+        "Registrar action list prepared by Graduate School staff. Email this file through the official channel "
+        "and wait for the Registrar to acknowledge it; the portal does not send the email."
+    )
+    note.font = Font(name="Arial", size=10, italic=True, color="475569")
+    note.alignment = Alignment(wrap_text=True)
+    header_fill = PatternFill("solid", fgColor="DCFCE7")
+    for column, value in enumerate(LEAVE_REGISTRAR_HEADERS, 1):
+        cell = sheet.cell(row=3, column=column, value=value)
+        cell.font = Font(name="Arial", size=10, bold=True, color="14532D")
+        cell.fill = header_fill
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+    for row_number, case in enumerate(cases, 4):
+        for column, value in enumerate(leave_registrar_row(case), 1):
+            cell = sheet.cell(row=row_number, column=column, value=value)
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+    for column in range(1, width + 1):
+        sheet.column_dimensions[chr(64 + column)].width = 22 if column not in {8, 10, 11} else 40
+    sheet.freeze_panes = "A4"
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def leave_registrar_export(slug: str, cases: list[LeaveCase], file_format: str, account: UserAccount) -> tuple[bytes, str, str, "LeaveExportLog"]:
+    """Build the list file and move Pending Handoff cases to Exported (once each)."""
+    stamp = now_utc()
+    actor = leave_actor(account)
+    for case in cases:
+        if case.registrar_status != "Pending Handoff":
+            continue
+        previous = case.registrar_status
+        case.registrar_status = "Exported - Ready to Send"
+        case.registrar_exported_at = stamp
+        leave_close_tasks(case, stages=("registrar",))
+        leave_log(
+            case, f"{leave_title(case)} added to the Registrar list", LEAVE_STAFF,
+            f"Handoff status: {previous} to {case.registrar_status}. Staff email the file manually and wait for acknowledgement.",
+            case.status, case.status, account=account, action="export", visibility="internal",
+        )
+    if file_format == "xlsx":
+        payload = leave_registrar_workbook(slug, cases)
+        mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    else:
+        file_format = "csv"
+        stream = io.StringIO()
+        writer = csv.writer(stream)
+        writer.writerow(LEAVE_REGISTRAR_HEADERS)
+        for case in cases:
+            writer.writerow(leave_registrar_row(case))
+        payload = stream.getvalue().encode("utf-8-sig")
+        mimetype = "text/csv"
+    prefix = "approved-leaves-of-absence" if slug == SLUG_LOA else "approved-readmissions"
+    file_name = f"{prefix}-{date.today().isoformat()}.{file_format}"
+    log = LeaveExportLog(
+        slug=slug, file_name=file_name, file_format=file_format,
+        case_ids_json=json.dumps([case.id for case in cases]), case_count=len(cases),
+        exported_by_user_id=actor["user_id"], exported_by_name=actor["name"], exported_at=stamp,
+    )
+    db.session.add(log)
+    db.session.flush()
+    return payload, mimetype, file_name, log
+
+
+def leave_export_log_dict(item: LeaveExportLog) -> dict:
+    return {
+        "id": item.id,
+        "slug": item.slug,
+        "file_name": item.file_name,
+        "file_format": item.file_format,
+        "case_count": item.case_count,
+        "case_ids": json.loads(item.case_ids_json or "[]"),
+        "exported_by": item.exported_by_name,
+        "exported_at": iso(item.exported_at),
+    }
+
+
+def leave_registrar_advance(case: LeaveCase, target: str, account: UserAccount) -> None:
+    """Exported -> Sent to Registrar -> Acknowledged, one step at a time."""
+    order = {"Exported - Ready to Send": "Sent to Registrar", "Sent to Registrar": "Acknowledged"}
+    if order.get(case.registrar_status) != target:
+        raise LeaveError(
+            f"{case.student.name}'s {KIND_LABELS[case.kind].lower()} is \"{case.registrar_status}\"; it cannot move to \"{target}\" now.",
+            409,
+        )
+    previous = case.registrar_status
+    case.registrar_status = target
+    if target == "Sent to Registrar":
+        case.registrar_sent_at = now_utc()
+    else:
+        case.registrar_acknowledged_at = now_utc()
+    leave_log(
+        case, f"{leave_title(case)} handoff: {target}", LEAVE_STAFF,
+        f"Handoff status: {previous} to {target}.", case.status, case.status,
+        account=account, action="handoff", visibility="internal",
+    )
 
 
 AWOL_RESIDENCY_CITATIONS = [
@@ -5244,6 +7379,7 @@ def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | 
             "Return Approved",
             "Extension Approved - Refresher Required",
             "Re-enrollment Required",
+            "Re-enrollment Completed",
         }:
             return None
         return (
@@ -5275,12 +7411,13 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
             "Return Submitted",
             "Returned for Revision",
             "Dean Review",
+            "Re-enrollment Required",
         }:
             latest = AwolCase(student_id=student.id)
             db.session.add(latest)
         newly_detected = not latest.automatically_flagged_at
         latest.status = latest.status if latest.status in {
-            "Return Submitted", "Returned for Revision", "Dean Review"
+            "Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"
         } else "AWOL Declared"
         latest.awol_effective_date = latest.awol_effective_date or effective_date or date.today()
         latest.detection_source = source
@@ -8568,6 +10705,12 @@ def register_routes(app: Flask) -> None:
                 except Exception as exc:  # noqa: BLE001
                     db.session.rollback()
                     return jsonify({"error": f"Could not prepare the demo account: {exc}"}), 400
+        try:
+            # Start leaves that begin today and flag leaves that are ending (idempotent).
+            sync_leave_cases(commit=True)
+        except Exception:  # noqa: BLE001 - signing in must never fail because of this
+            db.session.rollback()
+            app.logger.exception("Leave date sweep failed at sign-in")
         session.clear()  # a fresh session on every sign-in (no session fixation)
         session["account_id"] = account.id
         session["role"] = account.role
@@ -8712,6 +10855,13 @@ def register_routes(app: Flask) -> None:
             "student semester records": TermEnrollment.query.filter_by(term_id=term.id).count(),
             "subject enrollments": SubjectEnrollment.query.filter_by(term_id=term.id).count(),
             "residency enrollments": ResidencyEnrollment.query.filter_by(term_id=term.id).count(),
+            "leave or readmission requests": LeaveCase.query.filter(
+                or_(
+                    LeaveCase.start_term_id == term.id,
+                    LeaveCase.end_term_id == term.id,
+                    LeaveCase.target_term_id == term.id,
+                )
+            ).count(),
             "course-adjustment plans": CourseOfferingPlan.query.filter(
                 or_(
                     CourseOfferingPlan.target_term_id == term.id,
@@ -9125,6 +11275,7 @@ def register_routes(app: Flask) -> None:
                 "recommendations": student_portal_recommendations(student),
                 "research_milestones": [research_milestone_payload(student, gate) for gate in RESEARCH_MILESTONES],
                 "loa_allowed_reasons": LOA_ALLOWED_REASONS,
+                "leave_overview": leave_student_overview(student),
                 "readmission_requirements": readmission_requirements(),
                 "upcoming_semesters": upcoming_semester_labels(5),
                 "future_semesters": future_semester_labels(5),
@@ -9537,107 +11688,35 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        effective_start = (data.get("effective_start") or "").strip()
-        effective_end = (data.get("effective_end") or "").strip()
-        reason_category = (data.get("reason_category") or "").strip()
-        reason_details = (data.get("reason_remarks") or "").strip()
-        if reason_category not in LOA_ALLOWED_REASONS:
-            return jsonify({"error": "Choose one of the allowed Leave of Absence reasons."}), 400
-        if not reason_details:
-            return jsonify({"error": "Explain the circumstances for this Leave of Absence request."}), 400
-        start_term = AcademicTerm.query.filter_by(label=effective_start).first()
-        end_term = AcademicTerm.query.filter_by(label=effective_end).first()
-        if not start_term or not end_term:
-            return jsonify({"error": "Choose valid start and end semesters."}), 400
-        ordered_terms = AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
-        term_positions = {item.id: index for index, item in enumerate(ordered_terms)}
-        duration = term_positions[end_term.id] - term_positions[start_term.id] + 1
-        max_period = rule_value("loa.max_period_semesters", 2)
-        if duration < 1 or duration > max_period:
-            return jsonify({
-                "error": (
-                    f"A Leave of Absence may be approved for up to {max_period} consecutive "
-                    f"semesters at a time ({rule_citation('loa.max_period_semesters')}); "
-                    "a renewal is filed as a new request."
-                )
-            }), 400
-        max_total = rule_value("loa.max_total_semesters", 4)
-        already_approved = prior_loa_semesters(student)
-        if already_approved + duration > max_total:
-            return jsonify({
-                "error": (
-                    f"{already_approved} semester(s) of leave were already approved and this request "
-                    f"adds {duration}. A leave may be renewed for at most another year, so all leave "
-                    f"together cannot pass {max_total} semesters ({rule_citation('loa.max_total_semesters')})."
-                )
-            }), 400
-        filing = loa_filing_check(start_term)
-        if filing["status"] == "Fail":
-            return jsonify({"error": filing["detail"]}), 400
-        latest = (
-            TransactionLog.query.filter_by(transaction_slug="leave-of-absence", student_id=student.id)
-            .filter(TransactionLog.actor_role != "Demo Data")
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .first()
-        )
-        if latest and latest.new_status in {"Submitted", "Dean Review", "Approved"}:
-            return jsonify({"error": "A Leave of Absence request is already in progress."}), 409
-        period = f"{effective_start} to {effective_end}"
-        notes = [
-            "Student submitted a structured Leave of Absence application for staff eligibility review.",
-            f"Requested period: {period}.",
-            f"Requested duration: {duration} semester(s).",
-            f"Filing date check: {filing['detail']}",
-            f"Reason category: {reason_category}.",
-            f"Reason/remarks: {reason_details}.",
-            "Application format: structured portal form; no RAG or document extraction used.",
-        ]
-
-        add_task(student.id, "Review student Leave of Absence application", "GS Staff", 3, 55)
-        add_log(
-            "leave-of-absence",
-            student.id,
-            "Student",
-            "Structured LOA portal form",
-            "LOA application submitted",
-            "GS Staff",
-            "\n".join(notes),
-        )
-        db.session.commit()
-        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your LOA application."})
+        try:
+            case = leave_file_loa(student, data, account)
+            db.session.commit()
+        except LeaveError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), exc.status
+        label = "leave extension request" if case.kind == KIND_EXTENSION else "LOA application"
+        return jsonify({
+            "ok": True,
+            "case_id": case.id,
+            "message": f"Submitted. Graduate School staff will review your {label}.",
+        })
 
     @app.route("/api/student-portal/requests/leave-of-absence/withdraw", methods=["POST"])
     @require_api_login("student")
     def student_withdraw_loa_request():
+        """Older entry point: withdraw the student's open Leave of Absence request."""
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        latest = (
-            TransactionLog.query.filter_by(transaction_slug="leave-of-absence", student_id=student.id)
-            .filter(TransactionLog.actor_role != "Demo Data")
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .first()
-        )
-        pending_results = {"LOA application submitted", "LOA request forwarded to Dean"}
-        if not latest or latest.result not in pending_results:
+        adopt_legacy_leave_logs(student.id)
+        case = open_leave_case(student.id, (KIND_LOA, KIND_EXTENSION))
+        if not case:
             return jsonify({"error": "Only a pending LOA application can be withdrawn before the Dean decides."}), 409
-        for task in Task.query.filter(
-            Task.student_id == student.id,
-            Task.status.in_(["Pending", "Overdue"]),
-            or_(Task.title.contains("Leave of Absence"), Task.title.contains("LOA")),
-        ).all():
-            task.status = "Done"
-        add_log(
-            "leave-of-absence",
-            student.id,
-            "Student",
-            "Structured LOA portal form",
-            "LOA application withdrawn by student",
-            "Student",
-            "Student withdrew the pending application before a Dean decision. No standing was changed.",
-            previous_status=latest.new_status or "Submitted",
-            new_status="Withdrawn",
-        )
-        db.session.commit()
+        try:
+            leave_case_apply(case, "withdraw", account)
+            db.session.commit()
+        except LeaveError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), exc.status
         return jsonify({"ok": True, "message": "Your pending LOA application was withdrawn. You may submit a new application."})
 
     @app.route("/api/student-portal/requests/readmission", methods=["POST"])
@@ -9646,55 +11725,36 @@ def register_routes(app: Flask) -> None:
         data = request_payload()
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        target_return_term = (data.get("target_return_term") or "").strip()
-        previous_loa_start = (data.get("previous_loa_start") or "").strip()
-        previous_loa_end = (data.get("previous_loa_end") or "").strip()
-        return_intent = (data.get("return_intent") or "").strip()
-        previous_loa_period = f"{previous_loa_start} to {previous_loa_end}".strip()
-        return_term = AcademicTerm.query.filter_by(label=target_return_term).first()
-        loa_start_term = AcademicTerm.query.filter_by(label=previous_loa_start).first()
-        loa_end_term = AcademicTerm.query.filter_by(label=previous_loa_end).first()
-        if not return_term or return_term.start_date <= date.today():
-            return jsonify({"error": "Choose a valid future return semester."}), 400
-        if not loa_start_term or not loa_end_term or loa_end_term.start_date < loa_start_term.start_date:
-            return jsonify({"error": "Choose a valid previous LOA start and end semester."}), 400
-        if not return_intent:
-            return jsonify({"error": "Enter your intention and readiness to resume studies."}), 400
-        submitted = set(data.getlist("readmission_items"))
-        missing = [item for item in readmission_requirements() if item not in submitted]
-        if missing:
-            return jsonify({"error": "Complete the readmission checklist: " + ", ".join(missing)}), 400
-        latest = (
-            TransactionLog.query.filter_by(transaction_slug="readmission", student_id=student.id)
-            .filter(TransactionLog.actor_role != "Demo Data")
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .first()
-        )
-        if latest and latest.new_status in {"Submitted", "Dean Review", "Approved"}:
-            return jsonify({"error": "A readmission request is already in progress."}), 409
-        notes = [
-            "Student submitted a structured readmission request for staff review.",
-            f"Target return semester: {target_return_term}.",
-            f"Checklist submitted: {len(submitted)} item(s); missing/not marked: None.",
-            f"Previous LOA period: {previous_loa_period}.",
-            f"Previous LOA start: {previous_loa_start}.",
-            f"Previous LOA end: {previous_loa_end}.",
-            f"Return intention: {return_intent}.",
-            "Application format: structured portal form; no RAG or document extraction used.",
-        ]
+        try:
+            case = leave_file_readmission(student, data, account)
+            db.session.commit()
+        except LeaveError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), exc.status
+        return jsonify({
+            "ok": True,
+            "case_id": case.id,
+            "message": "Submitted. Graduate School staff will review your readmission request.",
+        })
 
-        add_task(student.id, "Review student readmission request", "GS Staff", 3, 55)
-        add_log(
-            "readmission",
-            student.id,
-            "Student",
-            "Structured readmission portal form",
-            "Readmission request submitted",
-            "GS Staff",
-            "\n".join(notes),
-        )
-        db.session.commit()
-        return jsonify({"ok": True, "message": "Submitted. Graduate School staff will review your readmission request."})
+    @app.route("/api/student-portal/leave-cases/<int:case_id>/<action>", methods=["POST"])
+    @require_api_login("student")
+    def student_leave_case_action(case_id: int, action: str):
+        """Withdraw a pending request, or cancel an approved leave that has not started."""
+        account = current_account()
+        case = db.session.get(LeaveCase, case_id)
+        if not case or case.student_id != account.student_id:
+            return jsonify({"error": "That request was not found."}), 404
+        if action not in {"withdraw", "cancel"}:
+            return jsonify({"error": "That action is not available to students."}), 400
+        data = request.get_json(silent=True) or {}
+        try:
+            outcome = leave_case_apply(case, action, account, comment=(data.get("comment") or ""))
+            db.session.commit()
+        except LeaveError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), exc.status
+        return jsonify({"ok": True, "message": outcome["message"], "case": leave_case_dict(case, role="student")})
 
     @app.route("/api/student-portal/requests/awol-return", methods=["POST"])
     @require_api_login("student")
@@ -10120,72 +12180,29 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/standing-changes/<slug>/<int:student_id>/registrar-report")
     @require_api_login("staff", "academic_coordinator")
     def standing_change_registrar_report(slug: str, student_id: int):
-        """Generate the provisional Registrar handoff for an approved LOA/readmission."""
-        config = STANDING_CHANGE_REPORT_CONFIG.get(slug)
-        if not config:
+        """One student's Registrar sheet for their latest Dean-approved leave or readmission."""
+        if slug not in LEAVE_SLUGS:
             return jsonify({"error": "This standing-change report is not supported."}), 404
         student = Student.query.get_or_404(student_id)
-        approval = (
-            TransactionLog.query.filter_by(
-                transaction_slug=slug,
-                student_id=student.id,
-                result=config["approved_result"],
+        adopt_legacy_leave_logs(student.id)
+        case = (
+            LeaveCase.query.filter(
+                LeaveCase.student_id == student.id,
+                LeaveCase.kind.in_(KINDS_FOR_SLUG[slug]),
+                LeaveCase.decided_at.isnot(None),
+                LeaveCase.status.in_(APPROVED_LEAVE_STATUSES),
             )
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+            .order_by(LeaveCase.id.desc())
             .first()
         )
-        if not approval:
+        if not case:
             return jsonify({"error": "The Dean must approve this request before a Registrar report is generated."}), 400
-        submission_result = "LOA application submitted" if slug == "leave-of-absence" else "Readmission request submitted"
-        submission = (
-            TransactionLog.query.filter_by(
-                transaction_slug=slug,
-                student_id=student.id,
-                result=submission_result,
-            )
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .first()
-        )
-        latest = (
-            TransactionLog.query.filter_by(transaction_slug=slug, student_id=student.id)
-            .filter(TransactionLog.actor_role != "Demo Data")
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .first()
-        )
-        if latest and latest.result in {config["approved_result"], config["generated_result"]}:
-            add_log(
-                slug,
-                student.id,
-                workflow_actor_label(current_account()),
-                "Registrar report",
-                config["generated_result"],
-                "Graduate School Staff",
-                "Provisional CSV generated; replace its layout when the Registrar confirms the official required format.",
-                previous_status="Approved",
-                new_status="Approved",
-                visibility="internal",
-            )
-            db.session.commit()
-
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow([f"USLS Graduate School {config['label']} Registrar Report"])
-        writer.writerow(["Format status", "Provisional - Registrar format still requires stakeholder confirmation"])
-        writer.writerow(["Student", student.name])
-        writer.writerow(["Student ID", student.student_number])
-        writer.writerow(["Program", student.program.code])
-        writer.writerow(["Dean approval date", iso(approval.created_at)])
-        if slug == "leave-of-absence":
-            writer.writerow(["Effective period", request_notes_value(submission.notes if submission else "", "Requested period")])
-            writer.writerow(["Reason category", request_notes_value(submission.notes if submission else "", "Reason category")])
-            writer.writerow(["Reason / remarks", request_notes_value(submission.notes if submission else "", "Reason/remarks")])
-        else:
-            writer.writerow(["Target return semester", request_notes_value(submission.notes if submission else "", "Target return semester")])
-            writer.writerow(["Previous LOA period", request_notes_value(submission.notes if submission else "", "Previous LOA period")])
-            writer.writerow(["Enrollment note", "The active standing is restored on Dean approval; course enrollment remains a separate Academic Coordinator process."])
-        writer.writerow(["Generated at", now_utc().isoformat()])
-        filename_slug = "loa" if slug == "leave-of-absence" else "readmission"
-        filename = f"{filename_slug}-registrar-{student.student_number}.csv"
+        writer.writerow(leave_registrar_rows(case)[0])
+        writer.writerow(leave_registrar_rows(case)[1])
+        filename = f"{'loa' if slug == SLUG_LOA else 'readmission'}-registrar-{student.student_number}.csv"
+        db.session.commit()
         return Response(
             output.getvalue(),
             mimetype="text/csv",
@@ -13209,68 +15226,20 @@ def register_routes(app: Flask) -> None:
             add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application), previous_status=previous_status, new_status=application.status)
 
         elif case_type in {"leave-of-absence", "readmission"}:
-            forwarded = TransactionLog.query.get_or_404(item_id)
-            expected_result = "LOA request forwarded to Dean" if case_type == "leave-of-absence" else "Readmission request forwarded to Dean"
-            if forwarded.transaction_slug != case_type or forwarded.result != expected_result or forwarded.new_status != "Dean Review":
+            case = LeaveCase.query.get_or_404(item_id)
+            if SLUG_FOR_KIND.get(case.kind) != case_type:
                 return jsonify({"error": "This request is not awaiting a Dean decision."}), 400
-            latest = (
-                TransactionLog.query.filter_by(transaction_slug=case_type, student_id=forwarded.student_id)
-                .filter(TransactionLog.actor_role != "Demo Data")
-                .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-                .first()
-            )
-            if not latest or latest.id != forwarded.id:
-                return jsonify({"error": "This request already has a newer workflow action."}), 400
-
-            student = forwarded.student
-            previous_status = "Dean Review"
-            if case_type == "leave-of-absence":
-                period = request_notes_value(forwarded.notes, "Requested semester period")
-                if decision == "approve":
-                    student.standing = "On Leave"
-                    student.current_stage = "LOA"
-                    student.enrollment_tag = "LOA"
-                    result, new_status, next_owner = "LOA approved by Dean", "Approved", "Student"
-                elif decision == "deny":
-                    result, new_status, next_owner = "LOA denied by Dean", "Denied", "Graduate School Staff"
-                elif decision == "return":
-                    result, new_status, next_owner = "LOA returned by Dean for revision", "Returned for Revision", "Student"
-                    add_task(student.id, "Revise Leave of Absence application", "Student", 5, 35)
-                else:
-                    return jsonify({"error": "LOA decisions must be approve, deny, or return."}), 400
-                detail = f"Requested semester period: {period or 'Not recorded'}."
-            else:
-                return_semester = request_notes_value(forwarded.notes, "Return semester")
-                if decision == "approve":
-                    student.standing = "Active"
-                    student.current_stage = "Coursework"
-                    student.enrollment_tag = "Not Enrolled"
-                    result, new_status, next_owner = "Readmission approved by Dean", "Approved", "Academic Coordinator"
-                    add_task(student.id, "Review readmitted student study plan and enrollment", "Academic Coordinator", 5, 45)
-                elif decision == "deny":
-                    result, new_status, next_owner = "Readmission denied by Dean", "Denied", "Graduate School Staff"
-                elif decision == "return":
-                    result, new_status, next_owner = "Readmission returned by Dean for revision", "Returned for Revision", "Student"
-                    add_task(student.id, "Complete readmission requirements", "Student", 5, 40)
-                else:
-                    return jsonify({"error": "Readmission decisions must be approve, deny, or return."}), 400
-                detail = f"Return semester: {return_semester or 'Not recorded'}."
-
-            recompute_risk(student)
-            resolve_standing_change_tasks(student.id, "Decide", "Dean")
-            workflow_message_record(
-                case_type, student, account, "Student", result,
-                note or f"{detail} Next owner: {next_owner}.",
-                "return" if decision == "return" else "notice",
-                previous_status, new_status,
-                visibility="student_visible",
-                status="Open" if decision == "return" else "Sent",
-            )
-            add_log(
-                case_type, student.id, f"Dean · {account.full_name}", "Approvals",
-                result, next_owner, " ".join(part for part in [detail, note] if part),
-                previous_status=previous_status, new_status=new_status,
-            )
+            if decision not in {"approve", "return", "deny"}:
+                label = "LOA" if case_type == "leave-of-absence" else "Readmission"
+                return jsonify({"error": f"{label} decisions must be approve, deny, or return."}), 400
+            try:
+                outcome = leave_case_apply(case, decision, account, comment=note)
+            except LeaveError as exc:
+                db.session.rollback()
+                status = 400 if exc.status == 409 else exc.status
+                return jsonify({"error": str(exc)}), status
+            db.session.commit()
+            return jsonify({"ok": True, "message": outcome["message"], "case": leave_case_dict(case, role="dean")})
 
         elif case_type == "awol-return":
             item = AwolCase.query.get_or_404(item_id)
@@ -14554,6 +16523,173 @@ def register_routes(app: Flask) -> None:
     def student_portal_assistant_suggestions():
         return jsonify({"items": ASSISTANT_STUDENT_SUGGESTIONS})
 
+    # ---- Leave of Absence / Readmission cases (staff board, Dean, exports) ----------------
+    def _leave_case_or_404(case_id: int) -> LeaveCase:
+        case = db.session.get(LeaveCase, case_id)
+        if not case:
+            from werkzeug.exceptions import NotFound
+            raise NotFound("That request was not found.")
+        return case
+
+    @app.route("/api/leave-cases")
+    @require_api_login("staff", "dean")
+    def leave_cases_list():
+        account = current_account()
+        slug = (request.args.get("slug") or SLUG_LOA).strip()
+        if slug not in LEAVE_SLUGS:
+            return jsonify({"error": "Choose leave-of-absence or readmission."}), 400
+        adopt_legacy_leave_logs()
+        db.session.commit()
+        cases = (
+            LeaveCase.query.filter(LeaveCase.kind.in_(KINDS_FOR_SLUG[slug]))
+            .order_by(LeaveCase.updated_at.desc(), LeaveCase.id.desc())
+            .all()
+        )
+        rows = [leave_case_dict(case, role=account.role) for case in cases]
+        counts: dict[str, int] = {}
+        for row in rows:
+            key = _lw.column_key_for_status(slug, row["status"]) or "other"
+            counts[key] = counts.get(key, 0) + 1
+        return jsonify({
+            "slug": slug,
+            "vocabulary": leave_vocabulary(),
+            "cases": rows,
+            "counts": counts,
+            "programs": sorted({row["student"]["program_code"] for row in rows}),
+            "reasons": sorted({row["reason_category"] for row in rows if row["reason_category"]}),
+        })
+
+    @app.route("/api/leave-cases/<int:case_id>")
+    @require_api_login("staff", "dean")
+    def leave_case_detail(case_id: int):
+        account = current_account()
+        case = _leave_case_or_404(case_id)
+        return jsonify({"case": leave_case_dict(case, role=account.role, detail=True), "vocabulary": leave_vocabulary()})
+
+    @app.route("/api/leave-cases/<int:case_id>/transition", methods=["POST"])
+    @require_api_login("staff", "dean")
+    def leave_case_transition(case_id: int):
+        """Every button and every drag-and-drop on the board ends up here."""
+        account = current_account()
+        case = _leave_case_or_404(case_id)
+        data = request_payload()
+        action = (data.get("action") or "").strip()
+        try:
+            outcome = leave_case_apply(case, action, account, comment=(data.get("comment") or ""), data=data)
+            db.session.commit()
+        except LeaveError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), exc.status
+        return jsonify({
+            "ok": True,
+            "message": outcome["message"],
+            "case": leave_case_dict(case, role=account.role, detail=True),
+        })
+
+    @app.route("/api/leave-cases/batch", methods=["POST"])
+    @require_api_login("staff", "dean")
+    def leave_cases_batch():
+        account = current_account()
+        data = request_payload()
+        case_ids = sorted({safe_int(value) for value in data.getlist("case_ids") if safe_int(value)})
+        action = (data.get("action") or "").strip()
+        if not case_ids:
+            return jsonify({"error": "Select at least one request."}), 400
+        batchable = {item["action"] for item in _lw.TRANSITIONS if item["batch"]}
+        if action not in batchable:
+            return jsonify({"error": "That step cannot be applied to several requests at once."}), 400
+        comment = (data.get("comment") or "").strip()
+        move_needs_comment = any(
+            item["action"] == action and item["needs_comment"] for item in _lw.TRANSITIONS if item["batch"]
+        )
+        if move_needs_comment and not comment:
+            return jsonify({"error": "Enter the required reason before applying this step."}), 400
+        batch_name = (data.get("batch_name") or "").strip()
+        result = leave_batch_apply(case_ids, action, account, comment, batch_name)
+        db.session.commit()
+        suffix = f" in {batch_name}" if batch_name else ""
+        return jsonify({
+            "ok": True,
+            **result,
+            "batch_name": batch_name,
+            "action": action,
+            "message": f"{len(result['updated'])} request(s) updated{suffix}; {len(result['skipped'])} skipped.",
+        })
+
+    @app.route("/api/leave-cases/sync", methods=["POST"])
+    @require_api_login("staff")
+    def leave_cases_sync():
+        summary = sync_leave_cases(commit=True)
+        return jsonify({"ok": True, **summary})
+
+    @app.route("/api/leave-cases/registrar-export", methods=["POST"])
+    @require_api_login("staff")
+    def leave_cases_registrar_export():
+        account = current_account()
+        data = request_payload()
+        slug = (data.get("slug") or SLUG_LOA).strip()
+        if slug not in LEAVE_SLUGS:
+            return jsonify({"error": "Choose leave-of-absence or readmission."}), 400
+        case_ids = sorted({safe_int(value) for value in data.getlist("case_ids") if safe_int(value)})
+        file_format = (data.get("format") or "csv").strip().lower()
+        if file_format not in {"csv", "xlsx"}:
+            return jsonify({"error": "Choose CSV or Excel."}), 400
+        cases = leave_registrar_eligible(slug, case_ids or None)
+        if case_ids and len(cases) != len(case_ids):
+            return jsonify({"error": "Every selected request must be Dean-approved and not yet sent to the Registrar."}), 409
+        if not cases:
+            return jsonify({"error": "No Dean-approved requests are waiting for a Registrar list."}), 400
+        payload, mimetype, file_name, log = leave_registrar_export(slug, cases, file_format, account)
+        db.session.commit()
+        return Response(
+            payload,
+            mimetype=mimetype,
+            headers={
+                "Content-Disposition": f'attachment; filename="{file_name}"',
+                "X-Exported-Count": str(len(cases)),
+                "X-Export-Id": str(log.id),
+                "X-Export-Filename": file_name,
+            },
+        )
+
+    @app.route("/api/leave-cases/handoff", methods=["POST"])
+    @require_api_login("staff")
+    def leave_cases_handoff():
+        account = current_account()
+        data = request_payload()
+        case_ids = sorted({safe_int(value) for value in data.getlist("case_ids") if safe_int(value)})
+        target = (data.get("status") or "").strip()
+        if not case_ids:
+            return jsonify({"error": "Select at least one request."}), 400
+        if target not in {"Sent to Registrar", "Acknowledged"}:
+            return jsonify({"error": "Choose Sent to Registrar or Acknowledged."}), 400
+        updated, skipped = [], []
+        for case_id in case_ids:
+            case = db.session.get(LeaveCase, case_id)
+            if not case:
+                skipped.append({"case_id": case_id, "reason": "Request not found"})
+                continue
+            try:
+                leave_registrar_advance(case, target, account)
+                updated.append({"case_id": case.id, "student_name": case.student.name})
+            except LeaveError as exc:
+                skipped.append({"case_id": case.id, "student_name": case.student.name, "reason": str(exc)})
+        db.session.commit()
+        return jsonify({
+            "ok": True, "updated": updated, "skipped": skipped,
+            "message": f"{len(updated)} request(s) marked {target}; {len(skipped)} skipped.",
+        })
+
+    @app.route("/api/leave-cases/export-log")
+    @require_api_login("staff", "dean")
+    def leave_cases_export_log():
+        slug = (request.args.get("slug") or "").strip()
+        query = LeaveExportLog.query
+        if slug in LEAVE_SLUGS:
+            query = query.filter_by(slug=slug)
+        rows = query.order_by(LeaveExportLog.id.desc()).limit(30).all()
+        return jsonify({"items": [leave_export_log_dict(item) for item in rows]})
+
     @app.route("/api/leave-of-absence/policy-review", methods=["POST"])
     @require_api_login("staff", "academic_coordinator", "dean")
     def leave_of_absence_policy_review():
@@ -14576,7 +16712,9 @@ def register_routes(app: Flask) -> None:
                     parse_api_date(value)
                 except ValueError:
                     return jsonify({"error": "Request date must use YYYY-MM-DD format."}), 400
-        return jsonify({"ok": True, "review": loa_policy_review(student, data)})
+        review = loa_policy_review(student, data)
+        db.session.commit()
+        return jsonify({"ok": True, "review": review})
 
     @app.route("/api/readmission/policy-review", methods=["POST"])
     @require_api_login("staff", "academic_coordinator", "dean")
@@ -14954,7 +17092,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(exc)}), 400
         message = "Saved. The student record, queue, and monitoring indicators were updated."
         if slug in {"leave-of-absence", "readmission"}:
-            message = "Forwarded to the Dean. An approved decision will update the student's standing immediately."
+            message = "Forwarded to the Dean. The student's standing changes only after the Dean approves and the leave begins."
         if slug == "student-handoff" and student_id:
             account = UserAccount.query.filter_by(student_id=student_id, role="student", active=True).first()
             if account:
@@ -16563,35 +18701,22 @@ def workflow_case_record(slug: str, student_id: int):
         return latest_graduation_endorsement(student_id)
     if slug in {"awol", "awol-return"}:
         return latest_awol_case(student_id)
-    if slug in {"leave-of-absence", "readmission"}:
-        submitted_result = {
-            "leave-of-absence": "LOA application submitted",
-            "readmission": "Readmission request submitted",
-        }[slug]
-        return (
-            TransactionLog.query.filter_by(
-                transaction_slug=slug,
-                student_id=student_id,
-                actor_role="Student",
-                result=submitted_result,
-            )
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .first()
-        )
+    if slug in LEAVE_SLUGS:
+        # A leave or readmission case is a real row; its status is on the row.
+        return latest_leave_case(student_id, slug)
     return None
 
 
 def workflow_record_status(slug: str, record) -> str:
     if not record:
         return "Not Submitted"
-    if isinstance(record, TransactionLog):
-        return record.new_status or record.result
     return record.endorsement_status if slug == "graduation" else record.status
 
 
 def set_workflow_record_status(slug: str, record, status: str) -> None:
-    if isinstance(record, TransactionLog):
-        record.new_status = status
+    if isinstance(record, LeaveCase):
+        # Leave cases change status only through leave_case_apply().
+        raise ValueError("A leave or readmission request changes status only through its own steps.")
     elif slug == "graduation":
         record.endorsement_status = status
     else:
@@ -16927,6 +19052,15 @@ def create_workflow_message(
         raise ValueError("This student does not have an active request in this workflow.")
     previous_status = workflow_record_status(slug, record)
     new_status = previous_status
+    if slug in LEAVE_SLUGS and action_type == "return":
+        # A return moves the case through the guarded transition table, like any other step.
+        if recipient_label != "Student":
+            raise ValueError("A leave or readmission request is returned to the student. Use a note to reach another reviewer.")
+        try:
+            outcome = leave_case_apply(record, "return", account, comment=comment)
+        except LeaveError as exc:
+            raise ValueError(str(exc)) from exc
+        return outcome["workflow_message"]
     if action_type == "return":
         new_status = workflow_backflow_status(slug, record, recipient_label, previous_status)
         set_workflow_record_status(slug, record, new_status)
@@ -16994,7 +19128,10 @@ def create_workflow_message(
 
 def workflow_approval_item(kind: str, item) -> dict:
     student = item.student
-    meta = workflow_case_meta("awol" if kind == "awol-return" else kind, student.id)
+    if kind in LEAVE_SLUGS:
+        meta = leave_case_meta(item)
+    else:
+        meta = workflow_case_meta("awol" if kind == "awol-return" else kind, student.id)
     if kind == "awol-return":
         return {
             "id": item.id,
@@ -17015,28 +19152,24 @@ def workflow_approval_item(kind: str, item) -> dict:
             "request_id": item.id,
             **meta,
         }
-    if kind in {"leave-of-absence", "readmission"}:
-        attachment = latest_request_attachment(student.id, kind)
-        if kind == "leave-of-absence":
-            request_value = request_notes_value(item.notes, "Requested semester period") or "Semester period not recorded"
-            title = f"Leave of Absence request · {student.name}"
-            subtitle = f"{student.program.code} · {request_value}"
-        else:
-            request_value = request_notes_value(item.notes, "Return semester") or "Return semester not recorded"
-            title = f"Readmission request · {student.name}"
-            subtitle = f"{student.program.code} · {request_value}"
+    if kind in LEAVE_SLUGS:
+        title = f"{KIND_LABELS[item.kind]} request · {student.name}"
+        value = leave_target_label(item) if item.kind == KIND_READMISSION else leave_period_text(item)
+        subtitle = f"{student.program.code} · {value or 'Semester not recorded'}"
         return {
             "id": item.id,
             "type": kind,
+            "kind": item.kind,
             "title": title,
             "subtitle": subtitle,
-            "status": item.new_status or item.result,
-            "workflow_status": item.new_status or item.result,
+            "status": item.status,
+            "workflow_status": item.status,
             "student": student_brief(student),
-            "submitted_at": iso(item.created_at),
-            "details": item.notes or item.result,
-            "record": {"attachments": [attachment_dict(attachment)] if attachment else []},
+            "submitted_at": iso(item.forwarded_at or item.submitted_at or item.created_at),
+            "details": _leave_merge_notes(leave_case_summary_notes(item), f"Staff notes: {item.staff_notes}" if item.staff_notes else ""),
+            "record": {"attachments": []},
             "request_id": item.id,
+            "case": leave_case_dict(item, role="dean", detail=True),
             **meta,
         }
     if kind == "practicum":
@@ -17101,47 +19234,21 @@ def workflow_approvals_payload() -> dict:
     def eligible_graduation_rows(query) -> list[GraduationEndorsement]:
         return [item for item in query.all() if graduation_eligibility(item.student)["eligible"]]
 
-    def latest_standing_logs(slug: str, results: set[str], limit: int = 100) -> list[TransactionLog]:
-        candidates = (
-            TransactionLog.query.filter(
-                TransactionLog.transaction_slug == slug,
-                TransactionLog.result.in_(results),
-                TransactionLog.actor_role != "Demo Data",
-            )
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .limit(limit * 3)
-            .all()
+    def standing_cases(slug: str, statuses, limit: int = 100, recent: bool = False) -> list[LeaveCase]:
+        query = LeaveCase.query.filter(
+            LeaveCase.kind.in_(KINDS_FOR_SLUG[slug]),
+            LeaveCase.status.in_(statuses),
         )
-        rows = []
-        seen = set()
-        for candidate in candidates:
-            if not candidate.student_id or candidate.student_id in seen:
-                continue
-            latest = (
-                TransactionLog.query.filter_by(transaction_slug=slug, student_id=candidate.student_id)
-                .filter(TransactionLog.actor_role != "Demo Data")
-                .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-                .first()
-            )
-            seen.add(candidate.student_id)
-            if latest and latest.id == candidate.id:
-                rows.append(candidate)
-            if len(rows) >= limit:
-                break
-        return rows
+        if recent:
+            query = query.filter(LeaveCase.decided_at.isnot(None)).order_by(LeaveCase.decided_at.desc(), LeaveCase.id.desc())
+        else:
+            query = query.order_by(LeaveCase.forwarded_at.asc(), LeaveCase.id.asc())
+        return query.limit(limit).all()
 
-    standing_pending = {
-        "leave-of-absence": latest_standing_logs("leave-of-absence", {"LOA request forwarded to Dean"}),
-        "readmission": latest_standing_logs("readmission", {"Readmission request forwarded to Dean"}),
-    }
-    standing_recent_results = {
-        "leave-of-absence": {"LOA approved by Dean", "LOA denied by Dean", "LOA returned by Dean for revision"},
-        "readmission": {"Readmission approved by Dean", "Readmission denied by Dean", "Readmission returned by Dean for revision"},
-    }
-    standing_recent = {
-        slug: latest_standing_logs(slug, results, 12)
-        for slug, results in standing_recent_results.items()
-    }
+    adopt_legacy_leave_logs(commit=True)
+    standing_pending = {slug: standing_cases(slug, ("Dean Review",)) for slug in LEAVE_SLUGS}
+    decided_statuses = ("Leave Scheduled", "On Leave", "Return Due", "Approved", "Denied", "Closed", "Expired", "Returned")
+    standing_recent = {slug: standing_cases(slug, decided_statuses, 12, recent=True) for slug in LEAVE_SLUGS}
     pending = []
     for slug, rows in standing_pending.items():
         pending.extend(workflow_approval_item(slug, item) for item in rows)
@@ -18448,23 +20555,53 @@ def reports_payload(filters=None) -> dict:
                 "next_owner": eligibility["next_owner"],
             })
 
-    loa_readmission_rows = [
-        {
-            "student": student_brief(student),
-            "standing": student.standing,
-            "stage": student.current_stage,
-            "latest_readmission": log_dict(
-                TransactionLog.query.filter_by(student_id=student.id, transaction_slug="readmission")
-                .order_by(TransactionLog.created_at.desc())
-                .first()
-            ) if TransactionLog.query.filter_by(student_id=student.id, transaction_slug="readmission").first() else None,
-        }
-        for student in filtered_students_query(filters)
+    adopt_legacy_leave_logs(commit=True)
+    leave_query = LeaveCase.query.order_by(LeaveCase.updated_at.desc(), LeaveCase.id.desc())
+    leave_query = leave_query.filter(LeaveCase.student_id.in_(student_ids)) if not empty else leave_query.filter(False)
+    loa_readmission_rows = []
+    students_with_cases = set()
+    for case in leave_query.limit(300).all():
+        students_with_cases.add(case.student_id)
+        loa_readmission_rows.append({
+            "id": case.id,
+            "student": student_brief(case.student),
+            "standing": case.student.standing,
+            "stage": case.student.current_stage,
+            "kind": case.kind,
+            "kind_label": KIND_LABELS[case.kind],
+            "status": case.status,
+            "status_label": STATUS_BY_KEY.get(case.status, {}).get("label", case.status),
+            "period_text": leave_target_label(case) if case.kind == KIND_READMISSION else leave_period_text(case),
+            "owner": _lw.next_owner(case.kind, case.status),
+            "submitted_at": iso(case.submitted_at),
+            "decided_at": iso(case.decided_at),
+            "registrar_status": case.registrar_status,
+        })
+    # A student marked On Leave who has no case on file still belongs on the report.
+    for student in (
+        filtered_students_query(filters)
         .filter(or_(Student.standing == "On Leave", Student.current_stage == "LOA"))
         .order_by(Student.last_name, Student.first_name)
         .limit(120)
         .all()
-    ]
+    ):
+        if student.id in students_with_cases:
+            continue
+        loa_readmission_rows.append({
+            "id": f"standing-{student.id}",
+            "student": student_brief(student),
+            "standing": student.standing,
+            "stage": student.current_stage,
+            "kind": "STANDING",
+            "kind_label": "On leave (no request on file)",
+            "status": "On Leave",
+            "status_label": "On leave",
+            "period_text": "Not recorded",
+            "owner": "",
+            "submitted_at": None,
+            "decided_at": None,
+            "registrar_status": "",
+        })
     at_risk_rows = []
     for student in filtered_students_query(filters).filter(Student.risk_level.in_(["At Risk of Delay", "Delayed"])).limit(120).all():
         recs = student_recommendations(student)["recommendations"]
@@ -18522,102 +20659,6 @@ def latest_request_attachment(student_id: int, request_type: str) -> StudentRequ
         .order_by(StudentRequestAttachment.uploaded_at.desc(), StudentRequestAttachment.id.desc())
         .first()
     )
-
-
-def submitted_request_students(request_type: str) -> list[dict]:
-    # Keep the newest student submission visible after staff forwarding and Dean
-    # review so the staff roster can group current and completed requests.
-    submitted_results = {
-        "leave-of-absence": {"LOA application submitted"},
-        "readmission": {"Readmission request submitted"},
-    }[request_type]
-    submission_logs = (
-        TransactionLog.query.filter(
-            TransactionLog.transaction_slug == request_type,
-            TransactionLog.actor_role == "Student",
-            TransactionLog.result.in_(submitted_results),
-        )
-        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-        .all()
-    )
-    seen: set[int] = set()
-    rows: list[dict] = []
-    for log in submission_logs:
-        if not log.student_id or log.student_id in seen:
-            continue
-        seen.add(log.student_id)
-        latest_log = (
-            TransactionLog.query.filter_by(transaction_slug=request_type, student_id=log.student_id)
-            .filter(TransactionLog.actor_role != "Demo Data")
-            .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-            .first()
-        )
-        student = Student.query.get(log.student_id)
-        if not student:
-            continue
-        decided = bool(latest_log and latest_log.id != log.id)
-        status_text = (
-            (latest_log.new_status or latest_log.result or "")
-            if latest_log else (log.new_status or log.result or "")
-        ).lower()
-        if decided:
-            if "withdrawn" in status_text:
-                status = "Withdrawn"
-            elif "dean review" in status_text:
-                status = "Dean Review"
-            elif "approved" in status_text:
-                status = "Approved"
-            elif "denied" in status_text or "deny" in status_text:
-                status = "Denied"
-            elif "return" in status_text:
-                status = "Returned for Revision"
-            elif "submitted" in status_text:
-                status = "Pending Review"
-            else:
-                status = "In Progress"
-        else:
-            status = "Pending Review"
-        attachment = None
-        row = {
-            **student_brief(student),
-            "student": student_brief(student),
-            "request_log_id": log.id,
-            "submitted_at": iso(log.created_at),
-            "source_reference": log.source_reference,
-            "notes": log.notes,
-            "last_result": latest_log.result if decided else None,
-            "last_decision_at": iso(latest_log.created_at) if decided else None,
-            "next_action_owner": latest_log.next_owner if latest_log else "GS Staff",
-            "attachment": attachment.original_name if attachment else None,
-            "attachment_detail": attachment_dict(attachment),
-            "status": status,
-            **workflow_case_meta(request_type, student.id),
-        }
-        if request_type == "leave-of-absence":
-            period = request_notes_value(log.notes, "Requested period")
-            start, end = "", ""
-            if " to " in period:
-                start, end = [part.strip() for part in period.split(" to ", 1)]
-            elif period and period.lower() != "not specified":
-                start = period
-            row.update({
-                "request_label": period if period else "Leave of Absence application",
-                "effective_start": start,
-                "effective_end": end,
-                "reason_category": request_notes_value(log.notes, "Reason category"),
-                "reason_remarks": request_notes_value(log.notes, "Reason/remarks"),
-            })
-        else:
-            row.update({
-                "request_label": request_notes_value(log.notes, "Target return semester") or request_notes_value(log.notes, "Target return term") or "Readmission request",
-                "target_return_term": request_notes_value(log.notes, "Target return semester") or request_notes_value(log.notes, "Target return term"),
-                "previous_loa_period": request_notes_value(log.notes, "Previous LOA period"),
-                "previous_loa_start": request_notes_value(log.notes, "Previous LOA start"),
-                "previous_loa_end": request_notes_value(log.notes, "Previous LOA end"),
-                "return_intent": request_notes_value(log.notes, "Return intention"),
-            })
-        rows.append(row)
-    return rows
 
 
 def practicum_roster_payload() -> list[dict]:
@@ -20984,18 +23025,6 @@ def handle_student_handoff(data: MultiDict) -> int:
     return student.id
 
 
-def pending_student_request_log(student_id: int, slug: str, submitted_result: str) -> TransactionLog:
-    latest = (
-        TransactionLog.query.filter_by(transaction_slug=slug, student_id=student_id)
-        .filter(TransactionLog.actor_role != "Demo Data")
-        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-        .first()
-    )
-    if not latest or latest.actor_role != "Student" or latest.result != submitted_result:
-        raise ValueError("The student must submit a new request before staff can forward it to the Dean.")
-    return latest
-
-
 def resolve_standing_change_tasks(student_id: int, title_fragment: str, owner: str) -> None:
     for task in Task.query.filter(
         Task.student_id == student_id,
@@ -21006,121 +23035,38 @@ def resolve_standing_change_tasks(student_id: int, title_fragment: str, owner: s
         task.status = "Done"
 
 
-STANDING_CHANGE_REPORT_CONFIG = {
-    "leave-of-absence": {
-        "approved_result": "LOA approved by Dean",
-        "generated_result": "LOA decision report exported",
-        "label": "Leave of Absence",
-    },
-    "readmission": {
-        "approved_result": "Readmission approved by Dean",
-        "generated_result": "Readmission decision report exported",
-        "label": "Readmission",
-    },
-}
+def _leave_legacy_forward(slug: str, data: MultiDict) -> int:
+    """Staff forward a student's request to the Dean (older form-post entry point)."""
+    account = require_workflow_actor("staff")
+    student = Student.query.get_or_404(int(data["student_id"]))
+    adopt_legacy_leave_logs(student.id)
+    case = (
+        LeaveCase.query.filter(
+            LeaveCase.student_id == student.id,
+            LeaveCase.kind.in_(KINDS_FOR_SLUG[slug]),
+            LeaveCase.status.in_(("Submitted", "Staff Review")),
+        )
+        .order_by(LeaveCase.id.desc())
+        .first()
+    )
+    if not case:
+        raise ValueError("The student must submit a new request before staff can forward it to the Dean.")
+    try:
+        leave_case_apply(case, "forward", account, comment=(data.get("workflow_comment") or ""), data=data)
+    except LeaveError as exc:
+        raise ValueError(str(exc)) from exc
+    return student.id
 
 
 def handle_leave_of_absence(data: MultiDict) -> int:
-    # The rule-based checker supports staff review; it never makes the Dean's
-    # decision or changes the student standing automatically.
-    account = require_workflow_actor("staff")
-    student = Student.query.get_or_404(int(data["student_id"]))
-    submission = pending_student_request_log(student.id, "leave-of-absence", "LOA application submitted")
-    request_date = (data.get("request_date") or "").strip()
-    effective_start = (data.get("effective_start") or "").strip()
-    effective_end = (data.get("effective_end") or "").strip()
-    reason = (data.get("reason_remarks") or "").strip()
-    staff_notes = (data.get("staff_notes") or "").strip()
-    prior_loa_count = TransactionLog.query.filter_by(
-        transaction_slug="leave-of-absence",
-        student_id=student.id,
-        result="LOA approved by Dean",
-    ).count()
-    eligibility_status = (data.get("eligibility_status") or "Checked").strip()
-    if eligibility_status not in {"Eligible", "Needs Review", "Not Eligible", "Pending Requirements", "Checked"}:
-        raise ValueError("Choose a valid LOA eligibility status.")
-    if not (effective_start and effective_end):
-        raise ValueError("The requested leave start and end semesters are required before forwarding.")
-    review = loa_policy_review(student, {
-        "prior_loa_count": prior_loa_count,
-        "reason_remarks": reason,
-        "reason_category": (data.get("reason_category") or "").strip(),
-        "effective_start": effective_start,
-        "effective_end": effective_end,
-        "application_reference": "Structured portal LOA application",
-    })
-    period = " to ".join([part for part in [effective_start, effective_end] if part])
-    notes = [
-        "Application format: structured portal LOA application.",
-        f"Request date: {request_date or 'Not recorded'}.",
-        f"Requested semester period: {period}.",
-        f"Prior LOA count: {prior_loa_count}.",
-        f"Eligibility result: {eligibility_status}.",
-        f"Source submission log: {submission.id}.",
-        f"Policy checker: {review['recommendation']}. {review['summary']}",
-    ]
-    if reason:
-        notes.append(f"Reason/remarks: {reason}")
-    if staff_notes:
-        notes.append(f"Staff notes: {staff_notes}")
-    resolve_standing_change_tasks(student.id, "Leave of Absence", "GS Staff")
-    add_task(student.id, "Decide Leave of Absence request", "Dean", 3, 60)
-    add_log(
-        "leave-of-absence", student.id, workflow_actor_label(account),
-        "Structured portal LOA application",
-        "LOA request forwarded to Dean", "Dean", "\n".join(notes),
-        previous_status="Submitted", new_status="Dean Review",
-    )
-    return student.id
+    # The policy checker supports staff review; it never makes the Dean's decision or
+    # changes the student standing. The request's period and reason come from the case,
+    # not from the staff form, so the Dean and the Registrar always read the same values.
+    return _leave_legacy_forward(SLUG_LOA, data)
 
 
 def handle_readmission(data: MultiDict) -> int:
-    # The rule-based checker supports staff review; every approval remains a
-    # recorded Dean decision.
-    account = require_workflow_actor("staff")
-    student = Student.query.get_or_404(int(data["student_id"]))
-    submission = pending_student_request_log(student.id, "readmission", "Readmission request submitted")
-    target_return_term = (data.get("target_return_term") or "").strip()
-    previous_loa_period = (data.get("previous_loa_period") or "").strip()
-    eligibility_status = (data.get("eligibility_status") or "Checked").strip()
-    if eligibility_status not in {"Eligible to Return", "Needs Review", "Not Eligible", "Pending Requirements", "Checked"}:
-        raise ValueError("Choose a valid readmission eligibility status.")
-    submitted = set(data.getlist("readmission_items"))
-    unknown_items = sorted(submitted - set(readmission_requirements()))
-    if unknown_items:
-        raise ValueError("Unknown readmission checklist item: " + ", ".join(unknown_items))
-    missing = [item for item in readmission_requirements() if item not in submitted]
-    missing.extend(split_items(data.get("missing_requirements", "")))
-    staff_notes = (data.get("staff_notes") or "").strip()
-    if not target_return_term:
-        raise ValueError("The requested return semester is required before forwarding.")
-    review = readmission_policy_review(student, {
-        "readmission_items": sorted(submitted),
-        "target_return_term": target_return_term,
-        "previous_loa_period": previous_loa_period,
-        "application_reference": "Structured portal readmission request",
-    })
-
-    notes = [
-        "Application format: structured portal readmission request.",
-        f"Return semester: {target_return_term}.",
-        f"Previous leave semester: {previous_loa_period or 'Not recorded'}.",
-        f"Eligibility result: {eligibility_status}.",
-        f"Missing requirements: {', '.join(missing) if missing else 'None'}.",
-        f"Source submission log: {submission.id}.",
-        f"Policy checker: {review['recommendation']}. {review['summary']}",
-    ]
-    if staff_notes:
-        notes.append(f"Staff notes: {staff_notes}")
-    resolve_standing_change_tasks(student.id, "readmission", "GS Staff")
-    add_task(student.id, "Decide readmission request", "Dean", 3, 60)
-    add_log(
-        "readmission", student.id, workflow_actor_label(account),
-        "Structured portal readmission request",
-        "Readmission request forwarded to Dean", "Dean", "\n".join(notes),
-        previous_status="Submitted", new_status="Dean Review",
-    )
-    return student.id
+    return _leave_legacy_forward(SLUG_READMISSION, data)
 
 
 def handle_course_audit(data: MultiDict) -> int:
@@ -21860,6 +23806,41 @@ def handle_awol(data: MultiDict) -> int:
         )
         add_log("awol", student.id, workflow_actor_label(account), "AWOL return review", result, "Dean", f"{review['summary']} {staff_notes}".strip(), previous_status="Return Submitted", new_status="Dean Review")
 
+    elif action == "complete_reenrollment":
+        item = AwolCase.query.get_or_404(safe_int(data.get("case_id")))
+        if item.student_id != student.id or item.status != "Re-enrollment Required":
+            raise ValueError(
+                "Only a return the Dean approved for full re-enrollment can be completed here."
+            )
+        item.status = "Re-enrollment Completed"
+        item.staff_notes = "\n".join(part for part in [item.staff_notes, staff_notes] if part) or None
+        item.updated_at = now_utc()
+        student.standing = "Active"
+        student.current_stage = "Coursework"
+        student.enrollment_tag = "Not Enrolled"
+        student.updated_at = now_utc()
+        for flag in StudentMonitoringFlag.query.filter_by(
+            student_id=student.id, category="AWOL policy alert", status="Open",
+        ).all():
+            flag.status = "Resolved"
+            flag.resolved_by_user_id = account.id
+            flag.resolution_note = "Resolved when the full re-enrollment was completed."
+            flag.resolved_at = now_utc()
+            flag.updated_at = now_utc()
+        resolve_standing_change_tasks(student.id, "Re-evaluate courses after maximum residence", "Academic Coordinator")
+        result = "Full re-enrollment completed; student is active again"
+        workflow_message_record(
+            "awol", student, account, "Student", result,
+            "Your courses were re-enrolled and your record is active again. Enrollment for the semester is a separate step.",
+            "notice", "Re-enrollment Required", "Re-enrollment Completed", status="Sent",
+        )
+        add_log(
+            "awol", student.id, workflow_actor_label(account), "AWOL return review", result, "Academic Coordinator",
+            staff_notes or "Staff completed the full re-enrollment.",
+            previous_status="Re-enrollment Required", new_status="Re-enrollment Completed",
+        )
+        recompute_risk(student)
+
     elif action == "record_residency":
         if student.enrollment_tag in {"AWOL", "LOA", "Withdrawn", "Completed"} or student.standing in {"AWOL", "On Leave", "Withdrawn"}:
             raise ValueError("Residency cannot replace AWOL, LOA, withdrawal, or completed standing.")
@@ -22050,6 +24031,30 @@ def handle_graduation(data: MultiDict) -> int:
     return student.id
 
 
+def reset_leave_cases(student: Student, kinds) -> int:
+    """Delete this student's leave cases of the given kinds and what they wrote to the record."""
+    cases = LeaveCase.query.filter(LeaveCase.student_id == student.id, LeaveCase.kind.in_(tuple(kinds))).all()
+    if not cases:
+        return 0
+    ids = [case.id for case in cases]
+    # A readmission points at a leave; a leave may be pointed at by extensions or a readmission.
+    LeaveCase.query.filter(LeaveCase.linked_case_id.in_(ids)).update({"linked_case_id": None}, synchronize_session=False)
+    LeaveCaseEvent.query.filter(LeaveCaseEvent.case_id.in_(ids)).delete(synchronize_session=False)
+    for case in cases:
+        db.session.delete(case)
+    if KIND_LOA in kinds:
+        # Put back what the leave closed, and drop the per-semester leave rows it wrote.
+        TermEnrollment.query.filter_by(student_id=student.id, status="LOA", source_reference=LEAVE_TERM_SOURCE).delete(
+            synchronize_session=False)
+        for enrollment in SubjectEnrollment.query.filter_by(student_id=student.id, source_reference=LEAVE_TERM_SOURCE).all():
+            enrollment.status = "Enrolled"
+            enrollment.source_reference = "Restored after the leave demo was reset"
+            enrollment.status_note = None
+            enrollment.cancelled_at = None
+    db.session.flush()
+    return len(cases)
+
+
 def reset_workflow_demo_case(slug: str, student: Student) -> dict:
     """Remove one student's demo case without touching academic source data."""
     request_types = {
@@ -22141,10 +24146,12 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
         removed_records += SubjectEnrollment.query.filter_by(student_id=student.id).delete(synchronize_session=False)
         removed_records += TermEnrollment.query.filter_by(student_id=student.id).delete(synchronize_session=False)
     elif slug == "leave-of-absence":
+        removed_records += reset_leave_cases(student, (KIND_LOA, KIND_EXTENSION))
         student.standing = "Active"
         student.current_stage = "Coursework"
         student.enrollment_tag = "Enrolled"
     elif slug == "readmission":
+        removed_records += reset_leave_cases(student, (KIND_READMISSION,))
         student.standing = "On Leave"
         student.current_stage = "LOA"
         student.enrollment_tag = "LOA"
@@ -27937,6 +29944,9 @@ def seed_maed_personas() -> None:
                 previous_status="Enrolled",
                 new_status="Residency",
             )
+    # The two persona requests above were written as log rows; give them case records.
+    db.session.flush()
+    adopt_legacy_leave_logs()
 
 
 def seed_database(count: int = 350) -> None:
@@ -28382,6 +30392,55 @@ def workflow_demo_config_for_student(student: Student | None) -> tuple[str, dict
     return None, None
 
 
+DEMO_LEAVE_PERIODS = {
+    # (leave starts, leave ends) for the two readmission demo students.
+    "GS-2026-READ-01": ("AY 2026-2027 1st Semester", "AY 2026-2027 1st Semester"),
+    "GS-2026-READ-02": ("AY 2026-2027 1st Semester", "AY 2026-2027 2nd Semester"),
+}
+
+
+def ensure_demo_leave_case(student: Student, demo_config: dict | None) -> LeaveCase:
+    """The approved leave a readmission demo student is on (created once, reset on demand)."""
+    start_label, end_label = DEMO_LEAVE_PERIODS.get(student.student_number, (
+        "AY 2026-2027 1st Semester", "AY 2026-2027 1st Semester",
+    ))
+    start_term, end_term = leave_term(start_label), leave_term(end_label)
+    case = (
+        LeaveCase.query.filter_by(student_id=student.id, kind=KIND_LOA, source="demo")
+        .order_by(LeaveCase.id.desc()).first()
+    )
+    if case is None:
+        case = LeaveCase(
+            student_id=student.id, kind=KIND_LOA, source="demo", status="On Leave",
+            reason_category="Medical / health", reason_text="Approved leave for the readmission demonstration.",
+            submitted_at=now_utc() - timedelta(days=60), forwarded_at=now_utc() - timedelta(days=58),
+            decided_at=now_utc() - timedelta(days=55), started_at=now_utc() - timedelta(days=50),
+            prior_stage="Coursework", prior_enrollment_tag="Enrolled", registrar_status="Acknowledged",
+        )
+        db.session.add(case)
+        db.session.flush()
+        for from_status, to_status, action in (
+            (None, "Submitted", "submit"), ("Submitted", "Dean Review", "forward"),
+            ("Dean Review", "On Leave", "approve"),
+        ):
+            db.session.add(LeaveCaseEvent(
+                case_id=case.id, from_status=from_status, to_status=to_status, action=action,
+                actor_role="Demo Data", actor_name="Demo Data",
+            ))
+    case.status = "On Leave"
+    case.closed_at = case.closed_reason = case.awol_proposed_at = case.return_reminded_at = None
+    case.start_term_id, case.end_term_id = (start_term.id if start_term else None), (end_term.id if end_term else None)
+    case.start_label, case.end_label = start_label, end_label
+    student.standing = "On Leave"
+    student.current_stage = "LOA"
+    student.enrollment_tag = "LOA"
+    student.risk_level = "On Track"
+    db.session.flush()
+    for term in leave_covered_terms(case):
+        ensure_term_enrollment(student, term, "LOA", LEAVE_TERM_SOURCE)
+    return case
+
+
 def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> None:
     """Keep upstream requirements complete without resetting the active demo case."""
     _, demo_config = workflow_demo_config_for_student(student)
@@ -28398,6 +30457,12 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     is_awol_demo = workflow == "awol"
     is_handoff_demo = workflow == "student-handoff"
     is_readmission_demo = workflow == "readmission"
+    # A demo student who already has a leave case keeps the standing that case gave them;
+    # the baseline only builds the starting state (first login, or after a reset).
+    has_leave_case = bool(
+        (is_loa_demo or is_readmission_demo)
+        and LeaveCase.query.filter_by(student_id=student.id).first() is not None
+    )
     is_new_demo = (
         is_enrollment_demo
         or is_adjustments_demo
@@ -28426,6 +30491,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     student.entry_year = student.entry_year if is_research_demo else 2026 if (is_withdrawal_demo or is_new_demo) else 2024
     student.academic_year_entry = student.academic_year_entry if is_research_demo else "2026-2027" if (is_withdrawal_demo or is_new_demo) else "2024-2025"
     student.year_level = "Year 1" if (is_withdrawal_demo or is_new_demo) else "Completed Coursework"
+    leave_snapshot = (student.standing, student.enrollment_tag, student.current_stage, student.risk_level)
     student.standing = "Active"
     student.enrollment_tag = (
         "Completed" if workflow == "graduation"
@@ -28452,6 +30518,8 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     student.risk_level = "Not Yet Assessed"
     student.adviser_name = student.adviser_name or "Dr. Liwayway Bautista"
     student.updated_at = now_utc()
+    if has_leave_case:
+        student.standing, student.enrollment_tag, student.current_stage, student.risk_level = leave_snapshot
 
     if workflow == "practicum":
         # Practicum demo identities changed from the retired MAED fixtures to
@@ -28494,6 +30562,8 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
                 status="Not Started",
             )
             db.session.add(record)
+        if has_leave_case and course.code in current_course_codes:
+            continue  # the leave already decided what this subject looks like
         if course.code in current_course_codes:
             active_term = active_term or get_active_term()
             record.status = "Enrolled"
@@ -28615,7 +30685,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
 
     if is_new_demo:
         active_term = get_active_term()
-        if current_course_codes and active_term:
+        if current_course_codes and active_term and not has_leave_case:
             academic_year, semester = split_academic_term_label(active_term.label)
             for course_code in current_course_codes:
                 course = Course.query.filter_by(program_id=program.id, code=course_code).first()
@@ -28657,15 +30727,10 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
                 "Requested MAED demo enrollment",
             )
             student.enrollment_tag = "Enrolled"
-        if is_loa_demo and active_term:
+        if is_loa_demo and active_term and not has_leave_case:
             ensure_term_enrollment(student, active_term, "Enrolled", "LOA demo active standing")
         if is_readmission_demo:
-            student.standing = "On Leave"
-            student.current_stage = "LOA"
-            student.enrollment_tag = "LOA"
-            student.risk_level = "On Track"
-            if active_term:
-                ensure_term_enrollment(student, active_term, "LOA", "Approved LOA demo standing")
+            ensure_demo_leave_case(student, demo_config)
         if is_handoff_demo:
             student.standing = "Active"
             student.current_stage = "Admission"
@@ -29330,6 +31395,7 @@ def run_startup_tasks(seed_count: int | None = None) -> dict:
     if Student.query.count() == 0 and seed_count > 0:
         seed_database(seed_count)
     ensure_business_rules()
+    adopt_legacy_leave_logs(commit=True)  # before the demo baseline, which reads leave cases
     ensure_demo_accounts()
     if demo_mode_enabled():
         ensure_panel_matching_demo_data()  # fabricated availability windows: demo data only
@@ -29340,6 +31406,7 @@ def run_startup_tasks(seed_count: int | None = None) -> dict:
     ensure_subject_enrollment_schema()
     sync_automatic_awol_statuses(commit=False)
     db.session.commit()
+    sync_leave_cases(commit=True)  # old log-only leave history becomes cases; dates move cases along
     return sync_result
 
 

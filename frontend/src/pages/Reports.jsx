@@ -451,12 +451,14 @@ function WithdrawalTable({ rows }) {
 }
 
 function LoaTable({ rows }) {
-  return <BaseTable headers={["Student", "Standing", "Stage", "Latest readmission"]} rows={rows} render={(row) => (
-    <tr key={row.student.id} className="border-b border-slate-50">
+  return <BaseTable headers={["Student", "Request", "Status", "Period / return semester", "Next owner", "Registrar list"]} rows={rows} render={(row) => (
+    <tr key={row.id} className="border-b border-slate-50">
       <StudentCell student={row.student} />
-      <td className="px-4 py-2.5"><StatusBadge value={row.standing} dot={false} /></td>
-      <td className="px-4 py-2.5 text-slate-600">{row.stage}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.latest_readmission?.result || "No readmission action"}</td>
+      <td className="px-4 py-2.5 text-slate-600">{row.kind_label}</td>
+      <td className="px-4 py-2.5"><StatusBadge value={row.status_label || row.status} dot={false} /></td>
+      <td className="px-4 py-2.5 text-slate-600">{row.period_text || "—"}</td>
+      <td className="px-4 py-2.5 text-slate-600">{row.owner || "—"}</td>
+      <td className="px-4 py-2.5 text-slate-600">{row.registrar_status && row.registrar_status !== "Not Ready" ? row.registrar_status : "—"}</td>
     </tr>
   )} />;
 }

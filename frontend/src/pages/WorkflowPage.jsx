@@ -57,12 +57,14 @@ import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } fr
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import ExportFollowUpModal from "../components/ExportFollowUpModal";
+import StageBoard from "../components/StageBoard";
 import { formatDate } from "../lib/format";
 import { printDataTable } from "../lib/print";
 import { useAuth } from "../auth";
 import { OnboardingGatePanel } from "../components/ProcessGates";
 import { Form1EndorsementQueue } from "./Form1Endorsements";
 import PolicyRules from "../components/PolicyRules";
+import LeaveCasesBoard from "./LeaveCasesBoard";
 
 // Which business-rules process each workflow screen applies.
 const RULE_PROCESS_BY_SLUG = {
@@ -107,16 +109,17 @@ const ICONS = {
 
 // Student-initiated workflows: staff pick from the submitted-request queue,
 // not the full student list (students file these from their own portal).
+// (Leave of Absence and Readmission now have their own case board: LeaveCasesBoard.)
 const USES_REQUEST_QUEUE = {
-  "leave-of-absence": true,
-  readmission: true,
+  "leave-of-absence": false,
+  readmission: false,
   awol: false,
 };
 
 const NEEDS_STUDENT = {
   "student-handoff": false,
-  "leave-of-absence": true,
-  readmission: true,
+  "leave-of-absence": false,
+  readmission: false,
   "course-audit": false,
   "research-gate": true,
   "panel-matching": true,
@@ -128,18 +131,11 @@ const NEEDS_STUDENT = {
 
 const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation", "leave-of-absence", "readmission", "awol"]);
 
-const REQUEST_BOARD_COLUMNS = [
-  { label: "For Review", statuses: ["Pending Review", "In Progress"] },
-  { label: "Approved", statuses: ["Approved"] },
-  { label: "Returned for Revision", statuses: ["Returned for Revision"] },
-  { label: "Denied", statuses: ["Denied"] },
-];
-
 const AWOL_BOARD_COLUMNS = [
   { label: "AWOL", statuses: ["AWOL Declared"] },
   { label: "Return Review", statuses: ["Return Submitted", "Returned for Revision"] },
   { label: "Dean Review", statuses: ["Dean Review"] },
-  { label: "Return Outcome", statuses: ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required", "Return Denied"] },
+  { label: "Return Outcome", statuses: ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required", "Re-enrollment Completed", "Return Denied"] },
   { label: "Residency", statuses: ["Residency", "Residency Completed"] },
 ];
 
@@ -326,29 +322,6 @@ export default function WorkflowPage() {
             </Card>
           )}
 
-          {usesQueue && (
-            <RequestQueue
-              slug={slug}
-              context={context}
-              formProps={formProps}
-              requests={context?.submitted_requests}
-              selectedId={studentId}
-              onPick={(r) => {
-                setStudentId(r.id);
-                setStudentLabel(r.search_label || r.name);
-                setResult(null);
-              }}
-              onClear={() => {
-                setStudentId(null);
-                setStudentLabel("");
-                setResult(null);
-                const next = new URLSearchParams(searchParams);
-                next.delete("student_id");
-                setSearchParams(next, { replace: true });
-              }}
-            />
-          )}
-
           {needsStudent && !studentId ? (
             usesQueue ? null : (
               <Card className="p-6">
@@ -377,8 +350,7 @@ export default function WorkflowPage() {
               {slug === "withdrawal" && <WithdrawalRoster {...formProps} />}
               {slug === "graduation" && <GraduationRoster {...formProps} />}
               {slug === "awol" && <AwolResidencyPanel {...formProps} />}
-              {slug === "leave-of-absence" && <LeaveOfAbsenceForm {...formProps} />}
-              {slug === "readmission" && <ReadmissionForm {...formProps} />}
+              {(slug === "leave-of-absence" || slug === "readmission") && <LeaveCasesBoard slug={slug} />}
             </Card>
           )}
 
@@ -425,225 +397,6 @@ export default function WorkflowPage() {
           policyQuestions={context?.deployment_policy_questions || []}
           onClose={() => setSupportModal("")}
         />
-      )}
-    </div>
-  );
-}
-
-// Submitted-request queue for student-initiated workflows (LOA / Readmission).
-function RequestQueue({ slug, context, formProps, requests, selectedId, onPick, onClear }) {
-  const list = requests || [];
-  const [viewMode, setViewMode] = useState("board");
-  const [filters, setFilters] = useState({ query: "", status: "" });
-  const [messageRow, setMessageRow] = useState(null);
-  const [messageNotice, setMessageNotice] = useState("");
-  const selected = list.find((r) => r.id === selectedId);
-  const selectedContextReady = Boolean(
-    selected && context?.selected_request?.id === selected.id
-  );
-  const reviewCount = list.filter((r) => ["Pending Review", "In Progress"].includes(r.status)).length;
-  const statuses = uniqueValues(list.map((r) => r.status));
-  const filtered = list.filter((r) => {
-    const haystack = `${r.name} ${r.student_number} ${r.program_code} ${r.request_label || ""}`.toLowerCase();
-    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
-      && (!filters.status || r.status === filters.status);
-  });
-
-  return (
-    <div className="space-y-4">
-      {messageNotice && (
-        <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
-          {messageNotice}
-        </div>
-      )}
-      <Card className="p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <SectionTitle title="Submitted requests" subtitle="Student-filed applications grouped by current status" icon={Inbox} />
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
-              <Users className="h-4 w-4" /> {reviewCount} for review
-            </span>
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          </div>
-        </div>
-        <div className="mb-4 flex flex-wrap gap-2">
-          <label className="relative min-w-[220px] flex-1">
-            <span className="sr-only">Search submitted requests</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="search"
-              value={filters.query}
-              onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
-              placeholder="Search name, student ID, or program…"
-              className="field-input pl-9"
-            />
-          </label>
-          <select
-            value={filters.status}
-            onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-            className="field-input cursor-pointer sm:w-56"
-            aria-label="Filter submitted requests by status"
-          >
-            <option value="">All statuses</option>
-            {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
-          </select>
-        </div>
-        {!list.length ? (
-          <EmptyState
-            icon={Inbox}
-            title="No submitted requests yet"
-            hint="Student-filed LOA or readmission requests will appear here."
-          />
-        ) : viewMode === "board" ? (
-          <WorkflowBoard
-            columns={REQUEST_BOARD_COLUMNS}
-            rows={filtered}
-            getStatus={(request) => request.status}
-            renderCard={(request) => (
-              <RequestBoardCard
-                key={request.request_log_id || request.id}
-                item={request}
-                onOpen={() => onPick(request)}
-                onMessage={() => setMessageRow(request)}
-              />
-            )}
-            empty="No requests match the current filters."
-          />
-        ) : (
-          <RequestTable rows={filtered} onOpen={onPick} onMessage={setMessageRow} />
-        )}
-      </Card>
-      {selected && (
-        <WorkflowCaseModal
-          id={`${slug}-request-${selected.request_log_id || selected.id}`}
-          title={selected.name}
-          subtitle={`${selected.student_number} · ${selected.program_code} · ${slug === "leave-of-absence" ? "Leave of Absence" : "Readmission"} request`}
-          status={selected.status}
-          onClose={onClear}
-          footer={(
-            <button type="button" onClick={() => setMessageRow(selected)} className="btn-ghost cursor-pointer px-4 py-2">
-              <MessageSquare className="h-4 w-4" /> Message / Return
-            </button>
-          )}
-        >
-          <div className="space-y-5">
-            <WorkflowSubmitFeedback result={formProps.result} error={formProps.submitError} />
-            <RequestSummary request={selected} />
-            <CaseMessageHistory messages={selected.messages || []} />
-            <WorkflowActivityList logs={selected.history || []} />
-            <WorkflowFileHistory files={[selected.attachment_detail].filter(Boolean)} />
-            {selectedContextReady ? (
-              slug === "leave-of-absence"
-                ? <LeaveOfAbsenceForm {...formProps} embedded />
-                : <ReadmissionForm {...formProps} embedded />
-            ) : (
-              <Spinner label="Loading request details…" />
-            )}
-          </div>
-        </WorkflowCaseModal>
-      )}
-      {messageRow && (
-        <WorkflowMessageModal
-          slug={slug}
-          row={messageRow}
-          context={context}
-          onClose={() => setMessageRow(null)}
-          onSaved={async (message) => {
-            setMessageNotice(message);
-            await formProps.refetch();
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function RequestBoardCard({ item, onOpen, onMessage }) {
-  return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/30">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
-          <p className="text-xs text-slate-400">{item.student_number} · {item.program_code}</p>
-        </div>
-        <StatusBadge value={item.status} dot={false} />
-      </div>
-      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.request_label || "Student request"}</p>
-      <p className="mt-2 text-xs text-slate-500">Submitted {formatDate(item.submitted_at)}</p>
-      <p className="mt-2 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">
-        Next: {item.next_action_owner || "GS Staff"}
-      </p>
-      {item.unresolved_messages > 0 && <p className="mt-2 text-xs font-semibold text-amber-700">{item.unresolved_messages} concern(s)</p>}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" onClick={onOpen} className="btn-ghost cursor-pointer px-2 py-1.5">
-          <Eye className="h-3.5 w-3.5" /> {item.status === "Pending Review" ? "Review" : "View"}
-        </button>
-        <button type="button" onClick={onMessage} className="btn-ghost cursor-pointer px-2 py-1.5">
-          <MessageSquare className="h-3.5 w-3.5" /> Message
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function RequestTable({ rows, onOpen, onMessage }) {
-  if (!rows.length) {
-    return <EmptyState icon={Inbox} title="No requests match the filters" hint="Clear the search or status filter and try again." />;
-  }
-  return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200">
-      <table className="w-full min-w-[720px] text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-            <th className="px-4 py-3">Student</th>
-            <th className="px-3 py-3">Request</th>
-            <th className="px-3 py-3">Status</th>
-            <th className="px-3 py-3">Submitted</th>
-            <th className="px-3 py-3">Next owner</th>
-            <th className="px-3 py-3 text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((request) => (
-            <tr key={request.request_log_id || request.id} className="border-b border-slate-50 transition-colors hover:bg-slate-50/60">
-              <td className="px-4 py-3">
-                <p className="font-semibold text-ink">{request.name}</p>
-                <p className="text-xs text-slate-400">{request.student_number} · {request.program_code}</p>
-              </td>
-              <td className="px-3 py-3 text-slate-600">{request.request_label || "Student request"}</td>
-              <td className="px-3 py-3"><StatusBadge value={request.status} dot={false} /></td>
-              <td className="px-3 py-3 text-slate-500">{formatDate(request.submitted_at)}</td>
-              <td className="px-3 py-3 text-xs font-semibold text-slate-600">{request.next_action_owner || "—"}</td>
-              <td className="px-3 py-3 text-right">
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => onOpen(request)} className="btn-ghost cursor-pointer px-3 py-1.5">
-                    <Eye className="h-3.5 w-3.5" /> {request.status === "Pending Review" ? "Review" : "View"}
-                  </button>
-                  <button type="button" onClick={() => onMessage(request)} className="btn-ghost cursor-pointer px-3 py-1.5">
-                    <MessageSquare className="h-3.5 w-3.5" /> Message
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function RequestSummary({ request, compact = false }) {
-  if (!request) return null;
-  const applicationSource = request.attachment || "Structured portal form";
-  return (
-    <div className={`grid gap-3 text-sm ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-      <Detail label="Request" value={request.request_label || "Submitted application"} />
-      <Detail label={request.attachment ? "Application file" : "Request format"} value={applicationSource} />
-      <Detail label="Submitted" value={formatDate(request.submitted_at)} />
-      {request.attachment_detail?.file_exists && request.attachment_detail?.url && (
-        <a href={request.attachment_detail.url} target="_blank" rel="noreferrer" className="btn-ghost w-fit px-3 py-2">
-          View PDF <ArrowUpRight className="h-3.5 w-3.5" />
-        </a>
       )}
     </div>
   );
@@ -2688,20 +2441,20 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
 
 const WORKFLOW_GUIDES = {
   "leave-of-absence": {
-    purpose: "Reviews a student-filed Leave of Absence application without changing standing before an authorized decision.",
-    submitter: "The student completes a structured request with semester dropdowns, an allowed reason, and remarks; no PDF is required.",
-    reviewers: "Graduate School Staff verifies eligibility and routes exceptions; the Dean reviews cases requiring a decision.",
-    stages: ["Student submission", "Staff policy review", "Dean review when required", "Standing update", "Student notice"],
-    incomplete: "Staff can return the request with a specific message while preserving its structured fields and activity history.",
-    final: "Approved means the authorized leave period is recorded and the monitoring profile shows the student On Leave.",
+    purpose: "Follows every Leave of Absence request from filing to the end of the leave, and keeps the student's record correct at each step.",
+    submitter: "The student fills in the start and end semester, an allowed reason and the circumstances. A student already on leave can ask once for an extension.",
+    reviewers: "Graduate School Staff check the request against the handbook rules and forward it; the Dean approves, returns or denies; staff send the approved leaves to the Registrar.",
+    stages: ["Submitted", "Staff review", "With the Dean", "Leave scheduled", "On leave", "Return due", "Closed"],
+    incomplete: "Staff or the Dean can return a request with a comment. The student corrects the same request and sends it again. A denial tells the student what happens next.",
+    final: "The leave starts when its first semester begins: the student becomes On Leave, subjects of that semester are closed (marked W if filed in the second half), and a leave record is kept for each semester. When the leave is ending, staff see it as Return due. A leave that ends with no return is only proposed as AWOL; a staff member confirms it.",
   },
   readmission: {
-    purpose: "Reviews a student-filed request to return after an approved leave period.",
-    submitter: "The student completes a structured return intention, prior LOA semester dropdowns, target return semester, and checklist.",
-    reviewers: "Graduate School Staff checks return eligibility and missing requirements; the Dean reviews exceptions.",
-    stages: ["Student submission", "Eligibility review", "Dean review when required", "Reactivation", "Student notice"],
-    incomplete: "The case can be returned with a message naming the exact structured field or checklist item that must be corrected.",
-    final: "Approved means the student is reactivated for the approved return semester and the monitoring profile is synchronized.",
+    purpose: "Brings a student back from an approved leave and restores their record.",
+    submitter: "The student on leave chooses a return semester, writes their intention and ticks the return checklist. The leave they are ending is filled in from their record.",
+    reviewers: "Graduate School Staff verify each checklist item and forward the request; the Dean decides; the Academic Coordinator plans the subjects after approval.",
+    stages: ["Submitted", "Staff review", "With the Dean", "Approved"],
+    incomplete: "A request can be returned with a comment. The student corrects it and sends it again. Returning before the leave ends is an early return and is flagged for the Dean.",
+    final: "Approval makes the student Active again at the stage they left, with the tag Not Enrolled until the Academic Coordinator enrolls them. The leave is closed.",
   },
   awol: {
     purpose: "Automatically flags evidence-backed AWOL standing, reviews structured return declarations, and tracks valid no-subject residency.",
@@ -4005,13 +3758,7 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, det
         return (
           <li
             key={row.student.id}
-            draggable={readyToDrag}
-            onDragStart={(event) => {
-              if (!readyToDrag) return;
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("text/plain", `graduation-student:${row.student.id}`);
-            }}
-            className={`rounded-lg px-3 py-2 ring-1 ${readyToDrag ? "cursor-grab bg-emerald-50 ring-emerald-200 active:cursor-grabbing" : "bg-white ring-slate-200"}`}
+            className={`rounded-lg px-3 py-2 ring-1 ${readyToDrag ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-slate-200"}`}
           >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
@@ -4107,13 +3854,7 @@ function GraduationBatchRow({
   const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   return (
     <article
-      draggable={readyToDrag}
-      onDragStart={(event) => {
-        if (!readyToDrag) return;
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", `graduation-batch:${group.id}`);
-      }}
-      className={`rounded-xl border px-3 py-1.5 transition-colors ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 hover:border-emerald-500 active:cursor-grabbing" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}
+      className={`rounded-xl border px-3 py-1.5 transition-colors ${readyToDrag ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}
     >
       <div className="space-y-3">
         <div className="min-w-0">
@@ -4190,152 +3931,163 @@ function GraduationBatchRow({
   );
 }
 
-function GraduationBatchBoardSections({
-  groups,
-  accountRole,
-  selectedIds,
-  expandedBatchIds,
-  onToggleBatch,
-  onToggleExpanded,
-  onProcessBatch,
-  onOpenStudent,
-  onMessageStudent,
-  onViewStage,
-  onExportBatch,
-  exportingBatchId,
-}) {
+// The Graduation staged board. The two candidate stages and the eight batch columns are
+// one StageBoard, so a card can be dragged (or moved with its "Move to..." menu). A move
+// never changes data here: it opens the same confirmation dialog the card buttons open,
+// which posts to the guarded endpoint, and the server checks every rule again.
+const GRADUATION_STAGE_COLUMNS = [
+  {
+    key: "stage-1",
+    kind: "stage",
+    stageNumber: 1,
+    selectable: false,
+    label: "1 · Academically Eligible — Awaiting Student Application",
+    title: "Academically Eligible — Awaiting Student Application",
+    description: "These students completed all required academic, research, and practicum stages. They are visible to staff, but cannot be selected for a graduation batch until they submit the signed application / review-window PDF in the student portal.",
+    empty: "No academically eligible students are currently waiting for a graduation application.",
+  },
+  {
+    key: "stage-2",
+    kind: "stage",
+    stageNumber: 2,
+    selectable: true,
+    label: "2 · Application Submitted — Ready for Batch Creation",
+    title: "Application Submitted — Ready for Batch Creation",
+    description: "The required student application / review-window PDF is on file. GS Staff may select individual students, all visible students, a program, or a completed-course cohort before creating the batch. Other staff accounts see this stage as read-only.",
+    empty: "No submitted graduation applications are waiting for batch creation.",
+  },
+];
+
+const GRADUATION_ALL_BOARD_COLUMNS = [
+  ...GRADUATION_STAGE_COLUMNS,
+  ...GRADUATION_BOARD_COLUMNS.map((column, index) => ({ ...column, key: `batch-${index + 3}`, kind: "batch" })),
+];
+
+// The batch status each step leads to, so a drop is only allowed on the column the step really moves to.
+// Steps that keep the batch in the same column (prepare endorsement, mark not eligible) are left out.
+const GRADUATION_STEP_DESTINATION_STATUS = {
+  compile_to_ac: "Coursework Review",
+  check_coursework: "Research Review",
+  validate_research: "Eligibility Confirmed",
+  send_to_dean: "Ready for Dean Review",
+  approve: "Dean Approved",
+};
+
+function graduationBoardItemId(item) {
+  return item.kind === "student" ? `student:${item.row.student.id}` : `batch:${item.group.id}`;
+}
+
+function graduationBoardColumnKey(item) {
+  if (item.kind === "student") return item.stage;
+  return GRADUATION_ALL_BOARD_COLUMNS.find((column) => column.kind === "batch" && column.statuses.includes(item.group.boardStatus))?.key || "";
+}
+
+function graduationBoardCanDrag(item, accountRole) {
+  if (item.kind === "student") return item.stage === "stage-2" && accountRole === "staff";
+  const selection = graduationStageSelection(item.group.rows, accountRole);
+  return Boolean(selection.action) || (graduationReadyForDeanReview(item.group) && accountRole === "dean");
+}
+
+function graduationBoardCheckMove(item, toColumn, accountRole) {
+  if (item.kind === "student") {
+    if (item.stage === "stage-1") return { allowed: false, reason: "Waiting for the student to submit the signed graduation application in the student portal." };
+    if (toColumn.kind === "batch" && toColumn.statuses.includes("For Review")) {
+      return accountRole === "staff" ? { allowed: true } : { allowed: false, reason: "Only Graduate School Staff create a graduation batch." };
+    }
+    return { allowed: false, reason: "A submitted application moves to 'Graduation Batch Created' when staff create the batch." };
+  }
+  const group = item.group;
+  const selection = graduationStageSelection(group.rows, accountRole);
+  if (!selection.action) {
+    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: "Export is a button on the batch card." };
+    return { allowed: false, reason: `No step is due on this batch for your role; waiting for: ${group.nextOwners.join(", ")}.` };
+  }
+  const actionLabel = graduationBatchActionLabel(selection.action);
+  const destinationStatus = GRADUATION_STEP_DESTINATION_STATUS[selection.action.id];
+  const destination = destinationStatus ? GRADUATION_ALL_BOARD_COLUMNS.find((column) => column.kind === "batch" && column.statuses.includes(destinationStatus)) : null;
+  if (!destination) return { allowed: false, reason: `This step does not move the batch to another column. Use the button on the card: ${actionLabel}.` };
+  if (toColumn.key === destination.key) return { allowed: true };
+  return { allowed: false, reason: `Move this batch one step at a time, to '${destination.label}': ${actionLabel}.` };
+}
+
+function GraduationBoardColumnHeader({ column, items, accountRole, selectedIds, onSelectAll, onClearSelection, onCreateBatch }) {
+  if (column.kind === "batch") {
+    return (
+      <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-slate-800">{column.label}</h3>
+          <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-500">{column.description}</p>
+        </div>
+        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
+      </header>
+    );
+  }
+  const rows = items.map((item) => item.row);
+  const canCreateBatch = column.selectable && accountRole === "staff";
+  const selectedCount = rows.filter((row) => selectedIds.has(row.student.id)).length;
+  const titleId = `graduation-candidate-stage-${column.stageNumber}`;
   return (
-    <>
-      {GRADUATION_BOARD_COLUMNS.map((column) => {
-        const items = groups.filter((group) => column.statuses.includes(group.boardStatus));
-        return (
-          <section key={column.label} className="flex min-h-[520px] w-full flex-col rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:w-[380px] sm:shrink-0">
-            <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-slate-800">{column.label}</h3>
-                <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-500">{column.description}</p>
-              </div>
-              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
-            </header>
-            <div className="flex-1 space-y-3">
-              {items.length ? items.map((group) => (
-                <GraduationBatchRow
-                  key={group.id}
-                  group={group}
-                  accountRole={accountRole}
-                  selectedIds={selectedIds}
-                  expanded={expandedBatchIds.has(group.id)}
-                  onToggleBatch={onToggleBatch}
-                  onToggleExpanded={onToggleExpanded}
-                  onProcessBatch={onProcessBatch}
-                  onOpenStudent={onOpenStudent}
-                  onMessageStudent={onMessageStudent}
-                  onViewStage={onViewStage}
-                  onExportBatch={onExportBatch}
-                  exporting={exportingBatchId === group.id}
-                />
-              )) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-4 text-center text-xs text-slate-400">{column.empty}</p>}
-            </div>
-          </section>
-        );
-      })}
-    </>
+    <div className="mb-4 space-y-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${column.selectable ? "bg-emerald-600 text-white" : "bg-slate-700 text-white"}`}>{column.stageNumber}</span>
+        <div>
+          <p id={titleId} className="font-display text-lg font-semibold text-ink">{column.title}</p>
+          <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-600">{column.description}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge value={`${rows.length} student${rows.length === 1 ? "" : "s"}`} dot={false} />
+        {canCreateBatch && rows.length > 0 && <button type="button" onClick={onSelectAll} className="btn-ghost cursor-pointer px-3 py-2">Select all visible</button>}
+        {canCreateBatch && selectedCount > 0 && <button type="button" onClick={onClearSelection} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
+        {canCreateBatch && <button type="button" disabled={!selectedCount} onClick={onCreateBatch} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> Create graduation batch</button>}
+      </div>
+    </div>
   );
 }
 
-function GraduationCandidateStageSection({
-  stageNumber,
-  title,
-  description,
-  empty,
-  rows,
-  accountRole,
-  selectedIds,
-  onToggleStudent,
-  onSelectAll,
-  onClearSelection,
-  onCreateBatch,
-  onOpenStudent,
-  selectable = false,
-}) {
-  const canCreateBatch = selectable && accountRole === "staff";
-  const selectedCount = rows.filter((row) => selectedIds.has(row.student.id)).length;
-  const titleId = `graduation-candidate-stage-${stageNumber}`;
+function GraduationStudentCard({ row, selectable, canSelect, selected, onToggleStudent, onOpenStudent }) {
+  const completedCourses = row.eligibility?.completed_courses || [];
+  const applicationFile = row.endorsement?.request_attachment;
   return (
-    <section className={`flex min-h-[520px] w-full flex-col rounded-xl border bg-white p-4 sm:w-[380px] sm:shrink-0 ${selectable ? "border-emerald-200" : "border-slate-200"}`} aria-labelledby={titleId}>
-      <div className="space-y-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${selectable ? "bg-emerald-600 text-white" : "bg-slate-700 text-white"}`}>{stageNumber}</span>
-          <div>
-            <p id={titleId} className="font-display text-lg font-semibold text-ink">{title}</p>
-            <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-600">{description}</p>
+    <div className={`rounded-xl border p-3 ${selectable ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50/60"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2.5">
+          {canSelect && <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
+            <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge value={`${rows.length} student${rows.length === 1 ? "" : "s"}`} dot={false} />
-          {canCreateBatch && rows.length > 0 && <button type="button" onClick={onSelectAll} className="btn-ghost cursor-pointer px-3 py-2">Select all visible</button>}
-          {canCreateBatch && selectedCount > 0 && <button type="button" onClick={onClearSelection} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
-          {canCreateBatch && <button type="button" disabled={!selectedCount} onClick={onCreateBatch} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> Create graduation batch</button>}
-        </div>
-      </div>
-      {rows.length ? <ul className="mt-4 flex-1 space-y-3">
-        {rows.map((row) => {
-          const selected = selectedIds.has(row.student.id);
-          const completedCourses = row.eligibility?.completed_courses || [];
-          const applicationFile = row.endorsement?.request_attachment;
-          return (
-            <li
-              key={row.student.id}
-              draggable={Boolean(row.has_submitted_documents)}
-              onDragStart={(event) => {
-                if (!row.has_submitted_documents) return;
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", `graduation-student:${row.student.id}`);
-              }}
-              className={`rounded-xl border p-3 ${selectable ? "cursor-grab border-emerald-200 bg-emerald-50/70 active:cursor-grabbing" : "border-slate-200 bg-slate-50/60"}`}
+        <span className="flex flex-wrap items-center justify-end gap-1.5">
+          <StatusBadge value={row.application_status} dot={false} />
+          {row.has_submitted_documents && applicationFile?.file_exists !== false && applicationFile?.url && (
+            <a
+              href={applicationFile.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-brand-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+              aria-label={`View submitted graduation application PDF for ${row.student.name}`}
             >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex min-w-0 items-start gap-2.5">
-                  {canCreateBatch && <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />}
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
-                    <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
-                  </div>
-                </div>
-                <span className="flex flex-wrap items-center justify-end gap-1.5">
-                  <StatusBadge value={row.application_status} dot={false} />
-                  {row.has_submitted_documents && applicationFile?.file_exists !== false && applicationFile?.url && (
-                    <a
-                      href={applicationFile.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-brand-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-                      aria-label={`View submitted graduation application PDF for ${row.student.name}`}
-                    >
-                      <FileText className="h-3.5 w-3.5" /> View PDF <ArrowUpRight className="h-3 w-3" />
-                    </a>
-                  )}
-                  {row.has_submitted_documents && applicationFile?.file_exists === false && (
-                    <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">PDF unavailable</span>
-                  )}
-                </span>
-              </div>
-              <GraduationRequirementBoxes row={row} />
-              {completedCourses.length > 0 && (
-                <p className="mt-2 text-xs text-slate-500">
-                  <span className="font-semibold text-slate-700">Completed-course cohort:</span>{" "}
-                  {completedCourses.slice(0, 4).map((course) => course.code).join(", ")}
-                  {completedCourses.length > 4 ? ` +${completedCourses.length - 4} more` : ""}
-                </p>
-              )}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs"><Eye className="h-3.5 w-3.5" /> View student</button>
-              </div>
-            </li>
-          );
-        })}
-      </ul> : <p className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-5 text-center text-xs text-slate-400">{empty}</p>}
-    </section>
+              <FileText className="h-3.5 w-3.5" /> View PDF <ArrowUpRight className="h-3 w-3" />
+            </a>
+          )}
+          {row.has_submitted_documents && applicationFile?.file_exists === false && (
+            <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">PDF unavailable</span>
+          )}
+        </span>
+      </div>
+      <GraduationRequirementBoxes row={row} />
+      {completedCourses.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700">Completed-course cohort:</span>{" "}
+          {completedCourses.slice(0, 4).map((course) => course.code).join(", ")}
+          {completedCourses.length > 4 ? ` +${completedCourses.length - 4} more` : ""}
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs"><Eye className="h-3.5 w-3.5" /> View student</button>
+      </div>
+    </div>
   );
 }
 
@@ -4362,13 +4114,7 @@ function GraduationBatchOverviewSection({ groups, accountRole, onSelectBatch, on
           return (
             <div
               key={group.id}
-              draggable={readyToDrag}
-              onDragStart={(event) => {
-                if (!readyToDrag) return;
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", `graduation-batch:${group.id}`);
-              }}
-              className={`rounded-xl border px-3 py-2 ${readyToDrag ? "cursor-grab border-emerald-300 bg-emerald-50 active:cursor-grabbing" : "border-slate-200 bg-slate-50/60"}`}
+              className={`rounded-xl border px-3 py-2 ${readyToDrag ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50/60"}`}
             >
               <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
                 <div className="min-w-0">
@@ -4927,6 +4673,14 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     () => graduationBatchGroups(visibleBatchedRows, selectedIds),
     [visibleBatchedRows, selectedIds],
   );
+  const boardItems = useMemo(
+    () => [
+      ...awaitingApplicationRows.map((row) => ({ kind: "student", stage: "stage-1", row })),
+      ...readyForBatchRows.map((row) => ({ kind: "student", stage: "stage-2", row })),
+      ...visibleBatchGroups.map((group) => ({ kind: "batch", group })),
+    ],
+    [awaitingApplicationRows, readyForBatchRows, visibleBatchGroups],
+  );
   function toggleReadyStudent(studentId) {
     const readyIds = new Set(readyForBatchRows.map((row) => row.student.id));
     setSelectedIds((current) => {
@@ -4954,6 +4708,51 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
   function processBatchGroup(group) {
     setSelectedIds(new Set(group.rows.map((row) => row.student.id)));
     setBatchOpen(true);
+  }
+  // A drop (or the "Move to..." menu) only opens the same confirmation dialog the card buttons open.
+  // The dialog posts to the guarded endpoint and the server checks every rule again.
+  function moveGraduationBoardItem(item) {
+    if (item.kind === "student") {
+      if (selectedIds.has(item.row.student.id)) createPreBatch();
+      else {
+        setSelectedIds(new Set([item.row.student.id]));
+        setBatchOpen(true);
+      }
+    } else {
+      processBatchGroup(item.group);
+    }
+    return { message: "Confirm the step in the dialog to finish moving it." };
+  }
+  function renderGraduationBoardCard(item) {
+    if (item.kind === "student") {
+      const canSelect = item.stage === "stage-2" && accountRole === "staff";
+      return (
+        <GraduationStudentCard
+          row={item.row}
+          selectable={item.stage === "stage-2"}
+          canSelect={canSelect}
+          selected={selectedIds.has(item.row.student.id)}
+          onToggleStudent={toggleReadyStudent}
+          onOpenStudent={openCase}
+        />
+      );
+    }
+    return (
+      <GraduationBatchRow
+        group={item.group}
+        accountRole={accountRole}
+        selectedIds={selectedIds}
+        expanded={expandedBatchIds.has(item.group.id)}
+        onToggleBatch={["staff", "academic_coordinator", "research_coordinator"].includes(accountRole) ? toggleBatchGroup : null}
+        onToggleExpanded={toggleExpandedBatch}
+        onProcessBatch={processBatchGroup}
+        onOpenStudent={openCase}
+        onMessageStudent={setMessageRow}
+        onViewStage={setStageGroup}
+        onExportBatch={accountRole === "dean" ? exportApprovedBatch : null}
+        exporting={exportingBatchId === item.group.id}
+      />
+    );
   }
   function toggleExpandedBatch(groupId) {
     setExpandedBatchIds((current) => {
@@ -5008,53 +4807,30 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
         </label>
         <p className="mt-2 text-xs text-slate-500">GS Staff can filter by program or completed course, choose “Select all visible” in Step 2, and create a cohort-specific graduation batch.</p>
       </div>
-      <div className="max-w-full overflow-x-auto rounded-xl pb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" role="region" aria-label="Graduation workflow Kanban board" tabIndex={0}>
-        <div className="grid grid-cols-1 gap-4 sm:flex sm:w-max sm:items-start">
-          <GraduationCandidateStageSection
-            stageNumber={1}
-            title="Academically Eligible — Awaiting Student Application"
-            description="These students completed all required academic, research, and practicum stages. They are visible to staff, but cannot be selected for a graduation batch until they submit the signed application / review-window PDF in the student portal."
-            empty="No academically eligible students are currently waiting for a graduation application."
-            rows={awaitingApplicationRows}
+      <StageBoard
+        ariaLabel="Graduation workflow Kanban board"
+        columns={GRADUATION_ALL_BOARD_COLUMNS}
+        items={boardItems}
+        getItemId={graduationBoardItemId}
+        getColumnKey={graduationBoardColumnKey}
+        renderCard={renderGraduationBoardCard}
+        canDrag={(item) => graduationBoardCanDrag(item, accountRole)}
+        showMoveMenu={(item) => !(item.kind === "student" && item.stage === "stage-1")}
+        checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}
+        onMove={moveGraduationBoardItem}
+        columnClassName="min-h-[520px] w-[380px]"
+        renderColumnHeader={(column, columnItems) => (
+          <GraduationBoardColumnHeader
+            column={column}
+            items={columnItems}
             accountRole={accountRole}
             selectedIds={selectedIds}
-            onToggleStudent={toggleReadyStudent}
-            onSelectAll={() => {}}
-            onClearSelection={() => setSelectedIds(new Set())}
-            onCreateBatch={createPreBatch}
-            onOpenStudent={openCase}
-          />
-          <GraduationCandidateStageSection
-            stageNumber={2}
-            title="Application Submitted — Ready for Batch Creation"
-            description="The required student application / review-window PDF is on file. GS Staff may select individual students, all visible students, a program, or a completed-course cohort before creating the batch. Other staff accounts see this stage as read-only."
-            empty="No submitted graduation applications are waiting for batch creation."
-            rows={readyForBatchRows}
-            accountRole={accountRole}
-            selectedIds={selectedIds}
-            selectable
-            onToggleStudent={toggleReadyStudent}
             onSelectAll={() => setSelectedIds(new Set(readyForBatchRows.map((row) => row.student.id)))}
             onClearSelection={() => setSelectedIds(new Set())}
             onCreateBatch={createPreBatch}
-            onOpenStudent={openCase}
           />
-          <GraduationBatchBoardSections
-            groups={visibleBatchGroups}
-            accountRole={accountRole}
-            selectedIds={selectedIds}
-            expandedBatchIds={expandedBatchIds}
-            onToggleBatch={["staff", "academic_coordinator", "research_coordinator"].includes(accountRole) ? toggleBatchGroup : null}
-            onToggleExpanded={toggleExpandedBatch}
-            onProcessBatch={processBatchGroup}
-            onOpenStudent={openCase}
-            onMessageStudent={setMessageRow}
-            onViewStage={setStageGroup}
-            onExportBatch={accountRole === "dean" ? exportApprovedBatch : null}
-            exportingBatchId={exportingBatchId}
-          />
-        </div>
-      </div>
+        )}
+      />
       {selectedRow && (
         <WorkflowCaseModal
           id={`graduation-case-${selectedRow.student.id}`}
@@ -5524,6 +5300,20 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
     }
   }
 
+  async function completeReenrollment() {
+    if (!selectedRow) return;
+    const saved = await submit({
+      student_id: selectedRow.student_id,
+      case_id: selectedRow.id,
+      workflow_action: "complete_reenrollment",
+      staff_notes: form.staff_notes,
+    });
+    if (saved) {
+      setSelectedRow(null);
+      setForm((current) => ({ ...current, staff_notes: "" }));
+    }
+  }
+
   async function endResidency() {
     if (!selectedRow) return;
     const saved = await submit({
@@ -5592,7 +5382,15 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
             {selectedRow.kind === "residency" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="Semester" value={selectedRow.term_label} /><Detail label="Purpose" value={selectedRow.reason} /></div>}
             {selectedRow.kind === "awol" && selectedRow.return_intent && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Student's written intention</p><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selectedRow.return_intent}</p>{selectedRow.return_reason && <><p className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500">Reason for return</p><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selectedRow.return_reason}</p></>}</div>}
             {selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) && <><Field label="Staff review notes"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>{review && <PolicyReviewCard title="Return-from-AWOL policy review" description="Deterministic checks for written intent and program-specific maximum residence before Dean routing." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview("forward_return_to_dean", selectedRow)} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}.`)} />}<button type="button" onClick={() => runReview("forward_return_to_dean", selectedRow)} disabled={reviewing} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run policy checker"}</button></>}
-            {selectedRow.kind === "awol" && accountRole === "staff" && ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(selectedRow.status) && (
+            {selectedRow.kind === "awol" && ["staff", "academic_coordinator"].includes(accountRole) && selectedRow.status === "Re-enrollment Required" && (
+              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-ink">The Dean approved a full re-enrollment</p>
+                <p className="text-xs leading-relaxed text-slate-600">The student stays AWOL until the courses are re-enrolled. When that is done, mark it complete: the student becomes Active again and this case closes. Nothing else opens a second AWOL case in the meantime.</p>
+                <Field label="Note for the record"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} placeholder="For example: all courses re-enrolled with the Academic Coordinator." /></Field>
+                <button type="button" disabled={submitting} onClick={completeReenrollment} className="btn-primary cursor-pointer"><CheckCircle2 className="h-4 w-4" /> {submitting ? "Saving…" : "Mark re-enrollment complete"}</button>
+              </div>
+            )}
+            {selectedRow.kind === "awol" && accountRole === "staff" && ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required", "Re-enrollment Completed"].includes(selectedRow.status) && (
               <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
                 <p className="text-sm font-semibold text-ink">Dean decision applied</p>
                 <p className="text-xs text-slate-600">The approved standing outcome is already reflected. Enrollment remains a separate Academic Coordinator action.</p>
@@ -5629,148 +5427,6 @@ function AwolBoardCard({ item, onOpen, onMessage }) {
         {onMessage && <button type="button" onClick={onMessage} className="btn-ghost cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}
       </div>
     </article>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Leave of Absence
-// ---------------------------------------------------------------------------
-function LeaveOfAbsenceForm({ context, studentId, submit, submitting, accountRole, embedded = false }) {
-  const selectedRequest = context?.selected_request;
-  const canForward = selectedRequest?.status === "Pending Review";
-  const [policyReview, setPolicyReview] = useState(context?.loa_policy_review || null);
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewError, setReviewError] = useState("");
-  const [reviewNotice, setReviewNotice] = useState("");
-  const [form, setForm] = useState({
-    request_date: new Date().toISOString().slice(0, 10),
-    effective_start: "",
-    effective_end: "",
-    reason_category: "",
-    reason_remarks: "",
-    eligibility_status: "Eligible",
-    staff_notes: "",
-  });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  useEffect(() => {
-    setPolicyReview(context?.loa_policy_review || null);
-  }, [context?.loa_policy_review]);
-
-  useEffect(() => {
-    if (!selectedRequest) return;
-    setForm((current) => ({
-      ...current,
-      request_date: (selectedRequest.submitted_at || "").slice(0, 10) || current.request_date,
-      effective_start: selectedRequest.effective_start || "",
-      effective_end: selectedRequest.effective_end || "",
-      reason_category: selectedRequest.reason_category || "",
-      reason_remarks: selectedRequest.reason_remarks || "",
-    }));
-  }, [selectedRequest?.request_log_id]);
-
-  async function runPolicyReview(applySuggestion = false) {
-    if (!studentId) return;
-    setReviewing(true);
-    setReviewError("");
-    setReviewNotice("");
-    try {
-      const result = await api.loaPolicyReview({ student_id: studentId, ...form });
-      setPolicyReview(result.review);
-      if (applySuggestion && result.review) {
-        setForm((current) => ({
-          ...current,
-          eligibility_status: result.review.recommendation || current.eligibility_status,
-          staff_notes: mergeReviewSummary(current.staff_notes, result.review.summary),
-        }));
-        setReviewNotice("Suggestion applied to the eligibility review and staff notes.");
-      }
-    } catch (err) {
-      setReviewError(err.message || "Could not run the LOA policy review.");
-    } finally {
-      setReviewing(false);
-    }
-  }
-
-  function onSubmit(e) {
-    e.preventDefault();
-    submit({ student_id: studentId, ...form });
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review leave application" subtitle="Run the fixed policy checks, record the review, and forward every decision to the Dean" icon={CalendarOff} />
-      {!embedded && <RequestSummary request={selectedRequest} />}
-      <LoaPolicyReviewCard
-        review={policyReview}
-        busy={reviewing}
-        error={reviewError}
-        notice={reviewNotice}
-        onReview={() => runPolicyReview(false)}
-        onApply={() => runPolicyReview(true)}
-      />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Request date" required>
-          <Input type="date" value={form.request_date} readOnly aria-readonly="true" className="bg-slate-50" required />
-        </Field>
-        <Field label="Effective start semester">
-          <Input value={form.effective_start} readOnly aria-readonly="true" className="bg-slate-50" />
-        </Field>
-        <Field label="Effective end semester">
-          <Input value={form.effective_end} readOnly aria-readonly="true" className="bg-slate-50" />
-        </Field>
-        <Field label="Reason category">
-          <Input value={form.reason_category} readOnly aria-readonly="true" className="bg-slate-50" />
-        </Field>
-        <Field label="Eligibility status / check result">
-          <Select
-            value={form.eligibility_status}
-            onChange={set("eligibility_status")}
-            placeholder=""
-            options={["Eligible", "Needs Review", "Not Eligible", "Pending Requirements"]}
-          />
-        </Field>
-      </div>
-
-      <Field label="Reason / remarks">
-        <Textarea value={form.reason_remarks} readOnly aria-readonly="true" className="bg-slate-50" />
-      </Field>
-      <Field label="Staff notes">
-        <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
-      </Field>
-      {canForward ? (
-        <SubmitButton submitting={submitting}>Forward to Dean</SubmitButton>
-      ) : (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; policy results remain advisory until the Dean decides.
-        </div>
-      )}
-      {accountRole === "staff" && selectedRequest?.status === "Approved" && (
-        <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
-          <p className="text-sm font-semibold text-ink">Approved and applied</p>
-          <p className="text-xs text-slate-600">The student standing changed to On Leave when the Dean approved the request.</p>
-          <a href={`/api/standing-changes/leave-of-absence/${studentId}/registrar-report`} className="btn-ghost w-fit cursor-pointer">
-            <Download className="h-4 w-4" /> Export LOA report for Registrar
-          </a>
-        </div>
-      )}
-    </form>
-  );
-}
-
-function LoaPolicyReviewCard({ review, busy, error, notice, onReview, onApply }) {
-  return (
-    <PolicyReviewCard
-      title="LOA policy review"
-      description="Deterministic checklist using the approved LOA rules and the structured request fields. It does not use RAG and does not approve a case."
-      emptyText="Run the review after selecting a submitted LOA request."
-      review={review}
-      busy={busy}
-      error={error}
-      notice={notice}
-      onReview={onReview}
-      onApply={onApply}
-    />
   );
 }
 
@@ -5837,145 +5493,6 @@ function PolicyReviewCard({ title, description, emptyText, review, busy, error, 
   );
 }
 
-function mergeReviewSummary(currentNotes, summary) {
-  const existing = String(currentNotes || "").trim();
-  const next = String(summary || "").trim();
-  if (!next || existing.includes(next)) return existing;
-  return existing ? `${existing}\n${next}` : next;
-}
-
-// ---------------------------------------------------------------------------
-// Readmission
-// ---------------------------------------------------------------------------
-function ReadmissionForm({ context, studentId, submit, submitting, accountRole, embedded = false }) {
-  const requirements = context.readmission_requirements || [];
-  const selectedRequest = context?.selected_request;
-  const canForward = selectedRequest?.status === "Pending Review";
-  const [items, setItems] = useState(requirements);
-  const [policyReview, setPolicyReview] = useState(context?.readmission_policy_review || null);
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewError, setReviewError] = useState("");
-  const [reviewNotice, setReviewNotice] = useState("");
-  const [form, setForm] = useState({
-    target_return_term: "",
-    previous_loa_period: "",
-    previous_loa_start: "",
-    previous_loa_end: "",
-    return_intent: "",
-    eligibility_status: "Eligible to Return",
-    missing_requirements: "",
-    staff_notes: "",
-  });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const toggle = (item) => setItems((r) => (r.includes(item) ? r.filter((x) => x !== item) : [...r, item]));
-
-  useEffect(() => setItems(context.readmission_requirements || []), [context.readmission_requirements]);
-  useEffect(() => setPolicyReview(context?.readmission_policy_review || null), [context?.readmission_policy_review]);
-
-  useEffect(() => {
-    if (!selectedRequest) return;
-    setForm((current) => ({
-      ...current,
-      target_return_term: selectedRequest.target_return_term || "",
-      previous_loa_period: selectedRequest.previous_loa_period || "",
-      previous_loa_start: selectedRequest.previous_loa_start || "",
-      previous_loa_end: selectedRequest.previous_loa_end || "",
-      return_intent: selectedRequest.return_intent || "",
-    }));
-  }, [selectedRequest?.request_log_id]);
-
-  function onSubmit(e) {
-    e.preventDefault();
-    submit({ student_id: studentId, ...form, readmission_items: items });
-  }
-
-  async function runPolicyReview(applySuggestion = false) {
-    if (!studentId) return;
-    setReviewing(true);
-    setReviewError("");
-    setReviewNotice("");
-    try {
-      const result = await api.readmissionPolicyReview({ student_id: studentId, ...form, readmission_items: items });
-      setPolicyReview(result.review);
-      if (applySuggestion && result.review) {
-        setForm((current) => ({
-          ...current,
-          eligibility_status: result.review.recommendation || current.eligibility_status,
-          missing_requirements: (result.review.missing_requirements || []).join(", "),
-          staff_notes: mergeReviewSummary(current.staff_notes, result.review.summary),
-        }));
-        setReviewNotice("Suggestion applied to eligibility, missing requirements, and staff notes.");
-      }
-    } catch (err) {
-      setReviewError(err.message || "Could not run the readmission policy review.");
-    } finally {
-      setReviewing(false);
-    }
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review readmission request" subtitle="Run the fixed return checks, record the review, and forward every decision to the Dean" icon={UserCheck} />
-      {!embedded && <RequestSummary request={selectedRequest} />}
-      <PolicyReviewCard
-        title="Readmission policy review"
-        description="Deterministic checklist using the approved readmission rules and structured request fields. It does not use RAG or make the decision."
-        emptyText="Run the review after selecting a submitted readmission request."
-        review={policyReview}
-        busy={reviewing}
-        error={reviewError}
-        notice={reviewNotice}
-        onReview={() => runPolicyReview(false)}
-        onApply={() => runPolicyReview(true)}
-      />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Target return semester" required>
-          <Input value={form.target_return_term} readOnly aria-readonly="true" className="bg-slate-50" required />
-        </Field>
-        <Field label="Previous LOA period">
-          <Input value={form.previous_loa_period} readOnly aria-readonly="true" className="bg-slate-50" />
-        </Field>
-        <Field label="Eligibility to return status">
-          <Select
-            value={form.eligibility_status}
-            onChange={set("eligibility_status")}
-            placeholder=""
-            options={["Eligible to Return", "Needs Review", "Not Eligible", "Pending Requirements"]}
-          />
-        </Field>
-      </div>
-      <Field label="Student's return intention">
-        <Textarea value={form.return_intent} readOnly aria-readonly="true" className="bg-slate-50" />
-      </Field>
-      <Field label="Eligibility to return checklist" hint="Unticked items are treated as missing requirements.">
-        <CheckList items={requirements} selected={items} onToggle={toggle} />
-      </Field>
-      <Field label="Missing requirements / remarks">
-        <Textarea value={form.missing_requirements} onChange={set("missing_requirements")} />
-      </Field>
-      <Field label="Staff notes">
-        <Textarea value={form.staff_notes} onChange={set("staff_notes")} />
-      </Field>
-      {canForward ? (
-        <SubmitButton submitting={submitting}>Complete review</SubmitButton>
-      ) : (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This request is <span className="font-semibold text-ink">{selectedRequest?.status || "not pending"}</span>. Staff can view its record; policy results remain advisory until the Dean decides.
-        </div>
-      )}
-      {accountRole === "staff" && selectedRequest?.status === "Approved" && (
-        <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
-          <p className="text-sm font-semibold text-ink">Approved and applied</p>
-          <p className="text-xs text-slate-600">Active standing was restored on Dean approval. Course enrollment remains a separate Academic Coordinator action.</p>
-          <a href={`/api/standing-changes/readmission/${studentId}/registrar-report`} className="btn-ghost w-fit cursor-pointer">
-            <Download className="h-4 w-4" /> Export readmission report for Registrar
-          </a>
-        </div>
-      )}
-    </form>
-  );
-}
-
 function MiniBox({ label, value, tone }) {
   const tones = {
     brand: "text-brand-700 bg-brand-50",
@@ -5996,9 +5513,9 @@ function workflowGuidance(slug) {
     "student-handoff":
       "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically — no manual typing.",
     "leave-of-absence":
-      "Leave of Absence is a stop/pause process. Staff verify the submitted application and forward it. The Dean alone approves, denies, or returns the request, and the student's status changes only after that decision.",
+      "A leave of absence pauses a student's studies. Each request is a case that moves across the board: staff check it, the Dean decides, and the student goes on leave when the first semester of the leave begins. Drag a card to the next column or use its Move to menu; both do exactly what the buttons do.",
     readmission:
-      "Readmission is a separate return/re-entry process after the approved leave period. A deterministic policy checker supports staff review, and every approval remains a Dean decision.",
+      "Readmission brings a student back from an approved leave. The student names the leave they are ending, a return semester and a checklist; staff verify each item, and the Dean decides. Approval makes the student active again; enrolling in subjects is a separate step for the Academic Coordinator.",
     awol:
       "AWOL restricts registration after a student leaves without formal LOA. A return requires written intent routed through the Dean. The policy review applies the 5/7-year normal and 7/9-year absolute residence limits, while valid no-subject residency remains a separate active enrollment state.",
     "course-audit":

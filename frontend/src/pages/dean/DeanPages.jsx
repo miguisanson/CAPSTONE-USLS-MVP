@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -16,6 +17,10 @@ import { DEAN_PROCESSES, DeanFeedback, DeanGate, processOfType, useDean } from "
 import { AgeBadge, CaseTable, casePath, daysSince, processLabel, useDeanFilters } from "./DeanShared";
 import { DeanListFilters, DeanWorkflowBoard, WorkflowApprovalCard } from "./DeanParts";
 import { deanItemDate } from "./deanHelpers";
+import { LeaveCaseSummary, isLeaveCaseItem, isLeaveDecisionDue } from "./DeanLeaveParts";
+import { LeaveBatchBar, LeaveBatchModal, LeavePendingTable } from "./DeanLeaveBatch";
+import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
+import HistoryDisclosure from "../../components/HistoryDisclosure";
 
 const PROCESS_ORDER = ["course-adjustments", "leave", "withdrawal", "practicum", "graduation"];
 const PROCESS_COUNT_KEY = {
@@ -309,9 +314,31 @@ export function DeanProcessPage() {
   );
 }
 
+// One line in a recent / overview list. Leave and readmission cases open into the same
+// summary the Dean saw when deciding, read-only.
+function DecidedRow({ item }) {
+  const leaveCase = isLeaveCaseItem(item) ? item.case : null;
+  return (
+    <li className="py-2 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <Link to={casePath(item)} className="min-w-0 truncate text-slate-700 hover:text-brand-700 hover:underline">{item.title}</Link>
+        {leaveCase ? leaveCaseStatusBadge(leaveCase) : <StatusBadge value={item.status} dot={false} />}
+      </div>
+      {leaveCase?.status === "Denied" && <p className="mt-1 text-xs font-semibold text-red-700">Follow-up owner: {leaveCase.owner || "Graduate School staff"}</p>}
+      {leaveCase && (
+        <HistoryDisclosure className="mt-2" label="View details" hideLabel="Hide details">
+          <LeaveCaseSummary item={item} />
+        </HistoryDisclosure>
+      )}
+    </li>
+  );
+}
+
 function DeanProcessBody({ process }) {
   const navigate = useNavigate();
-  const { workflowPending, workflowRecent, workflowOverview, counts } = useDean();
+  const { workflowPending, workflowRecent, workflowOverview, counts, refetch, setMsg } = useDean();
+  const [selectedLeave, setSelectedLeave] = useState(() => new Set());
+  const [batchModal, setBatchModal] = useState(null); // { action, rows } kept as a snapshot so the result stays visible after the list refreshes
   const types = DEAN_PROCESSES[process].types;
   const isStanding = process === "leave";
   const pending = workflowPending.filter((item) => types.includes(item.type));
@@ -321,6 +348,20 @@ function DeanProcessBody({ process }) {
   const visiblePending = apply(pending);
   const boardRows = apply(overview);
   const visibleRecent = apply(recent);
+  // Other cases (for example on leave or waiting for staff) that are in neither list above.
+  const listedKeys = new Set([...pending, ...recent].map((item) => `${item.type}-${item.id}`));
+  const visibleOther = isStanding ? apply(overview.filter((item) => isLeaveCaseItem(item) && !listedKeys.has(`${item.type}-${item.id}`))) : [];
+  const batchRows = isStanding ? visiblePending.filter((item) => isLeaveDecisionDue(item) && selectedLeave.has(item.id)) : [];
+  const toggleLeave = (id) => setSelectedLeave((current) => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const toggleAllLeave = (rows, on) => setSelectedLeave((current) => {
+    const next = new Set(current);
+    rows.forEach((item) => (on ? next.add(item.id) : next.delete(item.id)));
+    return next;
+  });
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -341,18 +382,33 @@ function DeanProcessBody({ process }) {
           )}
           <Card className="p-5">
             <SectionTitle title="Waiting for your decision" subtitle="Open a case to review it and decide" icon={Inbox} />
-            <CaseTable items={visiblePending} emptyTitle="Nothing to review in this section" emptyHint={isStanding ? "LOA, readmission and AWOL reviews will appear here when routed to the Dean." : "Submitted items for this role will appear here."} />
+            {isStanding && visiblePending.some(isLeaveDecisionDue) && <p className="-mt-2 mb-3 text-xs text-slate-500">Tick several leave or readmission requests to approve, return or deny them together.</p>}
+            {isStanding && <LeaveBatchBar count={batchRows.length} onPick={(action) => setBatchModal({ action, rows: batchRows })} onClear={() => setSelectedLeave(new Set())} />}
+            {isStanding && visiblePending.length > 0
+              ? <LeavePendingTable items={visiblePending} selectedIds={selectedLeave} onToggle={toggleLeave} onToggleAll={toggleAllLeave} />
+              : <CaseTable items={visiblePending} emptyTitle="Nothing to review in this section" emptyHint={isStanding ? "LOA, readmission and AWOL reviews will appear here when routed to the Dean." : "Submitted items for this role will appear here."} />}
           </Card>
+          {batchModal && (
+            <LeaveBatchModal
+              action={batchModal.action}
+              rows={batchModal.rows}
+              onClose={() => { setBatchModal(null); setSelectedLeave(new Set()); }}
+              onSaved={async (result) => { setMsg(result?.message || ""); await refetch(); }}
+            />
+          )}
           {visibleRecent.length > 0 && (
             <Card className="p-5">
               <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Clock className="h-3.5 w-3.5" /> Recent workflow decisions</p>
               <ul className="divide-y divide-slate-100">
-                {visibleRecent.map((item) => (
-                  <li key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <Link to={casePath(item)} className="min-w-0 truncate text-slate-700 hover:text-brand-700 hover:underline">{item.title}</Link>
-                    <StatusBadge value={item.status} dot={false} />
-                  </li>
-                ))}
+                {visibleRecent.map((item) => <DecidedRow key={`${item.type}-${item.id}`} item={item} />)}
+              </ul>
+            </Card>
+          )}
+          {visibleOther.length > 0 && (
+            <Card className="p-5">
+              <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Clock className="h-3.5 w-3.5" /> Other cases in progress</p>
+              <ul className="divide-y divide-slate-100">
+                {visibleOther.map((item) => <DecidedRow key={`${item.type}-${item.id}`} item={item} />)}
               </ul>
             </Card>
           )}

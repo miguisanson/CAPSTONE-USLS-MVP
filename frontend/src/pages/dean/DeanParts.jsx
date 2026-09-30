@@ -19,6 +19,8 @@ import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } fr
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
 import { GraduationRoster } from "../WorkflowPage";
+import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
+import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
 import {
   CLARIFICATION_TEMPLATES,
   graduationBatchLabel,
@@ -316,6 +318,8 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
     || (standingChange && item.workflow_status === "Dean Review")
   );
   const batchName = item.type === "graduation" ? graduationBatchLabel(item) : "";
+  const leaveCase = isLeaveCaseItem(item) ? item.case : null;
+  const requestWord = leaveCase ? "Case" : "Request";
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -324,11 +328,13 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
           <p className="text-sm text-slate-500">{item.subtitle} · submitted {formatDate(item.submitted_at)}</p>
           {batchName && <p className="mt-1 text-xs font-semibold text-brand-700">{batchName}</p>}
         </div>
-        <StatusBadge value={item.status} dot={false} />
+        {leaveCase ? leaveCaseStatusBadge(leaveCase) : <StatusBadge value={item.status} dot={false} />}
       </div>
-      <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-600">
-        {item.details}
-      </p>
+      {leaveCase ? <LeaveCaseSummary item={item} /> : (
+        <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-600">
+          {item.details}
+        </p>
+      )}
       {timeline && <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <WorkflowTimeline steps={timeline} title={timelineTitle} />
       </div>}
@@ -346,7 +352,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
       {item.history?.length > 0 && (
         <HistoryDisclosure className="mt-4" label="View logs" hideLabel="Hide logs" count={item.history.length}>
           <div className="rounded-xl border border-slate-200 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stage history · Request #{item.request_id || item.id}</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stage history · {requestWord} #{leaveCase?.id || item.request_id || item.id}</p>
             <ol className="mt-2 space-y-2">{[...item.history].reverse().map((entry) => <li key={entry.id} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-sm font-semibold text-ink">{entry.result}</p><p className="mt-1 text-xs text-slate-500">{entry.actor_role}{entry.actor_user_id ? ` · User #${entry.actor_user_id}` : ""}{entry.action_type ? ` · ${entry.action_type}` : ""} · {entry.previous_status || "—"} → {entry.new_status || "—"} · {formatDate(entry.created_at)}</p>{entry.notes && <p className="mt-1 text-xs text-slate-600">{entry.notes}</p>}</li>)}</ol>
           </div>
         </HistoryDisclosure>
@@ -368,6 +374,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
         className="field-input"
       />
       </div>}
+      {leaveCase && canDecide && <label className="mt-3 block"><span className="mb-1 block text-xs font-semibold text-slate-600">Your comment <span className="font-normal text-slate-400">(required to deny or return for revision)</span></span><textarea value={note[key] || ""} onChange={(event) => setNote((current) => ({ ...current, [key]: event.target.value }))} className="field-input min-h-24" placeholder="Write your reason. It is saved with your name, role, date and time." /></label>}
       {decisionOnly && <label className="mt-3 block"><span className="mb-1 block text-xs font-semibold text-slate-600">Review comment <span className="font-normal text-slate-400">({item.type === "withdrawal" ? "required when denying" : "required when returning for revision"})</span></span><textarea value={note[key] || ""} onChange={(event) => setNote((current) => ({ ...current, [key]: event.target.value }))} className="field-input min-h-24" placeholder="Add a review comment. It will be saved with your name, role, date, and time." /></label>}
       <div className="mt-3 flex flex-wrap gap-2">
         {canDecide && (
@@ -390,7 +397,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
         </button>}
         {!canDecide && (
           <span className="self-center text-xs font-semibold text-slate-500">
-            No Dean decision is due at this stage.
+            {leaveCase ? "Read only. This request is not waiting for a Dean decision." : "No Dean decision is due at this stage."}
           </span>
         )}
       </div>

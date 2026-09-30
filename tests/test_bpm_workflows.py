@@ -33,6 +33,7 @@ from app import (  # noqa: E402
     FacultyWorkingHour,
     Form1Endorsement,
     GraduationEndorsement,
+    LeaveCase,
     MonitoringSheetUpload,
     MonitoringValidationIssue,
     PanelAssignment,
@@ -2923,12 +2924,15 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             loa_rows = submitted_request_students("leave-of-absence")
             self.assertEqual(loa_rows[0]["status"], "Dean Review")
             self.assertEqual(loa_rows[0]["next_action_owner"], "Dean")
+            # The Dean now decides on the case record, not on a log row.
+            loa_case = LeaveCase.query.filter_by(student_id=student.id, kind="LOA").one()
+            self.assertEqual(forwarded.workflow_request_id, loa_case.id)
             self.assertTrue(any(
-                item["id"] == forwarded.id and item["type"] == "leave-of-absence"
+                item["id"] == loa_case.id and item["type"] == "leave-of-absence"
                 for item in workflow_approvals_payload()["pending"]
             ))
             decided = self._dean_client().post(
-                f"/api/approvals/workflow/leave-of-absence/{forwarded.id}/decide",
+                f"/api/approvals/workflow/leave-of-absence/{loa_case.id}/decide",
                 json={"decision": "approve"},
             )
             self.assertEqual(decided.status_code, 200, decided.get_json())
@@ -2981,12 +2985,13 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             readmission_rows = submitted_request_students("readmission")
             self.assertEqual(readmission_rows[0]["status"], "Dean Review")
             self.assertEqual(readmission_rows[0]["next_action_owner"], "Dean")
+            readmission_case = LeaveCase.query.filter_by(student_id=student.id, kind="READMISSION").one()
             self.assertTrue(any(
-                item["id"] == forwarded.id and item["type"] == "readmission"
+                item["id"] == readmission_case.id and item["type"] == "readmission"
                 for item in workflow_approvals_payload()["pending"]
             ))
             decided = self._dean_client().post(
-                f"/api/approvals/workflow/readmission/{forwarded.id}/decide",
+                f"/api/approvals/workflow/readmission/{readmission_case.id}/decide",
                 json={"decision": "approve"},
             )
             self.assertEqual(decided.status_code, 200, decided.get_json())
@@ -3059,7 +3064,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 result="LOA application submitted",
             ).first()
             self.assertEqual(loa_log.source_reference, "Structured LOA portal form")
-            self.assertIn("no RAG", loa_log.notes)
+            self.assertIn("Filed through the student portal form", loa_log.notes)
+            self.assertNotIn("RAG", loa_log.notes)
 
             withdrawn = client.post("/api/student-portal/requests/leave-of-absence/withdraw", json={})
             self.assertEqual(withdrawn.status_code, 200, withdrawn.get_json())
@@ -3090,7 +3096,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 result="Readmission request submitted",
             ).first()
             self.assertEqual(readmission_log.source_reference, "Structured readmission portal form")
-            self.assertIn("no RAG", readmission_log.notes)
+            self.assertIn("Filed through the student portal form", readmission_log.notes)
+            self.assertNotIn("RAG", readmission_log.notes)
 
     def test_readmission_needs_review_still_goes_to_dean(self):
         with app.app_context():
@@ -3143,8 +3150,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             readmission_rows = submitted_request_students("readmission")
             self.assertEqual(readmission_rows[0]["status"], "Dean Review")
             self.assertEqual(readmission_rows[0]["next_action_owner"], "Dean")
+            readmission_case = LeaveCase.query.filter_by(student_id=student.id, kind="READMISSION").one()
             self.assertTrue(any(
-                item["id"] == forwarded.id and item["type"] == "readmission"
+                item["id"] == readmission_case.id and item["type"] == "readmission"
                 for item in workflow_approvals_payload()["pending"]
             ))
 
@@ -4145,9 +4153,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 transaction_slug="leave-of-absence",
                 result="LOA application submitted",
             ).first())
-            self.assertEqual(
-                submitted_request_students("leave-of-absence")[0]["student_number"],
+            # The approved-leave demo students (Therese, Gabriel) now have real leave cases too,
+            # so find Benjamin's request by number instead of assuming it is the only one.
+            self.assertIn(
                 benjamin.student_number,
+                [row["student_number"] for row in submitted_request_students("leave-of-absence")],
             )
 
             miguel = students["2260004"]
@@ -4201,9 +4211,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             maria = students["2460009"]
             self.assertEqual(maria.standing, "On Leave")
-            self.assertEqual(
-                submitted_request_students("readmission")[0]["student_number"],
+            self.assertIn(
                 maria.student_number,
+                [row["student_number"] for row in submitted_request_students("readmission")],
             )
 
             paulo = students["2360010"]
@@ -4286,8 +4296,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 })
                 self.assertEqual(response.status_code, 200, response.get_json())
 
-            loa_row = submitted_request_students("leave-of-absence")[0]
-            readmission_row = submitted_request_students("readmission")[0]
+            loa_row = next(row for row in submitted_request_students("leave-of-absence") if row["student"]["id"] == benjamin.id)
+            readmission_row = next(row for row in submitted_request_students("readmission") if row["student"]["id"] == maria.id)
             awol_row = next(
                 row for row in awol_residency_roster_payload()
                 if row["student_id"] == clarisse.id

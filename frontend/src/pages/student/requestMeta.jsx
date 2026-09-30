@@ -33,8 +33,15 @@ export const REQUEST_GROUPS = [
         id: "readmission",
         label: "Readmission",
         icon: UserCheck,
-        lockedWhen: (data) => data.student.standing !== "On Leave" && data.student.current_stage !== "LOA",
+        lockedWhen: (data) => {
+          const overview = data.leave_overview;
+          if (!overview) return data.student.standing !== "On Leave" && data.student.current_stage !== "LOA";
+          // Keep the page open once any readmission exists, so an approved or denied one can still be read.
+          const hasReadmission = (overview.cases || []).some((item) => item.kind === "READMISSION");
+          return !overview.can_file?.readmission?.allowed && !hasReadmission;
+        },
         lockedReason: "Available only after an approved Leave of Absence.",
+        lockedReasonFrom: (data) => data.leave_overview?.can_file?.readmission?.reason,
       },
       {
         id: "awol",
@@ -74,6 +81,11 @@ export const STUDENT_REQUEST_PATHS = {
   practicum: "/student/practicum",
   graduation: "/student/graduation",
 };
+
+// The plain-words reason a request is locked: the server's own reason when it gave one.
+export function lockedReasonFor(item, data) {
+  return item.lockedReasonFrom?.(data) || item.lockedReason;
+}
 
 export const REQUEST_ITEMS = REQUEST_GROUPS.flatMap((group) => group.items);
 export function findRequestItem(id) {

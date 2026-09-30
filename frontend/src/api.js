@@ -403,6 +403,42 @@ export const api = {
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
   withdrawStudentLoaRequest: () =>
     request("/student-portal/requests/leave-of-absence/withdraw", { method: "POST", body: JSON.stringify({}) }),
+  // Leave of Absence / Readmission cases. `slug` is "leave-of-absence" or "readmission".
+  studentLeaveCaseAction: (caseId, action, payload = {}) =>
+    request(`/student-portal/leave-cases/${caseId}/${action}`, { method: "POST", body: JSON.stringify(payload) }),
+  leaveCases: (slug) => request(`/leave-cases?slug=${encodeURIComponent(slug)}`),
+  leaveCase: (id) => request(`/leave-cases/${id}`),
+  // Every button and every drag and drop on the staff board ends here.
+  leaveCaseTransition: (id, payload) =>
+    request(`/leave-cases/${id}/transition`, { method: "POST", body: JSON.stringify(payload) }),
+  leaveCasesBatch: (payload) =>
+    request("/leave-cases/batch", { method: "POST", body: JSON.stringify(payload) }),
+  syncLeaveCases: () => request("/leave-cases/sync", { method: "POST", body: JSON.stringify({}) }),
+  leaveExportLog: (slug) => request(`/leave-cases/export-log?slug=${encodeURIComponent(slug)}`),
+  leaveHandoff: (caseIds, status) =>
+    request("/leave-cases/handoff", { method: "POST", body: JSON.stringify({ case_ids: caseIds, status }) }),
+  exportLeaveRegistrarList: async (slug, format = "csv", caseIds = []) => {
+    const res = await fetch(`${BASE}/leave-cases/registrar-export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ slug, format, case_ids: caseIds }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] || `registrar-list.${format}`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
+  },
   uploadResearchEvidence: async (gate, itemName, file) => {
     const form = new FormData();
     form.append("gate", gate);

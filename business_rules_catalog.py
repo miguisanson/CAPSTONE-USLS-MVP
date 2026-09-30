@@ -279,13 +279,26 @@ BUSINESS_RULE_CATALOG = [
         "semester, the class standing of the enrolled courses becomes W (withdrawn) and no "
         "refund of tuition and fees is given. The portal shows this on the request.",
         True, "bool", None, HANDBOOK, "Attendance - Leave of Absence, guideline 2", "53",
-        enforced=False,
     ),
     _rule(
         "loa.min_completed_semesters", "loa",
         "Minimum semesters completed before a leave",
         "The student must have completed at least one semester before filing a leave.",
         1, "int", "semesters", PROTOTYPE, enforced=True,
+    ),
+    _rule(
+        "leave.return_due_days", "loa",
+        "A leave is marked Return Due this many days before it ends",
+        "Graduate School staff see the leave as Return Due, and the student is reminded to file a "
+        "readmission request or ask for an extension, this many days before the leave ends.",
+        30, "int", "days", PROTOTYPE, enforced=True,
+    ),
+    _rule(
+        "leave.return_grace_days", "loa",
+        "Days after a leave ends before AWOL is proposed",
+        "If a leave has ended and no readmission was filed after this many days, the system proposes "
+        "AWOL. A Graduate School staff member confirms it; nothing changes automatically.",
+        14, "int", "days", PROTOTYPE, enforced=True,
     ),
     _rule(
         "loa.awol_if_no_leave", "loa",
