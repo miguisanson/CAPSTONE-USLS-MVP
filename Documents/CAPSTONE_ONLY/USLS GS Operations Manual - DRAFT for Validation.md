@@ -1,13 +1,13 @@
 # University of St. La Salle Graduate School Operations Manual
 
-**DRAFT v0.1 — prepared by the capstone group for validation by the Graduate School; not an official USLS document until approved**
+**DRAFT v0.2 — prepared by the capstone group for validation by the Graduate School; not an official USLS document until approved**
 
 ## Document control
 
 | Item | Detail |
 |---|---|
 | Document title | University of St. La Salle Graduate School Operations Manual |
-| Version | 0.1 (draft for validation) |
+| Version | 0.2 (draft for validation) |
 | Date of this version | 2026-10-01 |
 | Prepared by | Capstone group CAP-IT1, Graduate Student Lifecycle Monitoring and Analytics Platform (University of St. La Salle Graduate School project) |
 | To be validated by | Graduate School Dean and Associate Dean, University of St. La Salle Graduate School (with the Academic Coordinators and the Research Coordinator) |
@@ -260,9 +260,9 @@ To record that an applicant has been admitted through the University's admission
 
 #### 4.1.8 How the platform supports this process
 
-GS staff import the monitoring workbook; the platform creates the student records and the enrolled subjects from it. It flags students found in the file but missing from the platform, and differences between the file and what the platform holds. It does not create a student number or an email address.
+GS staff upload the monitoring workbook (only the Graduate School staff role, or an administrator, can; the Academic Coordinator cannot). Before any row is applied, the platform checks it. A row with a missing student number, name or entry year, a duplicate student number in the file, a program that does not match, a student number already held by another student or with a different name, a different entry year, or a possible duplicate under another number is held as an unresolved validation issue and is not applied. Staff or the Academic Coordinator resolve each held row (keep the existing value, use the uploaded one, edit it, or upload a corrected workbook), and every resolution is logged. A clean row creates the student's record, the curriculum subject rows, the semester enrollment and a portal login whose first password the student must change at the first sign-in. Staff or the Academic Coordinator can also add one student by hand. The Dean then acts as the gate for onboarding: the report for an upload can be submitted only when the handoff is recorded, the profiles are created, every student has a program assignment and no validation issue is unresolved; the Dean approves it or returns it with remarks.
 
-**Difference between the platform and the rule.** The platform does not duplicate the admission checklist of the admission offices. The platform's onboarding checklist (admission approval, student profile sheet, program assignment, enrollment signal, official transcript) is the group's model and is not in any official source. Who imports the workbook (GS staff or the Academic Coordinator) is an open question (OQ-33).
+**Difference between the platform and the rule.** The platform does not repeat the admission checklist of the admission offices. A student number on an upload always comes from the file. One staff-only form for adding a single student can still generate a provisional number when the field is left blank; that is a convenience of the prototype and does not follow ADM-09, which leaves numbering to the Registrar. The platform creates a portal login for each student; it does not create the institutional email. The five-item onboarding list kept for each student (admission approval, student profile sheet, program assignment, enrollment signal, official transcript) is the group's model and is not in any official source; the Dean's gate uses the four derived checks above. The Handbook's admission requirements, fees and special cases (ADM-01 to ADM-08) are left to the admission offices. Who imports the workbook is decided in the platform (Graduate School staff only) but is still open for confirmation (OQ-33).
 
 ### 4.2 Enrollment and academic load
 
@@ -317,7 +317,7 @@ To state how a graduate student is advised and enrolled each semester and how ma
 | ENR-10 | Enrollment normally occurs in June to July. Dates are kept as configurable academic periods, not fixed dates. | Group working notes, July 20 checklist, items 10 and 76 (stakeholder-confirmed answer) | Practice |
 | ENR-11 | Each student-subject pair has one status: not taken, enrolled, taken, dropped, withdrawn; and, as reported by faculty, incomplete or failed. | Consultation 21 July 2026 | Practice |
 | ENR-12 | Faculty do not enter grades in the Graduate School record. A professor who fails a student or gives an incomplete reports it to the Academic Coordinator, who tags the status. | Consultation 21 July 2026 | Practice |
-| ENR-13 | If the load tagged for a student is outside six to nine units (part-time) or twelve units (full-time), the platform shows a warning to the Academic Coordinator. The warning does not block the tag. | Handbook 2022-2023, p. 48 | Proposed |
+| ENR-13 | The platform shows the Academic Coordinator the load tagged for a student (below six units, six to nine units part-time, above nine to twelve units full-time). A load above twelve units is flagged and can be saved only with a documented exception; a load below twelve units is information and does not block the tag. | Handbook 2022-2023, p. 48 | Proposed |
 
 #### 4.2.6 Exceptions and unusual cases
 
@@ -336,9 +336,9 @@ To state how a graduate student is advised and enrolled each semester and how ma
 
 #### 4.2.8 How the platform supports this process
 
-The platform shows each student's subjects and statuses, lets the Academic Coordinator or GS staff tag a subject as enrolled (by search or class-list upload), and shows the enrolled list per subject. It does not perform the official enrollment.
+The platform shows each student's subjects and statuses. The Academic Coordinator or GS staff tag subjects as enrolled through an enrollment preview (by search or by class-list upload), and a student can select offered subjects in the student portal within the same limits. The preview applies the register. It blocks a student who is AWOL, on leave, withdrawn, graduated or completed, a subject from another program, and a subject the student has already completed. It flags, and lets the tag be saved only with a documented exception chosen by the staff member, a load above the full-time load of 12 units, an addition or change of subject after the first week (see 4.3), a subject that is not on the published offering list, and a subject already active in another semester. The load is classified for information: below 6 units, 6 to 9 units (part-time), above 9 to 12 units (full-time). A student cannot grant himself or herself an exception: the portal refuses a selection that would need one. The class-list upload applies the standing, program, offering and duplicate checks but not the load check or the first-week check. The platform does not perform the official enrollment in AIMS.
 
-**Difference between the platform and the rule.** The platform accepts a unit range of 0 to 12 and does not check the six to nine unit normal load (ENR-13 is proposed). It does not check that a financial delinquency has been settled (ENR-04), because that belongs to the Business Office.
+**Difference between the platform and the rule.** The platform follows the Handbook's load (ENR-02) in part. The 12-unit full-time load is enforced with a documented exception. The 6-unit and 9-unit bounds of the part-time load are shown as information only, because the Handbook calls them the normal load and not a limit. ENR-13 is therefore implemented as a classification that blocks only above 12 units. The platform does not check financial delinquency (ENR-04, Business Office), attendance counting (ENR-03), the transfer of option (ENR-05), cross-enrollment (ENR-06) or special classes (ENR-07); these are left to people. It has no enrollment period: a semester carries start and end dates only (ENR-10).
 
 ### 4.3 Course offering and course adjustments (change and add of subject)
 
@@ -411,9 +411,9 @@ To decide which subjects will be offered in a coming semester, to assign faculty
 
 #### 4.3.8 How the platform supports this process
 
-The platform computes the subject needs from the curriculum and the subjects each student has taken, lets the Academic Coordinator choose what to offer and what to exclude, sends the plan to the Dean, publishes the approved offerings, and lets the Academic Coordinator assign a professor and a schedule. A class list can be uploaded or students tagged one at a time.
+The platform computes the subject needs from the curriculum and the subjects each student has taken (completed, taken and currently enrolled subjects are excluded; dropped, withdrawn and failed subjects count as a need). For each subject it shows how many students need it and, if the subject is left out, which students would be delayed. The Academic Coordinator chooses what to offer and what to leave out, assigns a professor (only active faculty of the program's college; the suggestions rank faculty by preferred subject, availability and current load, and the register caps a professor at 24 teaching units per semester, a prototype value) and submits the plan to the Dean. The Dean approves the plan or returns it with a comment. Only an approved plan can be published, and publication is refused if it would remove a subject in which students are already enrolled. Schedules and sections are entered as free text in the course offering setup. One student is enough for a subject to count as needed (a fixed value in the software, not in the register). A class list can be uploaded or students tagged one at a time. Adding a subject, or changing one subject for another, is checked against the first-week window (7 calendar days counted from the semester start date, register values course_adjustment.add_subject_window_days and change_subject_window_days). After the window the enrollment preview flags the change and it can be saved only by staff with a documented exception: the Associate Dean's written approval for an addition, or one of the three conditions for a change. A student cannot make the change through the portal after the window.
 
-**Difference between the platform and the rule.** The platform has no change-of-subject or add-of-subject step with the first-week window, the conditions in CRS-01, or the Associate Dean's written approval (CRS-02). It suggests subjects for offering when one student needs them (CRS-08), which is how the Associate Dean described the need, but it does not test minimum class size (CRS-04); whether a subject with one student should be opened is an open question (OQ-34).
+**Difference between the platform and the rule.** The first-week window of CRS-01, CRS-02 and CRS-06 is now checked, as the Handbook says. The conditions for a change (subject dissolved, schedule conflict, failed prerequisite) and the Associate Dean's written approval are recorded as the option chosen; the platform cannot see schedules or grades and does not verify the reason. It has no Advice Slip or Business Office un-tagging step (CRS-03) and no refund for a discontinued course (CRS-05). It suggests a subject for offering when one student needs it (CRS-08), which is how the Associate Dean described the need, but it does not test a minimum class size (CRS-04); whether a subject with one student should be opened is an open question (OQ-34). It does not check that planning happens in the term break (CRS-09). The Dean's approval before publication (CRS-10) is enforced.
 
 ### 4.4 Withdrawal of subject
 
@@ -480,7 +480,7 @@ To state when and how a student may withdraw from one subject, what the student 
 | WD-11 | An approved withdrawal is sent to the Registrar, which processes it in the registration system, and then to the Business Office for any fee arrangement. The Graduate School's responsibility ends at sending the request to the Registrar. | Consultation 21 July 2026 | Practice |
 | WD-12 | After the Registrar has been sent the request, the Graduate School tags the subject as withdrawn (a manual tag is enough), with the date applied, the date granted and a text area for the result. | Consultation 21 July 2026 | Practice |
 | WD-13 | According to the Associate Dean, a student may withdraw before classes begin or in the first week of classes; the Dean decides with discretion, and a request submitted after the deadline or with an insufficient or inconsistent justification is normally denied. (This is a second-hand account recorded by the group and conflicts with the Handbook's second week; see OQ-01.) | Consultation 29 July 2026, account of the Associate Dean's answer | Practice |
-| WD-14 | The platform shows the student the Handbook's fee bracket for the date of the request (first week, second week, later) as information only; the Business Office computes the fee. | Handbook 2022-2023, pp. 49, 51 | Proposed |
+| WD-14 | The platform shows the student and the staff the Handbook's fee bracket for the date of the request (10% in the first week, 20% in the second week, full fees after the window) as information only; the Business Office computes the fee. | Handbook 2022-2023, pp. 49, 51 | Proposed |
 
 #### 4.4.6 Exceptions and unusual cases
 
@@ -500,9 +500,9 @@ To state when and how a student may withdraw from one subject, what the student 
 
 #### 4.4.8 How the platform supports this process
 
-The student files a structured withdrawal request for one selected subject; GS staff forward it to the Dean; if approved, GS staff tag only that subject as withdrawn and prepare the list of approved withdrawals as an Excel file to be sent to the Registrar manually. The student stays active and the other subjects are unchanged. A denial leaves the enrollment unchanged.
+The student files a structured withdrawal request for one active enrolled subject, with a reason. The platform judges the window from the date of the request: a request is accepted before classes begin and until the end of the second week of classes (14 calendar days counted from the semester start date, register value withdrawal.window_days), and after that it is refused with a message that names the rule and its Handbook page and explains that the student may still withdraw from all subjects at full fees or file a leave of absence. The platform shows the fee tier for the date of the request as information only: 10% of the term's total due in the first week (days 1 to 7), 20% in the second week, and the full fees of the semester after the window. It does not compute or collect any payment, and for a request made before classes begin it says that the Handbook states no amount and that the Business Office confirms it. GS staff forward the request to the Dean. The Dean approves or denies it; a denial needs a reason and leaves the student's record unchanged. On approval a task is created for GS staff to tag only the selected subject as Withdrawn, and staff then export the Excel list of approved withdrawals (with the window deadline and the fee columns) to be sent to the Registrar manually. The student stays Active and the other subjects are unchanged. No grade W is recorded, because grades are outside the platform.
 
-**Difference between the platform and the rule.** The platform accepts a withdrawal only before classes begin or in the first seven calendar days of class and states that no academic penalty applies. The Handbook allows withdrawal until the second week, charges 10% in the first week and 20% in the second, and lets a student withdraw later by paying full fees. The platform's seven-day rule follows the group's account of the consultation (WD-13), not the Handbook. The Handbook is in force; the difference is listed as OQ-01.
+**Difference between the platform and the rule.** The platform now follows the Handbook: the window is the end of the second week with the 10% and 20% charges (WD-01, WD-02). The earlier build accepted a withdrawal only before classes or in the first seven calendar days and stated that no penalty applied; that rule came from the group's account of a consultation (WD-13), not from the Handbook. Seven days is now only the boundary between the first-week and second-week fee tiers. Some differences remain. The platform does not compute fees, so WD-02 to WD-05 rest on the Business Office. It replaces the student's letter and the Withdrawal Form with a structured request approved in the portal and does not produce the form (WD-06 to WD-08); whether the Graduate School accepts this is OQ-12. It does not write the grade W (WD-09). The Dean's decision does not re-check the window, because eligibility is judged on the date of the request. The second-hand account in WD-13 still differs from the Handbook; the Handbook is in force and the difference stays as OQ-01 for the Graduate School to confirm.
 
 ### 4.5 Dropping, including being dropped for absences
 
@@ -553,8 +553,8 @@ To state how a subject is dropped, whether by the professor for excessive absenc
 | DRP-06 | If a student gets a 5.0 he or she is automatically dropped from the program; failure in any subject means no re-admission to the program. | Handbook 2022-2023, p. 54 | Official |
 | DRP-07 | A student drops a subject during the semester by talking or writing to the Academic Coordinator. Once agreed, the Academic Coordinator or GS staff tag the subject as dropped with a date and notes. No student-facing drop request is needed in the Graduate School's record. | Consultation 21 July 2026 | Practice |
 | DRP-08 | The Graduate School drops the subject in AIMS as well as in its own record. | Consultation 21 July 2026 | Practice |
-| DRP-09 | A drop requested by a student is recorded without a Graduate School approval step (there is no Deny). The status moves from requested to recorded and stays marked as awaiting confirmation until the Graduate School has seen the change in AIMS. | Group working notes, July 20 checklist, items 18, 19 and 79 (revision adopted after the 15 July adviser session) | Proposed |
-| DRP-10 | A request made up to the end of the second week of classes is handled as a withdrawal (see WD-01); a request made later is recorded as a drop. The Handbook does not give this dividing line; it is the group's reading of the Associate Dean's distinction between withdrawal and dropping. | Handbook 2022-2023, p. 49; Consultation 21 July 2026 | Proposed |
+| DRP-09 | A drop agreed between the student and the Academic Coordinator is recorded by the Academic Coordinator without a separate Graduate School approval step (there is no Deny); the record stays marked as awaiting confirmation until the Graduate School has seen the change in AIMS. (The platform has no student drop request; see DRP-03 for the absence limit it enforces.) | Group working notes, July 20 checklist, items 18, 19 and 79 (revision adopted after the 15 July adviser session) | Proposed |
+| DRP-10 | A student's request to leave a single subject up to the end of the second week of classes is handled as a withdrawal (see WD-01); after that the Handbook gives no way to withdraw a single subject, and a subject is dropped by the professor for unexcused absences above 20% (DRP-03). The dividing line is the group's reading of the Associate Dean's distinction between withdrawal and dropping; what a student who wants to leave one subject after the second week may do is OQ-03. | Handbook 2022-2023, p. 49; Consultation 21 July 2026 | Proposed |
 | DRP-11 | To remain in good standing a master's student must maintain a weighted average of 2.0 or better, and a doctorate student 1.75 or better, at the end of each academic year; a grade of 3.0 (master's) or 2.0 (doctorate) is passing but carries no graduate credit. | Handbook 2022-2023, p. 54 | Official |
 | DRP-12 | A grade of INC may be given if the class standing is passing but the student fails to take the final examination or complete other requirements for illness or other valid reasons. It is removed within one academic year by meeting all course requirements and submitting the Incomplete Grade Removal Form to the Graduate School Office within the set deadline; after a year without compliance the grade becomes 3.0 (master's) or 2.0 (doctorate) and the subject is taken again; a student with INC in all subjects is dropped from the rolls of the Graduate School. | Handbook 2022-2023, p. 54 | Official |
 
@@ -575,9 +575,9 @@ To state how a subject is dropped, whether by the professor for excessive absenc
 
 #### 4.5.8 How the platform supports this process
 
-GS staff or the Academic Coordinator tag a subject as dropped with a date and a note, as the Associate Dean described. The student can see the status on the enrolled-subject list. No drop form or supporting document is required.
+Only the Academic Coordinator can record a subject as Dropped in the platform (GS staff cannot). The platform accepts the record only when the Academic Coordinator enters the student's unexcused absences as a percentage and the figure is above the limit in the register (20%, register value dropping.absence_limit_percent); otherwise it refuses and points to the withdrawal request. A note of at least three characters and an effective date inside the semester are also required. The percentage and the note are kept in the record and the log, and the student is notified. A student cannot request a drop in the platform: a student who wants to leave a subject files a withdrawal (see 4.4). The platform does not produce the DRP grade and does not apply the 5.0 consequences, the retention averages or the INC rule, which are kept in the register as documented only.
 
-**Difference between the platform and the rule.** The platform does not know about the 20% absence rule and does not produce the DRP grade; absences are kept by the professor. The platform does not distinguish a drop from a withdrawal by the date (DRP-10 is proposed). Whether a drop may be refused, what a drop costs, and whether a DRP 5.0 also ends the student's program are open questions (OQ-04 to OQ-06).
+**Difference between the platform and the rule.** The platform follows the Handbook's 20% rule (DRP-01, DRP-03) for the drop record. It no longer treats dropping as a student request that needs no approval (DRP-09 and DRP-10 describe the group's earlier proposal): there is no drop request, and the date does not separate a drop from a withdrawal. Excuses and approved absences (DRP-02, DRP-04) are kept by the professor; the platform only receives the percentage. It does not drop the subject in AIMS (DRP-08). Two routes can record the status Dropped without the 20% check: a class-list upload that marks a student as dropped, and a manual status entry in the monitoring sheet; for these the check rests on the person. Whether a drop may be refused, what a drop costs, and whether a DRP 5.0 also ends the student's program are open questions (OQ-04 to OQ-06).
 
 ### 4.6 Leave of absence (LOA)
 
@@ -608,7 +608,7 @@ To allow a student who does not intend to enroll in a semester to stay connected
 | Step | Who | What they do | Form / record | Time limit |
 |---|---|---|---|---|
 | 1 | Student | Writes to the Dean stating the reason for the leave and the period requested. | Written request to the Dean | On or before the deadline (date not stated) |
-| 2† | GS staff | Records the request and checks that the period and the student's earlier leaves are within the limits. Forwards it to the Dean. | LOA request record | — |
+| 2† | GS staff | Records the request and checks that the period and the total of the student's approved leave are within the limits. Forwards it to the Dean. | LOA request record | — |
 | 3 | Dean | Approves or denies the request. The leave may be approved for one year and renewed for at most another year. | Dean's decision | — |
 | 4 | Dean / Associate Dean / authorised representative | Informs the University Registrar of the leave, stating the reasons and the amount of money refunded to the student, if any. | Notice to the Registrar | — |
 | 5† | GS staff | Records the student's status as On Leave and the effective dates, and sends the student the decision. | Student status: On Leave | After the Dean's decision |
@@ -632,13 +632,13 @@ To allow a student who does not intend to enroll in a semester to stay connected
 | LOA-10 | A master's program must be finished within seven academic years and a doctoral program within nine academic years, including the leave of absence. | Handbook 2022-2023, p. 55 | Official |
 | LOA-11 | A student who withdraws from the college without a formal leave of absence is considered absent without leave (AWOL) and has registration privileges curtailed or entirely withdrawn. | Handbook 2022-2023, p. 53 | Official |
 | LOA-12 | The student may file the leave through a structured form in place of a letter, provided the Dean accepts the form as the written request. | Group working notes, Consultation 20 July 2026 rehearsal (structured form suggested by the adviser) | Proposed |
-| LOA-13 | The platform checks a leave request for an approved reason category, a valid start and end term, the student's earlier approved leaves and a future start term, and gives the Dean a recommendation; the Dean decides. | Group working notes, Platform (current build): LOA policy review | Proposed |
+| LOA-13 | The platform checks a leave request for an allowed reason category, a written reason, a valid start and end semester (at most two semesters per request and four in total with earlier approved leave), the filing date (not within fourteen days before the last day of classes) and the prototype minimum of one completed semester, and gives the Dean a recommendation; the Dean decides. | Group working notes, Platform (current build): LOA policy review | Proposed |
 
 #### 4.6.6 Exceptions and unusual cases
 
 - A leave in the second half of the semester: class standing is W and no refund is given (LOA-08). A leave requested within two weeks before the last day of classes is not granted (LOA-09).
 - The leave ends and the student does not return: the student is treated as absent without leave (see 4.8) unless a further renewal within the two-year limit has been approved (LOA-03).
-- The student wants to withdraw a pending leave request before the decision: the sources do not say whether this is allowed. The platform does not allow it at present (the adviser said it should; Consultation 20 July 2026) (OQ-12).
+- The student wants to withdraw a pending leave request before the decision: the sources do not say whether this is allowed. The platform allows it while the request is Submitted or in Dean Review, as the adviser suggested (Consultation 20 July 2026); the student may then file a new request (OQ-12).
 - A student who stopped attending without filing a leave: see 4.8, absent without leave.
 
 #### 4.6.7 Records produced and where they go
@@ -651,9 +651,9 @@ To allow a student who does not intend to enroll in a semester to stay connected
 
 #### 4.6.8 How the platform supports this process
 
-The student files a structured leave request (reason category, start and end term, reason, document). GS staff check the limits and forward the request to the Dean; the Dean's decision sets the status to On Leave and GS staff send the notice. The platform has a report of leaves and of prior approved leaves.
+The student files a structured leave request in the portal: a reason category, the reason, and the start and end semester. There is no letter or document to upload. The platform blocks the submission when the request covers more than the register allows for one request (2 semesters, loa.max_period_semesters), when the semesters already approved plus the request would pass 4 semesters in total (loa.max_total_semesters, renewals included), when the start semester is already over or is running with 14 days or fewer before its last day of classes (loa.no_filing_days_before_term_end), or when another leave request is already in progress. A request filed in the second half of a running semester is accepted with a note that the enrolled courses become W and no refund is given; the platform only shows that note, it does not mark the courses W or work out a refund. The number of earlier leaves is not limited, only the semesters. The platform also estimates whether the student has completed the prototype minimum of one semester; a shortfall is shown to the Dean as Needs Review and blocks nothing. Until the Dean decides, the student can withdraw a pending request (Submitted or Dean Review) and file a new one. GS staff review the same checks and forward the request to the Dean, who approves, denies or returns it for revision. Approval sets the status On Leave, which also stops the student being enrolled in subjects, and staff can download a provisional notice for the Registrar (period and reason category; no refund amount). The residency clock keeps running during the leave.
 
-**Difference between the platform and the rule.** The platform allows a leave of one or two consecutive semesters, requires fewer than four earlier approved leaves, requires a future start term, and describes the residency clock as paused. The Handbook allows one year renewable for at most another year, does not limit the number of leaves, allows a leave in the second half of a semester (with W and no refund) but not in the last two weeks, and counts leave inside the maximum residence. These are open questions OQ-09 to OQ-11; the Handbook is in force.
+**Difference between the platform and the rule.** The platform now follows the Handbook on the points where the earlier build had differed: a leave of up to one year (two semesters) per request, renewable up to four semesters in total, no limit on the number of leaves, a leave allowed in the second half of a semester (with W and no refund shown) but not within the last two weeks, and time on leave counted inside the maximum residence (the residency clock is never paused). Differences remain. The Handbook's filing deadline is not stated (LOA-04), so the platform applies only the two date checks above. The withdrawal fee after two weeks (LOA-06), the refund amount in the notice to the Registrar (LOA-07) and the marking of courses W (LOA-08) are not computed. A semester is counted by its position in the list of semesters set up in the platform, so a year of leave is two semesters, not three terms (OQ-09). The Dean's approval sets On Leave at once, not from the start semester, and does not run the limit checks again. The student form lists only future semesters, although the platform's check would also accept a semester that is running (OQ-11). These points are open questions OQ-09 to OQ-12; the Handbook is in force.
 
 ### 4.7 Return from leave of absence and readmission
 
@@ -717,9 +717,9 @@ To state how a student who was on leave of absence, or who was absent without le
 
 #### 4.7.8 How the platform supports this process
 
-The student files a structured readmission request with the target return term and the previous leave period; GS staff check the requirements and forward it to the Dean; the decision sets the status to Active.
+The student files a structured return request in the portal: a return semester that starts after today, the start and end of the previous leave, a written return intention, and four ticked confirmations (a structured return intention, an updated study plan, a consultation with the program or the adviser, and no pending accountability). The ticks are the student's own statement; nothing is uploaded or verified. GS staff review the request and forward it to the Dean. The review marks Needs Review when the student is not on leave, but does not block the request. The Dean approves, denies or returns it for revision. Approval sets the status Active, tags the student Not Enrolled for the return term and opens a task for the Academic Coordinator on the study plan and enrollment; a denial leaves the record as it was. Staff can download a provisional file for the Registrar with the return semester and the previous leave period.
 
-**Difference between the platform and the rule.** The platform's four-item checklist differs from the Handbook's four requirements (RDM-02). The platform does not record the interview, the Business Office clearance or the Advise Slip (OQ-13).
+**Difference between the platform and the rule.** The platform's four-item checklist differs from the Handbook's four requirements (RDM-02). The platform does not record the interview, the Business Office clearance or the Advise Slip (OQ-13), and it does not check failed subjects (RDM-03) or the maximum residence for a return from leave (RDM-04); these are left to people. The classification by years in the program is applied only to a return from AWOL (see 4.8), not to a return from leave. The portal does not require that the student is on leave before the request is filed; staff see a flag when the student is not.
 
 ### 4.8 Absence without leave (AWOL)
 
@@ -761,13 +761,13 @@ To state what happens to a student who stops enrolling without a formal leave of
 | AWL-02 | A student returning from AWOL declares the intention to enroll by writing to the University Registrar through the Graduate School Dean, who endorses it to the Registrar. | Handbook 2022-2023, p. 53 | Official |
 | AWL-03 | A returnee presents a Business Office clearance, an interview, an evaluation of subject and grade requirements and an Advise Slip from the Dean. | Handbook 2022-2023, p. 45 | Official |
 | AWL-04 | An AWOL status has the same effect as a leave of absence for reporting: it is communicated to the Registrar. | Consultation 20 July 2026, adviser's statement; not confirmed by Graduate School staff | Proposed |
-| AWL-05 | AWOL is flagged from source evidence (an imported AWOL standing, or a full semester without enrollment and without an approved leave), not typed in by a user. | Group working notes, Platform (current build): AWOL policy review | Proposed |
+| AWL-05 | AWOL is flagged from source evidence (an imported AWOL standing, or a semester enrollment marked Withdrawn with no approved leave and no resolved return), not typed in by a user and not inferred from absence alone. | Group working notes, Platform (current build): AWOL policy review | Proposed |
 | AWL-06 | On return, the student is classified by years in the program: within the normal limit (five years master's, seven years doctorate), extension with a graded six-unit refresher (up to seven and nine), or full re-enrollment beyond that. | Handbook 2022-2023, pp. 54-55 | Proposed |
 
 #### 4.8.6 Exceptions and unusual cases
 
 - It is not clear whether the period of AWOL counts toward maximum residence; the Handbook counts LOA (LOA-10) but is silent about AWOL (OQ-14).
-- A student with an approved leave is never AWOL; a student whose leave lapsed without return may become AWOL (Proposed).
+- A student with an approved leave is never AWOL; a student whose leave lapsed without return may become AWOL (Proposed; the platform does not do this automatically).
 
 #### 4.8.7 Records produced and where they go
 
@@ -778,9 +778,9 @@ To state what happens to a student who stops enrolling without a formal leave of
 
 #### 4.8.8 How the platform supports this process
 
-The platform flags a student as AWOL from source evidence and cannot be told by a user to declare AWOL. When the student returns it shows the classification by years in the program and requires the Dean's endorsement of the written intent.
+The platform flags a student as AWOL from evidence only and refuses an attempt by a user to declare AWOL. The evidence is an imported AWOL standing or tag, or a latest semester enrollment marked Withdrawn when the student has no leave of absence and no resolved return case; absence alone is not taken as evidence. When a student is flagged the platform sets the status, raises a monitoring alert, opens a task for the Academic Coordinator and stops the student being enrolled in subjects. To return, the student files a structured declaration (a future return semester, the last semester enrolled, a written intent and a reason); staff forward it and the Dean decides. The outcome depends on the student's years in the program measured against the register: within the normal limit (5 years for a master's, 7 for a doctorate) the return is approved and the student becomes Active; within the extension (up to 7 and 9 years) the return is approved with a graded six-unit refresher required and a task is opened; beyond that the student stays AWOL and a task for a re-enrollment evaluation is opened. After the Dean approves, staff can download a provisional file for the Registrar.
 
-**Difference between the platform and the rule.** The Handbook does not say how the Graduate School learns of an AWOL or who declares it (OQ-14). The platform's classification (AWL-06) applies the maximum-residence figures; the calculation counts years from the student's year of entry and is approximate.
+**Difference between the platform and the rule.** The Handbook does not say how the Graduate School learns of an AWOL or who declares it (OQ-14); the platform's rule is the evidence above. A leave that lapsed without a return is not turned into AWOL automatically. The AWOL period counts toward the maximum residence, because the residency clock is never paused. The Business Office clearance, the interview and the Advise Slip (AWL-03) are not recorded. Years are counted in academic years from the student's entry academic year, which is approximate (see 4.9).
 
 ### 4.9 Residency enrollment and maximum residence
 
@@ -828,7 +828,7 @@ To state when a student with no subjects must still enroll (residency) and the l
 | RES-08 | Doctorate program: candidacy within five academic years from admission; all requirements including the dissertation within seven academic years. | Handbook 2022-2023, p. 55 | Official |
 | RES-09 | Doctorate program: beyond seven years a maximum two-year extension with a graded six-unit refresher course; the program must be finished within nine academic years including leave of absence, after which the student must re-enroll all courses taken and earn credit units. | Handbook 2022-2023, p. 55 | Official |
 | RES-10 | Thesis or project paper writing must be finished within two years from the title or proposal defense; dissertation writing within three years from the title defense. | Handbook 2022-2023, p. 58 | Official |
-| RES-11 | The platform records each residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication) and marks a purpose as unsupported if the student's record does not match it. | Group working notes, Platform (current build): residency policy review | Proposed |
+| RES-11 | The platform records each residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication) and marks a purpose as unsupported if the student's record does not match it; staff may still record it with notes that explain the exception. | Group working notes, Platform (current build): residency policy review | Proposed |
 
 #### 4.9.6 Exceptions and unusual cases
 
@@ -846,9 +846,9 @@ To state when a student with no subjects must still enroll (residency) and the l
 
 #### 4.9.8 How the platform supports this process
 
-The platform records residency enrollment with a purpose, checks the purpose against the student's record, classifies a student by years in the program, and lists students near the limit on a watchlist.
+GS staff or an Academic Coordinator record a residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication); it is not started by the student. The platform reviews the record. The student must have no subject currently enrolled; the purpose must fit the student's record (the comprehensive examination needs the Comprehensive Exam stage, publication needs the writing, final defense or completed stage, thesis or practicum work needs no missing subjects); and the record must not be a substitute for a leave. A record that fails the review can be saved only with staff notes that explain the exception. A student who is AWOL, on leave, withdrawn or completed is blocked. A student can have one active residency enrollment per semester, and the number of residency semesters is not limited. The platform counts years in the program in academic years (the entry academic year is year 1 and the count steps up each June) and never reduces the count for a leave. It classifies each student against the register (master's: 5 normal and 7 absolute years; doctorate: 7 and 9; an extension of 2 years with a graded 6-unit refresher) and lists students on a watchlist as Within, Approaching or Exceeded.
 
-**Difference between the platform and the rule.** The platform treats the residency clock as paused during a leave of absence, which the Handbook does not allow because maximum residence includes leave (OQ-10). Its year count uses the calendar year of entry and is approximate (OQ-16).
+**Difference between the platform and the rule.** The platform no longer pauses the residency clock during a leave of absence: it follows the Handbook, where maximum residence includes leave (RES-07, RES-09; register value residency.includes_loa). The year count starts from the entry academic year and not from the date of admission, so it can differ from the Handbook's count by up to a year (OQ-16). With the Handbook's two-year extension, the year after the normal period is already within one year of the absolute limit, so the watchlist shows Approaching and a separate state for a student past the normal period does not appear. The purpose of completing an INC (RES-02) is not among the platform's purposes. The platform creates a task for the refresher course when the Dean approves an extension but does not track the course or approve the extension (RES-06), and it does not track candidacy dates (RES-05, RES-08) or the research writing limits (RES-10); the register shows these as documented only. The fee and the number of residency semesters are open (OQ-15).
 
 ### 4.10 Comprehensive examination
 
@@ -902,7 +902,7 @@ To state who may take the comprehensive examination, how to apply, how it is sco
 | CEX-10 | A student who passes the comprehensive examination confers with the Dean for a thesis or dissertation adviser and is considered advanced to candidacy. | Handbook 2022-2023, p. 57 | Official |
 | CEX-11 | Passing the comprehensive examination is a graduation requirement; for special academic honors the examination must be passed with no retake. | Handbook 2022-2023, pp. 55, 77 | Official |
 | CEX-12 | The monitoring workbook records the comprehensive examination in its own column. | Group working notes, Monitoring workbook, COMPRE column | Practice |
-| CEX-13 | The platform accepts a title defense application only after the comprehensive examination is passed and all curriculum subjects are complete. | Group working notes, Platform (current build): comprehensive exam eligibility | Proposed |
+| CEX-13 | The platform keeps all research stages from the title defense onward locked until the comprehensive examination status is Passed and all curriculum subjects are complete; the Graduate School can switch the examination requirement off in the register. | Group working notes, Platform (current build): comprehensive exam eligibility | Proposed |
 
 #### 4.10.6 Exceptions and unusual cases
 
@@ -919,9 +919,9 @@ To state who may take the comprehensive examination, how to apply, how it is sco
 
 #### 4.10.8 How the platform supports this process
 
-The platform checks that all curriculum subjects are complete before it allows the student to be marked eligible, and keeps the examination status (not taken, passed) in the student record.
+The platform works out whether a student is eligible for the comprehensive examination and does not let a user mark it. For the MBA and the Doctor of Psychology curricula, which it holds in full, eligibility is judged by the units completed in each category; for other programs every curriculum subject must be complete. In both cases no subject may be failed. The result of the examination (Not Taken or Passed) is not entered in the portal; it reaches the student's record only from the COMPRE column of the monitoring workbook. The platform does not record the application, the fee, the score per course, retakes or the refresher course. Until the status is Passed and the curriculum is complete, all research stages from the title defense onward are locked (register rule research.comprehensive_exam_before_research). The Graduate School can switch that rule off in the register, in which case research opens when the student is eligible.
 
-**Difference between the platform and the rule.** The platform blocks all research steps until the examination is passed (CEX-13). The Handbook says the student confers with the Dean for an adviser after passing, but also that an adviser may be assigned while the student is still taking courses (see ADV-08); the sequence relative to the title defense is an open question (OQ-17).
+**Difference between the platform and the rule.** The platform blocks the research steps until the examination is passed (CEX-13), which the Research Protocol does not state and the Handbook states only as the step before the student confers with the Dean for an adviser (p. 57). The Handbook also says an adviser may be assigned while the student is still taking courses (ADV-08); the sequence relative to the title defense is an open question (OQ-17). The evaluation by the Academic Coordinator or College Dean (CEX-03), the application, fee, scoring and retakes (CEX-05 to CEX-09) and the honors condition (CEX-11) are not modelled and are left to people.
 
 ### 4.11 Title defense
 
@@ -977,8 +977,8 @@ To have the student's three proposed research titles deliberated by a panel, so 
 | TTL-08 | The student asks the panel about their preferred mode of payment, settles the title defense fees and emails the proof to the GS mailbox within the first working day after the defense, with the subject line LAST NAME_type of defense_receipt. | Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Title Defense, Part III, step 4 | Official |
 | TTL-09 | Thesis or project paper writing must be finished within two years from the title or proposal defense; for the thesis the student has one year from the title defense to submit and defend a proposal. Dissertation writing must be finished within three years from the title defense, with one year to submit and defend a proposal. | Handbook 2022-2023, p. 58 | Official |
 | TTL-10 | If the approved title is still applicable, the same concept paper may be presented for re-defense; otherwise the student changes the research title or topic and goes through the title defense again. | Handbook 2022-2023, p. 58 | Official |
-| TTL-11 | GS staff check that Form 1, three concept papers and the Academic Coordinator's endorsement are present before the Research Coordinator nominates a panel. The check is for completeness only. | Group working notes, July 20 checklist, item 42; Group working notes, transactions list | Proposed |
-| TTL-12 | The platform does not schedule a title defense, nominate a panel or approve a title by itself; panel candidates are suggested from faculty specialization, availability and workload and staff may choose any faculty. | Group working notes, July 20 checklist, item 44 | Proposed |
+| TTL-11 | GS staff check that Form 1, three concept papers and the Academic Coordinator's endorsement are present before the Research Coordinator nominates a panel. The check is for completeness only; in the platform the endorsement is refused unless Form 1 and all three papers are uploaded, and panel matching opens only after it. | Group working notes, July 20 checklist, item 42; Group working notes, transactions list | Proposed |
+| TTL-12 | The platform does not schedule a title defense, nominate a panel or approve a title by itself; panel candidates are suggested from the uploaded concept papers, faculty specialization, availability and workload, and staff may choose any active faculty member. | Group working notes, July 20 checklist, item 44 | Proposed |
 
 #### 4.11.6 Exceptions and unusual cases
 
@@ -998,9 +998,9 @@ To have the student's three proposed research titles deliberated by a panel, so 
 
 #### 4.11.8 How the platform supports this process
 
-The student submits Form 1 and the three concept papers in the platform; the Academic Coordinator endorses; the Research Coordinator selects the panel (the platform suggests candidates and staff may override); the schedule is confirmed (see 4.16); the panel chair records the result and the approved title.
+The student uploads Form 1 and exactly three concept-paper PDFs in the platform. The Academic Coordinator endorses them with a drawn signature; the endorsement is refused unless Form 1 and all three papers are present, and uploading the papers again withdraws it. Panel matching opens only after that endorsement. The platform ranks faculty by comparing the uploaded papers with the faculty expertise records, by availability and by current panel load, and leaves out the adviser. The Research Coordinator or GS staff finalise the panel and may choose any active faculty member, but the platform checks the size of the panel, its roles and that its members are distinct before it accepts the panel, and a change to an existing panel needs a recorded reason. The schedule is booked by staff (see 4.16). The panel chair assigned to the defense enters the verdict (Approved, Deferred or Disapproved) in the Faculty Portal, only after the booked start time, and may name the selected title, which becomes the study title. A Disapproved verdict archives the evidence and asks the student for three new titles and a new panel.
 
-**Difference between the platform and the rule.** The platform requires the comprehensive examination to be passed first (CEX-13), which the Protocol does not state. It allows a title defense to be confirmed with no lead time, whereas the Protocol asks for two weeks' notice (TTL-01). For a project paper the platform includes an external panel member, which the Protocol does not (TTL-03; OQ-42).
+**Difference between the platform and the rule.** The platform now follows the Handbook and the Protocol on the points where the earlier build had differed. A title defense needs 14 days' notice, counted from the Academic Coordinator's endorsement of Form 1 (TTL-01); staff can proceed inside that time only by ticking an override and recording the reason (OQ-43). A project paper panel is the chair and two members (content and method) with no external member; the external member joins thesis and dissertation panels from the proposal defense (TTL-03, OQ-42). The platform also requires the comprehensive examination to be Passed, and every curriculum subject complete, before any title-defense step: the Handbook places the examination before the adviser and candidacy (p. 57), the Research Protocol does not state it (CEX-13, OQ-17). Not in the platform: the deliberation of the GS Research Committee on the panel (TTL-02), the paper Form 2 and the one-working-day deadline for it (TTL-06), the fee proof (TTL-08, OQ-27), and the approval of the same concept paper for a re-defense (TTL-10). The writing limits of TTL-09 are shown as information only.
 
 ### 4.12 Adviser designation, advising contract, change of title and change of adviser
 
@@ -1060,8 +1060,8 @@ To appoint a research adviser for a student, to set the advising timetable and c
 | ADV-14 | A student may make only one request to change the research adviser, before the proposal defense, for justifiable reasons: Form 3.1.1 signed by the current and new adviser, deliberated by the Research Coordinator, Associate Dean and Dean; then a new Form 3.1. | Handbook 2022-2023, p. 62; Research Protocol AY2024-2025, Request for Change of Research Adviser | Official |
 | ADV-15 | An adviser designated before the effectivity of his or her retirement may continue to serve until the final defense. | Handbook 2022-2023, p. 58 | Official |
 | ADV-16 | The student needs to propose three faculty as adviser options. | Consultation 21 July 2026, Associate Dean's description | Practice |
-| ADV-17 | Each nominated faculty member may accept or decline the nomination in the platform (the Associate Dean suggested this); the student and the Graduate School then choose among those who accept. | Consultation 21 July 2026, Associate Dean's suggestion | Proposed |
-| ADV-18 | Adviser-dependent steps (adviser signature, endorsement, document review, availability in scheduling) are blocked until an adviser is designated. | Group working notes, July 20 checklist, item 43 | Proposed |
+| ADV-17 | Each nominated faculty member may accept or decline the nomination (the Associate Dean suggested that the platform should offer this; it does not yet); the student and the Graduate School then choose among those who accept. | Consultation 21 July 2026, Associate Dean's suggestion | Proposed |
+| ADV-18 | Adviser-dependent steps (adviser signature, endorsement, document review, availability in scheduling) cannot be completed until an adviser is designated. | Group working notes, July 20 checklist, item 43 | Proposed |
 
 #### 4.12.6 Exceptions and unusual cases
 
@@ -1079,9 +1079,9 @@ To appoint a research adviser for a student, to set the advising timetable and c
 
 #### 4.12.8 How the platform supports this process
 
-The student nominates advisers and submits Form 3; the Research Coordinator forwards it to the Dean; the Dean, the Associate Dean and the Research Coordinator sign; Form 3.1 is sent and the adviser is recorded. The platform blocks adviser-dependent steps without an adviser.
+The platform does not run the adviser designation process. Form 3 and its companion forms (3.1, 3.2, 3.3, 3.4 and 3.1.1), the nomination of three faculty, the signatures of the Research Coordinator, the Associate Dean and the Dean, and the changes of title and of adviser all happen outside it. The adviser appears in the platform as a name on the student's record, set by GS staff when the monitoring record is created or corrected (a correction needs a recorded reason) and linked to the adviser's faculty login. From then on the platform uses the adviser in four ways. The adviser signs on screen the exact manuscript that the student uploaded, the Form 4 endorsements and the final manuscript; confirms minor revisions; is counted in the availability needed to book a defense; and can never sit on the same student's panel. Without the adviser's signature the proposal and final stages cannot be completed, although staff can still book a defense with a recorded reason.
 
-**Difference between the platform and the rule.** Who finally approves an adviser differs between the Handbook and the Protocol, and so do the adviser's qualifications and the advisee limit (OQ-19, OQ-20). The platform does not count the adviser's active advisees or check CMO 15 qualifications. The three-nominee practice (ADV-16) is not in the Handbook or the Protocol (OQ-21).
+**Difference between the platform and the rule.** The platform does not count an adviser's advisees, does not check the adviser's qualifications (CMO 15, doctoral degree, publication) and does not enforce the one-change limits for title and adviser. The register holds the five-advisee limit as a documented rule only (ADV-02, ADV-04, ADV-05, ADV-13, ADV-14). Who finally approves an adviser, and the advisee limit, differ between the Handbook and the Protocol (OQ-19, OQ-20). The three-nominee practice and the step in which each faculty member accepts or declines (ADV-16, ADV-17) are not built (OQ-21).
 
 ### 4.13 Proposal defense and ethics review
 
@@ -1145,7 +1145,7 @@ To have the student's research proposal examined by a panel and, after revisions
 | PRP-10 | A student who has used a change of title or a change of adviser must have done so before the proposal defense application (ADV-13, ADV-14). | Handbook 2022-2023, p. 62 | Official |
 | PRP-11 | Ethics clearance is needed before the closed-door final defense: the adviser emails Form 4, the Ethics Clearance and the manuscript to the Research Coordinator. | Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Closed-door Final Defense, Part I (Form 4 submission) | Official |
 | PRP-12 | The Research Coordinator records ethics clearance as received; the office checks that the document is present, not its content. | Group working notes, July 20 checklist, item 42 | Proposed |
-| PRP-13 | The platform blocks the proposal endorsement without an adviser, and, for quantitative studies, without Form 4.1. | Group working notes, July 20 checklist, item 43; Platform (current build) | Proposed |
+| PRP-13 | The platform does not complete the proposal stage without the adviser's signature on the manuscript and on Form 4, and it asks every student for Form 4.1 (it does not distinguish quantitative from qualitative studies). | Group working notes, July 20 checklist, item 43; Platform (current build) | Proposed |
 
 #### 4.13.6 Exceptions and unusual cases
 
@@ -1165,9 +1165,9 @@ To have the student's research proposal examined by a panel and, after revisions
 
 #### 4.13.8 How the platform supports this process
 
-The student uploads the proposal documents; the adviser signs Form 4 in the platform; the Research Coordinator records the ethics clearance; the platform checks that the required documents are present, and it suggests panel candidates and schedules the defense (see 4.16).
+The student uploads the proposal manuscript, Form 4, Form 4.1 and the endorsement. Each needs the adviser's on-screen signature on that exact file, and a replaced file returns to the adviser's queue. The proposal stage lists ten items: the manuscript, the panel, the Form 4 endorsement, Form 4.1 (or the qualitative exemption), the adviser's signature, the schedule, the result, Form 5.1, the ethics clearance and the ethics status record. Form 4.1 is asked of every student; the platform does not ask whether the study is quantitative or qualitative. The panel is the full panel, including the external member for a thesis or dissertation; the platform does not check that the external member is from outside the University or that the GS Research Committee approved. Booking follows 4.16, with a 14-day notice that staff can override with a reason. The chair records one of six outcomes (Passed; Passed with minor revisions; Provisional pass with revisions for panel approval; Provisional pass, re-defense required; Deferred; Failed), only at or after the booked time. Form 5.1 and the ethics items stay locked until the proposal is passed and its revisions are confirmed. The Research Coordinator records ethics as Cleared (this needs a date and Forms 5.1 and 5.2 uploaded), Returned or Not cleared. The proposal stage completes, and the final stage opens, only when ethics is Cleared.
 
-**Difference between the platform and the rule.** The platform checks that documents are present, not their validity. The platform's rule for the month after the defense for ethics review (PRP-08) is not enforced as a deadline. The platform has no step for Form 4.2 and the co-author contribution.
+**Difference between the platform and the rule.** The platform checks that documents are present and signed, not that they are valid. The month after the proposal defense for the ethics application (PRP-08) is a dated task of 30 days, not a block. It has no step for Form 4.2 and the co-author contribution (PRP-05). The two-week review period (PRP-03) is a warning that can be overridden. The approval of the external panel member (PRP-04, OQ-22), the statistician's consultation itself and the payment proof (PRP-09, OQ-27) are left to people. Ethics clearance before the final defense (PRP-11) is enforced.
 
 ### 4.14 Final defense (closed-door and public)
 
@@ -1252,9 +1252,9 @@ To have the completed thesis or dissertation examined in a closed-door final def
 
 #### 4.14.8 How the platform supports this process
 
-The adviser endorses the final defense in the platform; the platform checks that the required documents are present, the panel is complete and the schedule is confirmed with the lead time (14 days for the final defense, 5 for the public defense); the panel chair records the verdict.
+The adviser signs the Form 4 final endorsement and the final manuscript on screen. The final stage lists four items: the endorsement, the signed manuscript, the confirmed schedule and the result. The panel of the proposal defense carries over to the final defense; a change needs a recorded reason and puts any booking back to Needs Re-confirmation. Booking follows 4.16: 14 days counted from the date that staff record as the day the panel received the manuscript, a warning that staff can override with a reason. The panel chair records one of the six outcomes. After a pass with minor revisions the adviser or the chair confirms the student's revision; after a provisional pass with major revisions and no re-defense the chair confirms; after a re-defense or a fail the evidence is archived, the student resubmits, the adviser signs again and staff book again. The chair may enter the Form 7 score; when one is entered and it is below 85 (project paper, thesis) or 90 (dissertation), the platform refuses Passed and minor revisions. The public final defense cannot be booked in the platform: there is no Form 4.3, announcement, pre-registration, panel or verdict step for it.
 
-**Difference between the platform and the rule.** The platform applies a 14-day lead time for the final and a 5-day lead time for the public defense. The Handbook requires both five days for posting and two weeks for Form 4.3 (OQ-23). The platform does not record the score on Form 7 or the two tracks (before and after August 2020) (OQ-40).
+**Difference between the platform and the rule.** The platform does not handle the public final defense (FIN-11 to FIN-15, FIN-17), so the five-day and two-week periods for Form 4.3 (OQ-23) are not reached in practice, although the register still holds the five-day value. Forms 6 and 7 and the one-working-day deadline (FIN-10), Form 8 (FIN-07), the two tracks before and after August 2020 (FIN-16, OQ-40) and the defense fees are not in the platform. The Form 7 score is optional, and the platform applies the thresholds of FIN-09 only when a score is typed; the register lists the two score rules as documented only, which no longer describes the verdict form exactly.
 
 ### 4.15 Revisions and completion
 
@@ -1332,9 +1332,9 @@ To have the final manuscript approved by the panel, scanned for similarity (Turn
 
 #### 4.15.8 How the platform supports this process
 
-The platform keeps a completion checklist of five items (soft copy of the final manuscript, panel approval emails, Turnitin certificate with SIR not more than 15%, Form 9, Form 10). It marks research completion when all five are present.
+The platform keeps a completion checklist of five items that the student uploads as PDF files: the soft copy of the final manuscript, the panel approval emails (one file), the Turnitin certificate labelled as a similarity index of 15% or below, Form 9 and Form 10. An item counts as complete only after the student submits it and GS staff review and verify it. When all five are verified the case becomes Verified Complete and the student's stage becomes Completed, which feeds the graduation eligibility check. Staff read the Turnitin percentage on the certificate; the platform does not read it from the file, and it does not verify the content of any document.
 
-**Difference between the platform and the rule.** The platform does not record the bound copies, the CD, the conference presentation or the publication forms (Forms 11 to 13), and so cannot yet show the Handbook's publication requirement for graduation (OQ-25).
+**Difference between the platform and the rule.** The platform does not record the adviser's verification (CMP-02), the editor step, the bound copies, the CD, the conference presentation or the publication forms (Forms 11 to 13), and so cannot yet show the Handbook's publication requirement for graduation (OQ-25). The ethics clearance, which the Handbook also lists with the completion documents, is checked at the proposal stage and is not one of the five items. The register shows the Turnitin limit and the conference presentation as documented only. The period for sending the completion documents is not stated (OQ-26).
 
 ### 4.16 Defense scheduling and rescheduling
 
@@ -1385,7 +1385,7 @@ To set a date, time, venue or meeting link for a defense with the panel and advi
 | SCH-06 | The panel members must not agree with a proposed schedule without the revised manuscript. | Handbook 2022-2023, p. 65 | Official |
 | SCH-07 | A re-defense follows the same protocol as the original defense. | Handbook 2022-2023, pp. 64, 66-67; Research Protocol AY2024-2025, Proposal Defense, Part II (major revisions) | Official |
 | SCH-08 | Faculty invited to a panel may accept the invitation for the proposed date or mark themselves unavailable (the Associate Dean suggested this). | Consultation 21 July 2026, Associate Dean's suggestion for panel scheduling | Proposed |
-| SCH-09 | A defense is confirmed only when all required panel members and the adviser are available on the date and the lead time has passed; the student may ask for a schedule revision with new preferred dates; the reason for a reschedule is recorded. | Group working notes, BPM accurate flow, section 9; Platform (current build) | Proposed |
+| SCH-09 | A defense is confirmed only when all required panel members and the adviser are available on the date; the lead time is a warning that staff may override with a recorded reason; the student may send a scheduling request with preferred dates; a reschedule or cancellation needs a recorded reason and the name of who asked for it. | Group working notes, BPM accurate flow, section 9; Platform (current build) | Proposed |
 
 #### 4.16.6 Exceptions and unusual cases
 
@@ -1402,9 +1402,9 @@ To set a date, time, venue or meeting link for a defense with the panel and advi
 
 #### 4.16.8 How the platform supports this process
 
-The platform collects availability from the adviser and the panel, shows the earliest common dates, applies the lead time, lets the student accept or request a revision, and records the confirmed schedule, mode and venue. The panel availability in the demonstration data is sample data; the platform is not connected to a calendar.
+Once a panel is matched and the student is at the right stage, the student can send a scheduling request with a preferred date, mode, venue and constraints; it creates a task for the Research Coordinator and runs no lead-time check. The Research Coordinator or GS staff book the slot. The platform shows the free times common to the adviser and every panel member, taken from their connected Google Calendars where faculty have connected them and otherwise from the working hours and availability kept on the faculty profile. Only the defense that matches the student's stage (title, proposal or final) can be booked, and one active booking is allowed for each. A booking is refused when the panel is incomplete, the adviser sits on the panel, anyone is unavailable, the student, a panel member or the venue is double-booked, the time is in the past, or, for a title defense, the Academic Coordinator's endorsement is missing. The lead time (14 days for the title, proposal and final defenses, counted as in 4.11 and 4.14) and other pending requirements are warnings that staff can override with a recorded reason. Staff and the Research Coordinator can reschedule or cancel a booking; a reason and the name of who asked are required, the old booking is kept and linked, and a reschedule runs every check again. A cancellation or a Deferred verdict opens a task for the Research Coordinator. The platform does not send the student a proposed schedule to accept or revise.
 
-**Difference between the platform and the rule.** The platform uses a lead time of zero for a title defense, fourteen days for the proposal and final defense and five days for the public defense. The Protocol asks two weeks for the title defense and two weeks for Form 4.3 (OQ-23). The notice period for rescheduling is not defined in any source (OQ-28).
+**Difference between the platform and the rule.** The platform now applies a 14-day lead time to the title defense, as the Protocol asks, where the earlier build applied none. The public final defense (five days, or two weeks; OQ-23) cannot be booked. The lead time is a warning and not a block, because the sources describe no waiver (OQ-43). The steps in which the Research Coordinator asks for availability by message and the student accepts or revises a proposed schedule are the group's process model (SCH-08, SCH-09); the platform works out availability itself and the student only makes a request. The notice period for rescheduling is not defined in any source (OQ-28); the platform requires a reason but no notice period. The venue is only checked for a clash between bookings in the platform; reserving it with the GS Office is done by people (SCH-05).
 
 ### 4.17 Practicum
 
@@ -1475,9 +1475,9 @@ To record the practicum or internship required by some programs: the agreement w
 
 #### 4.17.8 How the platform supports this process
 
-The student submits the MOA, the hours and the certificate PDFs in the platform; GS staff forward to the Academic Coordinator; the Academic Coordinator can request additional certificates; the status report goes to the Dean. Staff can see the cases as a board or table.
+Only students of the Psychology programs and of the Master of Science in Guidance and Counseling can use the practicum workflow. The student's first submission of the memorandum of agreement (MOA) is refused unless the eligibility check says Eligible: the program is in scope, the completed units are at least Basic 6, Major 9, Cognate 6 and 21 in total, the title, proposal, ethics and final research stages have been reached, and the standing is Active. When source data are missing the check shows Needs verification and blocks. The MOA needs a PDF and a site. The case then runs in order. GS staff forward the MOA to the Academic Coordinator. The Academic Coordinator marks the practicum In Progress, or records Not Accepted - New Organization Required with a reason, after which the student arranges another organization and sends an updated MOA. The student submits certificate PDFs and the hours completed, and GS staff forward them. The Academic Coordinator requests more or records completion, which the platform refuses while the hours completed are below the required hours (200 by default). The Academic Coordinator then sends the status report to the Dean, who marks it reviewed. Staff can see the cases as a board or table.
 
-**Difference between the platform and the rule.** None of the practicum rules (programs, hours, unit prerequisites, documents) comes from the Handbook or the Research Protocol. The platform counts certificate files, not the validity of each certificate. All of it is the group's proposal and is listed for validation (OQ-29).
+**Difference between the platform and the rule.** None of the practicum rules (programs, hours, unit prerequisites, documents) comes from the Handbook or the Research Protocol. The program scope, the required hours and the unit prerequisites are prototype values held in the register with the status Needs review (PRC-03 to PRC-05, PRC-07; OQ-29). The platform counts certificate files, not the validity of each certificate; the hours are typed by the student; the supervisor's name is optional; and it does not record start and end dates or a schedule by organization. All of it is the group's proposal and is listed for validation.
 
 ### 4.18 Graduation application and endorsement
 
@@ -1556,9 +1556,9 @@ To confirm that a student has met every graduation requirement and to hand the e
 
 #### 4.18.8 How the platform supports this process
 
-The platform shows which students are academically eligible, asks for the signed application, lets GS staff group eligible students into a named batch, routes the batch to the Academic Coordinator, the Research Coordinator and the Dean, and exports the endorsed list for the Dean to send to the Registrar.
+The platform works out whether a student is academically eligible: coursework complete, each research stage complete (requirements, panel, schedule and a passing verdict), the practicum complete where it applies, and the five completion documents verified. A student can upload the signed graduation application (PDF) only when eligible. GS staff group eligible students into a named batch; the Academic Coordinator checks coursework; the Research Coordinator validates research and practicum; GS staff mark a student not eligible or prepare the endorsement and send it to the Dean; the Dean approves it or returns it. After approval the Dean exports the endorsed list as a CSV file (batch, student number, name, program, coursework, research and endorsement status, approval date, remarks and export status) and sends it to the Registrar by the official channel. Eligibility is checked again at export, and the status becomes Exported - Ready to Send.
 
-**Difference between the platform and the rule.** The platform does not check the Handbook's requirements for enrollment in the graduation semester, payment, the alumni seminar, public seminar series or publication (GRD-02, GRD-07 to GRD-10). The review window is limited to the active school year and has no opening or closing dates (OQ-30). The graduation document checklist beyond Forms 9 and 10 is to be confirmed (OQ-31).
+**Difference between the platform and the rule.** The platform does not check the Handbook's requirements for enrollment in the graduation semester, payment, the alumni seminar, the public seminar series, publication, or the bound copy and CD (GRD-02, GRD-06 to GRD-10), and it does not work out academic honors (GRD-12). The review window is limited to the active school year and has no opening or closing dates (OQ-30). The graduation document checklist beyond Forms 9 and 10 is to be confirmed (OQ-31).
 
 ### 4.19 Records handoff to the Registrar
 
@@ -1622,9 +1622,9 @@ To list what the Graduate School sends to the University Registrar and the Busin
 
 #### 4.19.8 How the platform supports this process
 
-The platform prepares the withdrawal Excel file and the graduation CSV file and shows a notice that nothing has been sent; the responsible person sends the file by email. The platform does not record the Registrar's confirmation.
+The platform prepares files and never sends them. It prepares the graduation CSV (Dean only), the Excel list of approved subject withdrawals (GS staff; the fee percentages are marked as information only), and one provisional CSV file per student for a leave of absence, a readmission, an AWOL return or a residency enrollment, each labelled as provisional until the Registrar confirms the format. After each download a message says that the portal sent no email and that the responsible person must email the file and wait for the Registrar's acknowledgement. Each export is written to the log for each student (what, who, when). A Daily changes list shows the changes that the Registrar must mirror in AIMS, each with a tick that GS staff set when they have updated AIMS. The platform does not record the Registrar's confirmation: the database has fields for it, but nothing sets them.
 
-**Difference between the platform and the rule.** Whether the Graduate School should record a Registrar acknowledgement, with a reference number and date, or leave acknowledgement outside the platform, is an open decision (OQ-32). The export columns and file names are not yet confirmed by the Registrar.
+**Difference between the platform and the rule.** Whether the Graduate School should record a Registrar acknowledgement, with a reference number and date, or leave acknowledgement outside the platform, is an open decision (OQ-32). HND-09 is therefore met in part: each export is logged, the acknowledgement is not. The export columns and file names are not yet confirmed by the Registrar.
 
 ## 5 Consolidated business rules register
 
@@ -1659,7 +1659,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | ENR-10 | Enrollment and academic load | Enrollment normally occurs in June to July. Dates are kept as configurable academic periods, not fixed dates. | Group working notes, July 20 checklist, items 10 and 76 (stakeholder-confirmed answer) | Practice |
 | ENR-11 | Enrollment and academic load | Each student-subject pair has one status: not taken, enrolled, taken, dropped, withdrawn; and, as reported by faculty, incomplete or failed. | Consultation 21 July 2026 | Practice |
 | ENR-12 | Enrollment and academic load | Faculty do not enter grades in the Graduate School record. A professor who fails a student or gives an incomplete reports it to the Academic Coordinator, who tags the status. | Consultation 21 July 2026 | Practice |
-| ENR-13 | Enrollment and academic load | If the load tagged for a student is outside six to nine units (part-time) or twelve units (full-time), the platform shows a warning to the Academic Coordinator. The warning does not block the tag. | Handbook 2022-2023, p. 48 | Proposed |
+| ENR-13 | Enrollment and academic load | The platform shows the Academic Coordinator the load tagged for a student (below six units, six to nine units part-time, above nine to twelve units full-time). A load above twelve units is flagged and can be saved only with a documented exception; a load below twelve units is information and does not block the tag. | Handbook 2022-2023, p. 48 | Proposed |
 | CRS-01 | Course offering and course adjustments (change and add of subject) | Changing one subject for another is allowed during the first week of classes if the original subject is dissolved, if the student has a schedule conflict, or if the student fails the prerequisite subject. | Handbook 2022-2023, pp. 48-49 | Official |
 | CRS-02 | Course offering and course adjustments (change and add of subject) | Adding subjects is allowed during the first week of classes upon the written approval of the Associate Dean. | Handbook 2022-2023, p. 49 | Official |
 | CRS-03 | Course offering and course adjustments (change and add of subject) | To add a subject: (1) un-tag the enrolment form in the Business Office, (2) secure an Advice Slip from the Graduate School Office, (3) go through the enrolment procedure. | Handbook 2022-2023, p. 49 | Official |
@@ -1685,7 +1685,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | WD-11 | Withdrawal of subject | An approved withdrawal is sent to the Registrar, which processes it in the registration system, and then to the Business Office for any fee arrangement. The Graduate School's responsibility ends at sending the request to the Registrar. | Consultation 21 July 2026 | Practice |
 | WD-12 | Withdrawal of subject | After the Registrar has been sent the request, the Graduate School tags the subject as withdrawn (a manual tag is enough), with the date applied, the date granted and a text area for the result. | Consultation 21 July 2026 | Practice |
 | WD-13 | Withdrawal of subject | According to the Associate Dean, a student may withdraw before classes begin or in the first week of classes; the Dean decides with discretion, and a request submitted after the deadline or with an insufficient or inconsistent justification is normally denied. (This is a second-hand account recorded by the group and conflicts with the Handbook's second week; see OQ-01.) | Consultation 29 July 2026, account of the Associate Dean's answer | Practice |
-| WD-14 | Withdrawal of subject | The platform shows the student the Handbook's fee bracket for the date of the request (first week, second week, later) as information only; the Business Office computes the fee. | Handbook 2022-2023, pp. 49, 51 | Proposed |
+| WD-14 | Withdrawal of subject | The platform shows the student and the staff the Handbook's fee bracket for the date of the request (10% in the first week, 20% in the second week, full fees after the window) as information only; the Business Office computes the fee. | Handbook 2022-2023, pp. 49, 51 | Proposed |
 | DRP-01 | Dropping, including being dropped for absences | Students are expected to attend classes regularly; the maximum number of absences allowed a student is 20% of the total number of class hours for the whole semester. | Handbook 2022-2023, p. 52 | Official |
 | DRP-02 | Dropping, including being dropped for absences | A student may be excused for a death in the family, illness (with a medical certificate from the USLS clinic or a personal doctor), or a graduate program activity endorsed by the Dean. Excuses are for time missed only, and all work missed must be made up to the satisfaction of the professor within a reasonable time. | Handbook 2022-2023, p. 52 | Official |
 | DRP-03 | Dropping, including being dropped for absences | When unexcused absence reaches more than 20% of the stipulated hours in one course, the student is automatically dropped from the course by the professor and is given a grade of DRP with a 5.0 grade. | Handbook 2022-2023, p. 52 | Official |
@@ -1694,8 +1694,8 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | DRP-06 | Dropping, including being dropped for absences | If a student gets a 5.0 he or she is automatically dropped from the program; failure in any subject means no re-admission to the program. | Handbook 2022-2023, p. 54 | Official |
 | DRP-07 | Dropping, including being dropped for absences | A student drops a subject during the semester by talking or writing to the Academic Coordinator. Once agreed, the Academic Coordinator or GS staff tag the subject as dropped with a date and notes. No student-facing drop request is needed in the Graduate School's record. | Consultation 21 July 2026 | Practice |
 | DRP-08 | Dropping, including being dropped for absences | The Graduate School drops the subject in AIMS as well as in its own record. | Consultation 21 July 2026 | Practice |
-| DRP-09 | Dropping, including being dropped for absences | A drop requested by a student is recorded without a Graduate School approval step (there is no Deny). The status moves from requested to recorded and stays marked as awaiting confirmation until the Graduate School has seen the change in AIMS. | Group working notes, July 20 checklist, items 18, 19 and 79 (revision adopted after the 15 July adviser session) | Proposed |
-| DRP-10 | Dropping, including being dropped for absences | A request made up to the end of the second week of classes is handled as a withdrawal (see WD-01); a request made later is recorded as a drop. The Handbook does not give this dividing line; it is the group's reading of the Associate Dean's distinction between withdrawal and dropping. | Handbook 2022-2023, p. 49; Consultation 21 July 2026 | Proposed |
+| DRP-09 | Dropping, including being dropped for absences | A drop agreed between the student and the Academic Coordinator is recorded by the Academic Coordinator without a separate Graduate School approval step (there is no Deny); the record stays marked as awaiting confirmation until the Graduate School has seen the change in AIMS. (The platform has no student drop request; see DRP-03 for the absence limit it enforces.) | Group working notes, July 20 checklist, items 18, 19 and 79 (revision adopted after the 15 July adviser session) | Proposed |
+| DRP-10 | Dropping, including being dropped for absences | A student's request to leave a single subject up to the end of the second week of classes is handled as a withdrawal (see WD-01); after that the Handbook gives no way to withdraw a single subject, and a subject is dropped by the professor for unexcused absences above 20% (DRP-03). The dividing line is the group's reading of the Associate Dean's distinction between withdrawal and dropping; what a student who wants to leave one subject after the second week may do is OQ-03. | Handbook 2022-2023, p. 49; Consultation 21 July 2026 | Proposed |
 | DRP-11 | Dropping, including being dropped for absences | To remain in good standing a master's student must maintain a weighted average of 2.0 or better, and a doctorate student 1.75 or better, at the end of each academic year; a grade of 3.0 (master's) or 2.0 (doctorate) is passing but carries no graduate credit. | Handbook 2022-2023, p. 54 | Official |
 | DRP-12 | Dropping, including being dropped for absences | A grade of INC may be given if the class standing is passing but the student fails to take the final examination or complete other requirements for illness or other valid reasons. It is removed within one academic year by meeting all course requirements and submitting the Incomplete Grade Removal Form to the Graduate School Office within the set deadline; after a year without compliance the grade becomes 3.0 (master's) or 2.0 (doctorate) and the subject is taken again; a student with INC in all subjects is dropped from the rolls of the Graduate School. | Handbook 2022-2023, p. 54 | Official |
 | LOA-01 | Leave of absence (LOA) | A student who does not intend to enroll in a semester may apply for a leave of absence; a student on leave does not sever his or her ties with the University. | Handbook 2022-2023, p. 52 | Official |
@@ -1710,7 +1710,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | LOA-10 | Leave of absence (LOA) | A master's program must be finished within seven academic years and a doctoral program within nine academic years, including the leave of absence. | Handbook 2022-2023, p. 55 | Official |
 | LOA-11 | Leave of absence (LOA) | A student who withdraws from the college without a formal leave of absence is considered absent without leave (AWOL) and has registration privileges curtailed or entirely withdrawn. | Handbook 2022-2023, p. 53 | Official |
 | LOA-12 | Leave of absence (LOA) | The student may file the leave through a structured form in place of a letter, provided the Dean accepts the form as the written request. | Group working notes, Consultation 20 July 2026 rehearsal (structured form suggested by the adviser) | Proposed |
-| LOA-13 | Leave of absence (LOA) | The platform checks a leave request for an approved reason category, a valid start and end term, the student's earlier approved leaves and a future start term, and gives the Dean a recommendation; the Dean decides. | Group working notes, Platform (current build): LOA policy review | Proposed |
+| LOA-13 | Leave of absence (LOA) | The platform checks a leave request for an allowed reason category, a written reason, a valid start and end semester (at most two semesters per request and four in total with earlier approved leave), the filing date (not within fourteen days before the last day of classes) and the prototype minimum of one completed semester, and gives the Dean a recommendation; the Dean decides. | Group working notes, Platform (current build): LOA policy review | Proposed |
 | RDM-01 | Return from leave of absence and readmission | A student returning from a leave of absence (LOA) or absence without leave (AWOL) declares his or her intention to enroll by writing to the University Registrar through the Graduate School Dean, who then endorses it to the University Registrar. | Handbook 2022-2023, p. 53 | Official |
 | RDM-02 | Return from leave of absence and readmission | A returnee must present: (1) clearance from the Business Office, (2) an interview (reason for delay, residency requirements), (3) evaluation of subject and grade requirements, (4) an Advise Slip from the Dean. | Handbook 2022-2023, p. 45 | Official |
 | RDM-03 | Return from leave of absence and readmission | Failure in any subject means no re-admission to the program. | Handbook 2022-2023, p. 54 | Official |
@@ -1720,7 +1720,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | AWL-02 | Absence without leave (AWOL) | A student returning from AWOL declares the intention to enroll by writing to the University Registrar through the Graduate School Dean, who endorses it to the Registrar. | Handbook 2022-2023, p. 53 | Official |
 | AWL-03 | Absence without leave (AWOL) | A returnee presents a Business Office clearance, an interview, an evaluation of subject and grade requirements and an Advise Slip from the Dean. | Handbook 2022-2023, p. 45 | Official |
 | AWL-04 | Absence without leave (AWOL) | An AWOL status has the same effect as a leave of absence for reporting: it is communicated to the Registrar. | Consultation 20 July 2026, adviser's statement; not confirmed by Graduate School staff | Proposed |
-| AWL-05 | Absence without leave (AWOL) | AWOL is flagged from source evidence (an imported AWOL standing, or a full semester without enrollment and without an approved leave), not typed in by a user. | Group working notes, Platform (current build): AWOL policy review | Proposed |
+| AWL-05 | Absence without leave (AWOL) | AWOL is flagged from source evidence (an imported AWOL standing, or a semester enrollment marked Withdrawn with no approved leave and no resolved return), not typed in by a user and not inferred from absence alone. | Group working notes, Platform (current build): AWOL policy review | Proposed |
 | AWL-06 | Absence without leave (AWOL) | On return, the student is classified by years in the program: within the normal limit (five years master's, seven years doctorate), extension with a graded six-unit refresher (up to seven and nine), or full re-enrollment beyond that. | Handbook 2022-2023, pp. 54-55 | Proposed |
 | RES-01 | Residency enrollment and maximum residence | Students who have finished all their coursework and are just working on their thesis or dissertation and practicum or internship, after a semester of enrollment for thesis writing and practicum, may enroll for residence. | Handbook 2022-2023, p. 48 | Official |
 | RES-02 | Residency enrollment and maximum residence | Students who are not enrolled in any subject but who want to complete an INC, will take the comprehensive exam, or are waiting for their research publication must also enroll for residence. Registration for residence should be done within the semester. | Handbook 2022-2023, p. 48 | Official |
@@ -1732,7 +1732,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | RES-08 | Residency enrollment and maximum residence | Doctorate program: candidacy within five academic years from admission; all requirements including the dissertation within seven academic years. | Handbook 2022-2023, p. 55 | Official |
 | RES-09 | Residency enrollment and maximum residence | Doctorate program: beyond seven years a maximum two-year extension with a graded six-unit refresher course; the program must be finished within nine academic years including leave of absence, after which the student must re-enroll all courses taken and earn credit units. | Handbook 2022-2023, p. 55 | Official |
 | RES-10 | Residency enrollment and maximum residence | Thesis or project paper writing must be finished within two years from the title or proposal defense; dissertation writing within three years from the title defense. | Handbook 2022-2023, p. 58 | Official |
-| RES-11 | Residency enrollment and maximum residence | The platform records each residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication) and marks a purpose as unsupported if the student's record does not match it. | Group working notes, Platform (current build): residency policy review | Proposed |
+| RES-11 | Residency enrollment and maximum residence | The platform records each residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication) and marks a purpose as unsupported if the student's record does not match it; staff may still record it with notes that explain the exception. | Group working notes, Platform (current build): residency policy review | Proposed |
 | CEX-01 | Comprehensive examination | The comprehensive examinations cover all basic or core courses, fields of concentration, and electives or cognates. They are given for two days for a master's and three days for a doctorate, with two-day intervals between examinations or consecutively as arranged, and last a maximum of eight hours per day. | Handbook 2022-2023, p. 56 | Official |
 | CEX-02 | Comprehensive examination | Master's scope: first day basic courses and electives or cognates; second day major courses. Doctorate scope: first day basic courses and electives or cognates; second and third days major courses. | Handbook 2022-2023, p. 56 | Official |
 | CEX-03 | Comprehensive examination | Master's students who have passed all academic requirements and been evaluated by their Graduate School Academic Coordinators may file an application; doctorate students evaluated by their College Deans may likewise file. | Handbook 2022-2023, p. 56 | Official |
@@ -1745,7 +1745,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | CEX-10 | Comprehensive examination | A student who passes the comprehensive examination confers with the Dean for a thesis or dissertation adviser and is considered advanced to candidacy. | Handbook 2022-2023, p. 57 | Official |
 | CEX-11 | Comprehensive examination | Passing the comprehensive examination is a graduation requirement; for special academic honors the examination must be passed with no retake. | Handbook 2022-2023, pp. 55, 77 | Official |
 | CEX-12 | Comprehensive examination | The monitoring workbook records the comprehensive examination in its own column. | Group working notes, Monitoring workbook, COMPRE column | Practice |
-| CEX-13 | Comprehensive examination | The platform accepts a title defense application only after the comprehensive examination is passed and all curriculum subjects are complete. | Group working notes, Platform (current build): comprehensive exam eligibility | Proposed |
+| CEX-13 | Comprehensive examination | The platform keeps all research stages from the title defense onward locked until the comprehensive examination status is Passed and all curriculum subjects are complete; the Graduate School can switch the examination requirement off in the register. | Group working notes, Platform (current build): comprehensive exam eligibility | Proposed |
 | TTL-01 | Title defense | The application for title defense (Form 1 and three concept papers to the Academic Coordinator) must be made at least two weeks before the scheduled defense. | Handbook 2022-2023, p. 59; Research Protocol AY2024-2025, Title Defense, Part I, step 2 note | Official |
 | TTL-02 | Title defense | The Research Coordinator nominates the panel members as recommended by the Academic Coordinator, after deliberation with the GS Research Committee. | Handbook 2022-2023, p. 60; Research Protocol AY2024-2025, Title Defense, Part I, step 4 | Official |
 | TTL-03 | Title defense | Panel for a project paper: one panel chair and two members (one content specialist and one method specialist). Thesis or bridging thesis: one chair and three members (one content specialist, one method specialist and one external panel). Dissertation: one chair and four members (two content specialists, one method specialist and one external panel). The chair and the content and method specialists are University-affiliated; the external panel is a content or industry expert who takes part from the proposal defense onwards. | Handbook 2022-2023, p. 60; Research Protocol AY2024-2025, Title Defense, Part I, step 4 | Official |
@@ -1756,8 +1756,8 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | TTL-08 | Title defense | The student asks the panel about their preferred mode of payment, settles the title defense fees and emails the proof to the GS mailbox within the first working day after the defense, with the subject line LAST NAME_type of defense_receipt. | Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Title Defense, Part III, step 4 | Official |
 | TTL-09 | Title defense | Thesis or project paper writing must be finished within two years from the title or proposal defense; for the thesis the student has one year from the title defense to submit and defend a proposal. Dissertation writing must be finished within three years from the title defense, with one year to submit and defend a proposal. | Handbook 2022-2023, p. 58 | Official |
 | TTL-10 | Title defense | If the approved title is still applicable, the same concept paper may be presented for re-defense; otherwise the student changes the research title or topic and goes through the title defense again. | Handbook 2022-2023, p. 58 | Official |
-| TTL-11 | Title defense | GS staff check that Form 1, three concept papers and the Academic Coordinator's endorsement are present before the Research Coordinator nominates a panel. The check is for completeness only. | Group working notes, July 20 checklist, item 42; Group working notes, transactions list | Proposed |
-| TTL-12 | Title defense | The platform does not schedule a title defense, nominate a panel or approve a title by itself; panel candidates are suggested from faculty specialization, availability and workload and staff may choose any faculty. | Group working notes, July 20 checklist, item 44 | Proposed |
+| TTL-11 | Title defense | GS staff check that Form 1, three concept papers and the Academic Coordinator's endorsement are present before the Research Coordinator nominates a panel. The check is for completeness only; in the platform the endorsement is refused unless Form 1 and all three papers are uploaded, and panel matching opens only after it. | Group working notes, July 20 checklist, item 42; Group working notes, transactions list | Proposed |
+| TTL-12 | Title defense | The platform does not schedule a title defense, nominate a panel or approve a title by itself; panel candidates are suggested from the uploaded concept papers, faculty specialization, availability and workload, and staff may choose any active faculty member. | Group working notes, July 20 checklist, item 44 | Proposed |
 | ADV-01 | Adviser designation, advising contract, change of title and change of adviser | The research adviser must be affiliated with the University and the degree program must be aligned with the student's program. | Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Designation of the Research Adviser, Part I, step 1 | Official |
 | ADV-02 | Adviser designation, advising contract, change of title and change of adviser | Protocol: the research adviser must have a PhD degree for PhD students and at least PhD units for MA students (CHED CMO 15), and should have a maximum of five active advisees for the current academic year. | Research Protocol AY2024-2025, Designation of the Research Adviser, Part I, step 1 note | Official |
 | ADV-03 | Adviser designation, advising contract, change of title and change of adviser | Handbook: the adviser shall be a faculty of the Graduate School and a holder of a doctoral degree aligned with the discipline, with at least one publication in a refereed journal or publicly recognized creative or technology outputs (CMO 15 s. 2019). | Handbook 2022-2023, p. 58 | Official |
@@ -1774,8 +1774,8 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | ADV-14 | Adviser designation, advising contract, change of title and change of adviser | A student may make only one request to change the research adviser, before the proposal defense, for justifiable reasons: Form 3.1.1 signed by the current and new adviser, deliberated by the Research Coordinator, Associate Dean and Dean; then a new Form 3.1. | Handbook 2022-2023, p. 62; Research Protocol AY2024-2025, Request for Change of Research Adviser | Official |
 | ADV-15 | Adviser designation, advising contract, change of title and change of adviser | An adviser designated before the effectivity of his or her retirement may continue to serve until the final defense. | Handbook 2022-2023, p. 58 | Official |
 | ADV-16 | Adviser designation, advising contract, change of title and change of adviser | The student needs to propose three faculty as adviser options. | Consultation 21 July 2026, Associate Dean's description | Practice |
-| ADV-17 | Adviser designation, advising contract, change of title and change of adviser | Each nominated faculty member may accept or decline the nomination in the platform (the Associate Dean suggested this); the student and the Graduate School then choose among those who accept. | Consultation 21 July 2026, Associate Dean's suggestion | Proposed |
-| ADV-18 | Adviser designation, advising contract, change of title and change of adviser | Adviser-dependent steps (adviser signature, endorsement, document review, availability in scheduling) are blocked until an adviser is designated. | Group working notes, July 20 checklist, item 43 | Proposed |
+| ADV-17 | Adviser designation, advising contract, change of title and change of adviser | Each nominated faculty member may accept or decline the nomination (the Associate Dean suggested that the platform should offer this; it does not yet); the student and the Graduate School then choose among those who accept. | Consultation 21 July 2026, Associate Dean's suggestion | Proposed |
+| ADV-18 | Adviser designation, advising contract, change of title and change of adviser | Adviser-dependent steps (adviser signature, endorsement, document review, availability in scheduling) cannot be completed until an adviser is designated. | Group working notes, July 20 checklist, item 43 | Proposed |
 | PRP-01 | Proposal defense and ethics review | Before the proposal defense the student must have consulted a statistician for a quantitative study, with Form 4.1 accomplished by the statistician. Form 4.1 is not required for qualitative studies. | Handbook 2022-2023, p. 63; Research Protocol AY2024-2025, Proposal Defense, Part I (statistical consultation) | Official |
 | PRP-02 | Proposal defense and ethics review | The research adviser accomplishes Form 4 with e-signature once the paper complies with the research paper guidelines set by the Graduate School Office; this must be done at least two weeks before the date of the defense. | Handbook 2022-2023, p. 63; Research Protocol AY2024-2025, Proposal Defense, Part I (Form 4 endorsement and note) | Official |
 | PRP-03 | Proposal defense and ethics review | The panel members are given two weeks to review the paper before the scheduled proposal defense. | Handbook 2022-2023, p. 63; Research Protocol AY2024-2025, Proposal Defense, Part I (panel review period) | Official |
@@ -1788,7 +1788,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | PRP-10 | Proposal defense and ethics review | A student who has used a change of title or a change of adviser must have done so before the proposal defense application (ADV-13, ADV-14). | Handbook 2022-2023, p. 62 | Official |
 | PRP-11 | Proposal defense and ethics review | Ethics clearance is needed before the closed-door final defense: the adviser emails Form 4, the Ethics Clearance and the manuscript to the Research Coordinator. | Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Closed-door Final Defense, Part I (Form 4 submission) | Official |
 | PRP-12 | Proposal defense and ethics review | The Research Coordinator records ethics clearance as received; the office checks that the document is present, not its content. | Group working notes, July 20 checklist, item 42 | Proposed |
-| PRP-13 | Proposal defense and ethics review | The platform blocks the proposal endorsement without an adviser, and, for quantitative studies, without Form 4.1. | Group working notes, July 20 checklist, item 43; Platform (current build) | Proposed |
+| PRP-13 | Proposal defense and ethics review | The platform does not complete the proposal stage without the adviser's signature on the manuscript and on Form 4, and it asks every student for Form 4.1 (it does not distinguish quantitative from qualitative studies). | Group working notes, July 20 checklist, item 43; Platform (current build) | Proposed |
 | FIN-01 | Final defense (closed-door and public) | Final decisions are pass, pass with minor revisions, and provisional pass with major revisions (subject for re-defense). | Handbook 2022-2023, p. 66; Research Protocol AY2024-2025, Closed-door Final Defense, Part II | Official |
 | FIN-02 | Final defense (closed-door and public) | The adviser emails Form 4, the Ethics Clearance and the manuscript to the Research Coordinator at least two weeks before the defense. | Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Closed-door Final Defense, Part I (Form 4 submission) | Official |
 | FIN-03 | Final defense (closed-door and public) | 14-Day Rule: "At least fourteen (14) days, inclusive of weekends, from the date the panel members of the oral defense received their copies of the thesis/dissertation to the date of the oral defense." | Handbook 2022-2023, p. 66; Research Protocol AY2024-2025, Closed-door Final Defense, Part I note | Official |
@@ -1828,7 +1828,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | SCH-06 | Defense scheduling and rescheduling | The panel members must not agree with a proposed schedule without the revised manuscript. | Handbook 2022-2023, p. 65 | Official |
 | SCH-07 | Defense scheduling and rescheduling | A re-defense follows the same protocol as the original defense. | Handbook 2022-2023, pp. 64, 66-67; Research Protocol AY2024-2025, Proposal Defense, Part II (major revisions) | Official |
 | SCH-08 | Defense scheduling and rescheduling | Faculty invited to a panel may accept the invitation for the proposed date or mark themselves unavailable (the Associate Dean suggested this). | Consultation 21 July 2026, Associate Dean's suggestion for panel scheduling | Proposed |
-| SCH-09 | Defense scheduling and rescheduling | A defense is confirmed only when all required panel members and the adviser are available on the date and the lead time has passed; the student may ask for a schedule revision with new preferred dates; the reason for a reschedule is recorded. | Group working notes, BPM accurate flow, section 9; Platform (current build) | Proposed |
+| SCH-09 | Defense scheduling and rescheduling | A defense is confirmed only when all required panel members and the adviser are available on the date; the lead time is a warning that staff may override with a recorded reason; the student may send a scheduling request with preferred dates; a reschedule or cancellation needs a recorded reason and the name of who asked for it. | Group working notes, BPM accurate flow, section 9; Platform (current build) | Proposed |
 | PRC-01 | Practicum | Students who have finished all their coursework and are just working on the practicum or internship, after a semester of enrollment for it, may enroll for residence. | Handbook 2022-2023, p. 48 | Official |
 | PRC-02 | Practicum | For the non-thesis track in Education, the integrating course (action research or practicum in the major field) must be completed before the student files for the comprehensive examination. | Handbook 2022-2023, p. 56 | Official |
 | PRC-03 | Practicum | The curriculum copied in the group's notes for the Doctor of Philosophy in Psychology lists DPSY330 Internship (six units) in the second semester of the second year, before the written comprehensive examination and the dissertation. (The document the curriculum was copied from is not identified in the notes.) | Group working notes, 'Course stuff' section, program curriculum tables | Practice |
@@ -1867,7 +1867,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 
 ## 6 Open questions for validation
 
-The group could not answer the following questions from the sources. Each states where the sources conflict, where they are silent, or where practice differs from the Handbook, gives the options the group can see, and leaves a blank for the Graduate School's answer. Where a question affects rules, the rule numbers are listed. Until a question is answered, the platform follows the Handbook.
+The group could not answer the following questions from the sources. Each states where the sources conflict, where they are silent, or where practice differs from the Handbook, gives the options the group can see, and leaves a blank for the Graduate School's answer. Where a question affects rules, the rule numbers are listed. Until a question is answered, the platform follows the Handbook. Where that ruling has already settled what the platform does (for example the withdrawal window and fees, the length of a leave, or whether a leave counts toward maximum residence), the list of sources says how the platform now works; the question stays open so that the Graduate School can confirm the rule or choose another.
 
 ### OQ-01 Withdrawal of subject: how long is it allowed and what does it cost?
 
@@ -1877,7 +1877,8 @@ The group could not answer the following questions from the sources. Each states
 
 - Handbook 2022-2023, pp. 49, 51: a student may withdraw subjects until the second week from the start of classes; 10% of the total amount due for the term is charged in the first week and 20% in the second week.
 - Consultation 29 July 2026 (the group's account of the Associate Dean's answer): withdrawal is possible before classes start or in the first week; Consultation 21 July 2026 describes withdrawal as the official, no-mark kind of leaving a subject.
-- Platform: before classes begin or in the first seven calendar days, with no academic penalty and no fee shown.
+- Platform now (implements option A): a withdrawal is accepted before classes begin and until the end of the second week (14 calendar days from the semester start date); the fee tier for the date of the request is shown as information only (10% in the first week, 20% in the second, full fees after the window); the Business Office collects. The earlier build's seven-day, no-penalty rule came from the consultation account and was replaced.
+- Owner's ruling for this revision: the Graduate School Handbook 2022-2023 is in force, so the platform follows it wherever it is explicit. The question stays so that the Graduate School can confirm the rule or choose another.
 
 **Question.** Which window and which fee apply to a withdrawal of a subject?
 
@@ -1900,6 +1901,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, pp. 49, 51: states a 10% charge "within the first week of classes" but nothing about a request made before classes begin.
+- Platform now: a request before classes begin is accepted and no amount is shown; the screen says that the Handbook states none and that the Business Office confirms it.
 
 **Question.** Is there a charge when a student withdraws a subject after enrolling but before classes start?
 
@@ -1924,6 +1926,7 @@ The group could not answer the following questions from the sources. Each states
 - Handbook 2022-2023, p. 49: "The student retains the right to withdraw all subjects at any time of the semester thereafter but will pay the full enrolment fees." It speaks of all subjects, not one.
 - Handbook 2022-2023, p. 53: grade symbols W (Withdrawn) and D (Dropped); a leave taken in the second half of the semester gives W for all courses.
 - Consultation 21 July 2026: dropping is leaving a subject in the middle of the semester; withdrawal is the official, earlier kind.
+- Platform now (implements option A): after the second week a single subject cannot be withdrawn; the message tells the student that all subjects may still be withdrawn at full fees, or a leave of absence filed.
 
 **Question.** After the second week, what may a student do with a single subject, and what mark and fee apply?
 
@@ -1949,6 +1952,7 @@ The group could not answer the following questions from the sources. Each states
 - Consultation 29 July 2026 (account of the Associate Dean): the Dean decides with discretion; usual reasons to deny are a late request or an unsupported reason.
 - Consultation 15 and 29 July 2026 (capstone adviser sessions, not Graduate School staff): dropping and withdrawing are a student's right and are not denied.
 - Consultation 21 July 2026: for dropping, the student talks to the Academic Coordinator and, once agreed, the subject is tagged dropped.
+- Platform now: the Dean approves or denies every withdrawal (a denial needs a reason); a drop is recorded by the Academic Coordinator without an approval step, and only when the unexcused absences entered are above 20%.
 
 **Question.** Who approves a withdrawal, who approves a drop, and on what grounds may a request be refused?
 
@@ -1972,6 +1976,7 @@ The group could not answer the following questions from the sources. Each states
 
 - Handbook 2022-2023: the only dropping rule is the automatic drop for absences (p. 52); no student-requested drop procedure or form is described; the Withdrawal Form is named (p. 49) but not supplied.
 - Consultation 21 July 2026: the student talks or writes to the Academic Coordinator; the Graduate School drops in AIMS as well as in its own record.
+- Platform now: there is no student drop request; the Academic Coordinator records the drop with the absence percentage, a note and a date; nothing is sent to AIMS.
 
 **Question.** What is the drop procedure, which form (if any) is used, who informs the professor and who records the drop in AIMS? How is the Graduate School informed if a student stops attending without telling anyone?
 
@@ -1996,6 +2001,7 @@ The group could not answer the following questions from the sources. Each states
 - Handbook 2022-2023, p. 52: an automatic drop for absences gives the grade DRP with a 5.0.
 - Handbook 2022-2023, p. 53: the grading table lists D (Dropped), not DRP.
 - Handbook 2022-2023, p. 54: a 5.0 means the student is automatically dropped from the program; failure in any subject means no re-admission.
+- Platform now: it does not produce the DRP grade or apply the retention rule; both are kept in the register as documented only.
 
 **Question.** Is DRP the same as D? Does a DRP with 5.0 count as a failure that drops the student from the program?
 
@@ -2018,6 +2024,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, pp. 48-49: change of subject and adding of subjects are allowed during the first week only; no fee or exception is stated.
+- Platform now: after the first week (7 calendar days from the semester start date) an addition or change is flagged and staff can save it only with a documented exception (the Associate Dean's written approval for an addition; subject dissolved, schedule conflict or failed prerequisite for a change); a student cannot do it in the portal.
 
 **Question.** Is any exception possible after the first week, who may grant it, and is there a fee for changing or adding?
 
@@ -2040,7 +2047,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, pp. 49, 52: "first week of classes", "second week" and "attendance counted from the first regular class meeting"; no calendar rule is given.
-- Platform: seven calendar days from the start date of the semester.
+- Platform now: calendar days from the start date of the semester: 7 for the first week (the fee tier and the add or change window) and 14 for the withdrawal window.
 
 **Question.** Are the weeks counted from the first day of classes of the semester, or from each subject's first class meeting? Do summer terms follow the same weeks?
 
@@ -2063,7 +2070,8 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, p. 52: a leave may be approved for one year and renewed for at most another year.
-- Platform: one or two consecutive semesters, and fewer than four earlier approved leaves; the platform's help text says up to four semesters in total.
+- Platform now (implements option A in part): up to two semesters per request and four semesters in total with renewals; the number of leaves is not limited; a semester is counted by its position in the list of semesters set up in the platform.
+- Owner's ruling for this revision: the Graduate School Handbook 2022-2023 is in force, so the platform follows it wherever it is explicit. The question stays so that the Graduate School can confirm the rule or choose another.
 
 **Question.** How long may a leave be, is the two-year limit counted per leave or over the whole program, is a year two semesters or three terms, and is there a maximum number of leaves?
 
@@ -2086,7 +2094,8 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, p. 55: a master's program must be finished within seven academic years including leave of absence; a doctorate within nine including leave.
-- Platform: the residency clock is paused during an approved leave.
+- Platform now (implements option A): time on leave counts; the residency clock is never paused (register value residency.includes_loa).
+- Owner's ruling for this revision: the Graduate School Handbook 2022-2023 is in force, so the platform follows it wherever it is explicit. The question stays so that the Graduate School can confirm the rule or choose another.
 
 **Question.** Is the leave included in the maximum residence as the Handbook says?
 
@@ -2110,7 +2119,7 @@ The group could not answer the following questions from the sources. Each states
 
 - Handbook 2022-2023, p. 52: "LOA must be done on or before the deadline" (no date is given).
 - Handbook 2022-2023, p. 53: a leave is allowed in the second half of a semester (class standing W, no refund) but not within two weeks before the last day of classes.
-- Platform: the leave must start in a future term; a leave cannot be filed for a semester already started.
+- Platform now (implements option B in part): a leave may start in a running semester until 14 days before its last day of classes; in the second half the courses become W with no refund (shown as a note only); a semester already over is refused. The student form still lists only future semesters.
 
 **Question.** What is the deadline to file a leave, and may a leave start in the semester already running?
 
@@ -2133,7 +2142,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, pp. 49, 52-53: the requests are letters to the Dean or the Registrar.
-- Platform: structured forms with a reference; a pending leave request cannot be withdrawn by the student (Consultation 20 July 2026).
+- Platform: structured forms with a reference; the student can withdraw a pending leave request while it is Submitted or in Dean Review, as the adviser suggested (Consultation 20 July 2026).
 
 **Question.** May a structured form replace the letter, and may a student withdraw a pending request?
 
@@ -2180,7 +2189,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, p. 53: a student who withdraws without a formal leave is AWOL, and registration privileges are curtailed or withdrawn; nothing is said about who declares it, when, or whether AWOL counts toward maximum residence.
-- Platform: AWOL is flagged from source evidence and cannot be declared manually.
+- Platform now: AWOL is flagged from source evidence (an imported AWOL standing, or a semester marked Withdrawn with no leave and no resolved return) and cannot be declared manually; the AWOL period counts toward maximum residence because the clock is never paused.
 
 **Question.** Who declares AWOL, after how long, is the Registrar told, and does the AWOL period count toward maximum residence?
 
@@ -2224,7 +2233,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, pp. 54-55: candidacy within three (master's) or five (doctorate) academic years from admission, completion within five or seven, an extension of up to two years with a graded six-unit refresher course, and absolute limits of seven and nine academic years; no rule says whether summer terms count or who approves an extension.
-- Platform: counts calendar years from the entry year, approximately.
+- Platform now: counts academic years from the entry academic year (year 1), stepping up each June, never reduced by leave; this can differ by up to a year from a count from the date of admission.
 
 **Question.** How is an academic year counted (summer terms?), and who approves an extension and the refresher course?
 
@@ -2249,7 +2258,7 @@ The group could not answer the following questions from the sources. Each states
 - Handbook 2022-2023, p. 57: after the student passes the comprehensive examination the student confers with the Dean for an adviser and is advanced to candidacy.
 - Handbook 2022-2023, p. 58: an adviser may be assigned while the student is still taking courses.
 - Research Protocol AY2024-2025: silent on the comprehensive examination.
-- Platform: a title defense application is accepted only after the examination is passed and all curriculum subjects are complete.
+- Platform now: all research stages from the title defense onward stay locked until the examination is Passed and all curriculum subjects are complete; the Graduate School can switch the examination requirement off in the register.
 
 **Question.** In what order must the comprehensive examination, the adviser designation and the title defense happen, and does it differ for thesis and non-thesis tracks?
 
@@ -2320,6 +2329,7 @@ The group could not answer the following questions from the sources. Each states
 - Handbook 2022-2023, p. 58: a Graduate School faculty with a doctoral degree aligned with the discipline and at least one refereed publication or recognized output; more than five advisees only with the Dean's approval.
 - Handbook 2022-2023, p. 59: a maximum of five advisees per semester.
 - Research Protocol AY2024-2025: a PhD for PhD students and at least PhD units for MA students; a maximum of five active advisees for the current academic year.
+- Platform now: the five-advisee limit is in the register as a documented rule only; the platform does not count advisees or check qualifications.
 
 **Question.** Which eligibility rule applies to MA advisers, and is the limit five per semester or five active advisees per academic year?
 
@@ -2387,6 +2397,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, pp. 72-73 and Research Protocol AY2024-2025, Closed-door Final Defense, Part IV and Public Defense, Part I: application (Form 4.3) "must be done 5 days before the preferred schedule for GS posting purposes"; the same section says "This must be done at least 2 weeks before the date of defense."
+- Platform now: a public final defense cannot be booked, so neither period is applied; the closed-door final defense has a 14-day notice that staff may override with a recorded reason.
 
 **Question.** What is the lead time for Form 4.3?
 
@@ -2500,6 +2511,7 @@ The group could not answer the following questions from the sources. Each states
 
 - Handbook 2022-2023 and Research Protocol AY2024-2025: nothing on rescheduling apart from re-defense following the same protocol.
 - Group process model: the student may ask for a schedule revision before confirmation.
+- Platform now: staff and the Research Coordinator can reschedule or cancel a booking with a required reason and the name of who asked; no notice period is applied; a reschedule runs every booking check again.
 
 **Question.** What is the notice period to reschedule, who approves, how many times, what happens to the fee, and what if a panel member withdraws?
 
@@ -2728,6 +2740,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - The only Handbook supplied is 2022-2023. The Protocol is for AY 2024-2025.
+- Owner's ruling for this revision: the Handbook 2022-2023 is in force, and the platform was changed to follow it wherever it is explicit (withdrawal window and fees, length of leave, leave counted in maximum residence, panel sizes, lead times).
 
 **Question.** Is there a later Handbook or any memorandum that changes withdrawal, leave, residency, or the defense rules?
 
@@ -2815,7 +2828,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, p. 60 and Research Protocol AY2024-2025: a project paper panel is the chair and two members (content and method); an external panel member applies to theses and dissertations.
-- Platform: requires an external panel member for a project paper.
+- Platform now (implements option A): a project paper panel is the chair and two members with no external seat; the external seat is added for theses and dissertations from the proposal defense.
 
 **Question.** Does a project paper panel include an external member?
 
@@ -2837,7 +2850,7 @@ The group could not answer the following questions from the sources. Each states
 **What the sources say**
 
 - Handbook 2022-2023, pp. 59, 63, 65 and Research Protocol AY2024-2025: applications must be made at least two weeks before the defense; no waiver is described.
-- Platform: no lead time for a title defense.
+- Platform now: a 14-day lead time applies to the title, proposal and final defenses; it is a warning, and staff can proceed with an override and a recorded reason.
 
 **Question.** May the Research Coordinator or the Dean accept an application with less notice, and on what grounds?
 
@@ -2896,7 +2909,7 @@ By signing below the reviewer confirms that they have read this manual, have cor
 | Version | Date | Changed by | Summary of change | Approved by |
 |---|---|---|---|---|
 | 0.1 | 2026-10-01 | Capstone group CAP-IT1 | First draft prepared from the Handbook 2022-2023, the Research Protocol AY 2024-2025, the office workbooks and the group's July 2026 consultation notes. Submitted for validation. | Not yet approved |
-|  |  |  |  |  |
+| 0.2 | 2026-10-01 | Capstone group CAP-IT1 | Platform paragraphs and the open questions brought in line with the platform as it now runs, after the ruling that the Handbook 2022-2023 is in force: subject withdrawal window and fees, length of a leave of absence, leave counted toward maximum residence, panel sizes, lead times, load, drop rule, first-week window for adding and changing subjects. Rules that describe the platform were reworded where they no longer matched. No Official or Practice rule changed. | Not yet approved |
 |  |  |  |  |  |
 
 ## Appendix A Forms named in the sources

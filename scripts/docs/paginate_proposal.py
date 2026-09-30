@@ -152,6 +152,41 @@ EDITS = [
      "For the originally proposed OpenAI API, official text pricing currently ranges", 1, False),
     ("is presented as Figure 6 in Section 3.2.5.5 and in Appendix P.",
      "is presented, as originally proposed, as Figure 6 in Section 3.2.5.5 and in Appendix P.", 1, False),
+    # ---- withdrawal window and leave of absence now follow the Handbook 2022-2023 (business rules, Section 5.14) ----
+    ("It is available before classes begin or during the first seven calendar days of classes. A withdrawal "
+     "granted in this window is penalty-free: the subject carries no grade and no adverse mark, the student's "
+     "other subjects are unaffected, and the student remains active in the graduate program.",
+     "It is available until the end of the second week from the start of classes, whether or not classes were "
+     "attended, and needs the Dean" + U + "s approval. Under the Graduate School Handbook 2022-2023, which is in "
+     "force, 10% of the term" + U + "s total due is charged when the withdrawal falls in the first week and 20% "
+     "when it falls in the second (Section 4.5). Staff described it in consultation as available before classes "
+     "begin or in the first week; the Handbook governs, and the difference is recorded as an open question in "
+     "the Operations Manual draft (Appendix AA). A withdrawal granted in this window leaves the student" + U +
+     "s other subjects unaffected, and the student remains active in the graduate program.", 1, False),
+    ("Handles the penalty-free withdrawal of a student from one particular enrolled subject, filed before "
+     "classes begin or during the first seven calendar days.",
+     "Handles the withdrawal of a student from one particular enrolled subject, filed before classes begin or "
+     "until the end of the second week of classes (14 calendar days from the semester start date). The screen "
+     "shows the fee tier for the date of the request (10% of the term" + U + "s total due in the first week, 20% "
+     "in the second) as information only; the Business Office settles any payment.", 1, False),
+    ("and the withdrawn subject carries no grade and no adverse mark.",
+     "and the portal writes no grade for the withdrawn subject (any grade mark is applied by the Registrar).",
+     1, False),
+    ("penalty-free subject withdrawals filed before classes or during the first week",
+     "subject withdrawals filed before classes or until the end of the second week, with the fee tier shown for "
+     "information only", 1, False),
+    ("with approved withdrawals carrying no academic grade or penalty", "with no grade written by the portal",
+     1, False),
+    ("the allowed reasons, the number of prior leaves, the permitted duration, and the requirement that the "
+     "effective period be a term that has not already begun",
+     "the allowed reasons, the permitted duration (up to two semesters a request and four in total, with no "
+     "limit on the number of leaves), and the filing date (no leave in the last two weeks of a semester)", 1,
+     False),
+    ("the permitted reasons, the number of prior leaves, the allowed duration, and the requirement that the "
+     "effective period be a term that has not already begun",
+     "the permitted reasons, the allowed duration (up to two semesters a request and four in total, with no "
+     "limit on the number of leaves), and the filing date (no leave in the last two weeks of a semester)", 1,
+     False),
 ]
 
 # (prefix of the paragraph to insert after, bold lead-in, body text)

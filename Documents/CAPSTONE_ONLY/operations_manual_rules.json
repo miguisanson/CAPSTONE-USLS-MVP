@@ -1,6 +1,6 @@
 {
   "document": "University of St. La Salle Graduate School Operations Manual",
-  "version": "0.1",
+  "version": "0.2",
   "date": "2026-10-01",
   "note": "Draft for validation. Practice and Proposed rules are not confirmed by the Graduate School.",
   "counts": {
@@ -396,7 +396,7 @@
       "id": "ENR-13",
       "process": "Enrollment and academic load",
       "process_section": "4.2",
-      "rule": "If the load tagged for a student is outside six to nine units (part-time) or twelve units (full-time), the platform shows a warning to the Academic Coordinator. The warning does not block the tag.",
+      "rule": "The platform shows the Academic Coordinator the load tagged for a student (below six units, six to nine units part-time, above nine to twelve units full-time). A load above twelve units is flagged and can be saved only with a documented exception; a load below twelve units is information and does not block the tag.",
       "source": "Handbook 2022-2023, p. 48",
       "sources": [
         {
@@ -794,7 +794,7 @@
       "id": "WD-14",
       "process": "Withdrawal of subject",
       "process_section": "4.4",
-      "rule": "The platform shows the student the Handbook's fee bracket for the date of the request (first week, second week, later) as information only; the Business Office computes the fee.",
+      "rule": "The platform shows the student and the staff the Handbook's fee bracket for the date of the request (10% in the first week, 20% in the second week, full fees after the window) as information only; the Business Office computes the fee.",
       "source": "Handbook 2022-2023, pp. 49, 51",
       "sources": [
         {
@@ -929,7 +929,7 @@
       "id": "DRP-09",
       "process": "Dropping, including being dropped for absences",
       "process_section": "4.5",
-      "rule": "A drop requested by a student is recorded without a Graduate School approval step (there is no Deny). The status moves from requested to recorded and stays marked as awaiting confirmation until the Graduate School has seen the change in AIMS.",
+      "rule": "A drop agreed between the student and the Academic Coordinator is recorded by the Academic Coordinator without a separate Graduate School approval step (there is no Deny); the record stays marked as awaiting confirmation until the Graduate School has seen the change in AIMS. (The platform has no student drop request; see DRP-03 for the absence limit it enforces.)",
       "source": "Group working notes, July 20 checklist, items 18, 19 and 79 (revision adopted after the 15 July adviser session)",
       "sources": [
         {
@@ -944,7 +944,7 @@
       "id": "DRP-10",
       "process": "Dropping, including being dropped for absences",
       "process_section": "4.5",
-      "rule": "A request made up to the end of the second week of classes is handled as a withdrawal (see WD-01); a request made later is recorded as a drop. The Handbook does not give this dividing line; it is the group's reading of the Associate Dean's distinction between withdrawal and dropping.",
+      "rule": "A student's request to leave a single subject up to the end of the second week of classes is handled as a withdrawal (see WD-01); after that the Handbook gives no way to withdraw a single subject, and a subject is dropped by the professor for unexcused absences above 20% (DRP-03). The dividing line is the group's reading of the Associate Dean's distinction between withdrawal and dropping; what a student who wants to leave one subject after the second week may do is OQ-03.",
       "source": "Handbook 2022-2023, p. 49; Consultation 21 July 2026",
       "sources": [
         {
@@ -1173,7 +1173,7 @@
       "id": "LOA-13",
       "process": "Leave of absence (LOA)",
       "process_section": "4.6",
-      "rule": "The platform checks a leave request for an approved reason category, a valid start and end term, the student's earlier approved leaves and a future start term, and gives the Dean a recommendation; the Dean decides.",
+      "rule": "The platform checks a leave request for an allowed reason category, a written reason, a valid start and end semester (at most two semesters per request and four in total with earlier approved leave), the filing date (not within fourteen days before the last day of classes) and the prototype minimum of one completed semester, and gives the Dean a recommendation; the Dean decides.",
       "source": "Group working notes, Platform (current build): LOA policy review",
       "sources": [
         {
@@ -1323,7 +1323,7 @@
       "id": "AWL-05",
       "process": "Absence without leave (AWOL)",
       "process_section": "4.8",
-      "rule": "AWOL is flagged from source evidence (an imported AWOL standing, or a full semester without enrollment and without an approved leave), not typed in by a user.",
+      "rule": "AWOL is flagged from source evidence (an imported AWOL standing, or a semester enrollment marked Withdrawn with no approved leave and no resolved return), not typed in by a user and not inferred from absence alone.",
       "source": "Group working notes, Platform (current build): AWOL policy review",
       "sources": [
         {
@@ -1503,7 +1503,7 @@
       "id": "RES-11",
       "process": "Residency enrollment and maximum residence",
       "process_section": "4.9",
-      "rule": "The platform records each residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication) and marks a purpose as unsupported if the student's record does not match it.",
+      "rule": "The platform records each residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication) and marks a purpose as unsupported if the student's record does not match it; staff may still record it with notes that explain the exception.",
       "source": "Group working notes, Platform (current build): residency policy review",
       "sources": [
         {
@@ -1698,7 +1698,7 @@
       "id": "CEX-13",
       "process": "Comprehensive examination",
       "process_section": "4.10",
-      "rule": "The platform accepts a title defense application only after the comprehensive examination is passed and all curriculum subjects are complete.",
+      "rule": "The platform keeps all research stages from the title defense onward locked until the comprehensive examination status is Passed and all curriculum subjects are complete; the Graduate School can switch the examination requirement off in the register.",
       "source": "Group working notes, Platform (current build): comprehensive exam eligibility",
       "sources": [
         {
@@ -1891,7 +1891,7 @@
       "id": "TTL-11",
       "process": "Title defense",
       "process_section": "4.11",
-      "rule": "GS staff check that Form 1, three concept papers and the Academic Coordinator's endorsement are present before the Research Coordinator nominates a panel. The check is for completeness only.",
+      "rule": "GS staff check that Form 1, three concept papers and the Academic Coordinator's endorsement are present before the Research Coordinator nominates a panel. The check is for completeness only; in the platform the endorsement is refused unless Form 1 and all three papers are uploaded, and panel matching opens only after it.",
       "source": "Group working notes, July 20 checklist, item 42; Group working notes, transactions list",
       "sources": [
         {
@@ -1906,7 +1906,7 @@
       "id": "TTL-12",
       "process": "Title defense",
       "process_section": "4.11",
-      "rule": "The platform does not schedule a title defense, nominate a panel or approve a title by itself; panel candidates are suggested from faculty specialization, availability and workload and staff may choose any faculty.",
+      "rule": "The platform does not schedule a title defense, nominate a panel or approve a title by itself; panel candidates are suggested from the uploaded concept papers, faculty specialization, availability and workload, and staff may choose any active faculty member.",
       "source": "Group working notes, July 20 checklist, item 44",
       "sources": [
         {
@@ -2181,7 +2181,7 @@
       "id": "ADV-17",
       "process": "Adviser designation, advising contract, change of title and change of adviser",
       "process_section": "4.12",
-      "rule": "Each nominated faculty member may accept or decline the nomination in the platform (the Associate Dean suggested this); the student and the Graduate School then choose among those who accept.",
+      "rule": "Each nominated faculty member may accept or decline the nomination (the Associate Dean suggested that the platform should offer this; it does not yet); the student and the Graduate School then choose among those who accept.",
       "source": "Consultation 21 July 2026, Associate Dean's suggestion",
       "sources": [
         {
@@ -2196,7 +2196,7 @@
       "id": "ADV-18",
       "process": "Adviser designation, advising contract, change of title and change of adviser",
       "process_section": "4.12",
-      "rule": "Adviser-dependent steps (adviser signature, endorsement, document review, availability in scheduling) are blocked until an adviser is designated.",
+      "rule": "Adviser-dependent steps (adviser signature, endorsement, document review, availability in scheduling) cannot be completed until an adviser is designated.",
       "source": "Group working notes, July 20 checklist, item 43",
       "sources": [
         {
@@ -2431,7 +2431,7 @@
       "id": "PRP-13",
       "process": "Proposal defense and ethics review",
       "process_section": "4.13",
-      "rule": "The platform blocks the proposal endorsement without an adviser, and, for quantitative studies, without Form 4.1.",
+      "rule": "The platform does not complete the proposal stage without the adviser's signature on the manuscript and on Form 4, and it asks every student for Form 4.1 (it does not distinguish quantitative from qualitative studies).",
       "source": "Group working notes, July 20 checklist, item 43; Platform (current build)",
       "sources": [
         {
@@ -3143,7 +3143,7 @@
       "id": "SCH-09",
       "process": "Defense scheduling and rescheduling",
       "process_section": "4.16",
-      "rule": "A defense is confirmed only when all required panel members and the adviser are available on the date and the lead time has passed; the student may ask for a schedule revision with new preferred dates; the reason for a reschedule is recorded.",
+      "rule": "A defense is confirmed only when all required panel members and the adviser are available on the date; the lead time is a warning that staff may override with a recorded reason; the student may send a scheduling request with preferred dates; a reschedule or cancellation needs a recorded reason and the name of who asked for it.",
       "source": "Group working notes, BPM accurate flow, section 9; Platform (current build)",
       "sources": [
         {
