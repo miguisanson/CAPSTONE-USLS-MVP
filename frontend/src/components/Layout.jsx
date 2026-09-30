@@ -94,8 +94,8 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue"]),
-  research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue"]),
+  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant"]),
+  research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/work-queue", "/assistant"]),
 };
 
 function NavItem({ to, label, icon: Icon, end, onClick }) {

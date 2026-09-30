@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { GraduationCap, LogOut, Users, CalendarClock, CalendarCheck2, CalendarDays, Eye, ShieldCheck, ExternalLink, X, BookOpen, Clock3, ClipboardCheck, LayoutDashboard, FileCheck, Printer, Lock } from "lucide-react";
+import { Bot, GraduationCap, LogOut, Users, CalendarClock, CalendarCheck2, CalendarDays, Eye, ShieldCheck, ExternalLink, X, BookOpen, Clock3, ClipboardCheck, LayoutDashboard, FileCheck, Printer, Lock } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
@@ -9,6 +9,7 @@ import { formatDate } from "../lib/format";
 import { printDataTable } from "../lib/print";
 import FacultyResearchWorkspace from "../components/FacultyResearchWorkspace";
 import RoleSidebar from "../components/RoleSidebar";
+import Assistant from "./Assistant";
 
 const FACULTY_NAV_GROUPS = [
   {
@@ -25,6 +26,10 @@ const FACULTY_NAV_GROUPS = [
       { id: "panels", number: 5, label: "Panel Assignments", icon: Users },
       { id: "availability", number: 6, label: "My Availability", icon: Clock3 },
     ],
+  },
+  {
+    label: "Support",
+    items: [{ id: "assistant", label: "Policy Assistant", icon: Bot }],
   },
 ];
 
@@ -117,6 +122,8 @@ export default function FacultyPortal() {
                     onNavigate={setView}
                   />
                 )}
+
+                {view === "assistant" && <Assistant policyOnly />}
 
                 {view === "classes" && (
                   <Card className="p-6">

@@ -5,18 +5,25 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle } from "../components/ui";
 import StudentPicker from "../components/StudentPicker";
+import { useAuth } from "../auth";
 
-export default function Assistant() {
+// Staff and admin can focus the chat on a student record; every other signed-in
+// role (Dean, coordinators, faculty) asks policy questions only.
+export default function Assistant({ policyOnly: policyOnlyProp = false }) {
+  const { user } = useAuth();
+  const policyOnly = policyOnlyProp || !["staff", "admin"].includes(user?.role);
   const [searchParams] = useSearchParams();
   const initialStudentId = searchParams.get("student_id");
   const initialQuestion = searchParams.get("q") || "";
-  const { data: meta } = useApi(() => api.meta(), []);
+  const { data: meta } = useApi(() => (policyOnly ? Promise.resolve(null) : api.meta()), [policyOnly]);
   const { data: suggData } = useApi(() => api.assistantSuggestions(), []);
   const [messages, setMessages] = useState([
     {
       role: "assistant",
       text:
-        "Hi! I'm the Policy & Case Guidance assistant. Ask me about a student's status, what's pending, or Graduate School policy (LOA, panel, defense readiness, completion). I answer from live records and the GS policy library — and always show my sources.",
+        policyOnly
+          ? "Hi! I'm the Policy Assistant. Ask me about Graduate School policy, forms, procedures, or deadlines. I answer from the policy document library and always show the document and page or section I used."
+          : "Hi! I'm the Policy & Case Guidance assistant. Ask me about a student's status, what's pending, or Graduate School policy (LOA, panel, defense readiness, completion). I answer from live records and the GS policy library — and always show my sources.",
       citations: [],
     },
   ]);
@@ -45,7 +52,7 @@ export default function Assistant() {
     setMessages((m) => [...m, { role: "user", text: q }]);
     setBusy(true);
     try {
-      const res = await api.assistant(q, studentId);
+      const res = await api.assistant(q, policyOnly ? null : studentId);
       setMessages((m) => [
         ...m,
         {
@@ -72,7 +79,7 @@ export default function Assistant() {
   return (
     <div className="space-y-5 animate-fade-up">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Policy &amp; Case Guidance</h1>
+        <h1 className="font-display text-2xl font-semibold text-ink">{policyOnly ? "Policy Assistant" : "Policy & Case Guidance"}</h1>
         <p className="mt-1 text-sm text-slate-500">
           Ask in plain language. Answers are grounded on live monitoring records and the Graduate School policy library,
           with sources shown. For guidance only — final decisions stay with authorized personnel.
@@ -89,7 +96,7 @@ export default function Assistant() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-ink">Assistant</p>
               <p className="text-[11px] text-slate-400">
-                {studentId ? `Focused on ${studentLabel.split(" - ")[1] || "a student"}` : "General · policy + all students"}
+                {policyOnly ? "Policy documents only" : studentId ? `Focused on ${studentLabel.split(" - ")[1] || "a student"}` : "General · policy + all students"}
               </p>
             </div>
           </div>
@@ -149,7 +156,7 @@ export default function Assistant() {
 
         {/* Side rail */}
         <div className="space-y-5">
-          <Card className="p-5">
+          {!policyOnly && <Card className="p-5">
             <SectionTitle title="Focus on a student" subtitle="Optional — ground answers in one record" icon={User} />
             <StudentPicker
               value={studentId}
@@ -160,7 +167,7 @@ export default function Assistant() {
                 setStudentLabel(label || "");
               }}
             />
-          </Card>
+          </Card>}
 
           <Card className="p-5">
             <SectionTitle
@@ -254,6 +261,7 @@ function Message({ m }) {
                     <span>{c.title}</span>
                     <span className="text-[10px] font-medium text-slate-400">{c.source}</span>
                   </summary>
+                  {c.warning && <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1 font-semibold text-amber-800">{c.warning}</p>}
                   <p className="mt-1.5 leading-relaxed text-slate-500">{c.text}</p>
                 </details>
               ))}

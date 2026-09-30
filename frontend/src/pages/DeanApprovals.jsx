@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Printer } from "lucide-react";
+import { Bot, Gavel, LogOut, CheckCircle2, RotateCcw, AlertTriangle, Inbox, Clock, LayoutDashboard, Briefcase, GraduationCap, CalendarOff, BarChart3, Download, Search, SlidersHorizontal, ArrowUpRight, Eye, MessageSquare, X, CheckSquare, Users, Printer } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
 import { formatDate, formatDateTime } from "../lib/format";
 import RoleSidebar from "../components/RoleSidebar";
+import RoleAssistantPage from "../components/RoleAssistantPage";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
@@ -39,6 +40,7 @@ const DEAN_NAV_GROUPS = [
     label: "Monitoring & Support",
     items: [
       { id: "reports", label: "Reports / Analytics", icon: BarChart3 },
+      { id: "assistant", label: "Policy Assistant", icon: Bot },
     ],
   },
 ];
@@ -516,6 +518,10 @@ export default function DeanApprovals() {
     setSelectedGraduationIds(new Set());
     setBatchOpen(false);
     await refetch();
+  }
+
+  if (view === "assistant") {
+    return <RoleAssistantPage roleLabel="Dean Portal" groups={DEAN_NAV_GROUPS} active={view} onChange={setView} user={user} logout={logout} />;
   }
 
   if (view === "graduation") {
