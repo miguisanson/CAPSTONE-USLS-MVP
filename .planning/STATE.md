@@ -22,7 +22,7 @@ Running (worktrees under `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`):
 |---|---|---|
 | `pkt/loa` | **FINISHED, NOT MERGED YET** — LOA + Readmission rebuild; its own gate 279/279 green. Merge next (expect conflicts in app.py around task_dict, run_startup_tasks, reports_payload, loa_policy_review — see its note `.planning/PACKET_LOA_STATE.md` on that branch; academic's note: keep `max(0, ((years_in_program(student) or 1) - 1) * 3)` for LOA minimum residency) | 7a8e6e7 |
 | `pkt/calendar` | Availability editor, adviser appointment, calendars, invitations, notifications, private .ics | 5cd57d2 |
-| `pkt/docs2` | Business Rules section in the proposal + Operations Manual synced with the code | 5cd57d2 |
+| `pkt/docs2` | **FINISHED, NOT MERGED YET** (b00594d) — proposal 4.5 Existing + 5.14 Proposed business rules, Appendix AA, Operations Manual v0.2 synced; docs-only, should merge cleanly. Follow-ups it found: ch.5 text on manual student creation / residency pause / route+table counts; Form 7 score thresholds listed as documented-only; drops via class list or monitoring entry skip the 20% check; student LOA form lists only future semesters | 5cd57d2 |
 
 Left after those: final polish packet (items in `LIVE_CHECK_NOTES.md`; add the
 Operations Manual draft to the policy library as a Draft document; remove the
