@@ -27,6 +27,8 @@ from dotenv import load_dotenv
 from flask import Flask, Response, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, inspect, or_, text
+from sqlalchemy import event as _sa_event
+from sqlalchemy.orm.attributes import get_history as _sa_get_history
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from werkzeug.datastructures import MultiDict
@@ -576,6 +578,17 @@ class CourseRecord(db.Model):
     resolved_at = db.Column(db.DateTime)
     remarks = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, default=now_utc)
+    # Provenance (owner decision 2026-10-01: portal entry is allowed, so every value
+    # says where it came from). NULL means imported / system-fed; "Manual entry"
+    # means a person typed it in the portal. Removal is soft: the row is kept.
+    source = db.Column(db.String(30))
+    source_user = db.Column(db.String(160))
+    source_at = db.Column(db.DateTime)
+    source_reason = db.Column(db.Text)
+    removed_at = db.Column(db.DateTime)
+    removed_by = db.Column(db.String(160))
+    removal_reason = db.Column(db.Text)
+    removed_status = db.Column(db.String(40))
 
     course = db.relationship("Course")
 
@@ -710,6 +723,30 @@ class MonitoringValidationIssue(db.Model):
     resolution_upload = db.relationship("MonitoringSheetUpload", foreign_keys=[resolution_upload_id])
     student = db.relationship("Student", foreign_keys=[student_id])
     resolved_by = db.relationship("UserAccount", foreign_keys=[resolved_by_user_id])
+
+
+class MonitoringEdit(db.Model):
+    """One field-level change made to a monitoring record in the portal.
+
+    Never edited or deleted: it is the per-student change history and the old ->
+    new audit trail for manual entry. Rows written by one user action share a
+    change_id.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("course.id"))
+    change_id = db.Column(db.String(40), nullable=False, default="")
+    action = db.Column(db.String(40), nullable=False)
+    field = db.Column(db.String(60), nullable=False, default="")
+    old_value = db.Column(db.Text)
+    new_value = db.Column(db.Text)
+    source = db.Column(db.String(30), nullable=False, default="Manual entry")
+    reason = db.Column(db.Text)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    actor_name = db.Column(db.String(160))
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+    course = db.relationship("Course")
 
 
 class StudentMonitoringFlag(db.Model):
@@ -1692,6 +1729,17 @@ MONITORING_CURRICULUM_TEMPLATE = [
 ]
 
 
+# Portal-entered subject rows that are not part of the program curriculum (an
+# elective taken elsewhere, a bridging course...). They live in the same Course
+# table but never count toward curriculum completion, eligibility or planning.
+MONITORING_FREE_FORM_CATEGORY = "Non-curriculum"
+
+
+def curriculum_course_filter():
+    """SQL filter that hides free-form (non-curriculum) courses."""
+    return func.coalesce(Course.category, "Core") != MONITORING_FREE_FORM_CATEGORY
+
+
 def monitoring_course_code(program_code: str, suffix: str) -> str:
     return f"{program_code}{suffix}" if suffix[:1].isdigit() else f"{program_code}-{suffix}"
 
@@ -1717,7 +1765,10 @@ def monitoring_curriculum_courses(program: Program) -> list[Course]:
         }
         return [by_code[code] for code in codes if code in by_code]
     template_codes = monitoring_template_codes(program.code)
-    courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
+    courses = (
+        Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter())
+        .order_by(Course.category, Course.code).all()
+    )
     by_code = {course.code: course for course in courses}
     template_courses = [by_code[code] for code in template_codes if code in by_code]
     return template_courses if template_courses else courses
@@ -1936,6 +1987,9 @@ def course_record_dict(record: CourseRecord) -> dict:
         "resolved_at": iso(record.resolved_at),
         "remarks": record.remarks or "",
         "updated_at": iso(record.updated_at),
+        "source": monitoring_record_source(record),
+        "source_by": record.source_user if record.source == "Manual entry" else None,
+        "source_at": iso(record.source_at) if record.source == "Manual entry" else None,
     }
 
 
@@ -2637,7 +2691,11 @@ RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Dropped",
     "Withdrawn",
 }
-NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken"}
+NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken", "Planned"}
+# Statuses a person may type into the Monitoring Sheet in the portal. Grades and
+# pass/fail outcomes stay out of scope; "Missing" means "no row" and is what a
+# removed row goes back to.
+MONITORING_MANUAL_STATUSES = ["Planned", "Enrolled", "Completed", "Withdrawn", "Dropped", "INC"]
 SUBJECT_WITHDRAWAL_WINDOW_DAYS = 7
 
 
@@ -9451,7 +9509,7 @@ def register_routes(app: Flask) -> None:
         terms = list(reversed(visible_terms()))
         programs = Program.query.order_by(Program.code).all()
         courses = (
-            Course.query.filter_by(program_id=program_id).order_by(Course.code).all()
+            Course.query.filter_by(program_id=program_id).filter(curriculum_course_filter()).order_by(Course.code).all()
             if program_id else []
         )
         return jsonify({
@@ -9591,7 +9649,7 @@ def register_routes(app: Flask) -> None:
         if scope == "active":
             query = query.filter(Student.standing == "Active")
         students = query.order_by(Student.last_name, Student.first_name).all()
-        courses = Course.query.filter_by(program_id=program.id).order_by(Course.code).all()
+        courses = Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter()).order_by(Course.code).all()
         created = 0
         offerings_created = 0
         touched_students = 0
@@ -10511,7 +10569,7 @@ def register_routes(app: Flask) -> None:
             .join(Course).order_by(Course.code).all()
         )
         offered_ids = {o.course_id for o in offerings}
-        curriculum = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
+        curriculum = Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter()).order_by(Course.category, Course.code).all()
         faculty = Faculty.query.filter_by(active=True, college=program.college).order_by(Faculty.name).all()
         account = current_account()
         return jsonify({
@@ -11647,9 +11705,162 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "message": f"{student.name} was marked Withdrawn.", "student_id": student.id})
 
+    # ---- Monitoring Sheet portal entry (owner decision 2026-10-01) -------
+    # Staff, academic coordinators and admins write; research coordinators and the
+    # dean read; a student only reads their own record (student portal route).
+    def monitoring_error_response(exc: MonitoringEntryError):
+        db.session.rollback()
+        return jsonify({"error": str(exc), **exc.extra}), exc.status
+
+    def monitoring_can_edit() -> bool:
+        account = current_account()
+        return bool(account and account.role in MONITORING_WRITE_ROLES)
+
+    @app.route("/api/monitoring/students", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_student_create():
+        data = request.get_json(silent=True) or {}
+        try:
+            student, login = monitoring_portal_create_student(data)
+            db.session.commit()
+        except MonitoringEntryError as exc:
+            return monitoring_error_response(exc)
+        payload = monitoring_record_payload(student, can_edit=True)
+        payload.update({
+            "ok": True,
+            "account": {"email": login.email, "created": True, "password": SIM_STUDENT_PASSWORD},
+            "message": f"{student.name} was added to the {student.program.code} monitoring sheet.",
+        })
+        return jsonify(payload), 201
+
+    @app.route("/api/monitoring/students/<int:student_id>")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
+    def monitoring_student_detail(student_id: int):
+        student = Student.query.get_or_404(student_id)
+        return jsonify(monitoring_record_payload(student, can_edit=monitoring_can_edit()))
+
+    @app.route("/api/monitoring/students/<int:student_id>", methods=["PATCH"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_student_update(student_id: int):
+        student = Student.query.get_or_404(student_id)
+        try:
+            changes = monitoring_portal_update_student(student, request.get_json(silent=True) or {})
+            db.session.commit()
+        except MonitoringEntryError as exc:
+            return monitoring_error_response(exc)
+        payload = monitoring_record_payload(student, can_edit=True)
+        payload.update({
+            "ok": True, "changed": bool(changes), "changes": changes,
+            "message": "Student record updated." if changes else "Nothing changed.",
+        })
+        return jsonify(payload)
+
+    @app.route("/api/monitoring/students/<int:student_id>/history")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
+    def monitoring_student_history(student_id: int):
+        Student.query.get_or_404(student_id)
+        limit = min(max(request.args.get("limit", 200, type=int) or 200, 1), 1000)
+        edits = (
+            MonitoringEdit.query.filter_by(student_id=student_id)
+            .order_by(MonitoringEdit.id.desc()).limit(limit).all()
+        )
+        return jsonify({"items": [monitoring_edit_dict(item) for item in edits]})
+
+    @app.route("/api/monitoring/students/<int:student_id>/subjects", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_subject_add(student_id: int):
+        student = Student.query.get_or_404(student_id)
+        try:
+            record = monitoring_portal_add_subject(student, request.get_json(silent=True) or {})
+            db.session.commit()
+        except MonitoringEntryError as exc:
+            return monitoring_error_response(exc)
+        return jsonify({
+            "ok": True,
+            "subject": monitoring_subject_item(record, record.course, in_curriculum=record.course.category != MONITORING_FREE_FORM_CATEGORY),
+            "message": f"{record.course.code} added to {student.name}'s monitoring sheet.",
+        }), 201
+
+    def _monitoring_record_or_404(student_id: int, record_id: int) -> CourseRecord:
+        record = CourseRecord.query.filter_by(id=record_id, student_id=student_id).first()
+        if not record:
+            raise MonitoringEntryError("That subject row was not found for this student.", 404)
+        return record
+
+    @app.route("/api/monitoring/students/<int:student_id>/subjects/<int:record_id>", methods=["PATCH"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_subject_update(student_id: int, record_id: int):
+        student = Student.query.get_or_404(student_id)
+        try:
+            record = _monitoring_record_or_404(student_id, record_id)
+            record, changes = monitoring_portal_update_subject(student, record, request.get_json(silent=True) or {})
+            db.session.commit()
+        except MonitoringEntryError as exc:
+            return monitoring_error_response(exc)
+        return jsonify({
+            "ok": True, "changed": bool(changes), "changes": changes,
+            "subject": monitoring_subject_item(record, record.course, in_curriculum=record.course.category != MONITORING_FREE_FORM_CATEGORY),
+            "message": f"{record.course.code} updated." if changes else "Nothing changed.",
+        })
+
+    @app.route("/api/monitoring/students/<int:student_id>/subjects/<int:record_id>", methods=["DELETE"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_subject_remove(student_id: int, record_id: int):
+        student = Student.query.get_or_404(student_id)
+        data = request.get_json(silent=True) or {}
+        data.setdefault("reason", request.args.get("reason", ""))
+        try:
+            record = _monitoring_record_or_404(student_id, record_id)
+            record = monitoring_portal_remove_subject(student, record, data)
+            db.session.commit()
+        except MonitoringEntryError as exc:
+            return monitoring_error_response(exc)
+        return jsonify({
+            "ok": True,
+            "subject": monitoring_subject_item(record, record.course, in_curriculum=record.course.category != MONITORING_FREE_FORM_CATEGORY),
+            "message": f"{record.course.code} was removed; the row stays in the change history.",
+        })
+
+    @app.route("/api/monitoring/subjects/bulk-add-remaining", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def monitoring_subjects_bulk_add():
+        data = request.get_json(silent=True) or {}
+        program = db.session.get(Program, safe_int(data.get("program_id")) or 0)
+        if not program:
+            return jsonify({"error": "Choose a program."}), 400
+        try:
+            result = monitoring_portal_bulk_add_remaining(program, data)
+            db.session.commit()
+        except MonitoringEntryError as exc:
+            return monitoring_error_response(exc)
+        result.update({"ok": True, "message": f"Added {result['added']} Planned subject row(s) for {result['students']} student(s)."})
+        return jsonify(result)
+
+    @app.route("/api/monitoring/export")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
+    def monitoring_export():
+        program_id = request.args.get("program_id", type=int)
+        program = db.session.get(Program, program_id) if program_id else Program.query.order_by(Program.code).first()
+        if not program:
+            return jsonify({"error": "No program found."}), 404
+        return Response(
+            monitoring_export_workbook(program),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="monitoring-{program.code}-{date.today().isoformat()}.xlsx"'},
+        )
+
+    @app.route("/api/student-portal/monitoring")
+    @require_api_login("student")
+    def student_portal_monitoring():
+        account = current_account()
+        student = db.session.get(Student, account.student_id) if account and account.student_id else None
+        if not student:
+            return jsonify({"error": "No student record is linked to this account."}), 404
+        return jsonify(monitoring_record_payload(student, can_edit=False, for_student=True))
+
     # ---- Monitoring grid (spreadsheet view, one program at a time) -------
     @app.route("/api/monitoring/grid")
-    @require_api_login("staff", "academic_coordinator")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def monitoring_grid():
         sync_automatic_awol_statuses(commit=True)
         program_id = request.args.get("program_id", type=int)
@@ -11723,6 +11934,12 @@ def register_routes(app: Flask) -> None:
         course_units = {c.id: (c.units or 3) for c in courses}
         total_units_all = sum(course_units.values())
 
+        manual_student_ids = {
+            item.student_id
+            for item in MonitoringEdit.query.filter(
+                MonitoringEdit.action == "create_student", MonitoringEdit.student_id.in_(sids or [-1])
+            ).all()
+        }
         rows = []
         for s in students:
             cells = {}
@@ -11757,6 +11974,14 @@ def register_routes(app: Flask) -> None:
                 "operational_cells": operational_cells,
                 "operational_sources": operational_sources,
                 "editable_course_ids": sorted(operational_cells),
+                # Course ids whose value a person typed in the portal (badge on the grid).
+                "manual_cells": sorted(
+                    c.id for c in courses
+                    if (s.id, c.id) in records
+                    and records[(s.id, c.id)].source == MONITORING_MANUAL_SOURCE
+                    and not records[(s.id, c.id)].removed_at
+                ),
+                "entry_source": MONITORING_MANUAL_SOURCE if s.id in manual_student_ids else "Imported",
                 "completed": done, "total": len(courses),
                 "grades": {c.id: (records[(s.id, c.id)].grade_value or "") for c in courses if (s.id, c.id) in records},
                 "grade_statuses": {c.id: (records[(s.id, c.id)].grade_status or "No Grade") for c in courses if (s.id, c.id) in records},
@@ -11793,8 +12018,14 @@ def register_routes(app: Flask) -> None:
             "total_units": total_units_all,
             "students": rows,
             "integrity": enrollment_integrity_payload(program, selected_term),
-            "read_only": True,
-            "permissions": {"can_update_subject_status": False},
+            # Portal entry is allowed for staff / coordinators (2026-10-01); everyone else reads.
+            "read_only": not monitoring_can_edit(),
+            "permissions": {
+                "can_update_subject_status": False,
+                "can_edit": monitoring_can_edit(),
+                "can_add_student": monitoring_can_edit(),
+            },
+            "statuses": MONITORING_MANUAL_STATUSES,
             "flag_categories": [
                 item for item in MONITORING_FLAG_CATEGORIES if item != "AWOL policy alert"
             ],
@@ -15623,7 +15854,9 @@ def _report_is_valid(report) -> bool:
 # Written independently of the decorators; the KPI compares this against what
 # the endpoints were actually registered with, so a drifted decorator lowers it.
 ACCESS_CONTROL_SPEC = [
-    ("Monitoring sheet", "monitoring_grid", {"staff", "academic_coordinator"}),
+    ("Monitoring sheet", "monitoring_grid", {"staff", "academic_coordinator", "research_coordinator", "dean"}),
+    ("Monitoring sheet portal entry", "monitoring_student_create", {"staff", "academic_coordinator"}),
+    ("Monitoring sheet subject rows", "monitoring_subject_add", {"staff", "academic_coordinator"}),
     ("Reports", "reports", {"staff", "academic_coordinator"}),
     ("Analytics", "reports_analytics", {"staff", "academic_coordinator"}),
     ("Students", "students_list", {"staff", "academic_coordinator"}),
@@ -17148,6 +17381,10 @@ def _monitoring_row_discrepancies(row, program, course_by_code, id_counts=None):
                 "Subject mismatch",
                 "Previously completed subjects missing in upload: " + ", ".join(comparison["completion_regressions"]),
             )
+        # Portal entry is allowed (2026-10-01); an upload never silently replaces it.
+        portal_conflicts = _portal_edit_conflicts(student, row)
+        if portal_conflicts:
+            add("Portal edit conflict", *portal_conflicts)
     elif not missing_fields:
         possible_match = possible_student_identity_match(
             row.get("first_name", ""), row.get("last_name", ""), program.id,
@@ -17233,13 +17470,30 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
             db.session.add(rec)
         new_status = "Completed" if done else "Missing"
         should_apply = is_new or done or (overwrite_completed and rec.status == "Completed")
+        if should_apply and rec.source == MONITORING_MANUAL_SOURCE and rec.status == new_status and not rec.removed_at:
+            continue  # the portal value already agrees with the sheet; keep its provenance
         if should_apply and rec.status != new_status:
+            if rec.source == MONITORING_MANUAL_SOURCE:
+                # Only reachable when staff resolved a "Portal edit conflict" in favour of the
+                # sheet: the overwrite of a portal value is itself recorded.
+                account, actor_name = _monitoring_actor()
+                _monitoring_edit(
+                    student, "import_overwrite", "status",
+                    "Removed" if rec.removed_at else rec.status, new_status,
+                    change_id=uuid4().hex, account=account, actor_name=actor_name, course=course,
+                    reason=f"Uploaded sheet applied after staff resolved a portal edit conflict (upload #{upload.id})" if upload else "Uploaded sheet applied",
+                    source="Imported",
+                )
             rec.status = new_status
             subject_changes += 1
         if should_apply:
             rec.term_label = ""
             rec.evidence_reference = f"AC Student Monitoring upload #{upload.id}" if upload else "AC Student Monitoring import"
             rec.updated_at = now_utc()
+            if new_status != "Missing" or (rec.source == MONITORING_MANUAL_SOURCE and not rec.removed_at):
+                rec.source = "Imported" if new_status != "Missing" else None
+                rec.source_user = rec.source_at = rec.source_reason = None
+                rec.removed_at = rec.removed_by = rec.removal_reason = rec.removed_status = None
 
     if is_new and term:
         db.session.add(TermEnrollment(student_id=student.id, term_id=term.id, status="Confirmed", source_reference="AC Student Monitoring import"))
@@ -17510,6 +17764,857 @@ def monitoring_upload_dict(upload: MonitoringSheetUpload) -> dict:
         "issues": validation_issues,
         "download_url": f"/api/monitoring/uploads/{upload.id}/download",
     }
+
+
+# ---------------------------------------------------------------------------
+# Monitoring Sheet portal entry (owner decision 2026-10-01)
+# ---------------------------------------------------------------------------
+# Staff and coordinators add students and subject rows and change statuses
+# directly in the portal; the workbook upload stays as a second way in. Rules:
+#   * every portal value is stamped "Manual entry" + who + when (+ reason);
+#   * every change is written to MonitoringEdit (old -> new) and the activity log;
+#   * deletes are soft (row kept, marked removed);
+#   * a later import never silently overwrites a portal value: it raises a
+#     "Portal edit conflict" validation issue and both facts are kept until staff
+#     resolve it (see _portal_edit_conflicts).
+# Grades stay out of scope.
+MONITORING_MANUAL_SOURCE = "Manual entry"
+MONITORING_NO_ROW_STATUSES = {"", "Missing", "Not Started", "Not Taken"}
+_MONITORING_IMPORT_HINTS = ("ac student monitoring", "aims", "import", "monitoring sheet upload")
+MONITORING_WRITE_ROLES = {"staff", "academic_coordinator", "admin"}
+
+
+class MonitoringEntryError(ValueError):
+    """A portal-entry request that cannot be accepted, with the HTTP status to use."""
+
+    def __init__(self, message: str, status: int = 400, **extra):
+        super().__init__(message)
+        self.status = status
+        self.extra = extra
+
+
+def monitoring_record_source(record: CourseRecord | None) -> str:
+    """Where a subject row's value came from: Manual entry, Imported, System or ''."""
+    if not record:
+        return ""
+    if record.source == MONITORING_MANUAL_SOURCE:
+        return MONITORING_MANUAL_SOURCE
+    if (record.status or "").strip() in MONITORING_NO_ROW_STATUSES:
+        return ""
+    if record.source == "Imported":
+        return "Imported"
+    reference = (record.evidence_reference or "").strip().lower()
+    if not reference or any(hint in reference for hint in _MONITORING_IMPORT_HINTS):
+        return "Imported"
+    return "System"
+
+
+@_sa_event.listens_for(CourseRecord, "before_update")
+def _course_record_drops_manual_provenance(mapper, connection, record):
+    """A status changed by another workflow (enrollment, withdrawal...) must not
+    keep claiming to be a manual entry."""
+    if getattr(record, "_monitoring_manual_write", False) or record.source != MONITORING_MANUAL_SOURCE:
+        return
+    if _sa_get_history(record, "status").has_changes():
+        record.source = None
+        record.source_user = None
+        record.source_at = None
+        record.source_reason = None
+        if (record.status or "") not in MONITORING_NO_ROW_STATUSES:
+            record.removed_at = None
+            record.removed_by = None
+            record.removal_reason = None
+            record.removed_status = None
+
+
+def _monitoring_actor() -> tuple[UserAccount | None, str]:
+    account = current_account() if has_request_context() else None
+    return account, (account.full_name if account else "System")
+
+
+def _monitoring_clean(value, limit: int | None = None) -> str:
+    text_value = re.sub(r"\s+", " ", str(value or "")).strip()
+    return text_value[:limit] if limit else text_value
+
+
+def _monitoring_stamp(record: CourseRecord, account: UserAccount | None, actor_name: str, reason: str) -> None:
+    """Mark a subject row as a manual entry made now by this user."""
+    record._monitoring_manual_write = True
+    record.source = MONITORING_MANUAL_SOURCE
+    record.source_user = actor_name
+    record.source_at = now_utc()
+    record.source_reason = reason or None
+    record.evidence_reference = "Monitoring sheet portal entry"
+    record.updated_at = now_utc()
+
+
+def _monitoring_edit(
+    student: Student,
+    action: str,
+    field: str,
+    old,
+    new,
+    *,
+    change_id: str,
+    account: UserAccount | None,
+    actor_name: str,
+    course: Course | None = None,
+    reason: str = "",
+    source: str = MONITORING_MANUAL_SOURCE,
+) -> MonitoringEdit:
+    edit = MonitoringEdit(
+        student_id=student.id,
+        course_id=course.id if course else None,
+        change_id=change_id,
+        action=action,
+        field=field,
+        old_value=None if old is None else str(old),
+        new_value=None if new is None else str(new),
+        source=source,
+        reason=reason or None,
+        actor_user_id=account.id if account else None,
+        actor_name=actor_name,
+    )
+    db.session.add(edit)
+    return edit
+
+
+def _monitoring_log(student: Student, account: UserAccount | None, summary: str, notes: str,
+                    previous: str | None = None, new: str | None = None) -> None:
+    add_log(
+        "student-handoff",
+        student.id,
+        workflow_actor_label(account) if account else "Graduate School Staff",
+        "Monitoring sheet (portal entry)",
+        summary,
+        "Academic Coordinator",
+        notes,
+        previous_status=previous,
+        new_status=new,
+        visibility="internal",
+    )
+
+
+def _monitoring_ay_entry(value) -> str:
+    text_value = _monitoring_clean(value, 20)
+    if not re.fullmatch(r"\d{2}(?:\d{2})?\s*-\s*\d{2}(?:\d{2})?", text_value):
+        raise MonitoringEntryError("School Year / AY Entry must look like 26-27 (or 2026-2027).")
+    return re.sub(r"\s+", "", text_value)
+
+
+def _monitoring_email_free(email: str, student: Student | None = None) -> None:
+    with db.session.no_autoflush:
+        student_query = Student.query.filter(func.lower(Student.email) == email.lower())
+        if student:
+            student_query = student_query.filter(Student.id != student.id)
+        account_query = UserAccount.query.filter(func.lower(UserAccount.email) == email.lower())
+        if student:
+            account_query = account_query.filter(
+                or_(UserAccount.student_id.is_(None), UserAccount.student_id != student.id)
+            )
+        if student_query.first() or account_query.first():
+            raise MonitoringEntryError(f"The email {email} is already used by another account.", 409)
+
+
+def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
+    """Create a student from the portal with the same rules the import applies."""
+    account, actor_name = _monitoring_actor()
+    program = None
+    if data.get("program_id") not in (None, ""):
+        program = db.session.get(Program, safe_int(data.get("program_id")) or 0)
+    elif _monitoring_clean(data.get("program_code")):
+        program = Program.query.filter(func.upper(Program.code) == _monitoring_clean(data.get("program_code")).upper()).first()
+    student_number = _monitoring_clean(data.get("student_number"), 40)
+    first_name = clean_person_name(_monitoring_clean(data.get("first_name"), 80))
+    last_name = clean_person_name(_monitoring_clean(data.get("last_name"), 80))
+    ay_raw = _monitoring_clean(data.get("academic_year_entry"), 20)
+    missing = [
+        label for label, value in (
+            ("Student ID", student_number), ("First name", first_name),
+            ("Last name", last_name), ("School Year / AY Entry", ay_raw),
+        ) if not value
+    ]
+    if missing:
+        raise MonitoringEntryError("Missing required fields: " + ", ".join(missing) + ".")
+    if not program:
+        raise MonitoringEntryError("Choose a valid program for this student.")
+    ay_entry = _monitoring_ay_entry(ay_raw)
+    collision = Student.query.filter_by(student_number=student_number).first()
+    if collision:
+        raise MonitoringEntryError(
+            f"Student ID {student_number} already belongs to {collision.name}.", 409,
+            existing_student=student_brief(collision),
+        )
+    entry_year = _entry_year_from_ay(ay_entry)
+    if not data.get("confirm_possible_duplicate"):
+        possible = possible_student_identity_match(first_name, last_name, program.id, entry_year)
+        if possible:
+            raise MonitoringEntryError(
+                f"{possible.name} ({possible.student_number}) is already in {program.code} with the same "
+                "name and entry year. Confirm to add this as a separate student.",
+                409, possible_match=student_brief(possible),
+            )
+    enrollment_tag = _monitoring_clean(data.get("enrollment_tag")) or "Enrolled"
+    if enrollment_tag not in {"Enrolled", "Not Enrolled"}:
+        raise MonitoringEntryError("Only Enrolled or Not Enrolled can be set here; LOA, AWOL and withdrawal have their own workflows.")
+    email = _monitoring_clean(data.get("email"), 160).lower()
+    if email:
+        if "@" not in email or " " in email:
+            raise MonitoringEntryError("Enter a valid email address.")
+        _monitoring_email_free(email)
+    term = db.session.get(AcademicTerm, safe_int(data.get("term_id")) or 0) if data.get("term_id") else get_active_term()
+
+    student = Student(
+        student_number=student_number,
+        first_name=first_name,
+        last_name=last_name,
+        email=email or unique_student_email(first_name, last_name, student_number),
+        program_id=program.id,
+        entry_year=entry_year,
+        academic_year_entry=ay_entry,
+        current_stage="Admission",
+        standing="Active",
+        enrollment_tag=enrollment_tag,
+        adviser_name=_monitoring_clean(data.get("adviser_name"), 120) or None,
+        monitoring_new_student=True,
+    )
+    student.year_level = str(max(1, (academic_year_start(term) if term else date.today().year) - entry_year + 1))
+    db.session.add(student)
+    db.session.flush()
+    if term:
+        db.session.add(TermEnrollment(
+            student_id=student.id, term_id=term.id, status="Confirmed",
+            source_reference="Monitoring sheet portal entry",
+        ))
+    for item in onboarding_requirements():
+        db.session.add(DocumentCheck(
+            student_id=student.id, gate="Admission Handoff", item_name=item,
+            status="Complete", evidence_reference="Monitoring sheet portal entry",
+        ))
+    login = ensure_student_account(student, student.email)
+    sync_student_curriculum(student)
+    db.session.flush()
+    recompute_risk(student)
+    change_id = uuid4().hex
+    _monitoring_edit(
+        student, "create_student", "record", None,
+        f"{student.name} ({student.student_number}) - {program.code}, AY {ay_entry}",
+        change_id=change_id, account=account, actor_name=actor_name,
+    )
+    _monitoring_log(
+        student, account, "Student added to the monitoring sheet in the portal",
+        f"{student.name} ({student.student_number}) added to {program.code}, AY entry {ay_entry}; "
+        "student login account created.",
+    )
+    return student, login
+
+
+MONITORING_STUDENT_EDIT_FIELDS = ("student_number", "first_name", "last_name", "email", "academic_year_entry", "adviser_name")
+
+
+def monitoring_portal_update_student(student: Student, data: dict) -> list[dict]:
+    """Edit the header fields a monitoring sheet holds. Returns the recorded changes."""
+    account, actor_name = _monitoring_actor()
+    reason = _monitoring_clean(data.get("reason"), 500)
+    incoming: dict[str, str] = {}
+    for field in MONITORING_STUDENT_EDIT_FIELDS:
+        if field not in data:
+            continue
+        value = _monitoring_clean(data.get(field), 160)
+        if field in {"first_name", "last_name"}:
+            value = clean_person_name(value)
+        if field == "email":
+            value = value.lower()
+        if field == "academic_year_entry" and value:
+            value = _monitoring_ay_entry(value)
+        if not value and field != "adviser_name":
+            raise MonitoringEntryError(f"{field.replace('_', ' ').capitalize()} cannot be blank.")
+        incoming[field] = value
+    current = {
+        "student_number": student.student_number,
+        "first_name": student.first_name,
+        "last_name": student.last_name,
+        "email": student.email,
+        "academic_year_entry": student_academic_year_entry(student),
+        "adviser_name": student.adviser_name or "",
+    }
+    changes = {field: value for field, value in incoming.items() if value != current[field]}
+    if not changes:
+        return []
+    if not reason:
+        raise MonitoringEntryError("Enter a reason for this correction; it is kept in the change history.")
+    if "student_number" in changes:
+        collision = Student.query.filter(
+            Student.student_number == changes["student_number"], Student.id != student.id
+        ).first()
+        if collision:
+            raise MonitoringEntryError(
+                f"Student ID {changes['student_number']} already belongs to {collision.name}.", 409,
+                existing_student=student_brief(collision),
+            )
+    if "email" in changes:
+        if "@" not in changes["email"] or " " in changes["email"]:
+            raise MonitoringEntryError("Enter a valid email address.")
+        _monitoring_email_free(changes["email"], student)
+
+    login = UserAccount.query.filter_by(student_id=student.id, role="student").first()
+    change_id = uuid4().hex
+    recorded = []
+    for field, value in changes.items():
+        recorded.append({"field": field, "old": current[field], "new": value})
+        _monitoring_edit(
+            student, "update_student", field, current[field], value,
+            change_id=change_id, account=account, actor_name=actor_name, reason=reason,
+        )
+        if field == "academic_year_entry":
+            student.academic_year_entry = value
+            student.entry_year = _entry_year_from_ay(value)
+        elif field == "adviser_name":
+            student.adviser_name = value or None
+        else:
+            setattr(student, field, value)
+    if "academic_year_entry" in changes:
+        student.year_level = str(student_current_course_year(student) or student.year_level or "")
+    if login:
+        login.full_name = f"{student.name} (Student)"
+        if "email" in changes:
+            login.email = student.email
+    student.updated_at = now_utc()
+    _monitoring_log(
+        student, account, "Monitoring sheet header corrected in the portal",
+        "; ".join(f"{item['field']}: {item['old'] or '(blank)'} → {item['new'] or '(blank)'}" for item in recorded)
+        + f". Reason: {reason}",
+    )
+    return recorded
+
+
+def _monitoring_subject_status(value) -> str:
+    status = _monitoring_clean(value)
+    match = next((item for item in MONITORING_MANUAL_STATUSES if item.lower() == status.lower()), None)
+    if not match:
+        raise MonitoringEntryError("Choose a status: " + ", ".join(MONITORING_MANUAL_STATUSES) + ".")
+    return match
+
+
+def _monitoring_after_subject_change(student: Student) -> None:
+    db.session.flush()
+    if student.current_stage == "Admission" and CourseRecord.query.filter_by(
+        student_id=student.id, status="Completed"
+    ).first():
+        student.current_stage = "Coursework"
+    student.updated_at = now_utc()
+    recompute_risk(student)
+
+
+def _monitoring_course_for_row(student: Student, data: dict) -> Course:
+    if data.get("course_id") not in (None, ""):
+        course = db.session.get(Course, safe_int(data.get("course_id")) or 0)
+        if not course:
+            raise MonitoringEntryError("That subject does not exist.", 404)
+        if course.program_id != student.program_id:
+            raise MonitoringEntryError(f"{course.code} belongs to another program; pick a subject from {student.program.code} or enter it as free-form.")
+        return course
+    code = _monitoring_clean(data.get("code"), 40)
+    if not code:
+        raise MonitoringEntryError("Pick a curriculum subject, or enter a subject code for a free-form row.")
+    in_program = Course.query.filter(Course.program_id == student.program_id, func.lower(Course.code) == code.lower()).first()
+    if in_program:
+        return in_program
+    if Course.query.filter(func.lower(Course.code) == code.lower()).first():
+        raise MonitoringEntryError(f"{code} is already used by another program's subject; use a different code for a free-form row.")
+    title = _monitoring_clean(data.get("title"), 160)
+    units = safe_int(data.get("units"))
+    if not title or not units or not 1 <= units <= 12:
+        raise MonitoringEntryError("A free-form subject needs a title and units between 1 and 12.")
+    course = Course(
+        program_id=student.program_id, code=code, title=title, units=units,
+        category=MONITORING_FREE_FORM_CATEGORY, recommended_term="",
+    )
+    db.session.add(course)
+    db.session.flush()
+    return course
+
+
+def _monitoring_row_values(data: dict) -> dict:
+    values = {}
+    if "term_label" in data:
+        term_label = _monitoring_clean(data.get("term_label"), 60)
+        if len(term_label) > 40:
+            raise MonitoringEntryError("Term taken is too long (40 characters at most).")
+        values["term_label"] = term_label
+    if "remarks" in data:
+        values["remarks"] = _monitoring_clean(data.get("remarks"), 500)
+    return values
+
+
+def monitoring_portal_add_subject(student: Student, data: dict) -> CourseRecord:
+    account, actor_name = _monitoring_actor()
+    status = _monitoring_subject_status(data.get("status"))
+    values = _monitoring_row_values(data)
+    reason = _monitoring_clean(data.get("reason"), 500)
+    course = _monitoring_course_for_row(student, data)
+    record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+    if record and not record.removed_at and (record.status or "") not in MONITORING_NO_ROW_STATUSES:
+        raise MonitoringEntryError(
+            f"{course.code} already has a row for this student ({record.status}); edit that row instead.", 409,
+        )
+    readded = bool(record and record.removed_at)
+    if not record:
+        record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+        db.session.add(record)
+        db.session.flush()
+    old_status = record.status or "Missing"
+    old_term, old_remarks = record.term_label or "", record.remarks or ""
+    record.status = status
+    record.term_label = values.get("term_label", record.term_label if readded else "") or None
+    record.remarks = values.get("remarks", record.remarks if readded else "") or None
+    record.removed_at = record.removed_by = record.removal_reason = record.removed_status = None
+    _monitoring_stamp(record, account, actor_name, reason)
+    change_id = uuid4().hex
+    action = "add_subject"
+    kwargs = dict(change_id=change_id, account=account, actor_name=actor_name, course=course, reason=reason)
+    _monitoring_edit(student, action, "status", old_status, status, **kwargs)
+    if (record.term_label or "") != old_term:
+        _monitoring_edit(student, action, "term_label", old_term, record.term_label or "", **kwargs)
+    if (record.remarks or "") != old_remarks:
+        _monitoring_edit(student, action, "remarks", old_remarks, record.remarks or "", **kwargs)
+    _monitoring_after_subject_change(student)
+    detail = f"{course.code} status: {old_status} → {status}"
+    if record.term_label:
+        detail += f"; term: {record.term_label}"
+    _monitoring_log(
+        student, account, f"Subject row {'re-added' if readded else 'added'} in the monitoring sheet",
+        detail + (f". Reason: {reason}" if reason else ""), old_status, status,
+    )
+    return record
+
+
+def monitoring_portal_update_subject(student: Student, record: CourseRecord, data: dict) -> tuple[CourseRecord, list[dict]]:
+    account, actor_name = _monitoring_actor()
+    course = record.course
+    if record.removed_at:
+        raise MonitoringEntryError(f"{course.code} was removed from this record; add it again to restore it.", 409)
+    reason = _monitoring_clean(data.get("reason"), 500)
+    changes = []  # (field, old, new, apply)
+    if "status" in data:
+        status = _monitoring_subject_status(data.get("status"))
+        if status != (record.status or "Missing"):
+            changes.append(("status", record.status or "Missing", status))
+    for field, new in _monitoring_row_values(data).items():
+        old = getattr(record, field) or ""
+        if new != old:
+            changes.append((field, old, new))
+    is_free_form = (course.category or "") == MONITORING_FREE_FORM_CATEGORY
+    for field in ("title", "units"):
+        if field in data:
+            if not is_free_form:
+                raise MonitoringEntryError("Title and units of a curriculum subject come from the curriculum and cannot be edited here.")
+            new = _monitoring_clean(data.get(field), 160) if field == "title" else safe_int(data.get(field))
+            if field == "units" and (not new or not 1 <= new <= 12):
+                raise MonitoringEntryError("Units must be between 1 and 12.")
+            if field == "title" and not new:
+                raise MonitoringEntryError("Title cannot be blank.")
+            if new != getattr(course, field):
+                changes.append((field, getattr(course, field), new))
+    if not changes:
+        return record, []
+    if monitoring_record_source(record) in {"Imported", "System"} and not reason:
+        raise MonitoringEntryError(
+            "This value came from an imported/system source. Enter a reason for changing it; it is kept in the change history.",
+        )
+    change_id = uuid4().hex
+    recorded = []
+    for field, old, new in changes:
+        recorded.append({"field": field, "old": old, "new": new})
+        _monitoring_edit(
+            student, "update_subject", field, old, new, change_id=change_id, account=account,
+            actor_name=actor_name, course=course, reason=reason,
+        )
+        if field in {"title", "units"}:
+            setattr(course, field, new)
+        else:
+            setattr(record, field, new or None if field != "status" else new)
+    _monitoring_stamp(record, account, actor_name, reason)
+    _monitoring_after_subject_change(student)
+    _monitoring_log(
+        student, account, "Subject row changed in the monitoring sheet",
+        f"{course.code} " + "; ".join(f"{item['field']}: {item['old'] or '(blank)'} → {item['new'] or '(blank)'}" for item in recorded)
+        + (f". Reason: {reason}" if reason else ""),
+        next((item["old"] for item in recorded if item["field"] == "status"), None),
+        next((item["new"] for item in recorded if item["field"] == "status"), None),
+    )
+    return record, recorded
+
+
+def monitoring_portal_remove_subject(student: Student, record: CourseRecord, data: dict) -> CourseRecord:
+    account, actor_name = _monitoring_actor()
+    reason = _monitoring_clean(data.get("reason"), 500)
+    course = record.course
+    if record.removed_at:
+        raise MonitoringEntryError(f"{course.code} is already removed from this record.", 409)
+    if (record.status or "") in MONITORING_NO_ROW_STATUSES:
+        raise MonitoringEntryError(f"{course.code} has no entry to remove.", 409)
+    if not reason:
+        raise MonitoringEntryError("Enter a reason for removing this row; the row is kept in the change history.")
+    old_status, old_term = record.status, record.term_label or ""
+    record.removed_status = old_status
+    record.removed_at = now_utc()
+    record.removed_by = actor_name
+    record.removal_reason = reason
+    record.status = "Missing"
+    record.term_label = None
+    _monitoring_stamp(record, account, actor_name, reason)
+    change_id = uuid4().hex
+    kwargs = dict(change_id=change_id, account=account, actor_name=actor_name, course=course, reason=reason)
+    _monitoring_edit(student, "remove_subject", "status", old_status, "Removed", **kwargs)
+    if old_term:
+        _monitoring_edit(student, "remove_subject", "term_label", old_term, "", **kwargs)
+    _monitoring_after_subject_change(student)
+    _monitoring_log(
+        student, account, "Subject row removed from the monitoring sheet",
+        f"{course.code} status: {old_status} → removed (row kept in history). Reason: {reason}",
+        old_status, "Removed",
+    )
+    return record
+
+
+def monitoring_portal_bulk_add_remaining(program: Program, data: dict) -> dict:
+    """Add every curriculum subject a student has not taken as a Planned row."""
+    account, actor_name = _monitoring_actor()
+    status = _monitoring_subject_status(data.get("status") or "Planned")
+    if status != "Planned":
+        raise MonitoringEntryError("Only Planned can be added in bulk; set other statuses one subject at a time.")
+    term_label = _monitoring_clean(data.get("term_label"), 40)
+    curriculum = monitoring_curriculum_courses(program)
+    if data.get("course_ids"):
+        wanted = {safe_int(item) for item in data.get("course_ids")}
+        curriculum = [course for course in curriculum if course.id in wanted]
+    if data.get("student_ids"):
+        ids = {safe_int(item) for item in data.get("student_ids")}
+        students = Student.query.filter(Student.program_id == program.id, Student.id.in_(ids or {-1})).all()
+        if len(students) != len(ids):
+            raise MonitoringEntryError("One or more students were not found in this program.", 404)
+    else:
+        students = Student.query.filter(
+            Student.program_id == program.id,
+            Student.standing.notin_(["Withdrawn", "Graduated", "Completed"]),
+        ).all()
+    added = touched = skipped_removed = 0
+    for student in students:
+        records = {item.course_id: item for item in CourseRecord.query.filter_by(student_id=student.id)}
+        change_id = uuid4().hex
+        student_added = []
+        for course in curriculum:
+            record = records.get(course.id)
+            if record and record.removed_at:
+                skipped_removed += 1
+                continue
+            if record and (record.status or "") not in MONITORING_NO_ROW_STATUSES:
+                continue
+            if not record:
+                record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+                db.session.add(record)
+                db.session.flush()
+            old_status = record.status or "Missing"
+            record.status = status
+            record.term_label = term_label or None
+            _monitoring_stamp(record, account, actor_name, "Bulk add of remaining curriculum subjects")
+            _monitoring_edit(
+                student, "bulk_add_subject", "status", old_status, status, change_id=change_id,
+                account=account, actor_name=actor_name, course=course,
+                reason="Bulk add of remaining curriculum subjects",
+            )
+            student_added.append(course.code)
+        if student_added:
+            added += len(student_added)
+            touched += 1
+            _monitoring_after_subject_change(student)
+            _monitoring_log(
+                student, account, "Remaining curriculum subjects added as Planned",
+                f"{len(student_added)} subject(s) added as {status}: {', '.join(student_added)}.",
+            )
+    return {"added": added, "students": touched, "skipped_removed": skipped_removed}
+
+
+def _portal_edit_conflicts(student: Student, row: dict) -> list[str]:
+    """Where an uploaded sheet claims a subject completed that a person edited in the portal.
+
+    Blank cells are not a claim, so they never conflict. A portal Completed
+    agrees with the sheet. Anything else (Enrolled, INC, Dropped, a removed
+    row...) is kept and reported instead of overwritten.
+    """
+    if not student:
+        return []
+    done_codes = {code for code, done in (row.get("subjects") or {}).items() if done}
+    if not done_codes:
+        return []
+    messages = []
+    for record in CourseRecord.query.filter_by(student_id=student.id, source=MONITORING_MANUAL_SOURCE).all():
+        code = record.course.code if record.course else ""
+        if code not in done_codes:
+            continue
+        if record.removed_at:
+            state = f"removed in the portal ({record.removal_reason or 'no reason recorded'})"
+        elif record.status == "Completed":
+            continue
+        else:
+            state = f"{record.status} in the portal"
+        who = record.source_user or "a staff member"
+        when = record.source_at.strftime("%Y-%m-%d") if record.source_at else "an earlier date"
+        messages.append(f"{code}: {state} (manual entry by {who} on {when}); the uploaded sheet says Completed")
+    return messages
+
+
+def monitoring_subject_item(record: CourseRecord | None, course: Course, *, in_curriculum: bool,
+                            operational: SubjectEnrollment | None = None, for_student: bool = False) -> dict:
+    manual = bool(record and record.source == MONITORING_MANUAL_SOURCE)
+    return {
+        "record_id": record.id if record else None,
+        "course_id": course.id,
+        "code": course.code,
+        "title": course.title,
+        "units": course.units or 3,
+        "category": course.category,
+        "in_curriculum": in_curriculum,
+        "status": ((record.status if record else "") or "Missing"),
+        "term_label": (record.term_label if record else "") or "",
+        "remarks": (record.remarks if record else "") or "",
+        "source": monitoring_record_source(record),
+        "source_by": None if for_student or not manual else record.source_user,
+        "source_at": iso(record.source_at) if manual else None,
+        "source_reason": None if for_student or not manual else record.source_reason,
+        "evidence_reference": (record.evidence_reference if record else "") or "",
+        "removed": bool(record and record.removed_at),
+        "removed_at": iso(record.removed_at) if record else None,
+        "removed_by": None if for_student or not record else record.removed_by,
+        "removal_reason": None if for_student or not record else record.removal_reason,
+        "removed_status": record.removed_status if record else None,
+        "operational_status": operational.status if operational else None,
+        "updated_at": iso(record.updated_at) if record else None,
+    }
+
+
+def monitoring_student_header(student: Student, *, for_student: bool = False) -> dict:
+    created = (
+        MonitoringEdit.query.filter_by(student_id=student.id, action="create_student")
+        .order_by(MonitoringEdit.id).first()
+    )
+    last_update = (
+        MonitoringEdit.query.filter_by(student_id=student.id, action="update_student")
+        .order_by(MonitoringEdit.id.desc()).first()
+    )
+    header = student_brief(student)
+    header["source"] = {
+        "label": MONITORING_MANUAL_SOURCE if created else "Imported",
+        "by": None if for_student or not created else created.actor_name,
+        "at": iso(created.created_at) if created else iso(student.monitoring_imported_at),
+        "upload_id": student.monitoring_upload_id,
+    }
+    header["last_change"] = None if not last_update else {
+        "by": None if for_student else last_update.actor_name,
+        "at": iso(last_update.created_at),
+        "reason": None if for_student else last_update.reason,
+    }
+    return header
+
+
+def monitoring_record_payload(student: Student, *, can_edit: bool, for_student: bool = False) -> dict:
+    curriculum = monitoring_curriculum_courses(student.program)
+    curriculum_ids = {course.id for course in curriculum}
+    records = {item.course_id: item for item in CourseRecord.query.filter_by(student_id=student.id).all()}
+    term = get_active_term()
+    operational = {}
+    if term:
+        operational = {
+            item.course_id: item
+            for item in SubjectEnrollment.query.filter_by(student_id=student.id, term_id=term.id).all()
+        }
+    subjects = [
+        monitoring_subject_item(records.get(course.id), course, in_curriculum=True,
+                                operational=operational.get(course.id), for_student=for_student)
+        for course in curriculum
+    ]
+    extras = sorted(
+        (item for course_id, item in records.items() if course_id not in curriculum_ids and item.course),
+        key=lambda item: item.course.code,
+    )
+    for record in extras:
+        if (record.status or "") in MONITORING_NO_ROW_STATUSES and not record.removed_at:
+            continue
+        subjects.append(monitoring_subject_item(
+            record, record.course, in_curriculum=False,
+            operational=operational.get(record.course_id), for_student=for_student,
+        ))
+    if for_student:
+        subjects = [item for item in subjects if not item["removed"]]
+    audit = compute_course_audit(student)
+    return {
+        "student": monitoring_student_header(student, for_student=for_student),
+        "subjects": subjects,
+        "summary": {
+            "completed_count": len(audit["completed"]),
+            "required_count": audit["required_count"],
+            "completed_units": audit["completed_units"],
+            "total_units": audit["total_units"],
+            "manual_rows": sum(1 for item in subjects if item["source"] == MONITORING_MANUAL_SOURCE and not item["removed"]),
+        },
+        "statuses": MONITORING_MANUAL_STATUSES,
+        "permissions": {"can_edit": can_edit},
+        "history_count": MonitoringEdit.query.filter_by(student_id=student.id).count(),
+        "active_term": term_dict(term) if term else None,
+    }
+
+
+def monitoring_edit_dict(edit: MonitoringEdit) -> dict:
+    return {
+        "id": edit.id,
+        "change_id": edit.change_id,
+        "action": edit.action,
+        "field": edit.field,
+        "old_value": edit.old_value,
+        "new_value": edit.new_value,
+        "source": edit.source,
+        "reason": edit.reason,
+        "actor_name": edit.actor_name,
+        "created_at": iso(edit.created_at),
+        "course_id": edit.course_id,
+        "code": edit.course.code if edit.course else None,
+        "title": edit.course.title if edit.course else None,
+    }
+
+
+def monitoring_export_workbook(program: Program) -> bytes:
+    """AC monitoring workbook for a program, including portal-entered students and rows.
+
+    Sheet 1 follows the AC template so it can be uploaded straight back; sheets 2
+    and 3 carry every subject row (with statuses the template cannot hold and the
+    provenance of each value) and the portal change history.
+    """
+    students = (
+        Student.query.filter_by(program_id=program.id)
+        .order_by(Student.entry_year, Student.last_name, Student.first_name).all()
+    )
+    category_rank = {name: index for index, name in enumerate(["Basic", "Major", "Cognate", "Core", "Comprehensive"])}
+    courses = sorted(monitoring_curriculum_courses(program), key=lambda c: category_rank.get(c.category or "Core", 99))
+    records = {
+        (item.student_id, item.course_id): item
+        for item in CourseRecord.query.filter(CourseRecord.student_id.in_([s.id for s in students] or [-1])).all()
+    }
+    header_font = Font(name="Arial", size=10, bold=True)
+    fill = PatternFill("solid", fgColor="DCFCE7")
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = f"{program.code} monitoring"[:31]
+    sheet["A1"] = f"PROGRAM: {program.code}"
+    sheet["A1"].font = Font(name="Arial", size=12, bold=True)
+    first_subject = 8
+    last_subject = first_subject + len(courses) - 1
+    compre_col = last_subject + 1
+    milestone_cols = {name: compre_col + 1 + index for index, name in enumerate(["TITLE", "PROPOSAL", "ETHICS", "FINAL"])}
+    note_col = compre_col + 6
+    top = {3: "NAME", 5: "IDNO", 6: "COURSE", 7: "YR", compre_col: "COMPRE", note_col: "NOTE"}
+    sub = {1: "AY ENTRY", 3: "SN", 4: "FN"}
+    previous = None
+    for offset, course in enumerate(courses):
+        column = first_subject + offset
+        sub[column] = course.code
+        group = (course.category or "Core").upper()
+        if group != previous:
+            top[column] = group
+            previous = group
+    for name, column in milestone_cols.items():
+        sub[column] = name
+    for column, label in top.items():
+        cell = sheet.cell(row=3, column=column, value=label)
+        cell.font, cell.fill = header_font, fill
+    for column, label in sub.items():
+        cell = sheet.cell(row=4, column=column, value=label)
+        cell.font, cell.fill = header_font, fill
+    sheet.freeze_panes = "H5"
+    manual_students = {
+        edit.student_id: edit for edit in
+        MonitoringEdit.query.filter(MonitoringEdit.action == "create_student",
+                                    MonitoringEdit.student_id.in_([s.id for s in students] or [-1])).all()
+    }
+    for index, student in enumerate(students, 1):
+        row = 4 + index
+        marks = monitoring_research_milestones(student)
+        sheet.cell(row=row, column=1, value=student_academic_year_entry(student))
+        sheet.cell(row=row, column=2, value=index)
+        sheet.cell(row=row, column=3, value=student.last_name)
+        sheet.cell(row=row, column=4, value=student.first_name)
+        sheet.cell(row=row, column=5, value=student.student_number)
+        sheet.cell(row=row, column=6, value=program.code)
+        sheet.cell(row=row, column=7, value=student.year_level or "")
+        for offset, course in enumerate(courses):
+            record = records.get((student.id, course.id))
+            if record and record.status in {"Completed", "Taken"}:
+                sheet.cell(row=row, column=first_subject + offset, value=course.units or 3)
+        if (student.comprehensive_exam_status or "").lower() == "passed":
+            sheet.cell(row=row, column=compre_col, value="PASSED")
+        for name, column in milestone_cols.items():
+            if marks.get(name.lower()):
+                sheet.cell(row=row, column=column, value="Y")
+        created = manual_students.get(student.id)
+        if created:
+            sheet.cell(row=row, column=note_col, value=f"Added in the portal by {created.actor_name} on {created.created_at:%Y-%m-%d}")
+
+    rows_sheet = workbook.create_sheet("Subject rows")
+    columns = [
+        "Student ID", "Student name", "Program", "Subject code", "Subject title", "Units", "In curriculum",
+        "Term taken", "Status", "Remarks", "Source", "Entered by", "Entered at", "Reason",
+        "Removed", "Removed status", "Removed reason",
+    ]
+    for column, label in enumerate(columns, 1):
+        cell = rows_sheet.cell(row=1, column=column, value=label)
+        cell.font, cell.fill = header_font, fill
+    curriculum_ids = {course.id for course in courses}
+    by_id = {student.id: student for student in students}
+    ordered = sorted(
+        (item for item in records.values()
+         if (item.status or "") not in MONITORING_NO_ROW_STATUSES or item.removed_at),
+        key=lambda item: (by_id[item.student_id].last_name, by_id[item.student_id].first_name, item.course.code),
+    )
+    for row_number, record in enumerate(ordered, 2):
+        student, course = by_id[record.student_id], record.course
+        manual = record.source == MONITORING_MANUAL_SOURCE
+        values = [
+            student.student_number, student.name, program.code, course.code, course.title, course.units or 3,
+            "Yes" if course.id in curriculum_ids else "No", record.term_label or "", record.status or "",
+            record.remarks or "", monitoring_record_source(record),
+            record.source_user if manual else "", record.source_at.strftime("%Y-%m-%d %H:%M") if manual and record.source_at else "",
+            record.source_reason if manual else "",
+            "Yes" if record.removed_at else "", record.removed_status or "", record.removal_reason or "",
+        ]
+        for column, value in enumerate(values, 1):
+            rows_sheet.cell(row=row_number, column=column, value=value)
+
+    history = workbook.create_sheet("Change history")
+    history_columns = ["When", "Student ID", "Student name", "Action", "Field", "Subject", "Old value", "New value", "Reason", "By"]
+    for column, label in enumerate(history_columns, 1):
+        cell = history.cell(row=1, column=column, value=label)
+        cell.font, cell.fill = header_font, fill
+    edits = (
+        MonitoringEdit.query.filter(MonitoringEdit.student_id.in_([s.id for s in students] or [-1]))
+        .order_by(MonitoringEdit.id).all()
+    )
+    for row_number, edit in enumerate(edits, 2):
+        student = by_id[edit.student_id]
+        values = [
+            edit.created_at.strftime("%Y-%m-%d %H:%M") if edit.created_at else "", student.student_number, student.name,
+            edit.action, edit.field, edit.course.code if edit.course else "", edit.old_value or "", edit.new_value or "",
+            edit.reason or "", edit.actor_name or "",
+        ]
+        for column, value in enumerate(values, 1):
+            history.cell(row=row_number, column=column, value=value)
+    for extra in (rows_sheet, history):
+        extra.freeze_panes = "A2"
+        for column in range(1, extra.max_column + 1):
+            extra.column_dimensions[chr(64 + column)].width = 18
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
 
 
 # ---------------------------------------------------------------------------
@@ -21471,7 +22576,7 @@ def student_semester_subjects(student: Student, term: AcademicTerm | None) -> di
 
 def curriculum_planning_payload(program: Program, term: AcademicTerm | None = None) -> dict:
     term = term or get_active_term()
-    courses = Course.query.filter_by(program_id=program.id).order_by(Course.category, Course.code).all()
+    courses = Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter()).order_by(Course.category, Course.code).all()
     student_query = Student.query.filter_by(program_id=program.id)
     if term:
         student_query = student_query.join(TermEnrollment).filter(
@@ -21857,7 +22962,7 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
     )
     saved_by_course = {offering.course_id: offering for offering in latest_plan.offerings} if latest_plan else {}
     demand = []
-    for course in Course.query.filter_by(program_id=program.id).order_by(Course.code).all():
+    for course in Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter()).order_by(Course.code).all():
         row = demand_by_course.get(course.id)
         if not row:
             row = {
@@ -22150,6 +23255,32 @@ def ensure_monitoring_flag_schema() -> None:
         if name not in existing:
             db.session.execute(text(f"ALTER TABLE student_monitoring_flag ADD COLUMN {name} {sql_type}"))
     db.session.commit()
+
+
+def ensure_monitoring_portal_entry_schema() -> None:
+    """Add portal-entry provenance to existing databases (additive only)."""
+    MonitoringEdit.__table__.create(bind=db.engine, checkfirst=True)
+    inspector = inspect(db.engine)
+    if "course_record" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("course_record")}
+    additions = {
+        "source": "VARCHAR(30)",
+        "source_user": "VARCHAR(160)",
+        "source_at": "DATETIME",
+        "source_reason": "TEXT",
+        "removed_at": "DATETIME",
+        "removed_by": "VARCHAR(160)",
+        "removal_reason": "TEXT",
+        "removed_status": "VARCHAR(40)",
+    }
+    changed = False
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE course_record ADD COLUMN {name} {sql_type}"))
+            changed = True
+    if changed:
+        db.session.commit()
 
 
 def ensure_monitoring_upload_schema() -> None:
@@ -25159,6 +26290,7 @@ with app.app_context():
                 db.session.execute(text(f"ALTER TABLE curriculum_offering ADD COLUMN {_name} {_sql}"))
         db.session.commit()
     ensure_schedule_request_schema()
+    ensure_monitoring_portal_entry_schema()
     ensure_monitoring_upload_schema()
     ensure_monitoring_flag_schema()
     ensure_awol_structured_request_schema()
