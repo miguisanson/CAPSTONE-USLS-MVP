@@ -22,10 +22,12 @@ const SLUG_LABEL = {
   practicum: "Practicum",
   withdrawal: "Withdrawal Requests",
   graduation: "Graduation Endorsement",
+  "aims-discrepancy": "AIMS discrepancy",
+  "academic-semesters": "Academic semesters",
 };
 
 function workflowLabel(slug) {
-  if (slug === ["loa", "decision"].join("-")) return "Standing Decision";
+  if (slug === "loa-decision") return "Standing Decision";
   return SLUG_LABEL[slug] || slug;
 }
 

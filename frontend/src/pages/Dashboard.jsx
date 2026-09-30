@@ -78,7 +78,7 @@ const tooltipStyle = {
   fontSize: 13,
 };
 
-const OWNERS = ["Graduate School Staff", "GS Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
+const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
 
 function DashboardFilters({ filters, meta, onChange, onClear }) {
   const active = Object.values(filters).filter(Boolean).length;
@@ -105,7 +105,7 @@ function DashboardFilters({ filters, meta, onChange, onClear }) {
         </FilterSelect>
         <FilterSelect label="Standing" value={filters.standing} onChange={(value) => onChange("standing", value)}>
           <option value="">All standings</option>
-          {["Active", "On Leave", "Withdrawn", "Completed"].map((standing) => <option key={standing} value={standing}>{standing}</option>)}
+          {["Active", "On Leave", "AWOL", "Withdrawn"].map((standing) => <option key={standing} value={standing}>{standing}</option>)}
         </FilterSelect>
         <FilterSelect label="Owner" value={filters.owner} onChange={(value) => onChange("owner", value)}>
           <option value="">All owners</option>
@@ -314,7 +314,7 @@ export default function Dashboard() {
           ) : (
             <EmptyState title="No schedule requests yet" />
           )}
-          <ChartDrilldownButtons items={["Needs Availability", "Rescheduled", "Confirmed"].map((label) => ({ label, count: data.schedule_distribution.find((item) => item.status === label)?.count || 0 }))} onClick={(value) => openDetail("schedule", value)} />
+          <ChartDrilldownButtons items={data.schedule_distribution.map((item) => ({ label: item.status, count: item.count }))} onClick={(value) => openDetail("schedule", value)} />
         </ChartCard>
       </div>
 

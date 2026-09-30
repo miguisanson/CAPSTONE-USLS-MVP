@@ -270,7 +270,7 @@ export function FacultyClassesPage() {
   const { data } = useFaculty();
   return (
     <div className="space-y-5 animate-fade-up">
-      <PageHeader title="Assigned Classes" description="Class rosters for your assigned subjects. Official grade data is read-only here." icon={BookOpenCheck} />
+      <PageHeader title="Assigned Classes" description="Class rosters for your assigned subjects." icon={BookOpenCheck} />
       <Card className="p-6">
         <FacultyClasses subjects={data.subjects || []} terms={data.terms || []} />
       </Card>

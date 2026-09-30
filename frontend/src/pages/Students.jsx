@@ -101,7 +101,7 @@ export default function Students() {
             ]} />
             <Select label="Stage" value={stage} onChange={setStage} options={meta?.stages || []} />
             <Select label="Risk" value={risk} onChange={setRisk} options={["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"]} />
-            <Select label="Standing" value={standing} onChange={setStanding} options={["Active", "On Leave", "Withdrawn", "Completed"]} />
+            <Select label="Standing" value={standing} onChange={setStanding} options={["Active", "On Leave", "AWOL", "Withdrawn"]} />
             <Select
               label="Program"
               value={programId}

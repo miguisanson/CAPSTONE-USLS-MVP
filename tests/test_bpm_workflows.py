@@ -1012,8 +1012,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "statuses": {str(self.student_id): "Completed"},
                 "grades": {str(self.student_id): "1.25"},
             })
-            self.assertEqual(response.status_code, 409, response.get_json())
-            self.assertTrue(response.get_json()["read_only"])
+            # The grade-encoding route was removed (grades are out of scope): nothing can write.
+            self.assertEqual(response.status_code, 405, response.get_json())
             db.session.refresh(record)
             self.assertEqual(record.status, "Enrolled")
             self.assertEqual(record.grade_status, "No Grade")
@@ -5240,9 +5240,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         # Task ownership and transaction-log actor labels use different
         # vocabularies; the workload report must not split one person across
         # several rows, and must not report the system as carrying load.
-        self.assertEqual(canonical_owner_role("Graduate School Staff"), "GS Staff")
-        self.assertEqual(canonical_owner_role("GS Staff"), "GS Staff")
-        self.assertEqual(canonical_owner_role("Graduate School Staff · Demo Account"), "GS Staff")
+        # One owner vocabulary (owner decision, cross-cutting audit H03): the canonical staff
+        # label is "Graduate School Staff"; "GS Staff" is only an old spelling.
+        self.assertEqual(canonical_owner_role("Graduate School Staff"), "Graduate School Staff")
+        self.assertEqual(canonical_owner_role("GS Staff"), "Graduate School Staff")
+        self.assertEqual(canonical_owner_role("Graduate School Staff · Demo Account"), "Graduate School Staff")
         self.assertEqual(canonical_owner_role("academic coordinator"), "Academic Coordinator")
         self.assertEqual(canonical_owner_role("Adviser"), "Faculty")
         for system_actor in ("Demo Data", "Workflow System", "System · LOA RAG", ""):

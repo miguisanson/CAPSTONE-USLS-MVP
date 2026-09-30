@@ -5,6 +5,7 @@ import random
 import re
 import shutil
 import sys
+import tempfile
 import json
 import hashlib
 import csv
@@ -27,9 +28,12 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from flask import Flask, Response, has_app_context, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, inspect, or_, text
+from sqlalchemy import event, func, inspect, or_, text
 from sqlalchemy import event as _sa_event
+from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import get_history as _sa_get_history
+from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import BadRequestKeyError
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from werkzeug.datastructures import MultiDict
@@ -49,16 +53,31 @@ load_dotenv()
 db = SQLAlchemy()
 
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
-UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "research_evidence"
-REQUEST_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "student_requests"
-MONITORING_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "monitoring_sheets"
-# Staff uploads live here. POLICY_DOCUMENT_UPLOAD_DIR lets a test run or a
-# deployment point somewhere else so nothing ever writes into the committed seed
-# library in uploads/policy_documents/.
-POLICY_DOCUMENT_UPLOAD_ROOT = Path(
-    os.getenv("POLICY_DOCUMENT_UPLOAD_DIR")
-    or (Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "policy_documents")
+# All user files live under one root. Tests (and seeding scripts) set USLS_UPLOAD_DIR to a temp
+# folder so they never write into the real ``uploads/`` directory.
+def _running_under_test_runner() -> bool:
+    main_spec = getattr(sys.modules.get("__main__"), "__spec__", None)
+    main_name = (getattr(main_spec, "name", None) or "").split(".")[0]
+    runner = Path(str(sys.argv[0] if sys.argv else "")).name.lower().removesuffix(".exe")
+    return main_name in {"unittest", "pytest"} or runner in {"pytest", "py.test"}
+
+
+# Under unittest/pytest the default is a fresh temp folder, so a test run (or seeding inside one)
+# can never write generated PDFs into the real ``uploads/`` directory.
+_UPLOADS_BASE = Path(
+    os.getenv("USLS_UPLOAD_DIR")
+    or (
+        tempfile.mkdtemp(prefix="usls-uploads-")
+        if _running_under_test_runner()
+        else Path(os.path.dirname(os.path.abspath(__file__))) / "uploads"
+    )
 )
+UPLOAD_ROOT = _UPLOADS_BASE / "research_evidence"
+REQUEST_UPLOAD_ROOT = _UPLOADS_BASE / "student_requests"
+MONITORING_UPLOAD_ROOT = _UPLOADS_BASE / "monitoring_sheets"
+# POLICY_DOCUMENT_UPLOAD_DIR lets a test run or a deployment point policy uploads elsewhere,
+# so nothing ever writes into the committed seed library in uploads/policy_documents/.
+POLICY_DOCUMENT_UPLOAD_ROOT = Path(os.getenv("POLICY_DOCUMENT_UPLOAD_DIR") or (_UPLOADS_BASE / "policy_documents"))
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 # Built-in policy library: the stakeholder documents committed with the project.
 # (Staff uploads are added on top of this list at run time, see _rag_document_sources.)
@@ -228,6 +247,25 @@ STAGES = [
     "Completed",
 ]
 
+# Standing is what a student is doing now. "Completed" is a lifecycle STAGE, not a standing.
+STANDINGS = ["Active", "On Leave", "AWOL", "Withdrawn"]
+# ONE definition of "at risk" (every count, filter and report uses it).
+AT_RISK_LEVELS = ("At Risk of Delay", "Delayed")
+
+
+def student_is_on_leave(student) -> bool:
+    """ONE definition of "on leave": standing On Leave, the LOA stage, or the LOA enrollment tag."""
+    return (
+        student.standing == "On Leave"
+        or student.current_stage == "LOA"
+        or student.enrollment_tag == "LOA"
+    )
+
+
+def student_is_at_risk(student) -> bool:
+    return student.risk_level in AT_RISK_LEVELS
+
+
 # Colleges are shared by programs and faculty so panel matching can prefer
 # same-college evaluators while still allowing cross-college matches.
 COLLEGES = [
@@ -344,8 +382,74 @@ def create_app() -> Flask:
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db.init_app(app)
 
+    register_json_error_handling(app)
     register_routes(app)
     return app
+
+
+HTTP_ERROR_MESSAGES = {
+    400: "The request could not be understood. Check what you entered and try again.",
+    401: "Sign in to continue.",
+    403: "You do not have permission to do that.",
+    404: "We could not find what you asked for.",
+    405: "That action is not available here.",
+    413: "The file or request is too large.",
+    415: "The request was sent in a format the server cannot read.",
+    429: "Too many requests. Wait a moment and try again.",
+    500: "Something went wrong on the server. Nothing was saved; try again or contact the Graduate School office.",
+}
+
+
+def register_json_error_handling(app: Flask) -> None:
+    """Every failure under /api/ answers with JSON ``{"error": "..."}`` and a sensible status.
+
+    The screens show ``error`` as-is, so they never see an HTML page or a Werkzeug sentence.
+    """
+    from werkzeug.exceptions import BadRequest, HTTPException
+
+    def is_api_request() -> bool:
+        return request.path.startswith("/api/")
+
+    @app.before_request
+    def reject_non_object_json_bodies():
+        # Handlers read the body as a dict; a list or a bare value used to end in a 500.
+        if (
+            is_api_request()
+            and request.method in {"POST", "PUT", "PATCH", "DELETE"}
+            and request.is_json
+        ):
+            body = request.get_json(silent=True)
+            if body is not None and not isinstance(body, dict):
+                return jsonify({"error": "Send the request as a JSON object."}), 400
+        return None
+
+    @app.errorhandler(HTTPException)
+    def http_error(exc: HTTPException):
+        if not is_api_request():
+            return exc
+        code = exc.code or 500
+        if code >= 500:
+            db.session.rollback()
+            app.logger.error("API error %s on %s %s", code, request.method, request.path)
+        message = HTTP_ERROR_MESSAGES.get(code, exc.name)
+        if isinstance(exc, BadRequest) and getattr(exc, "args", None) and type(exc).__name__ == "BadRequestKeyError":
+            message = f"A required field is missing: {exc.args[0]}."
+        elif exc.description and exc.description != type(exc).description and code < 500:
+            message = exc.description  # a message written for this case by abort(code, "...")
+        return jsonify({"error": message}), code
+
+    @app.errorhandler(ValueError)
+    @app.errorhandler(TypeError)
+    def unreadable_number(exc: Exception):
+        # int("abc") and int(None) on user input are the caller's mistake, not a server fault.
+        text_value = str(exc)
+        if is_api_request() and (
+            text_value.startswith("invalid literal for int()")
+            or text_value.startswith("int() argument must be")
+            or text_value.startswith("could not convert string to float")
+        ):
+            return jsonify({"error": "A number was expected but something else was sent."}), 400
+        raise exc
 
 
 # ---------------------------------------------------------------------------
@@ -1472,6 +1576,34 @@ def term_dict(term: AcademicTerm, active: AcademicTerm | None = None) -> dict:
     }
 
 
+def term_date_problem(term: AcademicTerm, exclude_id: int | None = None) -> tuple[int, str] | None:
+    """Return (status, message) when a semester's dates cannot be saved, else None.
+
+    Enrollment, the withdrawal window, residency and reports all read term start dates, so two
+    semesters may never overlap and each must start before it ends.
+    """
+    if not term.start_date or not term.end_date:
+        return 400, "Start and end dates are required."
+    if term.start_date >= term.end_date:
+        return 400, "The semester must start before it ends."
+    if term.planning_window_open and term.planning_window_close and term.planning_window_open > term.planning_window_close:
+        return 400, "The planning window must open before it closes."
+    query = AcademicTerm.query.filter(
+        AcademicTerm.start_date <= term.end_date,
+        AcademicTerm.end_date >= term.start_date,
+    )
+    if exclude_id is not None:
+        query = query.filter(AcademicTerm.id != exclude_id)
+    with db.session.no_autoflush:
+        clash = query.first()
+    if clash:
+        return 409, (
+            f"These dates overlap {clash.label} ({iso(clash.start_date)} to {iso(clash.end_date)}). "
+            "Semesters cannot overlap."
+        )
+    return None
+
+
 def get_active_term() -> AcademicTerm | None:
     active = AcademicTerm.query.filter_by(is_active_planning_term=True).first()
     if active:
@@ -2566,6 +2698,18 @@ def detected_practicum_certificate_count(record: PracticumRecord | None) -> int:
     return len(practicum_completion_attachments(record))
 
 
+# A withdrawal in one of these states no longer blocks the student from filing another request.
+# The portal's last step is the Excel export, so "Exported - Ready to Send" is finished.
+WITHDRAWAL_TERMINAL_STATUSES = frozenset({
+    "Denied",
+    "Returned",
+    "Returned for Clarification",
+    "Withdrawn Confirmed",
+    "Sent to Registrar",
+    "Exported - Ready to Send",
+})
+
+
 def latest_withdrawal_application(student_id: int) -> WithdrawalApplication | None:
     return (
         WithdrawalApplication.query.filter_by(student_id=student_id)
@@ -2824,10 +2968,7 @@ def workflow_case_meta(slug: str, student_id: int) -> dict:
 def task_dict(task: Task) -> dict:
     action_url = None
     action_label = None
-    if "lapsed INC" in task.title:
-        action_url = "/workflow/course-audit"
-        action_label = "Open Course Audit"
-    elif any(value in task.title.lower() for value in ["awol", "refresher", "re-enroll courses after maximum residence"]):
+    if any(value in task.title.lower() for value in ["awol", "refresher", "re-enroll courses after maximum residence"]):
         action_url = "/workflow/awol"
         action_label = "Open AWOL & Residency"
     return {
@@ -4201,6 +4342,38 @@ ROLE_LABELS = {
     "admin": "Administrator",
 }
 
+# ONE owner-role vocabulary. Task owners, transaction-log next owners, the dashboard, the Work
+# Queue, Decision Support and Analytics all use these labels. "GS Staff" is only an old spelling
+# that is still accepted as input and is rewritten to STAFF_OWNER.
+STAFF_OWNER = ROLE_LABELS["staff"]
+# Next owner recorded by the last step of a case that needs nobody else (queue aging ignores it).
+CASE_CLOSED_OWNER = "None"
+OWNER_ROLE_LABELS = {
+    "gs staff": STAFF_OWNER,
+    "graduate school staff": STAFF_OWNER,
+    "staff": STAFF_OWNER,
+    "academic coordinator": ROLE_LABELS["academic_coordinator"],
+    "research coordinator": ROLE_LABELS["research_coordinator"],
+    "dean": ROLE_LABELS["dean"],
+    "student": ROLE_LABELS["student"],
+}
+LEGACY_STAFF_OWNER_SPELLINGS = ("GS Staff",)
+
+
+def normalize_owner_label(value: str | None) -> str:
+    """Return the canonical owner label for a task owner or next owner; unknown labels are kept."""
+    text_value = (value or "").strip()
+    return OWNER_ROLE_LABELS.get(text_value.casefold(), text_value)
+
+
+def owner_task_clause(owner: str):
+    """SQL clause matching tasks owned by ``owner``, whichever way old rows spelled it."""
+    label = normalize_owner_label(owner)
+    if label == STAFF_OWNER:
+        return Task.owner_role.in_([STAFF_OWNER, *LEGACY_STAFF_OWNER_SPELLINGS])
+    return Task.owner_role == label
+
+
 WORKFLOW_MESSAGE_TEMPLATES = [
     "Remarks",
     "Please upload the correct document.",
@@ -4460,14 +4633,14 @@ def _make_rec(code, base_score, trigger, recommendation, owner, bonus=0):
         "severity": band_from_score(score),
         "trigger": trigger,
         "recommendation": recommendation,
-        "owner": owner or "GS Staff",
+        "owner": normalize_owner_label(owner) or STAFF_OWNER,
     }
 
 
 def student_recommendations(student: Student) -> dict:
     """Turn indicators into prescriptive, scored, owner-assigned next actions."""
     ind = student_indicators(student)
-    owner = ind["next_owner"] or "GS Staff"
+    owner = normalize_owner_label(ind["next_owner"]) or STAFF_OWNER
     recs: list[dict] = []
 
     if ind["overdue_tasks"] > 0:
@@ -4496,7 +4669,7 @@ def student_recommendations(student: Student) -> dict:
     if ind["standing"] == "On Leave":
         recs.append(_make_rec(
             "residency", 40, "Student is on Leave of Absence",
-            "Check the LOA expiry and prepare the readmission follow-up.", "GS Staff"))
+            "Check the LOA expiry and prepare the readmission follow-up.", STAFF_OWNER))
     if ind["days_in_stage"] >= STALL_WARN_DAYS and ind["stage"] != "Completed":
         d = ind["days_in_stage"]
         recs.append(_make_rec(
@@ -4607,6 +4780,40 @@ def recompute_risk(student: Student) -> None:
     student.risk_level = student_priority(student)["level"]
 
 
+def normalize_owner_role_vocabulary() -> int:
+    """Rewrite the old "GS Staff" owner spelling to the one canonical label on existing rows.
+
+    Guarded and idempotent: only touches rows that still carry a legacy spelling and tolerates a
+    database where the tables do not exist yet.
+    """
+    tables = set(inspect(db.engine).get_table_names())
+    changed = 0
+    for table, column in (("task", "owner_role"), ("transaction_log", "next_owner")):
+        if table not in tables:
+            continue
+        for legacy in LEGACY_STAFF_OWNER_SPELLINGS:
+            result = db.session.execute(
+                text(f"UPDATE {table} SET {column} = :new WHERE {column} = :old"),
+                {"new": STAFF_OWNER, "old": legacy},
+            )
+            changed += result.rowcount or 0
+    if changed:
+        db.session.commit()
+    return changed
+
+
+def normalize_stage_vocabulary() -> int:
+    """Move students left in the retired stage "Research" to the real stage "Writing"."""
+    if "student" not in set(inspect(db.engine).get_table_names()):
+        return 0
+    result = db.session.execute(
+        text("UPDATE student SET current_stage = 'Writing' WHERE current_stage = 'Research'")
+    )
+    if result.rowcount:
+        db.session.commit()
+    return result.rowcount or 0
+
+
 def ensure_delay_status_consistency() -> int:
     changed = 0
     for student in Student.query.all():
@@ -4616,6 +4823,33 @@ def ensure_delay_status_consistency() -> int:
             changed += 1
     if changed:
         db.session.commit()
+    return changed
+
+
+# Risk depends on the clock (overdue tasks, days in a stage), so the stored ``risk_level`` would go
+# stale on a server that stays up. Every screen that counts or filters by risk calls
+# refresh_risk_levels() first; it recomputes through student_priority() (the one definition) at most
+# once per RISK_REFRESH_SECONDS and whenever the day changes.
+RISK_REFRESH_SECONDS = max(int(os.getenv("USLS_RISK_REFRESH_SECONDS", "60") or 60), 0)
+_RISK_REFRESH_STATE: dict = {"at": None, "day": None}
+
+
+def refresh_risk_levels(force: bool = False) -> int:
+    """Bring every student's stored risk level up to date; returns how many changed."""
+    import time as _time
+
+    now = _time.monotonic()
+    today = date.today()
+    last = _RISK_REFRESH_STATE["at"]
+    if (
+        not force
+        and last is not None
+        and _RISK_REFRESH_STATE["day"] == today
+        and now - last < RISK_REFRESH_SECONDS
+    ):
+        return 0
+    changed = ensure_delay_status_consistency()
+    _RISK_REFRESH_STATE.update(at=now, day=today)
     return changed
 
 
@@ -4639,7 +4873,6 @@ def portfolio_recommendations(limit: int = 150) -> dict:
     for t in (
         Task.query.filter(Task.status.in_(["Pending", "Overdue"]), Task.due_at < today)
         .order_by(Task.due_at.asc())
-        .limit(80)
         .all()
     ):
         if not t.student:
@@ -4658,13 +4891,12 @@ def portfolio_recommendations(limit: int = 150) -> dict:
             Student.updated_at < cutoff,
         )
         .order_by(Student.updated_at.asc())
-        .limit(50)
         .all()
     ):
         d = max((now_utc() - (s.updated_at or s.created_at)).days, 0)
         owner = "Research Coordinator" if s.current_stage in (
             "Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense"
-        ) else "Academic Coordinator" if s.current_stage == "Coursework" else "GS Staff"
+        ) else "Academic Coordinator" if s.current_stage == "Coursework" else STAFF_OWNER
         rows.append(_portfolio_row(_make_rec(
             "stalled", 48, f"No recorded update in {d} days at {s.current_stage}",
             f"Follow up — inactive for {d} days at {s.current_stage}.",
@@ -4673,7 +4905,6 @@ def portfolio_recommendations(limit: int = 150) -> dict:
     for sc in (
         ScheduleRequest.query.filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES))
         .order_by(ScheduleRequest.created_at.desc())
-        .limit(40)
         .all()
     ):
         if sc.student:
@@ -4686,7 +4917,6 @@ def portfolio_recommendations(limit: int = 150) -> dict:
         db.session.query(DocumentCheck.student_id, func.count(DocumentCheck.id))
         .filter(DocumentCheck.status == "Missing")
         .group_by(DocumentCheck.student_id)
-        .limit(50)
         .all()
     ):
         s = Student.query.get(sid)
@@ -4697,26 +4927,30 @@ def portfolio_recommendations(limit: int = 150) -> dict:
                 "Student", bonus=min(n * 4, 24)), s))
 
     seen = {(r["student_id"], r["code"]) for r in rows}
-    for s in Student.query.filter(Student.standing == "On Leave").limit(40).all():
+    for s in Student.query.filter(on_leave_clause()).all():
         if (s.id, "residency") not in seen:
             rows.append(_portfolio_row(_make_rec(
                 "residency", 40, "Student is on Leave of Absence",
-                "Check the LOA expiry and prepare the readmission follow-up.", "GS Staff"), s))
+                "Check the LOA expiry and prepare the readmission follow-up.", STAFF_OWNER), s))
 
     rows.sort(key=lambda r: -r["score"])
+    # The summary counts EVERY flagged item; only the list that is sent to the screen is cut to
+    # ``limit`` rows, so the headline numbers never depend on the cut.
+    all_rows = rows
     rows = rows[:limit]
 
     by_severity: dict[str, int] = {}
     by_owner: dict[str, int] = {}
-    for r in rows:
+    for r in all_rows:
         by_severity[r["severity"]] = by_severity.get(r["severity"], 0) + 1
         by_owner[r["owner"]] = by_owner.get(r["owner"], 0) + 1
 
     return {
         "items": rows,
         "summary": {
-            "total": len(rows),
-            "students_flagged": len({r["student_id"] for r in rows}),
+            "total": len(all_rows),
+            "shown": len(rows),
+            "students_flagged": len({r["student_id"] for r in all_rows}),
             "by_severity": [
                 {"severity": sev, "count": by_severity.get(sev, 0)}
                 for sev in ["high", "medium", "low"]
@@ -5070,7 +5304,7 @@ def readmission_policy_review(student: Student, request_data: dict | None = None
     target_return_term = (request_data.get("target_return_term") or "").strip()
     previous_loa_period = (request_data.get("previous_loa_period") or "").strip()
     application_reference = (request_data.get("application_reference") or request_data.get("attachment") or "").strip()
-    on_leave = student.current_stage == "LOA" or student.enrollment_tag == "LOA" or student.standing == "On Leave"
+    on_leave = student_is_on_leave(student)
 
     checks = [
         {
@@ -8629,11 +8863,18 @@ def register_routes(app: Flask) -> None:
             {
                 "transactions": TRANSACTIONS,
                 "stages": STAGES,
+                "standings": STANDINGS,
                 "colleges": COLLEGES,
                 "programs": [program_dict(p) for p in programs],
                 "terms": [term_dict(t) for t in terms],
                 "upcoming_semesters": upcoming_semester_labels(5),
-                "faculty": [faculty_dict(f) for f in faculty],
+                # Students, faculty and the Dean see only names; contact emails, login status and
+                # calendar links are for the offices that run the Graduate School.
+                "faculty": (
+                    [faculty_dict(f) for f in faculty]
+                    if current_account().role in {*BACKOFFICE_ROLES, "admin"}
+                    else [{"id": f.id, "name": f.name, "college": f.college} for f in faculty]
+                ),
             }
         )
 
@@ -8677,6 +8918,9 @@ def register_routes(app: Flask) -> None:
         if AcademicTerm.query.filter_by(label=label).first():
             return jsonify({"error": f"{label} already exists."}), 400
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
+        problem = term_date_problem(term)
+        if problem:
+            return jsonify({"error": problem[1]}), problem[0]
         db.session.add(term)
         db.session.commit()
         return jsonify({"ok": True, "term": term_dict(term)})
@@ -8701,8 +8945,11 @@ def register_routes(app: Flask) -> None:
             )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        if not term.start_date or not term.end_date:
-            return jsonify({"error": "Start and end dates are required."}), 400
+        if AcademicTerm.query.filter_by(label=label).first():
+            return jsonify({"error": f"{label} already exists."}), 409
+        problem = term_date_problem(term)
+        if problem:
+            return jsonify({"error": problem[1]}), problem[0]
         db.session.add(term)
         db.session.commit()
         return jsonify({"ok": True, "term": term_dict(term)})
@@ -8727,8 +8974,13 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(exc)}), 400
         if "status" in data:
             term.status = (data.get("status") or "").strip() or None
-        if not term.start_date or not term.end_date:
-            return jsonify({"error": "Start and end dates are required."}), 400
+        if "label" in data and AcademicTerm.query.filter(AcademicTerm.label == term.label, AcademicTerm.id != term.id).first():
+            db.session.rollback()
+            return jsonify({"error": "Another semester already uses that label."}), 409
+        problem = term_date_problem(term, exclude_id=term.id)
+        if problem:
+            db.session.rollback()
+            return jsonify({"error": problem[1]}), problem[0]
         db.session.commit()
         return jsonify({"ok": True, "term": term_dict(term)})
 
@@ -8818,17 +9070,20 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def dashboard():
         sync_automatic_awol_statuses(commit=True)
+        refresh_risk_levels()
         return jsonify(dashboard_stats(request.args))
 
     @app.route("/api/dashboard/drilldown")
     @require_api_login("staff")
     def dashboard_drilldown():
+        refresh_risk_levels()
         return jsonify(dashboard_drilldown_payload(request.args))
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
     @require_api_login("staff", "academic_coordinator")
     def students_list():
+        refresh_risk_levels()
         query = Student.query.join(Program)
         q = request.args.get("q", "").strip()
         if q:
@@ -8855,12 +9110,12 @@ def register_routes(app: Flask) -> None:
             query = query.filter(Student.risk_level.in_(risk_values or [risk]))
         standing = request.args.get("standing", "").strip()
         if standing:
-            query = query.filter(Student.standing == standing)
+            query = apply_standing_filter(query, standing)
         student_status = request.args.get("student_status", "").strip().lower()
         if student_status == "awol":
             query = query.filter(Student.enrollment_tag == "AWOL")
         elif student_status == "loa":
-            query = query.filter(or_(Student.enrollment_tag == "LOA", Student.standing == "On Leave"))
+            query = query.filter(on_leave_clause())
         elif student_status == "compre-eligible":
             eligible_ids = [student.id for student in query.all() if comprehensive_exam_eligibility(student)["eligible"]]
             query = query.filter(Student.id.in_(eligible_ids or [-1]))
@@ -9568,7 +9823,7 @@ def register_routes(app: Flask) -> None:
             add_log(
                 "enrollment", student.id, f"Student - {account.full_name}",
                 "Student curriculum checklist", f"Enrolled in {', '.join(added)}",
-                "Graduate School Staff",
+                CASE_CLOSED_OWNER,
                 "Enrollment, monitoring, demand, and profile records were synchronized.",
             )
         student.updated_at = now_utc()
@@ -9946,14 +10201,7 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
         current = latest_withdrawal_application(student.id)
-        terminal_statuses = {
-            "Denied",
-            "Returned",
-            "Returned for Clarification",
-            "Withdrawn Confirmed",
-            "Sent to Registrar",
-        }
-        if current and current.status not in terminal_statuses:
+        if current and current.status not in WITHDRAWAL_TERMINAL_STATUSES:
             return jsonify({"error": "You already have an active withdrawal request. Follow its current status instead of creating another request."}), 400
         # Withdrawal is a structured portal request. A PDF is not required.
         # Preserve support for legacy/optional attachments sent by older clients,
@@ -10665,11 +10913,24 @@ def register_routes(app: Flask) -> None:
         status = request.args.get("status", "").strip()
         query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
         if owner:
-            query = query.filter(Task.owner_role == owner)
+            query = query.filter(owner_task_clause(owner))
         if status == "Overdue":
             query = query.filter(Task.due_at < date.today(), Task.status != "Done")
-        tasks = query.order_by(Task.priority.desc(), Task.due_at.asc()).limit(100).all()
-        return jsonify({"items": [task_dict(t) for t in tasks]})
+        page, page_size = page_arguments(request.args, default_size=50, max_size=200)
+        total = query.count()
+        tasks = (
+            query.order_by(Task.priority.desc(), Task.due_at.asc(), Task.id.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        return jsonify({
+            "items": [task_dict(t) for t in tasks],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": max((total + page_size - 1) // page_size, 1),
+        })
 
     # Human-facing audit feed; generated seed history is hidden for clarity.
     @app.route("/api/activity")
@@ -10686,6 +10947,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports")
     @require_api_login("staff", "academic_coordinator")
     def reports():
+        refresh_risk_levels()
         return jsonify(reports_payload(request.args))
 
     # Analytics is computed on demand rather than folded into /api/reports so
@@ -10693,6 +10955,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports/analytics")
     @require_api_login("staff", "academic_coordinator")
     def reports_analytics():
+        refresh_risk_levels()
         return jsonify(analytics_payload(request.args))
 
     # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
@@ -10812,27 +11075,43 @@ def register_routes(app: Flask) -> None:
     def enrollment_study_plan_send(plan_id: int):
         account = current_account()
         draft = StudyPlanDraft.query.get_or_404(plan_id)
+        if draft.status not in {"Draft", "Returned for Revision"}:
+            return jsonify({"error": "Only a draft or a returned study plan can be sent to the Academic Coordinator."}), 409
+        previous_status = draft.status
         draft.status = "Sent to Academic Coordinator"
         draft.sent_at = now_utc()
         add_log("enrollment", draft.student_id, workflow_actor_label(account), "Study plan draft",
                 "Study plan draft sent to Academic Coordinator", "Academic Coordinator", "",
-                previous_status="Draft", new_status="Sent to Academic Coordinator", visibility="internal")
+                previous_status=previous_status, new_status="Sent to Academic Coordinator", visibility="internal")
         db.session.commit()
         return jsonify({"item": study_plan_dict(draft)})
 
     @app.route("/api/enrollment/study-plans/<int:plan_id>/review", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff")
+    @require_api_login("academic_coordinator")
     def enrollment_study_plan_review(plan_id: int):
+        """The Academic Coordinator approves a study plan or returns it with a comment."""
         account = current_account()
         data = request.get_json(silent=True) or {}
         draft = StudyPlanDraft.query.get_or_404(plan_id)
-        draft.status = "Reviewed"
+        if draft.status != "Sent to Academic Coordinator":
+            return jsonify({"error": "Only a study plan that was sent to the Academic Coordinator can be reviewed."}), 409
+        decision = str(data.get("decision") or "approve").strip().lower()
+        remarks = str(data.get("remarks") or "").strip()
+        if decision not in {"approve", "return"}:
+            return jsonify({"error": "Choose Approve or Return."}), 400
+        if decision == "return" and not remarks:
+            return jsonify({"error": "Write a comment so the Graduate School knows what to change."}), 400
         draft.reviewed_at = now_utc()
-        draft.coordinator_remarks = (data.get("remarks") or "").strip() or None
+        draft.coordinator_remarks = remarks or None
+        if decision == "approve":
+            draft.status = "Reviewed"
+            result, next_owner = "Study plan reviewed by Academic Coordinator", CASE_CLOSED_OWNER
+        else:
+            draft.status = "Returned for Revision"
+            result, next_owner = "Study plan returned by Academic Coordinator", STAFF_OWNER
         add_log("enrollment", draft.student_id, workflow_actor_label(account), "Study plan draft",
-                "Study plan reviewed by Academic Coordinator", "Graduate School Staff",
-                draft.coordinator_remarks or "", previous_status="Sent to Academic Coordinator",
-                new_status="Reviewed", visibility="internal")
+                result, next_owner, remarks, previous_status="Sent to Academic Coordinator",
+                new_status=draft.status, visibility="internal")
         db.session.commit()
         return jsonify({"item": study_plan_dict(draft)})
 
@@ -11244,6 +11523,70 @@ def register_routes(app: Flask) -> None:
         db.session.delete(record)
         db.session.commit()
         return jsonify({"ok": True})
+
+    @app.route("/api/faculty/<int:faculty_id>", methods=["PATCH"])
+    @require_api_login("staff", "academic_coordinator")
+    def faculty_update(faculty_id: int):
+        """Edit a faculty profile and keep the connected login in step with it."""
+        faculty = Faculty.query.get_or_404(faculty_id)
+        data = request.get_json(silent=True) or {}
+        if "full_name" in data:
+            value = str(data.get("full_name") or "").strip()
+            if not value:
+                return jsonify({"error": "Full name cannot be empty."}), 400
+            faculty.name = value
+        if "department" in data:
+            value = str(data.get("department") or "").strip()
+            if not value:
+                return jsonify({"error": "Department cannot be empty."}), 400
+            faculty.college = value
+        if "specialization" in data:
+            value = str(data.get("specialization") or "").strip()
+            if not value:
+                return jsonify({"error": "Specialization cannot be empty."}), 400
+            faculty.specialization = value
+        if "email" in data:
+            email = str(data.get("email") or "").strip().lower()
+            if "@" not in email or email.startswith("@") or email.endswith("@"):
+                return jsonify({"error": "Enter a valid faculty email address."}), 400
+            linked = UserAccount.query.filter_by(faculty_id=faculty.id).first()
+            other_profile = Faculty.query.filter(func.lower(Faculty.email) == email, Faculty.id != faculty.id).first()
+            other_login = UserAccount.query.filter(
+                func.lower(UserAccount.email) == email,
+                UserAccount.id != (linked.id if linked else -1),
+            ).first()
+            if other_profile or other_login:
+                return jsonify({"error": "That email address is already in use."}), 409
+            faculty.email = email
+        if "status" in data:
+            status = str(data.get("status") or "").strip()
+            if status not in {"Active", "Inactive"}:
+                return jsonify({"error": "Choose Active or Inactive account status."}), 400
+            faculty.active = status == "Active"
+        if "eligible_roles" in data:
+            roles = data.get("eligible_roles")
+            roles = [roles] if isinstance(roles, str) else list(roles or [])
+            roles = list(dict.fromkeys(role for role in roles if role in FACULTY_ELIGIBLE_ROLES))
+            if not roles:
+                return jsonify({"error": "Choose at least one eligible faculty role."}), 400
+            faculty.eligible_roles = json.dumps(roles)
+            faculty.role = " / ".join(roles)
+        new_password = str(data.get("new_password") or "")
+        if new_password and len(new_password) < 8:
+            return jsonify({"error": "The new password must contain at least 8 characters."}), 400
+        try:
+            account = ensure_faculty_user_account(faculty)
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 409
+        if new_password:
+            account.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": f"{faculty.name} was updated.",
+            "faculty": faculty_profile_dict(faculty),
+        })
 
     @app.route("/api/faculty/<int:faculty_id>/preferences", methods=["PUT"])
     @require_api_login("staff", "academic_coordinator", "faculty")
@@ -13738,20 +14081,6 @@ def register_routes(app: Flask) -> None:
             "students": students,
         })
 
-    @app.route("/api/course-audit/roster", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff", "faculty")
-    def course_audit_roster_save():
-        return jsonify({
-            "error": (
-                "Grade and academic-outcome encoding is disabled for the USLS workflow. "
-                "Official grades remain read-only, and the Monitoring Sheet synchronizes "
-                "from authorized source workflows without direct editing."
-            ),
-            "read_only": True,
-            "monitoring_url": "/monitoring-sheet",
-        }), 409
-
-
     @app.route("/api/monitoring/subject-status", methods=["POST"])
     @require_api_login("academic_coordinator", "staff")
     def monitoring_subject_status_save():
@@ -14777,7 +15106,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login()
     def assistant():
         data = request_payload()
-        question = (data.get("question") or "").strip()
+        question = str(data.get("question") or "").strip()
         if not question:
             return jsonify({"error": "Ask a question to get started."}), 400
         account = current_account()
@@ -15230,6 +15559,12 @@ def register_routes(app: Flask) -> None:
                 if target:
                     recompute_risk(target)  # keep priority consistent with the new signals
             db.session.commit()
+        except BadRequestKeyError as exc:
+            db.session.rollback()
+            return jsonify({"error": f"A required field is missing: {exc.args[0]}."}), 400
+        except NotFound:
+            db.session.rollback()
+            return jsonify({"error": "We could not find that student or record."}), 404
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -15699,6 +16034,9 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/<path:path>")
     def catch_all(path: str):
+        if path == "api" or path.startswith("api/"):
+            # An unknown API address is a 404 the screens can read, never the SPA page.
+            return jsonify({"error": HTTP_ERROR_MESSAGES[404]}), 404
         candidate = os.path.join(FRONTEND_DIST, path)
         if path and os.path.isfile(candidate):
             return send_from_directory(FRONTEND_DIST, path)
@@ -15755,6 +16093,36 @@ def normalize_filters(filters) -> dict:
     }
 
 
+def on_leave_clause():
+    """SQL form of student_is_on_leave()."""
+    return or_(
+        Student.standing == "On Leave",
+        Student.current_stage == "LOA",
+        Student.enrollment_tag == "LOA",
+    )
+
+
+def at_risk_clause():
+    """SQL form of student_is_at_risk()."""
+    return Student.risk_level.in_(AT_RISK_LEVELS)
+
+
+def apply_standing_filter(query, value: str):
+    """Filter by standing with the same meaning on every screen.
+
+    ``On Leave`` uses the one on-leave definition; ``Completed`` (which older screens offered as a
+    standing) is the Completed stage; everything else is the stored standing.
+    """
+    value = (value or "").strip()
+    if not value:
+        return query
+    if value == "On Leave":
+        return query.filter(on_leave_clause())
+    if value == "Completed":
+        return query.filter(Student.current_stage == "Completed")
+    return query.filter(Student.standing == value)
+
+
 def filtered_students_query(filters):
     values = normalize_filters(filters)
     query = Student.query.join(Program)
@@ -15769,11 +16137,11 @@ def filtered_students_query(filters):
         risk_values = [item.strip() for item in re.split(r"[,/]", values["risk"]) if item.strip()]
         query = query.filter(Student.risk_level.in_(risk_values or [values["risk"]]))
     if values["standing"]:
-        query = query.filter(Student.standing == values["standing"])
+        query = apply_standing_filter(query, values["standing"])
     if values["owner"]:
         owner_student_ids = (
             db.session.query(Task.student_id)
-            .filter(Task.owner_role == values["owner"], Task.status.in_(["Pending", "Overdue"]))
+            .filter(owner_task_clause(values["owner"]), Task.status.in_(["Pending", "Overdue"]))
             .distinct()
         )
         query = query.filter(Student.id.in_(owner_student_ids))
@@ -15799,13 +16167,13 @@ def dashboard_stats(filters=None) -> dict:
     task_query = scoped(Task).filter(Task.status.in_(["Pending", "Overdue"]))
     owner = (filters.get("owner") or "").strip() if hasattr(filters, "get") else ""
     if owner:
-        task_query = task_query.filter(Task.owner_role == owner)
+        task_query = task_query.filter(owner_task_clause(owner))
 
     total_students = len(student_ids)
     active_students = students_scope().filter(Student.standing == "Active").count()
-    on_leave = students_scope().filter(Student.standing == "On Leave").count()
+    on_leave = students_scope().filter(on_leave_clause()).count()
     completed = students_scope().filter(Student.current_stage == "Completed").count()
-    at_risk = students_scope().filter(Student.risk_level.in_(["At Risk of Delay", "Delayed"])).count()
+    at_risk = students_scope().filter(at_risk_clause()).count()
     high_risk = students_scope().filter(Student.risk_level == "Delayed").count()
     withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
     pending_tasks = task_query.count()
@@ -15829,6 +16197,13 @@ def dashboard_stats(filters=None) -> dict:
         .all()
     )
     stage_distribution = [{"stage": stage, "count": stage_counts.get(stage, 0)} for stage in STAGES]
+    # A stage that is in the data but not in STAGES must still be visible, or the chart would add
+    # up to fewer students than the list shows.
+    stage_distribution += [
+        {"stage": stage or "Not set", "count": count}
+        for stage, count in sorted(stage_counts.items(), key=lambda item: str(item[0]))
+        if stage not in STAGES
+    ]
 
     risk_counts = dict(
         db.session.query(Student.risk_level, func.count(Student.id))
@@ -15867,7 +16242,14 @@ def dashboard_stats(filters=None) -> dict:
         .order_by(func.count(Task.id).desc())
         .all()
     )
-    tasks_by_owner = [{"owner": o, "count": n} for o, n in owner_rows]
+    owner_totals: dict[str, int] = {}
+    for owner_name, count in owner_rows:
+        label = normalize_owner_label(owner_name)
+        owner_totals[label] = owner_totals.get(label, 0) + count
+    tasks_by_owner = [
+        {"owner": o, "count": n}
+        for o, n in sorted(owner_totals.items(), key=lambda item: -item[1])
+    ]
 
     schedule_rows = (
         db.session.query(ScheduleRequest.status, func.count(ScheduleRequest.id))
@@ -16022,9 +16404,16 @@ def dashboard_drilldown_payload(filters) -> dict:
         cases = ResearchCase.query.filter(ResearchCase.current_gate == value, ResearchCase.student_id.in_(scoped_ids)).order_by(ResearchCase.opened_at.asc()).limit(150).all()
         return {"type": kind, "value": value, "title": value, "rows": [dashboard_student_row(item.student) for item in cases]}
     if kind == "owner":
-        tasks = Task.query.filter(Task.owner_role == value, Task.student_id.in_(scoped_ids), Task.status.in_(["Pending", "Overdue"])).order_by(Task.due_at.asc()).limit(150).all()
+        tasks = Task.query.filter(owner_task_clause(value), Task.student_id.in_(scoped_ids), Task.status.in_(["Pending", "Overdue"])).order_by(Task.due_at.asc()).limit(150).all()
         return {"type": kind, "value": value, "title": f"Open work owned by {value}", "rows": [task_dict(item) for item in tasks]}
     return {"type": kind, "value": value, "title": "Dashboard details", "rows": []}
+
+
+def page_arguments(args, default_size: int = 50, max_size: int = 200) -> tuple[int, int]:
+    """Read ?page= and ?page_size= safely (bad values fall back to the defaults)."""
+    page = max(safe_int(args.get("page"), 1), 1)
+    size = safe_int(args.get("page_size"), default_size) or default_size
+    return page, min(max(size, 5), max_size)
 
 
 def safe_int(value, default: int = 0) -> int:
@@ -17965,9 +18354,9 @@ def _percent(part: int, whole: int) -> float:
 # records non-human actors. Both are normalised to one canonical owner so the
 # workload report does not split a single person across several rows.
 CANONICAL_OWNER_ROLES = {
-    "gs staff": "GS Staff",
-    "graduate school staff": "GS Staff",
-    "staff": "GS Staff",
+    "gs staff": STAFF_OWNER,
+    "graduate school staff": STAFF_OWNER,
+    "staff": STAFF_OWNER,
     "academic coordinator": "Academic Coordinator",
     "research coordinator": "Research Coordinator",
     "dean": "Dean",
@@ -18003,6 +18392,26 @@ def canonical_owner_role(role: str | None) -> str | None:
     return CANONICAL_OWNER_ROLES.get(key, text)
 
 
+# A last log entry that names one of these as the next owner means nobody is waiting any more.
+CASE_CLOSED_OWNER_VALUES = {"", "none", "closed", "complete", "completed", "n/a", "-"}
+
+
+def workflow_case_is_closed(slug: str, student_id: int, latest_entry: TransactionLog | None = None) -> bool:
+    """True when a case needs nobody: the last step named no next owner, or the case record itself
+    has reached its end (an exported withdrawal, a reviewed practicum, an exported endorsement)."""
+    if latest_entry is not None and (latest_entry.next_owner or "").strip().casefold() in CASE_CLOSED_OWNER_VALUES:
+        return True
+    record = workflow_case_record(slug, student_id) if slug in {"withdrawal", "practicum", "graduation"} else None
+    if record is None:
+        return False
+    if slug == "graduation":
+        return (
+            getattr(record, "registrar_status", None) == "Exported - Ready to Send"
+            or record.endorsement_status in {"Sent to Registrar", "Registrar Received"}
+        )
+    return record.status in WORKFLOW_FINAL_STATUSES.get(slug, ())
+
+
 def queue_aging_report(student_ids: list[int]) -> dict:
     """Open case backlog per process area with age buckets (Table 13: aging)."""
     if not student_ids:
@@ -18024,8 +18433,8 @@ def queue_aging_report(student_ids: list[int]) -> dict:
             latest[entry.student_id] = entry
         ages = [
             _days_since(entry.created_at)
-            for entry in latest.values()
-            if (entry.next_owner or "").strip()
+            for student_id, entry in latest.items()
+            if not workflow_case_is_closed(slug, student_id, entry)
         ]
         if not ages:
             continue
@@ -18296,7 +18705,7 @@ def completion_attrition_report(students: list[Student]) -> dict:
             record["withdrawn"] += 1
         elif stage == "AWOL" or standing == "AWOL":
             record["awol"] += 1
-        elif stage == "LOA" or standing == "On Leave":
+        elif student_is_on_leave(student):
             record["on_leave"] += 1
         else:
             record["active"] += 1
@@ -18790,103 +19199,140 @@ def analytics_payload(filters=None) -> dict:
     return payload
 
 
+REPORT_TABS = (
+    "graduation_candidates",
+    "missing_requirements",
+    "practicum_monitoring",
+    "withdrawal_requests",
+    "loa_readmission",
+    "at_risk",
+    "open_overdue_tasks",
+    "research_completion",
+)
+
+
 def reports_payload(filters=None) -> dict:
+    """Report tabs with real counts. Only the rows are paged, never the count.
+
+    ``tab`` names the tab that ``page`` / ``page_size`` apply to; the other tabs return their first
+    page. Every tab says how many rows exist in total (``count``) and how many pages that makes.
+    """
     filters = filters or {}
     student_ids = report_student_ids(filters)
     empty = len(student_ids) == 0
+    selected_tab = _filter_value(filters, "tab")
+    requested_page, page_size = page_arguments(filters, default_size=100, max_size=200)
+
+    def page_for(key: str) -> int:
+        return requested_page if key == selected_tab else 1
+
+    def section(key: str, total: int, rows: list[dict]) -> dict:
+        return {
+            "count": total,
+            "rows": rows,
+            "page": page_for(key),
+            "page_size": page_size,
+            "pages": max((total + page_size - 1) // page_size, 1),
+        }
+
+    def paged(key: str, query):
+        """Real total for ``query`` and the rows of the requested page."""
+        total = query.count()
+        rows = query.offset((page_for(key) - 1) * page_size).limit(page_size).all()
+        return total, rows
 
     def by_students(model):
         query = model.query
         return query.filter(model.student_id.in_(student_ids)) if not empty else query.filter(False)
 
     dashboard = dashboard_stats(filters)
+
     practicum_query = scoped_practicum_records_query()
     practicum_query = (
         practicum_query.filter(PracticumRecord.student_id.in_(student_ids))
         if not empty
         else practicum_query.filter(False)
     )
-    practicum_rows = [
-        practicum_record_dict(item)
-        for item in practicum_query.order_by(PracticumRecord.updated_at.desc()).limit(150).all()
-    ]
-    withdrawal_rows = [
-        withdrawal_application_dict(item)
-        for item in by_students(WithdrawalApplication).order_by(WithdrawalApplication.updated_at.desc()).limit(150).all()
-    ]
-    graduation_rows = [
-        graduation_endorsement_dict(item)
-        for item in by_students(GraduationEndorsement).order_by(GraduationEndorsement.updated_at.desc()).limit(150).all()
-    ]
-    missing_rows = []
-    for student in filtered_students_query(filters).order_by(Student.last_name, Student.first_name).limit(120).all():
+    total, items = paged("practicum_monitoring", practicum_query.order_by(PracticumRecord.updated_at.desc()))
+    practicum_section = section("practicum_monitoring", total, [practicum_record_dict(item) for item in items])
+
+    total, items = paged("withdrawal_requests", by_students(WithdrawalApplication).order_by(WithdrawalApplication.updated_at.desc()))
+    withdrawal_section = section("withdrawal_requests", total, [withdrawal_application_dict(item) for item in items])
+
+    total, items = paged("graduation_candidates", by_students(GraduationEndorsement).order_by(GraduationEndorsement.updated_at.desc()))
+    graduation_section = section("graduation_candidates", total, [graduation_endorsement_dict(item) for item in items])
+
+    # Missing requirements: EVERY student is evaluated; only then is the list counted and paged.
+    missing_all = []
+    for student in filtered_students_query(filters).order_by(Student.last_name, Student.first_name).all():
         eligibility = graduation_eligibility(student)
         if eligibility["missing_coursework"] or eligibility["missing_research_requirements"] or eligibility["missing_practicum_requirement"]:
-            missing_rows.append({
-                "student": student_brief(student),
-                "coursework": eligibility["missing_coursework"][:6],
-                "research": eligibility["missing_research_requirements"][:6],
-                "practicum": eligibility["missing_practicum_requirement"],
-                "next_owner": eligibility["next_owner"],
-            })
+            missing_all.append((student, eligibility))
+    start = (page_for("missing_requirements") - 1) * page_size
+    missing_rows = [
+        {
+            "student": student_brief(student),
+            "coursework": eligibility["missing_coursework"][:6],
+            "research": eligibility["missing_research_requirements"][:6],
+            "practicum": eligibility["missing_practicum_requirement"],
+            "next_owner": eligibility["next_owner"],
+        }
+        for student, eligibility in missing_all[start:start + page_size]
+    ]
+    missing_section = section("missing_requirements", len(missing_all), missing_rows)
 
-    loa_readmission_rows = [
+    on_leave_query = filtered_students_query(filters).filter(on_leave_clause()).order_by(Student.last_name, Student.first_name)
+    total, items = paged("loa_readmission", on_leave_query)
+    loa_section = section("loa_readmission", total, [
         {
             "student": student_brief(student),
             "standing": student.standing,
             "stage": student.current_stage,
-            "latest_readmission": log_dict(
-                TransactionLog.query.filter_by(student_id=student.id, transaction_slug="readmission")
-                .order_by(TransactionLog.created_at.desc())
-                .first()
-            ) if TransactionLog.query.filter_by(student_id=student.id, transaction_slug="readmission").first() else None,
+            "latest_readmission": log_dict(latest_readmission) if latest_readmission else None,
         }
-        for student in filtered_students_query(filters)
-        .filter(or_(Student.standing == "On Leave", Student.current_stage == "LOA"))
-        .order_by(Student.last_name, Student.first_name)
-        .limit(120)
-        .all()
-    ]
+        for student in items
+        for latest_readmission in [
+            TransactionLog.query.filter_by(student_id=student.id, transaction_slug="readmission")
+            .order_by(TransactionLog.created_at.desc())
+            .first()
+        ]
+    ])
+
+    at_risk_query = filtered_students_query(filters).filter(at_risk_clause()).order_by(Student.last_name, Student.first_name)
+    total, items = paged("at_risk", at_risk_query)
     at_risk_rows = []
-    for student in filtered_students_query(filters).filter(Student.risk_level.in_(["At Risk of Delay", "Delayed"])).limit(120).all():
+    for student in items:
         recs = student_recommendations(student)["recommendations"]
         at_risk_rows.append({
             "student": student_brief(student),
             "top_recommendation": recs[0] if recs else None,
         })
-    task_rows = [
-        task_dict(task)
-        for task in by_students(Task)
-        .filter(Task.status.in_(["Pending", "Overdue"]))
-        .order_by(Task.due_at.asc())
-        .limit(160)
-        .all()
-    ]
-    research_rows = [
-        {
-            "student": student_brief(case.student),
-            "case": research_case_dict(case),
-        }
-        for case in by_students(ResearchCase)
-        .order_by(ResearchCase.opened_at.desc())
-        .limit(160)
-        .all()
-    ]
+    at_risk_section = section("at_risk", total, at_risk_rows)
+
+    task_query = by_students(Task).filter(Task.status.in_(["Pending", "Overdue"])).order_by(Task.due_at.asc(), Task.id.asc())
+    total, items = paged("open_overdue_tasks", task_query)
+    task_section = section("open_overdue_tasks", total, [task_dict(task) for task in items])
+
+    total, items = paged("research_completion", by_students(ResearchCase).order_by(ResearchCase.opened_at.desc()))
+    research_section = section("research_completion", total, [
+        {"student": student_brief(case.student), "case": research_case_dict(case)} for case in items
+    ])
 
     return {
         "filters": normalize_filters(filters),
         "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
         "stages": STAGES,
+        "standings": STANDINGS,
         "summary": dashboard["kpis"],
         "dashboard": dashboard,
-        "graduation_candidates": {"count": len(graduation_rows), "rows": graduation_rows},
-        "missing_requirements": {"count": len(missing_rows), "rows": missing_rows},
-        "practicum_monitoring": {"count": len(practicum_rows), "rows": practicum_rows},
-        "withdrawal_requests": {"count": len(withdrawal_rows), "rows": withdrawal_rows},
-        "loa_readmission": {"count": len(loa_readmission_rows), "rows": loa_readmission_rows},
-        "at_risk": {"count": len(at_risk_rows), "rows": at_risk_rows},
-        "open_overdue_tasks": {"count": len(task_rows), "rows": task_rows},
-        "research_completion": {"count": len(research_rows), "rows": research_rows},
+        "graduation_candidates": graduation_section,
+        "missing_requirements": missing_section,
+        "practicum_monitoring": practicum_section,
+        "withdrawal_requests": withdrawal_section,
+        "loa_readmission": loa_section,
+        "at_risk": at_risk_section,
+        "open_overdue_tasks": task_section,
+        "research_completion": research_section,
     }
 
 
@@ -18969,7 +19415,7 @@ def submitted_request_students(request_type: str) -> list[dict]:
             "notes": log.notes,
             "last_result": latest_log.result if decided else None,
             "last_decision_at": iso(latest_log.created_at) if decided else None,
-            "next_action_owner": latest_log.next_owner if latest_log else "GS Staff",
+            "next_action_owner": latest_log.next_owner if latest_log else STAFF_OWNER,
             "attachment": attachment.original_name if attachment else None,
             "attachment_detail": attachment_dict(attachment),
             "status": status,
@@ -19423,6 +19869,11 @@ def status_rank(status: str | None) -> int:
     return ranks.get(status or "", 0)
 
 
+def student_linked_tables() -> list:
+    """Every table with a ``student_id`` column, taken from the models themselves."""
+    return [table for table in db.metadata.sorted_tables if "student_id" in table.c and table.name != "student"]
+
+
 def merge_student_records(target: Student, source: Student, overwrite_profile: bool = False) -> dict:
     if target.id == source.id:
         raise ValueError("Choose two different student records to merge.")
@@ -19500,19 +19951,35 @@ def merge_student_records(target: Student, source: Student, overwrite_profile: b
             doc.student_id = target.id
             moved["related_records"] += 1
 
-    for model in (
-        ResearchCase,
-        ScheduleRequest,
-        Task,
-        TransactionLog,
-        StudentRequestAttachment,
-        PracticumRecord,
-        WithdrawalApplication,
-        GraduationEndorsement,
-    ):
-        for row in model.query.filter_by(student_id=source.id).all():
-            row.student_id = target.id
-            moved["related_records"] += 1
+    # Everything else that points at a student is moved by table metadata, so a table added later
+    # cannot be forgotten (messages, AWOL cases, advisers, verdicts, evidence, plans ...).
+    merged_by_hand = {"course_record", "term_enrollment", "subject_enrollment", "document_check", "panel_assignment"}
+    for table in student_linked_tables():
+        if table.name in merged_by_hand:
+            continue
+        if table.name == "user_account":
+            target_has_login = db.session.execute(
+                table.select().where(table.c.student_id == target.id)
+            ).first() is not None
+            if target_has_login:
+                # One student, one login: the duplicate's login is switched off, never left orphaned.
+                values = {"student_id": None}
+                if "active" in table.c:
+                    values["active"] = False
+                db.session.execute(table.update().where(table.c.student_id == source.id).values(**values))
+            else:
+                db.session.execute(table.update().where(table.c.student_id == source.id).values(student_id=target.id))
+            continue
+        if table.c.student_id.unique:
+            # At most one row per student: keep the target's, otherwise move the source's.
+            if db.session.execute(table.select().where(table.c.student_id == target.id)).first() is not None:
+                db.session.execute(table.delete().where(table.c.student_id == source.id))
+                continue
+        result = db.session.execute(table.update().where(table.c.student_id == source.id).values(student_id=target.id))
+        moved["related_records"] += result.rowcount or 0
+    # The bulk updates bypassed the ORM: drop cached collections so deleting the source below
+    # cannot cascade onto rows that now belong to the target.
+    db.session.expire(source)
 
     target_panel_keys = {(p.faculty_id, p.panel_role, p.gate): p for p in PanelAssignment.query.filter_by(student_id=target.id).all()}
     for panel in PanelAssignment.query.filter_by(student_id=source.id).all():
@@ -19554,6 +20021,11 @@ def add_log(
 ) -> TransactionLog:
     # Every workflow records what happened, who acted, where the evidence came
     # from, and who owns the next action.
+    next_owner = normalize_owner_label(next_owner) if next_owner else next_owner
+    # The log columns are 160 characters; MySQL (strict mode) refuses longer text, SQLite would not.
+    source = (source or "")[:160]
+    result = (result or "")[:160]
+    close_finished_workflow_tasks(slug, student_id, actor, result, new_status)
     account = current_account() if has_request_context() else None
     record = (
         workflow_case_record(slug, student_id)
@@ -19594,18 +20066,115 @@ def add_log(
     return log
 
 
+# Tasks that belong to each workflow, recognised by words in the title. Research-side workflows
+# (research gate, panel matching, defense scheduling) and LOA/readmission close their own tasks
+# elsewhere and are deliberately not listed here.
+WORKFLOW_TASK_MARKERS = {
+    "student-handoff": ("admission handoff", "student handoff"),
+    "practicum": ("practicum",),
+    "withdrawal": ("withdrawal",),
+    "graduation": ("graduation",),
+    "awol": ("awol", "refresher", "maximum residence", "residency"),
+}
+# A log entry that moves a case into one of these statuses ends the workflow for that student, so
+# every task still open for it is closed whoever owns it.
+WORKFLOW_FINAL_STATUSES = {
+    "withdrawal": {"Denied", "Exported - Ready to Send", "Withdrawn Confirmed", "Sent to Registrar"},
+    "practicum": {"Dean Reviewed"},
+}
+# Words in a log result that mean "only a message was sent, nothing was completed".
+_MESSAGE_ONLY_RESULT_SUFFIXES = ("message sent", "forwarded with a note")
+
+
+def _tasks_created_this_transaction() -> list:
+    return db.session.info.setdefault("fresh_tasks", [])
+
+
+def close_finished_workflow_tasks(
+    slug: str,
+    student_id: int | None,
+    actor: str | None,
+    result: str | None = None,
+    new_status: str | None = None,
+) -> int:
+    """Close the open tasks a recorded workflow step has just completed.
+
+    Recording a step (``add_log``) means the office that acted has done its part, so that
+    office's earlier open tasks for this student in this workflow are finished. A step that ends
+    the workflow closes every open task of it. Tasks created in the same transaction (the work
+    this step hands on) are never closed here.
+    """
+    markers = WORKFLOW_TASK_MARKERS.get(slug)
+    if not markers or not student_id:
+        return 0
+    final = new_status in WORKFLOW_FINAL_STATUSES.get(slug, ())
+    actor_owner = canonical_owner_role(actor)
+    message_only = (result or "").lower().endswith(_MESSAGE_ONLY_RESULT_SUFFIXES)
+    if not final and (not actor_owner or message_only):
+        return 0
+    fresh = {id(task) for task in _tasks_created_this_transaction()}
+    closed = 0
+    for task in Task.query.filter(
+        Task.student_id == student_id,
+        Task.status.in_(["Pending", "Overdue"]),
+    ).all():
+        if id(task) in fresh:
+            continue
+        if not any(marker in task.title.lower() for marker in markers):
+            continue
+        if final or canonical_owner_role(task.owner_role) == actor_owner:
+            task.status = "Done"
+            closed += 1
+    return closed
+
+
+def _forget_fresh_tasks(session, *_args) -> None:
+    session.info.pop("fresh_tasks", None)
+
+
+event.listen(Session, "after_commit", _forget_fresh_tasks)
+event.listen(Session, "after_soft_rollback", _forget_fresh_tasks)
+
+
+def close_tasks_of_finished_workflows() -> int:
+    """Startup clean-up: close open tasks left behind by workflows that already finished.
+
+    Older databases kept such tasks forever, which inflated "open" and "overdue" counts.
+    Only the student's latest case is looked at, so a newer active request keeps its tasks.
+    """
+    closed = 0
+    for slug, finder, final_statuses in (
+        ("withdrawal", latest_withdrawal_application, WORKFLOW_FINAL_STATUSES["withdrawal"]),
+        ("practicum", latest_practicum_record, WORKFLOW_FINAL_STATUSES["practicum"]),
+    ):
+        markers = WORKFLOW_TASK_MARKERS[slug]
+        open_by_student: dict[int, list[Task]] = {}
+        for task in Task.query.filter(Task.status.in_(["Pending", "Overdue"])).all():
+            if any(marker in task.title.lower() for marker in markers):
+                open_by_student.setdefault(task.student_id, []).append(task)
+        for student_id, tasks in open_by_student.items():
+            record = finder(student_id)
+            if record and record.status in final_statuses:
+                for task in tasks:
+                    task.status = "Done"
+                    closed += 1
+    if closed:
+        db.session.commit()
+    return closed
+
+
 def add_task(student_id: int, title: str, owner: str, days: int, priority: int = 20, status: str = "Pending") -> None:
     # Tasks make workflow follow-ups visible in the Work Queue.
-    db.session.add(
-        Task(
-            student_id=student_id,
-            title=title,
-            owner_role=owner,
-            due_at=date.today() + timedelta(days=days),
-            priority=priority,
-            status=status,
-        )
+    task = Task(
+        student_id=student_id,
+        title=title,
+        owner_role=normalize_owner_label(owner),
+        due_at=date.today() + timedelta(days=days),
+        priority=priority,
+        status=status,
     )
+    db.session.add(task)
+    _tasks_created_this_transaction().append(task)
 
 
 def ensure_task(student_id: int, title: str, owner: str, due_at: date, priority: int = 20, status: str = "Pending") -> Task:
@@ -21400,7 +21969,7 @@ def pending_student_request_log(student_id: int, slug: str, submitted_result: st
 def resolve_standing_change_tasks(student_id: int, title_fragment: str, owner: str) -> None:
     for task in Task.query.filter(
         Task.student_id == student_id,
-        Task.owner_role == owner,
+        owner_task_clause(owner),
         Task.status.in_(["Pending", "Overdue"]),
         Task.title.contains(title_fragment),
     ).all():
@@ -26330,9 +26899,9 @@ def curriculum_planning_payload(program: Program, term: AcademicTerm | None = No
     for student in students:
         if student.standing == "Active":
             active_count += 1
-        if student.standing == "On Leave":
+        if student_is_on_leave(student):
             loa_count += 1
-        if student.risk_level in ("At Risk of Delay", "Delayed") or student.current_stage == "LOA":
+        if student_is_at_risk(student) or student.current_stage == "LOA":
             delayed_count += 1
         record_count = CourseRecord.query.filter_by(student_id=student.id).count()
         missing_rows = max(len(courses) - record_count, 0)
@@ -29716,7 +30285,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
         else "Admission" if is_handoff_demo
         else "LOA" if is_readmission_demo
         else "Coursework" if (is_withdrawal_demo or is_enrollment_demo or is_adjustments_demo or is_loa_demo)
-        else "Research" if is_awol_demo and demo_config.get("scenario") == "residency"
+        else "Writing" if is_awol_demo and demo_config.get("scenario") == "residency"
         else "AWOL" if is_awol_demo
         else "Proposal Development" if is_research_demo
         else "Final Defense"
@@ -30431,6 +31000,9 @@ def ensure_faculty_account_schema() -> None:
             faculty.eligible_roles = default_roles
         # Only a NEW account gets the initial password; never overwrite one a person has chosen.
         primary = ensure_faculty_user_account(faculty, "DemoPass123!")
+        # A brand-new account has no id until it is flushed; without this the duplicate filter below
+        # compiles to "id IS NOT NULL" and deactivates the very login we just created.
+        db.session.flush()
         for duplicate in UserAccount.query.filter(
             UserAccount.faculty_id == faculty.id,
             UserAccount.role == "faculty",
@@ -30509,7 +31081,13 @@ def ensure_demo_accounts() -> None:
 
 app = create_app()
 
-with app.app_context():
+
+def run_schema_upgrades() -> None:
+    """Additive, guarded schema changes and data normalisation. Runs on every start.
+
+    Order matters: anything that reads a table through the ORM must run after the column adders
+    for that table (see tests/test_crosscut.py, old-database startup).
+    """
     # Add newly declared columns before any schema-check queries the affected tables.
     _early_inspector = inspect(db.engine)
     if "subject_enrollment" in set(_early_inspector.get_table_names()):
@@ -30535,6 +31113,9 @@ with app.app_context():
             if _name not in _co_existing:
                 db.session.execute(text(f"ALTER TABLE curriculum_offering ADD COLUMN {_name} {_sql}"))
         db.session.commit()
+    # user_account.faculty_id is read by ensure_workflow_activity_schema(), so add it first
+    # (older databases crashed with "no such column: user_account.faculty_id").
+    ensure_user_account_schema()
     ensure_schedule_request_schema()
     ensure_monitoring_portal_entry_schema()
     ensure_monitoring_upload_schema()
@@ -30550,9 +31131,11 @@ with app.app_context():
     ensure_research_evidence_schema()
     ensure_research_role_workflow_schema()
     ensure_curriculum_offering_schema()
-    ensure_user_account_schema()
     ensure_faculty_account_schema()
     ensure_policy_document_schema()
+    normalize_owner_role_vocabulary()
+    normalize_stage_vocabulary()
+    close_tasks_of_finished_workflows()
     ensure_authoritative_curricula()
     ensure_practicum_program_policy()
     ensure_course_year_consistency()
@@ -30566,6 +31149,10 @@ with app.app_context():
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
         print(f"Panel Matching demo data was not seeded: {exc}")
+
+
+with app.app_context():
+    run_schema_upgrades()
 
 
 def should_run_startup_tasks(argv=None, environ=None, main_name="unset") -> bool:
