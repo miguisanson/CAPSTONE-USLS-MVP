@@ -2782,6 +2782,8 @@ def schedule_request_dict(req: ScheduleRequest) -> dict:
         "manuscript_received_on": iso(req.manuscript_received_on),
         "needs_reconfirmation": req.status == RECONFIRM_DEFENSE_STATUS,
         "is_active": req.status in ACTIVE_DEFENSE_STATUSES,
+        "attention": defense_attention(req),
+        "ics_url": f"/api/defense-schedules/{req.id}/event.ics",
     }
 
 
@@ -12110,8 +12112,8 @@ def register_routes(app: Flask) -> None:
                     "View free and busy times for defense scheduling",
                     "Keep event names, descriptions, and guests private",
                     (
-                        "Create, update, or remove only official defense events scheduled "
-                        "through this system; all other calendar events stay unchanged"
+                        "Read-only: this system never creates, changes or deletes events in your Google "
+                        "Calendar. To see defenses there, subscribe to your private calendar link"
                     ),
                 ],
                 "schedule_source": "profile_schedule",
@@ -20904,6 +20906,17 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 .limit(12)
                 .all()
             ]
+            context["availability_requests"] = [
+                availability_request_dict(item)
+                for item in AvailabilityRequest.query.filter_by(student_id=selected_student.id)
+                .order_by(AvailabilityRequest.created_at.desc(), AvailabilityRequest.id.desc()).limit(30).all()
+            ]
+            if progress["gate"] in RESEARCH_GATE_DEFENSE_TYPES:
+                sync_panel_invitations(selected_student, progress["gate"], notify=False)
+            context["panel_invitations"] = [
+                panel_invitation_dict(item)
+                for item in PanelInvitation.query.filter_by(student_id=selected_student.id, gate=progress["gate"]).all()
+            ]
         if slug == "practicum":
             context["practicum_record"] = practicum_record_dict(
                 latest_practicum_record(selected_student.id),
@@ -27955,6 +27968,8 @@ def defense_faculty_directory() -> list[dict]:
                 FacultyAvailability.available_date >= date.today(),
             ).count(),
             "workload": PanelAssignment.query.filter_by(faculty_id=faculty.id).count(),
+            "availability_entered": faculty_availability_entered(faculty),
+            "availability_updated_at": iso(faculty.availability_updated_at),
         })
     return entries
 
@@ -32133,6 +32148,16 @@ def ensure_panel_matching_demo_data() -> dict[str, int]:
             changes["availability_windows"] += 1
         if current_count:
             changes["faculty_with_availability"] += 1
+        if demo_mode_enabled() and not faculty_hours_rows(faculty):
+            # Demo data, labelled as such: the demo panel works Monday-Friday 8-17. Every other faculty
+            # member stays "not entered" until they (or staff) enter hours.
+            for weekday in range(5):
+                db.session.add(FacultyWorkingHour(
+                    faculty_id=faculty.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0),
+                    enabled=True, source="demo seed", updated_at=now_utc(),
+                ))
+            db.session.flush()
+            db.session.expire(faculty, ["working_hours"])
 
     changes["expertise_records"] = ensure_faculty_expertise_demo()
 

@@ -1334,5 +1334,72 @@ class PrivateFeedTests(CalendarDataBase):
         self.assertEqual(app.test_client().get(f"/api/faculty/{self.faculty_ids['Chair Person']}/calendar.ics").status_code, 401)
 
 
+# ---------------------------------------------------------------------------
+# Existing data and demo data
+# ---------------------------------------------------------------------------
+class ExistingDataTests(CalendarBase):
+    def test_the_old_automatic_default_hours_no_longer_count_as_entered(self):
+        """Faculty created before this change all got Monday-Friday 8-17 automatically."""
+        with app.app_context():
+            faculty = Faculty(name="Old Default Person", college="GS", role="Faculty", specialization="x",
+                              email="old.default@example.test", active=True)
+            db.session.add(faculty)
+            db.session.flush()
+            for weekday in range(5):
+                db.session.add(app_module.FacultyWorkingHour(
+                    faculty_id=faculty.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0), enabled=True))
+            entered = Faculty(name="Entered Person", college="GS", role="Faculty", specialization="x",
+                              email="entered.person@example.test", active=True, availability_updated_at=datetime.now())
+            db.session.add(entered)
+            db.session.flush()
+            for weekday in range(5):
+                db.session.add(app_module.FacultyWorkingHour(
+                    faculty_id=entered.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0), enabled=True))
+            db.session.commit()
+            self.assertTrue(app_module.faculty_availability_entered(faculty))  # before the migration
+            flagged = app_module.label_system_default_working_hours()
+            db.session.expire_all()
+            self.assertGreaterEqual(flagged, 1)  # the fixture faculty look exactly like the old defaults too
+            self.assertFalse(app_module.faculty_availability_entered(db.session.get(Faculty, faculty.id)))
+            self.assertTrue(app_module.faculty_availability_entered(db.session.get(Faculty, entered.id)))
+            self.assertEqual(app_module.label_system_default_working_hours(), 0)
+
+    def test_the_demo_panel_gets_labelled_demo_hours_and_nobody_else_does(self):
+        with app.app_context():
+            demo = Faculty(name="Dr. Liwayway Bautista", college="GS", role="Faculty", specialization="Learning analytics",
+                           email="liwayway.demo@example.test", active=True)
+            other = Faculty(name="Dr. Somebody Else", college="GS", role="Faculty", specialization="Other",
+                            email="somebody.else@example.test", active=True)
+            db.session.add_all([demo, other])
+            db.session.commit()
+            app_module.ensure_panel_matching_demo_data()
+            db.session.commit()
+            db.session.expire_all()
+            rows = app_module.FacultyWorkingHour.query.filter_by(faculty_id=demo.id).all()
+            self.assertEqual(len(rows), 5)
+            self.assertEqual({row.source for row in rows}, {"demo seed"})
+            self.assertEqual(app_module.FacultyWorkingHour.query.filter_by(faculty_id=other.id).count(), 0)
+            app_module.ensure_panel_matching_demo_data()
+            db.session.commit()
+            self.assertEqual(app_module.FacultyWorkingHour.query.filter_by(faculty_id=demo.id).count(), 5)
+            self.assertFalse(app_module.faculty_availability_entered(db.session.get(Faculty, other.id)))
+
+    def test_the_google_consent_text_no_longer_promises_to_write_events(self):
+        body = self.faculty_client("Chair Person").get("/api/faculty-portal/google-calendar/authorization").get_json()
+        text_body = " ".join(body.get("permissions", []))
+        self.assertNotIn("Create, update, or remove", text_body)
+        self.assertIn("Read-only", text_body)
+
+    def test_the_staff_scheduling_context_lists_invitations_and_availability_requests(self):
+        self.ready_for_title()
+        self.staff().post("/api/availability-requests", json={
+            "student_id": self.student_id, "window_start": future_weekday(14).isoformat(), "window_end": future_weekday(28).isoformat(),
+        })
+        context = self.staff().get(f"/api/transactions/defense-scheduling/context?student_id={self.student_id}").get_json()
+        self.assertTrue(context["availability_requests"])
+        self.assertEqual(len(context["panel_invitations"]), 3)
+        self.assertTrue(all(item["availability_entered"] in (True, False) for item in context["faculty_directory"]))
+
+
 if __name__ == "__main__":
     unittest.main()
