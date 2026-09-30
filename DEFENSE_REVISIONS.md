@@ -143,13 +143,13 @@ embeddings and no AI in the score; Gemini only adds keywords and a rationale
 when an API key is set. Commit `83ea4f0` added 12 faculty profiles, 42
 availability windows and three different concept papers for one demo student.
 
-- [ ] **D1. The top candidates still tie on expertise.** Inferred from a
+- [x] **D1. The top candidates still tie on expertise.** *(done, v5.1: expertise is 60 points from TF-IDF / Gemini-embedding similarity between the paper and the faculty expertise records, scaled across the candidate pool; availability 25, workload 15; every candidate has a score breakdown.)* Inferred from a
       re-implementation of the scoring (not from the running app): the top three
       all hit the 50-point cap, so their order comes only from how many free
       time slots were hard-coded (5, 4, 3). The panel asked for differences
       driven by concept paper and expertise. Remove the cap saturation (scale the
       score) so expertise separates them.
-- [ ] **D2. The demo data is hand-tuned to one student.** Add several students
+- [x] **D2. The demo data is hand-tuned to one student.** *(done, v5.1: 7 demo students in 6 programs, real-pipeline test in `tests/test_panel_matching.py`.)* Add several students
       with concept papers in different fields (education, psychology, business,
       nursing …) so each gets a visibly different panel. *Accept:* a test runs
       the **real** pipeline (no mocked profile) for three papers and asserts three
@@ -157,12 +157,12 @@ availability windows and three different concept papers for one demo student.
 - [ ] **D3. WAITING — real faculty expertise from USLS.** The specialization
       text is invented. Ask the stakeholder for faculty expertise / research
       interests, past advisees, and sample concept papers (see §G).
-- [ ] **D4. Do not recommend the student's own adviser as a panelist**
+- [x] **D4. Do not recommend the student's own adviser as a panelist** *(done, v5.1: adviser and co-adviser are excluded and shown as not eligible; panel composition checked against the Research Protocol.)*
       (inferred: not excluded today).
-- [ ] **D5. Startup overwrites faculty expertise.** `ensure_panel_matching_
+- [x] **D5. Startup overwrites faculty expertise.** *(done, v5.1: seeds only what is missing; runs with the other startup seeders.)* `ensure_panel_matching_
       demo_data` (`app.py:23089`) resets `Faculty.specialization` on every start,
       wiping the roster import and any edit made in the UI. Only seed when empty.
-- [ ] **D6. Call it what it is.** The document and walkthrough say "RAG/AI-
+- [x] **D6. Call it what it is.** *(done, v5.1: labelled "Similarity match (keyword TF-IDF)" or "Semantic match (Gemini embeddings)".)* The document and walkthrough say "RAG/AI-
       generated recommendations". If the score stays rule-based, either add real
       semantic similarity (Gemini embeddings already exist for the assistant) or
       describe it honestly. The panel will ask.

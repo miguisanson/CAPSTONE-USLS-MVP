@@ -57,6 +57,13 @@ export const api = {
   },
   faculty: () => request("/faculty"),
   facultyProfile: (facultyId) => request(`/faculty/${facultyId}`),
+  facultyExpertise: (facultyId) => request(`/faculty/${facultyId}/expertise`),
+  addFacultyExpertise: (facultyId, payload) =>
+    request(`/faculty/${facultyId}/expertise`, { method: "POST", body: JSON.stringify(payload) }),
+  updateFacultyExpertise: (recordId, payload) =>
+    request(`/faculty-expertise/${recordId}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteFacultyExpertise: (recordId) =>
+    request(`/faculty-expertise/${recordId}`, { method: "DELETE", body: JSON.stringify({}) }),
   saveFacultyPreferences: (facultyId, courseIds) =>
     request(`/faculty/${facultyId}/preferences`, {
       method: "PUT",
