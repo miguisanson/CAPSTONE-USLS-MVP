@@ -270,3 +270,99 @@ using it.
   Tables 25.1, 25.5, 25.13-25.15, and the Appendix AA page and its TOC line (`A-110`).
 - Not verifiable without Word: the same limits as in section 3 (chapter-page numbers such as `4-15` come from
   Word's `chapStyle`; LibreOffice shows `15`).
+
+## 6. Chapters 5-6 and the appendices brought in line with the code (docs3 packet)
+
+Panel requirement behind it: the proposal must tell the truth about the built system. The first version of Chapters 5 and 6
+and Appendices V, W, Y and Z were written for an earlier build (119 routes, 35 tables, 61 tests, 371 students). This step
+regenerates everything that can be generated and moves every hand correction into a reviewable data file.
+
+### New pipeline steps (all idempotent, all in `scripts/docs/`)
+| Script / data | What it does |
+|---|---|
+| `sync_proposal_inventories.py collect` (project venv, Flask) | Reads `app.url_map`, the data model, the test files, optionally RUNS the suite (`--run-suite`) or parses a log (`--run-log`), seeds a **temporary** SQLite database the way a first start does and measures the demonstration dataset, the report counts and the KPI values. Writes `proposal_inventory.json`. |
+| `sync_proposal_inventories.py apply` (lxml venv) | Replaces Appendix V (every test, grouped by module, with result), W (run record), Y (every route: method, path, roles, purpose), Z (every table: purpose, key columns), the field tables of Section 5.9.2, Tables 24 (reports), 28, 29, the 6.3.3 defects text, the 6.3.4 per-module text, then applies `proposal_text_sync.json`. |
+| `proposal_text_sync.json` | Every hand correction of the prose: `find -> replace` (or whole-paragraph replace, or insert) with a `note` giving the reason and the code evidence. `{{tokens}}` (`routes`, `tables`, `tests`, `seed_students` ...) are filled from the inventory so no count is typed. Entries marked `requires_all_passed` stop the run if the recorded test run has a failure, so the text cannot claim a green run that did not happen. |
+| `sync_proposal_screens.py` | Section 5.10: inserts the staff screens added since the first version (from `proposal_screens.json`), renumbers 5.10.n, builds Tables 23.1-23.3 (pages of the Dean, student and faculty portal) **from `frontend/src/components/portalNav.jsx`**, and prints every navigation label / portal page that has no text, so a new screen cannot stay undocumented. |
+| `proposal_endpoint_purposes.json`, `proposal_table_purposes.json`, `proposal_field_descriptions.json`, `proposal_test_module_prose.json`, `proposal_screens.json` | The wording that cannot be derived from the code. A route, table or column missing from them gets a fallback line and is listed by the script. |
+| `rebuild_proposal.py` | Runs steps 1-5 below in the right order with the right interpreter. |
+
+### Regenerating everything (run after any code change)
+```
+python scripts/docs/rebuild_proposal.py "IN.docx" "OUT.docx" --suite          # about 20 minutes (runs the tests)
+python scripts/docs/rebuild_proposal.py "IN.docx" "OUT.docx" --run-log LOG --started ISO --ended ISO   # reuse a test log
+python scripts/docs/rebuild_proposal.py "IN.docx" "OUT.docx" --reuse-inventory     # docs only, inventory untouched
+```
+By hand, the same steps:
+```
+PY=E:/Github_Projects/CAPSTONE-USLS-MVP/.venv/Scripts/python.exe       # Flask, pymupdf
+PYL=E:/Temp/claude/opsman-venv/Scripts/python.exe                      # lxml
+$PY  scripts/docs/sync_proposal_inventories.py collect --run-suite      # 1 (or --run-log LOG --started .. --ended ..)
+$PYL scripts/docs/add_business_rules_section.py IN.docx S1.docx         # 2
+$PYL scripts/docs/sync_proposal_inventories.py apply S1.docx S2.docx    # 3
+$PYL scripts/docs/sync_proposal_screens.py S2.docx S3.docx              # 4
+$PY  scripts/docs/build_proposal.py S3.docx OUT.docx --profile file:///E:/Temp/claude/lo-profile-docs3   # 5
+```
+IN.docx may be the delivered file itself (every step replaces its own output). Use a private LibreOffice profile.
+
+### What was corrected (full list with evidence: `proposal_text_sync.json`, 129 entries)
+Counts generated, never typed (run of 2026-10-01 on the merged code): **209 routes** (212 method/path pairs; was 119), **55 tables**, 722 columns
+(was 35), **505 tests** in 13 files and 15 modules, all passed, 0 failed, 0 errors, 1074.682 s; demonstration dataset after a first start
+on a temporary database: 145 students, 12 programs, 230 subjects, 12 faculty, 19 demonstration student accounts (was "371 students, 59 faculty").
+
+Prose corrections, by section (each is one entry in `proposal_text_sync.json` with its evidence):
+- Ch.1 and Ch.4.4.4: "residency pause" (scope table, module text, data table, module table and their appendix copies): the residency clock is never
+  paused and leave counts toward maximum residence; constraint 3 ("imported values are read-only") now records the 2026-10-01 owner decision.
+- 5.1, 5.2.2, 5.3.1, 5.3.4, 5.4.3, 5.5 (assumptions 1, 2, 5, 6), 5.8.1, 5.8.3, 5.10.3/4, 5.12: staff can add a student and edit monitoring-sheet rows in the
+  portal, every value is labelled Imported / Manual entry / System with person, time, reason and history; a later import that disagrees is held as an issue.
+  The old "read-only / no manual student creation / audited status action" story was false (`POST /api/monitoring/subject-status` now always answers 409).
+- 5.3.2, 5.3.3, 5.10.5-5.10.8: course-offering plan cycle (draft, Dean, publish), class-list rules (faculty column, semester, blocked standings), documented
+  exception for a not-offered subject in single-student enrollment, class list is a per-subject roster (not a students-by-subjects matrix).
+- 5.3.5-5.3.9 and 5.10.9-5.10.13: ethics is part of the proposal gate, not a gate; Form 1 endorsement and concept-paper check; adviser signatures; verdict outcomes
+  per the protocol; panel matching uses TF-IDF / Gemini similarity over faculty expertise records of the paper text (not an uploaded CV, title excluded),
+  60/25/15 score, composition rules; scheduling (lead time, hard conflicts, invitations, reschedule/cancel/re-confirm); practicum hours are a student-entered running
+  total (the old "totalled across certificates" was false); graduation has no comprehensive-exam component (it gates starting research), the Dean exports the list.
+- 5.3.5 and 5.3.7 (new paragraphs): adviser appointment per the protocol; calendars, panel invitations, in-app notifications, private calendar feed.
+- 5.3.10, 5.3.11, 5.10.14-5.10.16: LOA/Readmission on a case record with a staged drag-and-drop board (shared with Graduation), side effects, Registrar list with sent/acknowledged,
+  AWOL is created from explicit evidence, residency. The withdrawal board does NOT support drag and drop and has seven columns (5.10.17).
+- 5.3.14, 5.3.15, 5.10.21, 5.10.26-5.10.29: policy documents (versions, draft/active/archived, categories), role scoping of the assistant, Dean / student / faculty portals
+  with sidebar pages (Tables 23.1-23.3 generated from `portalNav.jsx`), role-scoped views.
+- 5.4.1 and Table 22: seven account types, all seven sign in (the old text said six); rows rewritten from the real navigation. 5.4.4: staff can record "sent" / "acknowledged".
+- Table 21 and its note: the nine KPI measurements are now computed (Reports screen), so modules 4-6 are "Implemented" (they were "Partially implemented").
+- 5.7, Table 23: Python 3.11+ (3.14 verified), Node 24, MySQL optional (SQLite default), `cryptography` listed but unused (calendar tokens are plain columns), port from `FLASK_PORT`
+  (5000 default, 5050 in the demonstration launch). 5.8.1: login lock-out (5 failures / 15 min -> 5 min), cookie flags, first-login password change, DEMO_MODE.
+- 5.9, Appendix Z and the 14 field tables of 5.9.2: regenerated from the data model (name, type, key); several old descriptions were wrong (for example `completed_hours`).
+- 5.10 (screens): new entries Policy Documents, Business Rules, Form 1 Endorsements, Defense Calendar, Adviser Appointments; Login, Dashboard landing, Monitoring Sheet, Handoff,
+  Enrollment, Class List, Research Gate, Panel Matching, Scheduling, Practicum, Graduation, LOA, Readmission, AWOL, Reports (17 views), Student detail, Faculty, Semesters rewritten.
+- 5.11, Tables 24 and 25: 17 report views (10 operational + 7 analytics) with counts measured on the seeded database; six-plus exports; Registrar confirmation recorded for leave/readmission.
+- Ch.6: Table 26/27 (environment read from the machine), 6.3.1-6.3.4 and Tables 28-29 regenerated from the run, 6.3.3 "Defects" (DEF-001 closed, see below), 6.4/6.5 relabelled as
+  CAP-IT1 manual results, Table 32 rows, 6.6 items 1, 2, 3, 5, 6.8 (the "KPI not computed" reason removed).
+
+### Decisions taken while the owner was away
+- **DEF-001.** It is closed because `tests/test_bpm_workflows.py` now asserts the three Current subjects (MAED-COG1, MAED-MAJ1, MAED-MAJ3) that the baseline always created: the
+  test expectation was changed, not the seeding routine. The text says exactly that (6.3.3, 6.6 item 1).
+- **Manual results are not repeated.** Sections 6.4 (scenarios) and 6.5 (sign-in walkthrough) are manual browser results from the CAP-IT1 build. I cannot repeat them, so they are labelled
+  as such (caption of Table 31, intro of 6.4 and 6.5, Table 26) and the scenario rows and Table 32 were updated to the current behaviour from code and tests. The owner should repeat the
+  walkthrough before the defense or accept the label.
+- **Completion estimate** ("approximately eighty to eighty-five per cent", 6.8) is the owner's judgement and was left alone; only the reason "KPIs not computed" was removed.
+- **Numbering.** New screens and tables avoid renumbering: staff entries are inserted in 5.10 and renumbered (no cross-references to 5.10.n exist), the portal tables are 23.1-23.3,
+  the new adviser and calendar paragraphs sit inside 5.3.5 and 5.3.7 instead of new 5.3.n headings. Appendix Y has one Heading 3 per module (Y.1-Y.16) and Appendix V/Z use grouped rows.
+- Appendices N, O and Q (core tables, key relationships, ERD groups) are part of the originally proposed design (Chapter 3) and were left as they are; Appendix Z is the as-built inventory.
+- Test plain-language lines are derived from the test names (docstring if present), so apostrophes are missing in a few ("the students revise task"). Override by adding a docstring.
+- `rebuild_proposal.py` exists so the architect can regenerate after the next code packet: `--suite` re-runs the tests (about 18-20 minutes).
+
+### Verified / not verified
+Verified (real output, this machine):
+- Full suite on the merged code: `python -m unittest discover -s tests -p "test_*.py" -v`, 505 tests, OK, 1074.682 s (started 06:53:31, ended 07:11:30, 2026-10-01).
+- `validate.py --original` on the result: "All validations PASSED!" (paragraphs 9296 -> 12886). All XML parts re-parsed; 562 unique bookmark ids and names, every hyperlink anchor has a bookmark,
+  12 sections kept, 140 tables.
+- LibreOffice render: 475 pages, 494/494 headings and captions located, second pass identical ("labels stable").
+- Idempotent: running the whole pipeline on its own output gives the same text (paragraph-by-paragraph identical); only the ids of the zero-width bookmarks that
+  `add_business_rules_section.py` re-creates are renumbered, as before.
+- Looked at in the render: first pages of Appendix Y, Z and V, the execution record (W), Tables 28-29, 6.6, 6.8, 5.3.6/5.3.7, Table 23.1 (Dean portal pages), 5.11 with Table 24.
+Not verified:
+- Word itself (`1-1` style page labels, TOC refresh); the LibreOffice layout is an estimate.
+- Everything in Chapter 5 was checked against the code by reading it (four parallel read-only fact-checks plus a fifth after the calendar packet), not by clicking through the screens.
+- The screenshots (Figures 8-36, Appendix U) were not touched: they show the earlier UI and the new entries have none.
+- Code concern found while checking, NOT written into the document: proposal-stage panel matching seems to wait for the Form 5.2 ethics clearance, which can be recorded only after a passed
+  proposal defense (app.py `research_matching_profile`, about lines 27241-27260 before the calendar packet); the demo seed pre-completes the ethics record, so the test passes. Worth confirming.

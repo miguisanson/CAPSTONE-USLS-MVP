@@ -210,7 +210,7 @@ INSERTS = [
      "Chapters 1 to 3 describe the architecture as originally proposed (Node.js and Express.js, Prisma, JWT, "
      "NotebookLM, LangChain.js, the OpenAI API and ChromaDB), and they are kept as the original design. The "
      "system described in this chapter is the one that was built: Python 3 with Flask and SQLAlchemy, React with "
-     "Vite and Tailwind CSS, MySQL (SQLite for isolated tests), and Google Gemini for generation and "
+     "Vite and Tailwind CSS, MySQL for the deployed instance (a local SQLite file when no database URL is configured, and for isolated tests), and Google Gemini for generation and "
      "embeddings, with a local keyword-retrieval fallback when no API key is configured. The reasons for the "
      "change are given in Section 3.2.5. The scope, the modules, and the rule that the assistant supports but "
      "does not replace human decisions are unchanged; only the implementing technology differs. Figure 6 and "
