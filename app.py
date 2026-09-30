@@ -996,6 +996,37 @@ class FacultyWorkingHour(db.Model):
     enabled = db.Column(db.Boolean, default=True)
 
 
+# Evidence of what a faculty member is an expert in (interests, publications,
+# past advisees and panels, degrees). Panel Matching compares the student's paper
+# with all of it. `source` says where the record came from: "manual entry" for
+# portal entries, "demo seed" for the demonstration data.
+FACULTY_EXPERTISE_KINDS = {
+    "specialization": "Specialization",
+    "research_interest": "Research interest",
+    "publication": "Publication",
+    "past_advisee_title": "Past advisee title",
+    "past_panel_title": "Past panel title",
+    "degree": "Degree",
+}
+
+
+class FacultyExpertise(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    faculty_id = db.Column(db.Integer, db.ForeignKey("faculty.id"), nullable=False, index=True)
+    kind = db.Column(db.String(40), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    year = db.Column(db.Integer)
+    source = db.Column(db.String(120), nullable=False, default="manual entry")
+    created_by = db.Column(db.String(160))
+    created_at = db.Column(db.DateTime, default=now_utc)
+    updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
+
+    faculty = db.relationship(
+        "Faculty",
+        backref=db.backref("expertise_records", lazy=True, cascade="all, delete-orphan"),
+    )
+
+
 # Result of the panel matching transaction, including the rule score shown to users.
 class PanelAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1545,7 +1576,8 @@ def faculty_dict(faculty: Faculty) -> dict:
         "email": faculty.email or faculty_contact_email(faculty),
         "eligible_roles": faculty_eligible_roles(faculty),
         "account": faculty_account_dict(faculty),
-        "matching_keywords": matching_tokens(faculty.specialization)[:12],
+        "matching_keywords": faculty_matching_keywords(faculty),
+        "expertise_count": FacultyExpertise.query.filter_by(faculty_id=faculty.id).count(),
         "profile_source": "Imported faculty roster and coordinator-maintained teaching preferences",
         "profile_basis": [
             "Recorded specialization / CV summary",
@@ -9056,6 +9088,102 @@ def register_routes(app: Flask) -> None:
             "account": account_dict(account),
         }), 201
 
+    # Faculty expertise evidence: what Panel Matching compares the student's paper with.
+    def validated_expertise_payload(data: dict, partial: bool = False) -> tuple[dict, str | None]:
+        cleaned: dict = {}
+        if "kind" in data or not partial:
+            kind = str(data.get("kind") or "").strip()
+            if kind not in FACULTY_EXPERTISE_KINDS:
+                return {}, "Choose a valid kind of expertise record."
+            cleaned["kind"] = kind
+        if "text" in data or not partial:
+            body = re.sub(r"\s+", " ", str(data.get("text") or "")).strip()
+            if len(body) < 5 or len(body) > 600:
+                return {}, "Describe the expertise in 5 to 600 characters."
+            cleaned["text"] = body
+        if "year" in data:
+            raw_year = data.get("year")
+            if raw_year in (None, ""):
+                cleaned["year"] = None
+            else:
+                try:
+                    year = int(raw_year)
+                except (TypeError, ValueError):
+                    return {}, "Year must be a whole number."
+                if year < 1950 or year > date.today().year + 1:
+                    return {}, f"Year must be between 1950 and {date.today().year + 1}."
+                cleaned["year"] = year
+        return cleaned, None
+
+    @app.route("/api/faculty/<int:faculty_id>/expertise")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def faculty_expertise_list(faculty_id: int):
+        faculty = Faculty.query.get_or_404(faculty_id)
+        records = FacultyExpertise.query.filter_by(faculty_id=faculty.id).order_by(FacultyExpertise.id).all()
+        return jsonify({
+            "items": [faculty_expertise_dict(record) for record in records],
+            "kinds": [{"value": key, "label": label} for key, label in FACULTY_EXPERTISE_KINDS.items() if key != "specialization"],
+        })
+
+    @app.route("/api/faculty/<int:faculty_id>/expertise", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def faculty_expertise_create(faculty_id: int):
+        faculty = Faculty.query.get_or_404(faculty_id)
+        data = request.get_json(silent=True) or {}
+        cleaned, error = validated_expertise_payload(data)
+        if error:
+            return jsonify({"error": error}), 400
+        account = current_account()
+        record = FacultyExpertise(
+            faculty_id=faculty.id, source="manual entry",
+            created_by=account.full_name if account else None, **cleaned,
+        )
+        db.session.add(record)
+        db.session.flush()
+        add_log(
+            "panel-matching", None, workflow_actor_label(account), "Faculty expertise record",
+            f"Added expertise record for {faculty.name}", "Academic Coordinator",
+            f"{FACULTY_EXPERTISE_KINDS[record.kind]}: {record.text[:120]}", visibility="internal",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "item": faculty_expertise_dict(record)}), 201
+
+    @app.route("/api/faculty-expertise/<int:record_id>", methods=["PUT"])
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def faculty_expertise_update(record_id: int):
+        record = FacultyExpertise.query.get_or_404(record_id)
+        data = request.get_json(silent=True) or {}
+        cleaned, error = validated_expertise_payload(data, partial=True)
+        if error:
+            return jsonify({"error": error}), 400
+        for key, value in cleaned.items():
+            setattr(record, key, value)
+        # Any portal edit makes the record a manual entry, even if it began as demo data.
+        account = current_account()
+        record.source = "manual entry"
+        record.created_by = account.full_name if account else record.created_by
+        add_log(
+            "panel-matching", None, workflow_actor_label(account), "Faculty expertise record",
+            f"Edited expertise record for {record.faculty.name}", "Academic Coordinator",
+            f"{FACULTY_EXPERTISE_KINDS.get(record.kind, record.kind)}: {record.text[:120]}", visibility="internal",
+        )
+        db.session.commit()
+        return jsonify({"ok": True, "item": faculty_expertise_dict(record)})
+
+    @app.route("/api/faculty-expertise/<int:record_id>", methods=["DELETE"])
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def faculty_expertise_delete(record_id: int):
+        record = FacultyExpertise.query.get_or_404(record_id)
+        account = current_account()
+        add_log(
+            "panel-matching", None, workflow_actor_label(account), "Faculty expertise record",
+            f"Removed expertise record for {record.faculty.name}", "Academic Coordinator",
+            f"{FACULTY_EXPERTISE_KINDS.get(record.kind, record.kind)}: {record.text[:120]}", visibility="internal",
+        )
+        db.session.delete(record)
+        db.session.commit()
+        return jsonify({"ok": True})
+
     @app.route("/api/faculty/<int:faculty_id>/preferences", methods=["PUT"])
     @require_api_login("staff", "academic_coordinator", "faculty")
     def faculty_course_preferences_save(faculty_id: int):
@@ -16339,6 +16467,18 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             context["research_prerequisite"] = prerequisite
             matching_profile = research_matching_profile(selected_student)
             context["matching_profile"] = matching_profile
+            matching_result = (
+                panel_matching_result(selected_student, matching_profile)
+                if prerequisite["research_allowed"] and matching_profile["ready"]
+                else None
+            )
+            context["matching_method"] = matching_result["method"] if matching_result else None
+            context["matching_method_label"] = matching_result["method_label"] if matching_result else None
+            context["matching_method_note"] = matching_result["method_note"] if matching_result else ""
+            context["matching_weights"] = dict(PANEL_MATCH_WEIGHTS)
+            context["suggested_panel"] = matching_result["suggested_panel"] if matching_result else []
+            context["panel_composition"] = matching_result["composition"] if matching_result else None
+            context["excluded_faculty"] = matching_result["excluded"] if matching_result else []
             context["panel_recommendations"] = [
                 {
                     "faculty_id": row["faculty"].id,
@@ -16352,8 +16492,12 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     "availability_windows": row["availability_windows"],
                     "workload": row["workload"],
                     "score_breakdown": row["score_breakdown"],
+                    "breakdown": row["breakdown"],
+                    "flags": row["flags"],
+                    "method": row["method"],
+                    "method_label": row["method_label"],
                 }
-                for row in (recommend_panel(selected_student) if prerequisite["research_allowed"] and matching_profile["ready"] else [])
+                for row in (matching_result["rows"] if matching_result else [])
             ]
             context["assigned_panel"] = [
                 panel_assignment_dict(p)
@@ -17937,7 +18081,8 @@ def handle_panel_matching(data: MultiDict) -> int:
     matching_profile = research_matching_profile(student)
     if not matching_profile["ready"]:
         raise ValueError(matching_profile.get("blocked_reason") or "Panel matching requires readable research manuscript body text.")
-    recommendations = recommend_panel(student)
+    matching_result = panel_matching_result(student, matching_profile)
+    recommendations = matching_result["rows"]
     required_roles = panel_roles_for_student(student)
     selected_ids = []
     for value in data.getlist("faculty_ids"):
@@ -17947,8 +18092,17 @@ def handle_panel_matching(data: MultiDict) -> int:
             continue
         if faculty_id not in selected_ids:
             selected_ids.append(faculty_id)
+    adviser_conflicts = student_advisers(student)
+    for faculty_id in selected_ids:
+        if faculty_id in adviser_conflicts:
+            info = adviser_conflicts[faculty_id]
+            raise ValueError(
+                f"{info['faculty'].name} is the student's {info['role'].lower()} and cannot be assigned to the panel."
+            )
     if not selected_ids:
-        selected_ids = [row["faculty"].id for row in recommendations[: len(required_roles)]]
+        # Default: the suggested panel, seated by role (best methods profile on the Method seat).
+        selected_ids = [seat["faculty_id"] for seat in matching_result["suggested_panel"]]
+        required_roles = [seat["role"] for seat in matching_result["suggested_panel"]] or required_roles
     if len(selected_ids) != len(required_roles):
         raise ValueError(f"Select {len(required_roles)} different faculty members before finalizing the panel.")
 
@@ -17959,6 +18113,12 @@ def handle_panel_matching(data: MultiDict) -> int:
         if not row:
             raise ValueError("One of the selected faculty members is no longer eligible for panel assignment.")
         selected_rows.append(row)
+    composition = panel_composition_report(
+        student, [(required_roles[index], row["faculty"]) for index, row in enumerate(selected_rows)]
+    )
+    failed_rules = [check["message"] for check in composition["checks"] if not check["ok"] and check["severity"] == "required"]
+    if failed_rules:
+        raise ValueError("The panel does not satisfy the Research Protocol: " + " ".join(failed_rules))
 
     clear_panel_for_research_gate(student, matching_profile["gate"])
     for index, row in enumerate(selected_rows):
@@ -17972,8 +18132,8 @@ def handle_panel_matching(data: MultiDict) -> int:
                 faculty_id=row["faculty"].id,
                 gate=matching_profile["gate"],
                 panel_role=required_roles[index],
-                score=row["score"],
-                eligibility_note=row["note"],
+                score=int(round(row["score"])),
+                eligibility_note=f"{row['method_label']}: {row['note']}"[:220],
             )
         )
 
@@ -17989,7 +18149,7 @@ def handle_panel_matching(data: MultiDict) -> int:
                 f"{required_roles[index]}: {row['faculty'].name} ({row['score']})"
                 for index, row in enumerate(selected_rows)
             ]
-        ),
+        ) + f". Method: {matching_result['method_label']}.",
     )
     add_task(student.id, "Confirm assigned panel acceptance", "Research Coordinator", 3, 30)
     sync_research_progress(student)
@@ -19024,6 +19184,10 @@ def candidate_conflicts_profile_blocks(
 
 def faculty_profile_dict(faculty: Faculty, include_calendar_events: bool = False) -> dict:
     payload = faculty_dict(faculty)
+    payload["expertise_records"] = [
+        faculty_expertise_dict(record)
+        for record in FacultyExpertise.query.filter_by(faculty_id=faculty.id).order_by(FacultyExpertise.id).all()
+    ]
     upcoming = (
         FacultyAvailability.query.filter(
             FacultyAvailability.faculty_id == faculty.id,
@@ -19643,68 +19807,300 @@ def extract_research_phrases(text: str, limit: int = 14) -> list[str]:
     return (recognized + frequent_terms)[:limit]
 
 
-def faculty_specialization_token_stats() -> tuple[Counter, int]:
-    """Token document-frequency across active faculty specializations.
+# ---------------------------------------------------------------------------
+# Panel matching: explainable expertise similarity (defense revision D1 / D6)
+# ---------------------------------------------------------------------------
+# Score out of 100 = expertise similarity (60) + availability (25) + workload (15).
+# Expertise is the text similarity between the student's paper and everything
+# recorded about a faculty member's expertise. The method is TF-IDF cosine
+# similarity (pure Python, always available) or, when a Gemini key is configured,
+# embedding cosine similarity, with TF-IDF as the fallback on any error.
+PANEL_MATCH_WEIGHTS = {"expertise": 60, "availability": 25, "workload": 15}
+PANEL_MATCH_SIMILARITY_FLOOR = 0.10
+PANEL_MATCH_WINDOWS_FOR_FULL_MARKS = 8
+PANEL_MATCH_WORKLOAD_LIMIT = 6
+PANEL_MATCH_OVERLOAD_AT = 4
+PANEL_MATCH_METHOD_LABELS = {
+    "tfidf": "Similarity match (keyword TF-IDF)",
+    "gemini-embeddings": "Semantic match (Gemini embeddings)",
+}
+PANEL_EVIDENCE_KIND_WEIGHT = {
+    "specialization": 1.0,
+    "research_interest": 1.0,
+    "publication": 1.2,
+    "past_advisee_title": 1.0,
+    "past_panel_title": 0.8,
+    "degree": 0.6,
+}
+PANEL_STOPWORDS = set(MATCH_STOPWORDS) | {
+    "the", "and", "for", "are", "was", "not", "its", "how", "can", "who", "may", "use", "via", "per",
+    "has", "had", "but", "all", "any", "our", "out", "one", "two", "three", "each", "both", "such",
+    "than", "then", "them", "they", "will", "been", "being", "does", "done", "over", "under", "upon",
+    "within", "without", "whether", "while", "other", "others", "some", "same", "very", "well", "just",
+    "only", "own", "new", "many", "much", "less", "like", "whose", "whom", "there", "here",
+    "examines", "examine", "investigates", "investigate", "evaluates", "evaluate", "explores",
+    "explore", "proposes", "propose", "develops", "develop", "applies", "apply", "studies", "looking",
+    "look", "used", "uses", "across", "toward", "towards", "during", "before", "because",
+    "affects", "affect", "shape", "shapes", "describe", "describes", "compared",
+    "compare", "estimate", "estimated", "report", "reports", "reported", "recommend", "support",
+}
+PANEL_METHOD_WORDS = (
+    "method", "methodology", "statistic", "survey", "regression", "qualitative", "quantitative",
+    "instrument", "validation", "reliability", "psychometric", "sampling", "factor", "questionnaire",
+    "thematic", "coding", "measurement", "structural", "equation", "inferential", "mixed",
+)
+# Everyday research words: alone they say nothing about expertise, so they are not scored as single
+# words (they still build two-word phrases such as "machine learning" or "data mining").
+PANEL_GENERIC_TOPIC_WORDS = (
+    "data", "analysis", "analyses", "method", "methods", "system", "systems", "design", "record", "records",
+    "self", "program", "programs", "working", "adult", "adults", "young", "public", "learning", "learner",
+    "learners", "student", "students", "education", "educational", "outcome", "outcomes", "performance",
+)
+_PANEL_EMBEDDING_CACHE: dict[str, list[float]] = {}
+_PANEL_GENERIC_STEMS: set[str] = set()
 
-    This keeps matching field-neutral: terms that appear in many faculty
-    profiles are treated as broad context, while distinctive specialization
-    terms carry more ranking weight for every discipline.
-    """
-    document_frequency = Counter()
-    total_profiles = 0
-    for faculty in Faculty.query.filter_by(active=True).all():
-        tokens = set(matching_tokens(faculty.specialization or ""))
-        if not tokens:
+
+def _panel_stem(word: str) -> str:
+    if len(word) > 5 and word.endswith("ies"):
+        return word[:-3] + "y"
+    for suffix in ("ing", "ed", "es", "s"):
+        if len(word) - len(suffix) >= 4 and word.endswith(suffix):
+            return word[: -len(suffix)]
+    return word
+
+
+_PANEL_GENERIC_STEMS.update(_panel_stem(word) for word in PANEL_GENERIC_TOPIC_WORDS)
+
+
+def _panel_features(text_value: str, surfaces: dict | None = None) -> Counter:
+    """Stemmed unigram and bigram counts. `surfaces` remembers a readable form of each feature."""
+    counts: Counter = Counter()
+    for segment in re.split(r"[.;:,!?()\[\]\n\r/]+", (text_value or "").lower()):
+        raw = [
+            word for word in re.findall(r"[a-z][a-z0-9]{2,}", segment.replace("-", " "))
+            if word not in PANEL_STOPWORDS
+        ]
+        stems = [_panel_stem(word) for word in raw]
+        for word, stem in zip(raw, stems):
+            if stem not in _PANEL_GENERIC_STEMS:
+                counts[stem] += 1
+            if surfaces is not None:
+                surfaces.setdefault(stem, word)
+        for index in range(len(stems) - 1):
+            bigram = f"{stems[index]} {stems[index + 1]}"
+            counts[bigram] += 1
+            if surfaces is not None:
+                surfaces.setdefault(bigram, f"{raw[index]} {raw[index + 1]}")
+    return counts
+
+
+def faculty_expertise_dict(record: FacultyExpertise) -> dict:
+    return {
+        "id": record.id,
+        "faculty_id": record.faculty_id,
+        "kind": record.kind,
+        "kind_label": FACULTY_EXPERTISE_KINDS.get(record.kind, record.kind),
+        "text": record.text,
+        "year": record.year,
+        "source": record.source or "manual entry",
+        "created_by": record.created_by,
+        "created_at": iso(record.created_at),
+        "updated_at": iso(record.updated_at),
+    }
+
+
+def faculty_evidence_items(faculty: Faculty, records: list[FacultyExpertise] | None = None) -> list[dict]:
+    """Everything recorded about a faculty member's expertise: the roster specialization and all evidence rows."""
+    items = []
+    seen = set()
+    specialization = (faculty.specialization or "").strip()
+    if specialization:
+        seen.add(re.sub(r"\W+", " ", specialization.lower()).strip())
+        items.append({"kind": "specialization", "text": specialization, "year": None, "source": "faculty profile", "id": None})
+    if records is None:
+        records = FacultyExpertise.query.filter_by(faculty_id=faculty.id).order_by(FacultyExpertise.id).all()
+    for record in records:
+        key = re.sub(r"\W+", " ", (record.text or "").lower()).strip()
+        if not key or key in seen:
             continue
-        total_profiles += 1
-        document_frequency.update(tokens)
-    return document_frequency, total_profiles
+        seen.add(key)
+        items.append({
+            "kind": record.kind, "text": record.text, "year": record.year,
+            "source": record.source or "manual entry", "id": record.id,
+        })
+    return items
 
 
-def specialization_token_weight(token: str, document_frequency: Counter, total_profiles: int) -> float:
-    if not total_profiles:
-        return 1.0
-    frequency_ratio = document_frequency.get(token, 0) / total_profiles
-    if frequency_ratio <= 0.08:
-        return 2.0
-    if frequency_ratio <= 0.18:
-        return 1.5
-    if frequency_ratio <= 0.35:
-        return 1.0
-    return 0.45
+def faculty_matching_keywords(faculty: Faculty, limit: int = 12) -> list[str]:
+    surfaces: dict = {}
+    counts: Counter = Counter()
+    for item in faculty_evidence_items(faculty):
+        counts.update(_panel_features(item["text"], surfaces))
+    words = [term for term, _count in counts.most_common() if " " not in term]
+    return [surfaces.get(term, term) for term in words[:limit]]
 
 
 def faculty_matching_profiles() -> list[dict]:
+    records_by_faculty: dict[int, list[FacultyExpertise]] = {}
+    for record in FacultyExpertise.query.order_by(FacultyExpertise.id).all():
+        records_by_faculty.setdefault(record.faculty_id, []).append(record)
     rows = []
     for faculty in Faculty.query.filter_by(active=True).all():
-        profile_text = faculty.specialization or ""
+        evidence = faculty_evidence_items(faculty, records_by_faculty.get(faculty.id, []))
         rows.append({
             "id": faculty.id,
             "name": faculty.name,
             "specialization": faculty.specialization or "",
             "college": faculty.college or "",
-            "tokens": set(matching_tokens(profile_text)),
-            "text": profile_text,
+            "evidence": evidence,
+            "text": " ".join(item["text"] for item in evidence),
         })
     return rows
 
 
+def panel_tfidf_similarities(paper_text: str, corpus: dict[int, list[dict]]) -> dict:
+    """TF-IDF cosine similarity between the paper and each faculty member's evidence.
+
+    The document frequency is taken over the faculty corpus, so a term that every
+    faculty member mentions carries little weight and a distinctive term a lot.
+    The paper vector is limited to terms the corpus knows, which keeps the cosine
+    meaningful for long manuscripts.
+    """
+    surfaces: dict = {}
+    documents: dict[int, Counter] = {}
+    for faculty_id, items in corpus.items():
+        counter: Counter = Counter()
+        for item in items:
+            weight = PANEL_EVIDENCE_KIND_WEIGHT.get(item["kind"], 1.0)
+            for term, count in _panel_features(item["text"], surfaces).items():
+                counter[term] += count * weight
+        documents[faculty_id] = counter
+    total = len(documents)
+    document_frequency: Counter = Counter()
+    for counter in documents.values():
+        document_frequency.update(counter.keys())
+    idf = {term: math.log((1 + total) / (1 + df)) + 1 for term, df in document_frequency.items()}
+    query_counts = _panel_features(paper_text, surfaces)
+    query = {term: (1 + math.log(count)) * idf[term] for term, count in query_counts.items() if term in idf}
+    query_norm = math.sqrt(sum(value * value for value in query.values()))
+    results: dict[int, dict] = {}
+    for faculty_id, counter in documents.items():
+        vector = {term: (1 + math.log(count)) * idf[term] for term, count in counter.items() if count > 0}
+        norm = math.sqrt(sum(value * value for value in vector.values()))
+        contributions = {term: query[term] * vector[term] for term in query if term in vector}
+        similarity = sum(contributions.values()) / (query_norm * norm) if query_norm and norm else 0.0
+        results[faculty_id] = {"similarity": similarity, "contributions": contributions}
+    # Terms that many faculty mention say little about one person's expertise; they
+    # still count in the score (with a low weight) but are not shown as "matched topics".
+    common = {term for term, df in document_frequency.items() if total >= 5 and df / total > 0.34}
+    return {"results": results, "surfaces": surfaces, "common": common}
+
+
+def panel_matched_topics(contributions: dict, surfaces: dict, limit: int = 6, common: set | None = None) -> list[str]:
+    usable = {term: value for term, value in contributions.items() if not common or term not in common}
+    if not usable:
+        return []
+    strongest = max(usable.values())
+    ranked = sorted(
+        ((term, value) for term, value in usable.items() if value >= 0.2 * strongest),
+        key=lambda pair: (-pair[1], pair[0]),
+    )
+    chosen = [term for term, _value in ranked[: limit * 4]]
+    bigrams = [term for term in chosen if " " in term]
+    covered = {part for term in bigrams for part in term.split()}
+    topics = []
+    for term in chosen:
+        if " " not in term and term in covered:
+            continue
+        topics.append(surfaces.get(term, term))
+        if len(topics) >= limit:
+            break
+    return topics
+
+
+def panel_best_passage(paper_text: str, contributions: dict, limit: int = 260) -> str:
+    best_sentence, best_score = "", 0.0
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", paper_text or ""):
+        sentence = re.sub(r"\s+", " ", sentence).strip()
+        if len(sentence) < 25:
+            continue
+        terms = set(_panel_features(sentence))
+        score = sum(contributions.get(term, 0.0) for term in terms)
+        if score > best_score:
+            best_sentence, best_score = sentence, score
+    return paper_excerpt(best_sentence, limit) if best_sentence else ""
+
+
+def panel_evidence_matches(items: list[dict], contributions: dict, surfaces: dict, limit: int = 3, common: set | None = None) -> list[dict]:
+    scored = []
+    for item in items:
+        terms = set(_panel_features(item["text"]))
+        shared = {term: contributions[term] for term in terms if term in contributions}
+        if shared:
+            scored.append((sum(shared.values()), item, panel_matched_topics(shared, surfaces, 3, common)))
+    scored.sort(key=lambda entry: -entry[0])
+    return [
+        {
+            "kind": item["kind"],
+            "kind_label": FACULTY_EXPERTISE_KINDS.get(item["kind"], item["kind"]),
+            "text": paper_excerpt(item["text"], 170),
+            "year": item.get("year"),
+            "source": item.get("source") or "manual entry",
+            "matched": topics,
+        }
+        for _score, item, topics in scored[:limit]
+    ]
+
+
+def panel_method_affinity(items: list[dict]) -> int:
+    stems = {_panel_stem(word) for word in PANEL_METHOD_WORDS}
+    counts: Counter = Counter()
+    for item in items:
+        counts.update(_panel_features(item["text"]))
+    return sum(min(counts[stem], 3) for stem in stems)
+
+
+def panel_gemini_configured() -> bool:
+    return bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
+
+
+def panel_embedding_similarities(paper_text: str, faculty_texts: dict[int, str]) -> dict[int, float]:
+    """Cosine similarity of Gemini embeddings; raises on any failure so the caller can fall back."""
+    ids = list(faculty_texts)
+    texts = [paper_text[:9000]] + [faculty_texts[faculty_id][:9000] for faculty_id in ids]
+    keys = [hashlib.sha256(value.encode("utf-8")).hexdigest() for value in texts]
+    missing = [(key, value) for key, value in zip(keys, texts) if key not in _PANEL_EMBEDDING_CACHE]
+    if missing:
+        unique = list(dict(missing).items())
+        vectors = _gemini_embed_texts([value for _key, value in unique], "similarity")
+        if len(vectors) != len(unique):
+            raise RuntimeError("The embedding service returned an incomplete answer.")
+        if len(_PANEL_EMBEDDING_CACHE) > 400:
+            _PANEL_EMBEDDING_CACHE.clear()
+        for (key, _value), vector in zip(unique, vectors):
+            _PANEL_EMBEDDING_CACHE[key] = vector
+    paper_vector = _PANEL_EMBEDDING_CACHE[keys[0]]
+    similarities = {}
+    for faculty_id, key in zip(ids, keys[1:]):
+        vector = _PANEL_EMBEDDING_CACHE[key]
+        similarities[faculty_id] = sum(a * b for a, b in zip(paper_vector, vector))
+    return similarities
+
+
 def retrieve_faculty_for_panel_matching(paper_text: str, faculty_profiles: list[dict], limit: int = 8) -> list[dict]:
-    paper_counts = Counter(matching_tokens(paper_text))
-    token_frequency, total_profiles = faculty_specialization_token_stats()
+    if not (paper_text or "").strip():
+        return []
+    corpus = {profile["id"]: profile["evidence"] for profile in faculty_profiles}
+    analysis = panel_tfidf_similarities(paper_text, corpus)
     ranked = []
     for profile in faculty_profiles:
-        overlap = [token for token, _count in paper_counts.most_common() if token in profile["tokens"]]
-        phrase_hits = [
-            phrase for phrase in RESEARCH_KEY_PHRASES
-            if phrase in (paper_text or "").lower() and set(matching_tokens(phrase)).intersection(profile["tokens"])
-        ]
-        score = (
-            sum(min(paper_counts[token], 3) * specialization_token_weight(token, token_frequency, total_profiles) for token in overlap[:10])
-            + len(phrase_hits) * 4
-        )
-        if score:
-            ranked.append({**profile, "retrieval_score": score, "matched_terms": (phrase_hits + overlap)[:8]})
+        result = analysis["results"].get(profile["id"])
+        if result and result["similarity"] > 0:
+            ranked.append({
+                **profile,
+                "retrieval_score": result["similarity"],
+                "matched_terms": panel_matched_topics(result["contributions"], analysis["surfaces"], 8, analysis["common"]),
+            })
     return sorted(ranked, key=lambda item: item["retrieval_score"], reverse=True)[:limit]
 
 
@@ -19746,7 +20142,7 @@ def generate_local_panel_matching_rag(paper_text: str, retrieved_faculty: list[d
         faculty_matches.append({
             "faculty_id": profile["id"],
             "faculty_name": profile["name"],
-            "rationale": "Retrieved from faculty specialization overlap with the uploaded manuscript body.",
+            "rationale": "Retrieved from faculty expertise records that overlap with the uploaded manuscript body.",
             "matched_terms": terms,
         })
     keywords = []
@@ -19945,8 +20341,17 @@ def research_matching_profile(student: Student) -> dict:
         ],
         "keywords": keywords,
         "rag_summary": rag_payload.get("summary", ""),
+        "analysis_summary": rag_payload.get("summary", ""),
         "rag_faculty_matches": rag_payload.get("faculty_matches", []),
         "rag_mode": rag_payload.get("mode", "local-rag"),
+        # Honest wording for the screen: the ranking itself is a similarity
+        # score; Gemini, when configured, only helps with keywords and notes.
+        "analysis_label": {
+            "document-rag": "Keyword extraction assisted by Gemini",
+            "local-rag": "Keyword analysis (local, no AI service)",
+            "local-rag-fallback": "Keyword analysis (local; Gemini did not respond)",
+            "waiting": "Waiting for readable paper text",
+        }.get(rag_payload.get("mode", "local-rag"), "Keyword analysis"),
         "query_text": query_text,
         "readable_paper_count": len(readable_files),
         "ready": ready,
@@ -21271,7 +21676,9 @@ def panel_roles_for_student(student: Student) -> list[str]:
     # and defense scheduling.
     case_type = research_case_type(student)
     if case_type == "Project Paper":
-        return ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
+        # Research Protocol: Project Paper = 1 Panel Chair and 2 members
+        # (1 Content Specialist, 1 Method Specialist); no external panelist.
+        return ["Panel Chair", "Content Specialist", "Method Specialist"]
     if case_type == "Dissertation":
         return ["Panel Chair", "Content Specialist 1", "Content Specialist 2", "Method Specialist", "External Panel"]
     return ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
@@ -21951,55 +22358,222 @@ def compute_offering_demand() -> list[dict]:
     return sorted(demand.values(), key=lambda item: item["count"], reverse=True)[:12]
 
 
-def recommend_panel(student: Student) -> list[dict]:
-    # RAG-assisted retrieval analyzes the active gate's uploaded manuscript body
-    # and retrieved faculty profiles; the final rubric stays explainable.
-    profile = research_matching_profile(student)
-    query_counts = Counter(matching_tokens(profile["query_text"] + " " + " ".join(profile.get("keywords", []))))
-    token_frequency, total_profiles = faculty_specialization_token_stats()
-    analyzed_phrases = profile.get("keywords", [])
-    rag_match_by_id = {
+def _panel_name_key(name: str | None) -> str:
+    cleaned = re.sub(r"^(dr|prof|engr|atty|mr|ms|mrs)\.?\s+", "", (name or "").strip().lower())
+    return re.sub(r"[^a-z0-9]+", " ", cleaned).strip()
+
+
+def student_advisers(student: Student) -> dict[int, dict]:
+    """Faculty who advise this student (adviser, co-adviser): never eligible as panelists (revision D4)."""
+    found: dict[int, dict] = {}
+    active_faculty = Faculty.query.filter_by(active=True).all()
+    by_key = {_panel_name_key(faculty.name): faculty for faculty in active_faculty}
+
+    def add(faculty: Faculty | None, role: str) -> None:
+        if faculty and faculty.id not in found:
+            found[faculty.id] = {"faculty": faculty, "role": role}
+
+    research_case = (
+        ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+    )
+    for raw in (student.adviser_name, research_case.adviser_name if research_case else None):
+        for index, part in enumerate(re.split(r"\s*(?:;|/|&|\band\b)\s*", raw or "")):
+            if part.strip():
+                add(by_key.get(_panel_name_key(part)), "Adviser" if index == 0 else "Co-adviser")
+    for assignment in AdviserAssignment.query.filter_by(student_id=student.id, status="Active").all():
+        add(db.session.get(Faculty, assignment.faculty_id), "Adviser")
+    for approval in AdviserDocumentApproval.query.filter_by(student_id=student.id).all():
+        add(db.session.get(Faculty, approval.faculty_id), "Adviser")
+    return found
+
+
+def suggest_panel_roles(rows: list[dict], roles: list[str]) -> list[dict]:
+    """Seat the top-ranked candidates: the best methods profile takes the Method seat, the rest follow by score."""
+    method_role = next((role for role in roles if "Method" in role), None)
+    method_pick = None
+    pool = rows[: len(roles)]
+    if method_role and rows:
+        # The Method seat goes to the strongest recorded methods profile among the better-ranked
+        # candidates; the other seats follow by score.
+        best = max(rows[: len(roles) + 4], key=lambda row: (row["method_affinity"], row["score"]))
+        if best["method_affinity"] > 0:
+            method_pick = best
+            pool = [row for row in rows if row is not best][: len(roles) - 1]
+    remaining = list(pool)
+    seating: dict[str, dict] = {}
+    if method_pick:
+        seating[method_role] = method_pick
+    sequence = [role for role in roles if role != method_role or not method_pick]
+    chair_roles = [role for role in sequence if "Chair" in role]
+    external_roles = [role for role in sequence if "External" in role]
+    content_roles = [role for role in sequence if role not in chair_roles + external_roles]
+    for role in chair_roles + content_roles + external_roles:
+        if remaining:
+            seating[role] = remaining.pop(0)
+    return [
+        {
+            "role": role,
+            "faculty_id": seating[role]["faculty"].id,
+            "faculty_name": seating[role]["faculty"].name,
+            "score": seating[role]["score"],
+        }
+        for role in roles
+        if role in seating
+    ]
+
+
+def panel_composition_report(student: Student, assignments: list, gate: str | None = None) -> dict:
+    """Check a proposed panel against the Graduate School Research Protocol composition rules."""
+    roles = panel_roles_for_student(student)
+    case_type = research_case_type(student)
+    seated = [(role, faculty) for role, faculty in assignments if faculty is not None]
+    advisers = student_advisers(student)
+    checks: list[dict] = []
+
+    def add(rule: str, ok: bool, message: str, severity: str = "required") -> None:
+        checks.append({"rule": rule, "ok": bool(ok), "message": message, "severity": severity})
+
+    add(
+        "size",
+        len(seated) == len(roles),
+        f"A {case_type} panel has {len(roles)} members ({', '.join(roles)}); {len(seated)} seated."
+        if len(seated) != len(roles)
+        else f"All {len(roles)} panel seats required for a {case_type} are filled.",
+    )
+    seated_roles = sorted(role for role, _faculty in seated)
+    missing = [role for role in roles if role not in seated_roles]
+    add(
+        "roles",
+        sorted(roles) == seated_roles,
+        f"Missing seat(s): {', '.join(missing)}." if missing else "Every required role is seated exactly once.",
+    )
+    ids = [faculty.id for _role, faculty in seated]
+    add(
+        "distinct",
+        len(ids) == len(set(ids)),
+        "The same faculty member is seated more than once." if len(ids) != len(set(ids)) else "Every seat has a different faculty member.",
+    )
+    conflicts = [advisers[faculty.id] for _role, faculty in seated if faculty.id in advisers]
+    add(
+        "adviser",
+        not conflicts,
+        "; ".join(f"{item['faculty'].name} is the student's {item['role'].lower()} and cannot sit on the panel." for item in conflicts)
+        if conflicts
+        else "The student's adviser and co-adviser are not on the panel.",
+    )
+    chair = next((faculty for role, faculty in seated if role == "Panel Chair"), None)
+    add(
+        "chair",
+        bool(chair and chair.active),
+        f"{chair.name} chairs the panel (University-affiliated faculty)." if chair and chair.active
+        else "A University-affiliated Panel Chair must be seated.",
+    )
+    add(
+        "external",
+        True,
+        "The External Panel member is a content or industry expert who participates from the Proposal Defense onward."
+        if "External Panel" in roles
+        else f"A {case_type} panel has no External Panel seat.",
+        "info",
+    )
+    method = next((faculty for role, faculty in seated if "Method" in role), None)
+    if method:
+        has_methods = panel_method_affinity(faculty_evidence_items(method)) > 0
+        add(
+            "method",
+            has_methods,
+            f"{method.name} has recorded research-methods expertise." if has_methods
+            else f"{method.name} has no recorded research-methods expertise for the Method Specialist seat.",
+            "advisory",
+        )
+    return {
+        "case_type": case_type,
+        "required_roles": roles,
+        "checks": checks,
+        "satisfied": all(check["ok"] for check in checks if check["severity"] == "required"),
+        "source": "Graduate School Research Protocol (AY 2024-2025), Title Defense - panel composition",
+    }
+
+
+def _panel_reason(name: str, topics: list[str], evidence: list[dict], windows: int, workload: int, method: str, relative: float) -> str:
+    if topics:
+        kinds = sorted({item["kind_label"].lower() for item in evidence})
+        quoted = ", ".join(f"'{topic}'" for topic in topics[:3])
+        strength = "strongly" if relative >= 0.6 else "moderately" if relative >= 0.25 else "only weakly"
+        first = f"{name}: expertise records ({', '.join(kinds)}) {strength} match the paper on {quoted}"
+        if method == "gemini-embeddings":
+            first += " and are semantically close to it"
+    else:
+        first = f"{name}: no expertise record shares distinctive wording with the paper"
+    availability = f"{windows} conflict-free defense window{'s' if windows != 1 else ''}"
+    load = f"{workload} other student panel{'s' if workload != 1 else ''}"
+    return f"{first}; {availability}; {load}."
+
+
+def panel_matching_result(student: Student, profile: dict | None = None) -> dict:
+    """Score and rank faculty for this student's paper and explain every score."""
+    profile = profile or research_matching_profile(student)
+    paper_text = (profile.get("query_text") or "").strip()
+    advisers = student_advisers(student)
+    profiles = {item["id"]: item for item in faculty_matching_profiles()}
+    tfidf = panel_tfidf_similarities(paper_text, {fid: item["evidence"] for fid, item in profiles.items()})
+    method = "tfidf"
+    method_note = "Keyword TF-IDF similarity between the paper and each faculty member's expertise records."
+    similarities = {fid: result["similarity"] for fid, result in tfidf["results"].items()}
+    if paper_text and panel_gemini_configured():
+        try:
+            similarities = panel_embedding_similarities(paper_text, {fid: item["text"] for fid, item in profiles.items()})
+            method = "gemini-embeddings"
+            method_note = "Cosine similarity of Gemini embeddings of the paper and each faculty member's expertise records."
+        except Exception as exc:  # noqa: BLE001 - any failure falls back to the always-available method
+            method_note = f"Gemini embeddings could not be used ({str(exc)[:90]}); the score fell back to keyword TF-IDF."
+    pool_ids = [fid for fid in profiles if fid not in advisers]
+    pool_values = [similarities.get(fid, 0.0) for fid in pool_ids]
+    top_similarity = max(pool_values) if pool_values else 0.0
+    low_similarity = min(pool_values) if pool_values else 0.0
+    ai_notes = {
         item.get("faculty_id"): item
         for item in profile.get("rag_faculty_matches", [])
-        if item.get("faculty_id")
+        if item.get("faculty_id") and profile.get("rag_mode") == "document-rag"
     }
-    faculty_members = Faculty.query.filter_by(active=True).all()
+
+    today = date.today()
     rows = []
-    for faculty in faculty_members:
-        # Do not count this student's current finalized panel during regeneration;
-        # otherwise the same recommendation changes merely because it was saved.
-        workload = PanelAssignment.query.filter(
-            PanelAssignment.faculty_id == faculty.id,
-            PanelAssignment.student_id != student.id,
-        ).count()
+    for faculty in Faculty.query.filter_by(active=True).all():
+        if faculty.id in advisers:
+            continue
+        item = profiles[faculty.id]
+        result = tfidf["results"].get(faculty.id, {"similarity": 0.0, "contributions": {}})
+        similarity = similarities.get(faculty.id, 0.0)
+        if method == "tfidf":
+            relative = similarity / max(top_similarity, PANEL_MATCH_SIMILARITY_FLOOR) if similarity > 0 else 0.0
+        else:
+            spread = top_similarity - low_similarity
+            relative = (similarity - low_similarity) / spread if spread > 1e-9 else 0.0
+        expertise_score = round(PANEL_MATCH_WEIGHTS["expertise"] * max(0.0, min(1.0, relative)), 1)
+
+        # Do not count this student's own panel during regeneration; otherwise the
+        # same recommendation would change merely because it was saved.
+        workload = (
+            db.session.query(func.count(func.distinct(PanelAssignment.student_id)))
+            .filter(PanelAssignment.faculty_id == faculty.id, PanelAssignment.student_id != student.id)
+            .scalar()
+            or 0
+        )
         calendar_connected = google_calendar_configured(faculty)
         calendar_error = None
+        recurring_days = 0
         if calendar_connected:
-            calendar_window_end = date.today() + timedelta(days=28)
-            calendar_result = google_freebusy_lookup(
-                faculty,
-                date.today(),
-                calendar_window_end,
-            )
-            availability_count = google_calendar_free_window_count(
-                calendar_result,
-                date.today(),
-                calendar_window_end,
-            )
+            window_end = today + timedelta(days=28)
+            calendar_result = google_freebusy_lookup(faculty, today, window_end)
+            availability_count = google_calendar_free_window_count(calendar_result, today, window_end)
             calendar_error = calendar_result.get("error")
-            recurring_days = 0
         else:
             availability_rows = FacultyAvailability.query.filter(
                 FacultyAvailability.faculty_id == faculty.id,
-                FacultyAvailability.available_date >= date.today(),
+                FacultyAvailability.available_date >= today,
             ).all()
-            block_cache = {
-                faculty.id: faculty_calendar_blocks(
-                    faculty,
-                    date.today(),
-                    date.today() + timedelta(days=90),
-                )
-            }
+            block_cache = {faculty.id: faculty_calendar_blocks(faculty, today, today + timedelta(days=90))}
             availability_count = sum(
                 1
                 for slot in availability_rows
@@ -22011,52 +22585,16 @@ def recommend_panel(student: Student) -> list[dict]:
                     block_cache,
                 )
             )
-            recurring_days = sum(1 for item in faculty_working_hours(faculty) if item["enabled"])
-        faculty_profile_text = faculty.specialization or ""
-        faculty_tokens = set(matching_tokens(faculty_profile_text))
-        faculty_phrase_text = faculty_profile_text.lower()
-        matched_keywords = [token for token, _count in query_counts.most_common() if token in faculty_tokens][:8]
-        rag_match = rag_match_by_id.get(faculty.id)
-        rag_terms = [
-            term for term in (rag_match or {}).get("matched_terms", [])
-            if set(matching_tokens(term)).intersection(faculty_tokens)
-        ][:6]
-        matched_phrases = [
-            phrase
-            for phrase in analyzed_phrases
-            if " " in phrase
-            and (
-                set(matching_tokens(phrase)).issubset(faculty_tokens)
-                or phrase.lower() in faculty_phrase_text
-            )
-        ][:6]
-        # Keyword frequency is capped so repeated boilerplate in a PDF cannot
-        # dominate a faculty specialization match.
-        weighted_keyword_points = sum(
-            min(query_counts[token], 3) * specialization_token_weight(token, token_frequency, total_profiles)
-            for token in matched_keywords
+            recurring_days = sum(1 for day in faculty_working_hours(faculty) if day["enabled"])
+        capacity = availability_count + 0.5 * recurring_days
+        availability_score = round(
+            PANEL_MATCH_WEIGHTS["availability"] * min(1.0, capacity / PANEL_MATCH_WINDOWS_FOR_FULL_MARKS), 1
         )
-        distinctive_matches = [
-            token for token in matched_keywords
-            if specialization_token_weight(token, token_frequency, total_profiles) >= 1
-        ]
-        specialization_score = min(
-            50,
-            weighted_keyword_points * 3
-            + len(matched_phrases) * 6
-            + len(rag_terms) * 4
-            + (6 if rag_match else 0),
+        workload_score = round(
+            PANEL_MATCH_WEIGHTS["workload"] * (1 - min(workload, PANEL_MATCH_WORKLOAD_LIMIT) / PANEL_MATCH_WORKLOAD_LIMIT), 1
         )
-        if not distinctive_matches and not matched_phrases and not rag_terms:
-            specialization_score = min(specialization_score, 18)
-        availability_score = min(30, availability_count * 6)
-        if not availability_count and recurring_days:
-            availability_score = 12
-        workload_fit = max(0, 10 - min(workload, 5) * 2)
-        active_profile_fit = 4
-        specialization_fit = 6 if specialization_score >= 25 else 0
-        suitability_score = min(20, workload_fit + active_profile_fit + specialization_fit)
-        score = specialization_score + availability_score + suitability_score
+        score = round(expertise_score + availability_score + workload_score, 1)
+
         availability_status = (
             "Google Calendar unavailable"
             if calendar_connected and calendar_error
@@ -22072,32 +22610,91 @@ def recommend_panel(student: Student) -> list[dict]:
             if availability_count or recurring_days
             else "No availability recorded"
         )
-        reasons = []
-        if rag_terms:
-            reasons.append(f"RAG match: {', '.join(rag_terms[:2])}")
-        elif matched_phrases:
-            reasons.append(f"matches {', '.join(matched_phrases[:2])}")
-        elif matched_keywords:
-            reasons.append(f"matches {', '.join(matched_keywords[:3])}")
-        reasons.append(availability_status.lower())
-        reasons.append(f"{workload} active panel assignment{'s' if workload != 1 else ''}")
-        note = "; ".join(reasons)
+        topics = panel_matched_topics(result["contributions"], tfidf["surfaces"], 6, tfidf["common"])
+        evidence = panel_evidence_matches(item["evidence"], result["contributions"], tfidf["surfaces"], 3, tfidf["common"])
+        passage = panel_best_passage(paper_text, result["contributions"]) if topics else ""
+        flags = []
+        if workload >= PANEL_MATCH_OVERLOAD_AT:
+            flags.append({"type": "overload", "severity": "warning", "message": f"Already on {workload} other student panels."})
+        if not availability_count and not recurring_days:
+            flags.append({"type": "unavailable", "severity": "warning", "message": "No availability recorded for defense scheduling."})
+        elif calendar_connected and calendar_error:
+            flags.append({"type": "unavailable", "severity": "warning", "message": "Google Calendar could not be read."})
+        if not topics:
+            flags.append({"type": "no_overlap", "severity": "info", "message": "No expertise record shares a distinctive topic with the paper; listed after the candidates that do."})
+        if len(item["evidence"]) < 3:
+            flags.append({"type": "thin_records", "severity": "info", "message": "Few expertise records on file; add more in Faculty Profiles."})
+        reason = _panel_reason(faculty.name, topics, evidence, availability_count, workload, method, relative)
+        ai_note = ai_notes.get(faculty.id)
         rows.append({
             "faculty": faculty,
             "score": score,
-            "note": note,
-            "matched_keywords": rag_terms or matched_phrases or matched_keywords,
+            "note": reason[:220],
+            "matched_keywords": topics,
             "availability_status": availability_status,
             "availability_windows": availability_count,
             "availability_source": "google_calendar" if calendar_connected else "profile_schedule",
             "workload": workload,
+            "method": method,
+            "method_label": PANEL_MATCH_METHOD_LABELS[method],
+            "flags": flags,
+            "method_affinity": panel_method_affinity(item["evidence"]),
             "score_breakdown": {
-                "specialization": specialization_score,
+                "expertise": expertise_score,
                 "availability": availability_score,
-                "suitability": suitability_score,
+                "workload": workload_score,
+            },
+            "breakdown": {
+                "method": method,
+                "method_label": PANEL_MATCH_METHOD_LABELS[method],
+                "similarity": round(similarity, 4),
+                "components": {
+                    "expertise": {"score": expertise_score, "max": PANEL_MATCH_WEIGHTS["expertise"]},
+                    "availability": {"score": availability_score, "max": PANEL_MATCH_WEIGHTS["availability"]},
+                    "workload": {"score": workload_score, "max": PANEL_MATCH_WEIGHTS["workload"]},
+                },
+                "matched_topics": topics,
+                "matched_passage": passage,
+                "evidence": evidence,
+                "reason": reason,
+                "ai_rationale": (ai_note or {}).get("rationale") or None,
             },
         })
-    return sorted(rows, key=lambda row: row["score"], reverse=True)
+    # Expertise leads: candidates whose records share a distinctive topic with the paper come first,
+    # so availability and workload can never lift a non-match above a real match.
+    rows.sort(key=lambda row: (
+        0 if row["breakdown"]["matched_topics"] else 1,
+        -row["score"],
+        -row["score_breakdown"]["expertise"],
+        row["faculty"].name,
+    ))
+    roles = panel_roles_for_student(student)
+    suggested = suggest_panel_roles(rows, roles)
+    faculty_by_id = {row["faculty"].id: row["faculty"] for row in rows}
+    composition = panel_composition_report(
+        student, [(seat["role"], faculty_by_id[seat["faculty_id"]]) for seat in suggested]
+    )
+    return {
+        "rows": rows,
+        "excluded": [
+            {
+                "faculty_id": faculty_id,
+                "faculty_name": info["faculty"].name,
+                "reason": f"{info['role']} of this student; an adviser cannot sit on the student's panel.",
+            }
+            for faculty_id, info in advisers.items()
+        ],
+        "method": method,
+        "method_label": PANEL_MATCH_METHOD_LABELS[method],
+        "method_note": method_note,
+        "weights": dict(PANEL_MATCH_WEIGHTS),
+        "suggested_panel": suggested,
+        "composition": composition,
+    }
+
+
+def recommend_panel(student: Student, profile: dict | None = None) -> list[dict]:
+    return panel_matching_result(student, profile)["rows"]
 
 
 # ---------------------------------------------------------------------------
@@ -23062,21 +23659,216 @@ def panel_matching_demo_evidence_text(
     )
 
 
+def ensure_faculty_expertise_schema() -> None:
+    """Create the faculty expertise table on an existing database (additive only)."""
+    FacultyExpertise.__table__.create(bind=db.engine, checkfirst=True)
+
+
+def ensure_faculty_expertise_demo() -> int:
+    """Seed demonstration expertise evidence for faculty that have no evidence yet.
+
+    Never touches a faculty member who already has any expertise record, so
+    portal entries and edits always win over demo data.
+    """
+    from panel_demo_data import DEMO_SEED_SOURCE, FACULTY_EXPERTISE_DEMO
+
+    created = 0
+    for name, records in FACULTY_EXPERTISE_DEMO.items():
+        faculty = Faculty.query.filter_by(name=name, active=True).first()
+        if not faculty or FacultyExpertise.query.filter_by(faculty_id=faculty.id).count():
+            continue
+        for kind, text_value, year in records:
+            db.session.add(FacultyExpertise(
+                faculty_id=faculty.id, kind=kind, text=text_value, year=year,
+                source=DEMO_SEED_SOURCE, created_by="Demo seed",
+            ))
+            created += 1
+    return created
+
+
+def ensure_panel_matching_demo_students() -> int:
+    """Seed demo students in different programs and fields, each with three concept papers.
+
+    Students at the proposal stage have a passed title defense and an uploaded
+    proposal manuscript. Existing students are never modified.
+    """
+    from panel_demo_data import PANEL_MATCHING_DEMO_STUDENTS
+
+    created = 0
+    for spec in PANEL_MATCHING_DEMO_STUDENTS:
+        if Student.query.filter_by(student_number=spec["student_number"]).first():
+            continue
+        program = Program.query.filter_by(code=spec["program_code"]).first()
+        adviser = Faculty.query.filter_by(name=spec["adviser"], active=True).first()
+        if not program or not adviser:
+            continue
+        courses = monitoring_curriculum_courses(program)
+        if not courses:
+            ensure_monitoring_template_courses()
+            courses = monitoring_curriculum_courses(program)
+        if not courses:
+            continue
+        created += 1
+        student = Student(
+            student_number=spec["student_number"],
+            first_name=spec["first_name"],
+            last_name=spec["last_name"],
+            email=f"{spec['first_name']}.{spec['last_name']}@student.usls.edu.ph".lower(),
+            program_id=program.id,
+            entry_year=2024,
+            academic_year_entry="24-25",
+            year_level="2",
+            current_stage="Proposal Development",
+            standing="Active",
+            enrollment_tag="Enrolled",
+            comprehensive_exam_status="Passed",
+            risk_level="On Track",
+            adviser_name=adviser.name,
+        )
+        db.session.add(student)
+        db.session.flush()
+        for course in courses:
+            db.session.add(CourseRecord(
+                student_id=student.id, course_id=course.id, status="Completed",
+                evidence_reference="Demo seed: coursework complete", grade_status="No Grade",
+            ))
+        db.session.add(AdviserAssignment(student_id=student.id, faculty_id=adviser.id, status="Active"))
+        db.session.add(ResearchCase(
+            student_id=student.id,
+            case_type=research_case_type(student),
+            title=spec["case_title"],
+            current_gate="Form 1 - Title Defense",
+            status="Missing Requirements",
+            adviser_name=adviser.name,
+        ))
+        db.session.flush()
+        _seed_panel_demo_research(student, spec, adviser)
+        sync_research_progress(student)
+    return created
+
+
+def _panel_demo_evidence(student: Student, gate: str, item_name: str, number: int, label: str, body: str, complete: bool) -> None:
+    documents = {doc.item_name: doc for doc in ensure_research_document_checks(student.id, gate)}
+    document = documents[item_name]
+    gate_slug = re.sub(r"[^a-z0-9]+", "-", gate.lower()).strip("-")[:28]
+    item_slug = re.sub(r"[^a-z0-9]+", "-", item_name.lower()).strip("-")[:42]
+    stored_name = f"pmdemo-{student.student_number.lower()}-{gate_slug}-{item_slug}-{number}.pdf"
+    extracted = f"{label}\n\n{body}"
+    write_demo_pdf(UPLOAD_ROOT, stored_name, label, body)
+    db.session.add(ResearchEvidenceFile(
+        student_id=student.id,
+        document_check_id=document.id,
+        original_name=f"{label}.pdf",
+        stored_name=stored_name,
+        mime_type="application/pdf",
+        extracted_text=extracted,
+        compliance_status="Compliant",
+        compliance_score=90,
+        compliance_summary="Demonstration document written for the Panel Matching demo.",
+    ))
+    document.status = "Complete" if complete else "Submitted"
+    document.evidence_reference = "Demo seed" if complete else document.evidence_reference
+    document.updated_at = now_utc()
+    db.session.flush()
+
+
+def _seed_panel_demo_research(student: Student, spec: dict, adviser: Faculty) -> None:
+    title_gate = "Form 1 - Title Defense"
+    proposal_gate = "Form 4 - Proposal Defense Readiness"
+    past_title = spec["stage"] != "title"
+    name = student.name
+    _panel_demo_evidence(
+        student, title_gate, "Form 1 - Application for Title Defense", 1,
+        "Form 1 Application for Title Defense",
+        f"Application for Title Defense submitted by {name} ({student.program.code}) with three concept papers. "
+        f"Adviser: {adviser.name}. Demonstration document.",
+        past_title,
+    )
+    for number, (paper_title, paper_body) in enumerate(spec["concept_papers"], start=1):
+        _panel_demo_evidence(student, title_gate, "Three concept papers", number, paper_title, paper_body, past_title)
+    if not past_title:
+        return
+
+    # Title defense already passed: endorsement, schedule, panel, and verdict on file.
+    documents = {doc.item_name: doc for doc in ensure_research_document_checks(student.id, title_gate)}
+    db.session.add(Form1Endorsement(
+        student_id=student.id, coordinator_name="Academic Coordinator",
+        signature_data="Demo seed endorsement", status="Endorsed", endorsed_at=now_utc() - timedelta(days=90),
+    ))
+    for item_name in ("Academic Coordinator endorsement/e-signature", "Confirmed title defense schedule", "Title defense result"):
+        documents[item_name].status = "Complete"
+        documents[item_name].evidence_reference = "Demo seed"
+    assignments = []
+    for faculty_name, role in spec["title_panel"]:
+        member = Faculty.query.filter_by(name=faculty_name).first()
+        if not member:
+            continue
+        assignment = PanelAssignment(
+            student_id=student.id, faculty_id=member.id, gate=title_gate, panel_role=role,
+            score=0, eligibility_note="Demo seed: historical title-defense panel",
+        )
+        db.session.add(assignment)
+        assignments.append(assignment)
+    db.session.flush()
+    defense_day = date.today() - timedelta(days=75)
+    schedule = ScheduleRequest(
+        student_id=student.id, preferred_date=defense_day, preferred_end_date=defense_day,
+        start_time=time(9, 0), end_time=time(10, 30), defense_type=RESEARCH_GATE_DEFENSE_TYPES[title_gate],
+        mode="In person", venue="Graduate School Conference Room", status="Confirmed",
+        matched_count=len(assignments), required_forms_status="Complete",
+        panel_snapshot=json.dumps([
+            {"faculty_id": a.faculty_id, "name": a.faculty.name, "role": a.panel_role} for a in assignments
+        ]),
+        notes="Demo seed: historical title defense", confirmed_at=now_utc() - timedelta(days=80),
+    )
+    db.session.add(schedule)
+    db.session.flush()
+    chair = next((a for a in assignments if a.panel_role == "Panel Chair"), assignments[0]) if assignments else None
+    if chair:
+        db.session.add(DefenseVerdict(
+            student_id=student.id, schedule_request_id=schedule.id, panel_assignment_id=chair.id,
+            faculty_id=chair.faculty_id, gate=title_gate, defense_type=schedule.defense_type,
+            research_title=spec["case_title"], chair_name=chair.faculty.name, result="Passed",
+            remarks="Demo seed: title approved.", defense_date=defense_day, submitted_at=now_utc() - timedelta(days=75),
+        ))
+
+    # Proposal stage: manuscript and ethics clearance are in; waiting for Panel Matching.
+    _panel_demo_evidence(
+        student, proposal_gate, "Proposal manuscript", 1, "Proposal manuscript", spec["proposal_manuscript"], False
+    )
+    _panel_demo_evidence(
+        student, proposal_gate, "Ethics Clearance", 1, "Research Protocol Form 5.2 ethics clearance",
+        f"Ethics clearance granted to {name} for the approved research title. Demonstration document.", True,
+    )
+    proposal_docs = {doc.item_name: doc for doc in ensure_research_document_checks(student.id, proposal_gate)}
+    ethics_record = proposal_docs["Ethics clearance status and date"]
+    ethics_record.status = "Complete"
+    ethics_record.evidence_reference = "Cleared (demo seed)"
+    proposal_docs["Ethics Clearance"].evidence_reference = "Cleared (demo seed)"
+    db.session.flush()
+
+
 def ensure_panel_matching_demo_data() -> dict[str, int]:
-    """Populate every seeded faculty profile and Miguel's stage-aware matching sources."""
+    """Seed demo data for Panel Matching: faculty profiles, availability, expertise records and demo students.
+
+    Seeds only what is missing. A non-empty faculty specialization is never
+    overwritten (roster imports and portal edits win), and a faculty member who
+    already has expertise records keeps exactly those. Set
+    PANEL_MATCHING_DEMO_SEED=0 to switch the demo data off.
+    """
     changes = {
         "faculty_profiles": 0,
         "faculty_with_availability": 0,
         "availability_windows": 0,
         "evidence_files": 0,
+        "expertise_records": 0,
+        "demo_students": 0,
     }
-    student = Student.query.filter_by(student_number="2260004").first()
-    if not student:
+    if os.getenv("PANEL_MATCHING_DEMO_SEED", "1").strip().lower() in {"0", "false", "no", "off"}:
         return changes
 
-    first_slot_day = date.today() + timedelta(days=14)
     slot_days = []
-    candidate_day = first_slot_day
+    candidate_day = date.today() + timedelta(days=14)
     while len(slot_days) < 8:
         if candidate_day.weekday() < 5:
             slot_days.append(candidate_day)
@@ -23086,7 +23878,7 @@ def ensure_panel_matching_demo_data() -> dict[str, int]:
         faculty = Faculty.query.filter_by(name=faculty_name, active=True).first()
         if not faculty:
             continue
-        if faculty.specialization != profile["specialization"]:
+        if not (faculty.specialization or "").strip():
             faculty.specialization = profile["specialization"]
             changes["faculty_profiles"] += 1
 
@@ -23117,39 +23909,45 @@ def ensure_panel_matching_demo_data() -> dict[str, int]:
         if current_count:
             changes["faculty_with_availability"] += 1
 
-    research_case = ResearchCase.query.filter_by(student_id=student.id).first()
-    title = research_case.title if research_case else "Learning Analytics for Graduate Student Engagement"
-    for document in DocumentCheck.query.filter_by(student_id=student.id).all():
-        presentation = research_requirement_presentation(document.gate, document.item_name)
-        evidence_files = (
-            ResearchEvidenceFile.query.filter_by(
-                student_id=student.id,
-                document_check_id=document.id,
+    changes["expertise_records"] = ensure_faculty_expertise_demo()
+
+    student = Student.query.filter_by(student_number="2260004").first()
+    if student:
+        research_case = ResearchCase.query.filter_by(student_id=student.id).first()
+        title = research_case.title if research_case else "Learning Analytics for Graduate Student Engagement"
+        for document in DocumentCheck.query.filter_by(student_id=student.id).all():
+            presentation = research_requirement_presentation(document.gate, document.item_name)
+            evidence_files = (
+                ResearchEvidenceFile.query.filter_by(
+                    student_id=student.id,
+                    document_check_id=document.id,
+                )
+                .order_by(ResearchEvidenceFile.id.asc())
+                .all()
             )
-            .order_by(ResearchEvidenceFile.id.asc())
-            .all()
-        )
-        for file_number, evidence in enumerate(evidence_files, start=1):
-            if not evidence.stored_name.startswith("persona-2260004-research-"):
-                continue
-            extracted_text = panel_matching_demo_evidence_text(
-                student,
-                document,
-                title,
-                file_number,
-            )
-            stored_path = UPLOAD_ROOT / evidence.stored_name
-            needs_update = evidence.extracted_text != extracted_text or not stored_path.exists()
-            if not needs_update:
-                continue
-            evidence.extracted_text = extracted_text
-            write_demo_pdf(
-                UPLOAD_ROOT,
-                evidence.stored_name,
-                presentation["label"] if presentation else document.item_name,
-                extracted_text,
-            )
-            changes["evidence_files"] += 1
+            for file_number, evidence in enumerate(evidence_files, start=1):
+                if not evidence.stored_name.startswith("persona-2260004-research-"):
+                    continue
+                extracted_text = panel_matching_demo_evidence_text(
+                    student,
+                    document,
+                    title,
+                    file_number,
+                )
+                stored_path = UPLOAD_ROOT / evidence.stored_name
+                needs_update = evidence.extracted_text != extracted_text or not stored_path.exists()
+                if not needs_update:
+                    continue
+                evidence.extracted_text = extracted_text
+                write_demo_pdf(
+                    UPLOAD_ROOT,
+                    evidence.stored_name,
+                    presentation["label"] if presentation else document.item_name,
+                    extracted_text,
+                )
+                changes["evidence_files"] += 1
+
+    changes["demo_students"] = ensure_panel_matching_demo_students()
     return changes
 
 
@@ -25178,6 +25976,14 @@ with app.app_context():
     ensure_practicum_program_policy()
     ensure_course_year_consistency()
     ensure_delay_status_consistency()
+    # Demo data for Panel Matching must never block startup.
+    try:
+        ensure_faculty_expertise_schema()
+        ensure_panel_matching_demo_data()
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        print(f"Panel Matching demo data was not seeded: {exc}")
 
 
 if __name__ == "__main__":
@@ -25196,7 +26002,6 @@ if __name__ == "__main__":
         if Student.query.count() == 0:
             seed_database(seed_count)
         ensure_demo_accounts()
-        ensure_panel_matching_demo_data()
         seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases
         ensure_faculty_account_schema()
         ensure_workflow_activity_schema()

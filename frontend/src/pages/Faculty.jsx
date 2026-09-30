@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness, Building2, CalendarDays, ChevronLeft,
   ChevronRight, ExternalLink, FileSearch, Link2, Mail, Search, UsersRound, X, BookOpenCheck, Save,
+  Pencil, Plus, Trash2, Microscope,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
@@ -9,6 +10,7 @@ import { useApi } from "../hooks";
 import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
 import { initials } from "../lib/format";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
+import { useConfirm } from "../components/confirm";
 
 export default function Faculty() {
   const { data, loading, error, refetch } = useApi(() => api.faculty(), []);
@@ -175,7 +177,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
             <ProfileSection icon={BriefcaseBusiness} title="Specialization">
               <p className="text-sm leading-relaxed text-slate-600">{faculty.specialization}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">{(faculty.matching_keywords || []).slice(0, 8).map((keyword) => <span key={keyword} className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700">{keyword}</span>)}</div>
-              <p className="mt-2 text-xs text-slate-500">Used to explain recommendations in Panel Matching.</p>
+              <p className="mt-2 text-xs text-slate-500">Panel Matching compares the student's paper with this text and with the expertise records below.</p>
               {faculty.cv_profile && <button type="button" onClick={() => setShowCvAssistant(true)} className="btn-ghost mt-3 cursor-pointer"><FileSearch className="h-4 w-4" /> Open CV reference assistant</button>}
             </ProfileSection>
 
@@ -223,11 +225,136 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
             </ProfileSection>
           </div>
 
+          <ExpertiseEditor faculty={faculty} onChanged={onSaved} />
+
           <WeeklyCalendar faculty={faculty} />
         </div>
       </Card>
       {showCvAssistant && <FacultyAssignmentProfile faculty={faculty} onClose={() => setShowCvAssistant(false)} />}
     </div>
+  );
+}
+
+const EXPERTISE_KIND_HINTS = {
+  research_interest: "e.g. Learning analytics for graduate student engagement",
+  publication: "Title of a paper, chapter, or conference presentation",
+  past_advisee_title: "Title of a thesis, dissertation, or project paper this faculty advised",
+  past_panel_title: "Title of a paper this faculty sat on the panel for",
+  degree: "e.g. PhD in Educational Psychology",
+};
+
+function ExpertiseEditor({ faculty, onChanged }) {
+  const confirm = useConfirm();
+  const { data, loading, error, refetch } = useApi(() => api.facultyExpertise(faculty.id), [faculty.id]);
+  const items = data?.items || [];
+  const kinds = data?.kinds || [];
+  const blank = { kind: "research_interest", text: "", year: "" };
+  const [draft, setDraft] = useState(blank);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState(blank);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [problem, setProblem] = useState("");
+
+  useEffect(() => {
+    setDraft(blank);
+    setEditingId(null);
+    setMessage("");
+    setProblem("");
+  }, [faculty.id]);
+
+  async function run(action, success) {
+    setBusy(true);
+    setMessage("");
+    setProblem("");
+    try {
+      await action();
+      setMessage(success);
+      await refetch();
+      await onChanged?.();
+    } catch (err) {
+      setProblem(err.message || "Could not save the expertise record.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const payload = (value) => ({ kind: value.kind, text: value.text, year: value.year === "" ? null : value.year });
+
+  async function add(event) {
+    event.preventDefault();
+    await run(async () => {
+      await api.addFacultyExpertise(faculty.id, payload(draft));
+      setDraft({ ...blank, kind: draft.kind });
+    }, "Expertise record added. Panel Matching uses it immediately.");
+  }
+
+  async function saveEdit(event) {
+    event.preventDefault();
+    await run(async () => {
+      await api.updateFacultyExpertise(editingId, payload(editDraft));
+      setEditingId(null);
+    }, "Expertise record updated.");
+  }
+
+  async function remove(item) {
+    const ok = await confirm({
+      title: "Remove this expertise record?",
+      message: `"${item.text}" will no longer be used when matching panels for ${faculty.name}.`,
+      confirmLabel: "Remove record",
+      tone: "danger",
+    });
+    if (ok) await run(() => api.deleteFacultyExpertise(item.id), "Expertise record removed.");
+  }
+
+  function startEdit(item) {
+    setEditingId(item.id);
+    setEditDraft({ kind: item.kind, text: item.text, year: item.year ?? "" });
+    setMessage("");
+    setProblem("");
+  }
+
+  return (
+    <section aria-labelledby={`expertise-${faculty.id}`}>
+      <div className="mb-2 flex items-center gap-2"><Microscope className="h-4 w-4 text-brand-700" /><h3 id={`expertise-${faculty.id}`} className="text-sm font-semibold text-ink">Expertise records</h3><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{items.length}</span></div>
+      <p className="mb-3 text-xs text-slate-500">Research interests, publications, past advisee and panel titles, and degrees. Panel Matching reads all of them, so the more accurate they are the better the panel recommendations. Records marked <span className="font-semibold text-amber-800">Demo data</span> are sample entries; editing one turns it into a manual entry.</p>
+      {loading && !data ? <p className="text-xs text-slate-500" role="status">Loading expertise records…</p> : error ? <p className="text-xs font-semibold text-red-600" role="alert">{error}</p> : (
+        <div className="space-y-2">
+          {!items.length && <p className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">No expertise records yet. Add the first one below.</p>}
+          {items.map((item) => editingId === item.id ? (
+            <form key={item.id} onSubmit={saveEdit} className="grid gap-2 rounded-lg border border-brand-200 bg-brand-50/40 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
+              <select aria-label="Kind of record" className="field-input cursor-pointer" value={editDraft.kind} onChange={(event) => setEditDraft({ ...editDraft, kind: event.target.value })}>{kinds.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}</select>
+              <textarea aria-label="Record text" className="field-input" rows={2} value={editDraft.text} onChange={(event) => setEditDraft({ ...editDraft, text: event.target.value })} />
+              <input aria-label="Year" type="number" className="field-input" placeholder="Year" value={editDraft.year} onChange={(event) => setEditDraft({ ...editDraft, year: event.target.value })} />
+              <div className="flex items-start gap-2"><button type="submit" disabled={busy} className="btn-primary px-3 py-2 text-xs"><Save className="h-4 w-4" />Save</button><button type="button" onClick={() => setEditingId(null)} className="btn-ghost px-3 py-2 text-xs">Cancel</button></div>
+            </form>
+          ) : (
+            <div key={item.id} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700">{item.kind_label}</span>
+                  {item.year && <span className="text-[11px] text-slate-400">{item.year}</span>}
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.source === "demo seed" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600"}`}>{item.source === "demo seed" ? "Demo data" : "Manual entry"}</span>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-slate-700">{item.text}</p>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <button type="button" onClick={() => startEdit(item)} className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-400" aria-label={`Edit record: ${item.text}`}><Pencil className="h-4 w-4" /></button>
+                <button type="button" onClick={() => remove(item)} className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-red-400" aria-label={`Remove record: ${item.text}`}><Trash2 className="h-4 w-4" /></button>
+              </div>
+            </div>
+          ))}
+          <form onSubmit={add} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
+            <select aria-label="Kind of new record" className="field-input cursor-pointer" value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value })}>{kinds.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}</select>
+            <input aria-label="Text of new record" className="field-input" value={draft.text} onChange={(event) => setDraft({ ...draft, text: event.target.value })} placeholder={EXPERTISE_KIND_HINTS[draft.kind] || "Describe the expertise"} required minLength={5} maxLength={600} />
+            <input aria-label="Year of new record" type="number" min="1950" className="field-input" value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} placeholder="Year" />
+            <button type="submit" disabled={busy || draft.text.trim().length < 5} className="btn-primary px-3 py-2 text-xs"><Plus className="h-4 w-4" />Add record</button>
+          </form>
+        </div>
+      )}
+      {message && <p className="mt-2 text-xs font-semibold text-brand-700" role="status">{message}</p>}
+      {problem && <p className="mt-2 text-xs font-semibold text-red-600" role="alert">{problem}</p>}
+    </section>
   );
 }
 

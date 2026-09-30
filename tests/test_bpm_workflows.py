@@ -3787,7 +3787,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                     name=name,
                     college="Graduate School",
                     role="Adviser / Panel",
-                    specialization=f"Generic expertise {index}",
+                    # Empty on purpose: the demo seed fills a specialization only when it is empty
+                    # (defense revision D5); a non-empty one is never overwritten.
+                    specialization="",
                     email=f"panel-roster-{index}@example.test",
                     active=True,
                 ))
@@ -3823,17 +3825,22 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 db.session.commit()
                 repeat_changes = ensure_panel_matching_demo_data()
 
+            from panel_demo_data import FACULTY_EXPERTISE_DEMO
             self.assertEqual(changes, {
                 "faculty_profiles": 12,
                 "faculty_with_availability": 12,
                 "availability_windows": 42,
                 "evidence_files": 1,
+                "expertise_records": sum(len(items) for items in FACULTY_EXPERTISE_DEMO.values()),
+                "demo_students": 0,  # the BPM fixture has none of the demo programs
             })
             self.assertEqual(repeat_changes, {
                 "faculty_profiles": 0,
                 "faculty_with_availability": 12,
                 "availability_windows": 0,
                 "evidence_files": 0,
+                "expertise_records": 0,
+                "demo_students": 0,
             })
             roster = Faculty.query.filter(Faculty.name.in_(faculty_names)).order_by(Faculty.id).all()
             self.assertEqual(len(roster), 12)
@@ -3847,6 +3854,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             ))
             self.assertIn("longitudinal mixed-method evaluation", evidence.extracted_text)
 
+            # NOTE: this profile is mocked because the fixture student is not research-eligible, so this
+            # check of the ranking does not exercise the real paper-reading pipeline. The real-pipeline
+            # checks (no mocked profile) are in tests/test_panel_matching.py.
             matching_profile = {
                 "query_text": evidence.extracted_text,
                 "keywords": [
