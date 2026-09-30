@@ -163,7 +163,7 @@ export default function StudentOverview() {
       <StudentHero data={data} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={ClipboardCheck} label="Coursework" value={`${audit.completion_rate}%`} sub={`${audit.completed.length} completed, ${audit.missing_count} missing`} to="/student/progress" />
-        <StatCard icon={FileCheck} label="Research" value={researchCase?.status || "Not started"} sub={researchCase?.current_gate_label || "Open the Research page to begin"} tone="blue" to="/student/research" />
+        <StatCard icon={FileCheck} label="Research" badge value={researchCase?.status || "Not started"} sub={researchCase?.current_gate_label || "Open the Research page to begin"} tone="blue" to="/student/research" />
         <StatCard icon={ListTodo} label="Open tasks" value={(data.tasks || []).length} sub={`${(data.tasks || []).filter((task) => task.overdue).length} overdue`} tone="amber" />
         <StatCard icon={Mail} label="Unread messages" value={unreadCount} sub="Replies on your requests" tone={unreadCount ? "red" : "slate"} to="/student/messages" />
       </div>

@@ -248,7 +248,7 @@ export default function Layout({ children }) {
           <Breadcrumb path={location.pathname} current={current} role={user?.role} />
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex">
-              {user?.full_name || "Graduate School Staff"} · {ROLE_LABELS[user?.role] || "Staff"}
+              {user?.full_name || "Graduate School Staff"} · {user?.program || ROLE_LABELS[user?.role] || "Staff"}
             </span>
             <button
               type="button"
@@ -292,7 +292,12 @@ function Breadcrumb({ path, current, role }) {
     );
   }
   const parts = path.split("/").filter(Boolean);
-  const label = parts.length === 0 ? "Dashboard" : BREADCRUMB_LABELS[parts[0]] || parts[0].replace(/-/g, " ");
+  // A workflow page is named after its own workflow ("Leave of Absence"), from the sidebar list.
+  const workflowItem = parts[0] === "workflow" ? NAV_GROUPS.flatMap((group) => group.items).find((item) => item.to === `/${parts[0]}/${parts[1]}`) : null;
+  const label = workflowItem
+    ? workflowItem.label.replace(/^\d+\s*·\s*/, "")
+    : parts[0] === "workflow" && parts[1] ? parts[1].replace(/-/g, " ")
+    : parts.length === 0 ? "Dashboard" : BREADCRUMB_LABELS[parts[0]] || parts[0].replace(/-/g, " ");
   return (
     <div className="flex items-center gap-1.5 text-sm">
       <span className="font-semibold text-slate-400">Platform</span>

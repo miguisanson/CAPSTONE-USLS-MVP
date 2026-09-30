@@ -1415,7 +1415,7 @@ function PanelCandidateDetail({ candidate, methodLabel }) {
             {breakdown.matched_passage}
           </blockquote>
         ) : <p className="text-slate-500">No passage of the paper overlaps with this faculty member's records.</p>}
-        {breakdown.ai_rationale && <p className="rounded-lg bg-slate-50 px-3 py-2 text-slate-600"><span className="font-semibold">Optional AI note (Gemini):</span> {breakdown.ai_rationale}</p>}
+        {breakdown.ai_rationale && <p className="rounded-lg bg-slate-50 px-3 py-2 text-slate-600"><span className="font-semibold">Optional AI note:</span> {breakdown.ai_rationale}</p>}
       </div>
       <div className="space-y-2">
         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Expertise records used</p>
@@ -2398,7 +2398,23 @@ function useDemoCaseReset(slug, refetch) {
   return { resettingId, resetMessage, resetError, resetCase, clearResetFeedback };
 }
 
+// The reset endpoint only exists in demo mode (it answers 404 otherwise), so the button is
+// shown only when /api/auth/config says demo mode is on. The answer is asked for once.
+let demoModeRequest = null;
+function useDemoModeEnabled() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    demoModeRequest = demoModeRequest || api.authConfig().then((result) => Boolean(result?.demo_mode)).catch(() => false);
+    demoModeRequest.then((value) => { if (active) setEnabled(value); });
+    return () => { active = false; };
+  }, []);
+  return enabled;
+}
+
 function DemoResetButton({ student, resettingId, onReset }) {
+  const demoMode = useDemoModeEnabled();
+  if (!demoMode) return null;
   const busy = resettingId === student.id;
   return (
     <button
@@ -2536,16 +2552,16 @@ const WORKFLOW_GUIDES = {
     final: "Approval makes the student Active again at the stage they left, with the tag Not Enrolled until the Academic Coordinator enrolls them. The leave is closed.",
   },
   awol: {
-    purpose: "Automatically flags evidence-backed AWOL standing, reviews structured return declarations, and tracks valid no-subject residency.",
-    submitter: "A returning AWOL student completes a structured written declaration; staff reviews alerts and may record policy-valid residency.",
+    purpose: "Automatically flags evidence-backed AWOL standing, reviews return declarations, and tracks valid no-subject residency.",
+    submitter: "A returning AWOL student completes a written return declaration; staff reviews alerts and may record policy-valid residency.",
     reviewers: "Graduate School Staff performs the policy review and routes return cases to the Dean.",
-    stages: ["Automatic AWOL flag", "Structured return declaration", "Policy review", "Dean review", "Return or residency update"],
-    incomplete: "Reviewers can message or return an AWOL case while its structured declaration and audit trail remain visible.",
+    stages: ["Automatic AWOL flag", "Return declaration", "Policy review", "Dean review", "Return or residency update"],
+    incomplete: "Reviewers can message or return an AWOL case while its return declaration and audit trail remain visible.",
     final: "A decided return updates the student standing; residency remains a separate active, no-subject enrollment record.",
   },
   withdrawal: {
     purpose: "Withdraws a student from one enrolled subject until the end of the second week of classes (10% of the term is charged in the first week, 20% in the second), without changing program standing or unrelated classes.",
-    submitter: "The student chooses an eligible enrolled subject and states the reason for withdrawing. No PDF upload is required.",
+    submitter: "The student chooses an eligible enrolled subject and states the reason for withdrawing.",
     reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval returns to GS Staff for Excel export followed by manual Registrar email.",
     stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Subject removal", "Excel list export", "Manual email and acknowledgement outside the portal"],
     incomplete: "A Dean denial closes this subject request and leaves every enrollment unchanged. Messages and action comments remain in the case history.",
@@ -5427,7 +5443,7 @@ function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, res
           </div>
           <Field label="Semester" required><Select value={selectedTerm} onChange={(event) => setForm((current) => ({ ...current, term_id: event.target.value }))} placeholder="Select semester" options={(meta?.terms || []).map((term) => ({ value: String(term.id), label: term.label }))} required /></Field>
           <Field label="Staff verification notes" hint="Required when the residency policy result needs human review."><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>
-          {review && <PolicyReviewCard title="Residency policy review" description="Deterministic handbook checks using the recorded academic state; no RAG or automated decision." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
+          {review && <PolicyReviewCard title="Residency policy review" description="Checks against the handbook using the student's recorded academic state. The Dean makes the decision." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
           {!review && reviewError && <ErrorNote message={reviewError} />}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => runReview()} disabled={reviewing || !selectedStudent.id || !form.residency_reason} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run residency policy checker"}</button>
@@ -5592,7 +5608,7 @@ function workflowGuidance(slug) {
     "student-handoff":
       "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program and curriculum, and marks the subjects already completed automatically — no manual typing. A NOTE of LOA, AWOL or withdrawn on a new student is taken in as their standing. Subjects a student is enrolled in this semester come from the class list (Enrollment), not from this sheet.",
     "leave-of-absence":
-      "A leave of absence pauses a student's studies. Each request is a case that moves across the board: staff check it, the Dean decides, and the student goes on leave when the first semester of the leave begins. Drag a card to the next column or use its Move to menu; both do exactly what the buttons do.",
+      "A leave of absence means the student does not enroll for the semesters of the leave; the time on leave still counts toward the maximum residence. Each request is a case that moves across the board: staff check it, the Dean decides, and the student goes on leave when the first semester of the leave begins. Drag a card to the next column or use its Move to menu; both do exactly what the buttons do.",
     readmission:
       "Readmission brings a student back from an approved leave. The student names the leave they are ending, a return semester and a checklist; staff verify each item, and the Dean decides. Approval makes the student active again; enrolling in subjects is a separate step for the Academic Coordinator.",
     awol:

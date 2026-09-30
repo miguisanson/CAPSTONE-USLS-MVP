@@ -344,6 +344,30 @@ function SubjectRow({ row, canEdit, editing, statuses, termLabels, studentId, on
   );
 }
 
+// A subject is dropped by the professor when unexcused absences exceed the handbook limit, so a
+// Dropped row needs the absence percentage or a documented exception with its reason.
+function DropEvidenceFields({ form, setForm }) {
+  return (
+    <div className="grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 sm:grid-cols-2">
+      <p className="text-xs font-semibold text-amber-900 sm:col-span-2">
+        A subject is dropped by the professor when unexcused absences are more than 20% of class hours (Graduate School Handbook). Give the percentage, or explain the approved exception.
+      </p>
+      <Field label="Unexcused absences (% of class hours)">
+        <Input type="number" min="0" max="100" step="0.1" value={form.unexcused_absence_percent} onChange={(e) => setForm({ ...form, unexcused_absence_percent: e.target.value })} />
+      </Field>
+      <Field label="Or: documented exception and who approved it">
+        <Input value={form.drop_exception_reason} onChange={(e) => setForm({ ...form, drop_exception_reason: e.target.value })} maxLength={300} />
+      </Field>
+    </div>
+  );
+}
+
+function dropEvidence(form) {
+  return form.status === "Dropped"
+    ? { unexcused_absence_percent: form.unexcused_absence_percent, drop_exception_reason: form.drop_exception_reason }
+    : {};
+}
+
 // Add or edit one curriculum row in place. Enter saves, Esc cancels.
 function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved }) {
   const isAdd = row.status === "Missing";
@@ -354,6 +378,8 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
     term_label: row.term_label || "",
     remarks: row.remarks || "",
     reason: "",
+    unexcused_absence_percent: "",
+    drop_exception_reason: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -367,10 +393,10 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
     setError("");
     try {
       if (isAdd) {
-        const result = await api.addMonitoringSubject(studentId, { course_id: row.course_id, status: form.status, term_label: form.term_label, remarks: form.remarks, reason: form.reason });
+        const result = await api.addMonitoringSubject(studentId, { course_id: row.course_id, status: form.status, term_label: form.term_label, remarks: form.remarks, reason: form.reason, ...dropEvidence(form) });
         onSaved(result.message);
       } else {
-        const result = await api.updateMonitoringSubject(studentId, row.record_id, { status: form.status, term_label: form.term_label, remarks: form.remarks, reason: form.reason });
+        const result = await api.updateMonitoringSubject(studentId, row.record_id, { status: form.status, term_label: form.term_label, remarks: form.remarks, reason: form.reason, ...dropEvidence(form) });
         onSaved(result.message);
       }
     } catch (e) {
@@ -398,6 +424,7 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
         </Field>
         <Field label="Remarks"><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} maxLength={500} /></Field>
       </div>
+      {form.status === "Dropped" && form.status !== row.status && <DropEvidenceFields form={form} setForm={setForm} />}
       {needsReason && (
         <Field label="Reason for changing this imported value" required hint="Kept in the change history with your name.">
           <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} maxLength={500} required />
@@ -416,7 +443,7 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
 // Free-form subject (not in the curriculum), or re-adding a removed row (fixedCourse).
 function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, onSaved }) {
   const listId = useId();
-  const [form, setForm] = useState({ code: "", title: "", units: "3", status: "Completed", term_label: "", remarks: "" });
+  const [form, setForm] = useState({ code: "", title: "", units: "3", status: "Completed", term_label: "", remarks: "", unexcused_absence_percent: "", drop_exception_reason: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -426,8 +453,8 @@ function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, 
     setError("");
     try {
       const payload = fixedCourse
-        ? { course_id: fixedCourse.course_id, status: form.status, term_label: form.term_label, remarks: form.remarks }
-        : { code: form.code, title: form.title, units: Number(form.units), status: form.status, term_label: form.term_label, remarks: form.remarks };
+        ? { course_id: fixedCourse.course_id, status: form.status, term_label: form.term_label, remarks: form.remarks, ...dropEvidence(form) }
+        : { code: form.code, title: form.title, units: Number(form.units), status: form.status, term_label: form.term_label, remarks: form.remarks, ...dropEvidence(form) };
       const result = await api.addMonitoringSubject(studentId, payload);
       onSaved(result.message);
     } catch (e) {
@@ -455,6 +482,7 @@ function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, 
         </Field>
         <Field label="Remarks"><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} maxLength={500} /></Field>
       </div>
+      {form.status === "Dropped" && <DropEvidenceFields form={form} setForm={setForm} />}
       {!fixedCourse && <p className="text-xs text-slate-500">Free-form rows are kept and exported, but never count toward curriculum completion or eligibility.</p>}
       {error && <ErrorNote message={error} />}
       <div className="flex justify-end gap-2">

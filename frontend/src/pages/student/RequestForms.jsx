@@ -402,11 +402,11 @@ export function AwolReturnRequestForm({ data, onSaved }) {
         </div>
       )}
       {locked ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Your structured return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Your return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
-            The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete it here as structured fields; no PDF upload or RAG analysis is used.
+            The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete the form below; no file needs to be uploaded.
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Intended return semester" required><Select value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} required /></Field>

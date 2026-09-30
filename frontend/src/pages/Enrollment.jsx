@@ -293,6 +293,9 @@ export default function Enrollment() {
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
             Assign official semester offerings to an individual student. Confirming runs all checks and synchronizes the class list, monitoring sheet, student profile, and portal in one action.
           </p>
+          <p className="mt-1 max-w-3xl text-xs text-slate-500">
+            A class list row marked Dropped is accepted only with an "Unexcused Absence Percent" column above the handbook limit (20%), or a "Drop Exception Reason" that explains the approved exception.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <label className={`btn-ghost cursor-pointer ${busy === "classlist" ? "pointer-events-none opacity-60" : ""}`}>

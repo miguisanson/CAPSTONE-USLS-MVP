@@ -129,14 +129,17 @@ const STAT_TONES = {
 };
 
 // KPI tile used on the Student, Dean and Faculty dashboards. Pass `to` to make
-// the whole tile a link to the page where the figure can be acted on.
-export function StatCard({ icon: Icon, label, value, sub, tone = "brand", to }) {
+// the whole tile a link to the page where the figure can be acted on. Pass `badge` when the
+// value is a status in words rather than a number: it is shown as a badge, not in the big figure font.
+export function StatCard({ icon: Icon, label, value, sub, tone = "brand", to, badge = false }) {
   const body = (
     <div className={`card h-full p-5 transition-colors ${to ? "hover:border-brand-200 hover:bg-brand-50/30" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
-          <p className="mt-2 font-display text-3xl font-semibold text-ink">{value}</p>
+          {badge
+            ? <p className="mt-3"><StatusBadge value={value} dot={false} className="text-sm" /></p>
+            : <p className="mt-2 font-display text-3xl font-semibold text-ink">{value}</p>}
           {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
         </div>
         {Icon && (

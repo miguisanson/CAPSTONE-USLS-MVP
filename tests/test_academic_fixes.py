@@ -287,10 +287,14 @@ class AcademicFixTests(unittest.TestCase):
         return (date.today() + timedelta(days=offset)).isoformat()
 
     def test_class_list_dropped_row_is_recorded_as_dropped_not_enrolled(self):
+        # A drop row must carry the absence evidence (handbook: unexcused absences above 20%).
         body = self._csv([
-            f"{self.ay},1st Semester,GS-ACD-0001,ACD-501,Dr. File Named,Enrolled,{self._today_str()}",
-            f"{self.ay},1st Semester,GS-ACD-0001,ACD-502,Dr. File Named,Dropped,{self._today_str(1)}",
-        ])
+            f"{self.ay},1st Semester,GS-ACD-0001,ACD-501,Dr. File Named,Enrolled,{self._today_str()},",
+            f"{self.ay},1st Semester,GS-ACD-0001,ACD-502,Dr. File Named,Dropped,{self._today_str(1)},35",
+        ], header=(
+            "Academic Year,Term,Student ID,Subject Code,Faculty,Enrollment Status,Status Effective Date,"
+            "Unexcused Absence Percent"
+        ))
         preview = self._import(body, preview=True).get_json()
         self.assertEqual(preview["error_count"], 0, preview)
         imported = self._import(body)

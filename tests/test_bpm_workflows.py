@@ -1288,8 +1288,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "source_reference": "Faculty email dated July 23, 2026",
                 "note": "Final requirements were reported complete.",
             })
-            self.assertEqual(response.status_code, 409, response.get_json())
-            self.assertTrue(response.get_json()["read_only"])
+            # The old read-only stub route was removed (polish packet): portal edits go through
+            # /api/monitoring/students/<id>/subjects/<row>, so this URL no longer exists.
+            self.assertIn(response.status_code, (404, 405))
 
             db.session.refresh(record)
             db.session.refresh(enrollment)
@@ -1461,7 +1462,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "term_id": current_term.id,
                 "status": "Dropped",
             })
-            self.assertEqual(blocked.status_code, 409, blocked.get_json())
+            self.assertIn(blocked.status_code, (404, 405))  # stub route removed; see test_polish.py for the drop rule
             return
             student = db.session.get(Student, self.student_id)
             course = db.session.get(Course, self.course_id)
@@ -2348,7 +2349,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "source_reference": "End-of-semester AIMS status batch",
                 "note": "Confirmed as taken for operational monitoring.",
             })
-            self.assertEqual(response.status_code, 409, response.get_json())
+            self.assertIn(response.status_code, (404, 405))  # stub route removed; the subject stays untouched
             db.session.refresh(enrollment)
             db.session.refresh(record)
             self.assertEqual(enrollment.status, "Enrolled")

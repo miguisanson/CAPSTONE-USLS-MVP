@@ -330,7 +330,7 @@ function DropZone({ file, onFile, error, hint }) {
       <UploadCloud className={`h-7 w-7 ${file ? "text-brand-600" : "text-slate-400"}`} />
       {file ? <p className="text-sm font-semibold text-ink">{file.name} <span className="font-normal text-slate-500">· {formatBytes(file.size)}</span></p> : <p className="text-sm font-semibold text-slate-700">Drag a PDF or Word file here, or click to choose</p>}
       <p className="text-xs text-slate-500">{hint}</p>
-      <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} onChange={(event) => { take(event.target.files?.[0]); event.target.value = ""; }} />
+      <input ref={input} type="file" accept={ACCEPT} aria-label="Choose a PDF or Word file" className="sr-only" tabIndex={-1} onChange={(event) => { take(event.target.files?.[0]); event.target.value = ""; }} />
     </div>
     {error && <p role="alert" className="mt-2 text-sm font-semibold text-red-700">{error}</p>}
   </div>;

@@ -132,7 +132,7 @@ TRANSACTIONS = [
         "title": "Leave of Absence",
         "icon": "calendar-off",
         "group": "Standing",
-        "short": "Record an LOA application, route the Dean decision, and pause the student record when approved.",
+        "short": "Record an LOA application and route the Dean decision. Time on leave still counts toward the maximum residence.",
         "actor": "Student / GS Staff / Dean",
         "data": "Structured request date, effective semester period, reason, prior LOA count, eligibility check, Dean decision, status update, notice.",
     },
@@ -3377,14 +3377,48 @@ def _link_business_rules_to_policy_documents() -> int:
     return linked
 
 
+# Catalog fields that describe a rule but are not something a person edits as the rule's value.
+_RULE_METADATA_FIELDS = ("title", "description", "unit", "enforced", "not_enforced_reason")
+_RULE_SOURCE_FIELDS = ("source_title", "source_section", "source_page")
+
+
+def _sync_business_rule_metadata(existing_rules: dict) -> int:
+    """Refresh the descriptive fields of rules inserted by an older catalog.
+
+    Never touches the value, its status, its effective date or its revision history.
+    The source fields are also left alone once a person has edited the rule in the portal
+    (``updated_by_user_id`` is set), because staff can correct a citation there.
+    Returns the number of rows that changed.
+    """
+    changed = 0
+    for entry in BUSINESS_RULE_CATALOG:
+        rule = existing_rules.get(entry["key"])
+        if rule is None:
+            continue
+        fields = _RULE_METADATA_FIELDS + (() if rule.updated_by_user_id else _RULE_SOURCE_FIELDS)
+        touched = False
+        for field in fields:
+            wanted = entry[field]
+            if field == "enforced":
+                wanted = bool(wanted)
+            if getattr(rule, field) != wanted:
+                setattr(rule, field, wanted)
+                touched = True
+        changed += touched
+    return changed
+
+
 def ensure_business_rules() -> int:
-    """Insert missing rules from the seed catalog. Never changes an existing row.
+    """Insert missing rules from the seed catalog and keep their descriptive fields current.
 
     Idempotent and safe to call at import time, on every startup, after a database
-    reset, and from tests. Returns the number of rules inserted.
+    reset, and from tests. A rule's value, status and revision history are never
+    changed here (see ``_sync_business_rule_metadata``). Returns the number of rules inserted.
     """
     db.create_all()
-    existing = {row[0] for row in db.session.query(BusinessRule.key).all()}
+    existing_rules = {rule.key: rule for rule in BusinessRule.query.all()}
+    existing = set(existing_rules)
+    _sync_business_rule_metadata(existing_rules)
     created = 0
     for entry in BUSINESS_RULE_CATALOG:
         if entry["key"] in existing:
@@ -4484,11 +4518,22 @@ def human_activity_query():
 
 
 def account_dict(account: UserAccount) -> dict:
+    full_name = account.full_name
+    program = program_name = None
+    student = account.student if account.role == "student" and account.student_id else None
+    if student:
+        # The header shows "<name> · <program>": the student's own name, never the demo
+        # persona label that some seeded accounts carry in full_name.
+        full_name = student.name
+        program = student.program.code if student.program else None
+        program_name = student.program.name if student.program else None
     return {
         "id": account.id,
         "email": account.email,
-        "full_name": account.full_name,
+        "full_name": full_name,
         "role": account.role,
+        "program": program,
+        "program_name": program_name,
         "student_id": account.student_id,
         "faculty_id": account.faculty_id,
         "must_change_password": bool(account.must_change_password),
@@ -9002,6 +9047,57 @@ def create_policy_document(
         raise
     _reset_rag_indexes()
     return document
+
+
+OPERATIONS_MANUAL_FILE = BASE_DIR / "Documents" / "CAPSTONE_ONLY" / "USLS GS Operations Manual - DRAFT for Validation.docx"
+OPERATIONS_MANUAL_VALUES = {
+    "title": "USLS Graduate School Operations Manual (draft for validation)",
+    "description": (
+        "The capstone group's written description of how the Graduate School carries out each process, "
+        "with the business rules register. A draft: every answer that uses it says it is pending validation."
+    ),
+    "category": "Operations Manual",
+    "status": "draft",
+    "validation_note": "Prepared by the capstone group for Graduate School validation",
+}
+OPERATIONS_MANUAL_SEED_NOTE = "Seeded from the project files"
+
+
+def ensure_operations_manual_policy_document() -> int:
+    """Register the draft Operations Manual in the policy library (idempotent).
+
+    It is searchable by the Policy Assistant as a Draft document. Once staff replace the file or
+    change the record themselves this never overwrites their work; only an untouched seeded copy
+    follows a newer file in the project folder. Returns the number of records created or updated.
+    """
+    path = Path(OPERATIONS_MANUAL_FILE)
+    if not path.is_file() or path.stat().st_size <= 0:
+        return 0
+    file_bytes = path.read_bytes()
+    existing = PolicyDocument.query.filter_by(original_name=_policy_upload_names(path.name)[0]).first()
+    if existing is None:
+        existing = PolicyDocument.query.filter_by(title=OPERATIONS_MANUAL_VALUES["title"]).first()
+    if existing is not None:
+        versions = _ensure_policy_versions(existing)
+        current = versions[-1] if versions else None
+        untouched = len(versions) == 1 and current is not None and current.note == OPERATIONS_MANUAL_SEED_NOTE
+        stored = POLICY_DOCUMENT_UPLOAD_ROOT / existing.stored_name
+        if untouched and stored.is_file() and stored.read_bytes() != file_bytes:
+            replace_policy_document_file(
+                existing, file_bytes, path.name, db.session.get(UserAccount, existing.uploaded_by_user_id), {},
+                "Updated from the project files",
+            )
+            return 1
+        return 0
+    owner = (
+        UserAccount.query.filter_by(role="admin", active=True).order_by(UserAccount.id).first()
+        or UserAccount.query.filter_by(role="staff", active=True).order_by(UserAccount.id).first()
+        or UserAccount.query.order_by(UserAccount.id).first()
+    )
+    if owner is None:
+        return 0
+    create_policy_document(file_bytes, path.name, owner, dict(OPERATIONS_MANUAL_VALUES), OPERATIONS_MANUAL_SEED_NOTE)
+    return 1
 
 
 def replace_policy_document_file(
@@ -14105,7 +14201,7 @@ def register_routes(app: Flask) -> None:
         if score < 0 or score > 100:
             return None, (jsonify({"error": "The evaluation score must be between 0 and 100."}), 400)
         if gate == RESEARCH_GATE_FINAL and result in (VERDICT_PASSED, VERDICT_MINOR):
-            threshold = FINAL_DEFENSE_PASSING_SCORE["Dissertation" if research_case_type(student) == "Dissertation" else "Thesis"]
+            threshold = final_defense_passing_score(research_case_type(student))
             if score < threshold:
                 return None, (jsonify({
                     "error": (
@@ -15255,6 +15351,7 @@ def register_routes(app: Flask) -> None:
             "other_semester_count": count("active_other_term"),
             "unsupported_status_count": count("unsupported_status"),
             "bad_date_count": count("bad_date"),
+            "drop_evidence_count": count("drop_evidence"),
             "faculty_assignments": faculty_assignments,
             "faculty_mismatch_count": len(faculty_mismatches),
             "sample_not_found": not_found[:8],
@@ -15272,6 +15369,7 @@ def register_routes(app: Flask) -> None:
                 f"{len(blocked)} row(s) refused because the student is on leave, AWOL or withdrawn, "
                 f"{count('term_mismatch')} row(s) were for another semester, "
                 f"{count('already_dropped')} row(s) conflicted with a subject already dropped, "
+                f"{count('drop_evidence')} drop row(s) refused for missing absence evidence, "
                 f"{faculty_assignments} faculty assignment(s) applied and "
                 f"{len(faculty_mismatches)} faculty difference(s) left for the Dean-approved plan."
             ),
@@ -16097,20 +16195,6 @@ def register_routes(app: Flask) -> None:
             "students": students,
         })
 
-    @app.route("/api/monitoring/subject-status", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff")
-    def monitoring_subject_status_save():
-        """Monitoring is a read-only projection of source workflow records."""
-        return jsonify({
-            "error": (
-                "The Monitoring Sheet is read-only. Update enrollment through Enrollment, "
-                "subject withdrawal through the approved Withdrawal workflow, and official "
-                "course outcomes through the verified source import."
-            ),
-            "read_only": True,
-        }), 409
-
-
     @app.route("/api/monitoring/class-list")
     @require_api_login("staff", "academic_coordinator")
     def monitoring_class_list():
@@ -16393,50 +16477,6 @@ def register_routes(app: Flask) -> None:
                 "needs_action": sum(1 for item in open_items if not item["auto_resolvable"]),
             },
         })
-
-    @app.route("/api/students/<int:student_id>/remove", methods=["POST"])
-    @require_api_login("staff", "academic_coordinator")
-    def monitoring_remove_student(student_id: int):
-        return jsonify({
-            "error": "The Monitoring Sheet is read-only. Use the applicable standing-change workflow."
-        }), 409
-
-        # Legacy branch retained temporarily for migration reference.
-        # A "removal" from the monitoring sheet is a soft change: the student is
-        # marked Withdrawn (kept in the database with all history) rather than
-        # deleted, so records and the activity trail stay intact.
-        data = request.get_json(silent=True) or {}
-        student = Student.query.get_or_404(student_id)
-        reason = (data.get("reason") or "").strip()
-        previous = student.standing
-        if student.standing == "Withdrawn" and student.enrollment_tag == "Withdrawn":
-            return jsonify({"error": f"{student.name} is already marked Withdrawn."}), 400
-        student.standing = "Withdrawn"
-        student.enrollment_tag = "Withdrawn"
-        student.updated_at = now_utc()
-        cancelled_subjects = cancel_active_subject_enrollments(
-            student,
-            reason or "Removed via the monitoring sheet.",
-        )
-        account = current_account()
-        actor = workflow_actor_label(account) if account else "Graduate School Staff"
-        add_log(
-            "withdrawal",
-            student.id,
-            actor,
-            "Monitoring sheet removal",
-            f"{student.name} marked Withdrawn and removed from active monitoring.",
-            "Student",
-            (
-                f"{reason or 'Removed via the monitoring sheet.'} "
-                f"Cancelled {cancelled_subjects} active subject enrollment(s)."
-            ),
-            previous_status=previous,
-            new_status="Withdrawn",
-        )
-        recompute_risk(student)
-        db.session.commit()
-        return jsonify({"ok": True, "message": f"{student.name} was marked Withdrawn.", "student_id": student.id})
 
     # ---- Monitoring Sheet portal entry (owner decision 2026-10-01) -------
     # Staff, academic coordinators and admins write; research coordinators and the
@@ -16767,55 +16807,6 @@ def register_routes(app: Flask) -> None:
             "flag_categories": [
                 item for item in MONITORING_FLAG_CATEGORIES if item != "AWOL policy alert"
             ],
-        })
-
-    @app.route("/api/monitoring/compre-exam", methods=["POST"])
-    @require_api_login("academic_coordinator", "staff")
-    def monitoring_compre_exam_save():
-        return jsonify({
-            "error": "The Monitoring Sheet is read-only. Comprehensive exam results must come from the authorized exam-result workflow or source import.",
-            "read_only": True,
-        }), 409
-
-        # Legacy implementation retained for migration reference.
-        data = request_payload()
-        student = Student.query.get_or_404(int(data.get("student_id") or 0))
-        requested_status = str(data.get("status") or "").strip()
-        allowed = {"Not Taken", "Passed", "Failed"}
-        if requested_status not in allowed:
-            return jsonify({"error": "Choose Eligible, Passed, or Failed for the comprehensive exam status."}), 400
-        eligibility = comprehensive_exam_eligibility(student)
-        if not eligibility["eligible"] and requested_status in {"Passed", "Failed"}:
-            return jsonify({"error": "The student must complete all curriculum subjects before the comprehensive exam can be marked Passed or Failed."}), 400
-
-        previous_status = student.comprehensive_exam_status or "Not Taken"
-        student.comprehensive_exam_status = requested_status
-        if eligibility["eligible"] and student.current_stage in ("Admission", "Coursework"):
-            student.current_stage = "Comprehensive Exam"
-        recompute_risk(student)
-        account = current_account()
-        actor_role = "Faculty" if account and account.role == "faculty" else "Academic Coordinator"
-        actor = f"{actor_role} · {account.full_name}" if account else actor_role
-        add_log(
-            "course-audit",
-            student.id,
-            actor,
-            "Comprehensive exam status",
-            f"Comprehensive exam marked {requested_status}",
-            "Academic Coordinator",
-            f"Changed from {previous_status} to {requested_status}.",
-        )
-        db.session.commit()
-        updated_eligibility = comprehensive_exam_eligibility(student)
-        return jsonify({
-            "ok": True,
-            "student_id": student.id,
-            "stage": student.current_stage,
-            "risk": student.risk_level,
-            "eligible": updated_eligibility["eligible"],
-            "compre_eligibility": updated_eligibility,
-            "milestones": monitoring_research_milestones(student),
-            "message": f"Comprehensive exam marked {requested_status}.",
         })
 
     # Population-level queue of rule-based recommendations.
@@ -22426,6 +22417,44 @@ def _class_list_date(text: str) -> date | None:
     raise ValueError(value)
 
 
+DROP_EXCEPTION_MIN_LENGTH = 10
+
+
+def drop_evidence(percent_value, exception_reason) -> tuple[str | None, str | None]:
+    """Evidence that a subject may be recorded Dropped, as (evidence text, error message).
+
+    Handbook rule: a subject is dropped by the professor when the student's unexcused absences
+    exceed the register value (20% of class hours). Every path that records a drop asks for the
+    absence percentage above that line, or for a documented exception with its reason, so a drop
+    can never be recorded without one or the other.
+    """
+    limit = rule_value("dropping.absence_limit_percent", 20)
+    cite = rule_citation("dropping.absence_limit_percent") or "Graduate School Handbook 2022-2023"
+    text_value = str(percent_value if percent_value is not None else "").strip().rstrip("%").strip()
+    percent = None
+    if text_value:
+        try:
+            percent = float(text_value)
+        except ValueError:
+            percent = None
+        if percent is not None and not 0 <= percent <= 100:
+            percent = None
+    exception = " ".join(str(exception_reason or "").split())
+    if percent is not None and percent > limit:
+        return f"Unexcused absences {percent:g}% of class hours, above the {limit}% limit ({cite}).", None
+    if len(exception) >= DROP_EXCEPTION_MIN_LENGTH:
+        return f"Documented exception to the {limit}% absence rule ({cite}): {exception}.", None
+    if percent is not None:
+        return None, (
+            f"A subject is dropped only when unexcused absences are more than {limit}% of the class hours "
+            f"({cite}); {percent:g}% was entered. If an approved exception applies, record it with its reason."
+        )
+    return None, (
+        f"A drop needs the student's unexcused absences as a percentage of class hours, above {limit}% "
+        f"({cite}), or a documented exception with its reason."
+    )
+
+
 def evaluate_class_list_row(row: dict, term: AcademicTerm, academic_year: str, semester: str, seen_faculty: dict) -> dict | None:
     """Decide what one class-list row means. Shared by the preview and the import so they
     always agree. Returns None for an empty row. `reason` names the skip counter."""
@@ -22575,8 +22604,15 @@ def evaluate_class_list_row(row: dict, term: AcademicTerm, academic_year: str, s
     # Dropped row
     if existing and existing.status in {"Dropped", "Withdrawn"}:
         return fail("already_dropped", f"Already recorded {existing.status}; nothing to change.", "warning")
+    evidence, evidence_error = drop_evidence(
+        class_list_value(row, "UNEXCUSEDABSENCEPERCENT", "UNEXCUSEDABSENCES", "ABSENCEPERCENT", "ABSENCES"),
+        class_list_value(row, "DROPEXCEPTIONREASON", "EXCEPTIONREASON", "DROPEXCEPTION"),
+    )
+    if evidence_error:
+        return fail("drop_evidence", evidence_error)
+    result["drop_evidence"] = evidence
     effective_text = f" effective {effective.isoformat()}" if effective else ""
-    result["message"] = f"Will be recorded as Dropped{effective_text}"
+    result["message"] = f"Will be recorded as Dropped{effective_text}. {evidence}"
     return result
 
 
@@ -22595,7 +22631,9 @@ def apply_class_list_row(item: dict, term: AcademicTerm, filename: str, actor: s
         changed_at = now_utc()
         ledger.status = "Dropped"
         ledger.source_reference = f"Class list import ({filename})"[:160]
-        ledger.status_note = item["remarks"] or f"Dropped per class list import ({filename})."
+        ledger.status_note = " ".join(part for part in (
+            item["remarks"] or f"Dropped per class list import ({filename}).", item.get("drop_evidence"),
+        ) if part)
         ledger.status_changed_at = changed_at
         ledger.cancelled_at = effective_at or changed_at
         ledger.updated_at = changed_at
@@ -22605,7 +22643,10 @@ def apply_class_list_row(item: dict, term: AcademicTerm, filename: str, actor: s
         record.status = "Dropped"
         record.term_label = term.label
         record.evidence_reference = f"Class list import ({filename})"
-        record.remarks = "Dropped" + (f" effective {effective.isoformat()}" if effective else "") + " per class list import."
+        record.remarks = (
+            "Dropped" + (f" effective {effective.isoformat()}" if effective else "") + " per class list import. "
+            + (item.get("drop_evidence") or "")
+        ).strip()
         record.updated_at = changed_at
         db.session.flush()
         remaining_active = SubjectEnrollment.query.filter(
@@ -22625,7 +22666,8 @@ def apply_class_list_row(item: dict, term: AcademicTerm, filename: str, actor: s
         add_log("enrollment", student.id, actor, "Class list import",
                 f"{course.code} recorded as Dropped for {term.label}.", "Student",
                 f"From the uploaded class list. {previous} -> Dropped."
-                + (f" Effective {effective.isoformat()}." if effective else ""),
+                + (f" Effective {effective.isoformat()}." if effective else "")
+                + (f" {item['drop_evidence']}" if item.get("drop_evidence") else ""),
                 previous_status=previous, new_status="Dropped")
         return "dropped"
     previous = record.status if record else "Missing"
@@ -23888,11 +23930,21 @@ def _monitoring_row_values(data: dict) -> dict:
     return values
 
 
+def _monitoring_drop_reason(data: dict, reason: str) -> str:
+    """The change reason for a manual Dropped status, with the absence evidence the rule needs."""
+    evidence, error = drop_evidence(data.get("unexcused_absence_percent"), data.get("drop_exception_reason"))
+    if error:
+        raise MonitoringEntryError(error)
+    return f"{reason} {evidence}".strip() if reason else evidence
+
+
 def monitoring_portal_add_subject(student: Student, data: dict) -> CourseRecord:
     account, actor_name = _monitoring_actor()
     status = _monitoring_subject_status(data.get("status"))
     values = _monitoring_row_values(data)
     reason = _monitoring_clean(data.get("reason"), 500)
+    if status == "Dropped":
+        reason = _monitoring_drop_reason(data, reason)
     course = _monitoring_course_for_row(student, data)
     record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
     if record and not record.removed_at and (record.status or "") not in MONITORING_NO_ROW_STATUSES:
@@ -23959,6 +24011,8 @@ def monitoring_portal_update_subject(student: Student, record: CourseRecord, dat
                 changes.append((field, getattr(course, field), new))
     if not changes:
         return record, []
+    if any(field == "status" and new == "Dropped" for field, _old, new in changes):
+        reason = _monitoring_drop_reason(data, reason)
     if monitoring_record_source(record) in {"Imported", "System"} and not reason:
         raise MonitoringEntryError(
             "This value came from an imported/system source. Enter a reason for changing it; it is kept in the change history.",
@@ -27435,8 +27489,16 @@ RESEARCH_VERDICTS = {
         "summary": "Resubmission: at the Title stage a new set of three titles, otherwise a re-defense following the same protocol.",
     },
 }
-# business rule: final defense passing score (protocol Form 7; below this the panel cannot record a plain pass)
+# business rule: final defense passing score (protocol Form 7; below this the panel cannot record a plain pass).
+# The values in use come from the business-rules register; this dict is only the built-in default.
 FINAL_DEFENSE_PASSING_SCORE = {"Thesis": 85, "Dissertation": 90}
+
+
+def final_defense_passing_score(case_type: str) -> float:
+    """The Form 7 line for a thesis / project paper or a dissertation, read from the register."""
+    if case_type == "Dissertation":
+        return rule_value("defense.dissertation_major_revision_score", FINAL_DEFENSE_PASSING_SCORE["Dissertation"])
+    return rule_value("defense.thesis_major_revision_score", FINAL_DEFENSE_PASSING_SCORE["Thesis"])
 REVISION_EFFECTS = ("revise", "panel_revise")
 RESUBMIT_EFFECTS = ("redefense", "resubmit")
 REVISION_AWAITING = "Awaiting revisions"
@@ -33768,6 +33830,11 @@ def run_startup_tasks(seed_count: int | None = None) -> dict:
     ensure_business_rules()
     adopt_legacy_leave_logs(commit=True)  # before the demo baseline, which reads leave cases
     ensure_demo_accounts()
+    try:
+        ensure_operations_manual_policy_document()  # the draft manual is searchable as a Draft
+    except Exception as exc:  # noqa: BLE001 - the library must never block startup
+        db.session.rollback()
+        print(f"The Operations Manual draft was not added to the policy library: {exc}")
     if demo_mode_enabled():
         ensure_panel_matching_demo_data()  # fabricated availability windows: demo data only
     seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases

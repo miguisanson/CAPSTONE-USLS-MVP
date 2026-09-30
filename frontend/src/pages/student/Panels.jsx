@@ -73,7 +73,7 @@ export function ProgressPanel({ data }) {
       <SectionTitle title="My Academic Status" subtitle="Your current stage, requirements, and next step" icon={ClipboardCheck} />
       {student.standing === "On Leave" && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          Your studies are currently paused because you are on Leave of Absence. Readmission becomes available while this status is active.
+          You are on Leave of Absence, so you cannot enroll in subjects. The time on leave still counts toward your maximum residence. Readmission becomes available while this status is active.
         </div>
       )}
       <div className="mb-5 flex flex-wrap gap-1.5">
@@ -146,7 +146,7 @@ export function WorkflowStatusPanel({ data }) {
       status: data.residency_record?.status || data.awol_case?.status || data.student.enrollment_tag,
       detail: data.residency_record
         ? `${data.residency_record.term_label} · ${data.residency_record.reason}`
-        : data.awol_case?.policy_classification || "Submit the structured return declaration when ready to return.",
+        : data.awol_case?.policy_classification || "Submit your return declaration when you are ready to return.",
     });
   }
   rows.push({
