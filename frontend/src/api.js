@@ -204,6 +204,22 @@ export const api = {
     const qs = queryString(params);
     return request(`/monitoring/class-list${qs ? `?${qs}` : ""}`);
   },
+  // Monitoring Sheet portal entry (staff / coordinators write; others read).
+  monitoringStudent: (id) => request(`/monitoring/students/${id}`),
+  createMonitoringStudent: (payload) =>
+    request("/monitoring/students", { method: "POST", body: JSON.stringify(payload) }),
+  updateMonitoringStudent: (id, payload) =>
+    request(`/monitoring/students/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  monitoringHistory: (id) => request(`/monitoring/students/${id}/history`),
+  addMonitoringSubject: (id, payload) =>
+    request(`/monitoring/students/${id}/subjects`, { method: "POST", body: JSON.stringify(payload) }),
+  updateMonitoringSubject: (id, recordId, payload) =>
+    request(`/monitoring/students/${id}/subjects/${recordId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  removeMonitoringSubject: (id, recordId, payload) =>
+    request(`/monitoring/students/${id}/subjects/${recordId}`, { method: "DELETE", body: JSON.stringify(payload) }),
+  bulkAddMonitoringSubjects: (payload) =>
+    request("/monitoring/subjects/bulk-add-remaining", { method: "POST", body: JSON.stringify(payload) }),
+  monitoringExportUrl: (programId) => `${BASE}/monitoring/export${programId ? `?program_id=${programId}` : ""}`,
   saveCompreExam: (payload) =>
     request("/monitoring/compre-exam", { method: "POST", body: JSON.stringify(payload) }),
   monitoringUploads: () => request("/monitoring/uploads"),

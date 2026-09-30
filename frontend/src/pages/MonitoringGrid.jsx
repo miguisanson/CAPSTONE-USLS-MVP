@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Table2, Download, AlertTriangle, Check, Lock, Flag, ShieldCheck, X, CheckCircle2 } from "lucide-react";
+import { Table2, Download, AlertTriangle, Check, Lock, Flag, ShieldCheck, X, CheckCircle2, UserPlus, FileSpreadsheet, PencilLine, SquarePen } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, EmptyState, StatusBadge } from "../components/ui";
+import AddStudentDialog from "../components/monitoring/AddStudentDialog";
+import StudentRecordPanel from "../components/monitoring/StudentRecordPanel";
 
 const CELL_VIEW = {
   Completed: { cls: "bg-brand-500 text-white", mark: "C" },
@@ -12,6 +14,8 @@ const CELL_VIEW = {
   Enrolled: { cls: "bg-blue-100 text-blue-700", mark: "R" },
   Failed: { cls: "bg-red-100 text-red-700", mark: "F" },
   Dropped: { cls: "bg-violet-100 text-violet-700", mark: "D" },
+  Planned: { cls: "bg-sky-50 text-sky-700", mark: "P" },
+  INC: { cls: "bg-amber-100 text-amber-800", mark: "I" },
   Withdrawn: { cls: "bg-rose-100 text-rose-700", mark: "W" },
   Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
 };
@@ -46,6 +50,9 @@ export default function MonitoringGrid() {
   const [flagError, setFlagError] = useState("");
   const [resolvingFlagId, setResolvingFlagId] = useState(null);
   const [resolutionNote, setResolutionNote] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [recordPanel, setRecordPanel] = useState(null); // { studentId, courseId }
+  const [savedNotice, setSavedNotice] = useState("");
   function load(pid, nextProgress = progress, nextRisk = risk, nextEnrollment = enrollment) {
     setLoading(true);
     setError("");
@@ -67,6 +74,7 @@ export default function MonitoringGrid() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProgramId, selectedProgress, selectedRisk, selectedEnrollment, selectedTermId]);
 
+  const canEdit = Boolean(grid?.permissions?.can_edit);
   const flatCourses = useMemo(
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
     [grid]
@@ -186,10 +194,34 @@ export default function MonitoringGrid() {
 
   return (
     <div className="space-y-5 animate-fade-up">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
-        <p className="mt-1 text-sm text-slate-500">Read-only curriculum progress synchronized from enrollment and approved workflows.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-ink">Monitoring Sheet</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {canEdit
+              ? "Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff."
+              : "Curriculum progress for each student (view only)."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {grid && (
+            <a href={api.monitoringExportUrl(programId)} className="btn-ghost" download>
+              <FileSpreadsheet className="h-4 w-4" aria-hidden="true" /> Export workbook
+            </a>
+          )}
+          {canEdit && (
+            <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>
+              <UserPlus className="h-4 w-4" aria-hidden="true" /> Add student
+            </button>
+          )}
+        </div>
       </div>
+      {savedNotice && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-800" role="status">
+          <span>{savedNotice}</span>
+          <button type="button" onClick={() => setSavedNotice("")} className="cursor-pointer rounded-lg p-1 hover:bg-brand-100" aria-label="Dismiss message"><X className="h-4 w-4" /></button>
+        </div>
+      )}
 
       <Card className="p-4">
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
@@ -208,8 +240,12 @@ export default function MonitoringGrid() {
       </Card>
 
       <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-        <p><span className="font-semibold text-ink">Read-only view.</span> Enrollment, approved withdrawal, and verified source imports update this page automatically. Use Flag issue only to record a discrepancy without changing the source value.</p>
+        {canEdit ? <PencilLine className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /> : <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />}
+        {canEdit ? (
+          <p><span className="font-semibold text-ink">Select a subject cell or the pencil beside a name to add or edit a row.</span> Everything you type is marked Manual entry with your name and the time, and is kept in the change history. Imported values are never overwritten silently: a later upload that disagrees with a portal entry is held for review. Grades are not entered here.</p>
+        ) : (
+          <p><span className="font-semibold text-ink">View only.</span> Select a cell to see where a value came from and its change history. Only Graduate School staff and the Academic Coordinator can edit.</p>
+        )}
       </div>
 
       {grid?.integrity && (
@@ -241,7 +277,10 @@ export default function MonitoringGrid() {
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 ring-1 ring-blue-200" /> Enrolled</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-100 ring-1 ring-red-200" /> Failed</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-violet-100 ring-1 ring-violet-200" /> Dropped</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-sky-50 ring-1 ring-sky-200" /> Planned</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-100 ring-1 ring-amber-200" /> INC</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-slate-200" /> Not taken</span>
+        <span className="inline-flex items-center gap-1.5"><span className="relative h-3 w-3 rounded bg-slate-100 ring-1 ring-slate-200"><span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" /></span> Manual entry</span>
       </div>
 
       {loading ? (
@@ -249,7 +288,18 @@ export default function MonitoringGrid() {
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Could not load the sheet" hint={error} />
       ) : !grid || grid.students.length === 0 ? (
-        <EmptyState icon={Table2} title="No students in this program yet" hint="Import a monitoring sheet under Student Handoff to populate it." />
+        <Card>
+          <EmptyState
+            icon={Table2}
+            title="No students in this program yet"
+            hint={canEdit ? "Add a student here, or import a monitoring workbook under Student Handoff." : "Staff can add students here or import a monitoring workbook."}
+          />
+          {canEdit && (
+            <div className="flex justify-center pb-8">
+              <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}><UserPlus className="h-4 w-4" aria-hidden="true" /> Add student</button>
+            </div>
+          )}
+        </Card>
       ) : (
         <Card className="overflow-hidden p-0">
           <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500 sm:hidden">
@@ -343,6 +393,15 @@ export default function MonitoringGrid() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => setRecordPanel({ studentId: s.id, courseId: null })}
+                          title={`${canEdit ? "Edit" : "View"} the monitoring record of ${displayStudentName(s)}`}
+                          aria-label={`${canEdit ? "Edit" : "View"} monitoring record of ${displayStudentName(s)}`}
+                          className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-700"
+                        >
+                          <SquarePen className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => navigate(`/students/${s.id}`)}
                           className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left cursor-pointer"
                         >
@@ -352,6 +411,9 @@ export default function MonitoringGrid() {
                               <span className="text-[10px] text-slate-500">IDNO {s.student_number}</span>
                               {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
                                 <StatusBadge value={s.enrollment_tag} dot={false} />
+                              )}
+                              {s.entry_source === "Manual entry" && (
+                                <span className="rounded-full bg-amber-50 px-1.5 py-px text-[9px] font-bold text-amber-800 ring-1 ring-inset ring-amber-200" title="This student was added in the portal rather than imported from a sheet.">Manual</span>
                               )}
                             </span>
                           </span>
@@ -370,15 +432,19 @@ export default function MonitoringGrid() {
                       const sty = CELL_VIEW[status] || CELL_VIEW.Missing;
                       const officialStatus = s.official_cells?.[c.id] || "Missing";
                       const statusSource = s.operational_sources?.[c.id] || "";
+                      const manual = (s.manual_cells || []).includes(c.id);
                       return (
                         <td key={c.id} className="border-b border-r border-slate-100 p-0 text-center">
-                          <span
-                            aria-label={`${c.code} for ${displayStudentName(s)}: ${status}`}
-                            title={`${c.code} — ${status}. Official/imported status: ${officialStatus}.${statusSource ? ` Source: ${statusSource}.` : ""} Read-only; changes are synchronized from the source workflow.`}
-                            className={`flex h-9 w-full min-w-10 cursor-default items-center justify-center text-[10px] font-bold sm:h-10 sm:text-[11px] ${sty.cls}`}
+                          <button
+                            type="button"
+                            onClick={() => setRecordPanel({ studentId: s.id, courseId: c.id })}
+                            aria-label={`${c.code} for ${displayStudentName(s)}: ${status === "Missing" ? "not taken" : status}${manual ? ", manual entry" : ""}. ${canEdit ? "Select to edit" : "Select to view"}.`}
+                            title={`${c.code} — ${status === "Missing" ? "Not taken" : status}. ${manual ? "Manual entry (hover the record for who and when)." : `Imported/system status: ${officialStatus}.`}${statusSource ? ` Source: ${statusSource}.` : ""}`}
+                            className={`relative flex h-9 w-full min-w-10 cursor-pointer items-center justify-center text-[10px] font-bold transition-shadow hover:ring-2 hover:ring-inset hover:ring-brand-400 sm:h-10 sm:text-[11px] ${sty.cls}`}
                           >
                             {sty.mark}
-                          </span>
+                            {manual && <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                          </button>
                         </td>
                       );
                     })}
@@ -400,6 +466,30 @@ export default function MonitoringGrid() {
             </table>
           </div>
         </Card>
+      )}
+
+      {addOpen && (
+        <AddStudentDialog
+          programs={meta?.programs || grid?.programs || []}
+          defaultProgramId={programId}
+          onClose={() => setAddOpen(false)}
+          onCreated={(result, openNow) => {
+            load(programId);
+            if (openNow) setRecordPanel({ studentId: result.student.id, courseId: null });
+            else setSavedNotice(result.message);
+          }}
+        />
+      )}
+
+      {recordPanel && (
+        <StudentRecordPanel
+          studentId={recordPanel.studentId}
+          focusCourseId={recordPanel.courseId}
+          termLabels={(grid?.terms || meta?.terms || []).map((term) => term.label)}
+          onClose={() => setRecordPanel(null)}
+          onChanged={() => load(programId)}
+          onOpenProfile={(id) => navigate(`/students/${id}`)}
+        />
       )}
 
       {flagStudent && (
