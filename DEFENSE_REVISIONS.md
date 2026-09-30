@@ -14,6 +14,25 @@ bottom. Tick a box only when its acceptance line is true **and** the gate passes
 Items tagged **WAITING** cannot be built until the owner or the stakeholder
 answers — skip them and remind the owner.
 
+## Owner decisions, 2026-10-01 (these settle the WAITING items below)
+
+- **The 2022-2023 handbook is still in force.** Where the system and the
+  handbook disagree, the handbook wins (settles C1, G2, G3).
+- **Ignore Khloe's revised copy** — nobody knows where it is. The document
+  revisions are done in our own file (settles E0).
+- **The Graduate School has no Operations Manual.** The panel suggested we write
+  it and have the stakeholder correct/validate it. We draft it (settles G1:
+  `Documents/CAPSTONE_ONLY/USLS GS Operations Manual - DRAFT for Validation.docx`).
+- **Monitoring Sheet needs CRUD in the portal** — adding records directly, not
+  only uploading a sheet. "The biggest mistake."
+- **LOA and Readmission** are weak compared with Graduation (staged board, drag
+  and drop) — rebuild to that standard.
+- **Calendar / thesis-dissertation adviser appointment / defense scheduling**
+  is lacking — improve.
+- **Dean and Student views** must use the same layout as staff: sidebar
+  navigation and separate pages, not one long scrolling page.
+- Whole-project consistency check; work lands on branch `v5.1-migui_clean`.
+
 ---
 
 ## A. What the panel wrote
