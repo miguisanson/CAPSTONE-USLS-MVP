@@ -32,6 +32,11 @@ answers — skip them and remind the owner.
 - **Dean and Student views** must use the same layout as staff: sidebar
   navigation and separate pages, not one long scrolling page.
 - Whole-project consistency check; work lands on branch `v5.1-migui_clean`.
+- **Every document must match the web app** — mainly the proposal and the
+  walkthrough: screens, steps, accounts, rules, counts and screenshots are
+  updated after the code settles (section I).
+- LibreOffice is installed at `E:\LibreOffice` (2026-10-01) — use it to render
+  and check `.docx` files (`soffice.exe --headless --convert-to pdf`).
 
 ---
 
@@ -234,6 +239,21 @@ What we have: Graduate School Handbook 2022-2023, GS Research Protocol AY
       graduation review-window dates, export format the Registrar accepts).
 - [ ] **G7. The publication protocol** — our research protocol file is the
       version "without publication protocol".
+
+## I. Documents in sync with the system (do last, after the code settles)
+
+- [ ] **I1. Walkthrough** rewritten against the real app: accounts, nav labels,
+      every case's steps re-walked in the running system, new cases (policy
+      upload, business rules, monitoring sheet add/edit, LOA/readmission board,
+      adviser appointment, calendar), case numbering fixed, fresh screenshots.
+- [ ] **I2. Proposal** chapters 5–6 and appendices: module descriptions, screen
+      specifications, data tables, API and table inventories (counts generated
+      from the code, not typed), test matrix and execution record, screenshots.
+- [ ] **I3. Business Rules section** in the proposal (existing vs proposed),
+      generated from the rules register and the Operations Manual draft.
+- [ ] **I4. README / CHANGELOG / plan files** true to the current build.
+- [ ] **I5. Each document rendered with LibreOffice and looked at** before it
+      is called done.
 
 ## H. State of the build on 2026-09-30
 
