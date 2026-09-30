@@ -1,0 +1,3695 @@
+{
+  "document": "University of St. La Salle Graduate School Operations Manual",
+  "version": "0.1",
+  "date": "2026-10-01",
+  "note": "Draft for validation. Practice and Proposed rules are not confirmed by the Graduate School.",
+  "counts": {
+    "Official": 168,
+    "Practice": 22,
+    "Proposed": 40
+  },
+  "rules": [
+    {
+      "id": "ADM-01",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "A student seeking admission must submit an accomplished admission application form, two letters of recommendation, one 2x2 ID picture, transcript of record, honorable dismissal or transfer credential, pass the entrance examination and interview, comply with program-specific requirements, and sign an undertaking to finish the bridging course in a year.",
+      "source": "Handbook 2022-2023, pp. 42-43",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 42-43"
+        }
+      ],
+      "page": "pp. 42-43",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-02",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "The entrance examination fee (Graduate School P400) and the admission fee (P300) are non-refundable.",
+      "source": "Handbook 2022-2023, p. 46",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 46"
+        }
+      ],
+      "page": "p. 46",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-03",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "An applicant with insufficient background must take prerequisite or bridging courses; an applicant with a non-thesis master's degree enrolls in six units of thesis as a bridging course. The number of units differs by college.",
+      "source": "Handbook 2022-2023, pp. 43-44",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 43-44"
+        }
+      ],
+      "page": "pp. 43-44",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-04",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "A transferee may be credited a maximum of 25% of subjects taken during the last five years that are substantially the same in content, not credited to a previous degree, upon recommendation of the Admission Committee and within the residence requirement.",
+      "source": "Handbook 2022-2023, p. 45",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 45"
+        }
+      ],
+      "page": "p. 45",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-05",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "A special student (audit only) needs the permission of the Dean and a signed agreement waiving the right to receive or demand credit.",
+      "source": "Handbook 2022-2023, p. 45",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 45"
+        }
+      ],
+      "page": "p. 45",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-06",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "A foreign student pays an additional annual foreign fee; missionaries and religious, children of Overseas Filipino workers, special exchange students and students on audit are exempt.",
+      "source": "Handbook 2022-2023, p. 45",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 45"
+        }
+      ],
+      "page": "p. 45",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-07",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "Upon admission the Dean gives the student information about the program of study; students who do not meet the admission test cut-off are assigned a volunteer faculty adviser.",
+      "source": "Handbook 2022-2023, p. 42",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 42"
+        }
+      ],
+      "page": "p. 42",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-08",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "The applicant sends a letter of intent with the transcript of records and waits for notification within 3-5 working days before taking the entrance examination.",
+      "source": "Handbook 2022-2023, p. 45",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 45"
+        }
+      ],
+      "page": "p. 45",
+      "status": "Official"
+    },
+    {
+      "id": "ADM-09",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "The student number and the institutional email are created by the Registrar; the Graduate School does not generate or manually assign them.",
+      "source": "Consultation 15 July 2026, student number created by the Registrar; Group working notes, July 20 checklist, items 3 and 4",
+      "sources": [
+        {
+          "document": "Consultation 15 July 2026",
+          "location": "student number created by the Registrar"
+        },
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 3 and 4"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ADM-10",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "The admission checklist follows the official USLS admission process. The Graduate School does not repeat it; it records that admission was completed.",
+      "source": "Group working notes, July 20 checklist, item 4 (stakeholder-confirmed answer)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 4 (stakeholder-confirmed answer)"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ADM-11",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "Student records enter the Graduate School's record through the monitoring workbook prepared from the official records (AIMS); GS staff do not create student records manually, and a missing student is checked against the official source.",
+      "source": "Group working notes, July 20 checklist, items 2 and 6 (stakeholder-confirmed answer); Consultation 21 July 2026, no AIMS integration",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 2 and 6 (stakeholder-confirmed answer)"
+        },
+        {
+          "document": "Consultation 21 July 2026",
+          "location": "no AIMS integration"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ADM-12",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "GS staff record the source and the date of each handoff; the Academic Coordinator confirms the program assignment; the Dean acknowledges completed onboarding.",
+      "source": "Group working notes, BPM accurate flow, section 1",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, section 1"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ADM-13",
+      "process": "Admission handoff and onboarding",
+      "process_section": "4.1",
+      "rule": "A possible duplicate student is identified by the student number, never by name alone; staff compare the records and confirm or merge them only when verified.",
+      "source": "Group working notes, July 20 checklist, items 13 and 14",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 13 and 14"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ENR-01",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "The enrolment procedures are: (1) academic evaluation and electronic advising with the Academic Coordinator, (2) payment at the Cashiers in the Business Office, (3) validation in the student's AIMS account, (4) ID issuance or renewal.",
+      "source": "Handbook 2022-2023, p. 47",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 47"
+        }
+      ],
+      "page": "p. 47",
+      "status": "Official"
+    },
+    {
+      "id": "ENR-02",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "The normal load of a part-time graduate student is six (6) to nine (9) units per semester, and twelve (12) units for a full-time student.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "ENR-03",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "Attendance is counted from the first regular class meeting regardless of the time of registration.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "ENR-04",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "Students with financial delinquencies at the close of the semester are not permitted to register in the succeeding semester unless previous accounts are settled.",
+      "source": "Handbook 2022-2023, p. 51",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 51"
+        }
+      ],
+      "page": "p. 51",
+      "status": "Official"
+    },
+    {
+      "id": "ENR-05",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "A master's student may transfer to another master's option with the approval of the Dean, upon the recommendation of the Academic Coordinator and endorsed by the Associate Dean.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "ENR-06",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "Coursework at another institution is credited only if the student secured the Dean's written permission in advance; the Registrar then issues a cross-enrollment permit. Cross-enrollment is normally allowed only to a graduating student for a course not offered in the graduating semester, and never for major elective or major professional courses.",
+      "source": "Handbook 2022-2023, p. 50",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 50"
+        }
+      ],
+      "page": "p. 50",
+      "status": "Official"
+    },
+    {
+      "id": "ENR-07",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "A special class may be requested by the Academic Coordinator through the Dean, addressed to the Vice Chancellor for Academic Affairs. An undersized class is treated as a special class.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "ENR-08",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "Enrollment takes place in AIMS. The Academic Coordinator advises the subjects and tags the student as enrolled in the Graduate School's record; the Graduate School record is a monitoring record.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ENR-09",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "There are no ordinary course-to-course prerequisites in the Graduate School; eligibility rules apply mainly to the comprehensive examination and to the thesis or dissertation stage.",
+      "source": "Group working notes, July 20 checklist, items 16 and 75 (stakeholder-confirmed answer)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 16 and 75 (stakeholder-confirmed answer)"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ENR-10",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "Enrollment normally occurs in June to July. Dates are kept as configurable academic periods, not fixed dates.",
+      "source": "Group working notes, July 20 checklist, items 10 and 76 (stakeholder-confirmed answer)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 10 and 76 (stakeholder-confirmed answer)"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ENR-11",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "Each student-subject pair has one status: not taken, enrolled, taken, dropped, withdrawn; and, as reported by faculty, incomplete or failed.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ENR-12",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "Faculty do not enter grades in the Graduate School record. A professor who fails a student or gives an incomplete reports it to the Academic Coordinator, who tags the status.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ENR-13",
+      "process": "Enrollment and academic load",
+      "process_section": "4.2",
+      "rule": "If the load tagged for a student is outside six to nine units (part-time) or twelve units (full-time), the platform shows a warning to the Academic Coordinator. The warning does not block the tag.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Proposed"
+    },
+    {
+      "id": "CRS-01",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "Changing one subject for another is allowed during the first week of classes if the original subject is dissolved, if the student has a schedule conflict, or if the student fails the prerequisite subject.",
+      "source": "Handbook 2022-2023, pp. 48-49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 48-49"
+        }
+      ],
+      "page": "pp. 48-49",
+      "status": "Official"
+    },
+    {
+      "id": "CRS-02",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "Adding subjects is allowed during the first week of classes upon the written approval of the Associate Dean.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "CRS-03",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "To add a subject: (1) un-tag the enrolment form in the Business Office, (2) secure an Advice Slip from the Graduate School Office, (3) go through the enrolment procedure.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "CRS-04",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "An undersized class is treated as a special class; the Graduate School Dean ensures that each new batch reaches the minimum number of enrollees to allow for attrition.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "CRS-05",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "A full refund is made to students for any courses discontinued by the school.",
+      "source": "Handbook 2022-2023, p. 51",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 51"
+        }
+      ],
+      "page": "p. 51",
+      "status": "Official"
+    },
+    {
+      "id": "CRS-06",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "Course adjustments (change and add) may continue until the first week of classes.",
+      "source": "Group working notes, July 20 checklist, items 10, 34 and 77 (stakeholder-confirmed answer)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 10, 34 and 77 (stakeholder-confirmed answer)"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "CRS-07",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "The Academic Coordinator chooses the subjects to offer by studying which subjects students have and have not taken; each offering states the subject, the schedule and the professor; the Academic Coordinator decides who teaches it.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "CRS-08",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "A subject counts as needed when at least one student needs it. A need is not an offering: subject need, proposed offering, approved offering and scheduled class are kept separate.",
+      "source": "Group working notes, July 20 checklist, items 31 and 85 (answer attributed to the Associate Dean); Consultation 29 July 2026, the group reports the demand cutoff of one as the Associate Dean's answer",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 31 and 85 (answer attributed to the Associate Dean)"
+        },
+        {
+          "document": "Consultation 29 July 2026",
+          "location": "the group reports the demand cutoff of one as the Associate Dean's answer"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "CRS-09",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "Offerings are planned during the term break, after the previous semester ends and before enrollment.",
+      "source": "Group working notes, July 20 checklist, item 34; Consultation 29 July 2026 rehearsal",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 34; Consultation 29 July 2026 rehearsal"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "CRS-10",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "The Dean approves the offering plan before it is published.",
+      "source": "Group working notes, BPM accurate flow, section 3",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, section 3"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "CRS-11",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "When the Academic Coordinator decides not to offer a subject, the platform shows which students would be delayed, so that the decision can be made with that information; the decision stays with the Academic Coordinator.",
+      "source": "Group working notes, July 20 checklist, items 32, 33 and 86",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 32, 33 and 86"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "CRS-12",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "When assigning a professor the Academic Coordinator considers the professor's preferred subjects, availability, qualifications, current load and schedule conflicts; the platform only suggests.",
+      "source": "Group working notes, July 20 checklist, items 36-40, 88-90",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 36-40, 88-90"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "WD-01",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "The student may withdraw subjects until the second week from the start of classes regardless of whether or not classes have been attended.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "WD-02",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "Ten percent (10%) of the total amount due for the term is charged if the withdrawal is within the first week of classes, and twenty percent (20%) if within the second week, regardless of whether or not classes have been attended.",
+      "source": "Handbook 2022-2023, p. 49; Handbook 2022-2023, p. 51",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        },
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 51"
+        }
+      ],
+      "page": "p. 49; p. 51",
+      "status": "Official"
+    },
+    {
+      "id": "WD-03",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "The student retains the right to withdraw all subjects at any time of the semester after the second week but pays the full enrolment fees for the semester.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "WD-04",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "The student may be charged all school fees in full if withdrawal is made at any time after the second week of classes. If the withdrawal is due to a justifiable reason, the student is charged pertinent fees only up to and including the last month of attendance.",
+      "source": "Handbook 2022-2023, p. 51",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 51"
+        }
+      ],
+      "page": "p. 51",
+      "status": "Official"
+    },
+    {
+      "id": "WD-05",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "A student may seek a refund if he or she withdraws during the first two weeks of classes when tuition and other fees have been paid in full, or for any length longer than one month.",
+      "source": "Handbook 2022-2023, pp. 50-51",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 50-51"
+        }
+      ],
+      "page": "pp. 50-51",
+      "status": "Official"
+    },
+    {
+      "id": "WD-06",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "To file a withdrawal of subject, the student writes a letter and seeks approval from the Dean.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "WD-07",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "Once approved, the student accomplishes the Withdrawal Form and settles all financial obligations.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "WD-08",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "The accomplished Withdrawal Form is provided to the Registrar, the Accounting Office, and the student.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "WD-09",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "The grade symbol W means Withdrawn.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "WD-10",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "A subject withdrawal (from one subject, not from the Graduate School) before or in the first week of classes does not count against the student; dropping is the act of leaving a subject in the middle of the semester.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "WD-11",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "An approved withdrawal is sent to the Registrar, which processes it in the registration system, and then to the Business Office for any fee arrangement. The Graduate School's responsibility ends at sending the request to the Registrar.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "WD-12",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "After the Registrar has been sent the request, the Graduate School tags the subject as withdrawn (a manual tag is enough), with the date applied, the date granted and a text area for the result.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "WD-13",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "According to the Associate Dean, a student may withdraw before classes begin or in the first week of classes; the Dean decides with discretion, and a request submitted after the deadline or with an insufficient or inconsistent justification is normally denied. (This is a second-hand account recorded by the group and conflicts with the Handbook's second week; see OQ-01.)",
+      "source": "Consultation 29 July 2026, account of the Associate Dean's answer",
+      "sources": [
+        {
+          "document": "Consultation 29 July 2026",
+          "location": "account of the Associate Dean's answer"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "WD-14",
+      "process": "Withdrawal of subject",
+      "process_section": "4.4",
+      "rule": "The platform shows the student the Handbook's fee bracket for the date of the request (first week, second week, later) as information only; the Business Office computes the fee.",
+      "source": "Handbook 2022-2023, pp. 49, 51",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 49, 51"
+        }
+      ],
+      "page": "pp. 49, 51",
+      "status": "Proposed"
+    },
+    {
+      "id": "DRP-01",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "Students are expected to attend classes regularly; the maximum number of absences allowed a student is 20% of the total number of class hours for the whole semester.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "DRP-02",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "A student may be excused for a death in the family, illness (with a medical certificate from the USLS clinic or a personal doctor), or a graduate program activity endorsed by the Dean. Excuses are for time missed only, and all work missed must be made up to the satisfaction of the professor within a reasonable time.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "DRP-03",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "When unexcused absence reaches more than 20% of the stipulated hours in one course, the student is automatically dropped from the course by the professor and is given a grade of DRP with a 5.0 grade.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "DRP-04",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "A student who takes part in a school-sponsored activity or represents the University in an official capacity is granted an Approved Absence on the Dean's approval; it is not counted against the allowed absences.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "DRP-05",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "The grade symbols D (Dropped) and W (Withdrawn) appear in the grading system; students with grades INC, D or W, or who repeated a subject, are not eligible for the special academic honors.",
+      "source": "Handbook 2022-2023, pp. 53, 55",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 53, 55"
+        }
+      ],
+      "page": "pp. 53, 55",
+      "status": "Official"
+    },
+    {
+      "id": "DRP-06",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "If a student gets a 5.0 he or she is automatically dropped from the program; failure in any subject means no re-admission to the program.",
+      "source": "Handbook 2022-2023, p. 54",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 54"
+        }
+      ],
+      "page": "p. 54",
+      "status": "Official"
+    },
+    {
+      "id": "DRP-07",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "A student drops a subject during the semester by talking or writing to the Academic Coordinator. Once agreed, the Academic Coordinator or GS staff tag the subject as dropped with a date and notes. No student-facing drop request is needed in the Graduate School's record.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "DRP-08",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "The Graduate School drops the subject in AIMS as well as in its own record.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "DRP-09",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "A drop requested by a student is recorded without a Graduate School approval step (there is no Deny). The status moves from requested to recorded and stays marked as awaiting confirmation until the Graduate School has seen the change in AIMS.",
+      "source": "Group working notes, July 20 checklist, items 18, 19 and 79 (revision adopted after the 15 July adviser session)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, items 18, 19 and 79 (revision adopted after the 15 July adviser session)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DRP-10",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "A request made up to the end of the second week of classes is handled as a withdrawal (see WD-01); a request made later is recorded as a drop. The Handbook does not give this dividing line; it is the group's reading of the Associate Dean's distinction between withdrawal and dropping.",
+      "source": "Handbook 2022-2023, p. 49; Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        },
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "p. 49",
+      "status": "Proposed"
+    },
+    {
+      "id": "DRP-11",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "To remain in good standing a master's student must maintain a weighted average of 2.0 or better, and a doctorate student 1.75 or better, at the end of each academic year; a grade of 3.0 (master's) or 2.0 (doctorate) is passing but carries no graduate credit.",
+      "source": "Handbook 2022-2023, p. 54",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 54"
+        }
+      ],
+      "page": "p. 54",
+      "status": "Official"
+    },
+    {
+      "id": "DRP-12",
+      "process": "Dropping, including being dropped for absences",
+      "process_section": "4.5",
+      "rule": "A grade of INC may be given if the class standing is passing but the student fails to take the final examination or complete other requirements for illness or other valid reasons. It is removed within one academic year by meeting all course requirements and submitting the Incomplete Grade Removal Form to the Graduate School Office within the set deadline; after a year without compliance the grade becomes 3.0 (master's) or 2.0 (doctorate) and the subject is taken again; a student with INC in all subjects is dropped from the rolls of the Graduate School.",
+      "source": "Handbook 2022-2023, p. 54",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 54"
+        }
+      ],
+      "page": "p. 54",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-01",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "A student who does not intend to enroll in a semester may apply for a leave of absence; a student on leave does not sever his or her ties with the University.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-02",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "A request for a leave of absence is made in writing to the Dean and states the reason for the leave and specifies the period.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-03",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "The leave may be approved for a period of one (1) year but may be renewed for at most another year.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-04",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "LOA must be done on or before the deadline.",
+      "source": "Handbook 2022-2023, p. 52",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 52"
+        }
+      ],
+      "page": "p. 52",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-05",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "A student who does not intend to enroll for a valid reason (medical reasons) but still has remaining units to enroll is not allowed to enroll in Residency but should file for a Leave of Absence.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-06",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "A student may file an LOA if the student withdraws after two weeks of classes have elapsed; the student is subject to a withdrawal fee from the Cashier's office.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-07",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "The Dean, Associate Dean, or the duly authorized representative informs the University Registrar of the leave, indicating the reasons and the amount of money refunded to the student, if any.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-08",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "For a leave availed of by the student during the second half of the semester, the class standing of the courses enrolled is W (withdrawn); no refund of tuition and fees is provided.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-09",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "No leave of absence is granted during the semester within two (2) weeks before the last day of classes.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-10",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "A master's program must be finished within seven academic years and a doctoral program within nine academic years, including the leave of absence.",
+      "source": "Handbook 2022-2023, p. 55",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 55"
+        }
+      ],
+      "page": "p. 55",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-11",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "A student who withdraws from the college without a formal leave of absence is considered absent without leave (AWOL) and has registration privileges curtailed or entirely withdrawn.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "LOA-12",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "The student may file the leave through a structured form in place of a letter, provided the Dean accepts the form as the written request.",
+      "source": "Group working notes, Consultation 20 July 2026 rehearsal (structured form suggested by the adviser)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Consultation 20 July 2026 rehearsal (structured form suggested by the adviser)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "LOA-13",
+      "process": "Leave of absence (LOA)",
+      "process_section": "4.6",
+      "rule": "The platform checks a leave request for an approved reason category, a valid start and end term, the student's earlier approved leaves and a future start term, and gives the Dean a recommendation; the Dean decides.",
+      "source": "Group working notes, Platform (current build): LOA policy review",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Platform (current build): LOA policy review"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "RDM-01",
+      "process": "Return from leave of absence and readmission",
+      "process_section": "4.7",
+      "rule": "A student returning from a leave of absence (LOA) or absence without leave (AWOL) declares his or her intention to enroll by writing to the University Registrar through the Graduate School Dean, who then endorses it to the University Registrar.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "RDM-02",
+      "process": "Return from leave of absence and readmission",
+      "process_section": "4.7",
+      "rule": "A returnee must present: (1) clearance from the Business Office, (2) an interview (reason for delay, residency requirements), (3) evaluation of subject and grade requirements, (4) an Advise Slip from the Dean.",
+      "source": "Handbook 2022-2023, p. 45",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 45"
+        }
+      ],
+      "page": "p. 45",
+      "status": "Official"
+    },
+    {
+      "id": "RDM-03",
+      "process": "Return from leave of absence and readmission",
+      "process_section": "4.7",
+      "rule": "Failure in any subject means no re-admission to the program.",
+      "source": "Handbook 2022-2023, p. 54",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 54"
+        }
+      ],
+      "page": "p. 54",
+      "status": "Official"
+    },
+    {
+      "id": "RDM-04",
+      "process": "Return from leave of absence and readmission",
+      "process_section": "4.7",
+      "rule": "A student who cannot finish within the maximum residence (seven years for a master's, nine for a doctorate) must re-enroll all courses taken and earn new credits.",
+      "source": "Handbook 2022-2023, p. 55",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 55"
+        }
+      ],
+      "page": "p. 55",
+      "status": "Official"
+    },
+    {
+      "id": "RDM-05",
+      "process": "Return from leave of absence and readmission",
+      "process_section": "4.7",
+      "rule": "The platform's readmission checklist asks for a structured return intention, a confirmed updated study plan, a program or adviser consultation, and confirmation that no accountability is pending. The Handbook's four requirements (RDM-02) are the official list.",
+      "source": "Group working notes, Platform (current build): readmission requirements",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Platform (current build): readmission requirements"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "AWL-01",
+      "process": "Absence without leave (AWOL)",
+      "process_section": "4.8",
+      "rule": "A student who withdraws from a college without a formal leave of absence is considered in \"absent without leave\" status (AWOL) and has registration privileges curtailed or entirely withdrawn.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "AWL-02",
+      "process": "Absence without leave (AWOL)",
+      "process_section": "4.8",
+      "rule": "A student returning from AWOL declares the intention to enroll by writing to the University Registrar through the Graduate School Dean, who endorses it to the Registrar.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "AWL-03",
+      "process": "Absence without leave (AWOL)",
+      "process_section": "4.8",
+      "rule": "A returnee presents a Business Office clearance, an interview, an evaluation of subject and grade requirements and an Advise Slip from the Dean.",
+      "source": "Handbook 2022-2023, p. 45",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 45"
+        }
+      ],
+      "page": "p. 45",
+      "status": "Official"
+    },
+    {
+      "id": "AWL-04",
+      "process": "Absence without leave (AWOL)",
+      "process_section": "4.8",
+      "rule": "An AWOL status has the same effect as a leave of absence for reporting: it is communicated to the Registrar.",
+      "source": "Consultation 20 July 2026, adviser's statement; not confirmed by Graduate School staff",
+      "sources": [
+        {
+          "document": "Consultation 20 July 2026",
+          "location": "adviser's statement; not confirmed by Graduate School staff"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "AWL-05",
+      "process": "Absence without leave (AWOL)",
+      "process_section": "4.8",
+      "rule": "AWOL is flagged from source evidence (an imported AWOL standing, or a full semester without enrollment and without an approved leave), not typed in by a user.",
+      "source": "Group working notes, Platform (current build): AWOL policy review",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Platform (current build): AWOL policy review"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "AWL-06",
+      "process": "Absence without leave (AWOL)",
+      "process_section": "4.8",
+      "rule": "On return, the student is classified by years in the program: within the normal limit (five years master's, seven years doctorate), extension with a graded six-unit refresher (up to seven and nine), or full re-enrollment beyond that.",
+      "source": "Handbook 2022-2023, pp. 54-55",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 54-55"
+        }
+      ],
+      "page": "pp. 54-55",
+      "status": "Proposed"
+    },
+    {
+      "id": "RES-01",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "Students who have finished all their coursework and are just working on their thesis or dissertation and practicum or internship, after a semester of enrollment for thesis writing and practicum, may enroll for residence.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "RES-02",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "Students who are not enrolled in any subject but who want to complete an INC, will take the comprehensive exam, or are waiting for their research publication must also enroll for residence. Registration for residence should be done within the semester.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "RES-03",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "A student who does not intend to enroll for a valid reason but still has remaining units is not allowed to enroll in Residency, but files a leave of absence.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "RES-04",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "For the comprehensive examination the Academic Coordinator does the initial evaluation and the student is advised to enroll in Residency in Comprehensive Examination.",
+      "source": "Handbook 2022-2023, p. 56",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 56"
+        }
+      ],
+      "page": "p. 56",
+      "status": "Official"
+    },
+    {
+      "id": "RES-05",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "Master's program: candidacy must be attained within three academic years from the date of admission and all requirements completed within five academic years.",
+      "source": "Handbook 2022-2023, p. 54",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 54"
+        }
+      ],
+      "page": "p. 54",
+      "status": "Official"
+    },
+    {
+      "id": "RES-06",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "Master's program: a student who cannot comply within five years is allowed a maximum two-year extension but must enroll in a graded six-unit refresher course related to the area of specialization.",
+      "source": "Handbook 2022-2023, p. 54",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 54"
+        }
+      ],
+      "page": "p. 54",
+      "status": "Official"
+    },
+    {
+      "id": "RES-07",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "A master's program must be finished within a maximum of seven academic years including leave of absence; a student who cannot finish within seven years must re-enroll all the courses taken and earn new credits.",
+      "source": "Handbook 2022-2023, p. 55",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 55"
+        }
+      ],
+      "page": "p. 55",
+      "status": "Official"
+    },
+    {
+      "id": "RES-08",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "Doctorate program: candidacy within five academic years from admission; all requirements including the dissertation within seven academic years.",
+      "source": "Handbook 2022-2023, p. 55",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 55"
+        }
+      ],
+      "page": "p. 55",
+      "status": "Official"
+    },
+    {
+      "id": "RES-09",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "Doctorate program: beyond seven years a maximum two-year extension with a graded six-unit refresher course; the program must be finished within nine academic years including leave of absence, after which the student must re-enroll all courses taken and earn credit units.",
+      "source": "Handbook 2022-2023, p. 55",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 55"
+        }
+      ],
+      "page": "p. 55",
+      "status": "Official"
+    },
+    {
+      "id": "RES-10",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "Thesis or project paper writing must be finished within two years from the title or proposal defense; dissertation writing within three years from the title defense.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "RES-11",
+      "process": "Residency enrollment and maximum residence",
+      "process_section": "4.9",
+      "rule": "The platform records each residency enrollment with its purpose (thesis or dissertation work, practicum or internship, comprehensive examination, awaiting publication) and marks a purpose as unsupported if the student's record does not match it.",
+      "source": "Group working notes, Platform (current build): residency policy review",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Platform (current build): residency policy review"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "CEX-01",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "The comprehensive examinations cover all basic or core courses, fields of concentration, and electives or cognates. They are given for two days for a master's and three days for a doctorate, with two-day intervals between examinations or consecutively as arranged, and last a maximum of eight hours per day.",
+      "source": "Handbook 2022-2023, p. 56",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 56"
+        }
+      ],
+      "page": "p. 56",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-02",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "Master's scope: first day basic courses and electives or cognates; second day major courses. Doctorate scope: first day basic courses and electives or cognates; second and third days major courses.",
+      "source": "Handbook 2022-2023, p. 56",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 56"
+        }
+      ],
+      "page": "p. 56",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-03",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "Master's students who have passed all academic requirements and been evaluated by their Graduate School Academic Coordinators may file an application; doctorate students evaluated by their College Deans may likewise file.",
+      "source": "Handbook 2022-2023, p. 56",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 56"
+        }
+      ],
+      "page": "p. 56",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-04",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "Non-thesis students must have completed the integrating courses (feasibility study, project study, case study or applied research in the major field for MBA; action research or practicum in the major field for Education).",
+      "source": "Handbook 2022-2023, p. 56",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 56"
+        }
+      ],
+      "page": "p. 56",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-05",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "The application is filed with the Graduate Program Secretary at least two weeks before the scheduled examination; an examinee who withdraws the application informs the Graduate Program in writing with the reason at least three working days before the examination.",
+      "source": "Handbook 2022-2023, pp. 56-57",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 56-57"
+        }
+      ],
+      "page": "pp. 56-57",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-06",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "The examination fee is P1,100 for a master's and P2,500 for a doctorate, paid to the Business Office; the official receipt attached to the application is presented to the secretary before the exam.",
+      "source": "Handbook 2022-2023, p. 57",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 57"
+        }
+      ],
+      "page": "p. 57",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-07",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "The fee is forfeited if the examinee fails to appear during the examination dates or fails to inform the Graduate Program Services Office by a written note.",
+      "source": "Handbook 2022-2023, p. 57",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 57"
+        }
+      ],
+      "page": "p. 57",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-08",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "A student must get a minimum score of 7.00 points (70%) in all courses to pass. A student below 7.00 may take a first retake in the failed courses within the residency enrollment and is allowed two retakes within the semester.",
+      "source": "Handbook 2022-2023, p. 57",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 57"
+        }
+      ],
+      "page": "p. 57",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-09",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "A student who fails the second retake takes a refresher course on the failed courses the following semester and may take the examination for the third and last time in the following residency enrollment; failure the fourth time means disqualification from the program.",
+      "source": "Handbook 2022-2023, p. 57",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 57"
+        }
+      ],
+      "page": "p. 57",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-10",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "A student who passes the comprehensive examination confers with the Dean for a thesis or dissertation adviser and is considered advanced to candidacy.",
+      "source": "Handbook 2022-2023, p. 57",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 57"
+        }
+      ],
+      "page": "p. 57",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-11",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "Passing the comprehensive examination is a graduation requirement; for special academic honors the examination must be passed with no retake.",
+      "source": "Handbook 2022-2023, pp. 55, 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 55, 77"
+        }
+      ],
+      "page": "pp. 55, 77",
+      "status": "Official"
+    },
+    {
+      "id": "CEX-12",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "The monitoring workbook records the comprehensive examination in its own column.",
+      "source": "Group working notes, Monitoring workbook, COMPRE column",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Monitoring workbook, COMPRE column"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "CEX-13",
+      "process": "Comprehensive examination",
+      "process_section": "4.10",
+      "rule": "The platform accepts a title defense application only after the comprehensive examination is passed and all curriculum subjects are complete.",
+      "source": "Group working notes, Platform (current build): comprehensive exam eligibility",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Platform (current build): comprehensive exam eligibility"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "TTL-01",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "The application for title defense (Form 1 and three concept papers to the Academic Coordinator) must be made at least two weeks before the scheduled defense.",
+      "source": "Handbook 2022-2023, p. 59; Research Protocol AY2024-2025, Title Defense, Part I, step 2 note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 59"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part I, step 2 note"
+        }
+      ],
+      "page": "p. 59",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-02",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "The Research Coordinator nominates the panel members as recommended by the Academic Coordinator, after deliberation with the GS Research Committee.",
+      "source": "Handbook 2022-2023, p. 60; Research Protocol AY2024-2025, Title Defense, Part I, step 4",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 60"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part I, step 4"
+        }
+      ],
+      "page": "p. 60",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-03",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "Panel for a project paper: one panel chair and two members (one content specialist and one method specialist). Thesis or bridging thesis: one chair and three members (one content specialist, one method specialist and one external panel). Dissertation: one chair and four members (two content specialists, one method specialist and one external panel). The chair and the content and method specialists are University-affiliated; the external panel is a content or industry expert who takes part from the proposal defense onwards.",
+      "source": "Handbook 2022-2023, p. 60; Research Protocol AY2024-2025, Title Defense, Part I, step 4",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 60"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part I, step 4"
+        }
+      ],
+      "page": "p. 60",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-04",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "The panel members deliberate the three submitted titles without the presence of the student; the chair then admits the student.",
+      "source": "Handbook 2022-2023, p. 60; Research Protocol AY2024-2025, Title Defense, Part II",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 60"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part II"
+        }
+      ],
+      "page": "p. 60",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-05",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "The panel chair may record the defense with the consent of everyone in the meeting room and furnish the student the link of the recording.",
+      "source": "Handbook 2022-2023, p. 60",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 60"
+        }
+      ],
+      "page": "p. 60",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-06",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "The panel chair emails the accomplished Form 2 to the Research Coordinator and the student within the first working day after the defense.",
+      "source": "Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Title Defense, Part III, step 2",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 61"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part III, step 2"
+        }
+      ],
+      "page": "p. 61",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-07",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "If the proposed titles are disapproved, the student presents a new set of three titles and follows the same protocol; the decision is reflected in Form 2.",
+      "source": "Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Title Defense, Part III, step 3",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 61"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part III, step 3"
+        }
+      ],
+      "page": "p. 61",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-08",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "The student asks the panel about their preferred mode of payment, settles the title defense fees and emails the proof to the GS mailbox within the first working day after the defense, with the subject line LAST NAME_type of defense_receipt.",
+      "source": "Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Title Defense, Part III, step 4",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 61"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part III, step 4"
+        }
+      ],
+      "page": "p. 61",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-09",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "Thesis or project paper writing must be finished within two years from the title or proposal defense; for the thesis the student has one year from the title defense to submit and defend a proposal. Dissertation writing must be finished within three years from the title defense, with one year to submit and defend a proposal.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-10",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "If the approved title is still applicable, the same concept paper may be presented for re-defense; otherwise the student changes the research title or topic and goes through the title defense again.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "TTL-11",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "GS staff check that Form 1, three concept papers and the Academic Coordinator's endorsement are present before the Research Coordinator nominates a panel. The check is for completeness only.",
+      "source": "Group working notes, July 20 checklist, item 42; Group working notes, transactions list",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 42; Group working notes, transactions list"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "TTL-12",
+      "process": "Title defense",
+      "process_section": "4.11",
+      "rule": "The platform does not schedule a title defense, nominate a panel or approve a title by itself; panel candidates are suggested from faculty specialization, availability and workload and staff may choose any faculty.",
+      "source": "Group working notes, July 20 checklist, item 44",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 44"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ADV-01",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The research adviser must be affiliated with the University and the degree program must be aligned with the student's program.",
+      "source": "Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Designation of the Research Adviser, Part I, step 1",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 61"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Designation of the Research Adviser, Part I, step 1"
+        }
+      ],
+      "page": "p. 61",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-02",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "Protocol: the research adviser must have a PhD degree for PhD students and at least PhD units for MA students (CHED CMO 15), and should have a maximum of five active advisees for the current academic year.",
+      "source": "Research Protocol AY2024-2025, Designation of the Research Adviser, Part I, step 1 note",
+      "sources": [
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Designation of the Research Adviser, Part I, step 1 note"
+        }
+      ],
+      "page": "",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-03",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "Handbook: the adviser shall be a faculty of the Graduate School and a holder of a doctoral degree aligned with the discipline, with at least one publication in a refereed journal or publicly recognized creative or technology outputs (CMO 15 s. 2019).",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-04",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "In the exigency of service a faculty member may have more than five advisees with the approval of the Dean.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-05",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The student may express a preference, but the Dean, the Associate Dean and the Research Coordinator make the final decision based on the degree, expertise, research work, number of advisees (maximum five per semester) and total workload of the faculty member.",
+      "source": "Handbook 2022-2023, p. 59",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 59"
+        }
+      ],
+      "page": "p. 59",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-06",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The choice of adviser gives primary importance to the student's choice with the approval of the program adviser and the Dean; the Dean appoints the adviser on the basis of expertise in the student's topic following the Research Protocol.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-07",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "Faculty of other universities may serve as adviser in some circumstances if they are adjunct faculty of the Graduate School.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-08",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The assignment of an adviser may be done while the student is still taking academic courses.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-09",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "Form 3 is emailed by the student to the Academic Coordinator, who notes it to the Research Coordinator; the Dean's e-signature is not required at that point; the Research Coordinator emails Form 3 to the Dean; the Research Coordinator, the Associate Dean and the Dean sign; the Research Coordinator emails Form 3.1 to the student and adviser, who email the accomplished form back.",
+      "source": "Handbook 2022-2023, p. 61; Research Protocol AY2024-2025, Designation of the Research Adviser, Part I, steps 2-5",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 61"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Designation of the Research Adviser, Part I, steps 2-5"
+        }
+      ],
+      "page": "p. 61",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-10",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The advisee and adviser accomplish Form 3.2 and Form 3.3; the student emails them to the Research Coordinator within five days of receipt of Form 3.1.",
+      "source": "Handbook 2022-2023, pp. 61-62; Research Protocol AY2024-2025, Designation of the Research Adviser, Part II",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 61-62"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Designation of the Research Adviser, Part II"
+        }
+      ],
+      "page": "pp. 61-62",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-11",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The adviser is bound only to advising and shall not be selected as editor of the student or to any other appointment related to the conduct of the study.",
+      "source": "Handbook 2022-2023, p. 59",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 59"
+        }
+      ],
+      "page": "p. 59",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-12",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The adviser monitors the research according to the timetable in Form 3.2, reviews submitted proposals, questionnaires and chapters, gives technical and moral guidance, conducts a mock defense when necessary, attends the defense of the advisee, attends orientations set by the Graduate School, and adheres to the Research Protocol.",
+      "source": "Handbook 2022-2023, p. 59",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 59"
+        }
+      ],
+      "page": "p. 59",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-13",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "A student may make only one request to change the title of the study, before the proposal defense application: Form 3.4 and the new concept paper go to the adviser, who endorses the request to the panel; the panel deliberates and the chair emails the decision.",
+      "source": "Handbook 2022-2023, p. 62; Research Protocol AY2024-2025, Change of Title of the Study",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 62"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Change of Title of the Study"
+        }
+      ],
+      "page": "p. 62",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-14",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "A student may make only one request to change the research adviser, before the proposal defense, for justifiable reasons: Form 3.1.1 signed by the current and new adviser, deliberated by the Research Coordinator, Associate Dean and Dean; then a new Form 3.1.",
+      "source": "Handbook 2022-2023, p. 62; Research Protocol AY2024-2025, Request for Change of Research Adviser",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 62"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Request for Change of Research Adviser"
+        }
+      ],
+      "page": "p. 62",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-15",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "An adviser designated before the effectivity of his or her retirement may continue to serve until the final defense.",
+      "source": "Handbook 2022-2023, p. 58",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 58"
+        }
+      ],
+      "page": "p. 58",
+      "status": "Official"
+    },
+    {
+      "id": "ADV-16",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "The student needs to propose three faculty as adviser options.",
+      "source": "Consultation 21 July 2026, Associate Dean's description",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": "Associate Dean's description"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "ADV-17",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "Each nominated faculty member may accept or decline the nomination in the platform (the Associate Dean suggested this); the student and the Graduate School then choose among those who accept.",
+      "source": "Consultation 21 July 2026, Associate Dean's suggestion",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": "Associate Dean's suggestion"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ADV-18",
+      "process": "Adviser designation, advising contract, change of title and change of adviser",
+      "process_section": "4.12",
+      "rule": "Adviser-dependent steps (adviser signature, endorsement, document review, availability in scheduling) are blocked until an adviser is designated.",
+      "source": "Group working notes, July 20 checklist, item 43",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 43"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRP-01",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "Before the proposal defense the student must have consulted a statistician for a quantitative study, with Form 4.1 accomplished by the statistician. Form 4.1 is not required for qualitative studies.",
+      "source": "Handbook 2022-2023, p. 63; Research Protocol AY2024-2025, Proposal Defense, Part I (statistical consultation)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 63"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part I (statistical consultation)"
+        }
+      ],
+      "page": "p. 63",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-02",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The research adviser accomplishes Form 4 with e-signature once the paper complies with the research paper guidelines set by the Graduate School Office; this must be done at least two weeks before the date of the defense.",
+      "source": "Handbook 2022-2023, p. 63; Research Protocol AY2024-2025, Proposal Defense, Part I (Form 4 endorsement and note)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 63"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part I (Form 4 endorsement and note)"
+        }
+      ],
+      "page": "p. 63",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-03",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The panel members are given two weeks to review the paper before the scheduled proposal defense.",
+      "source": "Handbook 2022-2023, p. 63; Research Protocol AY2024-2025, Proposal Defense, Part I (panel review period)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 63"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part I (panel review period)"
+        }
+      ],
+      "page": "p. 63",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-04",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The adviser's recommendation of an external panel is subject to the approval of the GS Research Committee (Dean, Associate Dean, Academic Coordinator, Research Coordinator) according to the Protocol, and to the approval of the GS office according to the Handbook.",
+      "source": "Handbook 2022-2023, p. 63; Research Protocol AY2024-2025, Proposal Defense, Part I (external panel recommendation)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 63"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part I (external panel recommendation)"
+        }
+      ],
+      "page": "p. 63",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-05",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "For co-authorship, the student must have the major part and contribute at least 80% during the conduct of the study and must adhere to the contribution of work in Form 4.2; co-authorship or study grant agreements follow the institutional guidelines of the Center for Research and Engagement.",
+      "source": "Handbook 2022-2023, p. 64; Research Protocol AY2024-2025, Proposal Defense, Part II (co-authorship note)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 64"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part II (co-authorship note)"
+        }
+      ],
+      "page": "p. 64",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-06",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The panel deliberates the paper first without the student and the adviser; if major revisions are recommended the student is advised to do a re-defense following the same protocol, reflected in Form 5.",
+      "source": "Handbook 2022-2023, p. 64; Research Protocol AY2024-2025, Proposal Defense, Part II",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 64"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part II"
+        }
+      ],
+      "page": "p. 64",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-07",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The panel chair emails the consolidated Form 5 to the student, the adviser and the Research Coordinator within the first working day after the defense.",
+      "source": "Handbook 2022-2023, p. 64; Research Protocol AY2024-2025, Proposal Defense, Part III (consolidated Form 5)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 64"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part III (consolidated Form 5)"
+        }
+      ],
+      "page": "p. 64",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-08",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The application for ethics review (Form 5.2 with the revised manuscript and Form 5.1) is made within one month after the proposal defense.",
+      "source": "Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Proposal Defense, Part III (ethics review note)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 65"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part III (ethics review note)"
+        }
+      ],
+      "page": "p. 65",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-09",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The student settles payment to the preferred method of the panel members and emails the proof to the GS mailbox within the first working day after the defense.",
+      "source": "Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Proposal Defense, Part III (payment)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 65"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part III (payment)"
+        }
+      ],
+      "page": "p. 65",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-10",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "A student who has used a change of title or a change of adviser must have done so before the proposal defense application (ADV-13, ADV-14).",
+      "source": "Handbook 2022-2023, p. 62",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 62"
+        }
+      ],
+      "page": "p. 62",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-11",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "Ethics clearance is needed before the closed-door final defense: the adviser emails Form 4, the Ethics Clearance and the manuscript to the Research Coordinator.",
+      "source": "Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Closed-door Final Defense, Part I (Form 4 submission)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 65"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part I (Form 4 submission)"
+        }
+      ],
+      "page": "p. 65",
+      "status": "Official"
+    },
+    {
+      "id": "PRP-12",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The Research Coordinator records ethics clearance as received; the office checks that the document is present, not its content.",
+      "source": "Group working notes, July 20 checklist, item 42",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 42"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRP-13",
+      "process": "Proposal defense and ethics review",
+      "process_section": "4.13",
+      "rule": "The platform blocks the proposal endorsement without an adviser, and, for quantitative studies, without Form 4.1.",
+      "source": "Group working notes, July 20 checklist, item 43; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 43; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FIN-01",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "Final decisions are pass, pass with minor revisions, and provisional pass with major revisions (subject for re-defense).",
+      "source": "Handbook 2022-2023, p. 66; Research Protocol AY2024-2025, Closed-door Final Defense, Part II",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 66"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part II"
+        }
+      ],
+      "page": "p. 66",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-02",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "The adviser emails Form 4, the Ethics Clearance and the manuscript to the Research Coordinator at least two weeks before the defense.",
+      "source": "Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Closed-door Final Defense, Part I (Form 4 submission)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 65"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part I (Form 4 submission)"
+        }
+      ],
+      "page": "p. 65",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-03",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "14-Day Rule: \"At least fourteen (14) days, inclusive of weekends, from the date the panel members of the oral defense received their copies of the thesis/dissertation to the date of the oral defense.\"",
+      "source": "Handbook 2022-2023, p. 66; Research Protocol AY2024-2025, Closed-door Final Defense, Part I note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 66"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part I note"
+        }
+      ],
+      "page": "p. 66",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-04",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "The same set of panel members takes part in the closed-door final defense.",
+      "source": "Handbook 2022-2023, p. 66; Research Protocol AY2024-2025, Closed-door Final Defense, Part I (same panel)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 66"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part I (same panel)"
+        }
+      ],
+      "page": "p. 66",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-05",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "The panel members must not agree with the proposed schedule without the revised manuscript; the manuscript must already have been given to the panel before the date is set.",
+      "source": "Handbook 2022-2023, p. 65; Research Protocol AY2024-2025, Closed-door Final Defense, Part I note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 65"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part I note"
+        }
+      ],
+      "page": "p. 65",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-06",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "If a provisional pass with major revisions is given and the panel recommends a re-defense, the student follows the same protocol for the final defense afterward; the same amount of fees applies to the re-defense.",
+      "source": "Handbook 2022-2023, p. 67; Research Protocol AY2024-2025, Closed-door Final Defense, Part II note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 67"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part II note"
+        }
+      ],
+      "page": "p. 67",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-07",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "If a provisional pass with major revisions is given but no re-defense is recommended, the student complies with the corrections; once the revised manuscript is given to the panel for approval the 14-Day Rule applies; the adviser accomplishes Form 8 and emails it to the GS Research Coordinator.",
+      "source": "Handbook 2022-2023, p. 67; Research Protocol AY2024-2025, Closed-door Final Defense, Part II",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 67"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part II"
+        }
+      ],
+      "page": "p. 67",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-08",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "A student who fails to meet the recommendations of all the panel members at a given time is advised to re-defend following the same protocol.",
+      "source": "Handbook 2022-2023, p. 67; Research Protocol AY2024-2025, Closed-door Final Defense, Part II",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 67"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part II"
+        }
+      ],
+      "page": "p. 67",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-09",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "A provisional pass with major revisions must be reflected in Form 6 and agree with the score in Form 7: for a thesis the score is below 85; for a dissertation the score is below 90.",
+      "source": "Handbook 2022-2023, p. 67; Research Protocol AY2024-2025, Closed-door Final Defense, Part II note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 67"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part II note"
+        }
+      ],
+      "page": "p. 67",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-10",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "Each panel member accomplishes Form 6 and emails it to the panel chair, and accomplishes Form 7 and emails it to the Research Coordinator, within the first working day after the defense (the Protocol adds that the research adviser also accomplishes Form 7); the chair emails all Forms 6 and the consolidated comments to the Research Coordinator, adviser and student within the same time.",
+      "source": "Handbook 2022-2023, p. 67; Research Protocol AY2024-2025, Closed-door Final Defense, Part III",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 67"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III"
+        }
+      ],
+      "page": "p. 67",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-11",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "For students admitted on August 2020 and onwards, the student is given two to four weeks to prepare and apply for the public final defense.",
+      "source": "Handbook 2022-2023, p. 71; Research Protocol AY2024-2025, Closed-door Final Defense, Part IV",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 71"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part IV"
+        }
+      ],
+      "page": "p. 71",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-12",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "Form 4.3 must be fully accomplished with the e-signature of the panel members and the date the panel received the revised manuscript.",
+      "source": "Handbook 2022-2023, pp. 72-73; Research Protocol AY2024-2025, Public Defense, Part I (Form 4.3 notes)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 72-73"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Public Defense, Part I (Form 4.3 notes)"
+        }
+      ],
+      "page": "pp. 72-73",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-13",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "Form 6 must state the Action Taken by the student to address each comment and the specific page number where the improvement appears.",
+      "source": "Handbook 2022-2023, p. 72",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 72"
+        }
+      ],
+      "page": "p. 72",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-14",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "Application for the public final defense must be made 5 days before the preferred schedule for posting purposes; Form 4.3 must be submitted at least two weeks before the date of the defense. (The two periods conflict; see OQ-23.)",
+      "source": "Handbook 2022-2023, pp. 72-73; Research Protocol AY2024-2025, Public Defense, Part I (Form 4.3 notes)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 72-73"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Public Defense, Part I (Form 4.3 notes)"
+        }
+      ],
+      "page": "pp. 72-73",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-15",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "The announcement of the public defense is posted on the Graduate School Official Facebook Page with an embedded pre-registration link; the Research Coordinator coordinates campus entry with the GS Office.",
+      "source": "Handbook 2022-2023, p. 73; Research Protocol AY2024-2025, Public Defense, Part I (announcement and pre-registration)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 73"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Public Defense, Part I (announcement and pre-registration)"
+        }
+      ],
+      "page": "p. 73",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-16",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "Students enrolled (admitted) before August 2020 are not required to do a public final defense; instead, after the closed-door final defense, the student presents at a research conference.",
+      "source": "Handbook 2022-2023, pp. 68-69; Research Protocol AY2024-2025, Closed-door Final Defense, Part III note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 68-69"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III note"
+        }
+      ],
+      "page": "pp. 68-69",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-17",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "In the public final defense the student has 30 minutes to present; the Handbook adds another 30 minutes for questions and answers, and the audience may ask questions. Panel members must have Form 6 in hand to check compliance.",
+      "source": "Handbook 2022-2023, p. 73; Research Protocol AY2024-2025, Public Defense, Part II",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 73"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Public Defense, Part II"
+        }
+      ],
+      "page": "p. 73",
+      "status": "Official"
+    },
+    {
+      "id": "FIN-18",
+      "process": "Final defense (closed-door and public)",
+      "process_section": "4.14",
+      "rule": "Only the panel chair submits the defense verdict and the record of the result.",
+      "source": "Group working notes, July 20 checklist, item 48",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 48"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "CMP-01",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "After the student revises the paper, the manuscript is emailed to the panel members for their approval before Turnitin scanning and editing; the 14-Day Rule is applied, and the panel members then email the student confirming their initial approval.",
+      "source": "Handbook 2022-2023, p. 68; Research Protocol AY2024-2025, Closed-door Final Defense, Part III-IV",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 68"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III-IV"
+        }
+      ],
+      "page": "p. 68",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-02",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The adviser verifies that the panelists' recommendations are reflected in the manuscript and then endorses it for Turnitin scanning and editing.",
+      "source": "Research Protocol AY2024-2025, Closed-door Final Defense, Part III (adviser verification)",
+      "sources": [
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III (adviser verification)"
+        }
+      ],
+      "page": "",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-03",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The final draft undergoes Turnitin scanning; a similarity index rating (SIR) of not more than 15% is required before the paper goes to the editor.",
+      "source": "Handbook 2022-2023, p. 68; Research Protocol AY2024-2025, Closed-door Final Defense, Part III",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 68"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III"
+        }
+      ],
+      "page": "p. 68",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-04",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The student chooses from the pool of editors affiliated with the University so that the USLS IRF is employed; the 14-Day Rule applies to the editor; the editor gives Form 9, Editor Certification, once corrections are carried out.",
+      "source": "Handbook 2022-2023, p. 68; Research Protocol AY2024-2025, Closed-door Final Defense, Part III",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 68"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III"
+        }
+      ],
+      "page": "p. 68",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-05",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The student sends the soft copy of the final manuscript to the GS Office, copy furnished to the research ethics office, with the panel approval emails, ethics clearance, Turnitin certificate and editor's certification, within the period set by the office, to inform the office that the manuscript is ready for hard-bound reproduction.",
+      "source": "Handbook 2022-2023, p. 68",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 68"
+        }
+      ],
+      "page": "p. 68",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-06",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The GS Office coordinates with the panel members and advisers for the accomplishment of Form 10, Approval Sheet.",
+      "source": "Handbook 2022-2023, p. 68; Research Protocol AY2024-2025, Closed-door Final Defense, Part III",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 68"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III"
+        }
+      ],
+      "page": "p. 68",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-07",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The student submits the bound copies and CD with the signed approval sheets as part of the requirements for the diploma, TOR and other related documents.",
+      "source": "Handbook 2022-2023, p. 68; Research Protocol AY2024-2025, Closed-door Final Defense, Part III",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 68"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part III"
+        }
+      ],
+      "page": "p. 68",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-08",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The student presents the thesis or dissertation at a research conference (the Graduate School Research Conference or an external one); the certificate of presentation for an external conference may be submitted after the bound copies and CD. Only graduating students present at the Graduate School Research Conference and join the graduation ceremony.",
+      "source": "Handbook 2022-2023, pp. 68-69, 74; Research Protocol AY2024-2025, Public Defense, Part III note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 68-69, 74"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Public Defense, Part III note"
+        }
+      ],
+      "page": "pp. 68-69, 74",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-09",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "Publication: the student chooses a journal from the list of the Publication and Engagement Office and accomplishes Form 12 (Scopus, ISI and Web of Science for PhD; peer-reviewed journals for MA students); the manuscript, ethics clearance (if applicable), Form 11 (if applicable) and Form 12 go to the GS Research Coordinator for review by the Research Committee (Research Coordinator, Academic Coordinator, Associate Dean and the external expert); the Dean approves; the student then files Form 13 with the copy of the journal or the certificate of publication.",
+      "source": "Handbook 2022-2023, p. 75",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 75"
+        }
+      ],
+      "page": "p. 75",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-10",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The student can only be declared a graduate and join the graduation ceremony once Form 13 and a copy of the journal or certificate of publication has been submitted.",
+      "source": "Handbook 2022-2023, p. 75",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 75"
+        }
+      ],
+      "page": "p. 75",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-11",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The published journal must include the authorship affiliation in the sample format given in the Handbook.",
+      "source": "Handbook 2022-2023, p. 75",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 75"
+        }
+      ],
+      "page": "p. 75",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-12",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The best thesis or dissertation award requires a cut-off score of 96 points; the chairman of the committee or the Dean submits the work to the committee and approval by the majority is required.",
+      "source": "Handbook 2022-2023, pp. 76-77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 76-77"
+        }
+      ],
+      "page": "pp. 76-77",
+      "status": "Official"
+    },
+    {
+      "id": "CMP-13",
+      "process": "Revisions and completion",
+      "process_section": "4.15",
+      "rule": "The office checks that each completion document is present and that the Turnitin certificate shows a rating of 15% or below; it does not verify the content of the documents.",
+      "source": "Group working notes, July 20 checklist, item 42; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 42; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "SCH-01",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "For the title defense the GS Office coordinates with the panel members about the proposed schedule; the Research Coordinator informs the panel and the student of the date and time.",
+      "source": "Handbook 2022-2023, p. 60; Research Protocol AY2024-2025, Title Defense, Part I, steps 5-6",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 60"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Title Defense, Part I, steps 5-6"
+        }
+      ],
+      "page": "p. 60",
+      "status": "Official"
+    },
+    {
+      "id": "SCH-02",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "For the proposal and final defenses the student and the research adviser agree with the panel members on the date and time, and the agreed schedule is indicated in Form 4.",
+      "source": "Handbook 2022-2023, pp. 63, 65; Research Protocol AY2024-2025, Proposal Defense, Part I (agreed schedule)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 63, 65"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part I (agreed schedule)"
+        }
+      ],
+      "page": "pp. 63, 65",
+      "status": "Official"
+    },
+    {
+      "id": "SCH-03",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "Lead times: title defense application at least two weeks before the defense; Form 4 at least two weeks before the proposal or final defense; the panel has two weeks to review the manuscript; under the 14-Day Rule at least fourteen days, inclusive of weekends, pass from the date the panel receives the manuscript to the defense.",
+      "source": "Handbook 2022-2023, pp. 59, 63, 65-66; Research Protocol AY2024-2025, Closed-door Final Defense, Part I note",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 59, 63, 65-66"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Closed-door Final Defense, Part I note"
+        }
+      ],
+      "page": "pp. 59, 63, 65-66",
+      "status": "Official"
+    },
+    {
+      "id": "SCH-04",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "Public final defense: Form 4.3 must be submitted five days before the preferred schedule for posting purposes (and at least two weeks before the defense according to the same section; OQ-23).",
+      "source": "Handbook 2022-2023, pp. 72-73; Research Protocol AY2024-2025, Public Defense, Part I (Form 4.3 notes)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 72-73"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Public Defense, Part I (Form 4.3 notes)"
+        }
+      ],
+      "page": "pp. 72-73",
+      "status": "Official"
+    },
+    {
+      "id": "SCH-05",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "The panel chair coordinates with the GS Office for the venue (proposal and closed-door final defense); the GS Office reserves the venue for the public final defense. For students abroad the defense is online.",
+      "source": "Handbook 2022-2023, pp. 63, 66, 70, 73; Research Protocol AY2024-2025, Proposal Defense, Part I (venue and students abroad)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 63, 66, 70, 73"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part I (venue and students abroad)"
+        }
+      ],
+      "page": "pp. 63, 66, 70, 73",
+      "status": "Official"
+    },
+    {
+      "id": "SCH-06",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "The panel members must not agree with a proposed schedule without the revised manuscript.",
+      "source": "Handbook 2022-2023, p. 65",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 65"
+        }
+      ],
+      "page": "p. 65",
+      "status": "Official"
+    },
+    {
+      "id": "SCH-07",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "A re-defense follows the same protocol as the original defense.",
+      "source": "Handbook 2022-2023, pp. 64, 66-67; Research Protocol AY2024-2025, Proposal Defense, Part II (major revisions)",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 64, 66-67"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "Proposal Defense, Part II (major revisions)"
+        }
+      ],
+      "page": "pp. 64, 66-67",
+      "status": "Official"
+    },
+    {
+      "id": "SCH-08",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "Faculty invited to a panel may accept the invitation for the proposed date or mark themselves unavailable (the Associate Dean suggested this).",
+      "source": "Consultation 21 July 2026, Associate Dean's suggestion for panel scheduling",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": "Associate Dean's suggestion for panel scheduling"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "SCH-09",
+      "process": "Defense scheduling and rescheduling",
+      "process_section": "4.16",
+      "rule": "A defense is confirmed only when all required panel members and the adviser are available on the date and the lead time has passed; the student may ask for a schedule revision with new preferred dates; the reason for a reschedule is recorded.",
+      "source": "Group working notes, BPM accurate flow, section 9; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, section 9; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRC-01",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "Students who have finished all their coursework and are just working on the practicum or internship, after a semester of enrollment for it, may enroll for residence.",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
+    },
+    {
+      "id": "PRC-02",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "For the non-thesis track in Education, the integrating course (action research or practicum in the major field) must be completed before the student files for the comprehensive examination.",
+      "source": "Handbook 2022-2023, p. 56",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 56"
+        }
+      ],
+      "page": "p. 56",
+      "status": "Official"
+    },
+    {
+      "id": "PRC-03",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "The curriculum copied in the group's notes for the Doctor of Philosophy in Psychology lists DPSY330 Internship (six units) in the second semester of the second year, before the written comprehensive examination and the dissertation. (The document the curriculum was copied from is not identified in the notes.)",
+      "source": "Group working notes, 'Course stuff' section, program curriculum tables",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "'Course stuff' section, program curriculum tables"
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "PRC-04",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "The practicum workflow applies only to students in Psychology programs and in the Master of Science in Guidance and Counseling (MSGC); students of other programs are excluded.",
+      "source": "Group working notes, Proposal and scenario notes, practicum program restriction; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Proposal and scenario notes, practicum program restriction; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRC-05",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "A student may begin the practicum only after the platform's check of curriculum completion and research progress is satisfied; if source data are missing the check shows Needs verification, not Pass.",
+      "source": "Group working notes, Platform (current build): practicum eligibility",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Platform (current build): practicum eligibility"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRC-06",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "The student submits a signed MOA, the practicum site and the supervisor's name; GS staff record and forward it; the Academic Coordinator reviews it and marks the practicum as in progress.",
+      "source": "Group working notes, BPM accurate flow, section 11",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, section 11"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRC-07",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "The required practicum hours default to 200; the practicum cannot be marked completed below the required hours; completion evidence is one or more certificate PDFs, and several certificates are allowed when the hours come from different companies.",
+      "source": "Group working notes, Platform (current build); proposal notes",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Platform (current build); proposal notes"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRC-08",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "If the hours are short, the Academic Coordinator returns the case with a reason; the student submits additional evidence; the earlier files stay in the history and are not overwritten.",
+      "source": "Group working notes, Scenario notes, practicum unusual case",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Scenario notes, practicum unusual case"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRC-09",
+      "process": "Practicum",
+      "process_section": "4.17",
+      "rule": "The Academic Coordinator verifies hours and documents and sends a completed status report to the Dean; the Dean reviews the report and marks it reviewed. The Dean does not approve or deny the practicum.",
+      "source": "Group working notes, BPM accurate flow, section 11",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, section 11"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "GRD-01",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "A student will only be considered a graduate of the University after completing all the requirements listed below; a student will not be allowed to go up the stage if requirements are not met.",
+      "source": "Handbook 2022-2023, p. 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        }
+      ],
+      "page": "p. 77",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-02",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must be officially enrolled during the semester of application for graduation.",
+      "source": "Handbook 2022-2023, p. 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        }
+      ],
+      "page": "p. 77",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-03",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must have completed all the prescribed subjects for the degree.",
+      "source": "Handbook 2022-2023, p. 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        }
+      ],
+      "page": "p. 77",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-04",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must have passed the comprehensive examination.",
+      "source": "Handbook 2022-2023, p. 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        }
+      ],
+      "page": "p. 77",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-05",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must have completed a successful final oral defense of the project paper, thesis or dissertation, and complied with the required revisions.",
+      "source": "Handbook 2022-2023, p. 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        }
+      ],
+      "page": "p. 77",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-06",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must submit one bound approved copy of the project paper, thesis or dissertation and one CD. The bound copy conforms to the standard format of the University and contains the official approval by the members of the defense panel and the official acceptance by the Dean.",
+      "source": "Handbook 2022-2023, p. 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        }
+      ],
+      "page": "p. 77",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-07",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must have paid all financial obligations to the University; the Graduate School may withhold reports of grades, transcripts of records and diplomas of students who have not fully paid.",
+      "source": "Handbook 2022-2023, p. 77; Handbook 2022-2023, p. 51",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        },
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 51"
+        }
+      ],
+      "page": "p. 77; p. 51",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-08",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must have presented the thesis or dissertation in a public seminar series.",
+      "source": "Handbook 2022-2023, p. 77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        }
+      ],
+      "page": "p. 77",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-09",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The student must have published at least one research paper while enrolled in the program in a Scopus-indexed, Web of Science and ISI journal, for those enrolled from AY 2022-2023 onwards.",
+      "source": "Handbook 2022-2023, p. 77; Handbook 2022-2023, p. 75",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 77"
+        },
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 75"
+        }
+      ],
+      "page": "p. 77; p. 75",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-10",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "Graduating students are required to attend the Alumni seminar given by the Alumni Director.",
+      "source": "Handbook 2022-2023, p. 80",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 80"
+        }
+      ],
+      "page": "p. 80",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-11",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "The Office of the Registrar certifies the eligibility of candidates for graduation and honors.",
+      "source": "Handbook 2022-2023, p. 32",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 32"
+        }
+      ],
+      "page": "p. 32",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-12",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "Academic honors: Highest Academic Honor needs a GPA of 1.1 or better and no grade lower than 1.25; High Academic Honor needs a GPA of 1.25 or better and no grade lower than 1.25 (doctoral) or 1.5 (master's). Both need moral and academic integrity, no repeated subject, no INC, D or W grade, and passing the comprehensive examination with no re-take.",
+      "source": "Handbook 2022-2023, pp. 55-56",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 55-56"
+        }
+      ],
+      "page": "pp. 55-56",
+      "status": "Official"
+    },
+    {
+      "id": "GRD-13",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "GS staff compile the candidate list; the Academic Coordinator checks coursework; the Research Coordinator validates the research completion documents; GS staff prepare the endorsement list; the Dean approves it and sends it to the Registrar.",
+      "source": "Group working notes, BPM accurate flow, section 12",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, section 12"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "GRD-14",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "A student is eligible for selection into a graduation batch only after coursework, research and practicum (where applicable) are complete and the student has submitted a signed graduation application; an application with incorrect information is returned and replaced by a completely new corrected document, the original being kept.",
+      "source": "Group working notes, Scenario notes, graduation standard and unusual cases; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Scenario notes, graduation standard and unusual cases; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "GRD-15",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "Candidates are reviewed within a graduation review window for a school year opened and closed by the Graduate School; the dates, the treatment of late applicants and the treatment of eligible students who miss the window are to be set by the Graduate School.",
+      "source": "Group working notes, Scenario notes; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Scenario notes; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "GRD-16",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "After the Dean approves a batch, the endorsed list is exported as a file and the Dean sends it to the Registrar by the official email; the platform records the export and the status Exported — Ready to Send, and does not record that an email was sent or that the Registrar acknowledged it.",
+      "source": "Group working notes, Scenario notes; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Scenario notes; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "HND-01",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "The accomplished Withdrawal Form is provided to the Registrar, the Accounting Office, and the student.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "HND-02",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "The Dean, Associate Dean or authorized representative informs the University Registrar of a leave of absence, indicating the reasons and the amount of money refunded to the student, if any.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "HND-03",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "The Graduate School Dean endorses a returning student's written intention to enroll to the University Registrar.",
+      "source": "Handbook 2022-2023, p. 53",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 53"
+        }
+      ],
+      "page": "p. 53",
+      "status": "Official"
+    },
+    {
+      "id": "HND-04",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "Cross-enrollment: the Dean's written permission is presented to the Registrar, who issues the cross-enrollment permit; after the course the student submits the grade to the Registrar for inclusion in the academic record.",
+      "source": "Handbook 2022-2023, p. 50",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 50"
+        }
+      ],
+      "page": "p. 50",
+      "status": "Official"
+    },
+    {
+      "id": "HND-05",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "A professor submits his or her grades within one year after the course was enrolled; an error in grades is corrected after the professor explains in writing to the Dean and secures approval, before the Registrar submits grades to CHED.",
+      "source": "Handbook 2022-2023, p. 49",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 49"
+        }
+      ],
+      "page": "p. 49",
+      "status": "Official"
+    },
+    {
+      "id": "HND-06",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "The Registrar is the repository of the records of academic performance and certifies the eligibility of candidates for graduation and honors.",
+      "source": "Handbook 2022-2023, p. 32",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 32"
+        }
+      ],
+      "page": "p. 32",
+      "status": "Official"
+    },
+    {
+      "id": "HND-07",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "For a withdrawal, the request is sent to the Registrar, who processes it in the system, and the Business Office then arranges any tuition adjustment; the Graduate School's responsibility ends at sending the request to the Registrar.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "HND-08",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "There is no integration between AIMS and the Graduate School record. The Graduate School cannot pull data from AIMS and may ask the ITS for an Excel export.",
+      "source": "Consultation 21 July 2026",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Practice"
+    },
+    {
+      "id": "HND-09",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "The Graduate School keeps a log of each handoff (what, when, by whom, to which office) and of the Registrar's confirmation when one is received; the platform does not claim that the Registrar has acted until a confirmation is recorded.",
+      "source": "Group working notes, July 20 checklist, item 57; Consultation 20 July 2026, adviser's remark that the Registrar must confirm",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "July 20 checklist, item 57"
+        },
+        {
+          "document": "Consultation 20 July 2026",
+          "location": "adviser's remark that the Registrar must confirm"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "HND-10",
+      "process": "Records handoff to the Registrar",
+      "process_section": "4.19",
+      "rule": "The export for the Registrar is a file (for withdrawals, an Excel list of approved withdrawals; for graduation, a CSV list of endorsed candidates) sent by the responsible person by email; column layouts are to be confirmed by the Registrar.",
+      "source": "Group working notes, Scenario notes; Platform (current build)",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "Scenario notes; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    }
+  ]
+}
