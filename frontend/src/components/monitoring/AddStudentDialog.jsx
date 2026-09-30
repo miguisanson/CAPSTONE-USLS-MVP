@@ -83,7 +83,15 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
               <div>
                 <p className="font-semibold">{created.message}</p>
-                <p className="mt-1">Student portal login: <span className="font-semibold">{created.account?.email}</span>. The default first-login password is the same one the sheet import gives new students.</p>
+                <p className="mt-1">Student portal login: <span className="font-semibold">{created.account?.email}</span>.</p>
+                {created.account?.must_change_password ? (
+                  <p className="mt-1">
+                    Initial password (shown only now): <code className="rounded bg-white px-1.5 py-0.5 font-mono font-semibold">{created.account.password}</code>.
+                    Give it to the student; they must choose their own password at first sign-in.
+                  </p>
+                ) : (
+                  <p className="mt-1">The first-login password is the shared demo password, the same one the sheet import gives new students.</p>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2">

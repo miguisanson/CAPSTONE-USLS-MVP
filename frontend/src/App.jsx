@@ -20,6 +20,7 @@ import Assistant from "./pages/Assistant";
 import { StudentPortalProvider, StudentRoutes } from "./pages/student/StudentRoutes";
 import { DeanProvider, DeanRoutes } from "./pages/dean/DeanRoutes";
 import Login from "./pages/Login";
+import ChangePassword from "./pages/ChangePassword";
 import Form1Endorsements from "./pages/Form1Endorsements";
 import { FacultyProvider, FacultyRoutes } from "./pages/faculty/FacultyRoutes";
 import TermSettings from "./pages/TermSettings";
@@ -42,10 +43,13 @@ const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coo
 export default function App() {
   const { user, loading } = useAuth();
   if (loading) return <Spinner label="Checking account..." />;
+  // An account created with a generated initial password must choose its own first.
+  if (user?.must_change_password) return <ChangePassword />;
 
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/change-password" element={<ChangePassword />} />
       {/* Role portals: student, dean and faculty use the same Layout shell as the
           staff side; only the navigation items differ (see components/portalNav.jsx).
           Each provider wraps the Layout so the sidebar can show action badges. */}

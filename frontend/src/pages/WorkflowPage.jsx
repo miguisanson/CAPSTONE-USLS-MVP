@@ -865,6 +865,45 @@ function HandoffImport({ context }) {
               </Link>
             </div>
           )}
+          {result.accounts?.some((account) => account.must_change_password) && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3" role="status">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-800">
+                New student logins - shown only now
+              </p>
+              <p className="mb-2 text-sm text-amber-900">
+                Each student has their own initial password. Copy this list and give each password to its student;
+                it cannot be shown again, and the student must choose a new password at first sign-in.
+              </p>
+              <ul className="space-y-1 text-sm">
+                {result.accounts.map((account) => (
+                  <li key={account.email} className="flex flex-wrap justify-between gap-2 rounded-lg bg-white px-3 py-1.5">
+                    <span className="font-semibold text-ink">{account.name} · {account.email}</span>
+                    <code className="font-mono text-ink">{account.password}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {result.standing_from_note?.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">Standing read from the NOTE column</p>
+              <ul className="space-y-1 text-sm text-slate-700">
+                {result.standing_from_note.map((item) => (
+                  <li key={item.student_number}>{item.name} · {item.student_number}: {item.standing} (note: "{item.note}")</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {result.standing_needs_review?.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-800">NOTE suggests a different standing - nothing changed</p>
+              <ul className="space-y-1 text-sm text-amber-900">
+                {result.standing_needs_review.map((item) => (
+                  <li key={item.student_number}>{item.name} · {item.student_number}: note "{item.note}" suggests {item.suggested_standing}. Use the matching workflow if it is right.</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {result.duplicates?.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-3">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -6034,7 +6073,7 @@ function MiniBox({ label, value, tone }) {
 function workflowGuidance(slug) {
   const map = {
     "student-handoff":
-      "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program, and their enrolled subjects automatically — no manual typing.",
+      "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program and curriculum, and marks the subjects already completed automatically — no manual typing. A NOTE of LOA, AWOL or withdrawn on a new student is taken in as their standing. Subjects a student is enrolled in this semester come from the class list (Enrollment), not from this sheet.",
     "leave-of-absence":
       "Leave of Absence is a stop/pause process. Staff verify the submitted application and forward it. The Dean alone approves, denies, or returns the request, and the student's status changes only after that decision.",
     readmission:
