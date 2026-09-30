@@ -16,6 +16,16 @@
       "env": { "FLASK_PORT": "5050" }
     },
     {
+      "name": "usls-gs-check",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["app.py"],
+      "port": 5061,
+      "env": {
+        "FLASK_PORT": "5061",
+        "DATABASE_URL": "sqlite:///E:/Temp/claude/usls-check/check.sqlite3"
+      }
+    },
+    {
       "name": "usls-web",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
