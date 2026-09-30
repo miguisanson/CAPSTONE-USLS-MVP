@@ -11,26 +11,25 @@
 ### Progress (updated as work lands)
 
 Merged into `v5.1-migui_clean` and pushed: `pkt/health`, `pkt/monitor`, `pkt/portals`,
-`pkt/opsmanual`, `pkt/panel`, `pkt/docs`, `pkt/policy`, `pkt/rules`. Full gate after
-`pkt/rules`: **229 tests, 0 failures**; frontend build passes; headless-Edge live check
-of student / dean / faculty / staff pages: no page errors (see `LIVE_CHECK_NOTES.md`).
+`pkt/opsmanual`, `pkt/panel`, `pkt/docs`, `pkt/policy`, `pkt/rules`, `pkt/research-core`,
+`pkt/crosscut`, `pkt/academic`. Full gate at `5cd57d2`: **362 tests, 0 failures**
+(~14 min); frontend build passes. Old demo DB backup copied to
+`E:/Temp/claude/backup/` before crosscut untracked it.
 
 Running (worktrees under `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`):
 
 | Branch | Job | Based on |
 |---|---|---|
-| `pkt/research-core` | Research flow defects from `audit/research-workflows.md` | da33011 |
-| `pkt/crosscut` | Cross-cutting defects from `audit/cross-cutting.md` | 793e0c3 |
-| `pkt/loa` | LOA + Readmission rebuild (case table, real drag-and-drop board) | 7a8e6e7 |
-| `pkt/academic` | Enrollment / class list / offerings / residency fixes | 7a8e6e7 |
+| `pkt/loa` | LOA + Readmission rebuild (case table, real drag-and-drop board, Graduation board too) | 7a8e6e7 |
+| `pkt/calendar` | Availability editor, adviser appointment, calendars, invitations, notifications, private .ics | 5cd57d2 |
+| `pkt/docs2` | Business Rules section in the proposal + Operations Manual synced with the code | 5cd57d2 |
 
-Next after those: adviser appointment + availability editor + calendar pages
-(from the research audit's requirements list, after `pkt/research-core` merges);
-polish items in `LIVE_CHECK_NOTES.md`; then documents (section I of
-`DEFENSE_REVISIONS.md`): walkthrough rewrite, proposal ch. 5–6/appendices and the
-Business Rules section (re-run `scripts/docs/build_proposal.py` afterwards),
-regenerate the Operations Manual "platform differences" paragraphs from the final
-rules, add the Operations Manual draft to the policy library as a Draft document.
+Left after those: final polish packet (items in `LIVE_CHECK_NOTES.md`; add the
+Operations Manual draft to the policy library as a Draft document; remove the
+three monitoring 409 stub routes now that portal CRUD exists); walkthrough rewrite
+re-walked in the live app with fresh screenshots; proposal ch. 5–6 + appendix
+inventories regenerated from code; re-run `scripts/docs/add_business_rules_section.py`
+and `scripts/docs/build_proposal.py`; README/CHANGELOG; final gate, live check, push.
 
 ## If this session died
 
