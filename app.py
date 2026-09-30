@@ -29877,14 +29877,9 @@ def research_matching_profile(student: Student) -> dict:
             body_text = ""
         source_documents.append((item, body_text))
     readable_files = [(item, body_text) for item, body_text in source_documents if body_text.strip()]
-    ethics_record = None
-    if gate == "Form 4 - Proposal Defense Readiness":
-        ethics_record = DocumentCheck.query.filter_by(
-            student_id=student.id,
-            gate=gate,
-            item_name="Ethics clearance status and date",
-        ).first()
-    ethics_ready = gate != "Form 4 - Proposal Defense Readiness" or bool(ethics_record and ethics_record.status == "Complete")
+    # Research Protocol: ethics clearance (Forms 5.1/5.2) follows the proposal defense, so it
+    # never blocks proposal-stage panel matching; it is required before the final stage.
+    ethics_ready = gate != "Final Defense" or student_ethics_cleared(student)
     # Ground matching in PDF body text only. Filenames, research titles, and
     # program labels are display metadata and never enter keyword extraction.
     paper_text = "\n".join(body_text for _item, body_text in readable_files)
@@ -29904,7 +29899,7 @@ def research_matching_profile(student: Student) -> dict:
     elif len(readable_files) < required_count:
         blocked_reason = "Panel matching requires readable PDF body text from the uploaded manuscript source."
     elif not ethics_ready:
-        blocked_reason = "The Research Coordinator must record the Research Protocol Form 5.2 ethics clearance before Panel Matching."
+        blocked_reason = "The Research Coordinator must record the Research Protocol Form 5.2 ethics clearance before the final-defense panel is matched."
     return {
         "research_title": title,
         "gate": gate,
