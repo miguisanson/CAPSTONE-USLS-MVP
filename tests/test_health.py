@@ -529,13 +529,19 @@ class StartupTests(HealthTestBase):
             self.assertEqual(Student.query.count(), 2)
 
     def test_startup_tasks_are_idempotent_and_create_the_demo_accounts(self):
-        with app.app_context():
-            run_startup_tasks(seed_count=0)
-            first = UserAccount.query.count()
-            self.assertIsNotNone(UserAccount.query.filter_by(email="staff@usls.edu.ph").first())
-            run_startup_tasks(seed_count=0)
-            self.assertEqual(UserAccount.query.count(), first)
-            self.assertEqual(Student.query.filter_by(student_number="GS-HLT-A").count(), 1)
+        # Startup also registers the draft Operations Manual in the policy library; keep that
+        # copy (and the search index) in a scratch folder so no other test module sees it.
+        scratch = Path(tempfile.mkdtemp(prefix="health-policy-"))
+        with patch("app.POLICY_DOCUMENT_UPLOAD_ROOT", scratch / "policy_documents"), patch("app.RAG_INDEX_DIR", scratch / "rag-index"):
+            with app.app_context():
+                run_startup_tasks(seed_count=0)
+                first = UserAccount.query.count()
+                self.assertIsNotNone(UserAccount.query.filter_by(email="staff@usls.edu.ph").first())
+                run_startup_tasks(seed_count=0)
+                self.assertEqual(UserAccount.query.count(), first)
+                self.assertEqual(Student.query.filter_by(student_number="GS-HLT-A").count(), 1)
+                from app import PolicyDocument
+                self.assertEqual(PolicyDocument.query.filter_by(category="Operations Manual", status="draft").count(), 1)
 
 
 if __name__ == "__main__":

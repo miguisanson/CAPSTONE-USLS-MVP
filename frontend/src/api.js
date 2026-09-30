@@ -232,8 +232,6 @@ export const api = {
   bulkAddMonitoringSubjects: (payload) =>
     request("/monitoring/subjects/bulk-add-remaining", { method: "POST", body: JSON.stringify(payload) }),
   monitoringExportUrl: (programId) => `${BASE}/monitoring/export${programId ? `?program_id=${programId}` : ""}`,
-  saveCompreExam: (payload) =>
-    request("/monitoring/compre-exam", { method: "POST", body: JSON.stringify(payload) }),
   monitoringUploads: () => request("/monitoring/uploads"),
   resolveMonitoringIssue: (issueId, payload) =>
     request(`/monitoring/issues/${issueId}/resolve`, {

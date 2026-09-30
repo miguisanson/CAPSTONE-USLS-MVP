@@ -19,7 +19,7 @@ function FilterBar({ filters, options, onChange }) {
   const clear = () => onChange(EMPTY_FILTERS);
   const active = Object.values(filters).some(Boolean);
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <label className="block text-xs font-bold text-slate-500">
         Program
         <select className="field-input mt-1" value={filters.program_id} onChange={set("program_id")}>

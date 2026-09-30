@@ -342,3 +342,26 @@ PANEL_MATCHING_DEMO_STUDENTS = [
         ],
     },
 ]
+
+
+# Upcoming defenses for the calendars, the faculty dashboard and the reminders (demo mode only).
+# Each entry is a demonstration student cloned from a proposal-stage Panel Matching student
+# ("base"): same program, adviser and panel, but a new person and a Proposal Defense booked
+# "days_ahead" days from today. The seeder keeps the date in the future on every start.
+UPCOMING_DEFENSE_DEMO = [
+    {
+        "base": "GS-2026-PM-05", "student_number": "GS-2026-UD-01", "first_name": "Nico", "last_name": "Barrientos",
+        "case_title": "Reorder Point Policies and Service Levels for a Regional Hardware Distributor",
+        "days_ahead": 6, "start": "09:00", "end": "10:30", "mode": "In person", "venue": "Graduate School Conference Room",
+    },
+    {
+        "base": "GS-2026-PM-06", "student_number": "GS-2026-UD-02", "first_name": "Bea", "last_name": "Salonga",
+        "case_title": "Governance and Continuity Planning in Second-Generation Family Enterprises",
+        "days_ahead": 11, "start": "13:30", "end": "15:30", "mode": "Online", "venue": "Zoom (link sent by the Graduate School)",
+    },
+    {
+        "base": "GS-2026-PM-05", "student_number": "GS-2026-UD-03", "first_name": "Gab", "last_name": "Tolentino",
+        "case_title": "Inventory Accuracy and Order Fulfilment Time in a Cold-Chain Warehouse",
+        "days_ahead": 19, "start": "10:00", "end": "11:30", "mode": "In person", "venue": "Graduate School Conference Room",
+    },
+]

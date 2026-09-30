@@ -513,20 +513,17 @@ BUSINESS_RULE_CATALOG = [
         "defense.thesis_major_revision_score", "defense",
         "Thesis final defense: below 85 is a provisional pass with major revisions",
         "For a thesis a score below 85 on Form 7 is a provisional pass with major revisions "
-        "(subject for re-defense). For a dissertation the line is 90.",
+        "(subject for re-defense). For a dissertation the line is 90. The panel chair enters the "
+        "Form 7 score in the verdict form, which refuses a plain pass below this value.",
         85, "int", "score", PROTOCOL, "Closed-door Final Defense - II. During the defense", None,
-        enforced=False,
-        reason="The Form 7 score is recorded by the panel outside the portal.",
         document="protocol",
     ),
     _rule(
         "defense.dissertation_major_revision_score", "defense",
         "Dissertation final defense: below 90 is a provisional pass with major revisions",
         "For a dissertation a score below 90 on Form 7 is a provisional pass with major "
-        "revisions (subject for re-defense).",
+        "revisions (subject for re-defense). The verdict form refuses a plain pass below this value.",
         90, "int", "score", PROTOCOL, "Closed-door Final Defense - II. During the defense", None,
-        enforced=False,
-        reason="The Form 7 score is recorded by the panel outside the portal.",
         document="protocol",
     ),
     # ---- Practicum ---------------------------------------------------------

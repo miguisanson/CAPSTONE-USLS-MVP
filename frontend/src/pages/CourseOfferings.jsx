@@ -135,7 +135,7 @@ export default function CourseOfferings({ embedded = false }) {
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-[240px] flex-1">
               <p className="field-label">Add a subject to this semester's offerings</p>
-              <select value={addCourseId} onChange={(e) => setAddCourseId(e.target.value)} className="field-input cursor-pointer">
+              <select value={addCourseId} onChange={(e) => setAddCourseId(e.target.value)} aria-label="Subject to add to this semester's offerings" className="field-input cursor-pointer">
                 <option value="">Select a curriculum subject…</option>
                 {(data?.available_subjects || []).map((c) => <option key={c.id} value={c.id}>{c.code} — {c.title}</option>)}
               </select>
@@ -172,7 +172,7 @@ export default function CourseOfferings({ embedded = false }) {
                       <td className="px-3 py-3">
                         {canManage ? (
                           <div className="min-w-64">
-                            <select value={e.faculty_id} onChange={(ev) => setEdit(o.id, "faculty_id", ev.target.value)} className="field-input cursor-pointer">
+                            <select value={e.faculty_id} onChange={(ev) => setEdit(o.id, "faculty_id", ev.target.value)} aria-label={`Faculty for ${o.code}`} className="field-input cursor-pointer">
                               <option value="">Unassigned</option>
                               {(data.faculty || []).map((f) => <option key={f.id} value={f.id}>{f.name} · {f.specialization}</option>)}
                             </select>
@@ -193,17 +193,17 @@ export default function CourseOfferings({ embedded = false }) {
                         ) : (o.faculty_name || <span className="text-slate-400">Unassigned</span>)}
                       </td>
                       <td className="px-3 py-3">
-                        {canManage ? <input value={e.schedule} onChange={(ev) => setEdit(o.id, "schedule", ev.target.value)} placeholder="e.g. Sat 8:00-11:00" className="field-input max-w-48" /> : (o.schedule || <span className="text-slate-400">—</span>)}
+                        {canManage ? <input value={e.schedule} onChange={(ev) => setEdit(o.id, "schedule", ev.target.value)} placeholder="e.g. Sat 8:00-11:00" aria-label={`Schedule for ${o.code}`} className="field-input max-w-48" /> : (o.schedule || <span className="text-slate-400">—</span>)}
                       </td>
                       <td className="px-3 py-3">
-                        {canManage ? <input value={e.section} onChange={(ev) => setEdit(o.id, "section", ev.target.value)} placeholder="A" className="field-input max-w-20" /> : (o.section || <span className="text-slate-400">—</span>)}
+                        {canManage ? <input value={e.section} onChange={(ev) => setEdit(o.id, "section", ev.target.value)} placeholder="A" aria-label={`Section for ${o.code}`} className="field-input max-w-20" /> : (o.section || <span className="text-slate-400">—</span>)}
                       </td>
                       <td className="px-3 py-3 text-center"><StatusBadge value={`${o.enrolled_count}`} dot={false} /></td>
                       {canManage && (
                         <td className="px-5 py-3">
                           <div className="flex justify-end gap-2">
                             <button type="button" onClick={() => saveOffering(o)} disabled={busy === `save-${o.id}`} className="btn-ghost cursor-pointer px-3 py-2"><Save className="h-4 w-4" /> Save</button>
-                            <button type="button" onClick={() => removeOffering(o)} disabled={busy === `del-${o.id}`} className="btn-ghost cursor-pointer px-3 py-2 text-red-600"><Trash2 className="h-4 w-4" /></button>
+                            <button type="button" onClick={() => removeOffering(o)} disabled={busy === `del-${o.id}`} aria-label={`Remove ${o.code} from the offerings`} className="btn-ghost cursor-pointer px-3 py-2 text-red-600"><Trash2 className="h-4 w-4" /></button>
                           </div>
                         </td>
                       )}

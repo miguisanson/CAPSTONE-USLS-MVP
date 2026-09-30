@@ -115,6 +115,7 @@ export function OnboardingGatePanel({ role }) {
                       value={remarks[item.id] || ""}
                       onChange={(e) => setRemarks((r) => ({ ...r, [item.id]: e.target.value }))}
                       placeholder="Remarks (required to return)"
+                      aria-label="Dean remarks (required to return)"
                       className="field-input max-w-xs"
                     />
                     <button type="button" disabled={busy} className="btn-primary"
@@ -187,7 +188,7 @@ export function StudyPlanPanel({ students = [] }) {
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <label className="field-label">Student</label>
-          <select className="field-input" value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+          <select className="field-input" aria-label="Student" value={studentId} onChange={(e) => setStudentId(e.target.value)}>
             <option value="">Select a student…</option>
             {students.map((s) => (
               <option key={s.id} value={s.id}>{s.name} · {s.student_number}</option>
@@ -196,7 +197,7 @@ export function StudyPlanPanel({ students = [] }) {
         </div>
         <div>
           <label className="field-label">Curriculum version</label>
-          <select className="field-input" value={version} onChange={(e) => setVersion(e.target.value)} disabled={!studentId}>
+          <select className="field-input" aria-label="Curriculum version" value={version} onChange={(e) => setVersion(e.target.value)} disabled={!studentId}>
             <option value="">Select a version…</option>
             {(tag?.available_versions || []).map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
@@ -208,7 +209,7 @@ export function StudyPlanPanel({ students = [] }) {
           <label className="field-label">
             Reason for this version <span className="text-rose-600">· required, more than one version is published</span>
           </label>
-          <input className="field-input" value={rationale} onChange={(e) => setRationale(e.target.value)}
+          <input className="field-input" aria-label="Reason for this version" value={rationale} onChange={(e) => setRationale(e.target.value)}
             placeholder="e.g. Entered under this curriculum; no bridging subjects required." />
         </div>
       ) : null}
@@ -283,6 +284,7 @@ export function StudyPlanPanel({ students = [] }) {
                             value={reviewRemarks[p.id] || ""}
                             onChange={(e) => setReviewRemarks((r) => ({ ...r, [p.id]: e.target.value }))}
                             placeholder="Remarks (required to return)"
+                            aria-label="Review remarks (required to return)"
                             className="field-input min-w-[200px]"
                           />
                           <div className="flex flex-wrap gap-2">
@@ -380,7 +382,7 @@ export function CourseworkReportPanel({ role }) {
                 {role === "dean" && item.status === "Dean Review" ? (
                   <>
                     <input value={remarks[item.id] || ""} onChange={(e) => setRemarks((r) => ({ ...r, [item.id]: e.target.value }))}
-                      placeholder="Remarks (required to return)" className="field-input max-w-xs" />
+                      placeholder="Remarks (required to return)" aria-label="Dean remarks (required to return)" className="field-input max-w-xs" />
                     <button type="button" className="btn-primary" disabled={busy}
                       onClick={() => act(() => api.decideCourseworkReport(item.id, { decision: "acknowledge", remarks: remarks[item.id] || "" }))}>
                       Acknowledge

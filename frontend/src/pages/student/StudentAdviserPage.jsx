@@ -151,7 +151,9 @@ function CurrentCard({ tracker, onChanged }) {
         <div>
           <p className="font-display text-xl font-semibold text-ink">{current.faculty_name}</p>
           {current.faculty_college && <p className="text-sm text-slate-500">{current.faculty_college}</p>}
-          <p className="mt-1 text-sm text-slate-600">Appointed: {current.form31_issued_on ? fmtDay(current.form31_issued_on) : "Date not recorded"}</p>
+          <p className="mt-1 text-sm text-slate-600">{current.form31_issued_on || current.adviser_responded_at
+              ? `Appointed: ${fmtDay(current.form31_issued_on || String(current.adviser_responded_at).slice(0, 10))}`
+              : "Appointed before the online appointment process (no date on file)"}</p>
         </div>
         <StatusBadge value={current.status} dot={false} />
       </div>

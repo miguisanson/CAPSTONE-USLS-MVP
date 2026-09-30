@@ -142,9 +142,10 @@ export default function Assistant({ policyOnly: policyOnlyProp = false }) {
                 }}
                 rows={1}
                 placeholder="Ask about a student or a policy…"
+                aria-label="Your question"
                 className="field-input max-h-32 flex-1 resize-none"
               />
-              <button type="submit" disabled={busy || !input.trim()} className="btn-primary h-[46px] px-4">
+              <button type="submit" aria-label="Send question" disabled={busy || !input.trim()} className="btn-primary h-[46px] px-4">
                 <Send className="h-4 w-4" />
               </button>
             </div>

@@ -50,13 +50,13 @@ const STANDALONE_STUDENT_DEMOS = [
   {
     workflow: "leave-of-absence",
     title: "Leave of Absence",
-    description: "Structured LOA requests with deterministic policy checks.",
+    description: "Leave requests checked against the handbook rules.",
     icon: CalendarOff,
   },
   {
     workflow: "readmission",
     title: "Readmission",
-    description: "Approved-LOA personas ready for structured return requests.",
+    description: "Approved-LOA personas ready to file return requests.",
     icon: UserRound,
   },
   {
