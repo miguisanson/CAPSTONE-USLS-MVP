@@ -193,7 +193,7 @@ TRANSACTIONS = [
         "title": "Withdrawal Application",
         "icon": "log-out",
         "group": "Standing",
-        "short": "Process penalty-free subject withdrawals filed before classes or during the first week, then hand approved lists to the Registrar.",
+        "short": "Process subject withdrawals filed until the end of the second week of classes (10% / 20% of the term's fees), then hand approved lists to the Registrar.",
         "actor": "Student / GS Staff / Dean",
         "data": "Selected subject, eligibility window, reason, Dean decision, Registrar Excel handoff, and audit remarks.",
     },
@@ -472,6 +472,49 @@ class PolicyDocumentVersion(db.Model):
 
     document = db.relationship("PolicyDocument", back_populates="versions")
     uploaded_by = db.relationship("UserAccount")
+
+
+class BusinessRule(db.Model):
+    """One business rule the workflows read, with the policy it comes from.
+
+    Seeded from ``business_rules_catalog.py`` by ``ensure_business_rules()``;
+    afterwards the row is the source of truth and Graduate School staff edit it.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(120), unique=True, nullable=False)
+    process = db.Column(db.String(40), nullable=False)
+    title = db.Column(db.String(220), nullable=False)
+    description = db.Column(db.Text, nullable=False, default="")
+    value = db.Column(db.String(500), nullable=False)
+    value_type = db.Column(db.String(12), nullable=False, default="int")
+    unit = db.Column(db.String(30))
+    source_title = db.Column(db.String(220), nullable=False, default="")
+    source_section = db.Column(db.String(220))
+    source_page = db.Column(db.String(40))
+    policy_document_id = db.Column(db.Integer, db.ForeignKey("policy_document.id"))
+    enforced = db.Column(db.Boolean, nullable=False, default=True)
+    not_enforced_reason = db.Column(db.Text)
+    status = db.Column(db.String(20), nullable=False, default="active")
+    effective_date = db.Column(db.Date)
+    updated_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    updated_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+    policy_document = db.relationship("PolicyDocument")
+    updated_by = db.relationship("UserAccount")
+
+
+class BusinessRuleRevision(db.Model):
+    """History of every edit to a business rule (who, when, why)."""
+    id = db.Column(db.Integer, primary_key=True)
+    rule_id = db.Column(db.Integer, db.ForeignKey("business_rule.id"), nullable=False)
+    old_value = db.Column(db.String(500))
+    new_value = db.Column(db.String(500))
+    reason = db.Column(db.Text, nullable=False, default="")
+    changed_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    changed_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+    rule = db.relationship("BusinessRule", backref="revisions")
+    changed_by = db.relationship("UserAccount")
 
 
 class AcademicTerm(db.Model):
@@ -1707,8 +1750,8 @@ def faculty_dict(faculty: Faculty) -> dict:
         "availability_status": "Available" if any(day["enabled"] for day in working_hours) else "Unavailable",
         "panel_load": workload,
         "teaching_load_units": teaching_load,
-        "teaching_load_limit": FACULTY_TEACHING_LOAD_LIMIT,
-        "teaching_load_remaining": max(FACULTY_TEACHING_LOAD_LIMIT - teaching_load, 0),
+        "teaching_load_limit": faculty_teaching_load_limit(),
+        "teaching_load_remaining": max(faculty_teaching_load_limit() - teaching_load, 0),
         "preferred_subjects": [
             {
                 "id": item.course.id,
@@ -2019,7 +2062,11 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         "status": "Eligible for Comprehensive Exam" if eligible else "Not Eligible",
         "exam_status": student.comprehensive_exam_status or "Not Taken",
         "passed": (student.comprehensive_exam_status or "").lower() == "passed",
-        "research_allowed": eligible and (student.comprehensive_exam_status or "").lower() == "passed",
+        # research.comprehensive_exam_before_research: Graduate School Handbook 2022-2023, p. 57
+        "research_allowed": eligible and (
+            (student.comprehensive_exam_status or "").lower() == "passed"
+            or not rule_value("research.comprehensive_exam_before_research", True)
+        ),
         "categories": categories,
         "completed_units": qualifying_total,
         "required_units": required_units,
@@ -2045,8 +2092,11 @@ def require_research_prerequisite(student: Student) -> dict:
     prerequisite = comprehensive_exam_eligibility(student)
     if not prerequisite["eligible"]:
         raise ValueError("Complete all curriculum subjects before taking the comprehensive exam.")
-    if not prerequisite["passed"]:
-        raise ValueError("The comprehensive exam must be marked Passed before starting Title, Proposal, Ethics, or Final research activities.")
+    if not prerequisite["passed"] and rule_value("research.comprehensive_exam_before_research", True):
+        raise ValueError(
+            "The comprehensive exam must be marked Passed before starting Title, Proposal, Ethics, or Final "
+            f"research activities ({rule_citation('research.comprehensive_exam_before_research')})."
+        )
     return prerequisite
 
 
@@ -2568,7 +2618,9 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
         "subject_enrollment_id": application.subject_enrollment_id,
         "subject": subject_enrollment_dict(application.subject_enrollment) if application.subject_enrollment else None,
         "withdrawal_window": withdrawal_window,
-        "academic_record_effect": "No academic record / no grade impact",
+        "academic_record_effect": WITHDRAWAL_RECORD_EFFECT,
+        "fee_consequence": withdrawal_window["fee_consequence"] if withdrawal_window else None,
+        "fee_percent": withdrawal_window["fee_percent"] if withdrawal_window else None,
         "fee_status": application.fee_status,
         "requirement_status": application.requirement_status,
         "dean_decision": application.dean_decision,
@@ -2795,6 +2847,291 @@ def curriculum_offering_dict(offering: CurriculumOffering) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Business rules register
+# ---------------------------------------------------------------------------
+# One table (BusinessRule) holds every rule the workflows enforce, with the value
+# and the policy document/page it comes from. Workflows call rule_value(); they
+# never hard-code the number. business_rules_catalog.py holds the seed values.
+from flask import g as _flask_g  # noqa: E402
+
+from business_rules_catalog import (  # noqa: E402
+    BUSINESS_RULE_BY_KEY,
+    BUSINESS_RULE_CATALOG,
+    BUSINESS_RULE_PROCESSES,
+)
+
+BUSINESS_RULE_PROCESS_LABELS = dict(BUSINESS_RULE_PROCESSES)
+
+
+def _coerce_rule_value(raw, value_type: str):
+    """Convert the stored string to its typed value; raises ValueError if it cannot."""
+    if value_type == "int":
+        number = float(str(raw).strip())
+        if number != int(number):
+            raise ValueError("whole number expected")
+        return int(number)
+    if value_type == "decimal":
+        return float(str(raw).strip())
+    if value_type == "bool":
+        text_value = str(raw).strip().lower()
+        if text_value in {"1", "true", "yes", "y", "on"}:
+            return True
+        if text_value in {"0", "false", "no", "n", "off"}:
+            return False
+        raise ValueError("true or false expected")
+    return str(raw)
+
+
+def _rule_cache() -> dict | None:
+    """Per-request memo so a request reads each rule from the database once."""
+    if not has_request_context():
+        return None
+    cache = getattr(_flask_g, "_business_rules", None)
+    if cache is None:
+        cache = {}
+        _flask_g._business_rules = cache
+    return cache
+
+
+def clear_business_rule_cache() -> None:
+    if has_request_context():
+        _flask_g.pop("_business_rules", None)
+
+
+def _rule_fields(key: str) -> dict | None:
+    """The rule's fields from the register, else from the seed catalog, else None."""
+    cache = _rule_cache()
+    if cache is not None and key in cache:
+        return cache[key]
+    fields = None
+    try:
+        with db.session.no_autoflush:
+            row = BusinessRule.query.filter_by(key=key).first()
+        if row is not None:
+            fields = {
+                "value": row.value,
+                "value_type": row.value_type,
+                "source_title": row.source_title,
+                "source_page": row.source_page,
+                "title": row.title,
+            }
+    except Exception:  # register table not created yet: use the seed values
+        fields = None
+    if fields is None:
+        entry = BUSINESS_RULE_BY_KEY.get(key)
+        if entry is not None:
+            fields = {
+                "value": entry["value"],
+                "value_type": entry["value_type"],
+                "source_title": entry["source_title"],
+                "source_page": entry["source_page"],
+                "title": entry["title"],
+            }
+    if cache is not None:
+        cache[key] = fields
+    return fields
+
+
+def rule_value(key: str, default=None):
+    """The typed current value of a business rule (register first, seed catalog second)."""
+    fields = _rule_fields(key)
+    if fields is not None:
+        try:
+            return _coerce_rule_value(fields["value"], fields["value_type"])
+        except (TypeError, ValueError):
+            entry = BUSINESS_RULE_BY_KEY.get(key)
+            if entry is not None:
+                return _coerce_rule_value(entry["value"], entry["value_type"])
+    return default
+
+
+def _format_rule_citation(source_title: str | None, source_page: str | None) -> str:
+    title = source_title or ""
+    page = (source_page or "").strip()
+    if not page:
+        return title
+    prefix = "pp." if ("-" in page or "," in page) else "p."
+    return f"{title}, {prefix} {page}"
+
+
+def rule_citation(key: str) -> str:
+    """'Graduate School Handbook 2022-2023, p. 49' - where the rule comes from."""
+    fields = _rule_fields(key)
+    if not fields:
+        return ""
+    return _format_rule_citation(fields.get("source_title"), fields.get("source_page"))
+
+
+def business_rule_dict(rule: BusinessRule, history: list | None = None) -> dict:
+    try:
+        typed = _coerce_rule_value(rule.value, rule.value_type)
+    except (TypeError, ValueError):
+        typed = rule.value
+    return {
+        "id": rule.id,
+        "key": rule.key,
+        "process": rule.process,
+        "process_label": BUSINESS_RULE_PROCESS_LABELS.get(rule.process, rule.process),
+        "title": rule.title,
+        "description": rule.description,
+        "value": typed,
+        "value_type": rule.value_type,
+        "unit": rule.unit,
+        "source_title": rule.source_title,
+        "source_section": rule.source_section,
+        "source_page": rule.source_page,
+        "citation": _format_rule_citation(rule.source_title, rule.source_page),
+        "policy_document": (
+            {"id": rule.policy_document.id, "title": rule.policy_document.title}
+            if rule.policy_document
+            else None
+        ),
+        "enforced": bool(rule.enforced),
+        "not_enforced_reason": rule.not_enforced_reason,
+        "status": rule.status,
+        "effective_date": iso(rule.effective_date),
+        "updated_by": rule.updated_by.full_name if rule.updated_by else None,
+        "updated_at": iso(rule.updated_at),
+        "history": history or [],
+    }
+
+
+def business_rule_revision_dict(revision: BusinessRuleRevision) -> dict:
+    return {
+        "id": revision.id,
+        "old_value": revision.old_value,
+        "new_value": revision.new_value,
+        "reason": revision.reason,
+        "changed_by": revision.changed_by.full_name if revision.changed_by else None,
+        "changed_at": iso(revision.changed_at),
+    }
+
+
+def rules_for_process(process: str | None = None) -> list[dict]:
+    """Rules (with history) for one process, or all of them, in catalog order."""
+    query = BusinessRule.query
+    if process:
+        query = query.filter(BusinessRule.process == process)
+    rules = query.order_by(BusinessRule.id).all()
+    revisions_by_rule: dict[int, list] = {}
+    if rules:
+        for revision in (
+            BusinessRuleRevision.query
+            .filter(BusinessRuleRevision.rule_id.in_([rule.id for rule in rules]))
+            .order_by(BusinessRuleRevision.changed_at.desc(), BusinessRuleRevision.id.desc())
+            .all()
+        ):
+            revisions_by_rule.setdefault(revision.rule_id, []).append(revision)
+    return [
+        business_rule_dict(
+            rule,
+            [business_rule_revision_dict(item) for item in revisions_by_rule.get(rule.id, [])[:10]],
+        )
+        for rule in rules
+    ]
+
+
+def _link_business_rules_to_policy_documents() -> int:
+    """Attach rules to an uploaded handbook/protocol document when one exists.
+
+    Only fills empty links; never moves a rule someone already linked.
+    """
+    documents = PolicyDocument.query.order_by(PolicyDocument.id).all()
+    if not documents:
+        return 0
+
+    def find(hint: str):
+        for document in documents:
+            if hint in f"{document.original_name} {document.title}".lower():
+                return document
+        return None
+
+    linked = 0
+    for entry in BUSINESS_RULE_CATALOG:
+        hint = entry.get("document")
+        if not hint:
+            continue
+        document = find(hint)
+        if not document:
+            continue
+        rule = BusinessRule.query.filter_by(key=entry["key"]).first()
+        if rule and rule.policy_document_id is None and rule.status == "active":
+            rule.policy_document_id = document.id
+            linked += 1
+    return linked
+
+
+def ensure_business_rules() -> int:
+    """Insert missing rules from the seed catalog. Never changes an existing row.
+
+    Idempotent and safe to call at import time, on every startup, after a database
+    reset, and from tests. Returns the number of rules inserted.
+    """
+    db.create_all()
+    existing = {row[0] for row in db.session.query(BusinessRule.key).all()}
+    created = 0
+    for entry in BUSINESS_RULE_CATALOG:
+        if entry["key"] in existing:
+            continue
+        db.session.add(BusinessRule(
+            key=entry["key"],
+            process=entry["process"],
+            title=entry["title"],
+            description=entry["description"],
+            value=entry["value"],
+            value_type=entry["value_type"],
+            unit=entry["unit"],
+            source_title=entry["source_title"],
+            source_section=entry["source_section"],
+            source_page=entry["source_page"],
+            enforced=entry["enforced"],
+            not_enforced_reason=entry["not_enforced_reason"],
+            status=entry["status"],
+        ))
+        created += 1
+    db.session.flush()
+    _link_business_rules_to_policy_documents()
+    db.session.commit()
+    clear_business_rule_cache()
+    return created
+
+
+def flag_business_rules_for_policy_document(document_id: int, removed: bool = False) -> int:
+    """A policy document was replaced or deleted: its rules need a human check.
+
+    Does not commit; the calling route commits with its own change.
+    """
+    rules = BusinessRule.query.filter_by(policy_document_id=document_id).all()
+    for rule in rules:
+        rule.status = "needs_review"
+        rule.updated_at = now_utc()
+        if removed:
+            rule.policy_document_id = None
+    if rules:
+        account = current_account() if has_request_context() else None
+        add_log(
+            "business-rules",
+            None,
+            workflow_actor_label(account) if account else "Graduate School Staff",
+            "Policy document library",
+            f"{len(rules)} business rule(s) flagged for review",
+            "Graduate School Staff",
+            (
+                f"The policy document was {'removed' if removed else 'replaced'}. "
+                "Check these rules against the new text: "
+                + ", ".join(rule.key for rule in rules)
+                + "."
+            ),
+        )
+    clear_business_rule_cache()
+    return len(rules)
+
+
+def faculty_teaching_load_limit() -> int:
+    return rule_value("faculty.teaching_load_limit_units", 24)
+
+
 ACTIVE_SUBJECT_ENROLLMENT_STATUSES = {"Enrolled", "Current"}
 RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Completed",
@@ -2808,58 +3145,138 @@ NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken", "Planned"}
 # pass/fail outcomes stay out of scope; "Missing" means "no row" and is what a
 # removed row goes back to.
 MONITORING_MANUAL_STATUSES = ["Planned", "Enrolled", "Completed", "Withdrawn", "Dropped", "INC"]
-SUBJECT_WITHDRAWAL_WINDOW_DAYS = 7
+_WINDOW_ORDINALS = {1: "first", 2: "second", 3: "third", 4: "fourth"}
+
+
+def _withdrawal_window_phrase(days: int) -> str:
+    """'the end of the second week of classes (14 calendar days from the start of classes)'."""
+    weeks, remainder = divmod(days, 7)
+    if not remainder and weeks in _WINDOW_ORDINALS:
+        return (
+            f"the end of the {_WINDOW_ORDINALS[weeks]} week of classes "
+            f"({days} calendar days from the start of classes)"
+        )
+    return f"the first {days} calendar days of classes"
+
+
+def withdrawal_policy_statement() -> str:
+    """Plain-language withdrawal rule shown on the request and in the export."""
+    days = rule_value("withdrawal.window_days", 14)
+    return (
+        f"Subject withdrawal is allowed until {_withdrawal_window_phrase(days)}, whether or "
+        f"not classes were attended ({rule_citation('withdrawal.window_days')}). It is not free: "
+        f"{rule_value('withdrawal.fee_percent_first_week', 10)}% of the term's total due is charged "
+        f"in the first week and {rule_value('withdrawal.fee_percent_second_week', 20)}% in the second. "
+        "After the window a single subject cannot be withdrawn; the student may still withdraw "
+        "from all subjects (paying the full fees for the semester) or file a Leave of Absence."
+    )
+
+
+WITHDRAWAL_RECORD_EFFECT = (
+    "Recorded as Withdrawn in the enrollment ledger. Any grade mark (W) is applied "
+    "by the Registrar; grades are outside this portal."
+)
+
+FEE_INFORMATION_ONLY = (
+    "Shown for information only: the portal does not compute or collect payments; "
+    "the Business Office settles the fees."
+)
 
 
 def subject_withdrawal_window(
     item: SubjectEnrollment,
     as_of: date | None = None,
 ) -> dict:
-    """Return the penalty-free subject-withdrawal window for one enrollment.
+    """Return the subject-withdrawal window and fee consequence for one enrollment.
 
-    Graduate School subject withdrawal is available before classes begin and
-    through the first seven calendar days of the semester. The request remains
-    valid if reviewers act after the deadline because eligibility is determined
-    from the date the student submitted it.
+    The window length, the first-week boundary and the fee percentages all come
+    from the business-rules register (Graduate School Handbook 2022-2023, p. 49).
+    Eligibility is judged from the date the student submitted the request, so a
+    request stays valid if reviewers act after the deadline.
     """
     check_date = as_of or date.today()
     term = item.term
+    window_days = rule_value("withdrawal.window_days", 14)
+    first_week_days = rule_value("withdrawal.first_week_days", 7)
+    fee_first = rule_value("withdrawal.fee_percent_first_week", 10)
+    fee_second = rule_value("withdrawal.fee_percent_second_week", 20)
+    fee_after = rule_value("withdrawal.fee_percent_after_window", 100)
+    common = {
+        "checked_on": iso(check_date),
+        "policy": withdrawal_policy_statement(),
+        "academic_record_effect": WITHDRAWAL_RECORD_EFFECT,
+        "rule_key": "withdrawal.window_days",
+        "rule_source": rule_citation("withdrawal.window_days"),
+        "window_days": window_days,
+    }
     if not term or not term.start_date:
         return {
+            **common,
             "eligible": False,
             "status": "Needs semester dates",
             "term_start_date": None,
             "deadline": None,
-            "checked_on": iso(check_date),
-            "policy": (
-                "Subject withdrawal is allowed before classes begin or during "
-                "the first seven calendar days of class."
-            ),
-            "academic_record_effect": "No academic grade or penalty when approved within the window.",
+            "fee_tier": None,
+            "fee_percent": None,
+            "fee_consequence": "Semester dates are needed before the fee consequence can be shown.",
         }
 
-    deadline = term.start_date + timedelta(days=SUBJECT_WITHDRAWAL_WINDOW_DAYS - 1)
+    deadline = term.start_date + timedelta(days=window_days - 1)
+    days_since_start = (check_date - term.start_date).days
     if check_date < term.start_date:
-        eligible = True
-        status = "Before classes begin"
+        eligible, status, tier, fee = True, "Before classes begin", "Before classes begin", None
+        consequence = (
+            "The handbook states the charge from the first week of classes and gives no amount "
+            "for a withdrawal before classes begin; the Business Office confirms it. "
+            + FEE_INFORMATION_ONLY
+        )
+    elif days_since_start < first_week_days:
+        eligible, status, tier, fee = True, "First week of classes", "First week", fee_first
+        consequence = None
     elif check_date <= deadline:
-        eligible = True
-        status = "First week of classes"
+        eligible, status, tier, fee = True, "Second week of classes", "Second week", fee_second
+        consequence = None
     else:
-        eligible = False
-        status = "Withdrawal window closed"
+        eligible, status, tier, fee = False, "Withdrawal window closed", "After the second week", fee_after
+        consequence = (
+            f"A single subject can no longer be withdrawn. A student who withdraws from all "
+            f"subjects pays {fee_after}% of the fees for the semester "
+            f"({rule_citation('withdrawal.fee_percent_after_window')}). " + FEE_INFORMATION_ONLY
+        )
+    if consequence is None:
+        consequence = (
+            f"A charge of {fee}% of the term's total due applies "
+            f"({rule_citation('withdrawal.fee_percent_first_week')}). " + FEE_INFORMATION_ONLY
+        )
     return {
+        **common,
         "eligible": eligible,
         "status": status,
         "term_start_date": iso(term.start_date),
         "deadline": iso(deadline),
-        "checked_on": iso(check_date),
-        "policy": (
-            "Subject withdrawal is allowed before classes begin or during "
-            "the first seven calendar days of class."
-        ),
-        "academic_record_effect": "No academic grade or penalty when approved within the window.",
+        "fee_tier": tier,
+        "fee_percent": fee,
+        "fee_consequence": consequence,
     }
+
+
+def withdrawal_window_closed_message(window: dict) -> str:
+    """Rejection text for a withdrawal filed after the window; names the rule and its source."""
+    if window.get("status") == "Needs semester dates":
+        return (
+            "The semester start date is not recorded, so the withdrawal window cannot be checked. "
+            "Contact Graduate School staff to correct the semester dates."
+        )
+    deadline = window.get("deadline")
+    deadline_text = f" The deadline was {deadline}." if deadline else ""
+    days = window.get("window_days") or rule_value("withdrawal.window_days", 14)
+    return (
+        f"A single subject can only be withdrawn until {_withdrawal_window_phrase(days)}, whether "
+        f"or not classes were attended ({window.get('rule_source') or rule_citation('withdrawal.window_days')})."
+        f"{deadline_text} After that the student may still withdraw from all subjects but pays the "
+        "full fees for the semester, or may file a Leave of Absence. Contact Graduate School staff "
+        "if the recorded semester dates are incorrect."
+    )
 
 
 def subject_enrollment_dict(item: SubjectEnrollment) -> dict:
@@ -2886,12 +3303,7 @@ def subject_enrollment_dict(item: SubjectEnrollment) -> dict:
         "updated_at": iso(item.updated_at),
         "withdrawal_eligible": withdrawal_window["eligible"],
         "withdrawal_window": withdrawal_window,
-        "academic_record_effect": (
-            "No academic record / no grade impact"
-            if item.status == "Withdrawn"
-            and "no academic record" in (item.status_note or "").lower()
-            else None
-        ),
+        "academic_record_effect": WITHDRAWAL_RECORD_EFFECT if item.status == "Withdrawn" else None,
     }
 
 
@@ -3181,8 +3593,69 @@ def sync_subject_enrollment_from_course_record(
     return item
 
 
+def _first_weeks_phrase(days: int) -> str:
+    return "the first week of classes" if days == 7 else f"the first {days} calendar days of classes"
+
+
+def subject_adjustment_window(term: AcademicTerm, change: bool = False, as_of: date | None = None) -> dict:
+    """Is adding (or changing) a subject in this semester still inside the allowed window?
+
+    Adding a subject and changing one subject for another are allowed during the first
+    week of classes only (Graduate School Handbook 2022-2023, pp. 48-49); the length
+    comes from the business-rules register.
+    """
+    key = "course_adjustment.change_subject_window_days" if change else "course_adjustment.add_subject_window_days"
+    days = rule_value(key, 7)
+    today = as_of or date.today()
+    started = bool(term and term.start_date and today >= term.start_date)
+    deadline = term.start_date + timedelta(days=days - 1) if term and term.start_date else None
+    return {
+        "days": days,
+        "deadline": deadline,
+        "started": started,
+        "closed": bool(started and deadline and today > deadline),
+        "days_since_start": (today - term.start_date).days if started else None,
+        "rule_key": key,
+        "rule_source": rule_citation(key),
+        "phrase": _first_weeks_phrase(days),
+    }
+
+
+def adjustment_window_message(code: str, term: AcademicTerm, window: dict, change: bool) -> str:
+    if change:
+        rule_text = (
+            f"Changing one subject for another is allowed during {window['phrase']} only if the "
+            "original subject was dissolved, the student has a schedule conflict, or the student "
+            "failed the prerequisite subject"
+        )
+        action = "changed"
+    else:
+        rule_text = (
+            f"Adding a subject is allowed during {window['phrase']} with the written approval of "
+            "the Associate Dean"
+        )
+        action = "added"
+    return (
+        f"{code} would be {action} {window['days_since_start']} days after classes began "
+        f"({term.label} started {term.start_date.isoformat()}). {rule_text} (window ended "
+        f"{window['deadline'].isoformat()}; {window['rule_source']}). Exclude it, or enroll it with "
+        "the documented exception (the written approval)."
+    )
+
+
 def enrollment_conflict_options(kind: str) -> list[dict]:
     options = {
+        "add_window_closed": [
+            {"value": "exclude", "label": "Do not enroll (recommended)"},
+            {"value": "enroll_override", "label": "Enroll with the Associate Dean's written approval (documented exception)"},
+        ],
+        "change_window_closed": [
+            {"value": "exclude", "label": "Do not enroll (recommended)"},
+            {"value": "enroll_override", "label": "Enroll with documented exception (subject dissolved, schedule conflict or failed prerequisite)"},
+        ],
+        "over_load": [
+            {"value": "enroll_override", "label": "Enroll with documented exception (approved overload)"},
+        ],
         "not_offered": [
             {"value": "exclude", "label": "Do not enroll (recommended)"},
             {"value": "enroll_override", "label": "Enroll with documented exception"},
@@ -3315,7 +3788,73 @@ def enrollment_preview_payload(
     additions = sorted(requested_course_ids - current_active_ids)
     removals = sorted(current_active_ids - requested_course_ids)
     unchanged = sorted(current_active_ids & requested_course_ids)
+
+    # Adding / changing a subject is only allowed in the first week of classes
+    # (Graduate School Handbook 2022-2023, pp. 48-49). A first registration, when the
+    # student has no active subject in the semester yet, is not an "addition".
+    is_change = bool(removals)
+    adjustment_window = subject_adjustment_window(term, change=is_change)
+    if current_active_ids and additions and adjustment_window["closed"]:
+        kind = "change_window_closed" if is_change else "add_window_closed"
+        for course_id in additions:
+            course = courses_by_id.get(course_id)
+            if not course or course.program_id != student.program_id:
+                continue
+            conflicts.append({
+                "id": f"{'change' if is_change else 'add'}-window-{course.id}",
+                "kind": kind,
+                "severity": "warning",
+                "line": (
+                    f"Subject {course.code} · "
+                    f"{'Change of subject' if is_change else 'Adding a subject'} after the first week"
+                ),
+                "message": adjustment_window_message(course.code, term, adjustment_window, is_change),
+                "course_id": course.id,
+                "options": enrollment_conflict_options(kind),
+            })
+
+    # Academic load (Graduate School Handbook 2022-2023, p. 48).
+    requested_units = sum(
+        (courses_by_id[course_id].units or 0)
+        for course_id in requested_course_ids
+        if course_id in courses_by_id and courses_by_id[course_id].program_id == student.program_id
+    )
+    part_min = rule_value("enrollment.part_time_min_units", 6)
+    part_max = rule_value("enrollment.part_time_max_units", 9)
+    full_time = rule_value("enrollment.full_time_units", 12)
+    if requested_units > full_time:
+        load_label = "Above the full-time load"
+    elif requested_units > part_max:
+        load_label = "Full-time load"
+    elif requested_units >= part_min:
+        load_label = "Part-time load"
+    elif requested_units > 0:
+        load_label = "Below the normal part-time load"
+    else:
+        load_label = "No subjects"
+    load_source = rule_citation("enrollment.full_time_units")
+    if requested_units > full_time:
+        conflicts.append({
+            "id": "load-over-full-time",
+            "kind": "over_load",
+            "severity": "warning",
+            "line": f"Academic load · {term.label}",
+            "message": (
+                f"The selection adds up to {requested_units} units. The normal load is {part_min} to "
+                f"{part_max} units for a part-time student and {full_time} units for a full-time "
+                f"student per semester ({load_source}). Enroll only with a documented exception."
+            ),
+            "options": enrollment_conflict_options("over_load"),
+        })
     return {
+        "load": {
+            "units": requested_units,
+            "classification": load_label,
+            "part_time_min_units": part_min,
+            "part_time_max_units": part_max,
+            "full_time_units": full_time,
+            "rule_source": load_source,
+        },
         "student": student_brief(student),
         "term": term_dict(term),
         "requested_course_ids": sorted(requested_course_ids),
@@ -4161,9 +4700,9 @@ def portfolio_recommendations(limit: int = 150) -> dict:
 # For the MVP, the "retrieval corpus" is a curated in-code set of policy snippets.
 # A production version would ingest approved DOCX/PDF/XLSX documents into chunks.
 POLICY_SNIPPETS = [
-    {"id": "loa-residency", "title": "Leave of Absence & Residency", "source": "GS Research Protocol / Handbook",
-     "tags": ["loa", "leave", "residency", "terms", "pause", "eligible", "eligibility"],
-     "text": "A student may file a Leave of Absence with an approved reason. The residency clock is paused for the approved LOA period. LOA is limited (prototype rule: up to 4 semesters total) and the student must have completed at least one semester of residency before filing. The Dean approves the request; GS Staff records the effective dates."},
+    {"id": "loa-residency", "title": "Leave of Absence & Residency", "source": "Graduate School Handbook 2022-2023, pp. 52-55",
+     "tags": ["loa", "leave", "residency", "terms", "eligible", "eligibility", "maximum residence"],
+     "text": "A student who does not intend to enroll in a semester files a Leave of Absence in writing to the Dean, stating the reason and the period. A leave may be approved for one year (two semesters) and renewed for at most another year. No leave is granted within two weeks before the last day of classes, and a leave filed in the second half of a semester marks the enrolled courses W with no refund. The Dean approves the request; GS Staff records the effective dates. Maximum residence (master's 7 years, doctorate 9 years) includes time on leave of absence: the residency clock is not paused."},
     {"id": "readmission", "title": "Readmission of Returning Students", "source": "GS Research Protocol / Handbook",
      "tags": ["readmission", "return", "re-enroll", "comeback"],
      "text": "A returning student files for readmission with a return-intent letter, an updated study plan, a program/adviser endorsement, and clearance of any pending accountability. On approval the student is marked active for the return semester."},
@@ -4184,10 +4723,10 @@ POLICY_SNIPPETS = [
      "text": "Proposal defense readiness requires the Form 4 endorsement, the proposal manuscript, the adviser endorsement, Form 4.1 statistical consultation (quantitative) or a qualitative exemption, and an agreed schedule."},
     {"id": "panel", "title": "Panel Composition & Matching", "source": "GS Research Protocol — Panel",
      "tags": ["panel", "composition", "members", "chair", "external", "specialization"],
-     "text": "A thesis panel has a Chair, content and method specialists, and an external panel member; a dissertation panel adds a second content specialist. Panels are matched by specialization, availability, and current workload."},
+     "text": "A project paper panel has a Chair and 2 members (a content and a method specialist); a thesis panel has a Chair and 3 members (content, method and external); a dissertation panel has a Chair and 4 members (two content, a method and an external). Panels are matched by specialization, availability, and current workload."},
     {"id": "scheduling", "title": "Defense Scheduling & Lead Time", "source": "GS Research Protocol — Scheduling",
      "tags": ["schedule", "scheduling", "lead time", "defense date", "availability"],
-     "text": "A defense is confirmed only when the assigned panel is available on the chosen date and the required lead time is met (prototype: 14 days for proposal/final, 5 days for the public final). Otherwise the case waits for availability."},
+     "text": "A defense is confirmed only when the assigned panel is available on the chosen date and the required lead time is met: the title defense application, the proposal and the closed-door final defense endorsements are made at least 14 days (two weeks) before the defense, and the public final defense application 5 days before. Otherwise the case waits for availability."},
     {"id": "ethics", "title": "Ethics Review & Clearance", "source": "GS Research Protocol — Ethics (RERC)",
      "tags": ["ethics", "clearance", "rerc", "review"],
      "text": "Studies requiring ethics review submit for RERC clearance. Ethics clearance is recorded before data-collection and writing milestones proceed."},
@@ -4197,9 +4736,9 @@ POLICY_SNIPPETS = [
     {"id": "completion", "title": "Completion Evidence", "source": "GS Research Protocol — Completion",
      "tags": ["completion", "turnitin", "editor", "approval sheet", "form 9", "form 10", "similarity"],
      "text": "Completion requires the final manuscript, panel approval, ethics clearance, a Turnitin certificate (similarity not more than 15%), the Form 9 editor certification, and the Form 10 approval sheet."},
-    {"id": "withdrawal", "title": "Withdrawal", "source": "GS Handbook — Withdrawal",
-     "tags": ["withdrawal", "withdraw", "attrition", "drop out"],
-     "text": "A withdrawal request is routed for a Dean decision. On approval the case is closed with a recorded reason and monitoring stops."},
+    {"id": "withdrawal", "title": "Withdrawal", "source": "Graduate School Handbook 2022-2023, pp. 49-51",
+     "tags": ["withdrawal", "withdraw", "attrition", "drop out", "drop", "fees"],
+     "text": "A student may withdraw subjects until the end of the second week from the start of classes (14 calendar days), whether or not classes were attended. 10% of the term's total due is charged within the first week and 20% within the second week. After that a single subject cannot be withdrawn; the student may still withdraw all subjects but pays the full fees for the semester, or file a Leave of Absence. The request is approved by the Dean; the portal shows the fee consequence but does not compute payments."},
     {"id": "graduation", "title": "Graduation Endorsement", "source": "GS Handbook — Graduation",
      "tags": ["graduation", "endorsement", "candidate", "registrar"],
      "text": "Graduation endorsement checks coursework, research, practicum (if applicable), and clearance completion, then compiles the candidate endorsement list for Dean approval and registrar hand-off."},
@@ -4261,24 +4800,147 @@ def retrieve_policy(query: str, k: int = 3) -> list[dict]:
     return [sn for _, sn in scored[:k]]
 
 
+def loa_term_position_map() -> dict[int, int]:
+    return {term.id: index for index, term in enumerate(AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all())}
+
+
+def loa_period_semesters(period_text: str) -> int | None:
+    """Semesters covered by a 'start label to end label' period string, else None."""
+    match = re.search(r"^(.+?)\s+to\s+(.+?)$", (period_text or "").strip())
+    if not match:
+        return None
+    start_term = AcademicTerm.query.filter_by(label=match.group(1).strip()).first()
+    end_term = AcademicTerm.query.filter_by(label=match.group(2).strip().rstrip(".")).first()
+    if not start_term or not end_term:
+        return None
+    positions = loa_term_position_map()
+    return positions[end_term.id] - positions[start_term.id] + 1
+
+
+def prior_loa_semesters(student: Student) -> int:
+    """Semesters of leave the Dean already approved for this student (renewals count)."""
+    total = 0
+    approved_logs = (
+        TransactionLog.query.filter_by(
+            transaction_slug="leave-of-absence",
+            student_id=student.id,
+            result="LOA approved by Dean",
+        )
+        .order_by(TransactionLog.created_at.asc(), TransactionLog.id.asc())
+        .all()
+    )
+    for approved in approved_logs:
+        semesters = loa_period_semesters(
+            request_notes_value(approved.notes, "Requested semester period")
+        )
+        if semesters is None:
+            forwarded = (
+                TransactionLog.query.filter(
+                    TransactionLog.transaction_slug == "leave-of-absence",
+                    TransactionLog.student_id == student.id,
+                    TransactionLog.result == "LOA request forwarded to Dean",
+                    TransactionLog.id < approved.id,
+                )
+                .order_by(TransactionLog.id.desc())
+                .first()
+            )
+            semesters = loa_period_semesters(
+                request_notes_value(forwarded.notes, "Requested semester period") if forwarded else ""
+            )
+        total += max(semesters or 1, 1)
+    return total
+
+
+def loa_policy_citations() -> list[dict]:
+    """The LOA rule in plain words, built from the register so text and code agree."""
+    snippet = next((item for item in POLICY_SNIPPETS if item["id"] == "loa-residency"), {})
+    return [{
+        **snippet,
+        "source": rule_citation("loa.max_period_semesters"),
+        "text": (
+            "A student who does not intend to enroll in a semester files a Leave of Absence in "
+            "writing to the Dean, stating the reason and the period. The leave may be approved "
+            "for one year and renewed for at most another year. Register values in force: per "
+            f"request {rule_value('loa.max_period_semesters', 2)}, in total "
+            f"{rule_value('loa.max_total_semesters', 4)} (semesters, renewals included). No leave "
+            f"is granted within {rule_value('loa.no_filing_days_before_term_end', 14)} days before "
+            "the last day of classes, and a leave filed in the second half of a semester marks the "
+            "enrolled courses W with no refund. Time on leave counts toward maximum residence; the "
+            "residency clock is not paused."
+        ),
+    }]
+
+
+def loa_filing_check(start_term: AcademicTerm | None) -> dict:
+    """Is today a date on which a leave starting in this semester may be filed?"""
+    blackout = rule_value("loa.no_filing_days_before_term_end", 14)
+    source = rule_citation("loa.no_filing_days_before_term_end")
+    w_source = rule_citation("loa.second_half_marks_w")
+    if not start_term:
+        return {
+            "label": "Filing date",
+            "status": "Needs Review",
+            "detail": "A valid start semester is required to check the filing date.",
+        }
+    today = date.today()
+    if start_term.end_date < today:
+        return {
+            "label": "Filing date",
+            "status": "Fail",
+            "detail": f"The selected semester ended {start_term.end_date.isoformat()}; a leave cannot start in a semester that is over.",
+        }
+    if start_term.start_date > today:
+        return {
+            "label": "Filing date",
+            "status": "Pass",
+            "detail": f"The selected semester begins {start_term.start_date.isoformat()}.",
+        }
+    days_left = (start_term.end_date - today).days
+    if days_left <= blackout:
+        return {
+            "label": "Filing date",
+            "status": "Fail",
+            "detail": (
+                f"No leave of absence is granted within {blackout} days before the last day of "
+                f"classes ({start_term.end_date.isoformat()}); {days_left} day(s) remain "
+                f"({source})."
+            ),
+        }
+    term_length = max((start_term.end_date - start_term.start_date).days, 1)
+    if (today - start_term.start_date).days * 2 > term_length:
+        return {
+            "label": "Filing date",
+            "status": "Pass",
+            "detail": (
+                "Filed in the second half of the semester: the enrolled courses are marked W "
+                f"(withdrawn) and no refund of tuition and fees is given ({w_source})."
+            ),
+        }
+    return {
+        "label": "Filing date",
+        "status": "Pass",
+        "detail": f"Filed in the first half of the running semester, before the last {blackout} days ({source}).",
+    }
+
+
 def loa_policy_review(student: Student, request_data: dict | None = None) -> dict:
     request_data = request_data or {}
-    snippets = [item for item in POLICY_SNIPPETS if item["id"] == "loa-residency"]
-    prior_count = TransactionLog.query.filter_by(
-        transaction_slug="leave-of-absence",
-        student_id=student.id,
-        result="LOA approved by Dean",
-    ).count()
+    snippets = loa_policy_citations()
+    max_period = rule_value("loa.max_period_semesters", 2)
+    max_total = rule_value("loa.max_total_semesters", 4)
+    period_source = rule_citation("loa.max_period_semesters")
+    total_source = rule_citation("loa.max_total_semesters")
+    prior_semesters = prior_loa_semesters(student)
     reason_category = (request_data.get("reason_category") or "").strip()
     reason = (request_data.get("reason_remarks") or request_data.get("reason") or "").strip()
     effective_start = (request_data.get("effective_start") or "").strip()
     effective_end = (request_data.get("effective_end") or "").strip()
     application_reference = (request_data.get("application_reference") or request_data.get("source_reference") or request_data.get("attachment") or "").strip()
     completed_terms = max(0, int((date.today().year - (student.entry_year or date.today().year)) * 3))
+    min_completed = rule_value("loa.min_completed_semesters", 1)
     start_term = AcademicTerm.query.filter_by(label=effective_start).first() if effective_start else None
     end_term = AcademicTerm.query.filter_by(label=effective_end).first() if effective_end else None
-    ordered_terms = AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
-    term_positions = {term.id: index for index, term in enumerate(ordered_terms)}
+    term_positions = loa_term_position_map()
     duration = (
         term_positions[end_term.id] - term_positions[start_term.id] + 1
         if start_term and end_term else 0
@@ -4298,33 +4960,39 @@ def loa_policy_review(student: Student, request_data: dict | None = None) -> dic
         {
             "label": "Reason for leave",
             "status": "Present" if reason else "Needs Review",
-            "detail": reason or "Staff should confirm the student stated an approved reason.",
+            "detail": (
+                reason
+                or f"A leave is requested in writing with the reason and the period ({rule_citation('loa.written_request_required')}); staff should confirm the student stated a reason."
+            ),
         },
         {
             "label": "Effective period",
-            "status": "Pass" if start_term and end_term and 1 <= duration <= 2 else "Fail" if effective_start and effective_end else "Needs Review",
+            "status": "Pass" if start_term and end_term and 1 <= duration <= max_period else "Fail" if effective_start and effective_end else "Needs Review",
             "detail": (
-                f"{effective_start} to {effective_end} ({duration} semester(s)); allowed duration is one or two consecutive semesters."
+                f"{effective_start} to {effective_end} ({duration} semester(s)); a leave may be approved for up to {max_period} semester(s) at a time ({period_source})."
                 if start_term and end_term else "Start and end semesters are not both valid."
             ),
         },
         {
-            "label": "Future effective date",
-            "status": "Pass" if start_term and start_term.start_date > date.today() else "Fail" if start_term else "Needs Review",
+            "label": "Total leave",
+            "status": (
+                "Needs Review" if not duration
+                else "Pass" if prior_semesters + duration <= max_total else "Fail"
+            ),
             "detail": (
-                f"The selected semester begins {start_term.start_date.isoformat()}."
-                if start_term else "A valid future start semester is required."
+                f"{prior_semesters} semester(s) of leave already approved + {duration} requested = "
+                f"{prior_semesters + duration}. A leave may be renewed for at most another year, so "
+                f"all leave together cannot pass {max_total} semesters ({total_source})."
             ),
         },
-        {
-            "label": "Prior approved leaves",
-            "status": "Pass" if prior_count < 4 else "Fail",
-            "detail": f"{prior_count} prior approved LOA request(s) are recorded. The configured prototype maximum is 4; confirm the official rule value with the stakeholder.",
-        },
+        loa_filing_check(start_term),
         {
             "label": "Minimum residency",
-            "status": "Pass" if completed_terms >= 1 else "Needs Review",
-            "detail": f"Estimated completed residency: {completed_terms} semester(s) from entry year {student.entry_year}.",
+            "status": "Pass" if completed_terms >= min_completed else "Needs Review",
+            "detail": (
+                f"Estimated completed residency: {completed_terms} semester(s) from entry year {student.entry_year}; "
+                f"at least {min_completed} expected ({rule_citation('loa.min_completed_semesters')})."
+            ),
         },
     ]
     failed = [item for item in checks if item["status"] == "Fail"]
@@ -4432,7 +5100,7 @@ AWOL_RESIDENCY_CITATIONS = [
         "id": "gs-handbook-maximum-residence",
         "title": "Maximum residence",
         "source": "Graduate Programs Student Handbook 2022-2023, pp. 54-55",
-        "text": "Master's programs use a 5-year normal and 7-year absolute limit; doctoral programs use a 7-year normal and 9-year absolute limit. The two-year extension requires a graded 6-unit refresher course.",
+        "text": "Master's programs use a 5-year normal and 7-year absolute limit; doctoral programs use a 7-year normal and 9-year absolute limit. The two-year extension requires a graded 6-unit refresher course. The limits include time on leave of absence: the residency clock is not paused.",
     },
     {
         "id": "gs-handbook-residency-enrollment",
@@ -4691,14 +5359,20 @@ def latest_residency_enrollment(student_id: int, active_only: bool = False) -> R
 def residence_limits(student: Student) -> dict:
     program_name = (student.program.name or "").lower()
     doctoral = "doctor" in program_name or "phd" in program_name or student.program.code.upper() in {"DBA", "EDD", "PHD"}
-    normal = 7 if doctoral else 5
-    absolute = 9 if doctoral else 7
+    level = "doctorate" if doctoral else "master"
+    normal = rule_value(f"residency.{level}_normal_years", 7 if doctoral else 5)
+    absolute = rule_value(f"residency.{level}_absolute_years", 9 if doctoral else 7)
+    # The clock runs on calendar years since entry. Leave of absence is NOT
+    # subtracted: the handbook limits include time on leave (residency.includes_loa).
     years = max(0, date.today().year - int(student.entry_year or date.today().year))
     return {
         "program_level": "Doctorate" if doctoral else "Master's",
         "years_in_program": years,
         "normal_years": normal,
         "absolute_years": absolute,
+        "includes_loa": rule_value("residency.includes_loa", True),
+        "refresher_units": rule_value("residency.refresher_units", 6),
+        "citation": rule_citation(f"residency.{level}_absolute_years"),
     }
 
 
@@ -8797,6 +9471,16 @@ def register_routes(app: Flask) -> None:
                     "error": f"{curriculum_by_id[course_id].code} is already completed and cannot be checked as current."
                 }), 409
 
+        new_ids = requested_ids - set(active_by_course)
+        if active_by_course and new_ids:
+            adjustment_window = subject_adjustment_window(term)
+            if adjustment_window["closed"]:
+                codes = ", ".join(curriculum_by_id[item].code for item in sorted(new_ids))
+                return jsonify({
+                    "error": adjustment_window_message(codes, term, adjustment_window, False)
+                    + " Ask the Academic Coordinator to record it."
+                }), 409
+
         added = []
         for course_id in sorted(requested_ids - set(active_by_course)):
             course = curriculum_by_id[course_id]
@@ -8868,10 +9552,28 @@ def register_routes(app: Flask) -> None:
         ordered_terms = AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
         term_positions = {item.id: index for index, item in enumerate(ordered_terms)}
         duration = term_positions[end_term.id] - term_positions[start_term.id] + 1
-        if duration < 1 or duration > 2:
-            return jsonify({"error": "A Leave of Absence request may cover one or two consecutive semesters."}), 400
-        if start_term.start_date <= date.today():
-            return jsonify({"error": "The leave must begin next semester or later; it cannot start in a semester that has already begun."}), 400
+        max_period = rule_value("loa.max_period_semesters", 2)
+        if duration < 1 or duration > max_period:
+            return jsonify({
+                "error": (
+                    f"A Leave of Absence may be approved for up to {max_period} consecutive "
+                    f"semesters at a time ({rule_citation('loa.max_period_semesters')}); "
+                    "a renewal is filed as a new request."
+                )
+            }), 400
+        max_total = rule_value("loa.max_total_semesters", 4)
+        already_approved = prior_loa_semesters(student)
+        if already_approved + duration > max_total:
+            return jsonify({
+                "error": (
+                    f"{already_approved} semester(s) of leave were already approved and this request "
+                    f"adds {duration}. A leave may be renewed for at most another year, so all leave "
+                    f"together cannot pass {max_total} semesters ({rule_citation('loa.max_total_semesters')})."
+                )
+            }), 400
+        filing = loa_filing_check(start_term)
+        if filing["status"] == "Fail":
+            return jsonify({"error": filing["detail"]}), 400
         latest = (
             TransactionLog.query.filter_by(transaction_slug="leave-of-absence", student_id=student.id)
             .filter(TransactionLog.actor_role != "Demo Data")
@@ -8885,6 +9587,7 @@ def register_routes(app: Flask) -> None:
             "Student submitted a structured Leave of Absence application for staff eligibility review.",
             f"Requested period: {period}.",
             f"Requested duration: {duration} semester(s).",
+            f"Filing date check: {filing['detail']}",
             f"Reason category: {reason_category}.",
             f"Reason/remarks: {reason_details}.",
             "Application format: structured portal form; no RAG or document extraction used.",
@@ -9101,7 +9804,7 @@ def register_routes(app: Flask) -> None:
                 db.session.add(record)
             record.practicum_site = practicum_site
             record.supervisor_name = (data.get("supervisor_name") or record.supervisor_name or "").strip()
-            record.required_hours = record.required_hours or 200
+            record.required_hours = record.required_hours or practicum_required_hours()
             record.moa_attachment_id = moa_attachment.id
             record.moa_uploaded = True
             record.moa_status = "Uploaded"
@@ -9221,15 +9924,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Only an active enrolled subject can be withdrawn. Refresh and choose another subject."}), 400
         withdrawal_window = subject_withdrawal_window(subject_enrollment)
         if not withdrawal_window["eligible"]:
-            deadline = withdrawal_window.get("deadline")
-            deadline_text = f" The deadline was {deadline}." if deadline else ""
-            return jsonify({
-                "error": (
-                    "Penalty-free subject withdrawal is only available before "
-                    "classes begin or during the first seven calendar days of class."
-                    f"{deadline_text} Contact Graduate School staff if the semester dates are incorrect."
-                )
-            }), 409
+            return jsonify({"error": withdrawal_window_closed_message(withdrawal_window)}), 409
 
         previous_status = current.status if current else "Not Submitted"
         application = current if current and current.status in {"Returned", "Returned for Clarification"} else WithdrawalApplication(student_id=student.id)
@@ -9269,7 +9964,7 @@ def register_routes(app: Flask) -> None:
             f"Subject: {subject_enrollment.course.code if subject_enrollment.course else subject_enrollment.course_id}; "
             f"semester: {application.effective_term}. Reason: {application.reason or 'Not provided'}. "
             f"Eligibility: {withdrawal_window['status']} (deadline {withdrawal_window['deadline']}). "
-            "If approved, the subject is removed without an academic grade or penalty. "
+            f"Fee consequence: {withdrawal_window['fee_consequence']} "
             "No PDF attachment is required.",
             previous_status=previous_status,
             new_status=application.status,
@@ -9278,8 +9973,14 @@ def register_routes(app: Flask) -> None:
         return jsonify({
             "ok": True,
             "message": (
-                "Submitted within the penalty-free withdrawal window. Graduate "
-                "School staff will record and forward your subject request to the Dean."
+                f"Submitted within the withdrawal window ({withdrawal_window['status'].lower()}). "
+                "Graduate School staff will record and forward your subject request to the Dean. "
+                + (
+                    f"A charge of {withdrawal_window['fee_percent']}% of the term's total due applies "
+                    f"({withdrawal_window['rule_source']}); the Business Office settles it."
+                    if withdrawal_window.get("fee_percent") is not None
+                    else "The Business Office confirms any charge."
+                )
             ),
         })
 
@@ -10298,7 +10999,7 @@ def register_routes(app: Flask) -> None:
                 for course in Course.query.join(Program).order_by(Program.code, Course.code).all()
                 if course in monitoring_curriculum_courses(course.program)
             ],
-            "teaching_load_limit": FACULTY_TEACHING_LOAD_LIMIT,
+            "teaching_load_limit": faculty_teaching_load_limit(),
         })
 
     @app.route("/api/faculty/<int:faculty_id>")
@@ -11265,6 +11966,7 @@ def register_routes(app: Flask) -> None:
 
         final_ids = set(requested_ids)
         override_by_course: dict[int, list[str]] = {}
+        load_override_notes: list[str] = []
         move_enrollment_ids: set[int] = set()
         for conflict in preview["conflicts"]:
             resolution = resolutions.get(conflict["id"])
@@ -11280,6 +11982,8 @@ def register_routes(app: Flask) -> None:
                 override_by_course.setdefault(course_id, []).append(
                     f"{conflict['line']}: {resolution}"
                 )
+            elif resolution == "enroll_override":
+                load_override_notes.append(f"{conflict['line']}: {resolution}")
             elif resolution == "move_to_selected":
                 move_id = safe_int(conflict.get("other_enrollment_id"))
                 if move_id:
@@ -11360,7 +12064,9 @@ def register_routes(app: Flask) -> None:
                 course_id in existing_monitoring_ids
                 or (item and item.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES)
             )
-            override_notes = override_by_course.get(course_id, [])
+            override_notes = list(override_by_course.get(course_id, []))
+            if load_override_notes and course_id not in current_active:
+                override_notes.extend(load_override_notes)
             if not item:
                 item = SubjectEnrollment(
                     student_id=student.id,
@@ -11519,8 +12225,10 @@ def register_routes(app: Flask) -> None:
             return jsonify({
                 "error": (
                     "Only a dropped-subject status can be recorded here. "
-                    "Penalty-free withdrawal must be initiated by the student "
-                    "and completed through the Withdrawal workflow."
+                    "A withdrawal must be initiated by the student and completed through "
+                    "the Withdrawal workflow (allowed until "
+                    f"{_withdrawal_window_phrase(rule_value('withdrawal.window_days', 14))}; "
+                    f"{rule_citation('withdrawal.window_days')})."
                 )
             }), 400
         if enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
@@ -11528,6 +12236,31 @@ def register_routes(app: Flask) -> None:
                 "error": (
                     f"{enrollment.course.code if enrollment.course else 'This subject'} "
                     f"is already {enrollment.status}. Refresh before making another change."
+                )
+            }), 409
+        absence_limit = rule_value("dropping.absence_limit_percent", 20)
+        absence_rule = rule_citation("dropping.absence_limit_percent")
+        try:
+            absence_percent = float(str(data.get("unexcused_absence_percent") or "").strip())
+        except ValueError:
+            absence_percent = None
+        if absence_percent is None or absence_percent < 0 or absence_percent > 100:
+            return jsonify({
+                "error": (
+                    "Enter the student's unexcused absences as a percentage of the class hours "
+                    f"(0-100). A subject is dropped only when they exceed {absence_limit}% "
+                    f"({absence_rule})."
+                )
+            }), 400
+        if absence_percent <= absence_limit:
+            return jsonify({
+                "error": (
+                    f"A subject can only be dropped when unexcused absences are more than "
+                    f"{absence_limit}% of the class hours ({absence_rule}); "
+                    f"{absence_percent:g}% was entered. A student who wants to leave the "
+                    "subject earlier files a Subject Withdrawal instead (Withdrawal workflow), "
+                    f"which is allowed until {_withdrawal_window_phrase(rule_value('withdrawal.window_days', 14))} "
+                    f"({rule_citation('withdrawal.window_days')})."
                 )
             }), 409
         if len(note) < 3:
@@ -11579,6 +12312,7 @@ def register_routes(app: Flask) -> None:
         record.evidence_reference = source_reference
         record.remarks = (
             f"{new_status} effective {effective_date.isoformat()}. "
+            f"Unexcused absences {absence_percent:g}% (limit {absence_limit}%). "
             f"Academic Coordinator note: {note}"
         )
         record.updated_at = changed_at
@@ -11611,7 +12345,9 @@ def register_routes(app: Flask) -> None:
             f"{course.code} changed from {previous_status} to {new_status}",
             "Student",
             (
-                f"Effective {effective_date.isoformat()}. Coordinator note: {note}. "
+                f"Effective {effective_date.isoformat()}. Unexcused absences: "
+                f"{absence_percent:g}% of class hours, above the {absence_limit}% limit "
+                f"({absence_rule}). Coordinator note: {note}. "
                 "Official grade fields were unchanged."
             ),
             previous_status=previous_status,
@@ -12150,7 +12886,7 @@ def register_routes(app: Flask) -> None:
                             + provisional_loads.get(assigned.id, 0)
                             + assigned_units
                         )
-                        if projected_load > FACULTY_TEACHING_LOAD_LIMIT:
+                        if projected_load > faculty_teaching_load_limit():
                             return jsonify({
                                 "error": (
                                     f"{assigned.name} would reach {projected_load} units for {target_term.label}. "
@@ -13457,6 +14193,139 @@ def register_routes(app: Flask) -> None:
     def decision_support():
         return jsonify(portfolio_recommendations())
 
+    # ---- Business rules register ------------------------------------------
+    @app.route("/api/business-rules")
+    @require_api_login()
+    def business_rules_list():
+        process = (request.args.get("process") or "").strip() or None
+        if process and process not in BUSINESS_RULE_PROCESS_LABELS:
+            return jsonify({"error": "Unknown process."}), 400
+        try:
+            missing = BusinessRule.query.count() < len(BUSINESS_RULE_CATALOG)
+        except Exception:
+            db.session.rollback()
+            missing = True
+        if missing:
+            ensure_business_rules()  # first use after a database reset: seed the register
+        items = rules_for_process(process)
+        return jsonify({
+            "items": items,
+            "processes": [
+                {"key": key, "label": label} for key, label in BUSINESS_RULE_PROCESSES
+            ],
+            "summary": {
+                "total": len(items),
+                "enforced": sum(1 for item in items if item["enforced"]),
+                "documented_only": sum(1 for item in items if not item["enforced"]),
+                "needs_review": sum(1 for item in items if item["status"] == "needs_review"),
+            },
+            "can_edit": current_account().role in {"staff", "admin"},
+        })
+
+    @app.route("/api/business-rules/<int:rule_id>", methods=["PATCH"])
+    @require_api_login("staff")
+    def business_rule_update(rule_id: int):
+        rule = BusinessRule.query.get_or_404(rule_id)
+        data = request.get_json(silent=True) or {}
+        reason = str(data.get("reason") or "").strip()
+        if len(reason) < 3:
+            return jsonify({"error": "Give a reason for the change (who decided it and why)."}), 400
+        if len(reason) > 2000:
+            return jsonify({"error": "Keep the reason under 2,000 characters."}), 400
+        if "value" not in data:
+            return jsonify({"error": "Enter the new value."}), 400
+        raw_value = data.get("value")
+        try:
+            if rule.value_type == "text":
+                new_value = str(raw_value if raw_value is not None else "").strip()
+                if not new_value:
+                    raise ValueError("A value is required.")
+                if len(new_value) > 500:
+                    raise ValueError("Keep the value under 500 characters.")
+            else:
+                if isinstance(raw_value, bool) and rule.value_type != "bool":
+                    raise ValueError("Enter a number.")
+                typed = _coerce_rule_value(raw_value, rule.value_type)
+                if rule.value_type in {"int", "decimal"} and typed < 0:
+                    raise ValueError("The value cannot be negative.")
+                new_value = (
+                    "true" if typed is True else "false" if typed is False
+                    else str(typed)
+                )
+        except (TypeError, ValueError) as exc:
+            expected = {"int": "a whole number", "decimal": "a number", "bool": "true or false"}.get(rule.value_type, "text")
+            return jsonify({"error": f"{exc} This rule takes {expected}."}), 400
+
+        source_fields = {}
+        for field in ("source_title", "source_section", "source_page"):
+            if field in data:
+                source_fields[field] = (str(data.get(field) or "").strip() or None)
+        policy_document_id = rule.policy_document_id
+        if "policy_document_id" in data:
+            if data.get("policy_document_id") in (None, "", 0):
+                policy_document_id = None
+            else:
+                document = db.session.get(PolicyDocument, safe_int(data.get("policy_document_id")))
+                if not document:
+                    return jsonify({"error": "That policy document no longer exists."}), 400
+                policy_document_id = document.id
+        effective_date = date.today()
+        if data.get("effective_date"):
+            try:
+                effective_date = date.fromisoformat(str(data["effective_date"]))
+            except ValueError:
+                return jsonify({"error": "Use a valid effective date."}), 400
+        metadata_changed = (
+            any(getattr(rule, field) != value for field, value in source_fields.items())
+            or policy_document_id != rule.policy_document_id
+        )
+        if new_value == rule.value and not metadata_changed and rule.status == "active":
+            return jsonify({"error": "That is already the current value. Change the value or its source."}), 400
+
+        account = current_account()
+        old_value = rule.value
+        for field, value in source_fields.items():
+            setattr(rule, field, value)
+        rule.policy_document_id = policy_document_id
+        rule.value = new_value
+        rule.status = "active"
+        rule.effective_date = effective_date
+        rule.updated_by_user_id = account.id
+        rule.updated_at = now_utc()
+        db.session.add(BusinessRuleRevision(
+            rule_id=rule.id,
+            old_value=old_value,
+            new_value=new_value,
+            reason=reason,
+            changed_by_user_id=account.id,
+        ))
+        add_log(
+            "business-rules",
+            None,
+            workflow_actor_label(account),
+            "Business Rules register",
+            f"Business rule {rule.key} changed",
+            "Graduate School Staff",
+            (
+                f"{rule.key} ({rule.title}): {old_value} -> {new_value}"
+                f"{' ' + rule.unit if rule.unit else ''}. Reason: {reason}. "
+                f"Source: {_format_rule_citation(rule.source_title, rule.source_page)}."
+            ),
+        )
+        db.session.commit()
+        clear_business_rule_cache()
+        history = [
+            business_rule_revision_dict(item)
+            for item in BusinessRuleRevision.query.filter_by(rule_id=rule.id)
+            .order_by(BusinessRuleRevision.changed_at.desc(), BusinessRuleRevision.id.desc())
+            .limit(10)
+            .all()
+        ]
+        return jsonify({
+            "item": business_rule_dict(rule, history),
+            "message": f"{rule.title} was updated. The workflows use the new value from now on.",
+        })
+
     @app.route("/api/policy-documents")
     @require_api_login("staff")
     def policy_documents():
@@ -13540,6 +14409,8 @@ def register_routes(app: Flask) -> None:
             replace_policy_document_file(document, file_bytes, uploaded.filename, current_account(), values, note)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
+        flag_business_rules_for_policy_document(document.id)
+        db.session.commit()
         return jsonify({
             "item": policy_document_dict(document),
             "message": (
@@ -13554,6 +14425,7 @@ def register_routes(app: Flask) -> None:
         document = PolicyDocument.query.get_or_404(document_id)
         stored_names = {document.stored_name} | {row.stored_name for row in document.versions}
         title = document.title
+        flag_business_rules_for_policy_document(document.id, removed=True)
         db.session.delete(document)
         db.session.commit()
         for stored_name in stored_names:
@@ -14786,16 +15658,27 @@ def safe_int(value, default: int = 0) -> int:
         return default
 
 
-PRACTICUM_ELIGIBILITY_CONFIG = {
-    "unit_requirements": {"Basic": 6, "Major": 9, "Cognate": 6},
-    "total_units_required": 21,
-    "stage_requirements": [
-        {"key": "title", "label": "Title stage", "minimum_stage": "Proposal Development"},
-        {"key": "proposal", "label": "Proposal stage", "minimum_stage": "Data Collection"},
-        {"key": "ethics", "label": "Ethics clearance", "minimum_stage": "Data Collection"},
-        {"key": "final", "label": "Final stage", "minimum_stage": "Final Defense"},
-    ],
-}
+def practicum_eligibility_config() -> dict:
+    """Practicum eligibility thresholds; the unit and hour values come from the business-rules register."""
+    return {
+        "unit_requirements": {
+            "Basic": rule_value("practicum.required_units_basic", 6),
+            "Major": rule_value("practicum.required_units_major", 9),
+            "Cognate": rule_value("practicum.required_units_cognate", 6),
+        },
+        "total_units_required": rule_value("practicum.required_units_total", 21),
+        "required_hours": practicum_required_hours(),
+        "stage_requirements": [
+            {"key": "title", "label": "Title stage", "minimum_stage": "Proposal Development"},
+            {"key": "proposal", "label": "Proposal stage", "minimum_stage": "Data Collection"},
+            {"key": "ethics", "label": "Ethics clearance", "minimum_stage": "Data Collection"},
+            {"key": "final", "label": "Final stage", "minimum_stage": "Final Defense"},
+        ],
+    }
+
+
+def practicum_required_hours() -> int:
+    return rule_value("practicum.required_hours", 200)
 
 DEPLOYMENT_POLICY_QUESTIONS = [
     "What exact student data source will verify completed units?",
@@ -14855,7 +15738,7 @@ def practicum_eligibility(student: Student) -> dict:
 
     unit_values = {
         category: category_rows.get(category, {}).get("completed_units")
-        for category in PRACTICUM_ELIGIBILITY_CONFIG["unit_requirements"]
+        for category in practicum_eligibility_config()["unit_requirements"]
     }
     total = audit.get("completed_units", 0)
     checklist = [
@@ -14873,7 +15756,7 @@ def practicum_eligibility(student: Student) -> dict:
             ),
         )
     ]
-    for category, required in PRACTICUM_ELIGIBILITY_CONFIG["unit_requirements"].items():
+    for category, required in practicum_eligibility_config()["unit_requirements"].items():
         actual = unit_values[category]
         checklist.append(eligibility_item(
             category.lower(),
@@ -14884,7 +15767,7 @@ def practicum_eligibility(student: Student) -> dict:
             f"course_audit.by_category.{category}",
             "Curriculum category is not present in the encoded program." if actual is None else "",
         ))
-    total_required = PRACTICUM_ELIGIBILITY_CONFIG["total_units_required"]
+    total_required = practicum_eligibility_config()["total_units_required"]
     checklist.append(eligibility_item(
         "total",
         "Total units completed",
@@ -14895,7 +15778,7 @@ def practicum_eligibility(student: Student) -> dict:
         "No encoded curriculum is available for verification." if not audit.get("required_count") else "",
     ))
     stage_results = {}
-    for rule in PRACTICUM_ELIGIBILITY_CONFIG["stage_requirements"]:
+    for rule in practicum_eligibility_config()["stage_requirements"]:
         passed = stage_evidence[rule["key"]]
         if not passed and stage_known:
             passed = stage_index >= STAGES.index(rule["minimum_stage"])
@@ -14934,7 +15817,7 @@ def practicum_eligibility(student: Student) -> dict:
         "ethics_completed": stage_results["ethics"],
         "final_completed": stage_results["final"],
         "needs_verification": needs_verification,
-        "config": PRACTICUM_ELIGIBILITY_CONFIG,
+        "config": practicum_eligibility_config(),
         "checklist": checklist,
     }
 
@@ -15003,7 +15886,7 @@ def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: S
             )
     record.certificate_count = detected_practicum_certificate_count(record)
     if record.required_hours == 0:
-        record.required_hours = 200
+        record.required_hours = practicum_required_hours()
     record.updated_at = now_utc()
 
 
@@ -15061,7 +15944,7 @@ def withdrawal_notes(application: WithdrawalApplication) -> str:
         f"withdrawal window: {window['status'] if window else 'Not verified'}; "
         f"Dean decision: {application.dean_decision}; "
         f"Registrar: {application.registrar_status}; reference: {application.registrar_reference or 'Pending'}; "
-        "academic record effect: no grade or academic penalty."
+        f"fee consequence: {window['fee_consequence'] if window else 'Not verified'}"
     )
 
 
@@ -15078,8 +15961,8 @@ def approved_withdrawal_applications(application_ids: list[int] | None = None) -
     return query.order_by(WithdrawalApplication.decided_at.asc(), WithdrawalApplication.id.asc()).all()
 
 
-def apply_penalty_free_subject_withdrawal(application: WithdrawalApplication) -> None:
-    """Close one approved subject enrollment without adding an academic mark."""
+def apply_approved_subject_withdrawal(application: WithdrawalApplication) -> None:
+    """Close one approved subject enrollment (the Registrar applies any grade mark)."""
     enrollment = application.subject_enrollment
     if not enrollment or not enrollment.course or not enrollment.term:
         raise ValueError("This withdrawal request is not linked to a valid subject enrollment.")
@@ -15093,10 +15976,11 @@ def apply_penalty_free_subject_withdrawal(application: WithdrawalApplication) ->
     )
     changed_at = now_utc()
     enrollment.status = "Withdrawn"
-    enrollment.source_reference = "Approved early subject withdrawal - no academic record"
+    enrollment.source_reference = "Approved subject withdrawal"
     enrollment.status_note = (
-        "Approved before classes or during the first week. Retained in the "
-        "workflow audit only; no academic grade, penalty, or transcript mark."
+        "Approved within the withdrawal window. Retained in the workflow audit; "
+        "the fee consequence is settled with the Business Office and any grade mark "
+        "is applied by the Registrar."
     )
     enrollment.status_changed_at = changed_at
     enrollment.cancelled_at = datetime.combine(effective_date, time.min)
@@ -15135,7 +16019,7 @@ def apply_penalty_free_subject_withdrawal(application: WithdrawalApplication) ->
         ).first()
         if term_enrollment:
             term_enrollment.status = "Confirmed"
-            term_enrollment.source_reference = "Penalty-free subject withdrawal"
+            term_enrollment.source_reference = "Approved subject withdrawal"
             term_enrollment.confirmed_at = changed_at
         if application.student.enrollment_tag == "Enrolled":
             application.student.enrollment_tag = "Not Enrolled"
@@ -15149,18 +16033,18 @@ def withdrawal_registrar_workbook(applications: list[WithdrawalApplication]) -> 
     sheet.title = "Approved Withdrawals"
     sheet.freeze_panes = "A4"
 
-    sheet.merge_cells("A1:P1")
+    sheet.merge_cells("A1:R1")
     title = sheet["A1"]
     title.value = "USLS Graduate School Approved Subject Withdrawals"
     title.font = Font(name="Arial", size=14, bold=True, color="FFFFFF")
     title.fill = PatternFill("solid", fgColor="166534")
     title.alignment = Alignment(horizontal="center")
 
-    sheet.merge_cells("A2:P2")
+    sheet.merge_cells("A2:R2")
     note = sheet["A2"]
     note.value = (
-        "Registrar action list. Each request was submitted before classes began "
-        "or within the first seven calendar days and carries no academic grade or penalty."
+        "Registrar action list. " + withdrawal_policy_statement() + " The fee columns are "
+        "information for the Business Office; the portal does not compute payments."
     )
     note.font = Font(name="Arial", size=10, italic=True, color="475569")
     note.alignment = Alignment(wrap_text=True)
@@ -15182,6 +16066,8 @@ def withdrawal_registrar_workbook(applications: list[WithdrawalApplication]) -> 
         "Registrar Action",
         "Academic Record Effect",
         "GS Status",
+        "Fee Tier When Filed",
+        "Fee Charge % of Term Total (information only)",
     ]
     header_fill = PatternFill("solid", fgColor="DCFCE7")
     for column, value in enumerate(headers, 1):
@@ -15211,8 +16097,10 @@ def withdrawal_registrar_workbook(applications: list[WithdrawalApplication]) -> 
             application.decided_at.date() if application.decided_at else "",
             application.reason or "",
             "Confirm subject withdrawal (already tagged Withdrawn)",
-            "No academic record / no grade impact",
+            WITHDRAWAL_RECORD_EFFECT,
             application.registrar_status,
+            window.get("fee_tier") or "",
+            window["fee_percent"] if window.get("fee_percent") is not None else "",
         ]
         for column, value in enumerate(values, 1):
             cell = sheet.cell(row=row_index, column=column, value=value)
@@ -15221,10 +16109,10 @@ def withdrawal_registrar_workbook(applications: list[WithdrawalApplication]) -> 
             if isinstance(value, date):
                 cell.number_format = "yyyy-mm-dd"
 
-    widths = [15, 16, 28, 12, 16, 34, 8, 30, 16, 19, 15, 18, 38, 24, 31, 25]
+    widths = [15, 16, 28, 12, 16, 34, 8, 30, 16, 19, 15, 18, 38, 24, 31, 25, 20, 30]
     for index, width in enumerate(widths, 1):
         sheet.column_dimensions[chr(64 + index)].width = width
-    sheet.auto_filter.ref = f"A3:P{max(sheet.max_row, 3)}"
+    sheet.auto_filter.ref = f"A3:R{max(sheet.max_row, 3)}"
 
     output = io.BytesIO()
     workbook.save(output)
@@ -17229,6 +18117,7 @@ ACCESS_CONTROL_SPEC = [
     ("Built-in policy file view", "system_policy_document_file", {"staff"}),
     ("Policy retrieval test", "policy_document_test_question", {"staff"}),
     ("Policy assistant (any signed-in role)", "assistant", set()),
+    ("Business rule change", "business_rule_update", {"staff"}),
     ("Curriculum version tagging", "enrollment_curriculum_tag", {"staff", "academic_coordinator"}),
     ("Study plan drafts", "enrollment_study_plans", {"staff", "academic_coordinator"}),
     ("Dean workflow decision", "workflow_approval_decide", {"dean"}),
@@ -17839,7 +18728,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         "message_recipients": list(WORKFLOW_RECIPIENTS),
         "deployment_policy_questions": DEPLOYMENT_POLICY_QUESTIONS,
         "practicum_program_scope": practicum_program_scope(),
-        "eligibility_config": PRACTICUM_ELIGIBILITY_CONFIG,
+        "eligibility_config": practicum_eligibility_config(),
         "gate_requirements": {
             gate: required_documents_for_gate(gate)
             for gate in [
@@ -20882,7 +21771,7 @@ def handle_withdrawal(data: MultiDict) -> int:
             raise ValueError(
                 "The Dean must approve this request before GS Staff can tag the selected subject as Withdrawn."
             )
-        apply_penalty_free_subject_withdrawal(application)
+        apply_approved_subject_withdrawal(application)
         application.status = "Subject Tagged - Registrar Preparation"
         application.registrar_status = "Pending Excel Export"
         application.completed_at = None
@@ -24014,23 +24903,31 @@ def research_case_type(student: Student) -> str:
 def panel_roles_for_student(student: Student) -> list[str]:
     # Required roles are derived from the case type, then used by panel matching
     # and defense scheduling.
+    # The panel size per case type comes from the business-rules register
+    # (Graduate School Handbook 2022-2023, p. 60); roles are taken in this order.
     case_type = research_case_type(student)
-    if case_type == "Project Paper":
-        # Research Protocol: Project Paper = 1 Panel Chair and 2 members
-        # (1 Content Specialist, 1 Method Specialist); no external panelist.
-        return ["Panel Chair", "Content Specialist", "Method Specialist"]
     if case_type == "Dissertation":
-        return ["Panel Chair", "Content Specialist 1", "Content Specialist 2", "Method Specialist", "External Panel"]
-    return ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
+        roles = ["Panel Chair", "Content Specialist 1", "Content Specialist 2", "Method Specialist", "External Panel"]
+        size = rule_value("defense.panel_size_dissertation", 5)
+    elif case_type == "Project Paper":
+        roles = ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
+        size = rule_value("defense.panel_size_project_paper", 3)
+    else:
+        roles = ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]
+        size = rule_value("defense.panel_size_thesis", 4)
+    return roles[:max(size, 1)]
 
 
 def defense_lead_days(defense_type: str) -> int:
-    # Lead-time rule used by scheduling confirmation.
+    # Lead-time rule used by scheduling confirmation; values come from the
+    # business-rules register (Graduate School Research Protocol).
     if defense_type == "Title Defense":
-        return 0
+        return rule_value("defense.title_lead_days", 14)
     if defense_type == "Public Final Defense":
-        return 5
-    return 14
+        return rule_value("defense.public_final_lead_days", 5)
+    if defense_type == "Proposal Defense":
+        return rule_value("defense.proposal_lead_days", 14)
+    return rule_value("defense.final_lead_days", 14)
 
 
 def earliest_defense_date(defense_type: str, reference_date: date | None = None) -> date:
@@ -24310,9 +25207,6 @@ def curriculum_planning_payload(program: Program, term: AcademicTerm | None = No
     }
 
 
-FACULTY_TEACHING_LOAD_LIMIT = 24
-
-
 def faculty_preferred_course_ids(faculty: Faculty) -> list[int]:
     return [
         item.course_id
@@ -24350,7 +25244,7 @@ def faculty_candidates_for_course(
     for faculty in Faculty.query.filter_by(college=course.program.college, active=True).all():
         load = faculty_teaching_load_units(faculty, term, exclude_plan_id)
         has_availability = any(row["enabled"] for row in faculty_working_hours(faculty))
-        if not has_availability or load + required_units > FACULTY_TEACHING_LOAD_LIMIT:
+        if not has_availability or load + required_units > faculty_teaching_load_limit():
             continue
         preferred_ids = faculty_preferred_course_ids(faculty)
         candidates.append({
@@ -24378,7 +25272,7 @@ def automatic_faculty_assignment(
     eligible = [
         row for row in candidates
         if row["current_load"] + provisional_loads.get(row["faculty"].id, 0) + units
-        <= FACULTY_TEACHING_LOAD_LIMIT
+        <= faculty_teaching_load_limit()
     ]
     if not eligible:
         return None
@@ -27092,6 +27986,7 @@ def seed_database(count: int = 350) -> None:
     import_program_monitoring_sheets()
     ensure_practicum_program_policy()
     db.session.commit()
+    ensure_business_rules()
 
     seed_maed_personas()
     ensure_panel_matching_demo_data()
@@ -27615,7 +28510,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             record.grade_value = None
             record.term_label = active_term.label if is_active_course and active_term else None
             record.evidence_reference = (
-                "Approved early subject withdrawal; no academic record or grade impact."
+                "Approved subject withdrawal."
                 if is_withdrawn_course
                 else "Withdrawal demo active enrollment"
                 if is_active_course
@@ -27693,7 +28588,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
                 is_withdrawn_course = active_course.id == withdrawn_course_id
                 enrollment.status = "Withdrawn" if is_withdrawn_course else "Enrolled"
                 enrollment.status_note = (
-                    "Approved early subject withdrawal; no academic record or grade impact."
+                    "Approved subject withdrawal."
                     if is_withdrawn_course
                     else None
                 )
@@ -28005,7 +28900,7 @@ def normalize_withdrawal_workflow_states() -> int:
             application.subject_enrollment.status = "Withdrawn"
             application.subject_enrollment.status_note = (
                 application.subject_enrollment.status_note
-                or "Approved early subject withdrawal; no academic record or grade impact."
+                or "Approved subject withdrawal."
             )
             record = CourseRecord.query.filter_by(
                 student_id=application.student_id,
@@ -28388,6 +29283,7 @@ with app.app_context():
     ensure_practicum_program_policy()
     ensure_course_year_consistency()
     ensure_delay_status_consistency()
+    ensure_business_rules()
     # Demo data for Panel Matching must never block startup.
     try:
         ensure_faculty_expertise_schema()
@@ -28433,6 +29329,7 @@ def run_startup_tasks(seed_count: int | None = None) -> dict:
     db.create_all()
     if Student.query.count() == 0 and seed_count > 0:
         seed_database(seed_count)
+    ensure_business_rules()
     ensure_demo_accounts()
     if demo_mode_enabled():
         ensure_panel_matching_demo_data()  # fabricated availability windows: demo data only

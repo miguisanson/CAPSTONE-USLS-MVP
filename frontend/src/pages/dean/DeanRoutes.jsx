@@ -3,6 +3,7 @@ import { DeanProvider } from "./DeanContext";
 import { DeanCasePage, DeanDashboard, DeanProcessPage, DeanQueue } from "./DeanPages";
 import { DeanGraduationPage } from "./DeanGraduationPage";
 import { DeanAnalyticsPage, DeanAssistantPage, DeanGateReportsPage, DeanHistoryPage } from "./DeanReportPages";
+import BusinessRules from "../BusinessRules";
 
 // Dean portal routes. Mounted at /dean/* inside the shared Layout shell; the
 // provider wraps the Layout (see App.jsx) so the sidebar can show pending counts.
@@ -14,7 +15,7 @@ export function DeanRoutes() {
       <Route path="approvals/graduation" element={<DeanGraduationPage />} />
       <Route path="approvals/:process" element={<DeanProcessPage />} />
       <Route path="case/:type/:id" element={<DeanCasePage />} />
-      {/* NAV SLOT: a Business Rules page can be mounted here, e.g. <Route path="business-rules" ... /> */}
+      <Route path="business-rules" element={<BusinessRules />} />
       <Route path="gate-reports" element={<DeanGateReportsPage />} />
       <Route path="analytics" element={<DeanAnalyticsPage />} />
       <Route path="activity" element={<DeanHistoryPage />} />

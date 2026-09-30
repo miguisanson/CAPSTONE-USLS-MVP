@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Assistant from "../Assistant";
+import BusinessRules from "../BusinessRules";
 import { FacultyGate, FacultyProvider } from "./FacultyContext";
 import {
   FacultyAdviseesPage,
@@ -28,6 +29,7 @@ export function FacultyRoutes() {
         <Route path="classes" element={<FacultyClassesPage />} />
         <Route path="availability" element={<FacultyAvailabilityPage />} />
         <Route path="assistant" element={<Assistant policyOnly />} />
+        <Route path="business-rules" element={<BusinessRules />} />
         <Route path="*" element={<Navigate to="/faculty-portal" replace />} />
       </Routes>
     </FacultyGate>

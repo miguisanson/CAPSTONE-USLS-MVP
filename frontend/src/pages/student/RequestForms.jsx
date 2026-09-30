@@ -284,9 +284,9 @@ export function WithdrawalRequestForm({ data, onSaved }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current subject withdrawal stage</p><p className="mt-1 text-xs text-slate-500">This process applies to one subject only and never changes your active program standing.</p></div><StatusBadge value={status} dot={false} /></div></div>
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-        <p className="font-semibold">Penalty-free withdrawal window</p>
-        <p className="mt-1 text-xs leading-relaxed text-emerald-800">You may withdraw before classes begin or during the first seven calendar days of class. Once approved and forwarded, the subject carries no grade, academic penalty, or transcript mark.</p>
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <p className="font-semibold">When you can withdraw a subject</p>
+        <p className="mt-1 text-xs leading-relaxed text-amber-900">{(selectedSubject || activeSubjects[0])?.withdrawal_window?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of the term's total is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
       </div>
       <StageCard number={1} title="Send Withdrawal Request" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}>
         {applicationEditable ? (
@@ -313,7 +313,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
                   <CalendarClock className={`mt-0.5 h-5 w-5 shrink-0 ${selectedSubject.withdrawal_eligible ? "text-emerald-700" : "text-red-700"}`} aria-hidden="true" />
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider">
-                      {selectedSubject.withdrawal_eligible ? "Penalty-free withdrawal deadline" : "Withdrawal availability"}
+                      {selectedSubject.withdrawal_eligible ? "Withdrawal deadline" : "Withdrawal availability"}
                     </p>
                     <p className="mt-1 text-lg font-extrabold leading-tight">
                       {selectedSubject.withdrawal_eligible
@@ -326,10 +326,12 @@ export function WithdrawalRequestForm({ data, onSaved }) {
                         ? ` · Classes begin ${formatDate(selectedSubject.withdrawal_window.term_start_date)}`
                         : ""}
                     </p>
+                    {selectedSubject.withdrawal_window.fee_consequence && <p className="mt-2 text-xs font-semibold">Fee: {selectedSubject.withdrawal_window.fee_consequence}</p>}
+                    {selectedSubject.withdrawal_window.rule_source && <p className="mt-1 text-[11px] opacity-80">Rule: {selectedSubject.withdrawal_window.rule_source}</p>}
                   </div>
                 </div>
               )}
-              {!eligibleSubjects.length && <p role="alert" className="mt-2 text-xs font-semibold text-amber-700">No active subject is currently inside the penalty-free withdrawal window. Contact Graduate School staff if the recorded semester dates are incorrect.</p>}
+              {!eligibleSubjects.length && <p role="alert" className="mt-2 text-xs font-semibold text-amber-700">No active subject is currently inside the withdrawal window (until the end of the second week of classes). Contact Graduate School staff if the recorded semester dates are incorrect.</p>}
             </Field>
             <Field label="Reason for withdrawing from this subject" required>
               <Textarea value={form.reason} onChange={set("reason")} required />
@@ -339,7 +341,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               error={error}
               message={message}
               disabled={!form.subject_enrollment_id || !selectedSubject?.withdrawal_eligible}
-              disabledHint={!eligibleSubjects.length ? "No subject is currently eligible for penalty-free withdrawal." : !form.subject_enrollment_id ? "Choose an eligible enrolled subject before submitting." : ""}
+              disabledHint={!eligibleSubjects.length ? "No subject is currently inside the withdrawal window." : !form.subject_enrollment_id ? "Choose an eligible enrolled subject before submitting." : ""}
               label={returned ? "Resubmit subject withdrawal" : "Send withdrawal request"}
             />
           </div>
@@ -352,7 +354,8 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider">Eligibility recorded at submission</p>
                 <p className="mt-1 text-base font-extrabold">Eligible until {formatDate(existing?.withdrawal_window?.deadline)}</p>
-                <p className="mt-1 text-xs font-semibold text-emerald-800">{existing?.withdrawal_window?.status || "Penalty-free eligibility recorded"}</p>
+                <p className="mt-1 text-xs font-semibold text-emerald-800">{existing?.withdrawal_window?.status || "Eligibility recorded"}</p>
+                {existing?.withdrawal_window?.fee_consequence && <p className="mt-1 text-xs text-emerald-900">Fee: {existing.withdrawal_window.fee_consequence}</p>}
               </div>
             </div>
             <p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>
@@ -361,7 +364,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
       </StageCard>
       <StageCard number={2} title="GS Staff Forwards Request to Dean" state={status === "Submitted to GS Staff" ? "pending" : staffForwarded || denied ? "complete" : returned ? "returned" : "locked"} helper={status === "Submitted to GS Staff" ? "Graduate School staff is recording your structured request and forwarding it to the Dean." : staffForwarded || denied ? "Graduate School staff forwarded the request to the Dean." : "Available after Step 1 is submitted."} />
       <StageCard number={3} title="Dean Reviews Request" state={denied ? "rejected" : deanPending ? "pending" : deanApproved ? "complete" : "locked"} helper={denied ? "The Dean denied this request. The subject remains enrolled and your record is unchanged." : deanPending ? "The Dean is reviewing the selected subject, request date, and eligibility window." : deanApproved ? "The Dean approved the request and returned it to Graduate School staff for subject tagging." : "Available after GS Staff forwards the request."} />
-      <StageCard number={4} title="GS Staff Tags Subject as Withdrawn" state={subjectTagged ? "complete" : deanApproved ? "pending" : "locked"} helper={subjectTagged ? `${existing?.subject?.course_code || "The selected subject"} now shows Withdrawn in Official Offered Subjects, with no grade or academic penalty. Your other subjects and active program standing remain unchanged.` : deanApproved ? "Graduate School staff must tag you as Withdrawn from the selected subject before any Registrar Excel list can be prepared." : denied ? "This step does not open for a denied request." : "Available after Dean approval."} />
+      <StageCard number={4} title="GS Staff Tags Subject as Withdrawn" state={subjectTagged ? "complete" : deanApproved ? "pending" : "locked"} helper={subjectTagged ? `${existing?.subject?.course_code || "The selected subject"} now shows Withdrawn in Official Offered Subjects. Any fee is settled with the Business Office and any grade mark is applied by the Registrar. Your other subjects and active program standing remain unchanged.` : deanApproved ? "Graduate School staff must tag you as Withdrawn from the selected subject before any Registrar Excel list can be prepared." : denied ? "This step does not open for a denied request." : "Available after Dean approval."} />
       <StageCard number={5} title="GS Staff Exports Approved Excel List" state={excelReady ? "complete" : subjectTagged ? "pending" : "locked"} helper={excelReady ? "Your tagged withdrawal was included in the Excel list for the Registrar." : subjectTagged ? "The official subject status is updated, so Graduate School staff can now prepare the Excel list." : "Available after GS Staff tags the selected subject as Withdrawn."} />
       <StageCard number={6} title="GS Staff Emails Update and Waits for Acknowledgement" state={registrarAcknowledged ? "complete" : excelReady ? "pending" : "locked"} helper={registrarAcknowledged ? "Registrar acknowledgement was recorded." : excelReady ? "Graduate School staff must email the downloaded Excel list through the official channel and wait for the Registrar's acknowledgement. The portal does not send this email." : "Available after the approved list is exported."} />
       {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} />}

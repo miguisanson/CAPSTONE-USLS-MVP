@@ -26,7 +26,7 @@ const REQUEST_LABELS = {
   "course-audit": "Course Audit",
 };
 
-// Dates the student should not miss: open tasks and the penalty-free
+// Dates the student should not miss: open tasks and the subject
 // withdrawal window of each subject they are still enrolled in.
 function collectDeadlines(data) {
   const rows = [];
@@ -37,7 +37,7 @@ function collectDeadlines(data) {
     if (item.withdrawal_eligible && item.withdrawal_window?.deadline) {
       rows.push({
         key: `withdraw-${item.id}`,
-        label: `Penalty-free withdrawal window closes: ${item.course_code}`,
+        label: `Subject withdrawal window closes: ${item.course_code}`,
         date: item.withdrawal_window.deadline,
         meta: item.term_label,
         overdue: false,

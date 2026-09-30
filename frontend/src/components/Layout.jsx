@@ -28,6 +28,7 @@ import {
   CalendarRange,
   BookPlus,
   LibraryBig,
+  Scale,
 } from "lucide-react";
 import { useAuth } from "../auth";
 import { api } from "../api";
@@ -83,6 +84,7 @@ const NAV_GROUPS = [
       { to: "/decision-support", label: "Recommendations", icon: Lightbulb },
       { to: "/assistant", label: "Policy Assistant", icon: Bot },
       { to: "/policy-documents", label: "Policy Documents", icon: LibraryBig, roles: ["staff", "admin"] },
+      { to: "/business-rules", label: "Business Rules", icon: Scale },
     ],
   },
 ];
@@ -98,8 +100,8 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant"]),
-  research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant"]),
+  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
+  research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
 };
 
 function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {

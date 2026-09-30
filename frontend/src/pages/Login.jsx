@@ -68,7 +68,7 @@ const STANDALONE_STUDENT_DEMOS = [
   {
     workflow: "withdrawal",
     title: "Withdrawal",
-    description: "Active subject enrollment; ready to apply before classes or during the first week.",
+    description: "Active subject enrollment; can withdraw a subject until the end of the second week of classes.",
     icon: LogOut,
   },
 ];

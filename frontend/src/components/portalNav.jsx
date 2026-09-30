@@ -101,8 +101,7 @@ export const DEAN_NAV_GROUPS = [
       { to: "/dean/analytics", label: "Reports & Analytics", icon: BarChart3 },
       { to: "/dean/activity", label: "Decision History", icon: Activity },
       { to: "/dean/assistant", label: "Policy Assistant", icon: Bot },
-      // NAV SLOT: the Business Rules page (added by another packet) belongs here,
-      // e.g. { to: "/business-rules", label: "Business Rules", icon: Scale }.
+      { to: "/dean/business-rules", label: "Business Rules", icon: Scale },
     ],
   },
 ];
@@ -133,7 +132,7 @@ export const FACULTY_NAV_GROUPS = [
     label: "Support",
     items: [
       { to: "/faculty-portal/assistant", label: "Policy Assistant", icon: Bot },
-      // NAV SLOT: Business Rules for faculty can be added here.
+      { to: "/faculty-portal/business-rules", label: "Business Rules", icon: BookOpenCheck },
     ],
   },
 ];

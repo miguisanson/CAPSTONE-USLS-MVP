@@ -18,6 +18,19 @@ import { Card, PageHeader, SectionTitle, StatusBadge } from "../../components/ui
 import { useStudentPortal } from "./StudentPortalContext";
 import { STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel } from "./shared";
 import { ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
+import PolicyRules from "../../components/PolicyRules";
+
+// Which business-rules process each request page applies (shown as "Rules applied").
+const STUDENT_RULE_PROCESS_BY_VIEW = {
+  research: "research",
+  loa: "loa",
+  readmission: "readmission",
+  awol: "awol_residency",
+  withdrawal: "withdrawal",
+  practicum: "practicum",
+  graduation: "graduation",
+  schedule: "defense",
+};
 import { AwolReturnRequestForm, LoaRequestForm, ReadmissionRequestForm, WithdrawalRequestForm } from "./RequestForms";
 import { GraduationRequestForm, PracticumRequestForm } from "./CompletionForms";
 import { SchedulePanel } from "./Panels";
@@ -56,7 +69,7 @@ const REQUEST_PAGES = {
   },
   withdrawal: {
     title: "Subject Withdrawal",
-    description: "Withdraw from one enrolled subject inside the penalty-free window. It never changes your program standing.",
+    description: "Withdraw from one enrolled subject until the end of the second week of classes (fees apply). It never changes your program standing.",
     icon: LogOut,
     render: (data, onSaved) => <WithdrawalRequestForm data={data} onSaved={onSaved} />,
   },
@@ -122,6 +135,7 @@ export function StudentRequestPage({ id, aside = null }) {
       {aside}
       <Card className="p-4 sm:p-6">
         {messageSlug && <StudentClarificationPanel slug={messageSlug} data={data} onSaved={refetch} />}
+        {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} className="mb-4" defaultOpen={id === "withdrawal"} />}
         {locked ? (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
