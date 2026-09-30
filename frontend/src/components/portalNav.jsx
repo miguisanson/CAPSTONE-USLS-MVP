@@ -127,7 +127,13 @@ export const FACULTY_NAV_GROUPS = [
     items: [
       { to: "/faculty-portal/classes", label: "Assigned Classes", icon: BookOpenCheck },
       { to: "/faculty-portal/availability", label: "Availability & Calendar", icon: CalendarCheck },
-      // NAV SLOT: Policy Assistant / Business Rules for faculty can be added here.
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { to: "/faculty-portal/assistant", label: "Policy Assistant", icon: Bot },
+      // NAV SLOT: Business Rules for faculty can be added here.
     ],
   },
 ];

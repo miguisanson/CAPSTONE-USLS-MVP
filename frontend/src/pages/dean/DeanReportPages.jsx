@@ -219,9 +219,7 @@ function DeanHistoryBody() {
 }
 
 // ------------------------------------------------------------------ Policy assistant
-// The assistant page is shared with the staff view. Dean access to the assistant
-// endpoints is being opened by a separate change; until then this page shows the
-// endpoint's own "cannot access" message inside the chat.
+// The assistant page is shared with the staff view; the Dean gets policy answers only.
 export function DeanAssistantPage() {
-  return <Assistant />;
+  return <Assistant policyOnly />;
 }

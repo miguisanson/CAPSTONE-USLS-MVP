@@ -12,6 +12,9 @@ from openpyxl import load_workbook
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+# Never write into the committed seed library (uploads/policy_documents/) or the real RAG index.
+os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
+os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
     AcademicTerm,
@@ -1785,13 +1788,25 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
             "app.call_document_rag"
         ) as document_rag:
+            # Owner rule (B3, 2026-10-01): the document library is asked first for every
+            # policy question; the curated snippets are only a fallback.
+            document_rag.return_value = (
+                "Leave of absence and residency are covered by the handbook.",
+                [{
+                    "id": "loa-rule",
+                    "title": "Graduate School Handbook",
+                    "source": "handbook.pdf, p. 56",
+                    "text": "A request for a leave of absence shall be made in writing to the Dean.",
+                }],
+            )
             fast = client.post(
                 "/api/assistant",
                 json={"question": "Explain the LOA and residency rule."},
             )
             self.assertEqual(fast.status_code, 200, fast.get_json())
-            self.assertEqual(fast.get_json()["mode"], "policy-retrieval")
-            document_rag.assert_not_called()
+            self.assertEqual(fast.get_json()["mode"], "document-rag")
+            document_rag.assert_called_once()
+            document_rag.reset_mock()
 
             document_rag.return_value = (
                 "A student is allowed two retakes within the semester of enrollment.",

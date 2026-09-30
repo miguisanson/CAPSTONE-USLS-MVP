@@ -21,10 +21,11 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import quote_plus, urlencode, urlparse
+from time import monotonic as _monotonic
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from flask import Flask, Response, has_request_context, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, Response, has_app_context, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, inspect, or_, text
 from sqlalchemy import event as _sa_event
@@ -51,12 +52,18 @@ FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fronte
 UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "research_evidence"
 REQUEST_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "student_requests"
 MONITORING_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "monitoring_sheets"
-POLICY_DOCUMENT_UPLOAD_ROOT = Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "policy_documents"
+# Staff uploads live here. POLICY_DOCUMENT_UPLOAD_DIR lets a test run or a
+# deployment point somewhere else so nothing ever writes into the committed seed
+# library in uploads/policy_documents/.
+POLICY_DOCUMENT_UPLOAD_ROOT = Path(
+    os.getenv("POLICY_DOCUMENT_UPLOAD_DIR")
+    or (Path(os.path.dirname(os.path.abspath(__file__))) / "uploads" / "policy_documents")
+)
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+# Built-in policy library: the stakeholder documents committed with the project.
+# (Staff uploads are added on top of this list at run time, see _rag_document_sources.)
 RAG_DOCUMENT_PATHS = [
-    BASE_DIR / "data",
-    BASE_DIR / "Documents" / "USLS_Documents",
-    POLICY_DOCUMENT_UPLOAD_ROOT,
+    BASE_DIR / "Documents" / "CAPSTONE_ONLY" / "USLS_Documents",
 ]
 CONCEPT_PAPER_RAG_SOURCE = BASE_DIR / "Documents" / "RAG_Source" / "Concept_Paper"
 RAG_INDEX_DIR = Path(os.getenv("RAG_INDEX_DIR", str(BASE_DIR / ".rag_index")))
@@ -67,6 +74,10 @@ _RAG_INDEX_LOCK = threading.Lock()
 _RAG_VECTOR_LOCK = threading.Lock()
 _RAG_RESPONSE_CACHE: OrderedDict[tuple, tuple[str, list[dict]]] = OrderedDict()
 _RAG_RESPONSE_CACHE_LOCK = threading.Lock()
+_RAG_TERMS_CACHE: dict[int, list[str]] = {}
+_RAG_VECTOR_STATE: dict = {"path": None, "signature": None, "vectors": {}}
+_RAG_EMBED_COOLDOWN_UNTIL = 0.0
+_RAG_BACKGROUND_THREAD = None
 ASSISTANT_MAX_QUESTION_LENGTH = int(os.getenv("ASSISTANT_MAX_QUESTION_LENGTH", "1500"))
 PDF_OCR_MIN_WORDS = int(os.getenv("PDF_OCR_MIN_WORDS", "30"))
 PDF_OCR_MAX_PAGES = int(os.getenv("PDF_OCR_MAX_PAGES", "8"))
@@ -426,6 +437,40 @@ class PolicyDocument(db.Model):
     created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc, nullable=False)
 
+    # Library management: what kind of document it is, when it takes effect, and
+    # whether it is validated. "draft" documents are searched but every answer
+    # that cites one says it is pending validation; "archived" ones are kept for
+    # the record but not searched.
+    category = db.Column(db.String(40), nullable=False, default="Other")
+    effective_date = db.Column(db.Date)
+    status = db.Column(db.String(20), nullable=False, default="active")
+    validation_note = db.Column(db.Text)
+
+    uploaded_by = db.relationship("UserAccount")
+    versions = db.relationship(
+        "PolicyDocumentVersion",
+        back_populates="document",
+        order_by="PolicyDocumentVersion.version_number",
+        cascade="all, delete-orphan",
+    )
+
+
+class PolicyDocumentVersion(db.Model):
+    """One uploaded file of a policy document. The newest row is the current version."""
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey("policy_document.id"), nullable=False, index=True)
+    version_number = db.Column(db.Integer, nullable=False, default=1)
+    original_name = db.Column(db.String(255), nullable=False)
+    stored_name = db.Column(db.String(255), unique=True, nullable=False)
+    mime_type = db.Column(db.String(100), nullable=False, default="application/pdf")
+    file_size = db.Column(db.Integer, nullable=False, default=0)
+    page_count = db.Column(db.Integer, nullable=False, default=0)
+    chunk_count = db.Column(db.Integer, nullable=False, default=0)
+    note = db.Column(db.Text)
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+    document = db.relationship("PolicyDocument", back_populates="versions")
     uploaded_by = db.relationship("UserAccount")
 
 
@@ -4871,38 +4916,504 @@ def _status_sentence(student: Student, ind: dict) -> str:
     return ", ".join(bits) + "."
 
 
-def _rag_document_files() -> list[Path]:
+class PolicyPassageNotFound(RuntimeError):
+    """The policy library is empty or has no passage that is relevant to the question."""
+
+
+class PolicyOcrUnavailable(ValueError):
+    """A scanned PDF needs OCR, but OCR cannot be used on this computer."""
+
+
+POLICY_DRAFT_WARNING = "Draft — pending Graduate School validation"
+POLICY_DOCUMENT_CATEGORIES = ["Handbook", "Research Protocol", "Operations Manual", "Memo", "Form", "Other"]
+POLICY_DOCUMENT_STATUSES = ["active", "draft", "archived"]
+POLICY_SECTIONS_VERSION = 3
+POLICY_OCR_MAX_PAGES = int(os.getenv("POLICY_OCR_MAX_PAGES", "40"))
+_WML = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+# Display names for the stakeholder files that ship with the project. Anything
+# else gets a title made from its file name.
+_POLICY_SYSTEM_TITLES = [
+    ("graduate-school-handbook", "Graduate School Handbook 2022-2023", "Handbook"),
+    ("research-protocol", "Graduate School Research Protocol (AY 2024-2025)", "Research Protocol"),
+]
+_FILE_HASH_CACHE: dict[tuple, str] = {}
+_POLICY_SECTIONS_MEMORY: OrderedDict = OrderedDict()
+_POLICY_SECTIONS_LOCK = threading.Lock()
+
+
+def _policy_title_and_category(name: str) -> tuple[str, str]:
+    stem = re.sub(r"^[0-9a-f]{10}-", "", Path(name).stem)
+    lowered = stem.lower()
+    for key, title, category in _POLICY_SYSTEM_TITLES:
+        if key in lowered:
+            return title, category
+    words = re.sub(r"[_\-\s]+", " ", stem).strip()
+    if words.isupper():
+        words = words.title()
+    return words or name, "Other"
+
+
+def _file_sha256(path: Path) -> str:
+    stat = path.stat()
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    cached = _FILE_HASH_CACHE.get(key)
+    if cached:
+        return cached
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    _FILE_HASH_CACHE[key] = digest.hexdigest()
+    return _FILE_HASH_CACHE[key]
+
+
+def _policy_max_upload_mb() -> int:
+    try:
+        return max(1, int(os.getenv("POLICY_DOCUMENT_MAX_MB", "20")))
+    except ValueError:
+        return 20
+
+
+def _in_app_context(function):
+    """Run a database-touching helper even from a background thread."""
+    if has_app_context():
+        return function()
+    with app.app_context():
+        return function()
+
+
+def _managed_policy_sources(upload_root: Path) -> tuple[list[dict], set[str]]:
+    """Current files of staff-managed documents, plus every stored name the DB owns."""
+
+    def load():
+        documents = PolicyDocument.query.order_by(PolicyDocument.id).all()
+        version_rows = PolicyDocumentVersion.query.with_entities(
+            PolicyDocumentVersion.document_id,
+            PolicyDocumentVersion.version_number,
+            PolicyDocumentVersion.stored_name,
+        ).all()
+        known = {item.stored_name for item in documents} | {row.stored_name for row in version_rows}
+        current_version: dict[int, int] = {}
+        for row in version_rows:
+            current_version[row.document_id] = max(current_version.get(row.document_id, 1), row.version_number)
+        sources = []
+        for document in documents:
+            status = document.status or "active"
+            path = upload_root / document.stored_name
+            if status == "archived" or not path.is_file() or path.stat().st_size <= 0:
+                continue
+            sources.append({
+                "path": path,
+                "kind": "managed",
+                "document_id": document.id,
+                "title": document.title,
+                "category": document.category or "Other",
+                "status": status,
+                "effective_date": iso(document.effective_date),
+                "version": current_version.get(document.id, 1),
+            })
+        return sources, known
+
+    try:
+        return _in_app_context(load)
+    except Exception:  # noqa: BLE001 - the library must stay usable if the table is unreachable
+        try:
+            db.session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return [], set()
+
+
+def _rag_document_sources() -> list[dict]:
+    """Every file the Policy Assistant may search, each counted once.
+
+    Order of preference when the same bytes appear twice: a staff-managed
+    document, then the built-in library, then an unowned seed file left in the
+    uploads folder.
+    """
     configured = os.getenv("RAG_DOCUMENT_DIRS", "").strip()
-    roots = [Path(p.strip()) for p in configured.split(os.pathsep) if p.strip()] if configured else list(RAG_DOCUMENT_PATHS)
-    # Staff uploads are always part of the corpus, even when deployment-specific
-    # source directories are configured through the environment.
-    if POLICY_DOCUMENT_UPLOAD_ROOT not in roots:
-        roots.append(POLICY_DOCUMENT_UPLOAD_ROOT)
-    supported = {".pdf", ".docx", ".txt", ".md"}
-    files: list[Path] = []
+    roots = (
+        [Path(p.strip()) for p in configured.split(os.pathsep) if p.strip()]
+        if configured else list(RAG_DOCUMENT_PATHS)
+    )
+    upload_root = Path(POLICY_DOCUMENT_UPLOAD_ROOT)
+    supported = set(POLICY_DOCUMENT_TYPES)
+
+    def is_policy_file(path: Path) -> bool:
+        try:
+            return path.is_file() and path.suffix.lower() in supported and path.stat().st_size > 0
+        except OSError:
+            return False
+
+    managed, known_names = _managed_policy_sources(upload_root)
+    builtin_paths: list[Path] = []
     for root in roots:
         path = root if root.is_absolute() else BASE_DIR / root
-        if path.is_file() and path.suffix.lower() in supported and path.stat().st_size > 0:
-            files.append(path)
+        if path.is_file() and is_policy_file(path):
+            builtin_paths.append(path)
         elif path.is_dir():
-            files.extend(
-                item
-                for item in path.rglob("*")
-                if item.is_file() and item.suffix.lower() in supported and item.stat().st_size > 0
-            )
-    return sorted(dict.fromkeys(files))
+            builtin_paths.extend(sorted(item for item in path.rglob("*") if is_policy_file(item)))
+    seed_paths = (
+        sorted(item for item in upload_root.iterdir() if is_policy_file(item) and item.name not in known_names)
+        if upload_root.is_dir() else []
+    )
+
+    sources: list[dict] = []
+    seen_hashes: set[str] = set()
+    seen_paths: set[str] = set()
+    candidates = [(item["path"], item) for item in managed]
+    for path in builtin_paths + seed_paths:
+        title, category = _policy_title_and_category(path.name)
+        candidates.append((path, {
+            "path": path, "kind": "system", "document_id": None, "title": title,
+            "category": category, "status": "active", "effective_date": None, "version": None,
+        }))
+    for path, source in candidates:
+        resolved = str(path.resolve())
+        if resolved in seen_paths:
+            continue
+        try:
+            digest = _file_sha256(path)
+        except OSError:
+            continue
+        if digest in seen_hashes:
+            continue
+        seen_paths.add(resolved)
+        seen_hashes.add(digest)
+        sources.append({**source, "sha256": digest})
+    return sources
+
+
+def _rag_document_files() -> list[Path]:
+    return [source["path"] for source in _rag_document_sources()]
 
 
 def _reset_rag_indexes() -> None:
     """Make the next assistant request rebuild indexes after a library change."""
-    global _RAG_DOCUMENT_CHUNKS, _RAG_DOCUMENT_VECTORS, _RAG_LOAD_ERROR
+    global _RAG_DOCUMENT_CHUNKS, _RAG_LOAD_ERROR
     with _RAG_INDEX_LOCK:
         _RAG_DOCUMENT_CHUNKS = None
         _RAG_LOAD_ERROR = None
-    with _RAG_VECTOR_LOCK:
-        _RAG_DOCUMENT_VECTORS = None
+    _RAG_TERMS_CACHE.clear()
+    with _POLICY_SECTIONS_LOCK:
+        _POLICY_SECTIONS_MEMORY.clear()
     with _RAG_RESPONSE_CACHE_LOCK:
         _RAG_RESPONSE_CACHE.clear()
+
+
+# --- reading policy files -------------------------------------------------
+def _clean_policy_text(text: str) -> str:
+    text = (text or "").replace("\x00", " ")
+    # Drop lone surrogates, then repair the broken apostrophes/bullets that
+    # some PDF exports leave behind as U+FFFD.
+    text = text.encode("utf-8", "ignore").decode("utf-8", "ignore")
+    text = re.sub(r"(?<=\w)�(?=\w)", "’", text)
+    text = re.sub(r"(?m)^[ \t]*�[ \t]+", "• ", text)
+    return text.replace("�", "’")
+
+
+_OCR_INSTALL_HINT = (
+    "Install Tesseract OCR (Windows installer: https://github.com/UB-Mannheim/tesseract/wiki), "
+    "set TESSERACT_CMD to the full path of tesseract.exe if it is not on PATH, then upload again."
+)
+
+
+def _ocr_pdf_pages(file_bytes: bytes, max_pages: int) -> list[str]:
+    """OCR the pages of a scanned PDF (PyMuPDF renders, Tesseract reads).
+
+    Uses the same libraries, DPI and TESSERACT_CMD setting as the research
+    evidence OCR (ocr_pdf_text) but keeps the text per page so citations can
+    name the page. Raises PolicyOcrUnavailable when OCR cannot run here.
+    """
+    try:
+        import fitz
+        import pytesseract
+        from PIL import Image
+    except Exception as exc:  # noqa: BLE001
+        raise PolicyOcrUnavailable(
+            "OCR is not available because its Python packages (PyMuPDF, pytesseract, Pillow) are not installed. "
+            + _OCR_INSTALL_HINT
+        ) from exc
+    tesseract_cmd = os.getenv("TESSERACT_CMD", "").strip()
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+    try:
+        pytesseract.get_tesseract_version()
+    except Exception as exc:  # noqa: BLE001
+        raise PolicyOcrUnavailable("OCR is not available because the Tesseract program was not found. " + _OCR_INSTALL_HINT) from exc
+    try:
+        document = fitz.open(stream=file_bytes, filetype="pdf")
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("The PDF is damaged or cannot be read.") from exc
+    pages: list[str] = []
+    matrix = fitz.Matrix(PDF_OCR_DPI / 72, PDF_OCR_DPI / 72)
+    try:
+        for page in document[:max_pages]:
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+            pages.append((pytesseract.image_to_string(image) or "").strip())
+    except PolicyOcrUnavailable:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("The scanned PDF could not be read with OCR. Try a clearer scan or a text-based PDF or DOCX.") from exc
+    finally:
+        document.close()
+    return pages
+
+
+def _strip_running_headers(texts: list[str]) -> list[str]:
+    """Drop page headers/footers that repeat on many pages ("48 Handbook 2022-2023")."""
+    if len(texts) < 5:
+        return texts
+
+    def edge_lines(text: str) -> list[tuple[int, str]]:
+        lines = [line for line in text.splitlines() if line.strip()]
+        edges = {0: lines[0]} if lines else {}
+        if len(lines) > 1:
+            edges[len(lines) - 1] = lines[-1]
+        return list(edges.items())
+
+    counts: Counter = Counter()
+    for text in texts:
+        for _position, line in edge_lines(text):
+            counts[re.sub(r"\d+", "#", line.strip().lower())] += 1
+    threshold = max(3, int(0.3 * len(texts)))
+    repeated = {key for key, count in counts.items() if count >= threshold and len(key) < 120}
+    if not repeated:
+        return texts
+    cleaned = []
+    for text in texts:
+        lines = text.splitlines()
+        content = [index for index, line in enumerate(lines) if line.strip()]
+        drop = set()
+        for index in (content[:1] + content[-1:]):
+            if re.sub(r"\d+", "#", lines[index].strip().lower()) in repeated:
+                drop.add(index)
+        cleaned.append("\n".join(line for index, line in enumerate(lines) if index not in drop))
+    return cleaned
+
+
+def _pdf_sections(file_bytes: bytes) -> tuple[list[tuple[str, str]], int, bool]:
+    """(label, text) per page, the page count, and whether OCR was needed."""
+    from pypdf import PdfReader
+
+    try:
+        reader = PdfReader(io.BytesIO(file_bytes))
+        if reader.is_encrypted:
+            try:
+                unlocked = reader.decrypt("")
+            except Exception:  # noqa: BLE001
+                unlocked = 0
+            if not unlocked:
+                raise ValueError("Password-protected PDFs cannot be indexed.")
+        page_count = len(reader.pages)
+        texts = []
+        for page in reader.pages:
+            try:
+                texts.append(_clean_policy_text(page.extract_text() or ""))
+            except Exception:  # noqa: BLE001 - one bad page must not lose the document
+                texts.append("")
+    except ValueError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("The PDF is damaged or cannot be read.") from exc
+
+    ocr_used = False
+    word_total = sum(readable_word_count(text) for text in texts)
+    if page_count and word_total < max(PDF_OCR_MIN_WORDS, 8 * page_count):
+        if page_count > POLICY_OCR_MAX_PAGES:
+            if word_total < PDF_OCR_MIN_WORDS:
+                raise ValueError(
+                    f"This PDF looks scanned (it has no selectable text) and has {page_count} pages; OCR is limited "
+                    f"to {POLICY_OCR_MAX_PAGES} pages per file. Split it into smaller files or upload a text-based PDF or DOCX."
+                )
+        else:
+            try:
+                ocr_texts = _ocr_pdf_pages(file_bytes, page_count)
+            except PolicyOcrUnavailable as exc:
+                if word_total < PDF_OCR_MIN_WORDS:
+                    raise ValueError(
+                        f"This PDF looks scanned (it has no selectable text) and could not be read. {exc} "
+                        "Or upload a text-based PDF or DOCX instead."
+                    ) from exc
+                ocr_texts = []
+            for index, ocr_text in enumerate(ocr_texts[:page_count]):
+                cleaned = _clean_policy_text(ocr_text)
+                if readable_word_count(cleaned) > readable_word_count(texts[index]):
+                    texts[index] = cleaned
+                    ocr_used = True
+    texts = _strip_running_headers(texts)
+    sections = [(f"p. {number}", text) for number, text in enumerate(texts, start=1) if text.strip()]
+    return sections, page_count, ocr_used
+
+
+def _docx_own_text(paragraph) -> str:
+    """Text of one paragraph; nested paragraphs (text boxes) are read on their own."""
+    parts: list[str] = []
+
+    def walk(element) -> None:
+        for child in element:
+            tag = child.tag
+            if tag == f"{_WML}p" or tag in (f"{_WML}instrText", f"{_WML}delText"):
+                continue
+            if tag == f"{_WML}t":
+                parts.append(child.text or "")
+            elif tag in (f"{_WML}tab", f"{_WML}br", f"{_WML}cr"):
+                parts.append(" ")
+            else:
+                walk(child)
+
+    walk(paragraph)
+    return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
+def _docx_is_heading(paragraph, text: str) -> bool:
+    properties = paragraph.find(f"{_WML}pPr")
+    if properties is not None:
+        style = properties.find(f"{_WML}pStyle")
+        style_name = (style.get(f"{_WML}val") or "").lower() if style is not None else ""
+        if style_name.startswith(("heading", "title")) or properties.find(f"{_WML}outlineLvl") is not None:
+            return True
+    if not text or len(text.split()) > 12 or text.rstrip().endswith((".", ":", ";", ",")):
+        return False
+    # Many Word policies mark headings with bold text instead of a heading style.
+    runs = [run for run in paragraph.findall(f"{_WML}r") if _docx_own_text(run)]
+    if not runs:
+        return False
+    for run in runs:
+        bold = run.find(f"{_WML}rPr/{_WML}b")
+        if bold is None or (bold.get(f"{_WML}val") or "").lower() in {"0", "false", "off"}:
+            return False
+    return True
+
+
+def _docx_sections(file_bytes: bytes) -> list[tuple[str, str]]:
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            try:
+                info = archive.getinfo("word/document.xml")
+            except KeyError as exc:
+                raise ValueError("The DOCX file is damaged or is not a Word document.") from exc
+            if info.file_size > 20 * 1024 * 1024:
+                raise ValueError("The DOCX document content is too large to index safely.")
+            xml_bytes = archive.read(info)
+    except zipfile.BadZipFile as exc:
+        raise ValueError("The DOCX file is damaged or cannot be read.") from exc
+    lowered = xml_bytes[:200_000].lower()
+    if b"<!doctype" in lowered or b"<!entity" in lowered:
+        raise ValueError("The DOCX file contains unsupported XML declarations and cannot be indexed.")
+    try:
+        root = ET.fromstring(xml_bytes)
+        paragraphs = []
+        for paragraph in root.iter(f"{_WML}p"):
+            text = _clean_policy_text(_docx_own_text(paragraph))
+            if text:
+                paragraphs.append((text, _docx_is_heading(paragraph, text)))
+    except ET.ParseError as exc:
+        raise ValueError("The DOCX file is damaged or cannot be read.") from exc
+    except RecursionError as exc:
+        raise ValueError("The DOCX file is too deeply nested to read.") from exc
+
+    sections: list[tuple[str, str]] = []
+    heading_path = ""
+    lines: list[str] = []
+    has_body = False
+
+    def flush() -> None:
+        if lines:
+            label = f"section “{heading_path[:100]}”" if heading_path else ""
+            sections.append((label, "\n".join(lines)))
+
+    for text, is_heading in paragraphs:
+        if is_heading:
+            if has_body:
+                flush()
+                lines, has_body, heading_path = [], False, text
+            else:
+                heading_path = f"{heading_path} › {text}" if heading_path else text
+            lines.append(text)
+        else:
+            lines.append(text)
+            has_body = True
+    flush()
+    return sections
+
+
+def _policy_sections_cache_get(sha: str) -> dict | None:
+    with _POLICY_SECTIONS_LOCK:
+        cached = _POLICY_SECTIONS_MEMORY.get(sha)
+        if cached is not None:
+            _POLICY_SECTIONS_MEMORY.move_to_end(sha)
+            return cached
+    path = Path(RAG_INDEX_DIR) / "sections" / f"{sha}.json"
+    try:
+        stored = json.loads(path.read_text(encoding="utf-8"))
+        if stored.get("version") == POLICY_SECTIONS_VERSION and stored.get("sections"):
+            result = {
+                "sections": [(label, text) for label, text in stored["sections"]],
+                "page_count": int(stored.get("page_count") or 0),
+                "ocr_used": bool(stored.get("ocr_used")),
+            }
+            with _POLICY_SECTIONS_LOCK:
+                _POLICY_SECTIONS_MEMORY[sha] = result
+            return result
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def _policy_sections_cache_put(sha: str, result: dict) -> None:
+    with _POLICY_SECTIONS_LOCK:
+        _POLICY_SECTIONS_MEMORY[sha] = result
+        while len(_POLICY_SECTIONS_MEMORY) > 24:
+            _POLICY_SECTIONS_MEMORY.popitem(last=False)
+    try:
+        folder = Path(RAG_INDEX_DIR) / "sections"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / f"{sha}.json").write_text(
+            json.dumps({
+                "version": POLICY_SECTIONS_VERSION,
+                "page_count": result["page_count"],
+                "ocr_used": result["ocr_used"],
+                "sections": result["sections"],
+            }, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass  # the cache is an optimisation only
+
+
+def _policy_sections_for_bytes(file_bytes: bytes, suffix: str, sha: str | None = None) -> dict:
+    """Parse a PDF/DOCX into (label, text) sections, reusing earlier work for the same bytes."""
+    suffix = suffix.lower()
+    sha = sha or hashlib.sha256(file_bytes).hexdigest()
+    cached = _policy_sections_cache_get(sha)
+    if cached is not None:
+        return cached
+    try:
+        if suffix == ".pdf":
+            sections, page_count, ocr_used = _pdf_sections(file_bytes)
+        elif suffix == ".docx":
+            sections, page_count, ocr_used = _docx_sections(file_bytes), 0, False
+        else:
+            raise ValueError("Only PDF and DOCX policy documents can be uploaded.")
+    except ValueError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - odd files must give a readable error, never a crash
+        label = "PDF" if suffix == ".pdf" else "DOCX file"
+        raise ValueError(f"The {label} could not be read.") from exc
+    result = {"sections": sections, "page_count": page_count, "ocr_used": ocr_used}
+    if sections:
+        _policy_sections_cache_put(sha, result)
+    return result
+
+
+def _policy_sections_for_path(path: Path) -> dict:
+    sha = _file_sha256(path)
+    cached = _policy_sections_cache_get(sha)
+    if cached is not None:
+        return cached
+    return _policy_sections_for_bytes(path.read_bytes(), path.suffix, sha=sha)
 
 
 def _inspect_policy_document(file_bytes: bytes, suffix: str) -> tuple[int, int, str]:
@@ -4911,53 +5422,17 @@ def _inspect_policy_document(file_bytes: bytes, suffix: str) -> tuple[int, int, 
     mime_type = POLICY_DOCUMENT_TYPES.get(suffix)
     if not mime_type:
         raise ValueError("Only PDF and DOCX policy documents can be uploaded.")
-    max_bytes = max(1, int(os.getenv("POLICY_DOCUMENT_MAX_MB", "20"))) * 1024 * 1024
-    if len(file_bytes) > max_bytes:
-        raise ValueError(f"Policy documents must be {max_bytes // (1024 * 1024)} MB or smaller.")
-
-    chunks = []
-    page_count = 0
-    if suffix == ".pdf":
-        if not file_bytes.startswith(b"%PDF-"):
-            raise ValueError("Choose a valid PDF file.")
-        try:
-            from pypdf import PdfReader
-
-            reader = PdfReader(io.BytesIO(file_bytes))
-            if reader.is_encrypted:
-                raise ValueError("Password-protected PDFs cannot be indexed.")
-            page_count = len(reader.pages)
-            for page_index, page in enumerate(reader.pages, start=1):
-                chunks.extend(_chunk_rag_text(page.extract_text() or "", "validation.pdf", str(page_index)))
-        except ValueError:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            raise ValueError("The PDF is damaged or cannot be read.") from exc
-    else:
-        try:
-            with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
-                info = archive.getinfo("word/document.xml")
-                if info.file_size > 20 * 1024 * 1024:
-                    raise ValueError("The DOCX document content is too large to index safely.")
-                root = ET.fromstring(archive.read(info))
-            namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-            paragraphs = []
-            for paragraph in root.iter(f"{namespace}p"):
-                text_value = "".join(
-                    node.text or ""
-                    for node in paragraph.iter(f"{namespace}t")
-                ).strip()
-                if text_value:
-                    paragraphs.append(text_value)
-            chunks = _chunk_rag_text("\n".join(paragraphs), "validation.docx")
-        except ValueError:
-            raise
-        except (KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
-            raise ValueError("The DOCX file is damaged or cannot be read.") from exc
+    max_mb = _policy_max_upload_mb()
+    if len(file_bytes) > max_mb * 1024 * 1024:
+        raise ValueError(f"Policy documents must be {max_mb} MB or smaller.")
+    if suffix == ".pdf" and not file_bytes.startswith(b"%PDF-"):
+        raise ValueError("Choose a valid PDF file.")
+    info = _policy_sections_for_bytes(file_bytes, suffix)
+    chunks = _chunk_policy_sections("validation", info["sections"])
     if not chunks:
         label = "PDF" if suffix == ".pdf" else "DOCX file"
         raise ValueError(f"This {label} has no readable text to index.")
-    return page_count, len(chunks), mime_type
+    return info["page_count"], len(chunks), mime_type
 
 
 def _inspect_policy_pdf(file_bytes: bytes) -> tuple[int, int]:
@@ -4966,8 +5441,63 @@ def _inspect_policy_pdf(file_bytes: bytes) -> tuple[int, int]:
     return page_count, chunk_count
 
 
+# --- library listing -------------------------------------------------------
+def _policy_version_dict(document: PolicyDocument, version: PolicyDocumentVersion, is_current: bool) -> dict:
+    path = POLICY_DOCUMENT_UPLOAD_ROOT / version.stored_name
+    return {
+        "version": version.version_number,
+        "is_current": is_current,
+        "original_name": version.original_name,
+        "file_size": version.file_size,
+        "page_count": version.page_count,
+        "chunk_count": version.chunk_count,
+        "uploaded_by": version.uploaded_by.full_name if version.uploaded_by else "GS Staff",
+        "created_at": version.created_at.isoformat() if version.created_at else None,
+        "note": version.note or "",
+        "file_exists": path.is_file(),
+        "url": f"/api/policy-documents/{document.id}/versions/{version.version_number}/file",
+    }
+
+
+def _ensure_policy_versions(document: PolicyDocument) -> list[PolicyDocumentVersion]:
+    """Give a document uploaded before version history existed its version 1 row."""
+    if not document.versions:
+        db.session.add(PolicyDocumentVersion(
+            document_id=document.id,
+            version_number=1,
+            original_name=document.original_name,
+            stored_name=document.stored_name,
+            mime_type=document.mime_type,
+            file_size=document.file_size,
+            page_count=document.page_count,
+            chunk_count=document.chunk_count,
+            note="Initial upload",
+            uploaded_by_user_id=document.uploaded_by_user_id,
+            created_at=document.created_at or now_utc(),
+        ))
+        db.session.flush()
+        db.session.refresh(document)
+    return list(document.versions)
+
+
 def policy_document_dict(document: PolicyDocument) -> dict:
     path = POLICY_DOCUMENT_UPLOAD_ROOT / document.stored_name
+    rows = list(document.versions)
+    current_number = max((row.version_number for row in rows), default=1)
+    if rows:
+        versions = [_policy_version_dict(document, row, row.version_number == current_number) for row in rows]
+    else:  # uploaded before version history existed
+        versions = [{
+            "version": 1, "is_current": True, "original_name": document.original_name,
+            "file_size": document.file_size, "page_count": document.page_count,
+            "chunk_count": document.chunk_count,
+            "uploaded_by": document.uploaded_by.full_name if document.uploaded_by else "GS Staff",
+            "created_at": document.created_at.isoformat() if document.created_at else None,
+            "note": "Initial upload", "file_exists": path.is_file(),
+            "url": f"/api/policy-documents/{document.id}/versions/1/file",
+        }]
+    versions.sort(key=lambda item: item["version"], reverse=True)
+    status = document.status or "active"
     return {
         "id": document.id,
         "kind": "managed",
@@ -4985,16 +5515,30 @@ def policy_document_dict(document: PolicyDocument) -> dict:
         "url": f"/api/policy-documents/{document.id}/file",
         "can_edit": True,
         "can_delete": True,
-        "status": "Ready" if path.is_file() and document.chunk_count else "Unavailable",
+        "category": document.category or "Other",
+        "effective_date": iso(document.effective_date),
+        "status": status,
+        "validation_note": document.validation_note or "",
+        "warning": POLICY_DRAFT_WARNING if status == "draft" else None,
+        "version": current_number,
+        "versions": versions,
+        "index_status": (
+            "Archived" if status == "archived"
+            else "Ready" if path.is_file() and document.chunk_count else "Unavailable"
+        ),
     }
 
 
-def _system_policy_document_dict(path: Path) -> dict:
+def _system_policy_document_dict(source) -> dict:
+    if not isinstance(source, dict):
+        title, category = _policy_title_and_category(Path(source).name)
+        source = {"path": Path(source), "title": title, "category": category}
+    path = Path(source["path"])
     key = hashlib.sha256(str(path.resolve()).encode("utf-8")).hexdigest()[:20]
     return {
         "id": f"system-{key}",
         "kind": "system",
-        "title": path.stem.replace("_", " "),
+        "title": source.get("title") or path.stem.replace("_", " "),
         "description": "Built-in policy source managed with the application files.",
         "original_name": path.name,
         "file_type": path.suffix.lower().removeprefix(".").upper(),
@@ -5008,88 +5552,116 @@ def _system_policy_document_dict(path: Path) -> dict:
         "url": f"/api/policy-documents/system/{key}/file" if path.suffix.lower() in POLICY_DOCUMENT_TYPES else None,
         "can_edit": False,
         "can_delete": False,
-        "status": "Ready",
+        "category": source.get("category") or "Other",
+        "effective_date": None,
+        "status": "active",
+        "validation_note": "",
+        "warning": None,
+        "version": None,
+        "versions": [],
+        "index_status": "Ready",
     }
 
 
-def _rag_index_signature(files: list[Path]) -> dict:
+def _rag_index_signature(sources: list) -> dict:
+    files = []
+    for source in sources:
+        if not isinstance(source, dict):
+            source = {"path": Path(source)}
+        path = Path(source["path"])
+        stat = path.stat()
+        files.append({
+            "path": str(path.resolve()),
+            "size": stat.st_size,
+            "modified_ns": stat.st_mtime_ns,
+            "title": source.get("title"),
+            "category": source.get("category"),
+            "status": source.get("status"),
+            "document_id": source.get("document_id"),
+            "version": source.get("version"),
+        })
     return {
-        "files": [
-            {
-                "path": str(path.resolve()),
-                "size": path.stat().st_size,
-                "modified_ns": path.stat().st_mtime_ns,
-            }
-            for path in files
-        ],
+        "files": files,
         "chunk_size": int(os.getenv("RAG_CHUNK_SIZE", "180")),
         "chunk_overlap": int(os.getenv("RAG_CHUNK_OVERLAP", "30")),
+        "parser": POLICY_SECTIONS_VERSION,
     }
 
 
-def _chunk_rag_text(text: str, source: str, page: str = "") -> list[dict]:
+# --- chunking ----------------------------------------------------------------
+def _rag_split_words(text: str) -> list[str]:
     words = (text or "").split()
     chunk_size = max(100, int(os.getenv("RAG_CHUNK_SIZE", "180")))
-    overlap = min(
-        chunk_size // 3,
-        max(0, int(os.getenv("RAG_CHUNK_OVERLAP", "30"))),
-    )
-    chunks = []
+    overlap = min(chunk_size // 3, max(0, int(os.getenv("RAG_CHUNK_OVERLAP", "30"))))
+    bodies = []
     start = 0
     while start < len(words):
         body = " ".join(words[start:start + chunk_size]).strip()
         if body:
-            chunks.append({
-                "id": f"document-{len(chunks) + 1}",
-                "title": Path(source).name,
-                "source": f"{Path(source).name}, p. {page}" if page else Path(source).name,
-                "text": body,
-            })
+            bodies.append(body)
         if start + chunk_size >= len(words):
             break
         start += max(1, chunk_size - overlap)
+    return bodies
+
+
+def _chunk_rag_text(
+    text: str,
+    source: str,
+    page: str = "",
+    title: str | None = None,
+    location: str | None = None,
+) -> list[dict]:
+    """Split text into overlapping chunks that cite "<title>, <location>"."""
+    title = title or Path(source).name
+    label = location or (f"p. {page}" if page else "")
+    return [
+        {
+            "id": f"document-{number}",
+            "title": title,
+            "source": f"{title}, {label}" if label else title,
+            "text": body,
+        }
+        for number, body in enumerate(_rag_split_words(text), start=1)
+    ]
+
+
+def _chunk_policy_sections(title: str, sections: list[tuple[str, str]]) -> list[dict]:
+    chunks: list[dict] = []
+    part = 0
+    for label, text in sections:
+        if label:
+            chunks.extend(_chunk_rag_text(text, title, title=title, location=label))
+            continue
+        for body in _rag_split_words(text):
+            part += 1
+            chunks.append({"id": "", "title": title, "source": f"{title}, part {part}", "text": body})
     return chunks
 
 
-def _read_rag_document_chunks(files: list[Path]) -> list[dict]:
+def _read_rag_document_chunks(sources: list) -> list[dict]:
     chunks: list[dict] = []
-    for path in files:
-        suffix = path.suffix.lower()
+    for source in sources:
+        if not isinstance(source, dict):
+            title, category = _policy_title_and_category(Path(source).name)
+            source = {"path": Path(source), "title": title, "category": category, "status": "active", "kind": "system"}
+        path = Path(source["path"])
         try:
-            if suffix == ".pdf":
-                from pypdf import PdfReader
-
-                reader = PdfReader(str(path))
-                for page_index, page in enumerate(reader.pages, start=1):
-                    chunks.extend(
-                        _chunk_rag_text(
-                            page.extract_text() or "",
-                            path.name,
-                            str(page_index),
-                        )
-                    )
-            elif suffix == ".docx":
-                with zipfile.ZipFile(path) as archive:
-                    root = ET.fromstring(archive.read("word/document.xml"))
-                namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-                paragraphs = []
-                for paragraph in root.iter(f"{namespace}p"):
-                    text = "".join(
-                        node.text or ""
-                        for node in paragraph.iter(f"{namespace}t")
-                    ).strip()
-                    if text:
-                        paragraphs.append(text)
-                chunks.extend(_chunk_rag_text("\n".join(paragraphs), path.name))
-            else:
-                chunks.extend(
-                    _chunk_rag_text(
-                        path.read_text(encoding="utf-8", errors="replace"),
-                        path.name,
-                    )
-                )
-        except Exception:  # noqa: BLE001
+            info = _policy_sections_for_path(path)
+            document_chunks = _chunk_policy_sections(source.get("title") or path.stem, info["sections"])
+        except Exception as exc:  # noqa: BLE001 - keep the rest of the library searchable
+            print(f"Policy Assistant skipped {path.name}: {exc}")
             continue
+        for chunk in document_chunks:
+            chunk.update({
+                "file_name": path.name,
+                "kind": source.get("kind") or "system",
+                "document_id": source.get("document_id"),
+                "category": source.get("category") or "Other",
+                "status": source.get("status") or "active",
+                "version": source.get("version"),
+            })
+        chunks.extend(document_chunks)
     for index, chunk in enumerate(chunks, start=1):
         chunk["id"] = f"document-{index}"
     return chunks
@@ -5101,51 +5673,272 @@ def _load_rag_document_index() -> list[dict]:
     if _RAG_DOCUMENT_CHUNKS is not None:
         return _RAG_DOCUMENT_CHUNKS
     if _RAG_LOAD_ERROR is not None:
-        raise RuntimeError(_RAG_LOAD_ERROR)
+        raise PolicyPassageNotFound(_RAG_LOAD_ERROR)
 
     with _RAG_INDEX_LOCK:
         if _RAG_DOCUMENT_CHUNKS is not None:
             return _RAG_DOCUMENT_CHUNKS
         if _RAG_LOAD_ERROR is not None:
-            raise RuntimeError(_RAG_LOAD_ERROR)
+            raise PolicyPassageNotFound(_RAG_LOAD_ERROR)
 
-        files = _rag_document_files()
-        if not files:
-            _RAG_LOAD_ERROR = "No RAG documents found. Add PDF, DOCX, TXT, or MD files to data/ or Documents/USLS_Documents/."
-            raise RuntimeError(_RAG_LOAD_ERROR)
+        sources = _rag_document_sources()
+        if not sources:
+            # Not cached: the library may be filled before the next question.
+            raise PolicyPassageNotFound(
+                "No policy documents found. Add PDF or DOCX files to "
+                "Documents/CAPSTONE_ONLY/USLS_Documents/ or upload them on the Policy Documents page."
+            )
 
-        signature = _rag_index_signature(files)
-        metadata_path = RAG_INDEX_DIR / "corpus.json"
-        chunks_path = RAG_INDEX_DIR / "chunks.json"
-        _RAG_DOCUMENT_CHUNKS = None
+        signature = _rag_index_signature(sources)
+        metadata_path = Path(RAG_INDEX_DIR) / "corpus.json"
+        chunks_path = Path(RAG_INDEX_DIR) / "chunks.json"
+        loaded = None
         if metadata_path.exists() and chunks_path.exists():
             try:
-                saved_signature = json.loads(metadata_path.read_text(encoding="utf-8"))
-                if saved_signature == signature:
-                    saved_chunks = json.loads(
-                        chunks_path.read_text(encoding="utf-8")
-                    )
+                if json.loads(metadata_path.read_text(encoding="utf-8")) == signature:
+                    saved_chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
                     if isinstance(saved_chunks, list) and saved_chunks:
-                        _RAG_DOCUMENT_CHUNKS = saved_chunks
+                        loaded = saved_chunks
             except Exception:  # noqa: BLE001
-                _RAG_DOCUMENT_CHUNKS = None
+                loaded = None
 
-        if _RAG_DOCUMENT_CHUNKS is None:
-            _RAG_DOCUMENT_CHUNKS = _read_rag_document_chunks(files)
-            if not _RAG_DOCUMENT_CHUNKS:
-                _RAG_LOAD_ERROR = "RAG documents were found, but no readable text could be loaded."
-                raise RuntimeError(_RAG_LOAD_ERROR)
-            RAG_INDEX_DIR.mkdir(parents=True, exist_ok=True)
-            chunks_path.write_text(
-                json.dumps(_RAG_DOCUMENT_CHUNKS, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            metadata_path.write_text(
-                json.dumps(signature, indent=2),
-                encoding="utf-8",
-            )
-
+        if loaded is None:
+            loaded = _read_rag_document_chunks(sources)
+            if not loaded:
+                _RAG_LOAD_ERROR = "Policy documents were found, but no readable text could be loaded from them."
+                raise PolicyPassageNotFound(_RAG_LOAD_ERROR)
+            try:
+                Path(RAG_INDEX_DIR).mkdir(parents=True, exist_ok=True)
+                chunks_path.write_text(json.dumps(loaded, ensure_ascii=False), encoding="utf-8")
+                metadata_path.write_text(json.dumps(signature, indent=2), encoding="utf-8")
+            except OSError:
+                pass  # the on-disk copy only speeds up the next start
+        _RAG_DOCUMENT_CHUNKS = loaded
         return _RAG_DOCUMENT_CHUNKS
+
+
+def _policy_upload_names(filename: str) -> tuple[str, str]:
+    """(safe stored-as name, lowercase suffix); keeps the extension for non-ASCII names."""
+    suffix = Path(filename or "").suffix.lower()
+    stem = secure_filename(Path(filename or "").stem) or "policy-document"
+    return f"{stem}{suffix}", suffix
+
+
+def parse_policy_metadata(source) -> tuple[dict, str | None]:
+    """Validate the editable library fields that are present in ``source``.
+
+    Returns (values, error). Only supplied fields appear in ``values`` so the
+    same function serves upload (defaults applied by the caller) and PATCH.
+    """
+    values: dict = {}
+    if "title" in source:
+        title = (source.get("title") or "").strip()
+        if not title or len(title) > 220:
+            return {}, "Enter a document title up to 220 characters."
+        values["title"] = title
+    if "description" in source:
+        description = (source.get("description") or "").strip()
+        if len(description) > 2000:
+            return {}, "Keep the description under 2,000 characters."
+        values["description"] = description
+    if "category" in source:
+        category = (source.get("category") or "").strip() or "Other"
+        if category not in POLICY_DOCUMENT_CATEGORIES:
+            return {}, "Choose a category: " + ", ".join(POLICY_DOCUMENT_CATEGORIES) + "."
+        values["category"] = category
+    if "status" in source:
+        status = (source.get("status") or "").strip().lower() or "active"
+        if status not in POLICY_DOCUMENT_STATUSES:
+            return {}, "Choose a status: active, draft, or archived."
+        values["status"] = status
+    if "effective_date" in source:
+        raw = (source.get("effective_date") or "").strip()
+        if raw:
+            try:
+                values["effective_date"] = datetime.strptime(raw, "%Y-%m-%d").date()
+            except ValueError:
+                return {}, "Enter the effective date as YYYY-MM-DD."
+        else:
+            values["effective_date"] = None
+    if "validation_note" in source:
+        note = (source.get("validation_note") or "").strip()
+        if len(note) > 2000:
+            return {}, "Keep the validation note under 2,000 characters."
+        values["validation_note"] = note
+    return values, None
+
+
+def _policy_version_note(source) -> tuple[str, str | None]:
+    note = ((source.get("note") if hasattr(source, "get") else "") or "").strip()
+    if len(note) > 500:
+        return "", "Keep the version note under 500 characters."
+    return note, None
+
+
+def _write_policy_file(file_bytes: bytes, original_name: str) -> tuple[str, Path]:
+    stored_name = f"{uuid4().hex[:10]}-{original_name}"
+    target = POLICY_DOCUMENT_UPLOAD_ROOT / stored_name
+    POLICY_DOCUMENT_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(file_bytes)
+    return stored_name, target
+
+
+def _policy_ocr_note(file_bytes: bytes) -> str:
+    info = _policy_sections_cache_get(hashlib.sha256(file_bytes).hexdigest())
+    return " The text was read with OCR, so check the wording." if info and info.get("ocr_used") else ""
+
+
+def create_policy_document(
+    file_bytes: bytes, filename: str, account: UserAccount, values: dict, note: str = "",
+) -> PolicyDocument:
+    """Validate, store, and register a new policy document (version 1). Raises ValueError."""
+    original_name, suffix = _policy_upload_names(filename)
+    if suffix not in POLICY_DOCUMENT_TYPES:
+        raise ValueError("Only PDF and DOCX policy documents can be uploaded.")
+    page_count, chunk_count, mime_type = _inspect_policy_document(file_bytes, suffix)
+    stored_name, target = _write_policy_file(file_bytes, original_name)
+    document = PolicyDocument(
+        title=values["title"],
+        description=values.get("description", ""),
+        original_name=original_name,
+        stored_name=stored_name,
+        mime_type=mime_type,
+        file_size=len(file_bytes),
+        page_count=page_count,
+        chunk_count=chunk_count,
+        category=values.get("category", "Other"),
+        effective_date=values.get("effective_date"),
+        status=values.get("status", "active"),
+        validation_note=values.get("validation_note", ""),
+        uploaded_by_user_id=account.id,
+    )
+    document.versions.append(PolicyDocumentVersion(
+        version_number=1,
+        original_name=original_name,
+        stored_name=stored_name,
+        mime_type=mime_type,
+        file_size=len(file_bytes),
+        page_count=page_count,
+        chunk_count=chunk_count,
+        note=note or "Initial upload",
+        uploaded_by_user_id=account.id,
+    ))
+    try:
+        db.session.add(document)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        target.unlink(missing_ok=True)
+        raise
+    _reset_rag_indexes()
+    return document
+
+
+def replace_policy_document_file(
+    document: PolicyDocument, file_bytes: bytes, filename: str, account: UserAccount, values: dict, note: str = "",
+) -> PolicyDocument:
+    """Add a new current version; the previous file stays on disk and in the history."""
+    original_name, suffix = _policy_upload_names(filename)
+    if suffix not in POLICY_DOCUMENT_TYPES:
+        raise ValueError("Only PDF and DOCX policy documents can be uploaded.")
+    page_count, chunk_count, mime_type = _inspect_policy_document(file_bytes, suffix)
+    versions = _ensure_policy_versions(document)
+    next_number = max((row.version_number for row in versions), default=0) + 1
+    stored_name, new_path = _write_policy_file(file_bytes, original_name)
+    for field, value in values.items():
+        setattr(document, field, value)
+    document.versions.append(PolicyDocumentVersion(
+        version_number=next_number,
+        original_name=original_name,
+        stored_name=stored_name,
+        mime_type=mime_type,
+        file_size=len(file_bytes),
+        page_count=page_count,
+        chunk_count=chunk_count,
+        note=note,
+        uploaded_by_user_id=account.id,
+    ))
+    document.original_name = original_name
+    document.stored_name = stored_name
+    document.file_size = len(file_bytes)
+    document.mime_type = mime_type
+    document.page_count = page_count
+    document.chunk_count = chunk_count
+    document.uploaded_by_user_id = account.id
+    document.updated_at = now_utc()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        new_path.unlink(missing_ok=True)
+        raise
+    _reset_rag_indexes()
+    return document
+
+
+def policy_test_question_payload(question: str) -> dict:
+    """Which passages the Policy Assistant would use for a question (the 'Test a question' box)."""
+    base = {"question": question, "mode": "lexical", "items": [], "answer_preview": None, "passages_indexed": 0}
+    try:
+        chunks = _load_rag_document_index()
+    except PolicyPassageNotFound as exc:
+        return {**base, "message": str(exc)}
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    if api_key:
+        retrieved = _retrieve_rag_document_chunks(question, chunks, 5)
+    else:
+        retrieved = _retrieve_rag_document_chunks_lexically(question, chunks, 5)
+    mode = "vector" if any(item.get("_retrieval") in {"vector", "lexical-boost"} for item in retrieved) else "lexical"
+    if mode == "lexical":
+        retrieved = [item for item in retrieved if item.get("_relevant")]
+    idf = _rag_query_idf(set(_rag_terms(question)), [set(_rag_chunk_terms(chunk)) for chunk in chunks])
+    items = []
+    for rank, chunk in enumerate(retrieved, start=1):
+        excerpt, _score = _select_answer_sentences(question, chunk["text"], idf, 360)
+        items.append({
+            "rank": rank,
+            "document_id": chunk.get("document_id"),
+            "kind": chunk.get("kind"),
+            "title": chunk["title"],
+            "source": chunk["source"],
+            "category": chunk.get("category"),
+            "status": chunk.get("status") or "active",
+            "warning": POLICY_DRAFT_WARNING if (chunk.get("status") or "active") == "draft" else None,
+            "excerpt": excerpt or chunk["text"][:360],
+            "score": chunk.get("_score"),
+            "coverage": chunk.get("_coverage"),
+            "retrieval": chunk.get("_retrieval"),
+        })
+    preview = None
+    if items:
+        try:
+            preview = call_local_document_rag(question)[0]
+        except Exception:  # noqa: BLE001
+            preview = None
+    return {**base, "mode": mode, "items": items, "answer_preview": preview, "passages_indexed": len(chunks)}
+
+
+ASSISTANT_STAFF_SUGGESTIONS = [
+    "Which students need attention right now?",
+    "What does a student need for proposal defense readiness?",
+    "Explain the LOA and residency rule.",
+    "What evidence is required for completion?",
+    "How is a defense panel composed?",
+]
+ASSISTANT_POLICY_SUGGESTIONS = [
+    "Explain the LOA and residency rule.",
+    "What is the maximum residence period for a master's program?",
+    "What does a student need for proposal defense readiness?",
+    "How is a defense panel composed?",
+    "What is the withdrawal policy for a subject?",
+]
+ASSISTANT_STUDENT_SUGGESTIONS = [
+    "What should I do next based on my record?",
+    "Which subjects am I currently enrolled in?",
+    "Explain the incomplete-grade re-enrollment rule.",
+    "What do I need before a research defense?",
+    "Explain the leave, AWOL, and residency rules for students.",
+]
 
 
 def _gemini_generate(prompt: str) -> str:
@@ -5203,7 +5996,7 @@ def _normalized_embedding(values: list) -> list[float]:
     return [value / magnitude for value in vector]
 
 
-def _gemini_embed_texts(texts: list[str], purpose: str) -> list[list[float]]:
+def _gemini_embed_texts(texts: list[str], purpose: str, timeout: float | None = None) -> list[list[float]]:
     """Generate bounded semantic vectors with Gemini's current embedding model."""
     if not texts:
         return []
@@ -5224,7 +6017,7 @@ def _gemini_embed_texts(texts: list[str], purpose: str) -> list[list[float]]:
         f"{model_name}:batchEmbedContents"
     )
     vectors: list[list[float]] = []
-    timeout = max(5.0, float(os.getenv("RAG_EMBEDDING_TIMEOUT_SECONDS", "45")))
+    timeout = timeout or max(5.0, float(os.getenv("RAG_EMBEDDING_TIMEOUT_SECONDS", "45")))
     for start in range(0, len(texts), batch_size):
         batch = texts[start:start + batch_size]
         body = json.dumps({
@@ -5267,65 +6060,204 @@ def _gemini_embed_texts(texts: list[str], purpose: str) -> list[list[float]]:
 
 def _rag_vector_signature() -> dict:
     return {
-        "corpus": _rag_index_signature(_rag_document_files()),
         "model": os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2").removeprefix("models/"),
         "dimensions": max(128, min(3072, int(os.getenv("RAG_EMBEDDING_DIMENSIONS", "768")))),
-        "prompt_version": 1,
+        "prompt_version": 2,
     }
 
 
-def _load_rag_vector_index(chunks: list[dict]) -> dict[str, list[float]]:
-    """Load persisted vectors or embed the corpus once when it changes."""
-    global _RAG_DOCUMENT_VECTORS
+def _rag_chunk_vector_key(chunk: dict) -> str:
+    """Vectors are cached by passage content, so a new upload only embeds its own passages."""
+    return hashlib.sha1(
+        f"{chunk.get('title', '')}\n{chunk.get('source', '')}\n{chunk.get('text', '')}".encode("utf-8")
+    ).hexdigest()
+
+
+def _rag_vector_store() -> dict[str, list[float]]:
     signature = _rag_vector_signature()
-    if (
-        isinstance(_RAG_DOCUMENT_VECTORS, dict)
-        and _RAG_DOCUMENT_VECTORS.get("signature") == signature
-    ):
-        return _RAG_DOCUMENT_VECTORS["vectors"]
-
-    with _RAG_VECTOR_LOCK:
-        if (
-            isinstance(_RAG_DOCUMENT_VECTORS, dict)
-            and _RAG_DOCUMENT_VECTORS.get("signature") == signature
-        ):
-            return _RAG_DOCUMENT_VECTORS["vectors"]
-
-        vectors_path = RAG_INDEX_DIR / "vectors.json"
-        if vectors_path.exists():
+    path = Path(RAG_INDEX_DIR) / "vectors_v2.json"
+    state = _RAG_VECTOR_STATE
+    if state["path"] != str(path) or state["signature"] != signature:
+        vectors: dict[str, list[float]] = {}
+        if path.exists():
             try:
-                stored = json.loads(vectors_path.read_text(encoding="utf-8"))
-                stored_vectors = stored.get("vectors") or {}
-                expected_ids = {chunk["id"] for chunk in chunks}
-                if (
-                    stored.get("signature") == signature
-                    and set(stored_vectors) == expected_ids
-                    and all(isinstance(values, list) and values for values in stored_vectors.values())
-                ):
-                    _RAG_DOCUMENT_VECTORS = stored
-                    return stored_vectors
+                stored = json.loads(path.read_text(encoding="utf-8"))
+                if stored.get("signature") == signature and isinstance(stored.get("vectors"), dict):
+                    vectors = {
+                        key: value for key, value in stored["vectors"].items()
+                        if isinstance(value, list) and value
+                    }
             except Exception:  # noqa: BLE001
-                pass
+                vectors = {}
+        state.update(path=str(path), signature=signature, vectors=vectors)
+    return state["vectors"]
 
-        texts = [
-            f"Title: {chunk['title']}\nSource: {chunk['source']}\nPassage: {chunk['text']}"
-            for chunk in chunks
-        ]
-        embedded = _gemini_embed_texts(texts, "document")
-        vector_map = {
-            chunk["id"]: [round(value, 8) for value in vector]
-            for chunk, vector in zip(chunks, embedded, strict=True)
-        }
-        stored = {"signature": signature, "vectors": vector_map}
-        RAG_INDEX_DIR.mkdir(parents=True, exist_ok=True)
-        temporary_path = vectors_path.with_suffix(".json.tmp")
+
+def _rag_save_vector_store() -> None:
+    state = _RAG_VECTOR_STATE
+    if not state["path"]:
+        return
+    path = Path(state["path"])
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = path.with_suffix(".json.tmp")
         temporary_path.write_text(
-            json.dumps(stored, ensure_ascii=False, separators=(",", ":")),
+            json.dumps({"signature": state["signature"], "vectors": state["vectors"]}, ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8",
         )
-        temporary_path.replace(vectors_path)
-        _RAG_DOCUMENT_VECTORS = stored
-        return vector_map
+        temporary_path.replace(path)
+    except OSError:
+        pass
+
+
+def _rag_embedding_cooldown() -> float:
+    return max(0.0, float(os.getenv("RAG_EMBED_COOLDOWN_SECONDS", "60")))
+
+
+def _rag_embedding_failed() -> None:
+    """After a failed embedding call, go straight to keyword search for a while."""
+    global _RAG_EMBED_COOLDOWN_UNTIL
+    _RAG_EMBED_COOLDOWN_UNTIL = _monotonic() + _rag_embedding_cooldown()
+
+
+def _ensure_rag_vectors(
+    chunks: list[dict],
+    *,
+    inline_limit: int | None = None,
+    timeout: float | None = None,
+) -> dict[str, list[float]]:
+    """Return a vector per chunk id, embedding only passages not seen before.
+
+    With ``inline_limit`` set (the request path) a large backlog is handed to a
+    background thread instead of making the user's question wait for it.
+    """
+    acquired = _RAG_VECTOR_LOCK.acquire(blocking=inline_limit is None)
+    if not acquired:
+        raise RuntimeError("The semantic index is being prepared by another request.")
+    try:
+        store = _rag_vector_store()
+        keys = {chunk["id"]: _rag_chunk_vector_key(chunk) for chunk in chunks}
+        missing: list[dict] = []
+        queued: set[str] = set()
+        for chunk in chunks:
+            key = keys[chunk["id"]]
+            if key not in store and key not in queued:
+                queued.add(key)
+                missing.append(chunk)
+        if missing:
+            if _monotonic() < _RAG_EMBED_COOLDOWN_UNTIL:
+                raise RuntimeError("The embedding service failed recently; using keyword search for now.")
+            if inline_limit is not None and len(missing) > inline_limit:
+                _start_background_embedding()
+                raise RuntimeError("The semantic index is still being prepared.")
+            try:
+                for start in range(0, len(missing), 100):
+                    batch = missing[start:start + 100]
+                    embedded = _gemini_embed_texts(
+                        [
+                            f"Title: {chunk['title']}\nSource: {chunk['source']}\nPassage: {chunk['text']}"
+                            for chunk in batch
+                        ],
+                        "document",
+                        timeout=timeout,
+                    )
+                    if len(embedded) != len(batch):
+                        raise RuntimeError("The embedding service returned an incomplete batch.")
+                    for chunk, vector in zip(batch, embedded, strict=True):
+                        store[keys[chunk["id"]]] = [round(value, 8) for value in vector]
+            except Exception:
+                _rag_embedding_failed()
+                raise
+            finally:
+                _rag_save_vector_store()
+        return {chunk["id"]: store[keys[chunk["id"]]] for chunk in chunks}
+    finally:
+        _RAG_VECTOR_LOCK.release()
+
+
+def _start_background_embedding() -> None:
+    global _RAG_BACKGROUND_THREAD
+    if os.getenv("RAG_BACKGROUND_EMBED", "1").strip().lower() in {"0", "false", "no"}:
+        return
+    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")):
+        return
+    if _RAG_BACKGROUND_THREAD is not None and _RAG_BACKGROUND_THREAD.is_alive():
+        return
+    _RAG_BACKGROUND_THREAD = threading.Thread(target=prewarm_document_rag, name="rag-embed", daemon=True)
+    _RAG_BACKGROUND_THREAD.start()
+
+
+def _load_rag_vector_index(chunks: list[dict]) -> dict[str, list[float]]:
+    """Vectors for the current corpus; small changes are embedded on the spot."""
+    return _ensure_rag_vectors(
+        chunks,
+        inline_limit=max(1, int(os.getenv("RAG_INLINE_EMBED_LIMIT", "40"))),
+        timeout=max(3.0, float(os.getenv("RAG_INLINE_EMBED_TIMEOUT_SECONDS", "12"))),
+    )
+
+
+def _embed_rag_query(question: str) -> list[float]:
+    if _monotonic() < _RAG_EMBED_COOLDOWN_UNTIL:
+        raise RuntimeError("The embedding service failed recently; using keyword search for now.")
+    try:
+        return _gemini_embed_texts(
+            [question], "query",
+            timeout=max(3.0, float(os.getenv("RAG_INLINE_EMBED_TIMEOUT_SECONDS", "12"))),
+        )[0]
+    except Exception:
+        _rag_embedding_failed()
+        raise
+
+
+# --- keyword retrieval --------------------------------------------------------
+_RAG_EXTRA_STOPWORDS = set(
+    "explain describe tell give list state please answer again need needs want wants many much may might would "
+    "could about there their them they have has had been being also any some such than then into from does did "
+    "doing where why whom whose very just more most other own same".split()
+)
+
+
+def _rag_stem(word: str) -> str:
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 5 and word.endswith("ing"):
+        return word[:-3]
+    if len(word) > 4 and word.endswith(("ed", "es")):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _rag_terms(text: str) -> list[str]:
+    terms = []
+    for word in re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", (text or "").lower()):
+        if word in _STOPWORDS or word in _RAG_EXTRA_STOPWORDS:
+            continue
+        if len(word) <= 2 and not any(ch.isdigit() for ch in word):
+            continue
+        stem = _rag_stem(word)
+        if stem not in _STOPWORDS and stem not in _RAG_EXTRA_STOPWORDS:
+            terms.append(stem)
+    return terms
+
+
+def _rag_chunk_terms(chunk: dict) -> list[str]:
+    key = hash(chunk.get("text") or "")
+    cached = _RAG_TERMS_CACHE.get(key)
+    if cached is None:
+        cached = _rag_terms(chunk.get("text") or "")
+        _RAG_TERMS_CACHE[key] = cached
+    return cached
+
+
+def _rag_query_idf(query_terms: set[str], chunk_term_sets: list[set[str]]) -> dict[str, float]:
+    document_frequency = Counter(term for terms in chunk_term_sets for term in terms if term in query_terms)
+    corpus_size = max(1, len(chunk_term_sets))
+    return {
+        term: math.log((corpus_size + 1) / (document_frequency.get(term, 0) + 1)) + 1
+        for term in query_terms
+    }
 
 
 def _retrieve_rag_document_chunks_lexically(
@@ -5333,73 +6265,72 @@ def _retrieve_rag_document_chunks_lexically(
     chunks: list[dict],
     limit: int,
 ) -> list[dict]:
-    query_terms = set(_tokenize(question))
-    document_term_sets = [set(_tokenize(chunk.get("text", ""))) for chunk in chunks]
-    document_frequency = Counter(
-        term
-        for terms in document_term_sets
-        for term in terms
-        if term in query_terms
-    )
-    corpus_size = max(1, len(chunks))
-    query_sequence = _tokenize(question)
+    query_sequence = _rag_terms(question)
+    query_terms = set(query_sequence)
+    if not query_terms or not chunks:
+        return []
+    chunk_term_lists = [_rag_chunk_terms(chunk) for chunk in chunks]
+    chunk_term_sets = [set(terms) for terms in chunk_term_lists]
+    idf = _rag_query_idf(query_terms, chunk_term_sets)
+    total_idf = sum(idf.values()) or 1.0
     query_phrases = {
         " ".join(query_sequence[index:index + size])
         for size in (2, 3)
         for index in range(len(query_sequence) - size + 1)
     }
+    # Handbook wording hints: they nudge, they never outvote a real term match.
+    raw_terms = set(_tokenize(question))
     topic_anchors = []
-    question_terms_lower = set(query_sequence)
-    if "load" in question_terms_lower:
+    if "load" in raw_terms:
         topic_anchors.append("academic load")
-    if "inc" in question_terms_lower or "incomplete" in question_terms_lower:
+    if "inc" in raw_terms or "incomplete" in raw_terms:
         topic_anchors.extend(["incomplete grades", "removal of the inc"])
-    if "residence" in question_terms_lower and "maximum" in question_terms_lower:
+    if "residence" in raw_terms and "maximum" in raw_terms:
         topic_anchors.append("maximum residence")
-    if "comprehensive" in question_terms_lower:
+    if "comprehensive" in raw_terms:
         topic_anchors.append("comprehensive exam")
-    if (
-        {"repeat", "retake", "failed", "failure"} & question_terms_lower
-        and {"subject", "course", "class"} & question_terms_lower
-    ):
+    if {"repeat", "retake", "failed", "failure"} & raw_terms and {"subject", "course", "class"} & raw_terms:
         topic_anchors.append("retention policy")
-    if "withdraw" in question_terms_lower or "withdrawal" in question_terms_lower:
+    if "withdraw" in raw_terms or "withdrawal" in raw_terms:
         topic_anchors.append("withdrawal of subject")
-    if "leave" in question_terms_lower and "absence" in question_terms_lower:
+    if "leave" in raw_terms and "absence" in raw_terms:
         topic_anchors.append("leave of absence")
-    if (
-        {"graduate", "graduation"} & question_terms_lower
-        and {"requirement", "requirements", "completed", "complete"} & question_terms_lower
-    ):
+    if {"graduate", "graduation"} & raw_terms and {"requirement", "requirements", "completed", "complete"} & raw_terms:
         topic_anchors.append("graduation requirements")
-    scored = []
     question_lower = (question or "").lower()
-    for chunk in chunks:
-        title_terms = set(_tokenize(chunk.get("title", "")))
-        text_terms = _tokenize(chunk.get("text", ""))
-        text_counts = Counter(text_terms)
-        score = sum(
-            (
-                min(text_counts.get(term, 0), 3)
-                + (3 if term in title_terms else 0)
-            ) * (math.log((corpus_size + 1) / (document_frequency.get(term, 0) + 1)) + 1)
-            for term in query_terms
-        )
-        normalized_text = " ".join(text_terms)
+    document_words = ("handbook", "research protocol", "operations manual", "memo")
+
+    scored = []
+    for chunk, terms, term_set in zip(chunks, chunk_term_lists, chunk_term_sets, strict=True):
+        title_terms = set(_rag_terms(chunk.get("title", "")))
+        counts = Counter(terms)
+        score = 0.0
+        matched_idf = 0.0
+        for term in query_terms:
+            in_title = term in title_terms
+            if counts.get(term) or in_title:
+                matched_idf += idf[term]
+            score += (min(counts.get(term, 0), 3) + (3 if in_title else 0)) * idf[term]
+        if not score:
+            continue
+        normalized_text = " ".join(terms)
         score += sum(8 for phrase in query_phrases if phrase in normalized_text)
         raw_text = " ".join((chunk.get("text") or "").lower().split())
-        score += sum(100 for anchor in topic_anchors if anchor in raw_text)
-        source_label = f"{chunk.get('title', '')} {chunk.get('source', '')}".lower()
-        if "handbook" in question_lower and "handbook" in source_label:
-            score += 50
-        if "research protocol" in question_lower and "research-protocol" in source_label.replace(" ", "-"):
-            score += 50
-        if score:
-            scored.append((score, chunk))
-    scored.sort(key=lambda item: (-item[0], item[1].get("id", "")))
+        score += sum(12 for anchor in topic_anchors if anchor in raw_text)
+        label = f"{chunk.get('title', '')} {chunk.get('source', '')} {chunk.get('category', '')}".lower()
+        for phrase in document_words:
+            if phrase in question_lower and phrase in label:
+                score += 50
+        if chunk.get("kind") == "managed":
+            score *= 1.1  # a staff upload is the newer, approved word
+        coverage = matched_idf / total_idf
+        matched = sum(1 for term in query_terms if counts.get(term) or term in title_terms)
+        relevant = coverage >= 0.4 and matched >= min(2, len(query_terms))
+        scored.append((score, chunk, coverage, relevant))
+    scored.sort(key=lambda item: (-item[0], (item[1].get("status") or "active") != "active", item[1].get("id", "")))
     return [
-        {**chunk, "_retrieval": "lexical-fallback", "_score": score}
-        for score, chunk in scored[:limit]
+        {**chunk, "_retrieval": "lexical-fallback", "_score": round(score, 4), "_coverage": round(coverage, 3), "_relevant": relevant}
+        for score, chunk, coverage, relevant in scored[:limit]
     ]
 
 
@@ -5411,7 +6342,7 @@ def _retrieve_rag_document_chunks(
     limit = limit or max(1, int(os.getenv("RAG_TOP_K", "3")))
     try:
         vectors = _load_rag_vector_index(chunks)
-        query_vector = _gemini_embed_texts([question], "query")[0]
+        query_vector = _embed_rag_query(question)
         scored = [
             (
                 sum(a * b for a, b in zip(query_vector, vectors[chunk["id"]])),
@@ -5422,10 +6353,16 @@ def _retrieve_rag_document_chunks(
         ]
         scored.sort(key=lambda item: (-item[0], item[1].get("id", "")))
         if scored:
-            return [
+            top = [
                 {**chunk, "_retrieval": "vector", "_score": round(score, 6)}
                 for score, chunk in scored[:limit]
             ]
+            # Exact wording still matters: a passage that contains nearly every
+            # term of the question is never left out because of the embedding.
+            lexical = _retrieve_rag_document_chunks_lexically(question, chunks, 1)
+            if lexical and lexical[0]["_coverage"] >= 0.75 and lexical[0]["id"] not in {item["id"] for item in top}:
+                top = [{**lexical[0], "_retrieval": "lexical-boost"}] + top[: limit - 1]
+            return top
     except Exception:  # noqa: BLE001
         # Keep policy guidance available during an embedding outage. Generation
         # still receives retrieved source text and remains citation-grounded.
@@ -5436,8 +6373,11 @@ def _retrieve_rag_document_chunks(
 def prewarm_document_rag() -> None:
     """Prepare persisted document chunks and semantic vectors in the background."""
     try:
-        chunks = _load_rag_document_index()
-        vectors = _load_rag_vector_index(chunks)
+        def build():
+            chunks = _load_rag_document_index()
+            return chunks, _ensure_rag_vectors(chunks)
+
+        chunks, vectors = _in_app_context(build)
         print(
             f"Policy Assistant vector index is ready "
             f"({len(chunks)} chunks, {len(vectors)} vectors)."
@@ -5463,40 +6403,71 @@ def _case_context_for_rag(student: Student | None, payload: dict | None, snippet
     return "\n".join(context)
 
 
+def _policy_citation(chunk: dict) -> dict:
+    status = chunk.get("status") or "active"
+    return {
+        "id": chunk["id"],
+        "title": chunk["title"],
+        "source": chunk["source"],
+        "text": chunk["text"][:700],
+        "retrieval": chunk.get("_retrieval", "vector"),
+        "similarity": chunk.get("_score"),
+        "status": status,
+        "category": chunk.get("category"),
+        "document_id": chunk.get("document_id"),
+        "kind": chunk.get("kind"),
+        "warning": POLICY_DRAFT_WARNING if status == "draft" else None,
+    }
+
+
+def _finalize_document_answer(answer: str, chunks: list[dict]) -> str:
+    """Make every answer name its source document and flag draft documents."""
+    answer = (answer or "").strip()
+    if chunks and not any(chunk["title"].lower() in answer.lower() for chunk in chunks):
+        labels = []
+        for chunk in chunks[:2]:
+            if chunk["source"] not in labels:
+                labels.append(chunk["source"])
+        answer += "\n\nSource: " + "; ".join(labels)
+    drafts = [chunk for chunk in chunks if (chunk.get("status") or "active") == "draft"]
+    if drafts and POLICY_DRAFT_WARNING not in answer:
+        titles = []
+        for chunk in drafts:
+            if chunk["title"] not in titles:
+                titles.append(chunk["title"])
+        answer += f"\n\n{POLICY_DRAFT_WARNING}: {', '.join(titles)}."
+    return answer
+
+
 def call_document_rag(question: str, snippets: list[dict], payload: dict | None, student: Student | None) -> tuple[str, list[dict]]:
     document_chunks = _load_rag_document_index()
     retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks)
+    if not retrieved_chunks:
+        raise PolicyPassageNotFound("No matching policy passage was found.")
     case_context = _case_context_for_rag(student, payload, snippets)
     prompt = (
-        "Answer as the USLS Graduate School assistant. Use the retrieved handbook and research guideline "
-        "documents as the primary source. If student context is provided, use it only for that student's live "
+        "Answer as the USLS Graduate School assistant. Use the retrieved policy document excerpts (handbook, "
+        "research protocol, memos, manuals) as the primary source; when two excerpts disagree, prefer the one "
+        "marked as the newer or staff-uploaded document and say so. Name the source document title and page or "
+        "section you rely on. If an excerpt is marked DRAFT, say the rule is a draft pending Graduate School "
+        "validation. If student context is provided, use it only for that student's live "
         "status and do not invent approvals, decisions, or missing records. Answer the question directly in no "
         "more than 120 words. Include only the rules needed to answer it; do not paste long source passages. "
         "If the documents do not answer the question, say what is missing.\n\n"
     )
     if case_context:
         prompt += case_context + "\n\n"
-    if retrieved_chunks:
-        prompt += "Retrieved document excerpts:\n"
-        prompt += "\n\n".join(
-            f"[{chunk['source']}]\n{chunk['text']}"
-            for chunk in retrieved_chunks
-        )
-        prompt += "\n\n"
-    prompt += f"Question: {question}"
-    response = _gemini_generate(prompt)
-    citations = [
-        {
-            "id": chunk["id"],
-            "title": chunk["title"],
-            "source": chunk["source"],
-            "text": chunk["text"][:700],
-            "retrieval": chunk.get("_retrieval", "vector"),
-            "similarity": chunk.get("_score"),
-        }
+    prompt += "Retrieved document excerpts:\n"
+    prompt += "\n\n".join(
+        f"[{chunk['source']}"
+        + (" — DRAFT, pending Graduate School validation" if (chunk.get("status") or "active") == "draft" else "")
+        + (" — staff-uploaded" if chunk.get("kind") == "managed" else "")
+        + f"]\n{chunk['text']}"
         for chunk in retrieved_chunks
-    ]
-    return response, citations
+    )
+    prompt += f"\n\nQuestion: {question}"
+    response = _finalize_document_answer(_gemini_generate(prompt), retrieved_chunks)
+    return response, [_policy_citation(chunk) for chunk in retrieved_chunks]
 
 
 def _merge_rag_source_chunks(source_chunk: dict, document_chunks: list[dict]) -> str:
@@ -5656,7 +6627,15 @@ def _targeted_local_rag_answer(question: str, page_texts: list[str]) -> str | No
             start = selected[0].lower().find("a master")
             if start >= 0:
                 selected[0] = selected[0][start:]
-    elif "comprehensive" in lowered:
+    elif "comprehensive" in lowered and ("retake" in lowered or "how many times" in lowered):
+        selected = pick(
+            ("allowed to take 2 retakes",),
+            ("fails in the second retake", "refresher course"),
+            ("failure", "fourth time", "disqualification"),
+        )
+    elif "comprehensive" in lowered and any(
+        word in lowered for word in ("eligib", "requirement", "qualif", "apply", "file ")
+    ):
         selected = pick(
             ("master", "passed all academic requirements", "may file"),
             ("doctorate students", "passed all academic requirements", "may likewise file"),
@@ -5702,80 +6681,164 @@ def _targeted_local_rag_answer(question: str, page_texts: list[str]) -> str | No
     return " ".join(selected) if selected else None
 
 
+_ANSWER_ABBREVIATIONS = ("no.", "dr.", "mr.", "mrs.", "ms.", "prof.", "e.g.", "i.e.", "vs.", "sec.", "art.", "fig.", "approx.")
+
+
+def _split_policy_sentences(text: str) -> list[str]:
+    normalized = " ".join((text or "").split())
+    # A numbered heading such as "3.11 GRADUATION REQUIREMENTS" starts a new sentence.
+    normalized = re.sub(r"(?<![.!?:;])\s+(?=\d{1,2}(?:\.\d{1,2})+\s+[A-Z]{3,})", ". ", normalized)
+    pieces = re.split(r"(?<=[.!?])\s+(?=[\"“(•\-]?[A-Z0-9])", normalized)
+    merged: list[str] = []
+    for piece in pieces:
+        if merged and merged[-1].lower().endswith(_ANSWER_ABBREVIATIONS):
+            merged[-1] = f"{merged[-1]} {piece}"
+        else:
+            merged.append(piece)
+    sentences: list[str] = []
+    for piece in merged:
+        piece = piece.strip()
+        if not piece:
+            continue
+        if len(piece.split()) > 70:  # run-on PDF text: fall back to clause boundaries
+            sentences.extend(part.strip() for part in re.split(r"(?<=[;:])\s+", piece) if part.strip())
+        else:
+            sentences.append(piece)
+    return sentences
+
+
+_NUMBER_WORDS = {
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "twelve", "twenty",
+    "thirty", "fifty", "hundred", "half", "once", "twice",
+}
+_QUANTITY_QUESTION = re.compile(
+    r"\b(how many|how much|how long|how often|maximum|minimum|at most|at least|limit|deadline|within|units?|"
+    r"years?|days?|weeks?|months?|semesters?|percent|fee|fees|cost|score|grade)\b",
+    re.IGNORECASE,
+)
+
+
+def _select_answer_sentences(question: str, page_text: str, idf: dict[str, float], max_chars: int) -> tuple[str, float]:
+    """Pick the few sentences of a page or section that answer the question."""
+    sentences = _split_policy_sentences(page_text)
+    if not sentences:
+        return "", 0.0
+    query_sequence = _rag_terms(question)
+    query_terms = set(query_sequence)
+    phrases = {
+        " ".join(query_sequence[index:index + size])
+        for size in (2, 3)
+        for index in range(len(query_sequence) - size + 1)
+    }
+    asks_quantity = bool(_QUANTITY_QUESTION.search(question or ""))
+    scores = []
+    for sentence in sentences:
+        terms = _rag_terms(sentence)
+        term_set = set(terms)
+        score = sum(idf.get(term, 1.0) for term in query_terms if term in term_set)
+        if score:
+            normalized = " ".join(terms)
+            score += sum(3 for phrase in phrases if phrase in normalized)
+            if asks_quantity and (re.search(r"\d", sentence) or term_set & _NUMBER_WORDS):
+                score += 2
+        scores.append(score)
+    best = max(scores)
+    if best <= 0:
+        return "", 0.0
+
+    best_index = scores.index(best)
+    chosen = {best_index}
+    lead = sentences[best_index - 1] if best_index > 0 else ""
+    follow = sentences[best_index + 1] if best_index + 1 < len(sentences) else ""
+    if lead.rstrip().endswith(":") or re.match(r"^(and|or|but|which|however|provided|unless)\b", sentences[best_index], re.I):
+        chosen.add(best_index - 1)
+    if follow and re.match(r"^(however|but|otherwise|except|unless|provided|in case|if not|exceptions?)\b", follow, re.I):
+        chosen.add(best_index + 1)
+    if sentences[best_index].rstrip().endswith(":") or re.search(
+        r"(following|below|as follows|listed)\W*$", sentences[best_index], re.IGNORECASE
+    ):
+        chosen.update(range(best_index + 1, min(len(sentences), best_index + 4)))  # the list that follows
+    for index, score in sorted(enumerate(scores), key=lambda item: -item[1]):
+        if len(chosen) >= 3:
+            break
+        if index not in chosen and score >= 0.6 * best:
+            chosen.add(index)
+
+    selected: list[str] = []
+    used = 0
+    for index in sorted(chosen):
+        sentence = sentences[index]
+        if selected and used + len(sentence) > max_chars:
+            break
+        selected.append(sentence)
+        used += len(sentence) + 1
+    text = " ".join(selected)
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
+    return text, best
+
+
+def _local_answer_location(chunk: dict) -> str:
+    title = chunk.get("title") or ""
+    source = chunk.get("source") or ""
+    return source[len(title):].lstrip(", ") if source.startswith(title) else source
+
+
 def call_local_document_rag(question: str) -> tuple[str, list[dict]]:
-    """Extract matching handbook text when Gemini is unavailable."""
+    """Answer from the policy library without an AI service: cited, extractive, short."""
     document_chunks = _load_rag_document_index()
     retrieved_chunks = _retrieve_rag_document_chunks_lexically(
         question,
         document_chunks,
         max(8, int(os.getenv("RAG_TOP_K", "3"))),
     )
-    if not retrieved_chunks:
-        raise RuntimeError("No matching handbook passage was found.")
+    relevant = [chunk for chunk in retrieved_chunks if chunk.get("_relevant")]
+    if not relevant:
+        raise PolicyPassageNotFound("No matching policy passage was found.")
 
-    # Keep the response strictly extractive. Returning only the strongest
-    # source passage is more verbose than generation, but it cannot blend in a
-    # loosely matching rule from another document or handbook section.
-    selected_chunks = [retrieved_chunks[0]]
-    question_lower = (question or "").lower()
-    force_secondary = (
-        "comprehensive" in question_lower and "eligib" in question_lower
-    ) or (
-        "leave of absence" in question_lower and "return" in question_lower
-    )
-    suppress_secondary = (
-        ("graduate" in question_lower or "graduation" in question_lower)
-        and "require" in question_lower
-    )
-    if force_secondary and not suppress_secondary:
-        primary_title = retrieved_chunks[0].get("title")
-        same_source = [
-            chunk for chunk in retrieved_chunks[1:]
-            if chunk.get("title") == primary_title
-            and chunk.get("source") != retrieved_chunks[0].get("source")
-        ]
-        if "comprehensive" in question_lower and "eligib" in question_lower:
-            same_source = sorted(
-                same_source,
-                key=lambda chunk: "eligibility" not in (chunk.get("text") or "").lower(),
-            )
-        elif "leave of absence" in question_lower and "return" in question_lower:
-            same_source = sorted(
-                same_source,
-                key=lambda chunk: "leave may be approved" not in (chunk.get("text") or "").lower(),
-            )
-        secondary = same_source[0] if same_source else None
-        if secondary:
-            selected_chunks.append(secondary)
+    # Keep the response strictly extractive: sentences are copied from the
+    # strongest passage (and a second one only when it is nearly as strong), so
+    # an answer can never blend in a loosely matching rule.
+    top = relevant[0]
+    selected_chunks = [top]
+    for other in relevant[1:]:
+        if len(selected_chunks) >= 2:
+            break
+        if other["source"] != top["source"] and other["_score"] >= 0.6 * top["_score"]:
+            selected_chunks.append(other)
 
-    page_texts = [
-        _merge_rag_source_chunks(chunk, document_chunks)
-        for chunk in selected_chunks
-    ]
-    targeted_answer = _targeted_local_rag_answer(question, page_texts)
-    passages = []
+    page_texts = [_merge_rag_source_chunks(chunk, document_chunks) for chunk in selected_chunks]
     total_limit = max(500, int(os.getenv("LOCAL_RAG_MAX_ANSWER_CHARS", "1050")))
-    per_passage_limit = total_limit // len(selected_chunks)
-    for chunk, page_text in zip(selected_chunks, page_texts, strict=True):
-        excerpt = _focused_local_rag_excerpt(page_text, question, per_passage_limit)
-        if excerpt and excerpt not in passages:
-            passages.append(excerpt)
-
-    citations = [
-        {
-            "id": chunk["id"],
-            "title": chunk["title"],
-            "source": chunk["source"],
-            "text": chunk["text"][:700],
-            "retrieval": "lexical",
-            "similarity": chunk.get("_score"),
-        }
-        for chunk in selected_chunks
-    ]
-    if not passages:
-        raise RuntimeError("No readable handbook passage was found.")
-    answer = targeted_answer or "\n\n".join(passages)
-    return "According to the handbook: " + answer, citations
+    targeted_answer = _targeted_local_rag_answer(question, page_texts)
+    paragraphs: list[str] = []
+    cited = list(selected_chunks)
+    if targeted_answer:
+        paragraphs.append(f"According to {top['title']}, {_local_answer_location(top)}: {targeted_answer}")
+    else:
+        idf = _rag_query_idf(
+            set(_rag_terms(question)),
+            [set(_rag_chunk_terms(chunk)) for chunk in document_chunks],
+        )
+        cited = []
+        first_score = 0.0
+        for chunk, page_text in zip(selected_chunks, page_texts, strict=True):
+            text, score = _select_answer_sentences(question, page_text, idf, total_limit // len(selected_chunks))
+            if not text:
+                text = _focused_local_rag_excerpt(page_text, question, total_limit // len(selected_chunks))
+                score = 0.0
+            if not text:
+                continue
+            if cited and score < 0.6 * first_score:
+                continue  # the second passage adds nothing that answers the question
+            if not cited:
+                first_score = score
+            cited.append(chunk)
+            paragraphs.append(f"According to {chunk['title']}, {_local_answer_location(chunk)}: {text}")
+    if not paragraphs:
+        raise PolicyPassageNotFound("No readable policy passage was found.")
+    answer = _finalize_document_answer("\n\n".join(paragraphs), cited)
+    citations = [{**_policy_citation(chunk), "retrieval": "lexical"} for chunk in cited]
+    return answer, citations
 
 
 def _assistant_asks_portfolio(question: str) -> bool:
@@ -6143,16 +7206,20 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
             "Retrieved from the curated local policy library without AI generation.", False,
         ),
         "document-rag": (
-            "Handbook RAG · Gemini",
-            "Generated by Gemini from retrieved handbook or guideline excerpts.", True,
+            "Policy documents · Gemini",
+            "Generated by Gemini from retrieved policy document excerpts (handbook, protocol, uploads).", True,
         ),
         "document-rag-cache": (
-            "Handbook RAG · Gemini (cached)",
-            "Previously generated by Gemini from retrieved handbook or guideline excerpts.", True,
+            "Policy documents · Gemini (cached)",
+            "Previously generated by Gemini from retrieved policy document excerpts.", True,
         ),
         "document-rag-local": (
-            "Handbook RAG - Local retrieval",
-            "Extracted directly from matching handbook or guideline passages without AI generation.", False,
+            "Policy documents · Local retrieval",
+            "Extracted directly from matching policy document passages without AI generation.", False,
+        ),
+        "role-guarded": (
+            "Policy library · Role limits",
+            "This role can ask policy questions; student records are not available in this chat.", False,
         ),
         "offline-fallback": (
             "Policy fallback · Verified rules",
@@ -6383,63 +7450,56 @@ def assistant_validation_response(
     }
 
 
+ASSISTANT_DATABASE_INTENTS = {
+    "earliest_academic_entry", "graduation_forecast", "student_progress_blockers",
+    "student_graduation", "coursework_eligibility", "student_attention", "student_status",
+}
+ASSISTANT_STUDENT_BOUND_INTENTS = {
+    "student_progress_blockers", "student_graduation", "coursework_eligibility", "student_status",
+}
+ASSISTANT_POLICY_DOMAIN_TERMS = [
+    "research", "adviser", "advisor", "thesis", "dissertation",
+    "subject", "course", "class", "grade", "exam", "retake", "repeat",
+    "form", "defense", "panel", "ethics", "residency", "leave of absence",
+    "loa", "readmission", "withdrawal", "graduation", "completion",
+]
+
+
+def _policy_library_has_relevant_passage(question: str) -> bool:
+    try:
+        chunks = _load_rag_document_index()
+        return any(
+            chunk.get("_relevant")
+            for chunk in _retrieve_rag_document_chunks_lexically(question, chunks, 3)
+        )
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def assistant_requires_document_rag(
     question: str,
     student: Student | None,
     snippets: list[dict],
+    intent: str | None = None,
 ) -> bool:
-    """Route source-sensitive policy questions to the complete document library.
+    """The document library is the primary source for every policy question.
 
-    Suggested questions may be answered by the small curated policy corpus, but
-    users are not limited to those prompts. Free-form questions that ask for an
-    exact number, limit, or attempt count need the full handbook/protocol because
-    a related curated snippet may not contain the requested detail.
+    Curated snippets never answer first: a policy question goes to the complete
+    library (built-in documents plus staff uploads) and the snippets are only a
+    fallback when no passage is relevant. Questions about a live student
+    record, or about the portfolio, are answered from the database instead.
     """
     lowered = " ".join((question or "").lower().split())
-    document_intent = any(
-        phrase in lowered
-        for phrase in [
-            "according to the handbook",
-            "according to the manual",
-            "research protocol",
-            "policy document",
-            "source document",
-            "search the handbook",
-            "search the manual",
-            "cite the handbook",
-            "cite the manual",
-            "exact wording",
-            "what does the handbook say",
-            "what does the manual say",
-        ]
-    )
-    if document_intent:
-        return True
-
-    policy_domain_terms = [
-        "research", "adviser", "advisor", "thesis", "dissertation",
-        "subject", "course", "class", "grade", "exam", "retake", "repeat",
-        "form", "defense", "panel", "ethics", "residency", "leave of absence",
-        "loa", "readmission", "withdrawal", "graduation", "completion",
-    ]
-    if not any(term in lowered for term in policy_domain_terms):
+    intent = intent or _assistant_intent(question)
+    if intent in ASSISTANT_DATABASE_INTENTS:
         return False
-
-    # No curated match means the complete library is the only grounded source.
-    if not snippets:
+    if intent == "policy":
         return True
-
-    precision_phrases = [
-        "how many", "how often", "how long", "number of times", "maximum",
-        "minimum", "limit", "deadline", "within how many", "how soon",
-        "first retake", "second retake", "third retake", "last time",
-    ]
-    if any(phrase in lowered for phrase in precision_phrases):
+    # "unknown" intent: a question that uses policy vocabulary or matches the
+    # library is still a policy question (an uploaded rule may use any words).
+    if any(term in lowered for term in ASSISTANT_POLICY_DOMAIN_TERMS):
         return True
-
-    # Student context is safe to include, but the query remains stateless and
-    # therefore cannot leak a previous user's conversation into this answer.
-    return False
+    return _policy_library_has_relevant_passage(question)
 
 
 def student_requires_document_rag(
@@ -6514,33 +7574,57 @@ def _rag_cache_set(key: tuple, value: tuple[str, list[dict]]) -> None:
             _RAG_RESPONSE_CACHE.popitem(last=False)
 
 
-def generate_answer(question: str, student_id: int | None = None) -> dict:
-    student = Student.query.get(student_id) if student_id else None
+def assistant_role_guarded_response(role: str) -> dict:
+    label = ROLE_LABELS.get(role, "your role")
+    return {
+        "answer": (
+            f"As {label} you can ask me about Graduate School policy, procedures, forms, and deadlines, and I "
+            "answer from the policy document library with the source shown. Student records, rosters, and "
+            "monitoring lists are not available in this chat; use the screens in your own portal for those."
+        ),
+        "structured": None,
+        "mode": "role-guarded",
+        "source": _assistant_source("validation"),
+        "citations": [],
+        "grounded": None,
+        "recommendations": [],
+        "student": None,
+        "scope": "policy-only",
+        "read_only": True,
+    }
+
+
+def generate_answer(question: str, student_id: int | None = None, policy_only: bool = False, role: str = "") -> dict:
+    # Policy-only callers (Dean, coordinators, faculty) never get student data.
+    student = Student.query.get(student_id) if student_id and not policy_only else None
     payload = student_recommendations(student) if student else None
     validation_message = assistant_validation_message(question)
     if validation_message:
         return assistant_validation_response(validation_message, student, payload)
-    # The assistant is advisory only: it retrieves policy snippets and explains
+    # The assistant is advisory only: it retrieves policy passages and explains
     # backend-computed facts. It never changes records or approves decisions.
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     intent = _assistant_intent(question)
     intent_ai_used = False
-    if intent == "unknown" and api_key:
+    if intent == "unknown" and not assistant_requires_document_rag(question, student, [], intent) and api_key:
         classified_intent = _classify_assistant_intent_with_gemini(question, bool(student))
         if classified_intent and classified_intent != "unknown":
             intent = classified_intent
             intent_ai_used = True
 
-    database_intents = {
-        "earliest_academic_entry", "graduation_forecast", "student_progress_blockers",
-        "student_graduation", "coursework_eligibility", "student_attention", "student_status",
-    }
+    if not student and intent in ASSISTANT_STUDENT_BOUND_INTENTS:
+        # "What grade keeps a master's student in good standing?" names no student:
+        # it is a policy question, not a request for a record.
+        intent = "unknown"
+    database_intents = ASSISTANT_DATABASE_INTENTS
+    if policy_only and intent in database_intents:
+        return assistant_role_guarded_response(role)
     snippets = retrieve_policy(question, k=3) if intent in {"policy", "unknown"} else []
     mode = "database-rules" if intent in database_intents else "policy-retrieval"
     rag_citations = []
     attention_portfolio = portfolio_recommendations() if intent == "student_attention" else None
     database_report = _database_report_for_intent(intent, student, payload)
-    if assistant_requires_document_rag(question, student, snippets):
+    if assistant_requires_document_rag(question, student, snippets, intent):
         try:
             if not api_key:
                 raise RuntimeError("Gemini is not configured.")
@@ -6558,6 +7642,12 @@ def generate_answer(question: str, student_id: int | None = None) -> dict:
             try:
                 answer, rag_citations = call_local_document_rag(question)
                 mode = "document-rag-local"
+            except PolicyPassageNotFound:
+                # No passage in the library is relevant: only now do the curated snippets answer.
+                answer = local_grounded_answer(
+                    question, student, payload, snippets, attention_portfolio, database_report
+                )
+                mode = "policy-retrieval"
             except Exception:
                 answer = local_grounded_answer(
                     question, student, payload, snippets, attention_portfolio, database_report
@@ -12371,17 +13461,13 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def policy_documents():
         managed = PolicyDocument.query.order_by(PolicyDocument.updated_at.desc(), PolicyDocument.id.desc()).all()
-        managed_paths = {
-            (POLICY_DOCUMENT_UPLOAD_ROOT / item.stored_name).resolve()
-            for item in managed
-        }
-        system_items = [
-            _system_policy_document_dict(path)
-            for path in _rag_document_files()
-            if path.resolve() not in managed_paths
-        ]
         managed_items = [policy_document_dict(item) for item in managed]
-        ready = sum(item["status"] == "Ready" for item in managed_items + system_items)
+        system_items = [
+            _system_policy_document_dict(source)
+            for source in _rag_document_sources()
+            if source["kind"] == "system"
+        ]
+        ready = sum(item["index_status"] == "Ready" for item in managed_items + system_items)
         return jsonify({
             "items": managed_items + system_items,
             "summary": {
@@ -12389,77 +13475,52 @@ def register_routes(app: Flask) -> None:
                 "managed": len(managed_items),
                 "system": len(system_items),
                 "ready": ready,
+                "draft": sum(item["status"] == "draft" for item in managed_items),
+                "archived": sum(item["status"] == "archived" for item in managed_items),
             },
-            "max_upload_mb": max(1, int(os.getenv("POLICY_DOCUMENT_MAX_MB", "20"))),
+            "max_upload_mb": _policy_max_upload_mb(),
+            "categories": POLICY_DOCUMENT_CATEGORIES,
+            "statuses": POLICY_DOCUMENT_STATUSES,
+            "draft_warning": POLICY_DRAFT_WARNING,
         })
 
     @app.route("/api/policy-documents", methods=["POST"])
     @require_api_login("staff")
     def policy_document_create():
         uploaded = request.files.get("file")
-        title = (request.form.get("title") or "").strip()
-        description = (request.form.get("description") or "").strip()
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a PDF or DOCX file to upload."}), 400
-        if not title:
-            title = Path(uploaded.filename).stem.replace("_", " ").strip()
-        if not title or len(title) > 220:
-            return jsonify({"error": "Enter a document title up to 220 characters."}), 400
-        if len(description) > 2000:
-            return jsonify({"error": "Keep the description under 2,000 characters."}), 400
-        original_name = secure_filename(uploaded.filename) or "policy-document"
-        suffix = Path(original_name).suffix.lower()
-        if suffix not in POLICY_DOCUMENT_TYPES:
-            return jsonify({"error": "Only PDF and DOCX policy documents can be uploaded."}), 400
+        fields = {key: request.form.get(key) for key in request.form.keys()}
+        if not (fields.get("title") or "").strip():
+            fields["title"] = Path(uploaded.filename).stem.replace("_", " ").strip()
+        values, error = parse_policy_metadata(fields)
+        note, note_error = _policy_version_note(request.form)
+        if error or note_error:
+            return jsonify({"error": error or note_error}), 400
         file_bytes = uploaded.read()
         try:
-            page_count, chunk_count, mime_type = _inspect_policy_document(file_bytes, suffix)
+            document = create_policy_document(file_bytes, uploaded.filename, current_account(), values, note)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        stored_name = f"{uuid4().hex[:10]}-{original_name}"
-        target = POLICY_DOCUMENT_UPLOAD_ROOT / stored_name
-        POLICY_DOCUMENT_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(file_bytes)
-        account = current_account()
-        document = PolicyDocument(
-            title=title,
-            description=description,
-            original_name=original_name,
-            stored_name=stored_name,
-            mime_type=mime_type,
-            file_size=len(file_bytes),
-            page_count=page_count,
-            chunk_count=chunk_count,
-            uploaded_by_user_id=account.id,
-        )
-        try:
-            db.session.add(document)
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            target.unlink(missing_ok=True)
-            raise
-        _reset_rag_indexes()
-        return jsonify({
-            "item": policy_document_dict(document),
-            "message": f"{document.title} was added to the Policy Assistant library.",
-        }), 201
+        message = f"{document.title} was added to the Policy Assistant library."
+        if document.status == "draft":
+            message += " It is marked draft, so answers that use it will say it is pending Graduate School validation."
+        if document.status == "archived":
+            message = f"{document.title} was saved as archived and is not searched by the Policy Assistant."
+        return jsonify({"item": policy_document_dict(document), "message": message + _policy_ocr_note(file_bytes)}), 201
 
     @app.route("/api/policy-documents/<int:document_id>", methods=["PATCH"])
     @require_api_login("staff")
     def policy_document_update(document_id: int):
         document = PolicyDocument.query.get_or_404(document_id)
-        data = request_payload()
-        title = (data.get("title") or "").strip()
-        description = (data.get("description") or "").strip()
-        if not title or len(title) > 220:
-            return jsonify({"error": "Enter a document title up to 220 characters."}), 400
-        if len(description) > 2000:
-            return jsonify({"error": "Keep the description under 2,000 characters."}), 400
-        document.title = title
-        document.description = description
+        values, error = parse_policy_metadata(request_payload())
+        if error:
+            return jsonify({"error": error}), 400
+        for field, value in values.items():
+            setattr(document, field, value)
         document.updated_at = now_utc()
         db.session.commit()
+        _reset_rag_indexes()
         return jsonify({"item": policy_document_dict(document), "message": "Document details updated."})
 
     @app.route("/api/policy-documents/<int:document_id>/file", methods=["PUT"])
@@ -12469,50 +13530,34 @@ def register_routes(app: Flask) -> None:
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a replacement PDF or DOCX file."}), 400
-        original_name = secure_filename(uploaded.filename) or "policy-document"
-        suffix = Path(original_name).suffix.lower()
-        if suffix not in POLICY_DOCUMENT_TYPES:
-            return jsonify({"error": "Only PDF and DOCX policy documents can be uploaded."}), 400
+        fields = {key: request.form.get(key) for key in request.form.keys() if key in {"effective_date", "status", "validation_note"}}
+        values, error = parse_policy_metadata(fields)
+        note, note_error = _policy_version_note(request.form)
+        if error or note_error:
+            return jsonify({"error": error or note_error}), 400
         file_bytes = uploaded.read()
         try:
-            page_count, chunk_count, mime_type = _inspect_policy_document(file_bytes, suffix)
+            replace_policy_document_file(document, file_bytes, uploaded.filename, current_account(), values, note)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        old_path = POLICY_DOCUMENT_UPLOAD_ROOT / document.stored_name
-        stored_name = f"{uuid4().hex[:10]}-{original_name}"
-        new_path = POLICY_DOCUMENT_UPLOAD_ROOT / stored_name
-        POLICY_DOCUMENT_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-        new_path.write_bytes(file_bytes)
-        document.original_name = original_name
-        document.stored_name = stored_name
-        document.file_size = len(file_bytes)
-        document.mime_type = mime_type
-        document.page_count = page_count
-        document.chunk_count = chunk_count
-        document.uploaded_by_user_id = current_account().id
-        document.updated_at = now_utc()
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            new_path.unlink(missing_ok=True)
-            raise
-        old_path.unlink(missing_ok=True)
-        _reset_rag_indexes()
         return jsonify({
             "item": policy_document_dict(document),
-            "message": f"The file for {document.title} was replaced and re-indexed.",
+            "message": (
+                f"The file for {document.title} was replaced and re-indexed. "
+                "The previous version is kept in the version history." + _policy_ocr_note(file_bytes)
+            ),
         })
 
     @app.route("/api/policy-documents/<int:document_id>", methods=["DELETE"])
     @require_api_login("staff")
     def policy_document_delete(document_id: int):
         document = PolicyDocument.query.get_or_404(document_id)
-        path = POLICY_DOCUMENT_UPLOAD_ROOT / document.stored_name
+        stored_names = {document.stored_name} | {row.stored_name for row in document.versions}
         title = document.title
         db.session.delete(document)
         db.session.commit()
-        path.unlink(missing_ok=True)
+        for stored_name in stored_names:
+            (POLICY_DOCUMENT_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
         _reset_rag_indexes()
         return jsonify({"ok": True, "message": f"{title} was removed from the Policy Assistant library."})
 
@@ -12530,12 +13575,30 @@ def register_routes(app: Flask) -> None:
             mimetype=document.mime_type or POLICY_DOCUMENT_TYPES.get(Path(document.original_name).suffix.lower()),
         )
 
+    @app.route("/api/policy-documents/<int:document_id>/versions/<int:version_number>/file")
+    @require_api_login("staff")
+    def policy_document_version_file(document_id: int, version_number: int):
+        document = PolicyDocument.query.get_or_404(document_id)
+        row = next((item for item in document.versions if item.version_number == version_number), None)
+        if row is None and version_number == 1 and not document.versions:
+            row = document  # uploaded before version history existed: its only file is version 1
+        if row is None or not (POLICY_DOCUMENT_UPLOAD_ROOT / row.stored_name).is_file():
+            return jsonify({"error": "That version of the document is unavailable."}), 404
+        return send_from_directory(
+            POLICY_DOCUMENT_UPLOAD_ROOT,
+            row.stored_name,
+            as_attachment=False,
+            download_name=row.original_name,
+            mimetype=row.mime_type or POLICY_DOCUMENT_TYPES.get(Path(row.original_name).suffix.lower()),
+        )
+
     @app.route("/api/policy-documents/system/<key>/file")
     @require_api_login("staff")
     def system_policy_document_file(key: str):
-        for path in _rag_document_files():
+        for source in _rag_document_sources():
+            path = source["path"]
             expected = hashlib.sha256(str(path.resolve()).encode("utf-8")).hexdigest()[:20]
-            if expected == key and path.suffix.lower() in POLICY_DOCUMENT_TYPES:
+            if source["kind"] == "system" and expected == key and path.suffix.lower() in POLICY_DOCUMENT_TYPES:
                 return send_from_directory(
                     path.parent,
                     path.name,
@@ -12544,21 +13607,38 @@ def register_routes(app: Flask) -> None:
                 )
         return jsonify({"error": "Policy document not found."}), 404
 
-    # RAG-style policy/case guidance endpoint.
-    @app.route("/api/assistant", methods=["POST"])
+    @app.route("/api/policy-documents/test-question", methods=["POST"])
     @require_api_login("staff")
+    def policy_document_test_question():
+        question = (request_payload().get("question") or "").strip()
+        if not question:
+            return jsonify({"error": "Type a question to test."}), 400
+        if len(question) > ASSISTANT_MAX_QUESTION_LENGTH:
+            return jsonify({"error": f"Keep the question under {ASSISTANT_MAX_QUESTION_LENGTH} characters."}), 400
+        return jsonify(policy_test_question_payload(question))
+
+    # RAG-style policy/case guidance endpoint. Every signed-in role may ask
+    # policy questions; only Graduate School staff and admins also get answers
+    # built from student records, and a student stays in the student sandbox.
+    @app.route("/api/assistant", methods=["POST"])
+    @require_api_login()
     def assistant():
         data = request_payload()
         question = (data.get("question") or "").strip()
         if not question:
             return jsonify({"error": "Ask a question to get started."}), 400
+        account = current_account()
         student_id = data.get("student_id")
         try:
             student_id = int(student_id) if student_id else None
         except (TypeError, ValueError):
             student_id = None
         try:
-            return jsonify(generate_answer(question, student_id))
+            if account.role == "student":
+                return jsonify(generate_student_answer(question, Student.query.get_or_404(account.student_id)))
+            if account.role in {"staff", "admin"}:
+                return jsonify(generate_answer(question, student_id))
+            return jsonify(generate_answer(question, None, policy_only=True, role=account.role))
         except Exception:
             app.logger.exception("Policy Assistant could not complete a read-only request.")
             return jsonify({
@@ -12575,17 +13655,16 @@ def register_routes(app: Flask) -> None:
 
     # Starter questions for the Assistant UI.
     @app.route("/api/assistant/suggestions")
-    @require_api_login("staff")
+    @require_api_login()
     def assistant_suggestions():
-        return jsonify({
-            "items": [
-                "Which students need attention right now?",
-                "What does a student need for proposal defense readiness?",
-                "Explain the LOA and residency rule.",
-                "What evidence is required for completion?",
-                "How is a defense panel composed?",
-            ]
-        })
+        role = current_account().role
+        if role == "student":
+            items = ASSISTANT_STUDENT_SUGGESTIONS
+        elif role in {"staff", "admin"}:
+            items = ASSISTANT_STAFF_SUGGESTIONS
+        else:
+            items = ASSISTANT_POLICY_SUGGESTIONS
+        return jsonify({"items": items})
 
     @app.route("/api/student-portal/assistant", methods=["POST"])
     @require_api_login("student")
@@ -12601,15 +13680,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/student-portal/assistant/suggestions")
     @require_api_login("student")
     def student_portal_assistant_suggestions():
-        return jsonify({
-            "items": [
-                "What should I do next based on my record?",
-                "Which subjects am I currently enrolled in?",
-                "Explain the incomplete-grade re-enrollment rule.",
-                "What do I need before a research defense?",
-                "Explain the leave, AWOL, and residency rules for students.",
-            ]
-        })
+        return jsonify({"items": ASSISTANT_STUDENT_SUGGESTIONS})
 
     @app.route("/api/leave-of-absence/policy-review", methods=["POST"])
     @require_api_login("staff", "academic_coordinator", "dean")
@@ -16153,6 +17224,11 @@ ACCESS_CONTROL_SPEC = [
     ("Policy document details", "policy_document_update", {"staff"}),
     ("Policy document replacement", "policy_document_replace", {"staff"}),
     ("Policy document removal", "policy_document_delete", {"staff"}),
+    ("Policy document file view", "policy_document_file", {"staff"}),
+    ("Policy document version view", "policy_document_version_file", {"staff"}),
+    ("Built-in policy file view", "system_policy_document_file", {"staff"}),
+    ("Policy retrieval test", "policy_document_test_question", {"staff"}),
+    ("Policy assistant (any signed-in role)", "assistant", set()),
     ("Curriculum version tagging", "enrollment_curriculum_tag", {"staff", "academic_coordinator"}),
     ("Study plan drafts", "enrollment_study_plans", {"staff", "academic_coordinator"}),
     ("Dean workflow decision", "workflow_approval_decide", {"dean"}),
@@ -23997,6 +25073,27 @@ def ensure_schedule_request_schema() -> None:
     db.session.commit()
 
 
+def ensure_policy_document_schema() -> None:
+    """Add library-management columns and the version-history table; never drops data."""
+    PolicyDocument.__table__.create(bind=db.engine, checkfirst=True)
+    PolicyDocumentVersion.__table__.create(bind=db.engine, checkfirst=True)
+    inspector = inspect(db.engine)
+    existing = {column["name"] for column in inspector.get_columns("policy_document")}
+    additions = {
+        "category": "VARCHAR(40) NOT NULL DEFAULT 'Other'",
+        "effective_date": "DATE",
+        "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
+        "validation_note": "TEXT",
+    }
+    changed = False
+    for name, sql_type in additions.items():
+        if name not in existing:
+            db.session.execute(text(f"ALTER TABLE policy_document ADD COLUMN {name} {sql_type}"))
+            changed = True
+    if changed:
+        db.session.commit()
+
+
 def ensure_monitoring_flag_schema() -> None:
     """Add subject/field targeting columns to the flag table without dropping data."""
     inspector = inspect(db.engine)
@@ -27286,6 +28383,7 @@ with app.app_context():
     ensure_curriculum_offering_schema()
     ensure_user_account_schema()
     ensure_faculty_account_schema()
+    ensure_policy_document_schema()
     ensure_authoritative_curricula()
     ensure_practicum_program_policy()
     ensure_course_year_consistency()
