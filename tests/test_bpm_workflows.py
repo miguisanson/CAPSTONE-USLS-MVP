@@ -4044,7 +4044,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def test_defense_suggestions_start_after_required_lead_time(self):
         reference = date(2026, 7, 23)
-        # Research Protocol: the title defense application is made at least 2 weeks ahead.
+        # Protocol: Form 1 is endorsed at least 2 weeks before the title defense (reference = endorsement date).
         self.assertEqual(earliest_defense_date("Title Defense", reference), date(2026, 8, 6))
         self.assertEqual(earliest_defense_date("Public Final Defense", reference), date(2026, 7, 28))
         self.assertEqual(earliest_defense_date("Proposal Defense", reference), date(2026, 8, 6))

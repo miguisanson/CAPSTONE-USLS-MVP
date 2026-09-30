@@ -101,7 +101,8 @@ const ROLE_LABELS = {
 
 const ROLE_PATHS = {
   academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
-  research_coordinator: new Set(["/workflow/research-gate", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
+  // Protocol: the Research Coordinator nominates the panel and informs panel and student of the date.
+  research_coordinator: new Set(["/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
 };
 
 function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {

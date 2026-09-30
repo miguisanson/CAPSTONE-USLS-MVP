@@ -20,6 +20,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 
 import app as app_module  # noqa: E402
 from app import (  # noqa: E402
+    current_panel_gate,
     Faculty,
     FacultyAvailability,
     FacultyExpertise,
@@ -246,7 +247,8 @@ class PanelMatchingTests(unittest.TestCase):
                 ["Panel Chair", "Content Specialist 1", "Content Specialist 2", "Method Specialist", "External Panel"],
             )
             result = panel_matching_result(thesis)
-            self.assertEqual([item["role"] for item in result["suggested_panel"]], panel_roles_for_student(thesis))
+            # The suggestion seats the panel for the student's current defense stage (title stage: no external panelist yet).
+            self.assertEqual([item["role"] for item in result["suggested_panel"]], panel_roles_for_student(thesis, current_panel_gate(thesis)))
             checks = {c["rule"]: c for c in result["composition"]["checks"]}
             self.assertTrue(all(c["ok"] for c in checks.values()), checks)
             self.assertIn("size", checks)
@@ -256,7 +258,8 @@ class PanelMatchingTests(unittest.TestCase):
             others = [row["faculty"] for row in result["rows"][:2]]
             broken = panel_composition_report(
                 thesis,
-                [("Panel Chair", adviser), ("Content Specialist", others[0]), ("Method Specialist", others[1])],
+                # One seat short of the stage's panel (title stage: 3 seats).
+                [("Panel Chair", adviser), ("Content Specialist", others[0])],
             )
             failed = {c["rule"] for c in broken["checks"] if not c["ok"]}
             self.assertTrue({"size", "adviser"} <= failed, failed)
@@ -273,7 +276,7 @@ class PanelMatchingTests(unittest.TestCase):
             sid = student.id
             adviser_id = adviser.id
             others = [row["faculty"].id for row in self._rank("GS-2026-PM-01")[:3]]
-            required = panel_roles_for_student(student)
+            required = panel_roles_for_student(student, current_panel_gate(student))
         client = self._client(self.staff_id, "staff")
         response = client.post("/api/transactions/panel-matching", json={
             "student_id": sid, "faculty_ids": [adviser_id, *others],
