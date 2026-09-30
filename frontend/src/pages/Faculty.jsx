@@ -72,7 +72,7 @@ export default function Faculty() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Faculty Profiles</h1>
-          <p className="mt-1 text-sm text-slate-500">Search the faculty directory, then open a profile to review expertise, login email, panel load, and weekly availability.</p>
+          <p className="mt-1 text-sm text-slate-500">Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered.</p>
         </div>
         {canManage && <button type="button" onClick={() => { setNotice(""); setFormFor("new"); }} className="btn-primary shrink-0 cursor-pointer"><Plus className="h-4 w-4" /> Add faculty</button>}
       </header>
@@ -94,6 +94,8 @@ export default function Faculty() {
               <option>All availability</option>
               <option>Available</option>
               <option>Unavailable</option>
+              <option>Not entered</option>
+              <option>Google Calendar connected</option>
             </select>
           </div>
         </div>
@@ -111,7 +113,7 @@ export default function Faculty() {
               <p className="text-xs text-slate-400">Select a faculty member to open their profile</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-sm">
+              <table className="w-full min-w-[1200px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                     <th className="px-5 py-3">Faculty</th>
@@ -120,6 +122,7 @@ export default function Faculty() {
                     <th className="px-3 py-3">Login email</th>
                     <th className="px-3 py-3">Account</th>
                     <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3">Availability</th>
                     <th className="px-5 py-3 text-right">Panel load</th>
                     {canManage && <th className="px-5 py-3 text-right">Actions</th>}
                   </tr>
@@ -141,6 +144,7 @@ export default function Faculty() {
                       <td className="px-3 py-3 text-slate-600">{item.account?.email || item.email}</td>
                       <td className="px-3 py-3"><StatusBadge value={item.account?.active ? "Active login" : "No account"} dot={false} /></td>
                       <td className="px-3 py-3"><StatusBadge value={item.active ? "Active" : "Inactive"} dot={false} /></td>
+                      <td className="px-3 py-3"><AvailabilityBadge faculty={item} /></td>
                       <td className="px-5 py-3 text-right"><span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{item.panel_load}</span></td>
                       {canManage && <td className="px-5 py-3 text-right"><button type="button" onClick={(event) => { event.stopPropagation(); setNotice(""); setFormFor(item); }} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Edit</button></td>}
                     </tr>
@@ -276,7 +280,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
             <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-white/85"><Building2 className="h-3.5 w-3.5" />{faculty.college}</p>
           </div>
           <div className="hidden flex-wrap items-center justify-end gap-2 sm:flex">
-            <span className="rounded-full bg-emerald-400/20 px-2.5 py-1 text-xs font-semibold text-emerald-50 ring-1 ring-emerald-300/30">{faculty.availability_status}</span>
+            <AvailabilityBadge faculty={faculty} />
             <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold ring-1 ring-white/15">{faculty.panel_load} panel assignments</span>
           </div>
           <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg bg-white/10 transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white" aria-label="Close faculty profile"><X className="h-5 w-5" /></button>
@@ -330,7 +334,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
                 <p className="mt-3 text-xs leading-relaxed text-slate-600">
                   {calendar.connected
                     ? "Google busy periods are the source used by Defense Scheduling. Event names and details remain private."
-                    : "This faculty member must connect Google Calendar from their own Faculty Portal. Until then, the profile schedule remains active."}
+                    : "This faculty member must connect Google Calendar from their own Faculty Portal. Until then, only the hours they enter in their own portal are used."}
                 </p>
                 <a className="btn-ghost mt-3 w-full justify-center" href={feedUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />View availability feed</a>
               </div>
@@ -533,8 +537,10 @@ function WeeklyCalendar({ faculty }) {
   const calendarConnected = Boolean(faculty.calendar?.connected);
   const events = useMemo(() => [
     ...(faculty.upcoming_availability || []).map((event) => ({ ...event, title: "Available for defense", status: "available" })),
-    ...(faculty.calendar_events || []),
+    ...(faculty.calendar_events || []).filter((event) => event.source === "google_calendar"),
   ], [faculty]);
+  const hasHours = (faculty.working_hours || []).some((item) => item.enabled);
+  const hasAnything = hasHours || events.length > 0;
   const firstEventDate = events.length ? dateFromIso([...events].sort((a, b) => a.date.localeCompare(b.date))[0].date) : new Date();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(firstEventDate));
 
@@ -554,21 +560,30 @@ function WeeklyCalendar({ faculty }) {
           <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-brand-700" /><h3 className="font-semibold text-ink">Weekly availability & schedule</h3></div>
           <p className="mt-1 text-xs text-slate-500">
             {calendarConnected
-              ? "Live Google Calendar busy periods within the standard weekday defense window."
-              : "Recurring profile hours, available defense windows, and blocked commitments in one view."}
+              ? "Weekly hours the faculty member entered, plus live Google Calendar busy periods."
+              : "Weekly hours and available dates the faculty member entered. Nothing is assumed."}
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        {hasAnything && <div className="flex items-center gap-1.5">
           <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))} className="btn-ghost px-2" aria-label="Previous week"><ChevronLeft className="h-4 w-4" /></button>
           <button type="button" onClick={() => setWeekStart(startOfWeek(new Date()))} className="btn-ghost px-3">Today</button>
           <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))} className="btn-ghost px-2" aria-label="Next week"><ChevronRight className="h-4 w-4" /></button>
-        </div>
+        </div>}
       </div>
+
+      {!hasAnything && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Not entered</p>
+          <p className="mt-0.5 text-xs">The faculty member enters their weekly hours in their own portal. Until then, Defense Scheduling does not assume any free time for them.</p>
+        </div>
+      )}
+
+      {hasAnything && <>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-slate-700">{formatWeekRange(weekStart, weekEnd)}</p>
         <div className="flex flex-wrap gap-3 text-[11px] font-medium text-slate-500">
-          <Legend color="border-emerald-300 bg-emerald-50" label={calendarConnected ? "Defense scheduling window" : "Working hours"} />
+          <Legend color="border-emerald-300 bg-emerald-50" label="Weekly hours entered" />
           <Legend color="border-emerald-600 bg-emerald-500" label="Available slot" />
           <Legend color="border-blue-600 bg-blue-500" label="Blocked / busy" />
         </div>
@@ -585,16 +600,14 @@ function WeeklyCalendar({ faculty }) {
               {Array.from({ length: CALENDAR_END_HOUR - CALENDAR_START_HOUR + 1 }, (_, index) => <span key={index} className="absolute right-2 -translate-y-1/2 text-[10px] font-medium text-slate-400" style={{ top: index * HOUR_HEIGHT }}>{formatHour(CALENDAR_START_HOUR + index)}</span>)}
             </div>
             {days.map((day, dayIndex) => {
-              const workingDay = calendarConnected
-                ? (dayIndex < 5 ? { enabled: true, start: "08:00", end: "18:00" } : null)
-                : faculty.working_hours?.find((item) => item.weekday === dayIndex);
+              const workingDay = faculty.working_hours?.find((item) => item.weekday === dayIndex);
               const dayEvents = visibleEvents.filter((event) => sameDate(dateFromIso(event.date), day));
               return (
                 <div key={day.toISOString()} className="relative border-r border-slate-200 last:border-r-0" style={{ height: (CALENDAR_END_HOUR - CALENDAR_START_HOUR) * HOUR_HEIGHT }}>
                   {Array.from({ length: CALENDAR_END_HOUR - CALENDAR_START_HOUR }, (_, index) => <div key={index} className="absolute inset-x-0 border-t border-slate-100" style={{ top: index * HOUR_HEIGHT }} />)}
-                  {workingDay?.enabled && <CalendarBlock event={{ start: workingDay.start, end: workingDay.end, title: calendarConnected ? "Scheduling window" : "Working hours", status: "working" }} />}
+                  {workingDay?.enabled && <CalendarBlock event={{ start: workingDay.start, end: workingDay.end, title: "Weekly hours", status: "working" }} />}
                   {dayEvents.map((event, index) => <CalendarBlock key={`${event.date}-${event.start}-${event.title}-${index}`} event={event} index={index} />)}
-                  {!workingDay?.enabled && <p className="absolute inset-x-2 top-3 text-center text-[10px] font-semibold text-slate-300">Unavailable</p>}
+                  {!workingDay?.enabled && <p className="absolute inset-x-2 top-3 text-center text-[10px] font-semibold text-slate-300">No hours</p>}
                 </div>
               );
             })}
@@ -603,9 +616,10 @@ function WeeklyCalendar({ faculty }) {
       </div>
       <p className="mt-2 text-xs text-slate-500">
         {calendarConnected
-          ? "Defense Scheduling treats Google Calendar as authoritative and excludes every blue busy block. Event details stay private."
-          : "Defense Scheduling excludes blue profile commitments when comparing common panel availability."}
+          ? "Defense Scheduling excludes every blue Google Calendar busy block. Event details stay private."
+          : "Times are Philippine time."}
       </p>
+      </>}
     </section>
   );
 }
@@ -672,6 +686,24 @@ function formatWeekRange(start, end) {
   const startLabel = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const endLabel = end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return `${startLabel} – ${endLabel}`;
+}
+
+// "Not entered" / "Available" / ... plus when the faculty member last saved their hours.
+function AvailabilityBadge({ faculty }) {
+  const status = faculty.availability_status || (faculty.availability_entered ? "Entered" : "Not entered");
+  const updated = faculty.availability_entered && faculty.availability_updated_at ? formatUpdated(faculty.availability_updated_at) : "";
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <StatusBadge value={status} dot={false} />
+      {updated && <span className="text-[10px] font-medium text-slate-400">updated {updated}</span>}
+    </span>
+  );
+}
+
+function formatUpdated(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function ProfileSection({ icon: Icon, title, children }) {

@@ -2,19 +2,21 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   CalendarClock,
+  CalendarDays,
   ClipboardCheck,
   FileCheck,
   LayoutDashboard,
   ListTodo,
   Mail,
   MessageSquare,
+  UserCheck,
 } from "lucide-react";
 import { Card, EmptyState, PageHeader, SectionTitle, StatCard, StatusBadge } from "../../components/ui";
 import { formatDate, relativeDays } from "../../lib/format";
 import { useStudentPortal } from "./StudentPortalContext";
-import { ActivityPanel, ProgressPanel, RecommendationsPanel, SchedulePanel, StudentHero, WorkflowStatusPanel } from "./Panels";
+import { ActivityPanel, ProgressPanel, RecommendationsPanel, StudentHero, WorkflowStatusPanel } from "./Panels";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
-import { STUDENT_REQUEST_VIEW_BY_SLUG } from "./shared";
+import { STUDENT_REQUEST_VIEW_BY_SLUG, StudentSchedulePanel, fmtDay, isLiveSchedule } from "./shared";
 
 const REQUEST_LABELS = {
   "leave-of-absence": "Leave of Absence",
@@ -145,6 +147,53 @@ function NotificationsPanel({ messages }) {
   );
 }
 
+// What the defense booking means for the student right now, with only the buttons that make sense.
+const SCHEDULE_STATE_TEXT = {
+  Scheduled: (s) => `Your ${s.defense_type || "defense"} is booked for ${fmtDay(s.preferred_date)}.`,
+  Confirmed: (s) => `Your ${s.defense_type || "defense"} is booked for ${fmtDay(s.preferred_date)}.`,
+  "Needs Re-confirmation": () => "Your panel changed. Waiting for the Research Coordinator to confirm the date again.",
+  Held: (s) => `Your ${s.defense_type || "defense"} took place on ${fmtDay(s.preferred_date)}.`,
+  Deferred: () => "Your defense was deferred. Waiting for the Research Coordinator to set a new date.",
+  Rescheduled: () => "Your defense was moved. The newer booking replaces this one.",
+  Cancelled: () => "Your last booking was cancelled. You can request a new date.",
+};
+
+function DefenseScheduleCard({ data }) {
+  const schedules = data.schedules || [];
+  const live = schedules.find(isLiveSchedule) || null;
+  const current = live || schedules[0] || null;
+  const waitingForStaff = current && ["Deferred", "Needs Re-confirmation"].includes(current.status);
+  const canRequest = !live && !waitingForStaff;
+  const text = current ? (SCHEDULE_STATE_TEXT[current.status] || (() => `Status: ${current.status}.`))(current) : "No defense is booked yet.";
+  return (
+    <Card className="p-6">
+      <SectionTitle title="Defense schedule" subtitle="Your next defense and where to manage it" icon={CalendarDays} />
+      <p className="text-sm text-slate-700">{text}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link to="/student/calendar" className="btn-primary px-3 py-1.5 text-xs">My research calendar</Link>
+        {canRequest && <Link to="/student/defense-schedule" className="btn-ghost px-3 py-1.5 text-xs">Request a defense schedule</Link>}
+        {!canRequest && <Link to="/student/defense-schedule" className="btn-ghost px-3 py-1.5 text-xs">Defense schedule page</Link>}
+      </div>
+      <p className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-600">
+        <UserCheck className="h-4 w-4 text-brand-700" aria-hidden="true" />
+        Research adviser:
+        {adviserName(data) ? (
+          <>
+            <span className="font-semibold text-ink">{adviserName(data)}</span>
+            <Link to="/student/adviser" className="text-xs font-semibold text-brand-700 hover:underline">Adviser page</Link>
+          </>
+        ) : (
+          <Link to="/student/adviser" className="font-semibold text-brand-700 hover:underline">No adviser appointed yet - apply</Link>
+        )}
+      </p>
+    </Card>
+  );
+}
+
+function adviserName(data) {
+  return data.student?.adviser_name || data.research_case?.adviser_name || "";
+}
+
 export default function StudentOverview() {
   const { data } = useStudentPortal();
   const { student, course_audit: audit, research_case: researchCase } = data;
@@ -175,7 +224,8 @@ export default function StudentOverview() {
         <div className="space-y-5 lg:col-span-4">
           <DeadlinesPanel data={data} />
           <NotificationsPanel messages={messages} />
-          <SchedulePanel schedules={data.schedules || []} />
+          <DefenseScheduleCard data={data} />
+          <StudentSchedulePanel schedules={data.schedules || []} />
           <RecommendationsPanel recommendations={data.recommendations || []} />
         </div>
       </div>

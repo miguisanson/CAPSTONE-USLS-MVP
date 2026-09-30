@@ -24,7 +24,16 @@ export function processOfType(type) {
 const DeanContext = createContext(null);
 
 export function DeanProvider({ children }) {
-  const { data, loading, error, refetch } = useApi(() => api.approvals(), []);
+  const { data, loading, error, refetch: refetchApprovals } = useApi(() => api.approvals(), []);
+  // Adviser appointments waiting for the Dean's decision; a failed call counts as none.
+  const { data: adviserData, refetch: refetchAdviser } = useApi(
+    () => api.adviserAppointments({ scope: "open" }).catch(() => ({ appointments: [] })),
+    [],
+  );
+  const refetch = () => {
+    refetchAdviser();
+    return refetchApprovals();
+  };
   const navigate = useNavigate();
   const location = useLocation();
   const [busy, setBusy] = useState(0);
@@ -48,6 +57,17 @@ export function DeanProvider({ children }) {
     setActErr("");
   }, [location.pathname]);
 
+  // The adviser queue is decided on its own page; refresh the sidebar number when the Dean moves around.
+  const adviserFirstRun = useRef(true);
+  useEffect(() => {
+    if (adviserFirstRun.current) {
+      adviserFirstRun.current = false;
+      return;
+    }
+    refetchAdviser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
   // Graduation rows only count while the student is eligible (same rule as before).
   const graduationEligibleItem = (item) => item.type !== "graduation" || item.eligibility?.eligible === true;
   const workflowPending = useMemo(() => (data?.workflow_pending || []).filter(graduationEligibleItem), [data]);
@@ -55,6 +75,11 @@ export function DeanProvider({ children }) {
   const workflowOverview = useMemo(() => (data?.workflow_overview || []).filter(graduationEligibleItem), [data]);
   const pendingPlans = useMemo(() => data?.pending || [], [data]);
   const recentPlans = useMemo(() => data?.recent || [], [data]);
+
+  const pendingAdviser = useMemo(
+    () => (adviserData?.appointments || []).filter((row) => (row.actions || []).includes("appoint")).length,
+    [adviserData],
+  );
 
   const counts = useMemo(() => {
     const byProcess = (key) => workflowPending.filter((item) => DEAN_PROCESSES[key].types.includes(item.type)).length;
@@ -64,9 +89,10 @@ export function DeanProvider({ children }) {
       pendingWithdrawal: byProcess("withdrawal"),
       pendingPracticum: byProcess("practicum"),
       pendingGraduation: byProcess("graduation"),
+      pendingAdviser,
       pendingTotal: pendingPlans.length + workflowPending.length,
     };
-  }, [workflowPending, pendingPlans]);
+  }, [workflowPending, pendingPlans, pendingAdviser]);
 
   function findCase(type, id) {
     const key = String(id);
