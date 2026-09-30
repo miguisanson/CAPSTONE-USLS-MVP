@@ -8,36 +8,29 @@
   Codex, because Codex's sandbox cannot run the tests and nobody is here to
   unblock it. Main session = architect: briefs, merges, gate, live check.
 
-### Wave 1 — running in worktrees under `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`
+### Progress (updated as work lands)
 
-| Worktree / branch | Job | Status |
+Merged into `v5.1-migui_clean` and pushed: `pkt/health`, `pkt/monitor`, `pkt/portals`,
+`pkt/opsmanual`, `pkt/panel`, `pkt/docs`, `pkt/policy`, `pkt/rules`. Full gate after
+`pkt/rules`: **229 tests, 0 failures**; frontend build passes; headless-Edge live check
+of student / dean / faculty / staff pages: no page errors (see `LIVE_CHECK_NOTES.md`).
+
+Running (worktrees under `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`):
+
+| Branch | Job | Based on |
 |---|---|---|
-| `rules` / `pkt/rules` | Business-rules register, handbook values, drop rule, C6 test | running |
-| `policy` / `pkt/policy` | Finish policy upload (B1–B6), assistant for all roles | running |
-| `panel` / `pkt/panel` | Panel matching by real similarity, expertise records (D1–D6) | running |
-| `monitor` / `pkt/monitor` | Monitoring Sheet CRUD in the portal | running |
-| `portals` / `pkt/portals` | Dean / Student / Faculty portals on the shared sidebar shell | running |
-| `health` / `pkt/health` | Old red test, sign-in / DEMO_MODE, access-control sweep, README | running |
-| `docs` / `pkt/docs` | Proposal pagination, TOC, wording fixes | running |
-| `opsmanual` / `pkt/opsmanual` | Draft Operations Manual for stakeholder validation | running |
+| `pkt/research-core` | Research flow defects from `audit/research-workflows.md` | da33011 |
+| `pkt/crosscut` | Cross-cutting defects from `audit/cross-cutting.md` | 793e0c3 |
+| `pkt/loa` | LOA + Readmission rebuild (case table, real drag-and-drop board) | 7a8e6e7 |
+| `pkt/academic` | Enrollment / class list / offerings / residency fixes | 7a8e6e7 |
 
-Read-only audits writing to `.planning/audit/`: `academic-workflows.md`,
-`research-workflows.md`, `cross-cutting.md` — running.
-
-Each helper follows `.planning/PACKET_BRIEF.md` and commits on its own branch.
-
-### Next (after Wave 1 merges)
-
-1. Merge `pkt/*` one at a time into `v5.1-migui_clean`; after each: targeted
-   tests, then the full gate, `npm --prefix frontend run build`, commit, push.
-2. Wave 2 packets: LOA + Readmission rebuild (from `audit/academic-workflows.md`),
-   defense calendar + adviser appointment (from `audit/research-workflows.md`),
-   fixes for critical/high audit findings.
-3. Documents: Business Rules section + counts in the proposal, walkthrough
-   renumbering and new cases, import the Operations Manual draft into the policy
-   library as a Draft document.
-4. Live check in the browser (launch config `usls-gs-win`, port 5050) per role.
-5. Remove worktrees, final push, update this file.
+Next after those: adviser appointment + availability editor + calendar pages
+(from the research audit's requirements list, after `pkt/research-core` merges);
+polish items in `LIVE_CHECK_NOTES.md`; then documents (section I of
+`DEFENSE_REVISIONS.md`): walkthrough rewrite, proposal ch. 5–6/appendices and the
+Business Rules section (re-run `scripts/docs/build_proposal.py` afterwards),
+regenerate the Operations Manual "platform differences" paragraphs from the final
+rules, add the Operations Manual draft to the policy library as a Draft document.
 
 ## If this session died
 
