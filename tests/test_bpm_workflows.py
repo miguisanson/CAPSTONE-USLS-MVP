@@ -3383,7 +3383,12 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 record.course.code
                 for record in CourseRecord.query.filter_by(student_id=withdrawal_student.id, status="Current").all()
             ]
-            self.assertEqual(current_withdrawal_courses, ["MAED-MAJ1"])
+            # Elena Navarro is enrolled in three subjects (walkthrough: "Enrolled
+            # in three active subjects"); she withdraws from one of them.
+            self.assertEqual(
+                sorted(current_withdrawal_courses),
+                ["MAED-COG1", "MAED-MAJ1", "MAED-MAJ3"],
+            )
             self.assertEqual(withdrawal_student.standing, "Active")
             self.assertEqual(withdrawal_student.enrollment_tag, "Enrolled")
             self.assertEqual(research_student.name, "Miguel Yu")
@@ -3540,8 +3545,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(withdrawal_student.enrollment_tag, "Enrolled")
             self.assertEqual(withdrawal_student.current_stage, "Coursework")
             self.assertEqual(
-                [record.course.code for record in CourseRecord.query.filter_by(student_id=withdrawal_student_id, status="Current").all()],
-                ["MAED-MAJ1"],
+                sorted(record.course.code for record in CourseRecord.query.filter_by(student_id=withdrawal_student_id, status="Current").all()),
+                ["MAED-COG1", "MAED-MAJ1", "MAED-MAJ3"],
             )
 
             research_progress = detected_research_progress(research_student)

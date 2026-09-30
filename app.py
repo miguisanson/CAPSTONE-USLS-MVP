@@ -284,6 +284,36 @@ def resolve_database_url() -> str:
     return f"sqlite:///{sqlite_path}"
 
 
+def demo_mode_enabled() -> bool:
+    """The single switch for every presenter convenience (DEMO_MODE, default ON).
+
+    ON: the sign-in page offers an expandable "Demo accounts" panel, the demo
+    endpoints answer, and a demo persona's prerequisites are repaired at login.
+    OFF: the sign-in page is a plain email + password form, every demo endpoint
+    returns 404, and no default password is ever sent to the browser.
+    Read on every call so the switch can be flipped without touching code.
+    """
+    return os.getenv("DEMO_MODE", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def demo_password_hint() -> str:
+    """The shared default password, but only while DEMO_MODE is on."""
+    return SIM_STUDENT_PASSWORD if demo_mode_enabled() else ""
+
+
+def resolve_secret_key(environ=None) -> str:
+    """SECRET_KEY from the environment; otherwise a public default in demo mode
+    only. With DEMO_MODE off a missing key becomes a random per-process key, so
+    a session cookie can never be forged with a value published in the source."""
+    environ = os.environ if environ is None else environ
+    configured = environ.get("SECRET_KEY")
+    if configured:
+        return configured
+    if str(environ.get("DEMO_MODE", "1")).strip().lower() not in {"0", "false", "no", "off"}:
+        return "demo-only-secret"
+    return os.urandom(32).hex()
+
+
 def create_app() -> Flask:
     database_url = resolve_database_url()
     ensure_mysql_database(database_url)
@@ -291,7 +321,12 @@ def create_app() -> Flask:
     # static_folder disabled: our catch-all route serves both the built assets
     # and the SPA fallback, so Flask's greedy static route does not shadow client routes.
     app = Flask(__name__, static_folder=None)
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "demo-only-secret")
+    app.config["SECRET_KEY"] = resolve_secret_key()
+    # The session cookie is never readable by page scripts and is not sent on
+    # cross-site requests. Set SESSION_COOKIE_SECURE=1 when serving over HTTPS.
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes", "on"}
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db.init_app(app)
@@ -3488,11 +3523,91 @@ WORKFLOW_RECIPIENTS = {
 }
 
 
+class LoginThrottle:
+    """Per-process brake on repeated failed sign-ins.
+
+    An email (known or not, so lockout reveals nothing) is locked for
+    ``lockout_seconds`` after ``max_failures`` failures inside ``window_seconds``;
+    one client address gets a larger allowance. State lives in memory, so it
+    resets on restart and is per worker process.
+    """
+
+    def __init__(self, clock=None):
+        from time import monotonic
+
+        self.max_failures = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
+        self.ip_max_failures = int(os.getenv("LOGIN_IP_MAX_FAILURES", "40"))
+        self.window_seconds = int(os.getenv("LOGIN_FAILURE_WINDOW_SECONDS", "900"))
+        self.lockout_seconds = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "300"))
+        self.clock = clock or monotonic
+        self._lock = threading.Lock()
+        self._failures: dict[tuple[str, str], list[float]] = {}
+        self._locked_until: dict[tuple[str, str], float] = {}
+
+    def reset(self) -> None:
+        with self._lock:
+            self._failures.clear()
+            self._locked_until.clear()
+
+    @staticmethod
+    def _keys(email: str, ip: str) -> list[tuple[tuple[str, str], int]]:
+        return [(("email", (email or "")[:254].lower()), 0), (("ip", ip or ""), 1)]
+
+    def retry_after(self, email: str, ip: str) -> int:
+        """Seconds until sign-in may be tried again; 0 when not locked."""
+        now = self.clock()
+        with self._lock:
+            waits = [self._locked_until.get(key, 0) - now for key, _ in self._keys(email, ip)]
+        return max(0, int(max(waits) + 0.999)) if max(waits) > 0 else 0
+
+    def record_failure(self, email: str, ip: str) -> None:
+        now = self.clock()
+        with self._lock:
+            if len(self._failures) > 20000:  # bound memory under a spray of made-up emails
+                self._failures = {k: v for k, v in self._failures.items() if v and now - v[-1] < self.window_seconds}
+                self._locked_until = {k: v for k, v in self._locked_until.items() if v > now}
+            for key, kind in self._keys(email, ip):
+                recent = [t for t in self._failures.get(key, []) if now - t < self.window_seconds]
+                recent.append(now)
+                self._failures[key] = recent
+                if len(recent) >= (self.ip_max_failures if kind else self.max_failures):
+                    self._locked_until[key] = now + self.lockout_seconds
+                    self._failures[key] = []
+
+    def record_success(self, email: str) -> None:
+        with self._lock:
+            key = ("email", (email or "")[:254].lower())
+            self._failures.pop(key, None)
+            self._locked_until.pop(key, None)
+
+
+LOGIN_THROTTLE = LoginThrottle()
+# Checked when the email is unknown, so a miss costs as much as a wrong password.
+UNKNOWN_ACCOUNT_PASSWORD_HASH = generate_password_hash(os.urandom(16).hex())
+
+# Sessions that were signed out on purpose. The cookie is a signed value the
+# browser holds, so clearing it there alone would not stop a copy of it; every
+# login gets a random "sid" and logout remembers it here (bounded, per process).
+REVOKED_SESSION_IDS: "OrderedDict[str, None]" = OrderedDict()
+REVOKED_SESSION_LIMIT = 5000
+
+
+def revoke_session_id(sid: str | None) -> None:
+    if not sid:
+        return
+    REVOKED_SESSION_IDS[sid] = None
+    while len(REVOKED_SESSION_IDS) > REVOKED_SESSION_LIMIT:
+        REVOKED_SESSION_IDS.popitem(last=False)
+
+
 def current_account() -> UserAccount | None:
     account_id = session.get("account_id")
     if not account_id:
         return None
-    account = UserAccount.query.get(account_id)
+    if session.get("sid") in REVOKED_SESSION_IDS:
+        session.clear()
+        return None
+    account = db.session.get(UserAccount, account_id)
     if not account or not account.active:
         session.clear()
         return None
@@ -6492,14 +6607,39 @@ def register_routes(app: Flask) -> None:
     def health():
         return jsonify({"status": "ok", "students": Student.query.count()})
 
+    def demo_mode_off_response():
+        return jsonify({"error": "Not found."}), 404
+
+    def no_store(response):
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.route("/api/auth/config")
+    def auth_config():
+        """Tell the sign-in page whether to offer the demo panel. Public, no secrets."""
+        return no_store(jsonify({"demo_mode": demo_mode_enabled()}))
+
+    @app.route("/api/auth/demo-accounts")
+    def auth_demo_accounts():
+        """Ready-made staff/faculty/dean/student logins for the presenter's
+        expandable "Demo accounts" panel. Demo mode only; an account whose
+        password has been changed is never listed."""
+        if not demo_mode_enabled():
+            return demo_mode_off_response()
+        return no_store(jsonify({"items": demo_accounts_payload()}))
+
     @app.route("/api/auth/demo-students")
     def auth_demo_students():
-        """Expose only the purpose-built quick-login demo identities."""
-        return jsonify({"items": workflow_demo_students_payload()})
+        """Expose only the purpose-built quick-login demo identities (demo mode only)."""
+        if not demo_mode_enabled():
+            return demo_mode_off_response()
+        return no_store(jsonify({"items": workflow_demo_students_payload()}))
 
     @app.route("/api/auth/demo-students/<demo_key>/reset", methods=["POST"])
     def auth_demo_student_reset(demo_key: str):
-        """Reset a whitelisted demo student before authentication."""
+        """Reset a whitelisted demo student before authentication (demo mode only)."""
+        if not demo_mode_enabled():
+            return demo_mode_off_response()
         config = WORKFLOW_DEMO_STUDENTS.get(demo_key)
         if not config:
             return jsonify({"error": "Demo student not found."}), 404
@@ -6535,46 +6675,57 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/auth/me")
     def auth_me():
         account = current_account()
-        return jsonify({"user": account_dict(account) if account else None})
+        return no_store(jsonify({"user": account_dict(account) if account else None}))
 
     @app.route("/api/auth/login", methods=["POST"])
     def auth_login():
         body = request.get_json(silent=True) or {}
-        role = (body.get("role") or "").strip().lower()
-        email = (body.get("email") or "").strip().lower()
-        password = body.get("password") or ""
-        if role not in ["staff", "student", "dean", "faculty", "admin"]:
-            return jsonify({"error": "Choose an account type to sign in."}), 400
+        email = str(body.get("email") or "").strip().lower()
+        password = str(body.get("password") or "")
+        # The role a user gets is the role stored on the account. A "role" field
+        # sent by an older client is ignored: it can never widen or change access.
+        if not email or not password:
+            return no_store(jsonify({"error": "Enter your email and password."})), 400
+        client_ip = request.remote_addr or ""
+        wait = LOGIN_THROTTLE.retry_after(email, client_ip)
+        if wait:
+            response = jsonify({
+                "error": f"Too many failed sign-in attempts. Try again in {max(1, (wait + 59) // 60)} minute(s).",
+            })
+            response.headers["Retry-After"] = str(wait)
+            return no_store(response), 429
         account = UserAccount.query.filter_by(email=email, active=True).first()
-        role_matches = bool(
-            account
-            and (
-                (role == "staff" and account.role in BACKOFFICE_ROLES)
-                or account.role == role
-            )
+        # Always verify a hash so an unknown email costs the same as a wrong password.
+        password_ok = check_password_hash(
+            account.password_hash if account else UNKNOWN_ACCOUNT_PASSWORD_HASH, password
         )
-        if not role_matches or not check_password_hash(account.password_hash, password):
-            return jsonify({"error": "Invalid email, password, or account type."}), 401
-        _, demo_config = workflow_demo_config_for_student(account.student)
-        if demo_config:
-            try:
-                # Logging in repairs prerequisite source data but deliberately keeps
-                # the current workflow progress. The adjacent Reset button clears it.
-                ensure_workflow_demo_student_baseline(account.student, demo_config["workflow"])
-                db.session.commit()
-            except Exception as exc:  # noqa: BLE001
-                db.session.rollback()
-                return jsonify({"error": f"Could not prepare the demo account: {exc}"}), 400
-        session.clear()
+        if not account or not password_ok:
+            LOGIN_THROTTLE.record_failure(email, client_ip)
+            return no_store(jsonify({"error": "Incorrect email or password."})), 401
+        LOGIN_THROTTLE.record_success(email)
+        if demo_mode_enabled():
+            _, demo_config = workflow_demo_config_for_student(account.student)
+            if demo_config:
+                try:
+                    # Logging in repairs prerequisite source data but deliberately keeps
+                    # the current workflow progress. The adjacent Reset button clears it.
+                    ensure_workflow_demo_student_baseline(account.student, demo_config["workflow"])
+                    db.session.commit()
+                except Exception as exc:  # noqa: BLE001
+                    db.session.rollback()
+                    return jsonify({"error": f"Could not prepare the demo account: {exc}"}), 400
+        session.clear()  # a fresh session on every sign-in (no session fixation)
         session["account_id"] = account.id
         session["role"] = account.role
         session["student_id"] = account.student_id
-        return jsonify({"user": account_dict(account)})
+        session["sid"] = uuid4().hex
+        return no_store(jsonify({"user": account_dict(account)}))
 
     @app.route("/api/auth/logout", methods=["POST"])
     def auth_logout():
+        revoke_session_id(session.get("sid"))
         session.clear()
-        return jsonify({"ok": True})
+        return no_store(jsonify({"ok": True}))
 
     # Shared reference data used to render filters, dropdowns, and workflow cards.
     @app.route("/api/meta")
@@ -9394,7 +9545,9 @@ def register_routes(app: Flask) -> None:
         return jsonify({"ok": True, "message": "Defense verdict submitted.", "verdict": defense_verdict_dict(verdict)})
 
     @app.route("/api/faculty/<int:faculty_id>/calendar.ics")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean", "faculty")
     def faculty_calendar_feed(faculty_id: int):
+        # Was public and guessable by id; now needs a staff/faculty sign-in.
         faculty = Faculty.query.get_or_404(faculty_id)
         return Response(
             faculty_calendar_ics(faculty),
@@ -12503,7 +12656,9 @@ def register_routes(app: Flask) -> None:
         if slug == "student-handoff" and student_id:
             account = UserAccount.query.filter_by(student_id=student_id, role="student", active=True).first()
             if account:
-                message = f"Saved. Student portal account created: {account.email} / {SIM_STUDENT_PASSWORD}."
+                message = f"Saved. Student portal account created: {account.email}" + (
+                    f" / {demo_password_hint()}." if demo_password_hint() else "."
+                )
         return jsonify(
             {
                 "ok": True,
@@ -12848,6 +13003,8 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/transactions/<slug>/demo-reset", methods=["POST"])
     @require_api_login("staff")
     def transaction_demo_reset(slug: str):
+        if not demo_mode_enabled():
+            return jsonify({"error": "Not found."}), 404
         if slug not in {"practicum", "withdrawal", "graduation", "research"}:
             return jsonify({"error": "Demo reset is not available for this workflow."}), 404
         data = request_payload()
@@ -17346,7 +17503,7 @@ def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = No
             students_changed += 1
         if applied["is_new"]:
             created += 1
-            created_accounts.append({"name": student.name, "email": student.email, "password": SIM_STUDENT_PASSWORD})
+            created_accounts.append({"name": student.name, "email": student.email, "password": demo_password_hint()})
         elif row_subject_changes or existing_before.get("academic_year_entry") != student.academic_year_entry:
             updated += 1
         else:
@@ -17399,9 +17556,11 @@ def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = No
                    f"from the {program.code} monitoring sheet ({skipped} already in system or "
                    f"needing verification, {len(conflicts)} conflict(s))."
                    + (
-                       f" Portal login for {created_accounts[0]['name']}: {created_accounts[0]['email']} / {SIM_STUDENT_PASSWORD}."
+                       f" Portal login for {created_accounts[0]['name']}: {created_accounts[0]['email']}"
+                       + (f" / {demo_password_hint()}." if demo_password_hint() else ".")
                        if len(created_accounts) == 1
-                       else f" {len(created_accounts)} new student portal account(s) created (password: {SIM_STUDENT_PASSWORD})."
+                       else f" {len(created_accounts)} new student portal account(s) created"
+                       + (f" (password: {demo_password_hint()})." if demo_password_hint() else ".")
                        if created_accounts
                        else ""
                    ),
@@ -24736,6 +24895,29 @@ def ensure_workflow_demo_students() -> list[Student]:
     return students
 
 
+DEMO_ACCOUNT_CATALOG = [
+    ("staff", "GS Staff", "Intake and records", "staff@usls.edu.ph"),
+    ("academic_coordinator", "Academic Coordinator", "Coursework and practicum", "academic@usls.edu.ph"),
+    ("research_coordinator", "Research Coordinator", "Research completion", "research@usls.edu.ph"),
+    ("admin", "Administrator", "All staff screens (review)", "admin@usls.edu.ph"),
+    ("dean", "Dean", "Approvals", "dean@usls.edu.ph"),
+    ("faculty", "Faculty", "Adviser and panel work", "liwayway.bautista@usls.edu.ph"),
+    ("student", "Student", "Student portal", "student@usls.edu.ph"),
+]
+
+
+def demo_accounts_payload() -> list[dict]:
+    """Presenter logins for the demo panel. Only accounts that still use the
+    shared demo password are listed, so a real password is never implied."""
+    items = []
+    for role, label, detail, email in DEMO_ACCOUNT_CATALOG:
+        account = UserAccount.query.filter_by(email=email, active=True).first()
+        if not account or not check_password_hash(account.password_hash, SIM_STUDENT_PASSWORD):
+            continue
+        items.append({"role": account.role, "label": label, "detail": detail, "email": email, "password": SIM_STUDENT_PASSWORD})
+    return items
+
+
 def workflow_demo_students_payload() -> list[dict]:
     payload = []
     for demo_key, config in WORKFLOW_DEMO_STUDENTS.items():
@@ -25180,6 +25362,61 @@ with app.app_context():
     ensure_delay_status_consistency()
 
 
+def should_run_startup_tasks(argv=None, environ=None, main_name="unset") -> bool:
+    """Should importing the app run the seed/maintenance steps?
+
+    Yes for every way of serving it (``python app.py``, ``flask run``, gunicorn).
+    No under a test runner (tests build their own data and must stay fast), for
+    ``python app.py --seed`` (which does its own reset), or when
+    USLS_SKIP_STARTUP_TASKS=1 (maintenance scripts that only import models).
+    """
+    argv = sys.argv if argv is None else argv
+    environ = os.environ if environ is None else environ
+    if main_name == "unset":
+        main_spec = getattr(sys.modules.get("__main__"), "__spec__", None)
+        main_name = getattr(main_spec, "name", None)
+    if str(environ.get("USLS_SKIP_STARTUP_TASKS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        return False
+    if "--seed" in argv:
+        return False
+    if (main_name or "").split(".")[0] in {"unittest", "pytest"}:
+        return False
+    if argv and Path(str(argv[0])).name.lower().removesuffix(".exe") in {"pytest", "py.test"}:
+        return False
+    return True
+
+
+def run_startup_tasks(seed_count: int | None = None) -> dict:
+    """Idempotent seed and maintenance steps that must run however the app starts.
+
+    Call inside an app context. Safe to repeat: it seeds only an empty database,
+    creates missing accounts, and re-syncs derived data without changing content.
+    """
+    if seed_count is None:
+        seed_count = int(os.getenv("DEMO_SEED_COUNT", "350"))
+    db.create_all()
+    if Student.query.count() == 0 and seed_count > 0:
+        seed_database(seed_count)
+    ensure_demo_accounts()
+    if demo_mode_enabled():
+        ensure_panel_matching_demo_data()  # fabricated availability windows: demo data only
+    seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases
+    ensure_faculty_account_schema()
+    ensure_workflow_activity_schema()
+    sync_result = sync_all_curricula()
+    ensure_subject_enrollment_schema()
+    sync_automatic_awol_statuses(commit=False)
+    db.session.commit()
+    return sync_result
+
+
+if should_run_startup_tasks():
+    with app.app_context():
+        _startup_sync = run_startup_tasks()
+        if _startup_sync["created"]:
+            print(f"Added {_startup_sync['created']} missing curriculum row(s) for {_startup_sync['students']} student(s).")
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
@@ -25193,19 +25430,6 @@ if __name__ == "__main__":
             db.session.commit()
             print(f"Seeded {Student.query.count()} student(s) and {Faculty.query.count()} faculty from imported source sheets.")
             raise SystemExit(0)
-        if Student.query.count() == 0:
-            seed_database(seed_count)
-        ensure_demo_accounts()
-        ensure_panel_matching_demo_data()
-        seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases
-        ensure_faculty_account_schema()
-        ensure_workflow_activity_schema()
-        sync_result = sync_all_curricula()
-        ensure_subject_enrollment_schema()
-        sync_automatic_awol_statuses(commit=False)
-        db.session.commit()
-        if sync_result["created"]:
-            print(f"Added {sync_result['created']} missing curriculum row(s) for {sync_result['students']} student(s).")
 
     port = int(os.getenv("FLASK_PORT", "5000"))
     if (
