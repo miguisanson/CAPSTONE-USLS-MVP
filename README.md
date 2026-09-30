@@ -126,11 +126,23 @@ TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
 
 The app first tries normal PDF text extraction, then falls back to OCR when too little text is found.
 
+Everything below runs inside the project's own virtual environment. On Windows that is
+`.venv\Scripts\python.exe` (on macOS/Linux, `.venv/bin/python`); `npm run dev`, `npm run seed` and
+`npm run setup` already use it, so you only type the path yourself when you run Python by hand, for
+example `.venv\Scripts\python.exe -m unittest ...`. If the machine's Python was upgraded and
+`.venv\Scripts\python.exe` reports `No Python at ...`, run `npm run install:python` to rebuild the
+virtual environment.
+
 ### 4. Start the app
 
 ```cmd
 npm run dev
 ```
+
+The seed and maintenance steps (empty database seeding, demo accounts, curriculum sync) run
+automatically when the app starts, however it is started (`npm run dev`, `python app.py`,
+`flask --app app run`, or a WSGI server), and are safe to repeat. They are skipped under the test
+runner, for `python app.py --seed`, and when `USLS_SKIP_STARTUP_TASKS=1` is set.
 
 Then open <http://localhost:5000>. Press `Ctrl+C` in the terminal to stop the server.
 
@@ -174,6 +186,78 @@ FLASK_PORT=5001 npm run dev:web
 | `npm run dev:web` | Vite dev server on :5173 with hot reload (run `npm run dev` in a second terminal for the API) |
 
 > If you change anything under `frontend/src`, run `npm run build` (or use `npm run dev:web`) to see it.
+
+## Sign-in and demo mode
+
+Sign-in is a real email + password check. The role a user gets (staff, academic coordinator,
+research coordinator, admin, dean, faculty, student) is the role stored on the account; the sign-in
+form has no role picker and the server ignores any role a client sends. Failed sign-ins all get the
+same message, an email is locked for five minutes after five failed attempts, the session cookie is
+`HttpOnly` and `SameSite=Lax`, and signing out invalidates the session on the server.
+
+**`DEMO_MODE`** is the one switch for every presenter convenience. It is **on by default** so the
+local demo flow keeps working; set `DEMO_MODE=0` (in `.env` or the environment) for anything shared.
+
+| | `DEMO_MODE` on (default) | `DEMO_MODE=0` |
+|---|---|---|
+| Sign-in page | empty email + password form, plus a collapsed, clearly labelled **Demo accounts** panel that the presenter expands | plain email + password form |
+| Demo endpoints (`/api/auth/demo-accounts`, `/api/auth/demo-students`, demo reset) | available | `404` |
+| Passwords sent to the browser | only inside the expanded panel | never |
+| Demo persona repair at sign-in | yes | no |
+| Fabricated panel-matching availability seeded at start-up | yes | no |
+| `SECRET_KEY` not set | uses a public default | uses a random per-process key (set `SECRET_KEY` so sessions survive a restart) |
+
+Nothing is ever pre-filled: the presenter either types the password or presses **Fill form** /
+**Sign in** on a demo account.
+
+Notes for a real deployment: the seeded staff, dean and faculty accounts and every new student
+account start with the shared demo password, and there is no password-reset screen yet, so change
+those passwords before real use. Lockout is kept in memory (per server process, reset on restart).
+Set `SESSION_COOKIE_SECURE=1` when serving over HTTPS.
+
+## Configuration
+
+Set these in the environment or in `.env` (the app never needs `.env` to start).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | local SQLite file | e.g. `mysql+pymysql://root:1234@localhost:3306/usls_gs_demo` |
+| `FLASK_PORT` | `5000` | port the app listens on |
+| `DEMO_MODE` | `1` | presenter conveniences on/off (see above) |
+| `SECRET_KEY` | public demo value in demo mode | signs the session cookie |
+| `SESSION_COOKIE_SECURE` | `0` | `1` when served over HTTPS |
+| `LOGIN_MAX_FAILURES`, `LOGIN_LOCKOUT_SECONDS` | `5`, `300` | sign-in lockout |
+| `DEMO_SEED_COUNT` | `350` | synthetic students when seeding |
+| `GOOGLE_API_KEY` (or `GOOGLE_AI_STUDIO_API_KEY`) | none, optional | Gemini key for the Policy Assistant |
+| `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL` | `gemini-2.5-flash`, `gemini-embedding-2` | Gemini models |
+| `RAG_PREWARM` | `1` | pre-build the document index at start-up (only when a Gemini key is set) |
+| `TESSERACT_CMD` | on `PATH` | OCR for scanned PDFs |
+
+**Without a Gemini key** the app runs fully. The Policy Assistant still answers: database questions
+(students needing attention, blockers, enrollment) use the built-in rules, and policy questions are
+answered by local keyword retrieval over the handbook and uploaded policy documents, without a
+generated summary. Panel-matching keyword suggestions fall back to local keyword scoring.
+With a key, policy questions are answered by Gemini retrieval-augmented generation with citations,
+and unfamiliar questions are classified by the model. Set the key before the demo and ask a few
+unscripted questions to confirm it.
+
+## Running the tests
+
+The suite is plain `unittest` (no pytest needed). Each test file builds its own temporary SQLite
+database, so it never touches `usls_gs_demo.sqlite3`. From the project root on Windows:
+
+```cmd
+.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
+```
+
+The whole run takes a few minutes. To run one file or one test:
+
+```cmd
+.venv\Scripts\python.exe -m unittest tests.test_health -v
+.venv\Scripts\python.exe -m unittest tests.test_bpm_workflows.BpmWorkflowSimulationTests.test_name -v
+```
+
+`npm run build` only proves the React app compiles; there is no frontend test runner yet.
 
 ## Database
 

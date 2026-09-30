@@ -10,6 +10,7 @@ the upload-history table.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -18,6 +19,9 @@ from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+# This command only needs the models; skip the seed/maintenance steps that
+# importing the app would otherwise run against the live database.
+os.environ.setdefault("USLS_SKIP_STARTUP_TASKS", "1")
 
 from app import (
     MONITORING_UPLOAD_ROOT,

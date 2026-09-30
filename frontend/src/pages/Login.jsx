@@ -1,28 +1,11 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX, Gavel } from "lucide-react";
+import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorNote } from "../components/ui";
 
-const DEMO = {
-  staff: { email: "staff@usls.edu.ph", password: "DemoPass123!" },
-  academic_coordinator: { email: "academic@usls.edu.ph", password: "DemoPass123!" },
-  research_coordinator: { email: "research@usls.edu.ph", password: "DemoPass123!" },
-  admin: { email: "admin@usls.edu.ph", password: "DemoPass123!" },
-  dean: { email: "dean@usls.edu.ph", password: "DemoPass123!" },
-  student: { email: "student@usls.edu.ph", password: "DemoPass123!" },
-  faculty: { email: "liwayway.bautista@usls.edu.ph", password: "DemoPass123!" },
-};
-
 const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/approvals", student: "/student", faculty: "/faculty-portal" };
-const LABEL = { staff: "Staff", dean: "Dean", student: "Student" };
-const STAFF_ACCOUNTS = [
-  { role: "staff", label: "GS Staff", detail: "Intake and records" },
-  { role: "academic_coordinator", label: "Academic Coordinator", detail: "Coursework and practicum" },
-  { role: "research_coordinator", label: "Research Coordinator", detail: "Research completion" },
-  { role: "admin", label: "Administrator", detail: "All staff screens (review)" },
-];
 
 const STUDENT_LIFECYCLE_DEMOS = [
   {
@@ -93,33 +76,50 @@ const STANDALONE_STUDENT_DEMOS = [
 export default function Login() {
   const { user, login, loading, error } = useAuth();
   const navigate = useNavigate();
-  const [role, setRole] = useState("staff");
-  const [staffAccount, setStaffAccount] = useState("staff");
-  const [form, setForm] = useState(DEMO.staff);
-  const [localError, setLocalError] = useState("");
+  // The form always starts empty: nothing is pre-filled, so a real typed login can be shown.
+  const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoAccounts, setDemoAccounts] = useState([]);
   const [demoStudents, setDemoStudents] = useState([]);
-  const [demoLoading, setDemoLoading] = useState(true);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoLoaded, setDemoLoaded] = useState(false);
   const [demoError, setDemoError] = useState("");
   const [demoNotice, setDemoNotice] = useState("");
   const [quickLoginBusy, setQuickLoginBusy] = useState("");
   const [resetBusy, setResetBusy] = useState("");
   const [openDemoGroup, setOpenDemoGroup] = useState("");
 
-  useEffect(() => {
-    setForm(DEMO[role === "staff" ? staffAccount : role]);
-    setLocalError("");
-    if (role !== "student") setOpenDemoGroup("");
-  }, [role, staffAccount]);
-
+  // Ask the server whether demo mode is on. With it off, this page is only the form.
   useEffect(() => {
     let active = true;
-    api.demoStudents()
+    api.authConfig()
       .then((result) => {
-        if (active) setDemoStudents(result.items || []);
+        if (active) setDemoMode(Boolean(result.demo_mode));
+      })
+      .catch(() => {
+        if (active) setDemoMode(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Demo credentials are fetched only when the presenter expands the panel.
+  useEffect(() => {
+    if (!demoMode || !demoOpen || demoLoaded) return undefined;
+    let active = true;
+    setDemoLoading(true);
+    Promise.all([api.demoAccounts(), api.demoStudents()])
+      .then(([accounts, students]) => {
+        if (!active) return;
+        setDemoAccounts(accounts.items || []);
+        setDemoStudents(students.items || []);
+        setDemoLoaded(true);
       })
       .catch((requestError) => {
-        if (active) setDemoError(requestError.message || "Demo student accounts could not be loaded.");
+        if (active) setDemoError(requestError.message || "Demo accounts could not be loaded.");
       })
       .finally(() => {
         if (active) setDemoLoading(false);
@@ -127,35 +127,39 @@ export default function Login() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode, demoOpen, demoLoaded]);
 
   if (user?.role) return <Navigate to={HOME[user.role] || "/"} replace />;
 
+  async function signIn(credentials) {
+    // The role is decided by the server from the account; the form never sends one.
+    const signedIn = await login({ email: credentials.email.trim(), password: credentials.password });
+    navigate(HOME[signedIn.role] || "/", { replace: true });
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
-    setLocalError("");
     try {
-      const signedIn = await login({ role, ...form });
-      navigate(HOME[signedIn.role] || "/", { replace: true });
+      await signIn(form);
     } catch {
-      setLocalError("Login failed. Check the account type, email, and password.");
+      /* the message is shown from the auth context */
     }
   }
 
-  async function quickLogin(student) {
-    setLocalError("");
+  function fillForm(account) {
+    setDemoError("");
+    setForm({ email: account.email, password: account.password });
+    setShowPassword(true);
+  }
+
+  async function quickLogin(account, busyKey) {
     setDemoError("");
     setDemoNotice("");
-    setQuickLoginBusy(student.key);
+    setQuickLoginBusy(busyKey);
     try {
-      const signedIn = await login({
-        role: "student",
-        email: student.email,
-        password: student.password,
-      });
-      navigate(HOME[signedIn.role] || "/student", { replace: true });
+      await signIn(account);
     } catch (requestError) {
-      setDemoError(requestError.message || `Could not sign in as ${student.name}.`);
+      setDemoError(requestError.message || `Could not sign in as ${account.name || account.label}.`);
     } finally {
       setQuickLoginBusy("");
     }
@@ -182,9 +186,11 @@ export default function Login() {
     }
   }
 
+  const sharedPassword = demoAccounts[0]?.password || demoStudents[0]?.password || "";
+
   return (
     <div className="min-h-screen bg-canvas">
-      <main className="mx-auto grid min-h-screen w-full max-w-6xl grid-cols-1 items-center gap-8 px-4 py-8 lg:grid-cols-2 lg:px-8">
+      <main className="mx-auto grid min-h-screen w-full max-w-6xl grid-cols-1 items-start gap-8 px-4 py-8 lg:grid-cols-2 lg:items-center lg:px-8">
         <section className="space-y-5">
           <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-white shadow-sm">
             <GraduationCap className="h-8 w-8" />
@@ -195,96 +201,132 @@ export default function Login() {
               Graduate School Lifecycle Portal
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-600">
-              Sign in with your role account to access the correct workflow steps.
+              Sign in with your Graduate School account. The screens you see depend on the role your account holds.
             </p>
           </div>
 
-          {role === "staff" && (
-            <div className="mb-5">
-              <p className="field-label">Choose staff responsibility</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {STAFF_ACCOUNTS.map((account) => (
-                  <button
-                    key={account.role}
-                    type="button"
-                    onClick={() => setStaffAccount(account.role)}
-                    className={`cursor-pointer rounded-xl border px-3 py-3 text-left transition-colors ${staffAccount === account.role ? "border-brand-500 bg-brand-50 ring-1 ring-brand-200" : "border-slate-200 bg-white hover:border-brand-200 hover:bg-slate-50"}`}
-                  >
-                    <span className="block text-sm font-bold text-ink">{account.label}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">{account.detail}</span>
-                  </button>
-                ))}
-              </div>
+          {demoMode && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60">
+              <button
+                type="button"
+                onClick={() => setDemoOpen((value) => !value)}
+                aria-expanded={demoOpen}
+                aria-controls="demo-accounts-panel"
+                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2 text-sm font-bold text-amber-900">
+                    <PlayCircle className="h-4 w-4" /> Demo accounts
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">Demo mode</span>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-amber-800/80">
+                    For presentations only. Expand to see ready-made accounts; nothing is filled in until you choose.
+                  </span>
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-amber-800 transition-transform ${demoOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {demoOpen && (
+                <div id="demo-accounts-panel" className="space-y-4 border-t border-amber-200 px-4 pb-4 pt-3">
+                  {demoLoading && <p className="text-sm text-slate-500">Loading demo accounts…</p>}
+
+                  {demoAccounts.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="field-label">Staff, Dean, Faculty and Student</p>
+                      {sharedPassword && (
+                        <p className="text-xs text-slate-600">
+                          Demo password for every account below:{" "}
+                          <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[12px] text-ink ring-1 ring-slate-200">{sharedPassword}</code>
+                        </p>
+                      )}
+                      <ul className="divide-y divide-amber-100 overflow-hidden rounded-xl border border-amber-100 bg-white">
+                        {demoAccounts.map((account) => (
+                          <li key={account.email} className="flex items-center gap-2 p-2">
+                            <span className="min-w-0 flex-1 px-1">
+                              <span className="block truncate text-sm font-bold text-ink">{account.label}</span>
+                              <span className="block truncate text-[11px] text-slate-500">{account.email} · {account.detail}</span>
+                            </span>
+                            <button type="button" onClick={() => fillForm(account)} className="btn-ghost shrink-0 px-2.5 py-1.5 text-xs">
+                              Fill form
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => quickLogin(account, account.email)}
+                              disabled={Boolean(quickLoginBusy || resetBusy)}
+                              className="btn-primary shrink-0 px-2.5 py-1.5 text-xs"
+                              aria-label={`Sign in as ${account.label} (demo)`}
+                            >
+                              {quickLoginBusy === account.email ? "Signing in…" : "Sign in"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {demoStudents.length > 0 && (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="field-label">Student workflow demos</p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                          Arranged in the Graduate School lifecycle sequence. Select a student to sign in, or reset one case for a clean walkthrough.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {STUDENT_LIFECYCLE_DEMOS.map((group) => (
+                          <DemoStudentGroup
+                            key={group.workflow}
+                            open={openDemoGroup === group.workflow}
+                            onToggle={() => setOpenDemoGroup((current) => (current === group.workflow ? "" : group.workflow))}
+                            title={group.title}
+                            description={group.description}
+                            icon={group.icon}
+                            students={demoStudents.filter((student) => student.workflow === group.workflow)}
+                            quickLoginBusy={quickLoginBusy}
+                            resetBusy={resetBusy}
+                            onLogin={(student) => quickLogin(student, student.key)}
+                            onReset={resetDemoStudent}
+                          />
+                        ))}
+                      </div>
+                      <div>
+                        <p className="field-label">Standalone processes</p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                          Leave, return, AWOL or residency, and early subject-withdrawal scenarios that branch from the main student lifecycle.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {STANDALONE_STUDENT_DEMOS.map((group) => (
+                          <DemoStudentGroup
+                            key={group.workflow}
+                            open={openDemoGroup === group.workflow}
+                            onToggle={() => setOpenDemoGroup((current) => (current === group.workflow ? "" : group.workflow))}
+                            title={group.title}
+                            description={group.description}
+                            icon={group.icon}
+                            students={demoStudents.filter((student) => student.workflow === group.workflow)}
+                            quickLoginBusy={quickLoginBusy}
+                            resetBusy={resetBusy}
+                            onLogin={(student) => quickLogin(student, student.key)}
+                            onReset={resetDemoStudent}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div aria-live="polite" className="min-h-5">
+                    {demoNotice && (
+                      <p className="flex items-start gap-1.5 text-xs font-semibold leading-relaxed text-emerald-700">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {demoNotice}
+                      </p>
+                    )}
+                    {demoError && <ErrorNote message={demoError} />}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-          {role === "student" && <div className="space-y-3 pt-1">
-            <div>
-              <p className="field-label">Student workflow demos</p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                Arranged in the Graduate School lifecycle sequence. Select a student to sign in instantly, or reset one case for a clean walkthrough.
-              </p>
-            </div>
-
-            {demoLoading ? (
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
-                Loading demo students…
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                {STUDENT_LIFECYCLE_DEMOS.map((group) => (
-                  <DemoStudentGroup
-                    key={group.workflow}
-                    open={openDemoGroup === group.workflow}
-                    onToggle={() => setOpenDemoGroup((current) => current === group.workflow ? "" : group.workflow)}
-                    title={group.title}
-                    description={group.description}
-                    icon={group.icon}
-                    students={demoStudents.filter((student) => student.workflow === group.workflow)}
-                    quickLoginBusy={quickLoginBusy}
-                    resetBusy={resetBusy}
-                    onLogin={quickLogin}
-                    onReset={resetDemoStudent}
-                  />
-                ))}
-              </div>
-            )}
-
-            {!demoLoading && <div className="space-y-3 pt-2">
-              <div>
-                <p className="field-label">Standalone processes</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  Leave, return, AWOL or residency, and early subject-withdrawal scenarios that can branch from the main student lifecycle.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                {STANDALONE_STUDENT_DEMOS.map((group) => (
-                  <DemoStudentGroup
-                    key={group.workflow}
-                    open={openDemoGroup === group.workflow}
-                    onToggle={() => setOpenDemoGroup((current) => current === group.workflow ? "" : group.workflow)}
-                    title={group.title}
-                    description={group.description}
-                    icon={group.icon}
-                    students={demoStudents.filter((student) => student.workflow === group.workflow)}
-                    quickLoginBusy={quickLoginBusy}
-                    resetBusy={resetBusy}
-                    onLogin={quickLogin}
-                    onReset={resetDemoStudent}
-                  />
-                ))}
-              </div>
-            </div>}
-
-            <div aria-live="polite" className="min-h-5">
-              {demoNotice && (
-                <p className="flex items-start gap-1.5 text-xs font-semibold leading-relaxed text-emerald-700">
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {demoNotice}
-                </p>
-              )}
-              {demoError && <ErrorNote message={demoError} />}
-            </div>
-          </div>}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
@@ -293,18 +335,13 @@ export default function Login() {
             <p className="mt-1 text-sm text-slate-500">Accounts are created by the Graduate School office.</p>
           </div>
 
-          <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
-            <ModeButton active={role === "staff"} icon={UserCog} label="Staff" onClick={() => setRole("staff")} />
-            <ModeButton active={role === "faculty"} icon={GraduationCap} label="Faculty" onClick={() => setRole("faculty")} />
-            <ModeButton active={role === "dean"} icon={Gavel} label="Dean" onClick={() => setRole("dean")} />
-            <ModeButton active={role === "student"} icon={UserRound} label="Student" onClick={() => setRole("student")} />
-          </div>
-
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4" autoComplete="on">
             <label className="block">
               <span className="field-label">Email</span>
               <input
                 type="email"
+                name="email"
+                autoComplete="username"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 className="field-input"
@@ -316,6 +353,8 @@ export default function Login() {
               <span className="relative block">
                 <input
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                   className="field-input pr-11"
@@ -332,7 +371,7 @@ export default function Login() {
               </span>
             </label>
 
-            <ErrorNote message={localError || error} />
+            <ErrorNote message={error} />
 
             <button type="submit" disabled={loading} className="btn-primary w-full">
               {loading ? (
@@ -341,7 +380,7 @@ export default function Login() {
                 </>
               ) : (
                 <>
-                  <LockKeyhole className="h-4 w-4" /> Sign in as {role === "staff" ? STAFF_ACCOUNTS.find((item) => item.role === staffAccount)?.label : LABEL[role] || "Staff"}
+                  <LockKeyhole className="h-4 w-4" /> Sign in
                 </>
               )}
             </button>
@@ -418,19 +457,5 @@ function DemoStudentGroup({ className = "", open, onToggle, title, description, 
       </div>
       )}
     </section>
-  );
-}
-
-function ModeButton({ active, icon: Icon, label, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
-        active ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
-      }`}
-    >
-      <Icon className="h-4 w-4" /> {label}
-    </button>
   );
 }
