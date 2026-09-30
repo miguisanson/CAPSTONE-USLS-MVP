@@ -34,7 +34,8 @@ const STUDENT_RULE_PROCESS_BY_VIEW = {
 import { AwolReturnRequestForm, LoaRequestForm, ReadmissionRequestForm, WithdrawalRequestForm } from "./RequestForms";
 import { GraduationRequestForm, PracticumRequestForm } from "./CompletionForms";
 import { SchedulePanel } from "./Panels";
-import { REQUEST_GROUPS, STUDENT_REQUEST_PATHS, findRequestItem } from "./requestMeta";
+import { REQUEST_GROUPS, STUDENT_REQUEST_PATHS, findRequestItem, lockedReasonFor } from "./requestMeta";
+import { leaveRequestStatus } from "./LeaveCaseCards";
 
 const REQUEST_PAGES = {
   research: {
@@ -51,13 +52,13 @@ const REQUEST_PAGES = {
   },
   loa: {
     title: "Leave of Absence",
-    description: "Apply for one or two consecutive semesters of leave. Staff check eligibility, then the Dean decides.",
+    description: "Ask for a leave of absence, or for more time on a leave you are already on. Graduate School staff check your request, then the Dean decides.",
     icon: CalendarOff,
     render: (data, onSaved) => <LoaRequestForm data={data} semesters={data.future_semesters || []} onSaved={onSaved} />,
   },
   readmission: {
     title: "Readmission",
-    description: "Return to active status after an approved Leave of Absence.",
+    description: "Ask to come back to your studies when your leave of absence is ending. Staff check your request, then the Dean decides.",
     icon: UserCheck,
     render: (data, onSaved) => <ReadmissionRequestForm data={data} onSaved={onSaved} />,
   },
@@ -96,9 +97,13 @@ function requestStatus(id, data) {
     case "schedule":
       return data.schedules?.[0]?.status || "No request";
     case "loa":
-      return data.student.standing === "On Leave" ? "On Leave" : latestLog("leave-of-absence")?.new_status || "Not submitted";
+      return data.leave_overview
+        ? leaveRequestStatus(data, "loa")
+        : data.student.standing === "On Leave" ? "On Leave" : latestLog("leave-of-absence")?.new_status || "Not submitted";
     case "readmission":
-      return latestLog("readmission")?.new_status || "Not submitted";
+      return data.leave_overview
+        ? leaveRequestStatus(data, "readmission")
+        : latestLog("readmission")?.new_status || "Not submitted";
     case "awol":
       return data.awol_case?.status || "No request";
     case "withdrawal":
@@ -139,7 +144,7 @@ export function StudentRequestPage({ id, aside = null }) {
         {locked ? (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-            <p>{item.lockedReason}</p>
+            <p>{lockedReasonFor(item, data)}</p>
           </div>
         ) : (
           page.render(data, refetch)
@@ -228,7 +233,7 @@ export function StudentRequestCenter() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold">{item.label}</span>
-                        <span className="block truncate text-xs text-slate-500">{locked ? item.lockedReason : requestStatus(item.id, data)}</span>
+                        <span className="block truncate text-xs text-slate-500">{locked ? lockedReasonFor(item, data) : requestStatus(item.id, data)}</span>
                       </span>
                       {locked ? <Lock className="h-4 w-4 shrink-0 text-slate-400" aria-label="Locked" /> : <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />}
                     </Link>

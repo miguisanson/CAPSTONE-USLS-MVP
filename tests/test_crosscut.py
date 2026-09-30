@@ -793,7 +793,14 @@ class SeededConsistencyTests(unittest.TestCase):
             expected = sum(1 for s in Student.query.all() if app_module.student_is_on_leave(s))
             self.assertGreater(expected, 0)
             self.assertEqual(self.get("/api/dashboard")["kpis"]["on_leave"], expected)
-            self.assertEqual(self.get("/api/reports")["loa_readmission"]["count"], expected)
+            # The LOA / Readmission report now lists request cases (pending, denied and closed too),
+            # so check that every student on leave appears on it rather than comparing the row count.
+            report_rows = self.get("/api/reports", page_size=200)["loa_readmission"]["rows"]
+            on_leave_in_report = {
+                row["student"]["id"] for row in report_rows
+                if app_module.student_is_on_leave(Student.query.get(row["student"]["id"]))
+            }
+            self.assertEqual(len(on_leave_in_report), expected)
             self.assertEqual(self.get("/api/students", student_status="loa", page_size=5)["total"], expected)
             self.assertEqual(self.get("/api/students", standing="On Leave", page_size=5)["total"], expected)
 

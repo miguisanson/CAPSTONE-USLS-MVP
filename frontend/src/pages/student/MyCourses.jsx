@@ -4,6 +4,8 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { Card, EmptyState, ErrorNote, SectionTitle, StatusBadge } from "../../components/ui";
+import { LeaveBanner, isOnLeaveOrAwol } from "./LeaveCaseCards";
+import { STUDENT_REQUEST_PATHS } from "./requestMeta";
 
 export function MyCoursesPanel({ data, onSaved }) {
   const subjects = data.curriculum_subjects || [];
@@ -47,6 +49,25 @@ export function MyCoursesPanel({ data, onSaved }) {
     }
   }
 
+  // While the student is on leave or marked AWOL, enrollment is closed: show why instead of the checkboxes.
+  const { onLeave, awol } = isOnLeaveOrAwol(data.student);
+  if (onLeave || awol) {
+    const banner = data.leave_overview?.banner || (awol
+      ? { tone: "bad", title: "Your record is marked AWOL", text: "You cannot enroll until a return request is approved." }
+      : { tone: "info", title: "You are on leave of absence", text: "Your enrollment is closed until a readmission is approved." });
+    return (
+      <Card className="p-6">
+        <SectionTitle title="My suggested curriculum" subtitle="Your subjects cannot be changed right now" icon={BookOpenCheck} />
+        <LeaveBanner
+          banner={banner}
+          linkTo={awol ? STUDENT_REQUEST_PATHS.awol : STUDENT_REQUEST_PATHS.readmission}
+          linkLabel={awol ? "Open Return from AWOL" : "Ask to come back (Readmission)"}
+        />
+        <p className="mt-3 text-sm text-slate-600">Subjects can be added again once you are back in the program.</p>
+      </Card>
+    );
+  }
+
   return (
     <Card className="p-6">
       <SectionTitle title="My suggested curriculum" subtitle="Add published subjects you are taking this semester. Subjects already on your enrollment record stay locked." icon={BookOpenCheck} />
@@ -76,7 +97,7 @@ export function MyCoursesPanel({ data, onSaved }) {
           <p className="text-xs text-slate-500">{selected.size} subject{selected.size === 1 ? "" : "s"} checked for this semester.</p>
         </div>
         {message && <p className="rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{message}</p>}
-        {error && <ErrorNote>{error}</ErrorNote>}
+        <ErrorNote message={error} />
       </div> : <EmptyState icon={BookOpenCheck} title="No curriculum is available" hint="Ask the Academic Coordinator to confirm your curriculum version." />}
     </Card>
   );

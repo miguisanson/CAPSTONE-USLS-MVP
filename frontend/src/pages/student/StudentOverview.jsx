@@ -14,6 +14,7 @@ import { formatDate, relativeDays } from "../../lib/format";
 import { useStudentPortal } from "./StudentPortalContext";
 import { ActivityPanel, ProgressPanel, RecommendationsPanel, SchedulePanel, StudentHero, WorkflowStatusPanel } from "./Panels";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
+import { LeaveBanner, LeaveStatusPanel } from "./LeaveCaseCards";
 import { STUDENT_REQUEST_VIEW_BY_SLUG } from "./shared";
 
 const REQUEST_LABELS = {
@@ -158,6 +159,7 @@ export default function StudentOverview() {
         description="Where you stand in the graduate lifecycle, and what to do next."
         icon={LayoutDashboard}
       />
+      <LeaveBanner banner={data.leave_overview?.banner} />
       <StudentHero data={data} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={ClipboardCheck} label="Coursework" value={`${audit.completion_rate}%`} sub={`${audit.completed.length} completed, ${audit.missing_count} missing`} to="/student/progress" />
@@ -170,6 +172,7 @@ export default function StudentOverview() {
           <NextActionCard data={data} unreadCount={unreadCount} />
           <ProgressPanel data={data} />
           <WorkflowStatusPanel data={data} />
+          <LeaveStatusPanel data={data} />
           <ActivityPanel logs={(data.logs || []).slice(0, 5)} />
         </div>
         <div className="space-y-5 lg:col-span-4">
