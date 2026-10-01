@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from .common import main_text
-from .helpers_a3 import center_text, column_holds, drag_card, frame_board, open_link
+from .helpers_a3 import dean_board_decision, center_text, column_holds, drag_card, frame_board, open_link
 
 KEY = "leave-of-absence-daniel"
 EMAIL = "loa.daniel@usls.edu.ph"
@@ -133,34 +133,11 @@ def run(rt):
     # ---- Part C: Dean decides ---------------------------------------------------------
     dean = rt.new_page("dean@usls.edu.ph")
 
-    def dean_open():
-        dean.get_by_role("link", name=re.compile(r"Leave . Readmission")).first.click()
-        rt.settle(dean, 1500)
-        rt.shot(dean, f"{S}-13")
+    def dean_decide():
+        dean_board_decision(rt, dean, r"^Leave of Absence", WHO, "Leave scheduled", DEAN_COMMENT,
+                            (f"{S}-13", f"{S}-14", f"{S}-15"))
 
-    rt.step("Dean opens Leave / Readmission / AWOL", dean_open)
-
-    def dean_review():
-        dean.get_by_role("link", name="Review").first.click()
-        rt.settle(dean, 1500)
-        rt.shot(dean, f"{S}-14")
-        dean.get_by_role("button", name="Approve").first.scroll_into_view_if_needed()
-        rt.shot(dean, f"{S}-15")
-
-    rt.step("Dean opens the case", dean_review)
-
-    def dean_approve():
-        ta = dean.get_by_label(re.compile("Your comment", re.I))
-        if ta.count():
-            ta.first.fill(DEAN_COMMENT)
-        dean.get_by_role("button", name="Approve", exact=True).first.click()
-        dean.wait_for_timeout(900)
-        rt.shot(dean, f"{S}-16")
-        dean.get_by_role("button", name="Approve current stage").click()
-        rt.settle(dean, 2000)
-        rt.shot(dean, f"{S}-16b")
-
-    rt.step("Dean approves", dean_approve)
+    rt.step("Dean drags the card to Leave scheduled and confirms", dean_decide)
 
     # ---- staff starts the leave, Registrar list ---------------------------------------
     def staff_board_again():

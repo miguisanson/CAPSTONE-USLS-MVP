@@ -120,3 +120,29 @@ def show_column(page: Page, prefix: str, region_label: str = "board") -> None:
         [prefix, region_label],
     )
     page.wait_for_timeout(600)
+
+
+def dean_board_decision(rt: Runtime, dean: Page, link: str, who: str, to_column: str, comment: str,
+                        shots: tuple[str, str, str], from_column: str = "With the Dean") -> None:
+    """Dean decision on the shared board: open the page, drag the card to the decision column,
+    confirm in the window. ``shots`` = (board before, window, board after)."""
+    dean.get_by_role("link", name=re.compile(link)).first.click()
+    rt.settle(dean, 2500)
+    try:
+        dean.get_by_role("textbox", name=re.compile("Search", re.I)).first.fill(who)
+        rt.settle(dean, 800)
+    except Exception:  # noqa: BLE001
+        pass
+    frame_board(dean, from_column)
+    rt.shot(dean, shots[0])
+    drag_card(rt, dean, who, to_column)
+    dean.wait_for_timeout(800)
+    dlg = dean.locator("[role=dialog]").last
+    if dlg.locator("textarea").count():
+        dlg.locator("textarea").first.fill(comment)
+    rt.note("dean dialog: " + " | ".join(dlg.inner_text().split("\n"))[:600])
+    rt.shot(dean, shots[1])
+    dlg.get_by_role("button").last.click()
+    rt.settle(dean, 2200)
+    frame_board(dean, from_column)
+    rt.shot(dean, shots[2])

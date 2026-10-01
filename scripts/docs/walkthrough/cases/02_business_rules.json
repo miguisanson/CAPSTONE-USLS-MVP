@@ -6,7 +6,7 @@
  "duration": "8 min",
  "story": [
   "The panel asked a direct question: can a student drop on Day 1? The answer is not hidden in code. Every rule the workflows follow is kept in one register with its value, the handbook or protocol page it comes from, and a plain label saying whether the portal enforces it, only documents it, or still needs review. The same rules are shown on the screen where they apply, so a staff member or a student sees the rule and its source at the moment of the decision.",
-  "This case opens the register, finds the withdrawal and dropping rules, shows the rule panel on the standalone and lifecycle screens, and ends on the student's Subject Withdrawal page, which shows the deadline rule. The Graduate School Handbook 2022-2023 is in force; where the portal and the handbook disagree, the handbook wins. Rules that came from the prototype and have no handbook page are marked Needs review."
+  "This case opens the register, finds the withdrawal and dropping rules, shows the rule panel on the standalone and lifecycle screens, and ends on the student's Subject Withdrawal page, which shows the deadline rule. The Graduate School Handbook 2022-2023 is in force; where the portal and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked and carry an Official badge; rules that came from the prototype and have no handbook page are marked Needs review and Pending validation."
  ],
  "accounts": [
   [
@@ -43,7 +43,7 @@
    "title": "Part A - The Business Rules register",
    "steps": [
     {
-     "text": "Sign in as **staff@usls.edu.ph** and open **Business Rules** under Monitoring & support. The header explains that the rules come with the page they are from and that the Graduate School Handbook 2022-2023 is in force. Four counters sit under it: rules in the register, enforced by the system, documented only, and need review. In this run they read 65, 47, 18 and 12. Below are the filters and a search box, then the rules grouped by process (Enrollment and academic load, Course adjustments, Subject withdrawal, Dropping a subject and retention, Leave of absence, Readmission, AWOL and residency, Research requirements, Defense scheduling and panels, Practicum, Graduation, Faculty).",
+     "text": "Sign in as **staff@usls.edu.ph** and open **Business Rules** under Monitoring & support. The header says that the Graduate School Handbook 2022-2023 is in force, that rules set by the Handbook or the Research Protocol are **locked** (they change only when the Graduate School issues a new policy, uploaded under Policy Documents), and that prototype rules awaiting validation can be adjusted, with every change recorded with a reason. Four counters sit under it: rules in the register, enforced by the system, documented only, and need review. In this run they read 65, 47, 18 and 12. Below are six filters (All rules, Enforced by the system, Documented only, Needs review, Official (locked), Pending validation) and a search box, then the rules grouped by process (Enrollment and academic load, Course adjustments, Subject withdrawal, Dropping a subject and retention, Leave of absence, Readmission, AWOL and residency, Research requirements, Defense scheduling and panels, Practicum, Graduation, Faculty). Each handbook rule carries a dark badge such as **Official - Handbook p. 48** with a lock and a line saying it changes only when a new policy is issued; it has no change button.",
      "shots": [
       {
        "id": "business-rules-01",
@@ -52,7 +52,7 @@
      ]
     },
     {
-     "text": "Type **withdraw** in the search box. The register narrows to the **Subject withdrawal** group, the **Dropping a subject and retention** rule and the leave rules that mention withdrawal. Read the first rule: **Subject withdrawal window, 14 days** - a student may withdraw subjects until the end of the second week from the start of classes, whether or not classes were attended; the request needs the Dean's approval; after the window a single subject can no longer be withdrawn. Its source line reads Graduate School Handbook 2022-2023, p. 49, Registration - Withdrawal of Subject, and its badge reads **Enforced by the system**.",
+     "text": "Type **withdraw** in the search box. The register narrows to the **Subject withdrawal** group, the **Dropping a subject and retention** rule and the leave rules that mention withdrawal. Read the first rule: **Subject withdrawal window, 14 days** - a student may withdraw subjects until the end of the second week from the start of classes, whether or not classes were attended; the request needs the Dean's approval; after the window a single subject can no longer be withdrawn. Its source line reads Graduate School Handbook 2022-2023, p. 49, Registration - Withdrawal of Subject, and its badges read **Enforced by the system** and **Official - Handbook p. 49** (locked).",
      "shots": [
       {
        "id": "business-rules-02",
@@ -81,7 +81,7 @@
      ]
     },
     {
-     "text": "Clear the search and select the filter **Needs review**. Only rules that came from the prototype remain. Each one shows the source **Prototype rule - pending Graduate School validation** and an amber **Needs review** badge: minimum semesters completed before a leave, the return-due and grace days for a leave, the 200 practicum hours and the practicum unit requirements, the faculty teaching load limit, and the reminder intervals. They work in the portal today but have no handbook page yet, and the Graduate School is asked to confirm them.",
+     "text": "Clear the search and select the filter **Needs review**. Only rules that came from the prototype remain. Each one shows the source **Prototype rule - pending Graduate School validation** and an amber **Needs review** badge: minimum semesters completed before a leave, the return-due and grace days for a leave, the 200 practicum hours and the practicum unit requirements, the faculty teaching load limit, and the reminder intervals. They work in the portal today but have no handbook page yet, and the Graduate School is asked to confirm them. Unlike the locked handbook rules, each of these shows **Pending validation - can be adjusted until the Graduate School confirms** and a **Confirm or adjust** button; this walkthrough does not use it.",
      "shots": [
       {
        "id": "business-rules-05",
@@ -105,7 +105,7 @@
    "intro": "Each workflow screen has a collapsible panel titled Rules applied on this screen. It reads from the same register, so the value and the handbook page are always the ones in Part A.",
    "steps": [
     {
-     "text": "Open **Withdrawal Requests** under Standalone Processes and expand **Rules applied on this screen** (5 rules from the Graduate School policies). The panel lists the window, the fee boundary and the three fee rules with their sources and badges. A link at the bottom, **See every business rule and its history**, goes back to the register.",
+     "text": "Open **Withdrawal Requests** under Standalone Processes (header: Withdraw a student from one subject until the end of the second week of classes, without changing program standing) and expand **Rules applied on this screen** (5 rules from the Graduate School policies). The panel lists the window, the fee boundary and the three fee rules with their sources and badges. A link at the bottom, **See every business rule and its history**, goes back to the register.",
      "shots": [
       {
        "id": "business-rules-07",
@@ -150,7 +150,7 @@
      ]
     },
     {
-     "text": "Still in Enrollment, choose program **MAED**, choose the student **Roberto Aquino**, and select the **Enrolled** badge on one subject row (MAED-MAJ3). The **Record dropped subject** dialog opens. It already shows the panel **When a subject can be dropped** with the 20% absence rule and its source (Handbook p. 52). Close the dialog without saving. Nothing is changed.",
+     "text": "Still in Enrollment, choose program **MAED**, choose the student **Roberto Aquino**, and select the **Enrolled** badge on one subject row (MAED-MAJ3). The **Record dropped subject** dialog opens. It already shows the panel **When a subject can be dropped** with the 20% absence rule and its source (Handbook p. 52), then fields for the unexcused-absence percentage and a coordinator note, and a note that a withdrawal must be initiated by the student in the Withdrawal workflow. The dialog is taller than a 768 px window, so the screenshot is taken with an enlarged window. Close the dialog with Cancel; nothing is changed.",
      "shots": [
       {
        "id": "business-rules-12",
@@ -191,7 +191,7 @@
      ]
     },
     {
-     "text": "Scroll down. A yellow note, **When you can withdraw a subject**, repeats the rule in plain words: until the end of the second week of classes (14 calendar days from the start of classes), 10% of the term's total due in the first week and 20% in the second. Under **Send Withdrawal Request** the subject list marks each subject **WITHDRAWAL WINDOW CLOSED**, and a message reads: No active subject is currently inside the withdrawal window (until the end of the second week of classes). **Send withdrawal request** stays disabled.",
+     "text": "Scroll down. A yellow note, **When you can withdraw a subject**, repeats the rule in plain words: until the end of the second week of classes (14 calendar days from the start of classes), 10% of the term's total due in the first week and 20% in the second. Under **Send your withdrawal request** the subject list marks each subject **WITHDRAWAL WINDOW CLOSED**, and a message reads: No active subject is currently inside the withdrawal window (until the end of the second week of classes). **Send withdrawal request** stays disabled.",
      "shots": [
       {
        "id": "business-rules-16",
@@ -221,8 +221,8 @@
  ],
  "notes": [
   "Fees are information only. The portal does not compute or collect payments; the Business Office does.",
-  "Handbook rules are the authority. Prototype rules marked Needs review are working defaults, not Graduate School policy, until validated.",
-  "The register lets staff change a rule value with a recorded reason and shows it in Change history; this walkthrough does not change any value, and official handbook values are to be locked against editing.",
+  "Handbook rules are the authority and are locked. Prototype rules marked Needs review are working defaults, not Graduate School policy, until validated.",
+  "Official handbook and protocol values are locked: they cannot be edited in the register and change only when the Graduate School issues a new policy, uploaded under Policy Documents. Only prototype rules (Pending validation) can be confirmed or adjusted, each with a recorded reason and a Change history. This walkthrough changes no value.",
   "The withdrawal window is checked against the recorded semester start date; if the recorded dates are wrong, the student page tells the student to contact Graduate School staff.",
   "Counts in the register (65 rules, 47 enforced, 18 documented only, 12 needing review) are those observed in this run and change when rules are added."
  ]

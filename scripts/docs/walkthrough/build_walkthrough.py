@@ -112,6 +112,7 @@ class Builder:
         self.figure = 0
         self.headings: list[tuple[int, str]] = []
         self.missing: list[str] = []
+        self.used: set[str] = set()
         self._styles()
         self._page()
 
@@ -259,6 +260,7 @@ class Builder:
             self.para(f"[missing screenshot: {shot_id}]", italic=True, color=GREY)
             return None
         self.figure += 1
+        self.used.add(shot_id)
         p = self.doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.paragraph_format.keep_with_next = True
@@ -511,9 +513,19 @@ def main() -> int:
     dest = REPO / "Documents" / "CAPSTONE_ONLY" / "walkthrough_screenshots"
     dest.mkdir(parents=True, exist_ok=True)
     count = 0
+    for old in dest.glob("*.png"):
+        if old.stem not in b.used:
+            old.unlink()  # no longer referenced by the document
     for png in sorted(SHOTS.glob("*.png")):
-        shutil.copy2(png, dest / png.name)
-        count += 1
+        if png.stem in b.used:
+            try:  # 256-colour copy (UI screenshots lose nothing visible and shrink about 3x); originals stay in shots/
+                from PIL import Image
+
+                with Image.open(png) as im:
+                    im.convert("RGB").quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(dest / png.name, optimize=True)
+            except ImportError:
+                shutil.copy2(png, dest / png.name)
+            count += 1
     print(f"copied {count} screenshots to {dest}")
     return 0
 

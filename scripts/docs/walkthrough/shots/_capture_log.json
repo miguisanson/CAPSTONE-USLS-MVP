@@ -1,497 +1,138 @@
 [
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "reset research-miguel: Reset Miguel Yu's Research Gate, Panel Matching, Defense Scheduling demo. All prerequisite stages are complete and the student is ready to begin again."
+  "message": "shot calendars-01"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-01"
+  "message": "shot calendars-02"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "student: open Research"
+  "message": "A1 staff opens the calendar and selects a defense"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-02"
+  "message": "shot calendars-03"
  },
  {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-03"
- },
- {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "student: read the rules shown on the screen"
+  "message": "A2 staff filters Everything in the agenda view"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-04"
+  "message": "Dean calendar page removed: /dean/calendar redirects to the Approvals Queue; no Dean calendar shots"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-06"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-07"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-08"
+ },
+ {
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "student: upload Form 1"
+  "message": "C1 faculty 'My calendar' week, month and a defense"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-05"
+  "message": "shot calendars-09"
  },
  {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-06"
- },
- {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "student: upload three concept papers and read compliance check"
+  "message": "C2 faculty availability editor"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-07"
+  "message": "shot calendars-10"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "student: submit Title Defense for review"
+  "message": "D1 faculty creates the private calendar link and the link is read back"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-08"
+  "message": "shot calendars-11"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-12"
+ },
+ {
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "student: Research Adviser page"
+  "message": "E1 student research calendar and bell"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-09"
+  "message": "shot calendars-13"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "research coordinator: adviser appointment record"
+  "message": "F1 faculty notification bell"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-10"
+  "message": "shot calendars-14"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "faculty (adviser): My Advisees lists Miguel"
+  "message": "G1 staff adviser appointment screen"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-11"
+  "message": "shot calendars-15"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "staff: open Research Gate and pick Miguel"
+  "message": "G2 student adviser page"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "note",
-  "message": "shot research_title-12"
+  "message": "shot calendars-16"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_16_calendars",
   "kind": "ok",
-  "message": "staff: submitted files visible"
+  "message": "G3 faculty advisees page"
  },
  {
-  "case": "case_13_research_title",
+  "case": "case_17_verdicts",
   "kind": "note",
-  "message": "shot research_title-13"
+  "message": "slots: nico 11:04-11:08, bea 11:10-11:14, gab 11:16-11:20, bea2 11:22-11:26"
  },
  {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-14"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "ok",
-  "message": "staff: Verify submitted requirements"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-15"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "ok",
-  "message": "academic coordinator: open Form 1 endorsements and select Miguel"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-16"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-17"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "ok",
-  "message": "academic coordinator: draw and finalize signature"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "after endorse, on screen: Cannot read properties of null (reading 'getContext') / Form 1 endorsed successfully."
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-18"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-19"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "ok",
-  "message": "academic coordinator: Endorse and sign Form 1"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-20"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-21"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "ok",
-  "message": "staff: Research Gate after endorsement; panel matching is next"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-22"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "note",
-  "message": "shot research_title-23"
- },
- {
-  "case": "case_13_research_title",
-  "kind": "ok",
-  "message": "staff: faculty profile and expertise records"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "reset research-miguel: Reset Miguel Yu's Research Gate, Panel Matching, Defense Scheduling demo. All prerequisite stages are complete and the student is ready to begin again."
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "prepare Miguel (case 13 steps: upload, verify, endorse)"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-01"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-02"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: open Panel Matching, pick Miguel"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-03"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-04"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: paper analysis, method label, weights and adviser exclusion"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-05"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranked candidates for Miguel"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-06"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: Why this score for the top candidate"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-07"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-08"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: adjust seats (Content Specialist changed to the #3 candidate)"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-09"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-10"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: Finalize selected panel"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-11"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: Research Gate shows the final panel"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "marlon.geronimo@usls.edu.ph: no pending invitation (already answered earlier)"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "faculty: panel chair accepts the invitation"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "patricia.salvador@usls.edu.ph: no pending invitation (already answered earlier)"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "faculty: content specialist accepts"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "teodoro.ramos@usls.edu.ph: no pending invitation (already answered earlier)"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "faculty: method specialist accepts"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-12"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-13"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranking for GS-2026-PM-01"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-14"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-15"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranking for GS-2026-PM-02"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-16"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-17"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranking for GS-2026-PM-03"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-18"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-19"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranking for GS-2026-PM-04"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-20"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-21"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranking for GS-2026-PM-05"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-22"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-23"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranking for GS-2026-PM-06"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-24"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-25"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: ranking for GS-2026-PM-07"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-26"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: PM-04 ranking before the expertise edit"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-27"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: Faculty page, open profile, read expertise records"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-28"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-29"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: add a research-interest record"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-30"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: PM-04 ranking after the edit"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "note",
-  "message": "shot panel_matching-31"
- },
- {
-  "case": "case_14_panel_matching",
-  "kind": "ok",
-  "message": "staff: remove the added record again"
+  "case": "case_17_verdicts",
+  "kind": "FAIL",
+  "message": "precondition: fresh demo database",
+  "detail": "RuntimeError: NEEDS A FRESH DATABASE: Nico, Bea and Gab (GS-2026-UD-01..03) already hold their verdicts, so case 17 cannot be repeated. Restart the demo on a new SQLite file; the existing verdicts-*.png are kept."
  }
 ]

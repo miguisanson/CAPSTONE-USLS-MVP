@@ -213,8 +213,13 @@ def run(rt: Runtime) -> None:
     rt.step("D2 staff sees Deferred and the schedule status", staff_after_deferred)
 
     def rebook_bea():
-        t = h.now_manila()
-        t = (t + timedelta(minutes=5)).replace(second=0, microsecond=0)
+        t = h.now_manila() + timedelta(minutes=5)
+        # the panels share panelists: start after Gab's slot has ended, never overlapping it
+        gab_act = h.sched_state(api, ids["gab"])["active"]
+        if gab_act:
+            gab_end = datetime.strptime(f"{gab_act['preferred_date']} {gab_act['end_time']}", "%Y-%m-%d %H:%M") + timedelta(minutes=2)
+            t = max(t, gab_end)
+        t = t.replace(second=0, microsecond=0)
         slots["bea2"] = (t, t + timedelta(minutes=4))
         reschedule_soon("bea2", "Salonga", None, "", "", fresh=True)
     bea_state = h.sched_state(api, ids["bea"])

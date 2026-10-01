@@ -21,7 +21,7 @@
     {
       "title": "Part A - The Dean portal",
       "steps": [
-        {"text": "Sign in as the Dean by typing the email and password. The Dean lands on the **Dean Dashboard**: decisions waiting by process (Course Adjustments, Leave / Readmission / AWOL, Withdrawal Requests, Practicum Reports, Graduation Endorsement), the items that have waited longest, how long items have waited, and the most recent decisions.",
+        {"text": "Sign in as the Dean by typing the email and password. The Dean lands on the **Dean Dashboard**: decisions waiting by process (Course Adjustments, Leave of Absence, Readmission, AWOL & Residency, Withdrawal Requests, Practicum Reports, Graduation Endorsement), the items that have waited longest, how long items have waited, and the most recent decisions.",
          "shots": [{"id": "portals-dean-01", "caption": "Dean Dashboard: decisions waiting by process and how long they have waited."}]},
         {"text": "Open **Approvals Queue** in the sidebar. Every process that needs the Dean is grouped on this page, with search, program and status filters. The sidebar also has one page per process, and a badge showing how many items wait in each.",
          "shots": [{"id": "portals-dean-02", "caption": "Approvals Queue, grouped by process."}]},
@@ -29,7 +29,7 @@
          "shots": [{"id": "portals-dean-03", "caption": "Decision History: what the Dean has decided, newest first."}]},
         {"text": "Open **Reports & Analytics** in the Dean portal. The figures are computed from the approvals records: waiting now, recent decisions, approval share and the load by process.",
          "shots": [{"id": "portals-dean-04", "caption": "Dean Reports & Analytics: decisions by process."}]},
-        {"text": "Open **Business Rules**. The Dean can read the same register of rules as the staff, with the source page of each rule. The page states that only Graduate School staff and the administrator can change a value.",
+        {"text": "Open **Business Rules**. The Dean can read the same register of rules as the staff, with the source page of each rule. Rules set by the Handbook or the Research Protocol are shown as Official (locked); the page states that they change only when the Graduate School issues a new policy, and that only Graduate School staff and the administrator can adjust the prototype rules.",
          "shots": [{"id": "portals-dean-05", "caption": "Business Rules as the Dean sees them (read only)."}]}
       ]
     },

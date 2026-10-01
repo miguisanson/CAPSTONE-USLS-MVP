@@ -227,7 +227,7 @@
    "intro": "Each account below was signed in by typing its email and DemoPass123! into the empty form. The server, not the form, decides the portal.",
    "steps": [
     {
-     "text": "Sign in as **academic@usls.edu.ph**. The portal opens on the **Monitoring Sheet**, with a shortened sidebar that has no Student Handoff, Leave of Absence, Readmission or Policy Documents entries.",
+     "text": "Sign in as **academic@usls.edu.ph**. The portal opens on the **Monitoring Sheet**. The sidebar is shortened: Reports; Students, Faculty, Monitoring Sheet, Enrollment Class List; lifecycle workflows 2 to 8 (there is no 1 · Student Handoff); AWOL & Residency as the only standalone process; and Work Queue, Policy Assistant and Business Rules. There is no Leave of Absence, Readmission, Withdrawal Requests, Activity Log or Policy Documents entry.",
      "shots": [
       {
        "id": "signin-09",
@@ -236,7 +236,7 @@
      ]
     },
     {
-     "text": "Sign in as **research@usls.edu.ph**. The portal opens on **Graduation Endorsement**; the sidebar is limited to the Monitoring Sheet, Research Gate, Panel Matching, Defense Scheduling, Graduation and support items.",
+     "text": "Sign in as **research@usls.edu.ph**. The portal opens on **Graduation Endorsement**. The sidebar is limited to Monitoring Sheet; 4 · Research Gate, 5 · Panel Matching, 6 · Defense Scheduling and 8 · Graduation; and Work Queue, Policy Assistant and Business Rules.",
      "shots": [
       {
        "id": "signin-10",
@@ -245,7 +245,7 @@
      ]
     },
     {
-     "text": "Sign in as **admin@usls.edu.ph**. The portal opens on the Dashboard with the full staff sidebar. The top bar reads System Administrator - Administrator.",
+     "text": "Sign in as **admin@usls.edu.ph**. The portal opens on the Dashboard with the full staff sidebar (the same entries as the staff account). The top bar reads System Administrator - Administrator.",
      "shots": [
       {
        "id": "signin-11",
@@ -254,7 +254,7 @@
      ]
     },
     {
-     "text": "Sign in as **dean@usls.edu.ph**. The **Dean Portal** opens on the Dean Dashboard (decisions waiting, by process). Its sidebar has an **Approvals** group and its own Policy Assistant and Business Rules.",
+     "text": "Sign in as **dean@usls.edu.ph**. The **Dean Portal** opens on the Dean Dashboard (decisions waiting, by process). Its sidebar has an **Approvals** group (Approvals Queue, Course Adjustments, Leave of Absence, Readmission, AWOL & Residency, Withdrawal Requests, Practicum Reports, Graduation Endorsement, Admission & Coursework Reports) and a Monitoring & support group (Reports & Analytics, Decision History, Policy Assistant, Business Rules).",
      "shots": [
       {
        "id": "signin-12",
@@ -263,7 +263,7 @@
      ]
     },
     {
-     "text": "Sign in as **liwayway.bautista@usls.edu.ph**. The **Faculty Portal** opens on the Dashboard; the sidebar shows only advising, panel and teaching items, and the note says a faculty member sees only the advisees and panels assigned to them.",
+     "text": "Sign in as **liwayway.bautista@usls.edu.ph**. The **Faculty Portal** opens on a welcome dashboard. The sidebar has Advising & research (My Advisees, Signatures & Endorsements, Panel Assignments & Papers, Panel Invitations, Defense Schedule, My Calendar, My Availability, Verdicts), Teaching (Assigned Classes) and Support (Policy Assistant, Business Rules). The footer says a faculty member sees only the advisees and panels assigned to them.",
      "shots": [
       {
        "id": "signin-13",
@@ -272,7 +272,7 @@
      ]
     },
     {
-     "text": "Sign in as **student@usls.edu.ph**. The **Student Portal** opens on the Dashboard with the welcome message for Miguel Yu, 2260004, MAED, and the Academics, Requests and Support groups in the sidebar.",
+     "text": "Sign in as **student@usls.edu.ph**. The **Student Portal** opens on the Dashboard with a welcome for Miguel Yu, 2260004, MAED. The sidebar groups are Overview, Academics, Research, Requests and Support.",
      "shots": [
       {
        "id": "signin-14",

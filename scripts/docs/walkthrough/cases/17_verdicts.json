@@ -75,7 +75,7 @@
   {
    "title": "Part F - The calendar afterwards",
    "steps": [
-    {"text": "As GS Staff open the defense calendar. Today's defenses are listed with their time and stage; a defense that has a verdict is marked **Verdict recorded** in its detail panel and its verdict deadline flag is struck through. Filter **Status** to **Everything** to include cancelled and rescheduled bookings.", "shots": [{"id": "verdicts-27", "caption": "Defense calendar after the verdicts."}]}
+    {"text": "As GS Staff open Defense Scheduling and select the **Calendar** tab. Today's defenses are listed with their time and stage; a defense that has a verdict is marked **Verdict recorded** in its detail panel and its verdict deadline flag is struck through. Filter **Status** to **Everything** to include cancelled and rescheduled bookings.", "shots": [{"id": "verdicts-27", "caption": "Defense calendar after the verdicts."}]}
    ]
   }
  ],

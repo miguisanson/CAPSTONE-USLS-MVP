@@ -74,9 +74,16 @@ def run(rt):
 
     def staff_adviser_view():
         rc = rt.new_page("research@usls.edu.ph")
-        rt.go(rc, "/adviser-appointments")
+        rt.go(rc, "/workflow/research-gate")
+        tab = rc.get_by_role("tab", name=re.compile("Adviser designation"))
+        if tab.count():
+            tab.first.click()
+        else:
+            rc.get_by_role("button", name=re.compile("Adviser designation")).first.click()
+        rt.settle(rc)
         rc.get_by_role("tab", name=re.compile("^All")).click()
         rt.settle(rc)
+        h.scroll_to(rc, rc.get_by_text("Miguel Yu", exact=True).first, 160)
         rt.shot(rc, sid(9))
         rc.context.close()
 

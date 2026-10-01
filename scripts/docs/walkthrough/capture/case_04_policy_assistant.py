@@ -69,6 +69,16 @@ def run(rt: Runtime) -> None:
     rt.step("staff: open Policy Assistant", open_staff)
 
     rt.step("staff: Day 1 withdrawal question", lambda: ask_chat(rt, staff, Q_DAY1, s(2)))
+
+    def open_source():
+        summ = staff.get_by_role("log").locator("summary").last
+        summ.scroll_into_view_if_needed()
+        summ.click()
+        staff.wait_for_timeout(600)
+        rt.note("source opened: " + staff.get_by_role("log").inner_text()[-900:].replace(chr(10), " | "))
+        staff.get_by_role("log").evaluate("e => { e.scrollTop = e.scrollHeight; }")
+        rt.shot(staff, s(9))
+    rt.step("staff: open the cited source to see the exact passage", open_source)
     rt.step("staff: leave of absence and maximum residence question", lambda: ask_chat(rt, staff, Q_LOA_RES, s(3)))
     rt.step("staff: adding a subject question", lambda: ask_chat(rt, staff, Q_ADD, s(4)))
 
@@ -91,8 +101,11 @@ def run(rt: Runtime) -> None:
             student.wait_for_timeout(600)
             t = student.locator("main").inner_text()
             rt.note("student ANSWER: " + t[t.find("Ask assistant"):][:1100].replace("\n", " | "))
-            scroll_to(student.get_by_text(re.compile("^According to")).first, 90)
-            rt.shot(student, s(6))
+            try:
+                scroll_to(student.get_by_text(re.compile("Answered from the documents|Sources", re.I)).first, 130)
+            except Exception:  # noqa: BLE001 - answer wording changed; show the page as it is
+                student.mouse.wheel(0, 400)
+            rt.shot(student, s(6), full=True)
         finally:
             student.context.close()
     rt.step("student: leave-of-absence question with manual references", student_flow)

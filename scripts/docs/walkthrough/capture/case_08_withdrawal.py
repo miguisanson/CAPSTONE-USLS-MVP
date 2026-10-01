@@ -13,6 +13,7 @@ SLUG = "withdrawal"
 CURRENT = "AY 2026-2027 1st Semester"
 ORIGINAL_START = "2026-08-01"
 SUBJECT = "MAED-MAJ1"
+FWD = re.compile(r"Record (&|and) forward to Dean")
 REASON = "I need to revise my first-semester study load."
 
 
@@ -36,7 +37,7 @@ def _set_term_start(rt: Runtime, page: Page, start: str, *, shots: tuple[str, st
 
 def _open_withdrawal_page(rt: Runtime, page: Page) -> None:
     rt.go(page, "/student/requests/withdrawal")
-    page.get_by_text("Send Withdrawal Request").first.wait_for()
+    page.get_by_text("Enrolled subject").first.wait_for()
 
 
 def _find_request(page: Page, name: str = "Elena Navarro"):
@@ -57,7 +58,7 @@ def run(rt: Runtime) -> None:
     def refusal():
         _open_withdrawal_page(rt, joshua)
         rt.note("JOSHUA PAGE: " + visible_text(joshua, "main", 9000).split("Rules applied on this screen")[0][-200:].replace(chr(10), " | "))
-        scroll_to(joshua, "Current subject withdrawal stage", offset=90)
+        scroll_to(joshua, "When you can withdraw a subject", offset=90)
         rt.shot(joshua, f"{SLUG}-01")
         txt = visible_text(joshua, "main", 14000)
         i = txt.find("When you can withdraw a subject")
@@ -81,7 +82,7 @@ def run(rt: Runtime) -> None:
 
     def student_form():
         _open_withdrawal_page(rt, elena)
-        scroll_to(elena, "Current subject withdrawal stage", offset=90)
+        scroll_to(elena, "When you can withdraw a subject", offset=90)
         rt.shot(elena, f"{SLUG}-05")
 
     rt.step("Elena opens Subject Withdrawal", student_form)
@@ -107,7 +108,7 @@ def run(rt: Runtime) -> None:
         rt.settle(elena)
         top(elena)
         rt.note("ELENA SENT: " + visible_text(elena, "main", 3000)[:700].replace(chr(10), " | "))
-        scroll_to(elena, "Current subject withdrawal stage", offset=90)
+        scroll_to(elena, "When you can withdraw a subject", offset=90)
         rt.shot(elena, f"{SLUG}-08")
 
     rt.step("Send the withdrawal request", send)
@@ -125,30 +126,29 @@ def run(rt: Runtime) -> None:
 
     rt.step("Staff see the request on the board", staff_open)
 
-    VIEW = "xpath=//*[normalize-space(text())='Elena Navarro']/ancestor::*[.//button[normalize-space()='View']][1]//button[normalize-space()='View']"
+    VIEW = "xpath=//*[normalize-space(text())='Elena Navarro']/ancestor::*[.//button[starts-with(normalize-space(),'View')]][1]//button[starts-with(normalize-space(),'View')]"
 
     def staff_review():
         staff.locator(VIEW).first.click()
-        staff.get_by_role("button", name="Record & forward to Dean").wait_for()
+        staff.get_by_role("button", name=FWD).wait_for()
         staff.wait_for_timeout(600)
         rt.shot(staff, f"{SLUG}-10")
 
     rt.step("Staff open Elena's request", staff_review)
 
     def staff_history():
-        staff.get_by_text("View stage history").first.click()
+        pass
         staff.wait_for_timeout(600)
-        staff.get_by_text("Step 6: GS Staff emails").first.scroll_into_view_if_needed()
+        staff.get_by_text("Where this request is", exact=False).first.scroll_into_view_if_needed()
         rt.shot(staff, f"{SLUG}-11")
 
     rt.step("Open the stage history", staff_history)
 
     def staff_forward():
-        staff.get_by_role("button", name="Record & forward to Dean").first.click()
-        staff.get_by_text("Confirm: Record & forward to Dean").first.wait_for()
-        staff.wait_for_timeout(500)
+        staff.get_by_role("button", name=FWD).first.click()
+        staff.wait_for_timeout(800)
         rt.shot(staff, f"{SLUG}-12")
-        staff.get_by_role("button", name="Record & forward to Dean").last.click()
+        staff.get_by_role("button", name=FWD).last.click()
         staff.wait_for_timeout(2500)
         rt.settle(staff)
         rt.note("AFTER FORWARD: " + staff.locator("body").inner_text()[-900:].replace(chr(10), " | "))
@@ -168,9 +168,7 @@ def run(rt: Runtime) -> None:
     rt.step("Dean opens Withdrawal Requests", dean_open)
 
     def dean_approve():
-        btn = dean.get_by_role("button", name=re.compile(r"^(Review|View|Open|Approve)"))
-        rt.note("DEAN BUTTONS: " + str([b.inner_text() for b in btn.all()][:6]))
-        btn.first.click()
+        dean.locator(VIEW).first.click()
         dean.wait_for_timeout(1200)
         rt.note("DEAN DIALOG: " + dean.locator("body").inner_text()[-2500:].replace(chr(10), " | "))
         rt.shot(dean, f"{SLUG}-14")
@@ -178,11 +176,13 @@ def run(rt: Runtime) -> None:
     rt.step("Dean opens the request", dean_approve)
 
     def dean_decide():
-        dean.get_by_role("button", name="Approve").first.click()
+        rt.note("DEAN DETAIL BUTTONS: " + str([b.inner_text() for b in dean.get_by_role("button").all()][-8:]))
+        dean.get_by_role("button", name=re.compile(r"^Approve")).first.click()
         dean.wait_for_timeout(1500)
         rt.note("DEAN AFTER APPROVE CLICK: " + dean.locator("body").inner_text()[-900:].replace(chr(10), " | "))
         rt.shot(dean, f"{SLUG}-15")
-        dean.get_by_role("button", name="Approve current stage").click()
+        if dean.get_by_role("button", name=re.compile(r"^Approve")).count() > 1:
+            dean.get_by_role("button", name=re.compile(r"^Approve")).last.click()
         dean.wait_for_timeout(2500)
         rt.settle(dean)
         rt.note("DEAN AFTER CONFIRM: " + dean.locator("main").last.inner_text()[:700].replace(chr(10), " | "))
@@ -203,11 +203,12 @@ def run(rt: Runtime) -> None:
     rt.step("Staff reopen the approved request", staff_after_approval)
 
     def staff_tag():
-        staff.get_by_role("button", name="Tag student as withdrawn from subject").first.click()
+        rt.note("STAFF DETAIL BUTTONS: " + str([b.inner_text() for b in staff.get_by_role("button").all()][-8:]))
+        staff.get_by_role("button", name=re.compile(r"Tag .*withdrawn", re.I)).first.click()
         staff.wait_for_timeout(1000)
         rt.note("TAG CONFIRM: " + staff.locator("body").inner_text()[-800:].replace(chr(10), " | "))
         rt.shot(staff, f"{SLUG}-19")
-        staff.get_by_role("button", name=re.compile(r"Tag student as withdrawn from subject")).last.click()
+        staff.get_by_role("button", name=re.compile(r"Tag .*withdrawn", re.I)).last.click() if staff.get_by_text(re.compile("Confirm: Tag")).count() else None
         staff.wait_for_timeout(2500)
         rt.settle(staff)
         rt.note("AFTER TAG: " + staff.locator("body").inner_text()[-1500:].replace(chr(10), " | "))

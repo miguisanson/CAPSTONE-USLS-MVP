@@ -1,6 +1,6 @@
 """Case 16 - Calendars for every role (staff, Dean, faculty, student), private calendar feed, bell, adviser appointment.
 
-Reads the same defense (Gab Tolentino, else Bea Salonga, else Nico Barrientos) from each role's point of view.
+Reads the same defense (Gab Tolentino, else Bea Salonga, else Nico Barrientos) from the staff, faculty and student points of view.
 Nothing here changes scheduling data; the only write is creating the faculty member's private calendar link.
 """
 from __future__ import annotations
@@ -22,6 +22,10 @@ def sid(n: int) -> str:
 
 def open_event(page) -> str:
     """Click one defense in the calendar that is on screen; return its visible label."""
+    try:
+        page.get_by_role("button", name=re.compile("|".join(NAMES))).first.wait_for(timeout=12000)
+    except Exception:  # noqa: BLE001
+        pass
     for name in NAMES:
         loc = page.get_by_role("button", name=re.compile(name))
         if loc.count():
@@ -40,11 +44,12 @@ def run(rt: Runtime) -> None:
     staff = rt.new_page(h.STAFF)
 
     def staff_calendar():
+        h.open_defense_scheduling(rt, staff)
         try:
-            staff.get_by_role("link", name=re.compile("Defense Calendar$")).first.click(timeout=5000)
+            staff.get_by_role("tab", name=re.compile("Calendar")).first.click(timeout=8000)
             rt.settle(staff)
         except Exception:  # noqa: BLE001
-            rt.go(staff, "/calendar")
+            rt.go(staff, "/workflow/defense-scheduling?view=calendar")
         facts["staff_text"] = h.page_text(staff, 3500)
         rt.shot(staff, sid(1))
         facts["staff_event"] = open_event(staff)
@@ -61,15 +66,8 @@ def run(rt: Runtime) -> None:
         rt.shot(staff, sid(3), full=True)
     rt.step("A2 staff filters Everything in the agenda view", staff_filter)
 
-    # ---- Part B: Dean -----------------------------------------------------------------------------
-    dean = rt.new_page(h.DEAN)
-
-    def dean_calendar():
-        rt.go(dean, "/dean/calendar")
-        rt.shot(dean, sid(4))
-        facts["dean_event"] = open_event(dean)
-        rt.shot(dean, sid(5))
-    rt.step("B1 Dean opens the read-only calendar", dean_calendar)
+    # ---- Part B: the Dean no longer has a calendar page in this build (/dean/calendar redirects to Approvals)
+    rt.note('Dean calendar page removed: /dean/calendar redirects to the Approvals Queue; no Dean calendar shots')
 
     # ---- Part C: faculty ---------------------------------------------------------------------------
     cruz = rt.new_page(h.FAC["cruz"])
@@ -131,7 +129,13 @@ def run(rt: Runtime) -> None:
 
     # ---- Part G: adviser appointment (read-only tour) ------------------------------------------------
     def adviser_staff():
-        rt.go(staff, "/adviser-appointments")
+        try:
+            staff.get_by_role("link", name=re.compile(r"Research Gate$")).first.click(timeout=8000)
+            rt.settle(staff)
+            staff.get_by_role("tab", name=re.compile("Adviser designation")).first.click(timeout=8000)
+            rt.settle(staff)
+        except Exception:  # noqa: BLE001
+            rt.go(staff, "/workflow/research-gate?view=adviser")
         facts["adviser_staff"] = h.page_text(staff, 2500)
         rt.shot(staff, sid(14))
     rt.step("G1 staff adviser appointment screen", adviser_staff)

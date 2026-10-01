@@ -10,87 +10,280 @@
   "The demo personas Lianne Mercado (course-adjustments-lianne) and Roberto Aquino (course-adjustments-roberto) are reset first so that their missing MAED subjects are part of the demand the coordinator reads. Planning is done for the next semester, AY 2026-2027 2nd Semester, so that the current semester's offering list used by Enrollment is not touched."
  ],
  "accounts": [
-  ["Graduate School Staff", "staff@usls.edu.ph", "Academic Semesters; read-only view of the published plan"],
-  ["Academic Coordinator", "academic@usls.edu.ph", "Faculty profiles, demand, draft, submit, publish, Offering setup"],
-  ["Dean", "dean@usls.edu.ph", "Approves the submitted plan under Approvals > Course Adjustments"],
-  ["Password", "DemoPass123!", "same for all three accounts"]
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Academic Semesters; read-only view of the published plan"
+  ],
+  [
+   "Academic Coordinator",
+   "academic@usls.edu.ph",
+   "Faculty profiles, demand, draft, submit, publish, Offering setup"
+  ],
+  [
+   "Dean",
+   "dean@usls.edu.ph",
+   "Approves the submitted plan under Approvals > Course Adjustments"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for all three accounts"
+  ]
  ],
  "data": [
-  ["Program", "MAED — Master of Arts in Education"],
-  ["Planning semester", "AY 2026-2027 2nd Semester (shown as Next)"],
-  ["Demo personas reset", "course-adjustments-lianne, course-adjustments-roberto"],
-  ["Draft edit", "MAED-COG10: 2 sections, faculty taken from the suggestion; MAED-MAJ1 offered manually"],
-  ["Offering setup entry", "MAED-COG10: schedule Sat 8:00-11:00, section A"],
-  ["Temporary semester (Part A)", "AY 2031-2032 1st Semester, 2031-08-01 to 2031-11-29, dates then edited to 2031-11-30 and the semester removed"]
+  [
+   "Program",
+   "MAED — Master of Arts in Education"
+  ],
+  [
+   "Planning semester",
+   "AY 2026-2027 2nd Semester (shown as Next)"
+  ],
+  [
+   "Demo personas reset",
+   "course-adjustments-lianne, course-adjustments-roberto"
+  ],
+  [
+   "Draft edit",
+   "MAED-COG10: 2 sections, faculty taken from the suggestion; MAED-MAJ1 offered manually"
+  ],
+  [
+   "Offering setup entry",
+   "MAED-COG10: schedule Sat 8:00-11:00, section A"
+  ],
+  [
+   "Temporary semester (Part A)",
+   "AY 2031-2032 1st Semester, 2031-08-01 to 2031-11-29, dates then edited to 2031-11-30 and the semester removed"
+  ]
  ],
  "parts": [
   {
    "title": "Part A — Academic Semesters (staff)",
    "intro": "The semester list is the calendar of the platform. Enrollment, Course Adjustments and the reports all read it, and so do the handbook rules that count days from the first day of classes.",
    "steps": [
-    {"text": "Sign in as Graduate School Staff and open **Academic Semesters** under Overview. Read the list: each semester shows its label and its dates, and exactly one carries the **Current** badge (AY 2026-2027 1st Semester, 2026-08-01 to 2026-11-29).",
-     "shots": [{"id": "course-adjustments-01", "caption": "Academic Semesters: every semester with its dates, the Current badge, and the Set as current / Edit dates / Remove actions."}]},
-    {"text": "Click **Edit dates** on the current semester. The form offers **Start date**, **End date**, **Planning opens** and **Planning closes**. Click **Cancel**; nothing is changed, because the current semester's start date is what the live rules measure from.",
-     "shots": [{"id": "course-adjustments-02", "caption": "Edit dates opens four date fields for the semester. Cancelled without saving."}]},
-    {"text": "Click **Add semester**, type the name **AY 2031-2032 1st Semester**, set the start date 2031-08-01 and the end date 2031-11-29, and click **Save semester**. The new semester appears at the top of the list. The form states that semester dates cannot overlap another semester.",
-     "shots": [{"id": "course-adjustments-03", "caption": "Add semester form filled in."}, {"id": "course-adjustments-04", "caption": "The new semester is in the list."}]},
-    {"text": "Click **Edit dates** on the new semester, change the end date to 2031-11-30 and click **Save dates**. Then click **Remove**. The confirmation states that only an unused, non-current semester can be removed and that a semester with student, enrollment, residency or course-adjustment records is kept as history. Confirm with **Remove semester**.",
-     "shots": [{"id": "course-adjustments-05", "caption": "Dates edited and saved."}, {"id": "course-adjustments-05b", "caption": "Removal asks for confirmation and explains when a semester is kept as history."}]},
+    {
+     "text": "Sign in as Graduate School Staff and open **Academic Semesters** under Overview. Read the list: each semester shows its label and its dates, and exactly one carries the **Current** badge (AY 2026-2027 1st Semester, 2026-08-01 to 2026-11-29).",
+     "shots": [
+      {
+       "id": "course-adjustments-01",
+       "caption": "Academic Semesters: every semester with its dates, the Current badge, and the Set as current / Edit dates / Remove actions."
+      }
+     ]
+    },
+    {
+     "text": "Click **Edit dates** on the current semester. The form offers **Start date**, **End date**, **Planning opens** and **Planning closes**. Click **Cancel**; nothing is changed, because the current semester's start date is what the live rules measure from.",
+     "shots": [
+      {
+       "id": "course-adjustments-02",
+       "caption": "Edit dates opens four date fields for the semester. Cancelled without saving."
+      }
+     ]
+    },
+    {
+     "text": "Click **Add semester**, type the name **AY 2031-2032 1st Semester**, set the start date 2031-08-01 and the end date 2031-11-29, and click **Save semester**. The new semester appears at the top of the list. The form states that semester dates cannot overlap another semester.",
+     "shots": [
+      {
+       "id": "course-adjustments-03",
+       "caption": "Add semester form filled in."
+      },
+      {
+       "id": "course-adjustments-04",
+       "caption": "The new semester is in the list."
+      }
+     ]
+    },
+    {
+     "text": "Click **Edit dates** on the new semester, change the end date to 2031-11-30 and click **Save dates**. Then click **Remove**. The confirmation states that only an unused, non-current semester can be removed and that a semester with student, enrollment, residency or course-adjustment records is kept as history. Confirm with **Remove semester**.",
+     "shots": [
+      {
+       "id": "course-adjustments-05",
+       "caption": "Dates edited and saved."
+      },
+      {
+       "id": "course-adjustments-05b",
+       "caption": "Removal asks for confirmation and explains when a semester is kept as history."
+      }
+     ]
+    },
     "Explain what the dates do. The withdrawal window is counted from the semester start date (14 calendar days, with the fee step at 7 days), and the window for adding or changing a subject is 7 calendar days from the start. These day counts live in Business Rules; the start date comes from this page. A wrong start date therefore moves every deadline, which is why only staff maintain it and why the current semester is not edited in the demonstration."
    ]
   },
   {
    "title": "Part B — Faculty profiles (brief)",
    "steps": [
-    {"text": "Sign in as the Academic Coordinator and open **Faculty** under Records. The directory lists each faculty member with department, specialization, login email, account state, availability and panel load, and can be narrowed by search, department and availability.",
-     "shots": [{"id": "course-adjustments-06", "caption": "Faculty Profiles directory."}]},
-    {"text": "Open **Dr. Liwayway Bautista**. The profile shows specialization keywords, preferred teaching subjects, contact and login email, teaching load against the 24-unit ceiling, current assignments, and the calendar connection. The text on the profile explains that Panel Matching compares a student's paper with the specialization text and the expertise records. Close the profile.",
-     "shots": [{"id": "course-adjustments-07", "caption": "A faculty profile: expertise, preferred subjects, load and assignments."}]}
+    {
+     "text": "Sign in as the Academic Coordinator and open **Faculty** under Records. The directory lists each faculty member with department, specialization, login email, account state, availability and panel load, and can be narrowed by search, department and availability.",
+     "shots": [
+      {
+       "id": "course-adjustments-06",
+       "caption": "Faculty Profiles directory."
+      }
+     ]
+    },
+    {
+     "text": "Open **Dr. Liwayway Bautista**. The profile shows specialization keywords, preferred teaching subjects, contact and login email, teaching load against the 24-unit ceiling, current assignments, and the calendar connection. The text on the profile explains that Panel Matching compares a student's paper with the specialization text and the expertise records. Close the profile.",
+     "shots": [
+      {
+       "id": "course-adjustments-07",
+       "caption": "A faculty profile: expertise, preferred subjects, load and assignments."
+      }
+     ]
+    }
    ]
   },
   {
    "title": "Part C — Demand and the offering draft (Academic Coordinator)",
    "steps": [
-    {"text": "Open **2 · Course Adjustments** and keep the **Demand & adjustments** tab active. Select **MAED** as Program and **AY 2026-2027 2nd Semester (Next)** as the semester. The four-stage strip **Draft, Submitted, Approved, Published** shows where the plan is; with no plan yet, nothing is highlighted.",
-     "shots": [{"id": "course-adjustments-08", "caption": "Course Adjustments filters and the governance strip."}]},
-    {"text": "Click the panel **Adding or changing a subject: rules applied** to open it. It lists the three handbook rules that apply here, each with its value, its source page and an enforcement label: adding a subject is allowed during the first week of classes (7 days, Handbook p. 49, Enforced by the system); changing one subject for another is first week only, for three listed reasons (pp. 48-49, Enforced by the system); the reason for a change is confirmed by staff (Documented only).",
-     "shots": [{"id": "course-adjustments-08b", "caption": "The rules applied to this screen, with value, source and enforcement label."}]},
-    {"text": "Read the four counters under the plan buttons: **Curriculum subjects** (18), **Affected students**, **Delayed if withheld** and **Selected to offer**. Then read the **Subject-needs report**: **Students reviewed**, **Subjects with need** (18) and **Student-subject needs**. The totals change with the student records; in the capture run the report reviewed 16 to 17 students with 187 to 202 student-subject needs.",
-     "shots": [{"id": "course-adjustments-09", "caption": "Plan status, counters and the start of the Subject-needs report."}]},
-    {"text": "Scroll the report table. For each subject it shows **Students needing**, **Not taken** and the **Affected students** by name and student number (for example Anton Bautista, Maureen Castillo, Daniel Cruz, Clarissa Dela Cruz, with the rest as +N more). Students needing counts students for whom the subject is next in their sequence; Not taken is the wider set who have not completed it. Completed, taken and current subjects are excluded. **Download CSV** exports the report.",
-     "shots": [{"id": "course-adjustments-10", "caption": "Subject-needs report with named affected students."}]},
-    {"text": "Scroll to **Course offering decisions**. Each row shows the subject, its basis (Demand or Manual), demand, the affected students with the impact line (for example Needed next, Will be delayed if not offered), status, sections, and the suggested faculty with the coordinator's own choice. One affected student is enough demand to offer a subject.",
-     "shots": [{"id": "course-adjustments-11", "caption": "Course offering decisions: demand, affected students, sections, faculty."}]},
-    {"text": "Set **Sections for MAED-COG10** to 2 and choose the suggested faculty in the faculty list of that row. Then click the circle on MAED-MAJ1, which the demand rule had not proposed, to offer it manually (**Offer MAED-MAJ1**); the **Selected to offer** counter rises to 11.",
-     "shots": [{"id": "course-adjustments-12", "caption": "Sections and faculty set on MAED-COG10."}]},
-    {"text": "Click **Save draft**. The button becomes **Update draft (11 offered)** and the strip shows **Draft** as the current stage. The page also autosaves a pending change after a short pause.",
-     "shots": [{"id": "course-adjustments-13", "caption": "Draft stage active after saving."}]},
-    {"text": "Click **Submit for approval**. The strip moves to **Submitted**, the message reads Submitted to Dean with the date and Awaiting decision, and **Save draft**, **Submit for approval** and **Publish** are disabled. Only **Start new draft** remains, so the plan cannot be changed while the Dean decides.",
-     "shots": [{"id": "course-adjustments-14", "caption": "Submitted: the plan is read-only while it awaits the Dean."}]}
+    {
+     "text": "Open **2 · Course Adjustments** and keep the **Demand & adjustments** tab active. Select **MAED** as Program and **AY 2026-2027 2nd Semester (Next)** as the semester. The four-stage strip **Draft, Submitted, Approved, Published** shows where the plan is; with no plan yet, nothing is highlighted.",
+     "shots": [
+      {
+       "id": "course-adjustments-08",
+       "caption": "Course Adjustments filters and the governance strip."
+      }
+     ]
+    },
+    {
+     "text": "Click the panel **Adding or changing a subject: rules applied** to open it. It lists the three handbook rules that apply here, each with its value, its source page and an enforcement label: adding a subject is allowed during the first week of classes (7 days, Handbook p. 49, Enforced by the system); changing one subject for another is first week only, for three listed reasons (pp. 48-49, Enforced by the system); the reason for a change is confirmed by staff (Documented only).",
+     "shots": [
+      {
+       "id": "course-adjustments-08b",
+       "caption": "The rules applied to this screen, with value, source and enforcement label."
+      }
+     ]
+    },
+    {
+     "text": "Read the four counters under the plan buttons: **Curriculum subjects** (18), **Affected students**, **Delayed if withheld** and **Selected to offer**. Then read the **Subject-needs report**, headed with the program, the planning semester and the time generated. Two notes explain the columns: **Needing next term** (the subject is in the student's next semester group, or must be retaken after failing, dropping or withdrawing; the number to plan an offering from) and **Not taken yet** (everyone who still has to take it at some point; always at least as large). Four tiles follow: **Students reviewed**, **Subjects needed next term**, **Student seats needed** and **Subjects with a backlog**. In the capture run: 17 students reviewed, 10 subjects needed next term, 84 seats, 18 subjects with a backlog.",
+     "shots": [
+      {
+       "id": "course-adjustments-09",
+       "caption": "Plan status, counters and the start of the Subject-needs report."
+      }
+     ]
+    },
+    {
+     "text": "Below the tiles, use **Search a subject or a student** to filter. Subjects are grouped under **Needed next term** and sorted by students needing next term. Each row shows the subject with units, category and year, a bar of how many of the students reviewed need it, the **Needing next** and **Not taken yet** counts, and **Show students**, which opens the named affected students. (This expander was not opened in the capture run.) **Download CSV** exports the report.",
+     "shots": [
+      {
+       "id": "course-adjustments-10",
+       "caption": "Subject-needs report with named affected students."
+      }
+     ]
+    },
+    {
+     "text": "Scroll to **Course offering decisions**. Each row shows the subject, its basis (Demand or Manual), demand, the affected students with the impact line (for example Needed next, Will be delayed if not offered), status, sections, and the suggested faculty with the coordinator's own choice. One affected student is enough demand to offer a subject.",
+     "shots": [
+      {
+       "id": "course-adjustments-11",
+       "caption": "Course offering decisions: demand, affected students, sections, faculty."
+      }
+     ]
+    },
+    {
+     "text": "Set **Sections for MAED-COG10** to 2 and choose the suggested faculty in the faculty list of that row. Then click the circle on MAED-MAJ1, which the demand rule had not proposed, to offer it manually (**Offer MAED-MAJ1**); the **Selected to offer** counter rises to 11.",
+     "shots": [
+      {
+       "id": "course-adjustments-12",
+       "caption": "Sections and faculty set on MAED-COG10."
+      }
+     ]
+    },
+    {
+     "text": "Click **Save draft**. The button becomes **Update draft (11 offered)** and the strip shows **Draft** as the current stage. The page also autosaves a pending change after a short pause.",
+     "shots": [
+      {
+       "id": "course-adjustments-13",
+       "caption": "Draft stage active after saving."
+      }
+     ]
+    },
+    {
+     "text": "Click **Submit for approval**. The strip moves to **Submitted**, the message reads Submitted to Dean with the date and Awaiting decision, and **Save draft**, **Submit for approval** and **Publish** are disabled. Only **Start new draft** remains, so the plan cannot be changed while the Dean decides.",
+     "shots": [
+      {
+       "id": "course-adjustments-14",
+       "caption": "Submitted: the plan is read-only while it awaits the Dean."
+      }
+     ]
+    }
    ]
   },
   {
    "title": "Part D — Dean decision",
    "steps": [
-    {"text": "Sign in as the Dean and open **Approvals > Course Adjustments**. The page lists the plan as Course offerings, MAED, AY 2026-2027 2nd Semester, with the number of subjects proposed, the submission date, and for each subject its demand, sections and Offered or Not Offered decision.",
-     "shots": [{"id": "course-adjustments-15", "caption": "Dean's queue: the submitted plan with demand and decisions per subject."}]},
-    {"text": "Scroll below the subject table to the decision buttons. The Dean can approve the plan or return it for revision; click **Approve**. The page confirms Offering plan approved by Dean and lists the plan under Recent decisions as Approved.",
-     "shots": [{"id": "course-adjustments-15b", "caption": "The decision buttons under the plan."}, {"id": "course-adjustments-16", "caption": "Approved: recorded under Recent decisions."}]}
+    {
+     "text": "Sign in as the Dean and open **Approvals > Course Adjustments**. The page lists the plan as Course offerings, MAED, AY 2026-2027 2nd Semester, with the number of subjects proposed, the submission date, and for each subject its demand, sections and Offered or Not Offered decision.",
+     "shots": [
+      {
+       "id": "course-adjustments-15",
+       "caption": "Dean's queue: the submitted plan with demand and decisions per subject."
+      }
+     ]
+    },
+    {
+     "text": "Scroll below the subject table to the decision buttons. The Dean can approve the plan or return it for revision; click **Approve**. The page confirms Offering plan approved by Dean and lists the plan under Recent decisions as Approved.",
+     "shots": [
+      {
+       "id": "course-adjustments-15b",
+       "caption": "The decision buttons under the plan."
+      },
+      {
+       "id": "course-adjustments-16",
+       "caption": "Approved: recorded under Recent decisions."
+      }
+     ]
+    }
    ]
   },
   {
    "title": "Part E — Publish and Offering setup (Academic Coordinator)",
    "steps": [
-    {"text": "Return as the Academic Coordinator and reopen MAED for the same semester. The strip shows **Approved** and the note reads Approved by the Dean with the date. **Publish**, disabled until now, is available.",
-     "shots": [{"id": "course-adjustments-17", "caption": "Approved stage; Publish is now available."}]},
-    {"text": "Click **Publish**. The strip shows **Published** and the note reads Published on the date. The plan becomes the official offering list for the semester.",
-     "shots": [{"id": "course-adjustments-18", "caption": "Published."}]},
-    {"text": "Open the **Offering setup** tab (Course Offering Setup) for the same program and semester. Each published subject is a row with faculty, schedule, section and enrolled count. Faculty suggestions appear as a link with their basis (availability and current teaching load); the coordinator can change every assignment. The faculty chosen in the draft is carried over.",
-     "shots": [{"id": "course-adjustments-19", "caption": "Course Offering Setup for the published semester."}]},
-    {"text": "On the **MAED-COG10** row, type the schedule **Sat 8:00-11:00** and the section **A**, and click **Save**. The row keeps the faculty, schedule and section, and the Enrolled count stays 0 until students are enrolled.",
-     "shots": [{"id": "course-adjustments-20", "caption": "Faculty, schedule and section saved for MAED-COG10."}]},
-    {"text": "Sign in again as Graduate School Staff and open the same program and semester in **Course Adjustments**. The strip shows **Published** and a note states that Graduate School Staff have read-only access: only an Academic Coordinator can change, submit and publish the plan.",
-     "shots": [{"id": "course-adjustments-21", "caption": "Staff see the published plan but cannot change it."}]}
+    {
+     "text": "Return as the Academic Coordinator and reopen MAED for the same semester. The strip shows **Approved** and the note reads Approved by the Dean with the date. **Publish**, disabled until now, is available.",
+     "shots": [
+      {
+       "id": "course-adjustments-17",
+       "caption": "Approved stage; Publish is now available."
+      }
+     ]
+    },
+    {
+     "text": "Click **Publish**. The strip shows **Published** and the note reads Published on the date. The plan becomes the official offering list for the semester.",
+     "shots": [
+      {
+       "id": "course-adjustments-18",
+       "caption": "Published."
+      }
+     ]
+    },
+    {
+     "text": "Open the **Offering setup** tab (Course Offering Setup) for the same program and semester. Each published subject is a row with faculty, schedule, section and enrolled count. Faculty suggestions appear as a link with their basis (availability and current teaching load); the coordinator can change every assignment. The faculty chosen in the draft is carried over.",
+     "shots": [
+      {
+       "id": "course-adjustments-19",
+       "caption": "Course Offering Setup for the published semester."
+      }
+     ]
+    },
+    {
+     "text": "On the **MAED-COG10** row, type the schedule **Sat 8:00-11:00** and the section **A**, and click **Save**. The row keeps the faculty, schedule and section, and the Enrolled count stays 0 until students are enrolled.",
+     "shots": [
+      {
+       "id": "course-adjustments-20",
+       "caption": "Faculty, schedule and section saved for MAED-COG10."
+      }
+     ]
+    },
+    {
+     "text": "Sign in again as Graduate School Staff and open the same program and semester in **Course Adjustments**. The strip shows **Published** and a note states that Graduate School Staff have read-only access: only an Academic Coordinator can change, submit and publish the plan.",
+     "shots": [
+      {
+       "id": "course-adjustments-21",
+       "caption": "Staff see the published plan but cannot change it."
+      }
+     ]
+    }
    ]
   }
  ],
@@ -99,6 +292,7 @@
   "The Subject-needs report is decision support. It does not offer a subject, assign faculty or publish by itself, and it does not change any student's curriculum status. The counts are recalculated every time the screen is opened, so they move when other work is done on the same records.",
   "There is no free-text planning note on the draft in the current screen; the decision record is the offer toggle, the sections and the faculty choice.",
   "The platform does not check faculty double-booking or student schedule conflicts when a schedule is typed in Offering setup.",
-  "Start new draft reopens a Submitted, Approved or Published plan as a new draft; a draft save on a plan that is with the Dean or approved is refused by the system so the approved list cannot be wiped by accident."
+  "Start new draft reopens a Submitted, Approved or Published plan as a new draft; a draft save on a plan that is with the Dean or approved is refused by the system so the approved list cannot be wiped by accident.",
+  "The Subject-needs report was redesigned after the first walkthrough: it now uses Needing next term and Not taken yet columns, summary tiles, search and a Show students expander instead of a single table with a +N more list."
  ]
 }

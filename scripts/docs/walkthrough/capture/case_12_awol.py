@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from .common import main_text
-from .helpers_a3 import open_link
+from .helpers_a3 import dean_board_decision, drag_card, frame_board, open_link
 
 KEY = "awol-maya"
 EMAIL = "awol.maya@usls.edu.ph"
@@ -20,15 +20,15 @@ def run(rt):
 
     staff = rt.new_page("staff@usls.edu.ph")
 
+    def search(page, text):
+        page.get_by_role("textbox", name=re.compile("Search", re.I)).first.fill(text)
+        rt.settle(page, 800)
+
     def st_open():
         open_link(rt, staff, "AWOL & Residency", "/workflow/awol")
         rt.shot(staff, f"{S}-01")
-        staff.get_by_label(re.compile("Search AWOL")).fill("Maya")
-        rt.settle(staff, 800)
-        staff.get_by_role("heading", name=re.compile("AWOL, return, and residency cases")).first.evaluate(
-            "el => el.scrollIntoView({block: 'start'})")
-        staff.evaluate("document.querySelector('main')?.scrollBy?.(0, -70)")
-        staff.wait_for_timeout(500)
+        search(staff, "Maya")
+        frame_board(staff, "AWOL")
         rt.shot(staff, f"{S}-02")
         rt.note("draggable cards on the AWOL board: %d" % staff.locator("[draggable=true]").count())
 
@@ -67,13 +67,10 @@ def run(rt):
 
     def st_case():
         rt.go(staff, "/workflow/awol")
-        staff.get_by_label(re.compile("Search AWOL")).fill("Maya")
-        rt.settle(staff, 800)
-        staff.get_by_role("heading", name=re.compile("AWOL, return, and residency cases")).first.evaluate(
-            "el => el.scrollIntoView({block: 'start'})")
-        staff.wait_for_timeout(500)
+        search(staff, "Maya")
+        frame_board(staff, "AWOL")
         rt.shot(staff, f"{S}-07")
-        staff.get_by_role("button", name="View", exact=True).first.click()
+        staff.locator("[draggable=true]").filter(has_text="Maya").first.get_by_role("button", name="View details").click()
         rt.settle(staff, 1200)
         rt.shot(staff, f"{S}-08")
 
@@ -81,70 +78,65 @@ def run(rt):
 
     def st_check():
         dlg = staff.locator("[role=dialog]").last
-        dlg.get_by_role("button", name="Run policy checker").click()
-        rt.settle(staff, 1500)
+        chk = dlg.get_by_role("button", name=re.compile("policy checker|policy check", re.I))
+        if chk.count():
+            chk.first.click()
+            rt.settle(staff, 1500)
         dlg.get_by_text(re.compile("policy", re.I)).last.scroll_into_view_if_needed()
-        rt.note("checker: " + " | ".join(dlg.inner_text().split("\n"))[-1800:])
+        rt.note("checker: " + " | ".join(dlg.inner_text().split())[-1500:])
         rt.shot(staff, f"{S}-09")
 
-    rt.step("staff runs the policy checker", st_check)
+    rt.step("staff reads/runs the policy checker", st_check)
 
     def st_forward():
         dlg = staff.locator("[role=dialog]").last
-        notes = dlg.get_by_label(re.compile("Staff review notes", re.I))
-        if notes.count():
-            notes.first.fill(STAFF_NOTE)
-        else:
-            dlg.locator("textarea").first.fill(STAFF_NOTE)
+        rt.note("window buttons: " + str([b.inner_text() for b in dlg.get_by_role("button").all()]))
         rt.shot(staff, f"{S}-10")
-        dlg.get_by_role("button", name="Forward to Dean").click()
-        rt.settle(staff, 1800)
+        btn = dlg.get_by_role("button", name=re.compile("Forward to Dean", re.I))
+        if btn.count():
+            btn.last.click()
+            staff.wait_for_timeout(900)
+            d2 = staff.locator("[role=dialog]").last
+            if d2.locator("textarea").count():
+                d2.locator("textarea").first.fill(STAFF_NOTE)
+            rt.shot(staff, f"{S}-10b")
+            d2.get_by_role("button").last.click()
+            rt.settle(staff, 1800)
+            close = staff.get_by_role("button", name="Close details")
+            if close.count():
+                close.first.click()
+        else:
+            staff.get_by_role("button", name="Close details").first.click()
+            drag_card(rt, staff, "Maya", "With the Dean")
+            d2 = staff.locator("[role=dialog]").last
+            if d2.locator("textarea").count():
+                d2.locator("textarea").first.fill(STAFF_NOTE)
+            rt.shot(staff, f"{S}-10b")
+            d2.get_by_role("button").last.click()
+            rt.settle(staff, 1800)
+        frame_board(staff, "Return review")
         rt.shot(staff, f"{S}-11")
 
-    rt.step("staff adds notes and forwards to the Dean", st_forward)
+    rt.step("staff forwards to the Dean", st_forward)
 
     dean = rt.new_page("dean@usls.edu.ph")
 
-    def d_open():
-        dean.get_by_role("link", name=re.compile(r"Leave . Readmission")).first.click()
-        rt.settle(dean, 1500)
-        rt.shot(dean, f"{S}-12")
-        dean.get_by_role("row").filter(has_text="Maya").get_by_role("link", name="Review").click()
-        rt.settle(dean, 1500)
-        rt.shot(dean, f"{S}-13")
-        dean.get_by_role("button", name="Approve", exact=True).first.scroll_into_view_if_needed()
-        rt.shot(dean, f"{S}-14")
+    def d_decide():
+        dean_board_decision(rt, dean, r"^AWOL & Residency", "Maya", "Back in the program", DEAN_COMMENT,
+                            (f"{S}-12", f"{S}-13", f"{S}-14"))
 
-    rt.step("Dean opens Maya's case", d_open)
-
-    def d_approve():
-        ta = dean.get_by_label(re.compile("Your comment", re.I))
-        if ta.count():
-            ta.first.fill(DEAN_COMMENT)
-        dean.get_by_role("button", name="Approve", exact=True).first.click()
-        dean.wait_for_timeout(900)
-        rt.shot(dean, f"{S}-15")
-        dean.get_by_role("button", name=re.compile(r"^Approve current stage")).click()
-        rt.settle(dean, 2000)
-        rt.shot(dean, f"{S}-16")
-
-    rt.step("Dean approves", d_approve)
+    rt.step("Dean drags the card to Back in the program and confirms", d_decide)
 
     def st_after():
         rt.go(staff, "/workflow/awol")
-        staff.get_by_label(re.compile("Search AWOL")).fill("Maya")
-        rt.settle(staff, 800)
-        staff.get_by_role("heading", name=re.compile("AWOL, return, and residency cases")).first.evaluate(
-            "el => el.scrollIntoView({block: 'start'})")
-        staff.wait_for_timeout(500)
-        staff.get_by_role("heading", name="Return Outcome").first.scroll_into_view_if_needed()
-        staff.wait_for_timeout(500)
-        rt.shot(staff, f"{S}-17")
-        staff.get_by_role("button", name="View", exact=True).first.click()
+        search(staff, "Maya")
+        frame_board(staff, "Re-enrollment")
+        rt.shot(staff, f"{S}-15")
+        staff.locator("[draggable=true], article").filter(has_text="Maya").first.get_by_role("button", name="View details").click()
         rt.settle(staff, 1200)
-        rt.shot(staff, f"{S}-17b")
+        rt.shot(staff, f"{S}-16")
         staff.get_by_role("button", name="Close details").first.click()
         rt.go(student, "/student/requests/awol-return")
-        rt.shot(student, f"{S}-18", full=True)
+        rt.shot(student, f"{S}-17", full=True)
 
     rt.step("staff and student see the outcome", st_after)

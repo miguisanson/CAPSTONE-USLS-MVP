@@ -9,50 +9,184 @@
   "The demonstration document is made up for the walkthrough: a one-page memo with a lounge reservation rule. It is created with a time stamp in its title so a re-run does not collide, and it is removed at the end. No official document is changed or deleted."
  ],
  "accounts": [
-  ["Graduate School Staff (Grace Fernandez)", "staff@usls.edu.ph", "Policy Documents is a staff and administrator screen only"]
+  [
+   "Graduate School Staff (Grace Fernandez)",
+   "staff@usls.edu.ph",
+   "Policy Documents is a staff and administrator screen only"
+  ]
  ],
  "data": [
-  ["Document title", "Walkthrough Memo - Lounge Reservation <date-time stamp>, for example 20261001-0750"],
-  ["File, version 1", "Lounge_Reservation_Memo_<stamp>.pdf (one page): a student organisation may reserve the Graduate School lounge at most four (4) times per semester"],
-  ["File, version 2", "Lounge_Reservation_Memo_<stamp>_v2.pdf: the same memo with six (6) times"],
-  ["Category, status", "Memo, Active"],
-  ["Version note", "First upload for the walkthrough; then: Raised the limit from four to six reservations"],
-  ["Test questions", "Can a student withdraw a subject on Day 1?  |  How many times may a student organisation reserve the Graduate School lounge per semester?"]
+  [
+   "Document title",
+   "Walkthrough Memo - Lounge Reservation <date-time stamp>, for example 20261001-0750"
+  ],
+  [
+   "File, version 1",
+   "Lounge_Reservation_Memo_<stamp>.pdf (one page): a student organisation may reserve the Graduate School lounge at most four (4) times per semester"
+  ],
+  [
+   "File, version 2",
+   "Lounge_Reservation_Memo_<stamp>_v2.pdf: the same memo with six (6) times"
+  ],
+  [
+   "Category, status",
+   "Memo, Active"
+  ],
+  [
+   "Version note",
+   "First upload for the walkthrough; then: Raised the limit from four to six reservations"
+  ],
+  [
+   "Test questions",
+   "Can a student withdraw a subject on Day 1?  |  How many times may a student organisation reserve the Graduate School lounge per semester?"
+  ]
  ],
  "parts": [
   {
    "title": "Part A - The library and the Draft Operations Manual",
    "steps": [
-    {"text": "Sign in as **staff@usls.edu.ph** and open **Policy Documents** under Monitoring & support. The page is titled **Policy document library**. Four counters show the number of sources, staff uploads, drafts pending validation and sources ready for the assistant. Below them are the **Test a question** panel and the **Documents** list with a search box and category and status filters.", "shots": [{"id": "policy-documents-01", "caption": "The Policy document library: counters, Test a question, and the document cards."}]},
+    {
+     "text": "Sign in as **staff@usls.edu.ph** and open **Policy Documents** under Monitoring & support. The page is titled **Policy document library**. Four counters show the number of sources, staff uploads, drafts pending validation and sources ready for the assistant. Below them are the **Test a question** panel and the **Documents** list with a search box and category and status filters.",
+     "shots": [
+      {
+       "id": "policy-documents-01",
+       "caption": "The Policy document library: counters, Test a question, and the document cards."
+      }
+     ]
+    },
     "Read the three starting cards. The **Graduate School Handbook 2022-2023** (PDF, Handbook) and the **Graduate School Research Protocol (AY 2024-2025)** (DOCX, Research Protocol) are built-in sources: they are view-only. Every card shows its category, version, file type, size, and the number of searchable sections, and the **Actions** menu (three dots) offers View document and, for staff uploads, Edit details, Replace file and Remove.",
-    {"text": "Type **Operations Manual** in the search box. The card for **USLS Graduate School Operations Manual (draft for validation)** has the amber status **Draft** and an amber warning: Draft - pending Graduate School validation. Assistant answers that use this document say so. Its note reads Prepared by the capstone group for Graduate School validation. Open **Version history** on the card to see version 1, marked Current, searched.", "shots": [{"id": "policy-documents-02", "caption": "The Operations Manual is a Draft: it is searched, but every answer that uses it is flagged as pending validation."}]},
-    {"text": "In **Test a question**, type **Can a student withdraw a subject on Day 1?** and select **Find passages**. The panel reports the passages found by keyword search, then an **Answer preview** extracted from the passages with no AI. The first passage is the Operations Manual, section 4.4 Withdrawal of subject, with the status Draft: Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the term's total due in the first week and 20% in the second. The preview ends with the line Draft - pending Graduate School validation. Further passages cite the Handbook (p. 53) and other sections of the manual.", "shots": [{"id": "policy-documents-03", "caption": "Test a question on the Day 1 case: the cited source is the Draft Operations Manual, section 4.4, flagged as pending validation."}]}
+    {
+     "text": "Type **Operations Manual** in the search box. The card for **USLS Graduate School Operations Manual (draft for validation)** has the amber status **Draft** and an amber warning: Draft - pending Graduate School validation. Assistant answers that use this document say so. Its note reads Prepared by the capstone group for Graduate School validation. Open **Version history** on the card to see version 1, marked Current, searched.",
+     "shots": [
+      {
+       "id": "policy-documents-02",
+       "caption": "The Operations Manual is a Draft: it is searched, but every answer that uses it is flagged as pending validation."
+      }
+     ]
+    },
+    {
+     "text": "In **Test a question**, type **Can a student withdraw a subject on Day 1?** and select **Find passages**. The panel reports 5 passages found by keyword search, then an **Answer preview** extracted from the passages with no AI. It reads: Panel question: can a student drop a subject at any time, for example on Day 1? Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the term's total due is charged in the first week and 20% in the second; a student may also change a subject or add a subject only in the first week. The line Source: USLS Graduate School Operations Manual (draft for validation) (4.4 Withdrawal of subject) and the line Draft - pending Graduate School validation follow. The first passage card is the Operations Manual, section 4.4, status Draft; the second is its Timeline of consequences section; further passages cite the Handbook and other sections of the manual.",
+     "shots": [
+      {
+       "id": "policy-documents-03",
+       "caption": "Test a question on the Day 1 case: the cited source is the Draft Operations Manual, section 4.4, flagged as pending validation."
+      }
+     ]
+    }
    ]
   },
   {
    "title": "Part B - Upload a new policy document",
    "steps": [
-    {"text": "Select **Add document**. The **Add policy document** dialog opens: a drop area for a PDF or DOCX file (up to 20 MB), then Document title, Category, Effective date, Status (Active, Draft or Archived), Description and Version note.", "shots": [{"id": "policy-documents-04", "caption": "The Add policy document dialog, empty."}]},
-    {"text": "Choose the file **Lounge_Reservation_Memo_<stamp>.pdf**, enter the title **Walkthrough Memo - Lounge Reservation <stamp>**, set Category to **Memo**, leave Status on Active, add the description and the version note **First upload for the walkthrough**.", "shots": [{"id": "policy-documents-05", "caption": "The dialog filled with the file, title, category, description and version note."}]},
-    {"text": "Select **Upload and index**. The file is read and indexed, the dialog closes and a green notice reads: the document was added to the Policy Assistant library. The counters change to 4 sources and 2 staff uploads.", "shots": [{"id": "policy-documents-06", "caption": "Upload complete: the notice confirms the document is in the Policy Assistant library."}]},
-    {"text": "Search the list for the time stamp. The card shows Category Memo, Version 1, type PDF, 1 page, 1 searchable section, who uploaded it and when.", "shots": [{"id": "policy-documents-13", "caption": "The new card: one page, one searchable section, uploaded by Grace Fernandez."}]}
+    {
+     "text": "Select **Add document**. The **Add policy document** dialog opens: a drop area for a PDF or DOCX file (up to 20 MB), then Document title, Category, Effective date, Status (Active, Draft or Archived), Description and Version note.",
+     "shots": [
+      {
+       "id": "policy-documents-04",
+       "caption": "The Add policy document dialog, empty."
+      }
+     ]
+    },
+    {
+     "text": "Choose the file **Lounge_Reservation_Memo_<stamp>.pdf**, enter the title **Walkthrough Memo - Lounge Reservation <stamp>**, set Category to **Memo**, leave Status on Active, add the description and the version note **First upload for the walkthrough**.",
+     "shots": [
+      {
+       "id": "policy-documents-05",
+       "caption": "The dialog filled with the file, title, category, description and version note."
+      }
+     ]
+    },
+    {
+     "text": "Select **Upload and index**. The file is read and indexed, the dialog closes and a green notice reads: the document was added to the Policy Assistant library. The counters change to 4 sources and 2 staff uploads.",
+     "shots": [
+      {
+       "id": "policy-documents-06",
+       "caption": "Upload complete: the notice confirms the document is in the Policy Assistant library."
+      }
+     ]
+    },
+    {
+     "text": "Search the list for the time stamp. The card shows Category Memo, Version 1, type PDF, 1 page, 1 searchable section, who uploaded it and when.",
+     "shots": [
+      {
+       "id": "policy-documents-13",
+       "caption": "The new card: one page, one searchable section, uploaded by Grace Fernandez."
+      }
+     ]
+    }
    ]
   },
   {
    "title": "Part C - Test a question, then replace the file",
    "steps": [
-    {"text": "Clear the search, type **How many times may a student organisation reserve the Graduate School lounge per semester?** in Test a question and select **Find passages**. The panel reports 1 passage found. The Answer preview reads According to Walkthrough Memo - Lounge Reservation <stamp>, p. 1: a student organisation may reserve the Graduate School lounge at most four (4) times per semester. The passage card names the document, status Active, and the page, p. 1. A policy uploaded a minute ago is already searchable.", "shots": [{"id": "policy-documents-07", "caption": "Test a question: the new memo is found, with its document name and page."}]},
-    {"text": "On the new card, open the **Actions** menu and choose **Replace file**. The **Replace file** dialog says the new file becomes version 2 and that the current one stays in the version history and is no longer searched. Choose **Lounge_Reservation_Memo_<stamp>_v2.pdf** and enter **Raised the limit from four to six reservations** under What changed.", "shots": [{"id": "policy-documents-08", "caption": "Replace file: the dialog explains that the old version is kept but no longer searched."}]},
-    {"text": "Select **Replace and re-index**. The notice reads that the file was replaced and re-indexed and that the previous version is kept in the version history. The Test a question panel still shows the earlier answer, because it is not re-run by itself.", "shots": [{"id": "policy-documents-09", "caption": "After the replacement: the notice, with the earlier test result still on screen."}]},
-    {"text": "Open **Version history (2)** on the card. Version 2 is marked **Current, searched** with its note; Version 1 is listed below it with its own file name and note, each with a **View** link.", "shots": [{"id": "policy-documents-14", "caption": "Version history: version 2 is the current, searched version; version 1 is kept for the record."}]},
-    {"text": "Run the same question again. The Answer preview now reads six (6) times per semester. The assistant uses only the current version.", "shots": [{"id": "policy-documents-10", "caption": "The same question after the replacement: the answer follows version 2."}]}
+    {
+     "text": "Clear the search, type **How many times may a student organisation reserve the Graduate School lounge per semester?** in Test a question and select **Find passages**. The panel reports 1 passage found. The Answer preview quotes the memo: Section 1. A student organisation may reserve the Graduate School lounge at most four (4) times per semester, and Section 2, then the line Source: Walkthrough Memo - Lounge Reservation <stamp> (p. 1). The passage card names the document, status Active, and the page, p. 1. A policy uploaded a minute ago is already searchable.",
+     "shots": [
+      {
+       "id": "policy-documents-07",
+       "caption": "Test a question: the new memo is found, with its document name and page."
+      }
+     ]
+    },
+    {
+     "text": "On the new card, open the **Actions** menu and choose **Replace file**. The **Replace file** dialog says the new file becomes version 2 and that the current one stays in the version history and is no longer searched. Choose **Lounge_Reservation_Memo_<stamp>_v2.pdf** and enter **Raised the limit from four to six reservations** under What changed.",
+     "shots": [
+      {
+       "id": "policy-documents-08",
+       "caption": "Replace file: the dialog explains that the old version is kept but no longer searched."
+      }
+     ]
+    },
+    {
+     "text": "Select **Replace and re-index**. The notice reads that the file was replaced and re-indexed and that the previous version is kept in the version history. The Test a question panel still shows the earlier answer, because it is not re-run by itself.",
+     "shots": [
+      {
+       "id": "policy-documents-09",
+       "caption": "After the replacement: the notice, with the earlier test result still on screen."
+      }
+     ]
+    },
+    {
+     "text": "Open **Version history (2)** on the card. Version 2 is marked **Current, searched** with its note; Version 1 is listed below it with its own file name and note, each with a **View** link.",
+     "shots": [
+      {
+       "id": "policy-documents-14",
+       "caption": "Version history: version 2 is the current, searched version; version 1 is kept for the record."
+      }
+     ]
+    },
+    {
+     "text": "Run the same question again. The Answer preview now quotes six (6) times per semester, with the same source line and page. The assistant uses only the current version.",
+     "shots": [
+      {
+       "id": "policy-documents-10",
+       "caption": "The same question after the replacement: the answer follows version 2."
+      }
+     ]
+    }
    ]
   },
   {
    "title": "Part D - Clean up what was created",
    "steps": [
-    {"text": "Open the **Actions** menu on the walkthrough memo and choose **Remove**. A confirmation asks Remove this policy document? and explains that the document and all stored versions are deleted and the Policy Assistant stops using them, and that setting the status to Archived keeps the record without searching it.", "shots": [{"id": "policy-documents-11", "caption": "The confirmation before a staff upload is removed."}]},
-    {"text": "Select **Remove document**. A notice confirms the removal and the counters return to 3 sources and 1 staff upload (the Draft Operations Manual). The Remove action exists only on staff uploads; the built-in sources cannot be removed.", "shots": [{"id": "policy-documents-12", "caption": "The memo is removed; the official documents are untouched."}]}
+    {
+     "text": "Open the **Actions** menu on the walkthrough memo and choose **Remove**. A confirmation asks Remove this policy document? and explains that the document and all stored versions are deleted and the Policy Assistant stops using them, and that setting the status to Archived keeps the record without searching it.",
+     "shots": [
+      {
+       "id": "policy-documents-11",
+       "caption": "The confirmation before a staff upload is removed."
+      }
+     ]
+    },
+    {
+     "text": "Select **Remove document**. A notice confirms the removal and the counters return to 3 sources and 1 staff upload (the Draft Operations Manual). The Remove action exists only on staff uploads; the built-in sources cannot be removed.",
+     "shots": [
+      {
+       "id": "policy-documents-12",
+       "caption": "The memo is removed; the official documents are untouched."
+      }
+     ]
+    }
    ]
   }
  ],

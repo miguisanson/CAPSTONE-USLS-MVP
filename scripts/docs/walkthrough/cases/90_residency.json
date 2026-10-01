@@ -6,40 +6,112 @@
  "duration": "4 min",
  "story": [
   "Nicolas Valdez is a Master of Arts in Education student in the writing stage who is not enrolled in any subject this semester. Residency keeps such a student active while he completes allowed academic work. It is separate from AWOL, Leave of Absence, withdrawal and completed standing.",
-  "Graduate School Staff pick the student on the AWOL & Residency screen, choose a handbook purpose and the semester, run the residency policy checker and, when the evidence supports it, record the residency. Nicolas's demo record has 14 course-audit subjects still missing, so the checker asks for human review; the walkthrough shows that result as it appears."
+  "Graduate School Staff open Record residency on the AWOL & Residency board, pick the student, choose a handbook purpose and the semester, run the residency policy checker and, when the evidence supports it, record the residency. Nicolas's demo record has 14 course-audit subjects still missing, so the checker asks for human review; the walkthrough shows that result as it appears."
  ],
  "accounts": [
-  ["Graduate School Staff", "staff@usls.edu.ph", "Residency checker and record on AWOL & Residency"],
-  ["Password", "DemoPass123!", "same for every demo account"]
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Residency checker and record on AWOL & Residency"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account"
+  ]
  ],
  "data": [
-  ["Student", "Nicolas Valdez, GS-2026-RES-01, MAED"],
-  ["Residency purpose", "Thesis / dissertation work (other choices: Practicum / internship completion, Comprehensive examination, Awaiting research publication)"],
-  ["Semester", "AY 2026-2027 1st Semester"],
-  ["Staff verification notes", "Thesis writing continues without subject enrollment; adviser confirmed progress this semester."]
+  [
+   "Student",
+   "Nicolas Valdez, GS-2026-RES-01, MAED"
+  ],
+  [
+   "Residency purpose",
+   "Thesis / dissertation work (other choices: Practicum / internship completion, Comprehensive examination, Awaiting research publication)"
+  ],
+  [
+   "Semester",
+   "AY 2026-2027 1st Semester"
+  ],
+  [
+   "Staff verification notes",
+   "Thesis writing continues without subject enrollment; adviser confirmed progress this semester."
+  ]
  ],
  "parts": [
   {
    "title": "Part A - Check and record the Residency",
    "intro": "Nicolas's demo record is reset first (sign-in page demo reset).",
    "steps": [
-    {"text": "Sign in as GS Staff and open **AWOL & Residency** under Standalone Processes. The top panel, \"Automatic AWOL alerts and residency\", holds the notice that AWOL cannot be declared manually and, below it, the Residency form: **Student** search, **Residency purpose**, **Semester** and **Staff verification notes**.", "shots": [{"id": "residency-01", "caption": "AWOL & Residency: the Residency form below the AWOL notice."}]},
-    {"text": "Search \"Valdez\" in the student box and select **Nicolas Valdez**. Choose the **Residency purpose** Thesis / dissertation work and the **Semester** AY 2026-2027 1st Semester, and type the staff verification note (required when the checker needs human review).", "shots": [{"id": "residency-02", "caption": "Nicolas selected, purpose and semester chosen."}]},
-    {"text": "Click **Run residency policy checker**. The **Residency policy review** (\"Checks against the handbook using the student's recorded academic state. The Dean makes the decision.\") shows the result **Needs Human Review** with three checks: **No subject enrollment** (Pass - no current/enrolled subjects are recorded), **Permitted residency purpose** (Needs Review - course audit has 14 missing/incomplete subjects) and **Not an LOA substitute** (Needs Review - if course units remain and the student will not enroll, use LOA instead of residency). An **Apply suggestion** button copies the checker's suggestion; the checker is advice only.", "shots": [{"id": "residency-03", "caption": "Residency policy review with its three checks."}]},
-    {"text": "Click **Record residency**. The page confirms \"Saved. The student record, queue, and monitoring indicators were updated.\"", "shots": [{"id": "residency-04", "caption": "Residency recorded."}]}
+    {
+     "text": "Sign in as GS Staff and open **AWOL & Residency** under Standalone Processes. The board header has a **Record residency** button; the Residency columns (Residency, Residency closed) sit at the right of the board.",
+     "shots": [
+      {
+       "id": "residency-01",
+       "caption": "AWOL & Residency board with the Record residency button."
+      }
+     ]
+    },
+    {
+     "text": "Click **Record residency**. A window opens with **Student** search, **Residency purpose**, **Semester** and **Staff verification notes**. Search \"Valdez\", select **Nicolas Valdez**, choose the purpose Thesis / dissertation work and the semester AY 2026-2027 1st Semester, and type the staff verification note.",
+     "shots": [
+      {
+       "id": "residency-02",
+       "caption": "Record residency window with Nicolas selected."
+      }
+     ]
+    },
+    {
+     "text": "Click **Run residency policy checker**. The residency policy review appears with the result **Needs Human Review** (advice for staff; the Dean decides). Read the checks it lists, including the handbook condition that a student with course units left who will not enroll should use LOA instead.",
+     "shots": [
+      {
+       "id": "residency-03",
+       "caption": "Residency policy review inside the window."
+      }
+     ]
+    },
+    {
+     "text": "Click **Record residency** in the window. The page confirms \"Saved. The student record, queue, and monitoring indicators were updated.\"",
+     "shots": [
+      {
+       "id": "residency-04",
+       "caption": "Residency recorded."
+      }
+     ]
+    }
    ]
   },
   {
    "title": "Part B - Where the record shows",
    "steps": [
-    {"text": "Scroll to **AWOL, return, and residency cases** and search Nicolas. His card is in the **Residency** column: status Residency, \"Needs Human Review\", AY 2026-2027 1st Semester. Click **View**: status Residency, policy classification Needs Human Review, Dean decision Not applicable, semester, purpose, and the note \"Residency active - the term-enrollment and monitoring records were updated when staff recorded this residency.\" The window offers **Export residency report for Registrar** and **Close residency** (to end the residency when the period is over).", "shots": [{"id": "residency-05", "caption": "Residency card for Nicolas on the case board."}, {"id": "residency-06", "caption": "Residency case window with the Registrar report and Close residency."}]},
-    {"text": "Open **Students** and search Valdez. The directory row shows Nicolas with enrollment **Residency** and standing **Active**.", "shots": [{"id": "residency-07", "caption": "Students directory after the Residency was recorded."}]}
+    {
+     "text": "Search Nicolas on the board. His card is in the **Residency** column. Click **View details**: the window shows the tracker (Residency recorded, Residency closed), the student, type Residency, semester, purpose, the policy result (Needs Human Review), the date recorded, the staff note and the policy check (suggested for the Dean: Review or Use LOA).",
+     "shots": [
+      {
+       "id": "residency-05",
+       "caption": "Residency card for Nicolas."
+      },
+      {
+       "id": "residency-06",
+       "caption": "Residency case window."
+      }
+     ]
+    },
+    {
+     "text": "Open **Students** and search Valdez. The directory row shows Nicolas with enrollment **Residency** and standing **Active**.",
+     "shots": [
+      {
+       "id": "residency-07",
+       "caption": "Students directory after the Residency was recorded."
+      }
+     ]
+    }
    ]
   }
  ],
  "notes": [
   "Residency is an active no-subject enrollment state for approved academic work. A student with remaining course units who will stop studying should use Leave of Absence instead; the checker says so in its third check.",
   "The checker flags Nicolas as Needs Human Review because his course audit still has missing subjects. Staff can still record the residency after verifying the evidence; the case then carries the classification Needs Human Review. The Dean's decision is Not applicable for Residency.",
-  "The Registrar report export and Close residency buttons exist on the case window; they were not pressed in this walkthrough."
+  "The Residency case window can also be closed when the period ends; that was not done in this walkthrough."
  ]
 }

@@ -1,17 +1,24 @@
 """Re-walk the demonstration in a running copy of the app and save screenshots.
 
-Start the app first (demo mode, any database you can throw away):
+Use a FRESH throw-away database (cases 15 and 17 consume seeded demo students that cannot be reset),
+demo mode, and a port of your own (5074 here; 5061 is blocked by Chromium):
 
-    DATABASE_URL=sqlite:///E:/Temp/claude/walkthrough/wt.sqlite3 FLASK_PORT=5074 DEMO_MODE=1 \
-        .venv/Scripts/python.exe app.py
+    npm --prefix frontend run build
+    DATABASE_URL=sqlite:///E:/Temp/claude/walkthrough/wt2.sqlite3 FLASK_PORT=5074 DEMO_MODE=1         .venv/Scripts/python.exe app.py          # first start seeds; wait for GET /api/auth/config -> 200
 
-then (``WT_BASE`` defaults to http://127.0.0.1:5074):
+then, from the repo root (``WT_BASE`` defaults to http://127.0.0.1:5074):
 
-    .venv/Scripts/python.exe scripts/docs/walkthrough/capture_walkthrough.py            # every case
-    .venv/Scripts/python.exe scripts/docs/walkthrough/capture_walkthrough.py --only 05 07
+    PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -u scripts/docs/walkthrough/capture_walkthrough.py            # every case, ~45 min
+    ... capture_walkthrough.py --only 05 07          # chosen cases
 
-Each ``capture/case_NN_*.py`` module mirrors ``cases/NN_*.json``. Screenshots go
-to ``shots/``; a per-step result log goes to ``shots/_capture_log.json``.
+Cases touch disjoint demo students, so these groups can run in parallel processes against one server (about 25 min):
+    --only 00 01 02 03 04 05 | --only 06 07 08 09 21 | --only 10 11 12 19 20 90 | --only 13 14 18 | --only 15 16 17 ; then --only 22
+Order constraints inside a group: 06 before 07, 13 before 14 before 18, 15 before 16 and 17. Cases 15/17/18 book defenses a few minutes
+ahead and wait for the start time, so run them on a weekday between 08:00 and 16:00 (Asia/Manila).
+
+Each ``capture/case_NN_*.py`` mirrors ``cases/NN_*.json``. Screenshots go to ``shots/``; a per-step log goes to
+``shots/_capture_log.json`` (overwritten by every process). A failed step keeps the screenshot from the previous run.
+Then build the document:  E:/Temp/claude/wt-venv/Scripts/python.exe scripts/docs/walkthrough/build_walkthrough.py
 """
 from __future__ import annotations
 

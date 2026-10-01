@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .helpers_a3 import center_text, column_holds, drag_card, frame_board, open_link
+from .helpers_a3 import dean_board_decision, center_text, column_holds, drag_card, frame_board, open_link
 
 KEY = "readmission-therese"
 EMAIL = "readmission.therese@usls.edu.ph"
@@ -104,30 +104,11 @@ def run(rt):
 
     dean = rt.new_page("dean@usls.edu.ph")
 
-    def d_open():
-        dean.get_by_role("link", name=re.compile(r"Leave . Readmission")).first.click()
-        rt.settle(dean, 1500)
-        rt.shot(dean, f"{S}-11")
-        dean.get_by_role("row").filter(has_text="Therese").get_by_role("link", name="Review").click()
-        rt.settle(dean, 1500)
-        rt.shot(dean, f"{S}-12")
-        dean.get_by_role("button", name="Approve", exact=True).first.scroll_into_view_if_needed()
-        rt.shot(dean, f"{S}-13")
+    def d_decide():
+        dean_board_decision(rt, dean, r"^Readmission", WHO, "Approved - back in the program", DEAN_COMMENT,
+                            (f"{S}-11", f"{S}-12", f"{S}-13"))
 
-    rt.step("Dean opens the case", d_open)
-
-    def d_approve():
-        ta = dean.get_by_label(re.compile("Your comment", re.I))
-        if ta.count():
-            ta.first.fill(DEAN_COMMENT)
-        dean.get_by_role("button", name="Approve", exact=True).first.click()
-        dean.wait_for_timeout(900)
-        rt.shot(dean, f"{S}-14")
-        dean.get_by_role("button", name=re.compile(r"^Approve current stage")).click()
-        rt.settle(dean, 2000)
-        rt.shot(dean, f"{S}-15")
-
-    rt.step("Dean approves", d_approve)
+    rt.step("Dean drags the card to Approved and confirms", d_decide)
 
     def st_result():
         rt.go(staff, f"/workflow/{SLUG}")

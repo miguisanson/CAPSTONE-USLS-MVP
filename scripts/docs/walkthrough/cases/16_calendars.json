@@ -1,82 +1,212 @@
 {
  "slug": "calendars",
- "title": "Calendars for every role — staff, Dean, faculty, student, private feed, bell",
+ "title": "Calendars for every role — staff, faculty, student, private feed, bell",
  "kind": "live",
- "owner": "GS Staff, Dean, Faculty, Student",
+ "owner": "GS Staff, Faculty, Student",
  "duration": "6 min",
  "story": [
-  "Once a defense is booked ({case:defense-scheduling}) everybody involved sees the same booking in their own calendar. Staff see every defense and can open it in Defense Scheduling; the Dean sees the same calendar read-only; a faculty member sees only the defenses he or she sits on or advises, together with his or her availability; a student sees only his or her own defense, the deadlines that lead to it and a link for the phone calendar.",
-  "This case walks through the four calendars with the same defense, the faculty availability editor, the private calendar link (a subscribe link that works in Google Calendar, Outlook or Apple Calendar without signing in), the notification bell and the adviser appointment screens. The calendar link is read-only for the platform: nothing is ever written back to Google."
+  "Once a defense is booked ({case:defense-scheduling}) everybody involved sees the same booking in their own calendar. Staff see every defense and can open it in Defense Scheduling; a faculty member sees only the defenses he or she sits on or advises, together with his or her availability; a student sees only his or her own defense, the deadlines that lead to it and a link for the phone calendar.",
+  "This case walks through the calendars with the same defense, the faculty availability editor, the private calendar link (a subscribe link that works in Google Calendar, Outlook or Apple Calendar without signing in), the notification bell and the adviser appointment screens. The calendar link is read-only for the platform: nothing is ever written back to Google."
  ],
  "accounts": [
-  ["GS Staff", "staff@usls.edu.ph", "Defense calendar with filters; opens a defense in Defense Scheduling"],
-  ["Dean", "dean@usls.edu.ph", "Read-only defense calendar"],
-  ["Faculty — External Panel", "angela.cruz@usls.edu.ph", "My calendar, availability editor, private link, bell"],
-  ["Student", "student@usls.edu.ph", "Research calendar and bell (Miguel Yu)"],
-  ["Faculty — adviser", "liwayway.bautista@usls.edu.ph", "Advisees page"]
+  [
+   "GS Staff",
+   "staff@usls.edu.ph",
+   "Defense calendar with filters; opens a defense in Defense Scheduling"
+  ],
+  [
+   "Faculty — External Panel",
+   "angela.cruz@usls.edu.ph",
+   "My calendar, availability editor, private link, bell"
+  ],
+  [
+   "Student",
+   "student@usls.edu.ph",
+   "Research calendar and bell (Miguel Yu)"
+  ],
+  [
+   "Faculty — adviser",
+   "liwayway.bautista@usls.edu.ph",
+   "Advisees page"
+  ]
  ],
  "data": [
-  ["Defense shown in every role", "A Proposal Defense of the demonstration students (Gab Tolentino, Bea Salonga, Nico Barrientos) booked in {case:defense-scheduling} and {case:verdicts}"],
-  ["Calendar filters", "Status: Everything; view: Agenda"],
-  ["Private link", "Created from the faculty calendar with Create my private link"]
+  [
+   "Defense shown in every role",
+   "A Proposal Defense of the demonstration students (Gab Tolentino, Bea Salonga, Nico Barrientos) booked in {case:defense-scheduling} and {case:verdicts}"
+  ],
+  [
+   "Calendar filters",
+   "Status: Everything; view: Agenda"
+  ],
+  [
+   "Private link",
+   "Created from the faculty calendar with Create my private link"
+  ]
  ],
  "parts": [
   {
    "title": "Part A - Staff: the defense calendar",
    "steps": [
-    {"text": "Sign in as GS Staff (staff@usls.edu.ph). Open the defense calendar (the **Calendar** tab of Defense Scheduling; it can also be reached from the link **Open the defense calendar** on that screen). Confirm the filters **Program**, **Stage**, **Status** (**Booked and held**), **Panelist or adviser**, **Venue** and **Student**, the legend (Title, Proposal and Final Defense, Deadline, Needs attention, Verdict overdue) and the month view with each defense as a coloured chip (time and stage) and the protocol deadlines as flags.", "shots": [{"id": "calendars-01", "caption": "Staff defense calendar: month view with filters, legend, defenses and deadlines."}]},
-    {"text": "Select one defense chip. The panel on the right shows the stage and student, the status badge (for example **Scheduled**), date, time, venue, mode, program, adviser, the last change and its reason, the panel with roles, **Add to my calendar (.ics)** and **Open in Defense Scheduling**.", "shots": [{"id": "calendars-02", "caption": "A selected defense: status, time, venue, adviser, panel and the actions available to staff."}]},
-    {"text": "Set **Status** to **Everything** and switch the view to **Agenda**. Confirm that cancelled and rescheduled bookings now appear with their status as well as the booked and held ones. Scroll through the list.", "shots": [{"id": "calendars-03", "caption": "Agenda view with every status: cancelled and rescheduled bookings stay visible for the record."}]}
+    {
+     "text": "Sign in as GS Staff (staff@usls.edu.ph). Open **6 · Defense Scheduling** and select the **Calendar** tab (it can also be reached from the link **Open the defense calendar** on the Scheduling tab). Confirm the filters **Program**, **Stage**, **Status** (**Booked and held**), **Panelist or adviser**, **Venue** and **Student**, the legend (Title, Proposal and Final Defense, Deadline, Needs attention, Verdict overdue) and the month view with each defense as a coloured chip (time and stage) and the protocol deadlines as flags.",
+     "shots": [
+      {
+       "id": "calendars-01",
+       "caption": "Staff defense calendar: month view with filters, legend, defenses and deadlines."
+      }
+     ]
+    },
+    {
+     "text": "Select one defense chip. The panel on the right shows the stage and student, the status badge (for example **Scheduled**), date, time, venue, mode, program, adviser, the last change and its reason, the panel with roles, **Add to my calendar (.ics)** and **Open in Defense Scheduling**.",
+     "shots": [
+      {
+       "id": "calendars-02",
+       "caption": "A selected defense: status, time, venue, adviser, panel and the actions available to staff."
+      }
+     ]
+    },
+    {
+     "text": "Set **Status** to **Everything** and switch the view to **Agenda**. Confirm that cancelled and rescheduled bookings now appear with their status as well as the booked and held ones. Scroll through the list.",
+     "shots": [
+      {
+       "id": "calendars-03",
+       "caption": "Agenda view with every status: cancelled and rescheduled bookings stay visible for the record."
+      }
+     ]
+    }
    ]
   },
   {
-   "title": "Part B - Dean: the same calendar, read only",
+   "title": "Part B - Faculty: My calendar and the availability editor",
    "steps": [
-    {"text": "Sign out and sign in as the Dean (dean@usls.edu.ph). Open **Defense Calendar** in the Dean sidebar. Confirm the heading \"Every scheduled defense with its panel, venue and deadlines. Read only.\" and the same filters and month view.", "shots": [{"id": "calendars-04", "caption": "Dean's defense calendar: same defenses, read only."}]},
-    {"text": "Select the same defense. Confirm the same details and panel, and that there is no button to open Defense Scheduling (the Dean can print and download the .ics entry only).", "shots": [{"id": "calendars-05", "caption": "The Dean's detail panel: no scheduling action."}]}
+    {
+     "text": "Sign out and sign in as Dr. Angela Cruz (angela.cruz@usls.edu.ph). In the faculty sidebar open **My Calendar**. Confirm the heading \"Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times\", the tick boxes **Deadlines**, **My availability** and **Google busy times**, the legend with **Available** (green) and **Not available** (red), and the week view with her working hours shaded green.",
+     "shots": [
+      {
+       "id": "calendars-06",
+       "caption": "Faculty My calendar: week view with the defenses she sits on and her availability layer."
+      }
+     ]
+    },
+    {
+     "text": "Select **Month**. Confirm that only defenses where she is on the panel (or adviser) appear.",
+     "shots": [
+      {
+       "id": "calendars-07",
+       "caption": "The month view for the faculty member."
+      }
+     ]
+    },
+    {
+     "text": "Select a defense chip. Confirm the detail panel adds **Your role** (for example External Panel) and the button **I cannot attend this defense**, which sends a reason to the Research Coordinator.",
+     "shots": [
+      {
+       "id": "calendars-08",
+       "caption": "Faculty detail panel: the panelist's role and the cannot-attend button."
+      }
+     ]
+    },
+    {
+     "text": "In the sidebar open **My Availability** (the faculty availability editor). Read **Weekly hours** (Monday to Friday with From/To times, Saturday and Sunday not available), **Specific dates** (not available / available only these hours), **Requests from the Graduate School** and **Google Calendar** (**Not connected** in the demo, with a **Connect Google Calendar** button). Staff use exactly these entries when they search for a shared date.",
+     "shots": [
+      {
+       "id": "calendars-09",
+       "caption": "Faculty availability editor: weekly hours, specific dates and requests from the Graduate School."
+      }
+     ]
+    }
    ]
   },
   {
-   "title": "Part C - Faculty: My calendar and the availability editor",
+   "title": "Part C - Private calendar link",
    "steps": [
-    {"text": "Sign out and sign in as Dr. Angela Cruz (angela.cruz@usls.edu.ph). In the faculty sidebar open **My Calendar**. Confirm the heading \"Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times\", the tick boxes **Deadlines**, **My availability** and **Google busy times**, the legend with **Available** (green) and **Not available** (red), and the week view with her working hours shaded green.", "shots": [{"id": "calendars-06", "caption": "Faculty My calendar: week view with the defenses she sits on and her availability layer."}]},
-    {"text": "Select **Month**. Confirm that only defenses where she is on the panel (or adviser) appear.", "shots": [{"id": "calendars-07", "caption": "The month view for the faculty member."}]},
-    {"text": "Select a defense chip. Confirm the detail panel adds **Your role** (for example External Panel) and the button **I cannot attend this defense**, which sends a reason to the Research Coordinator.", "shots": [{"id": "calendars-08", "caption": "Faculty detail panel: the panelist's role and the cannot-attend button."}]},
-    {"text": "In the sidebar open **My Availability** (the faculty availability editor). Read **Weekly hours** (Monday to Friday with From/To times, Saturday and Sunday not available), **Specific dates** (not available / available only these hours), **Requests from the Graduate School** and **Google Calendar** (**Not connected** in the demo, with a **Connect Google Calendar** button). Staff use exactly these entries when they search for a shared date.", "shots": [{"id": "calendars-09", "caption": "Faculty availability editor: weekly hours, specific dates and requests from the Graduate School."}]}
-   ]
-  },
-  {
-   "title": "Part D - Private calendar link",
-   "steps": [
-    {"text": "Return to **My Calendar** and scroll to **Subscribe to this calendar** (\"Defenses and deadlines in your own calendar app\"). Select **Create my private link**. Confirm **Your private link** appears (a long address ending in .ics), the instruction \"In Google Calendar choose \\\"Other calendars\\\" then \\\"From URL\\\" and paste the link. Anyone with the link can see your calendar, so do not share it.\", and the buttons **New link** and **Turn off**.", "shots": [{"id": "calendars-10", "caption": "Private calendar link: created on demand, can be replaced or turned off."}]},
+    {
+     "text": "Return to **My Calendar** and scroll to **Subscribe to this calendar** (\"Defenses and deadlines in your own calendar app\"). Select **Create my private link**. Confirm **Your private link** appears (a long address ending in .ics), the instruction \"In Google Calendar choose \\\"Other calendars\\\" then \\\"From URL\\\" and paste the link. Anyone with the link can see your calendar, so do not share it.\", and the buttons **New link** and **Turn off**.",
+     "shots": [
+      {
+       "id": "calendars-10",
+       "caption": "Private calendar link: created on demand, can be replaced or turned off."
+      }
+     ]
+    },
     "Open the link in a browser tab (or let the capture fetch it): it answers without signing in with a standard calendar file (BEGIN:VCALENDAR, time zone Asia/Manila) that lists one VEVENT for each defense and deadline of this faculty member, with the venue, mode and panel in the description. The calendar app only reads this link; the platform never writes to Google."
    ]
   },
   {
-   "title": "Part E - Student: research calendar and bell",
+   "title": "Part D - Student: research calendar and bell",
    "steps": [
-    {"text": "Sign out and sign in as the student (student@usls.edu.ph, Miguel Yu). Open **Research Calendar** in the student sidebar (the page is titled \"My research calendar\"). Confirm **Your next defense** (when a defense is booked it shows the date, time and panel; before that it reads \"No defense is booked yet\" with **Request a defense schedule**), **Next deadlines**, the sentence \"If your defense is moved, a notice with the old and the new time arrives in the bell at the top of the page.\", the calendar and **Subscribe to this calendar**.", "shots": [{"id": "calendars-11", "caption": "Student research calendar: next defense, deadlines, calendar and private link."}]},
-    {"text": "Select the bell. Read the notifications for the student (when a defense is booked, rescheduled or cancelled the student receives a notice with the old and the new time).", "shots": [{"id": "calendars-12", "caption": "The student's notification bell."}]}
+    {
+     "text": "Sign out and sign in as the student (student@usls.edu.ph, Miguel Yu). Open **Research Calendar** in the student sidebar (the page is titled \"My research calendar\"). Confirm **Your next defense** (when a defense is booked it shows the date, time and panel; before that it reads \"No defense is booked yet\" with **Request a defense schedule**), **Next deadlines**, the sentence \"If your defense is moved, a notice with the old and the new time arrives in the bell at the top of the page.\", the calendar and **Subscribe to this calendar**.",
+     "shots": [
+      {
+       "id": "calendars-11",
+       "caption": "Student research calendar: next defense, deadlines, calendar and private link."
+      }
+     ]
+    },
+    {
+     "text": "Select the bell. Read the notifications for the student (when a defense is booked, rescheduled or cancelled the student receives a notice with the old and the new time).",
+     "shots": [
+      {
+       "id": "calendars-12",
+       "caption": "The student's notification bell."
+      }
+     ]
+    }
    ]
   },
   {
-   "title": "Part F - Faculty notification bell after scheduling",
+   "title": "Part E - Faculty notification bell after scheduling",
    "steps": [
-    {"text": "Sign in as Dr. Angela Cruz and select the bell on the faculty dashboard. Read the notices created by the scheduling steps: \"Proposal Defense of ... is scheduled\" (date, time, venue and mode), \"... was rescheduled\" (moved from the old time to the new time, with the reason and who asked), \"... was cancelled\" (with the reason), the reminders \"Defense in 14 days / today\" and \"Verdict due by ...\" (first working day after the defense), and \"Please enter your availability\". Selecting a notice opens the related page.", "shots": [{"id": "calendars-13", "caption": "Faculty notification bell: scheduling, rescheduling, cancellation, reminders and verdict deadlines."}]}
+    {
+     "text": "Sign in as Dr. Angela Cruz and select the bell on the faculty dashboard. Read the notices created by the scheduling steps: \"Proposal Defense of ... is scheduled\" (date, time, venue and mode), \"... was rescheduled\" (moved from the old time to the new time, with the reason and who asked), \"... was cancelled\" (with the reason), the reminders \"Defense in 14 days / today\" and \"Verdict due by ...\" (first working day after the defense), and \"Please enter your availability\". Selecting a notice opens the related page.",
+     "shots": [
+      {
+       "id": "calendars-13",
+       "caption": "Faculty notification bell: scheduling, rescheduling, cancellation, reminders and verdict deadlines."
+      }
+     ]
+    }
    ]
   },
   {
-   "title": "Part G - Adviser appointment, as it exists in the protocol",
+   "title": "Part F - Adviser appointment, as it exists in the protocol",
    "intro": "The adviser appointment follows the protocol steps below; each role sees its own part. This part is a read-only look.",
    "steps": [
-    {"text": "As GS Staff open the adviser appointment screen. Read the protocol line: \"Form 3 → Academic Coordinator notes → Research Coordinator sends to the Dean → Dean, Associate Dean or Research Coordinator approves (Form 3.1) → adviser accepts → student sends Forms 3.2 and 3.3 within 5 days.\" The queue filters are **Needs my action**, **In progress**, **Accepted - contract** and **All**; **Record an adviser appointed outside the portal** is for students imported from the monitoring sheet who already have an adviser.", "shots": [{"id": "calendars-14", "caption": "Adviser appointments (staff): the protocol steps and the queue filters."}]},
-    {"text": "As the student (student@usls.edu.ph) open **Research Adviser** (the page is titled \"My research adviser\"). Confirm the adviser's name, the date appointed and the status **Accepted**, and the form **Request change of adviser (Form 3.1.1)**: a change is allowed once, only before the proposal defense, and needs both the current and the new adviser to agree, then the Dean decides.", "shots": [{"id": "calendars-15", "caption": "Student adviser page: the appointed adviser and the change-of-adviser request."}]},
-    {"text": "As a faculty adviser (liwayway.bautista@usls.edu.ph) open **My Advisees**. Confirm the limit \"You can advise at most ... 5 advisees\", the advisee table with program, stage and appointment date, and the note \"Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1.\"", "shots": [{"id": "calendars-16", "caption": "Faculty advisees: advising limit, appointment date and contract deadline."}]}
+    {
+     "text": "As GS Staff open **4 · Research Gate** and select the **Adviser designation** tab. Read the protocol line: \"Form 3 → Academic Coordinator notes → Research Coordinator sends to the Dean → Dean, Associate Dean or Research Coordinator approves (Form 3.1) → adviser accepts → student sends Forms 3.2 and 3.3 within 5 days.\" The queue filters are **Needs my action**, **In progress**, **Accepted - contract** and **All**; **Record an adviser appointed outside the portal** is for students imported from the monitoring sheet who already have an adviser.",
+     "shots": [
+      {
+       "id": "calendars-14",
+       "caption": "Adviser designation tab in Research Gate (staff): the protocol steps and the queue filters."
+      }
+     ]
+    },
+    {
+     "text": "As the student (student@usls.edu.ph) open **Research Adviser** (the page is titled \"My research adviser\"). Confirm the adviser's name, the date appointed and the status **Accepted**, and the form **Request change of adviser (Form 3.1.1)**: a change is allowed once, only before the proposal defense, and needs both the current and the new adviser to agree, then the Dean decides.",
+     "shots": [
+      {
+       "id": "calendars-15",
+       "caption": "Student adviser page: the appointed adviser and the change-of-adviser request."
+      }
+     ]
+    },
+    {
+     "text": "As a faculty adviser (liwayway.bautista@usls.edu.ph) open **My Advisees**. Confirm the limit \"You can advise at most ... 5 advisees\", the advisee table with program, stage and appointment date, and the note \"Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1.\"",
+     "shots": [
+      {
+       "id": "calendars-16",
+       "caption": "Faculty advisees: advising limit, appointment date and contract deadline."
+      }
+     ]
+    }
    ]
   }
  ],
  "notes": [
   "All times are Philippine time (Asia/Manila). The calendars read one shared feed, so a change made in Defense Scheduling appears in every role at once.",
+  "The Dean has no calendar page in this version: the Dean portal shows approvals, reports and decision history, and the former Dean calendar address now leads back to the Approvals Queue.",
   "The private link is a secret address: anyone who has it can read the owner's calendar, so it can be replaced (New link) or switched off (Turn off) at any time. Google Calendar is read-only for the platform; connecting a Google account only lets staff see busy times when they search for a shared slot.",
   "The student calendar only shows a booked defense when the research demo student has one; the demonstration students that carry the scheduling and verdict cases do not have a student login, so their own notices cannot be shown from the student side.",
   "Faculty bell items and deadline flags are computed when the bell or calendar is opened; there is no background scheduler and no email."
