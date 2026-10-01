@@ -8,21 +8,16 @@
   Codex, because Codex's sandbox cannot run the tests and nobody is here to
   unblock it. Main session = architect: briefs, merges, gate, live check.
 
-### Progress (2026-10-01 ~09:00, usage limit reached)
+### Progress (2026-10-01 11:00)
 
-Everything is merged into `v5.1-migui_clean` and pushed except the walkthrough
-(`pkt/walkthrough`, still running; commit due 10:15, scripts re-runnable).
-Last merges: rulesux (locked handbook rules, Recommendations -> Work Queue tab,
-calendar/adviser as tabs), layoutfix (no page h-scroll, corrected subject-needs report),
-standalone (one template + drag-and-drop for LOA/Readmission/AWOL/Withdrawal), assistant2
-(policy_rag.py BM25 retrieval; eval 94% hit@1 / 100% hit@3).
-Gate before assistant2: running (`E:/Temp/claude/usls-check/gate.log`). After assistant2:
-policy/assistant tests 59/60 — the one failure is
-`test_seed_folder_is_tracked_and_real_uploads_are_not_ignored_by_accident`, which the helper
-says fails only when run as named modules and passes under `discover`; verify with the full gate.
+Everything is merged into `v5.1-migui_clean` and pushed, including the walkthrough.
+Full gate on the final code: 591 tests; the only failure was a randomly-seeded test
+(fixed in 6ade188, verified with three hash seeds). Frontend build passes.
 
-Next: full gate on HEAD; merge `pkt/walkthrough`, re-run its capture + build on final code;
-re-run `scripts/docs/rebuild_proposal.py`; README/CHANGELOG; push.
+Next session: section J of `DEFENSE_REVISIONS.md` (13 bugs found while re-walking the
+demo + re-capture walkthrough cases 9 and 18), then re-run `scripts/docs/rebuild_proposal.py`
+so the proposal reflects the last merges, and refresh the proposal's Appendix U screenshots
+from `Documents/CAPSTONE_ONLY/walkthrough_screenshots/`.
 
 ## If this session died
 

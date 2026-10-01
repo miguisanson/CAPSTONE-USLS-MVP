@@ -258,10 +258,31 @@ What we have: Graduate School Handbook 2022-2023, GS Research Protocol AY
 ## Status on 2026-10-01 (branch `v5.1-migui_clean`)
 
 Done and tested (573 automated tests green before the last merge). Still open:
-B7/E5/I1 walkthrough (rewritten against the live app, being merged), I5 render check of the
+B7/E5/I1 walkthrough (rewritten against the live app — merged; cases 9 and 18 need one more capture), I5 render check of the
 final documents, F1 a Gemini key on the demo machine for AI-worded answers (keyword answers
 work without it), D3/G2–G7 real data and confirmations from the Graduate School, and the
 stakeholder's validation of the Operations Manual draft (44 open questions).
+
+## J. Bugs found while re-walking the demo (2026-10-01) — fix next
+
+Found by driving the live app for the new walkthrough (reproduction steps are in
+`scripts/docs/walkthrough/cases/`). None is covered by a failing test yet: write the
+test first.
+
+- [ ] J1. Enrollment "Record dropped subject" dialog is taller than the screen at 1366×768 — Save unreachable.
+- [ ] J2. Demo reset sets subjects to "Not Started", which blocks single-student enrollment.
+- [ ] J3. Withdrawal report re-judges the window at report time ("window closed / Fee 100%") instead of using the window recorded at submission.
+- [ ] J4. After "Endorse and sign Form 1" a "Cannot read properties of null (reading 'getContext')" banner appears (the endorsement saves).
+- [ ] J5. Research Coordinator's student search in Research Gate always says "No students match" (opening with `?student_id=` works).
+- [ ] J6. Defense Scheduling "Change panel" shows existing members under the wrong role labels.
+- [ ] J7. Panel invitation answers survive a demo reset.
+- [ ] J8. Practicum: the Dean's "Mark reviewed" window is titled "Approve current stage".
+- [ ] J9. A signed-in Dean does not see a new practicum report until reload.
+- [ ] J10. Graduation: after the Dean's CSV export the batch stays "Dean Approved" instead of "Exported - Ready to Send".
+- [ ] J11. After a monitoring-sheet import the Onboarding report panel still says "No import batches yet".
+- [ ] J12. Residency can be recorded when the checker says "Needs Human Review".
+- [ ] J13. Policy Assistant still returns loosely related passages for some questions the library does not cover.
+- [ ] J14. Walkthrough cases 9 and 18 not fully re-captured on the final build; re-run `capture_walkthrough.py --only 09 18` on a weekday 08:00–16:00 with a fresh database, then `build_walkthrough.py`.
 
 ## H. State of the build on 2026-09-30
 
