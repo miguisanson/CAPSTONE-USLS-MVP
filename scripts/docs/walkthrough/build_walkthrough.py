@@ -361,7 +361,7 @@ def render_blocks(b: Builder, sections: list[dict]) -> None:
 
 
 def render_case(b: Builder, number: int, case: dict) -> None:
-    suffix = "  ·  reference only" if case.get("kind") == "reference" else ""
+    suffix = "  ·  reference only" if case.get("kind") == "reference" and "reference only" not in case["title"] else ""
     b.heading(f"Case {number} — {case['title']}{suffix}", 2)
     bits = [x for x in (f"Time: {case['duration']}" if case.get("duration") else "", case.get("owner", "")) if x]
     if bits:
@@ -428,7 +428,7 @@ def build(toc_pages: dict[str, int] | None, out: Path) -> Builder:
     b.para(front["running_order_intro"])
     rows = []
     for n, c in enumerate(cases, 1):
-        rows.append([f"Case {n}", c["title"] + ("  ·  reference only" if c.get("kind") == "reference" else ""), c.get("owner", ""), c.get("duration", "")])
+        rows.append([f"Case {n}", c["title"] + ("  ·  reference only" if c.get("kind") == "reference" and "reference only" not in c["title"] else ""), c.get("owner", ""), c.get("duration", "")])
     b.table(["Case", "What is demonstrated", "Who", "Time"], rows, [0.7, 3.3, 1.8, 0.7], small=True)
     for text in front.get("running_order_notes", []):
         b.para(text)

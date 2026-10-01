@@ -62,7 +62,9 @@ def run(rt: Runtime) -> None:
         rt.step("precondition: demo students GS-2026-UD-01..03 exist", lambda: (_ for _ in ()).throw(
             RuntimeError("The demonstration students GS-2026-UD-01..03 are missing: start the app in demo mode on a fresh database.")))
         return
-    if _verdict_count() == 3:
+    _bea = h.sched_state(api, ids["bea"])
+    _bea_resumable = (not _bea["active"]) and (_bea["outcome"] or {}).get("effect") == "reschedule"  # Deferred, not yet rebooked
+    if _verdict_count() == 3 and not _bea_resumable:
         rt.step("precondition: fresh demo database", lambda: (_ for _ in ()).throw(
             RuntimeError("NEEDS A FRESH DATABASE: Nico, Bea and Gab (GS-2026-UD-01..03) already hold their verdicts, so case 17 "
                          "cannot be repeated. Restart the demo on a new SQLite file; the existing verdicts-*.png are kept.")))
