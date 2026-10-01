@@ -68,26 +68,26 @@ page `frontend/src/pages/PolicyDocuments.jsx`, staff and admin only, PDF and
 DOCX up to 20 MB, edit / replace / delete, uploaded text is chunked and used
 by the Policy Assistant.
 
-- [ ] **B1. Fix the built-in document folder path.** `RAG_DOCUMENT_PATHS`
+- [x] **B1. Fix the built-in document folder path.** `RAG_DOCUMENT_PATHS`
       (`app.py:54-58`) points at `Documents/USLS_Documents` and `data`; neither
       exists. The real folder is `Documents/CAPSTONE_ONLY/USLS_Documents`. Today
       the only corpus is the two files committed in `uploads/policy_documents/`.
       *Accept:* a test proves the handbook is found from the real folder and is
       not indexed twice.
-- [ ] **B2. End-to-end test: upload → the assistant answers from it.** No test
+- [x] **B2. End-to-end test: upload → the assistant answers from it.** No test
       proves an uploaded document is actually retrieved. *Accept:* a test uploads
       a DOCX with a made-up rule, asks about it, and gets that rule back with the
       document named as the source.
-- [ ] **B3. A newly uploaded policy must win over the built-in snippets.**
+- [x] **B3. A newly uploaded policy must win over the built-in snippets.**
       Curated `POLICY_SNIPPETS` (`app.py:3913`) answer some staff questions first,
       so a new contradicting upload is ignored unless the question contains words
       like "how many / maximum / deadline" (`app.py:6181`).
-- [ ] **B4. Keep policy history.** Replace overwrites the file: no version, no
+- [x] **B4. Keep policy history.** Replace overwrites the file: no version, no
       effective date, no category. The panel asked for policies to be managed,
       so keep the old version and record who changed it and when.
-- [ ] **B5. Scanned PDFs.** Rejected as "no readable text" although OCR exists
+- [x] **B5. Scanned PDFs.** Rejected as "no readable text" although OCR exists
       elsewhere in the app. Either run OCR or say so clearly on the page.
-- [ ] **B6. Housekeeping.** Remove the accidental `"capstone-usls-platform":
+- [x] **B6. Housekeeping.** Remove the accidental `"capstone-usls-platform":
       "file:.."` self-dependency in `frontend/package.json`; add the two file-view
       routes to `ACCESS_CONTROL_SPEC`; decide whether `uploads/policy_documents/`
       is committed (it is the only upload folder not in `.gitignore`).
@@ -114,24 +114,24 @@ policy document. Uploading or replacing a policy changes nothing in a workflow.
 | INC must be completed; all-INC means dropped from the rolls | *not found* | Handbook rule | **Missing** |
 | Defense lead times, panel size 4 / 5, Turnitin ≤ 15%, comprehensive exam before title | 21280, ~21275, 3949, 1811 | Research Protocol (check each against the protocol text) | To verify |
 
-- [ ] **C1. WAITING — owner/stakeholder decision on the three CONFLICT rows.**
+- [x] **C1. WAITING — owner/stakeholder decision on the three CONFLICT rows.**
       Which is right: the handbook or what Sir Eddie said in the July meetings?
       Do not guess. Run `grill-me` with the owner, then record the answer here.
-- [ ] **C2. One rules register.** Move every hard-coded rule into a single
+- [x] **C2. One rules register.** Move every hard-coded rule into a single
       table (rule id, plain-language text, value, process, source document, page,
       effective date). Workflows read the value from it. *Accept:* changing a
       value in the register changes the workflow's behaviour in a test.
-- [ ] **C3. Each rule cites its policy.** Every rule row points to a
+- [x] **C3. Each rule cites its policy.** Every rule row points to a
       `PolicyDocument` and a page; the workflow screen shows "Rule: … — source:
       Handbook p. 49". Replacing that document flags its rules "needs review".
-- [ ] **C4. Answer the panel's drop question in the system.** Dropping a
+- [x] **C4. Answer the panel's drop question in the system.** Dropping a
       subject and Course Adjustments must state and enforce *when* a drop is
       allowed (Day 1? first week? after?), and the rejection message must cite
       the rule.
-- [ ] **C5. Add the missing handbook rules** that are in scope (change/add
+- [x] **C5. Add the missing handbook rules** that are in scope (change/add
       subject window, academic load), and list in the document the ones
       deliberately out of scope (grades, retention) with the stakeholder reason.
-- [ ] **C6. Fix the time-bomb test.** `test_workflow_clarification_can_be_
+- [x] **C6. Fix the time-bomb test.** `test_workflow_clarification_can_be_
       returned_and_answered` now fails because the withdrawal deadline in its
       fixture (2026-08-07) has passed. The test must set its own dates.
 
@@ -177,18 +177,18 @@ TOC still has page numbers and still lists every table and figure, and there is
 page 378 is the API list — so the page numbers on the defense form refer to a
 **different, newer file that is not in this repo**.
 
-- [ ] **E0. WAITING — owner: get the revised document.** Khloe marked D2 and
+- [x] **E0. Settled (owner, 2026-10-01: ignore the other copy) — — owner: get the revised document.** Khloe marked D2 and
       D3 "done" on 2026-08-14. Ask her (or check the shared Google Doc) for that
       version and put it in `Documents/CAPSTONE_ONLY/`. If it does not exist,
       E1–E3 must be done from scratch.
-- [ ] **E1. Pagination:** no page number on the TOC; chapters numbered
+- [x] **E1. Pagination:** no page number on the TOC; chapters numbered
       chapter-page (1-1, 1-2 … 2-1 …). Needs a section break per chapter.
-- [ ] **E2. TOC:** follows that format; tables and figures removed from it
+- [x] **E2. TOC:** follows that format; tables and figures removed from it
       (they already have their own lists).
-- [ ] **E3. Business rules chapter/section:** existing rules (from the handbook
+- [x] **E3. Business rules chapter/section:** existing rules (from the handbook
       and research protocol) and proposed rules (what the system enforces), per
       process. §C's table is the starting content.
-- [ ] **E4. Old wording that contradicts the system** (verified in the file):
+- [x] **E4. Old wording that contradicts the system** (verified in the file):
       - Withdrawal described as leaving the program: "controlled exit process"
         (Fig. text, ch. 1), "monitoring stops" (milestone tables, twice),
         glossary "Withdrawal – the formal process of leaving the graduate
@@ -211,11 +211,11 @@ page 378 is the API list — so the page numbers on the defense form refer to a
 - [ ] **F1. Demo the Policy Assistant live**, with a Gemini key confirmed on
       the demo machine (without a key it answers by keyword search only). The
       assistant is tuned to a few handbook questions; test ten unscripted ones.
-- [ ] **F2. "Sign in page — no logging in".** Login is a real password check,
+- [x] **F2. "Sign in page — no logging in".** Login is a real password check,
       but the page pre-fills credentials and has one-click student buttons, and
       `/api/auth/demo-students` hands out passwords without login. Type the
       password in the demo; put the quick-login behind a demo-mode switch.
-- [ ] **F3. Let the Dean and coordinators use the policy chat** (today: staff,
+- [x] **F3. Let the Dean and coordinators use the policy chat** (today: staff,
       admin and students only).
 
 ## G. WAITING — documents still needed from the stakeholder (USLS)
@@ -223,7 +223,7 @@ page 378 is the API list — so the page numbers on the defense form refer to a
 What we have: Graduate School Handbook 2022-2023, GS Research Protocol AY
 2024-2025, the student monitoring template, the research monitoring sheet.
 
-- [ ] **G1. Graduate School Operations Manual** — the panel said its policies
+- [x] **G1. Graduate School Operations Manual** — the panel said its policies
       "should be included". It is not in the repo and the handbook never mentions
       it. This blocks S2 and D3 (business rules).
 - [ ] **G2. A current handbook** (ours is 2022-2023) or confirmation that it is
@@ -246,14 +246,22 @@ What we have: Graduate School Handbook 2022-2023, GS Research Protocol AY
       every case's steps re-walked in the running system, new cases (policy
       upload, business rules, monitoring sheet add/edit, LOA/readmission board,
       adviser appointment, calendar), case numbering fixed, fresh screenshots.
-- [ ] **I2. Proposal** chapters 5–6 and appendices: module descriptions, screen
+- [x] **I2. Proposal** chapters 5–6 and appendices: module descriptions, screen
       specifications, data tables, API and table inventories (counts generated
       from the code, not typed), test matrix and execution record, screenshots.
-- [ ] **I3. Business Rules section** in the proposal (existing vs proposed),
+- [x] **I3. Business Rules section** in the proposal (existing vs proposed),
       generated from the rules register and the Operations Manual draft.
-- [ ] **I4. README / CHANGELOG / plan files** true to the current build.
+- [x] **I4. README / CHANGELOG / plan files** true to the current build.
 - [ ] **I5. Each document rendered with LibreOffice and looked at** before it
       is called done.
+
+## Status on 2026-10-01 (branch `v5.1-migui_clean`)
+
+Done and tested (573 automated tests green before the last merge). Still open:
+B7/E5/I1 walkthrough (rewritten against the live app, being merged), I5 render check of the
+final documents, F1 a Gemini key on the demo machine for AI-worded answers (keyword answers
+work without it), D3/G2–G7 real data and confirmations from the Graduate School, and the
+stakeholder's validation of the Operations Manual draft (44 open questions).
 
 ## H. State of the build on 2026-09-30
 
