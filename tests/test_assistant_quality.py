@@ -12,6 +12,7 @@ Set ASSISTANT_EVAL_LEGACY=1 to measure the old retriever (handbook pages are the
 import json
 import os
 import re
+import zlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -295,7 +296,8 @@ class GeminiHybridPathTests(EvalBase):
     def fake_vector(text, size=48):
         bucket = [0.0] * size
         for word in re.findall(r"[a-z0-9]+", text.lower()):
-            bucket[hash(word) % size] += 1.0
+            # zlib.crc32, not hash(): str hashes change on every run, which made this test flaky.
+            bucket[zlib.crc32(word.encode()) % size] += 1.0
         norm = sum(v * v for v in bucket) ** 0.5 or 1.0
         return [v / norm for v in bucket]
 
