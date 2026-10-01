@@ -220,7 +220,7 @@ export default function Layout({ children }) {
         Skip to main content
       </a>
       {/* Desktop sidebar */}
-      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:block">
+      <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white lg:block 2xl:w-72">
         <div className="sticky top-0 h-screen">
           <SidebarContent user={user} />
         </div>
@@ -246,7 +246,7 @@ export default function Layout({ children }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur lg:px-6 2xl:px-8">
           <button
             type="button"
             aria-label="Open menu"
@@ -256,8 +256,8 @@ export default function Layout({ children }) {
             <Menu className="h-5 w-5" />
           </button>
           <Breadcrumb path={location.pathname} current={current} role={user?.role} />
-          <div className="ml-auto flex items-center gap-3">
-            <span className="hidden rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex">
+          <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
+            <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-block xl:max-w-[24rem]" title={`${user?.full_name || "Graduate School Staff"} · ${user?.program || ROLE_LABELS[user?.role] || "Staff"}`}>
               {user?.full_name || "Graduate School Staff"} · {user?.program || ROLE_LABELS[user?.role] || "Staff"}
             </span>
             <NotificationBell />
@@ -275,7 +275,7 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 focus:outline-none lg:px-8 lg:py-8">{children}</main>
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[90rem] flex-1 px-4 py-6 focus:outline-none lg:px-6 lg:py-7 2xl:px-8 2xl:py-8">{children}</main>
       </div>
     </div>
   );
@@ -310,7 +310,7 @@ function Breadcrumb({ path, current, role }) {
     : parts[0] === "workflow" && parts[1] ? parts[1].replace(/-/g, " ")
     : parts.length === 0 ? "Dashboard" : BREADCRUMB_LABELS[parts[0]] || parts[0].replace(/-/g, " ");
   return (
-    <div className="flex items-center gap-1.5 text-sm">
+    <div className="flex min-w-0 items-center gap-1.5 text-sm">
       <span className="font-semibold text-slate-400">Platform</span>
       <ChevronRight className="h-4 w-4 text-slate-300" />
       <span className="font-semibold capitalize text-ink">{label}</span>

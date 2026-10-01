@@ -417,12 +417,10 @@ export default function Enrollment() {
                 </div>
                 {data.offered_subjects.length ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[820px] text-sm">
+                    <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                           <th className="px-5 py-3">Subject</th>
-                          <th className="px-3 py-3">Category</th>
-                          <th className="px-3 py-3">Units</th>
                           <th className="px-3 py-3">Student status</th>
                           <th className="px-3 py-3">Demand</th>
                           <th className="px-5 py-3 text-right">Enrollment</th>
@@ -455,9 +453,8 @@ export default function Enrollment() {
                               <td className="px-5 py-3">
                                 <p className="font-semibold text-ink">{course.course_code}</p>
                                 <p className="text-xs text-slate-500">{course.course_title}</p>
+                                <p className="text-xs text-slate-400">{[course.course_category, course.course_units != null ? `${course.course_units} unit${Number(course.course_units) === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ")}</p>
                               </td>
-                              <td className="px-3 py-3 text-slate-600">{course.course_category}</td>
-                              <td className="px-3 py-3 text-slate-600">{course.course_units}</td>
                               <td className="px-3 py-3">
                                 {alreadyEnrolled ? (
                                   <button

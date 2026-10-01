@@ -173,7 +173,7 @@ function MonthView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline,
   return (
     <div className="overflow-x-auto">
       {/* Seven equal columns that shrink with the card (chips truncate); the 30rem floor only matters on a phone. */}
-      <div className="min-w-[30rem]">
+      <div className="min-w-[28rem]">
         <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] border-b border-slate-200 text-center text-[11px] font-bold uppercase tracking-wide text-slate-400">
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((name) => (
             <div key={name} className="py-2">{name}</div>
@@ -269,7 +269,7 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
   const hasAvailabilityLayer = Boolean(availability && availability.length);
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[38rem]">
+      <div className="min-w-[32rem]">
         <div className="grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] border-b border-slate-200">
           <div />
           {days.map((day) => {

@@ -403,9 +403,9 @@ export default function MonitoringGrid() {
                         <button
                           type="button"
                           onClick={() => navigate(`/students/${s.id}`)}
-                          className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left cursor-pointer"
+                          className="flex min-w-0 flex-1 items-center text-left cursor-pointer"
                         >
-                          <span className="min-w-0">
+                          <span className="min-w-0 flex-1">
                             <span className="block truncate text-xs font-semibold text-ink sm:text-sm">{displayStudentName(s)}</span>
                             <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
                               <span className="text-[10px] text-slate-500">IDNO {s.student_number}</span>
@@ -415,9 +415,9 @@ export default function MonitoringGrid() {
                               {s.entry_source === "Manual entry" && (
                                 <span className="rounded-full bg-amber-50 px-1.5 py-px text-[9px] font-bold text-amber-800 ring-1 ring-inset ring-amber-200" title="This student was added in the portal rather than imported from a sheet.">Manual</span>
                               )}
+                              <StatusBadge value={s.risk} dot={false} />
                             </span>
                           </span>
-                          <StatusBadge value={s.risk} dot={false} />
                         </button>
                       </div>
                     </td>

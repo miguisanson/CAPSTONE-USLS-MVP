@@ -56,6 +56,7 @@ import StudentPicker from "../components/StudentPicker";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
+import HandoffResult from "../components/HandoffResult";
 import ExportFollowUpModal from "../components/ExportFollowUpModal";
 import StageBoard from "../components/StageBoard";
 import { formatDate } from "../lib/format";
@@ -598,122 +599,18 @@ function HandoffImport({ context }) {
       </div>
 
       {result && (
-        <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/50 p-5 animate-fade-up">
-          <div className="flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <CheckCircle2 className="h-5 w-5" /> {result.message}
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
-            <ResultStat label="New" value={result.created} />
-            <ResultStat label="AY/YR refreshed" value={result.updated ?? 0} />
-            <ResultStat label="Existing / skipped" value={result.skipped ?? 0} />
-            <ResultStat label="Cell changes" value={result.subject_changes ?? 0} />
-            <ResultStat label="Conflicts" value={result.conflict_count ?? 0} />
-            <ResultStat label="Subjects" value={result.subjects} />
-            <ResultStat label="Program" value={result.program} />
-          </div>
-          {result.program_id && (
-            <div className="flex flex-wrap gap-2">
-              <Link to={`/monitoring-sheet?program_id=${result.program_id}`} className="btn-primary">
-                <Table2 className="h-4 w-4" /> Open Monitoring Sheet
-              </Link>
-              <Link to="/students" className="btn-ghost">
-                <Users className="h-4 w-4" /> View Students
-              </Link>
-            </div>
-          )}
-          {result.accounts?.some((account) => account.must_change_password) && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3" role="status">
-              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-800">
-                New student logins - shown only now
-              </p>
-              <p className="mb-2 text-sm text-amber-900">
-                Each student has their own initial password. Copy this list and give each password to its student;
-                it cannot be shown again, and the student must choose a new password at first sign-in.
-              </p>
-              <ul className="space-y-1 text-sm">
-                {result.accounts.map((account) => (
-                  <li key={account.email} className="flex flex-wrap justify-between gap-2 rounded-lg bg-white px-3 py-1.5">
-                    <span className="font-semibold text-ink">{account.name} · {account.email}</span>
-                    <code className="font-mono text-ink">{account.password}</code>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {result.standing_from_note?.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">Standing read from the NOTE column</p>
-              <ul className="space-y-1 text-sm text-slate-700">
-                {result.standing_from_note.map((item) => (
-                  <li key={item.student_number}>{item.name} · {item.student_number}: {item.standing} (note: "{item.note}")</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {result.standing_needs_review?.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-800">NOTE suggests a different standing - nothing changed</p>
-              <ul className="space-y-1 text-sm text-amber-900">
-                {result.standing_needs_review.map((item) => (
-                  <li key={item.student_number}>{item.name} · {item.student_number}: note "{item.note}" suggests {item.suggested_standing}. Use the matching workflow if it is right.</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {result.duplicates?.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                Already in the system
-              </p>
-              <p className="mb-2 text-sm font-medium text-slate-600">
-                These students were already added, so they were not imported again.
-              </p>
-              <ul className="space-y-2">
-                {result.duplicates.slice(0, 8).map((d) => (
-                  <li key={`${d.incoming_student_number}-${d.matched_student.id}`} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                    <p className="font-semibold text-ink">{d.incoming_name || d.matched_student.name} · {d.incoming_student_number}</p>
-                    <p className="text-xs text-slate-500">
-                      Student is in the system as {d.matched_student.name} · {d.matched_student.student_number}.
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {result.validation_issues?.length > 0 && (
+        <HandoffResult
+          result={result}
+          isAudit={isAudit}
+          issues={result.validation_issues?.length > 0 ? (
             <ValidationIssueTable
               issues={result.validation_issues}
               onOpen={setSelectedIssue}
               onBulkResolved={applyBulkResolution}
               title="Validation results"
             />
-          )}
-          {result.sample?.length > 0 && (
-            <div className="rounded-xl border border-slate-100 bg-white p-3">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                {isAudit ? "Updated students (sample)" : "Imported students (sample)"}
-              </p>
-              <ul className="divide-y divide-slate-100">
-                {result.sample.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
-                      <p className="text-xs text-slate-400">
-                        {s.student_number} · {s.program_code} · {s.stage} · {s.completed}/{s.total_subjects} subjects
-                      </p>
-                    </div>
-                    <Link
-                      to={`/students/${s.id}`}
-                      className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50 cursor-pointer"
-                    >
-                      Open <ArrowUpRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+          ) : null}
+        />
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -722,7 +619,7 @@ function HandoffImport({ context }) {
             <h3 className="flex items-center gap-2 font-semibold text-ink"><History className="h-4 w-4 text-brand-600" /> Upload history</h3>
             <p className="mt-1 text-xs text-slate-500">Every uploaded workbook is preserved. Open a version to review conflicts between its values and the current record.</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{uploadHistory?.items?.length || 0} backups</span>
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{uploadHistory?.items?.length || 0} backups</span>
         </div>
         {uploadHistory?.items?.length ? (
           <HistoryDisclosure label="View upload history" hideLabel="Hide upload history" count={uploadHistory.items.length}>
@@ -1010,15 +907,6 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
 function ComparisonRecord({ title, icon: Icon, record, empty = "No values supplied" }) {
   if (!record || !Object.keys(record).length) return <div className="rounded-xl border border-dashed border-slate-300 p-4"><h3 className="flex items-center gap-2 font-semibold text-ink"><Icon className="h-4 w-4 text-slate-500" /> {title}</h3><p className="mt-4 text-sm text-slate-500">{empty}</p></div>;
   return <section className="rounded-xl border border-slate-200 p-4"><h3 className="flex items-center gap-2 font-semibold text-ink"><Icon className="h-4 w-4 text-brand-700" /> {title}</h3><dl className="mt-4 space-y-3 text-sm">{[["Name", record.name || `${record.first_name || ""} ${record.last_name || ""}`.trim()], ["Student ID", record.student_number], ["School Year", record.academic_year_entry], ["Completed subjects", record.completed_count ?? (record.completed_subjects || []).length]].map(([label, value]) => <div key={label} className="grid grid-cols-[8rem_1fr] gap-2"><dt className="text-slate-500">{label}</dt><dd className="font-semibold text-slate-800">{value || "—"}</dd></div>)}</dl></section>;
-}
-
-function ResultStat({ label, value }) {
-  return (
-    <div className="rounded-xl bg-white p-3 text-center ring-1 ring-slate-100">
-      <p className="font-display text-xl font-semibold leading-none text-ink">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{label}</p>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------

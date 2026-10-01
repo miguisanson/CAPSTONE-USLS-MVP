@@ -113,17 +113,14 @@ export default function Faculty() {
               <p className="text-xs text-slate-400">Select a faculty member to open their profile</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1200px] text-sm">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                     <th className="px-5 py-3">Faculty</th>
-                    <th className="px-3 py-3">Department</th>
-                    <th className="px-3 py-3">Specialization</th>
-                    <th className="px-3 py-3">Login email</th>
-                    <th className="px-3 py-3">Account</th>
+                    <th className="hidden px-3 py-3 lg:table-cell">Department / specialization</th>
                     <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3">Availability</th>
-                    <th className="px-5 py-3 text-right">Panel load</th>
+                    <th className="hidden px-3 py-3 md:table-cell">Availability</th>
+                    <th className="px-3 py-3 text-right">Panel load</th>
                     {canManage && <th className="px-5 py-3 text-right">Actions</th>}
                   </tr>
                 </thead>
@@ -134,18 +131,23 @@ export default function Faculty() {
                         <div className="flex items-center gap-3">
                           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{initials(item.name)}</span>
                           <div className="min-w-0">
-                            <button type="button" onClick={() => selectFaculty(item.id)} className="cursor-pointer truncate text-left font-semibold text-ink hover:text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-400">{item.name}</button>
-                            <p className="text-xs text-slate-400">{item.role}</p>
+                            <button type="button" onClick={() => selectFaculty(item.id)} className="block max-w-full cursor-pointer truncate text-left font-semibold text-ink hover:text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-400">{item.name}</button>
+                            <p className="truncate text-xs text-slate-400" title={item.account?.email || item.email}>{item.role} · {item.account?.email || item.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-slate-600">{item.college}</td>
-                      <td className="max-w-sm px-3 py-3 text-slate-600"><p className="line-clamp-2">{item.specialization}</p></td>
-                      <td className="px-3 py-3 text-slate-600">{item.account?.email || item.email}</td>
-                      <td className="px-3 py-3"><StatusBadge value={item.account?.active ? "Active login" : "No account"} dot={false} /></td>
-                      <td className="px-3 py-3"><StatusBadge value={item.active ? "Active" : "Inactive"} dot={false} /></td>
-                      <td className="px-3 py-3"><AvailabilityBadge faculty={item} /></td>
-                      <td className="px-5 py-3 text-right"><span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{item.panel_load}</span></td>
+                      <td className="hidden max-w-xs px-3 py-3 text-slate-600 lg:table-cell">
+                        <p className="truncate text-xs font-semibold text-slate-500" title={item.college}>{item.college}</p>
+                        <p className="line-clamp-2" title={item.specialization}>{item.specialization}</p>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge value={item.active ? "Active" : "Inactive"} dot={false} />
+                          <StatusBadge value={item.account?.active ? "Active login" : "No account"} dot={false} />
+                        </div>
+                      </td>
+                      <td className="hidden px-3 py-3 md:table-cell"><AvailabilityBadge faculty={item} /></td>
+                      <td className="px-3 py-3 text-right"><span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{item.panel_load}</span></td>
                       {canManage && <td className="px-5 py-3 text-right"><button type="button" onClick={(event) => { event.stopPropagation(); setNotice(""); setFormFor(item); }} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Edit</button></td>}
                     </tr>
                   ))}
