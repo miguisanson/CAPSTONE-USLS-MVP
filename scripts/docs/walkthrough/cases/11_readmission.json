@@ -1,0 +1,67 @@
+{
+ "slug": "readmission",
+ "title": "Readmission — return from an approved leave",
+ "kind": "live",
+ "owner": "Student, GS Staff, Dean",
+ "duration": "6 min",
+ "story": [
+  "Therese Lacson is a Master of Arts in Education student on an approved Leave of Absence (AY 2026-2027 1st Semester, running until Nov 29, 2026). Her enrollment is closed until a readmission is approved, so she files a separate Readmission request in the Student Portal: the semester she wants to return in, why she is ready, and four confirmations.",
+  "The request travels on the same staged board as the Leave of Absence. Staff drag the card to In staff review, read the policy check, verify the checklist and forward the case. The Dean decides; on approval the student is active again and the Academic Coordinator plans the enrollment as a separate step."
+ ],
+ "accounts": [
+  ["Student demo", "readmission.therese@usls.edu.ph", "Therese Lacson, on leave, files the readmission"],
+  ["Graduate School Staff", "staff@usls.edu.ph", "Readmission board, drag to In staff review, verifies the checklist, forwards to the Dean"],
+  ["Dean", "dean@usls.edu.ph", "Leave / Readmission / AWOL, approves"],
+  ["Password", "DemoPass123!", "same for every demo account"]
+ ],
+ "data": [
+  ["Semester to return in", "AY 2026-2027 2nd Semester (first choice offered)"],
+  ["Why ready", "My leave is ending and I am ready to resume thesis work with my adviser. My study plan is updated and I have no pending accountability."],
+  ["Return checklist (student)", "all four items ticked: Structured return intention completed, Updated study plan confirmed, Program or adviser consultation completed, No pending accountability confirmed"],
+  ["Staff note to the Dean", "Return semester is after the leave; checklist is complete. Forwarded for the Dean's decision."],
+  ["Dean comment", "Approved. The Academic Coordinator will plan the enrollment for the return semester."]
+ ],
+ "parts": [
+  {
+   "title": "Part A - The student asks to come back",
+   "intro": "Therese's demo account is reset first so the case starts from the same state every time.",
+   "steps": [
+    {"text": "Sign in as Therese Lacson and open **Readmission** under Requests. The page reads \"Not submitted\". A blue notice says \"You are on leave of absence. Your enrollment is closed until a readmission is approved.\" and names the leave she is ending (AY 2026-2027 1st Semester, running until Nov 29, 2026). Readmission is therefore a separate request, not an extension of the leave form.", "shots": [{"id": "readmission-01", "caption": "Readmission page of a student on leave."}]},
+    {"text": "Open **Rules applied on this screen**. It lists one rule from the Graduate School policies: a returning student writes an intent to enroll, addressed to the University Registrar through the Graduate School Dean (Handbook 2022-2023, p. 53), enforced by the system.", "shots": [{"id": "readmission-02", "caption": "The one handbook rule behind the screen, with its source page."}]},
+    {"text": "Choose **Semester you want to return in** (AY 2026-2027 2nd Semester; the list starts after the current semester, and the page notes that a student may ask to return before the leave ends but the Dean decides whether that is allowed). Type the reason in **Why you are ready to come back** and tick the four items under \"Before you send this, confirm each item\".", "shots": [{"id": "readmission-03", "caption": "Request filled in with the four confirmations ticked."}]},
+    {"text": "Click **Submit readmission request**. The page shows \"Submitted. Graduate School staff will review your readmission request.\", status **Submitted**, **Waiting for: Graduate School Staff**, the ticked checklist, and a four-step tracker (Request submitted, Staff review, Dean decision, Back in the program). **Withdraw request** remains available.", "shots": [{"id": "readmission-04", "caption": "After submitting: waiting for Graduate School Staff."}]}
+   ]
+  },
+  {
+   "title": "Part B - Staff review on the Readmission board",
+   "steps": [
+    {"text": "Sign in as GS Staff, open **Readmission** under Standalone Processes and search Therese. The board columns are Submitted, In staff review, Returned to student, With the Dean, Approved - back in the program and Not approved. Therese's card is in Submitted: \"Returning: AY 2026-2027 2nd Semester\", **Next: Graduate School Staff**, tag **Awaiting your review**.", "shots": [{"id": "readmission-05", "caption": "Readmission board filtered to Therese: the card is in Submitted."}]},
+    {"text": "Drag the card onto **In staff review**. \"Therese Lacson: Review started.\" appears and the card sits in the new column. This is a real drag and drop; the **Move to...** button on the card does the same for keyboard and phone users.", "shots": [{"id": "readmission-06", "caption": "After the drop: the card is in In staff review."}]},
+    {"text": "Click **View details**. The window shows the tracker (Staff review is the current step) and the request: return semester, the student's intention, the linked leave (Leave of Absence, AY 2026-2027 1st Semester, On leave) and the eligibility result (Not set yet). Scroll to the **Policy check** (\"Advice for staff - the Dean decides\"). The result reads **Eligible to Return**, suggested for the Dean: Approve, and lists the checks (readmission application present, previous LOA period present, target return semester present, and so on).", "shots": [{"id": "readmission-07", "caption": "Request window: request, linked leave, eligibility not set yet."}, {"id": "readmission-08", "caption": "Policy check inside the request window."}]},
+    {"text": "Click **Forward to Dean**. The window offers an **Eligibility result** (default: use the policy check result, Eligible to Return) and a **Return checklist**: each item is marked \"The student ticked this\" and staff tick it to mark it verified. The window warns that anything left unticked reaches the Dean as Needs Review. Tick all four items, type the note for the Dean and click **Forward to Dean**.", "shots": [{"id": "readmission-09", "caption": "Forward to Dean: staff verify the four checklist items."}]},
+    {"text": "\"Therese Lacson: Forwarded to the Dean.\" appears. Close the window: the card is in **With the Dean**, **Next: Dean**.", "shots": [{"id": "readmission-10", "caption": "The card is with the Dean."}]}
+   ]
+  },
+  {
+   "title": "Part C - The Dean decides",
+   "steps": [
+    {"text": "Sign in as the Dean and open **Leave / Readmission / AWOL**. Therese's Readmission request is listed as waiting.", "shots": [{"id": "readmission-11", "caption": "Dean's list with the readmission request waiting."}]},
+    {"text": "Click **Review**. The case page shows the tracker (Dean decision is current), the return semester, the leave being ended, the student's intention, the checklist with both marks for each item (**Student ticked**, **Staff verified**), the staff eligibility result and the staff note.", "shots": [{"id": "readmission-12", "caption": "Dean's case page: checklist ticked by the student and verified by staff."}]},
+    {"text": "Scroll to the case discussion and the decision area: **Approve**, **Deny**, **Return for revision**, with a comment box (required to deny or return).", "shots": [{"id": "readmission-13", "caption": "Decision buttons and comment box."}]},
+    {"text": "Type the comment and click **Approve**. The confirmation window shows Dean Review to Approved / reviewed and the recorded comment; click **Approve current stage**. The request leaves the waiting list and appears under Recent workflow decisions as **Approved**; the earlier Leave of Absence of Therese now shows as **Closed**.", "shots": [{"id": "readmission-14", "caption": "Confirmation window."}, {"id": "readmission-15", "caption": "After approval: the Dean's list is empty and the decision is recorded."}]}
+   ]
+  },
+  {
+   "title": "Part D - What the screens show afterwards",
+   "steps": [
+    {"text": "Back on the staff Readmission board the card is in **Approved - back in the program** (\"The student is active again. The Academic Coordinator plans the enrollment.\") with **Next: Academic Coordinator** and **Registrar: Pending Handoff**; the Registrar list now offers the download buttons.", "shots": [{"id": "readmission-16", "caption": "Staff board: approved, back in the program."}, {"id": "readmission-17", "caption": "Request window of the approved case: all four tracker steps done, eligibility result Eligible to Return."}]},
+    {"text": "Sign in as Therese again and open Readmission. The status is **Approved** and the discussion shows the Dean's message: the readmission is approved, she is active for AY 2026-2027 2nd Semester, the Academic Coordinator will plan her subjects, and enrollment is a separate step. The Dean's comment is the newest post, highlighted in green.", "shots": [{"id": "readmission-18", "caption": "Student's view after the Dean's decision."}]}
+   ]
+  }
+ ],
+ "notes": [
+  "Readmission restores the student to active standing; it does not enroll her in subjects. The Academic Coordinator plans the enrollment afterwards.",
+  "The policy check is advice for staff; the Dean decides. Items staff leave unticked reach the Dean as Needs Review.",
+  "As with Leave of Absence, the approved request goes to the Registrar list, which staff download and email themselves; the portal sends no email."
+ ]
+}

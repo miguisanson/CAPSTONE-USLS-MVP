@@ -1,0 +1,98 @@
+{
+ "slug": "defense-scheduling",
+ "title": "Defense Scheduling — shared availability, conflict warnings, panel invitations",
+ "kind": "live",
+ "owner": "GS Staff (books), Faculty panelists (answer)",
+ "duration": "10 min",
+ "story": [
+  "Gab Tolentino (GS-2026-UD-03, MBA) is at the Proposal Defense stage. His four-person panel has already been matched (Dr. Marco Villanueva as Panel Chair, Dr. Benjamin Reyes, Dr. Teodoro Ramos and Dr. Angela Cruz as External Panel) and his research adviser is Dr. Paolo Navarro. A defense is already booked for him on Tuesday 20 October, but the Graduate School needs a different date.",
+  "GS Staff open Defense Scheduling and read, in one screen, what the student still owes, who is on the panel, whether each panelist accepted the invitation, and when the adviser and the panel are all free. The system never assumes anybody is free: it uses only the weekly hours and the dates that each person entered (or a connected Google Calendar).",
+  "The case shows the two kinds of warning. A HARD warning blocks the booking and cannot be overridden (a panelist outside the hours he or she entered, a double-booked panelist or room, a declined invitation, a date in the past). A SOFT warning needs a recorded reason (booking before the 14-day lead time, a panelist who has not entered availability). Staff then cancel the old booking with a reason and book the new one from the Best Shared Options. Today in the demo is Thursday 1 October 2026, so the 14-day lead time puts the earliest allowed date at Thursday 15 October 2026."
+ ],
+ "accounts": [
+  ["GS Staff", "staff@usls.edu.ph", "Opens Defense Scheduling, books and cancels the defense"],
+  ["Faculty — Method Specialist", "teodoro.ramos@usls.edu.ph", "Enters a date on which he is not available"],
+  ["Faculty — External Panel", "angela.cruz@usls.edu.ph", "Declines, then accepts, the panel invitation"]
+ ],
+ "data": [
+  ["Student", "Gab Tolentino, GS-2026-UD-03, MBA, Proposal Defense"],
+  ["Panel", "Dr. Marco Villanueva (Panel Chair), Dr. Benjamin Reyes (Content Specialist), Dr. Teodoro Ramos (Method Specialist), Dr. Angela Cruz (External Panel); adviser Dr. Paolo Navarro"],
+  ["Availability request message", "Please confirm your hours for the Proposal Defense of Gab Tolentino."],
+  ["Faculty date entered by Dr. Ramos", "I am NOT available — Thu 22 Oct 2026, whole day, note \"Out of town\""],
+  ["Decline reason (Dr. Cruz)", "Clinical rotation clash on the proposed dates; please find a replacement."],
+  ["Slots tried (hard / soft)", "Thu 22 Oct 10:00-12:00 (Dr. Ramos not available); Mon 5 Oct 13:00-14:30 (before the lead time); Thu 15 Oct 08:00-10:00 for a second student (panel and room already booked)"],
+  ["Cancellation reason", "Panel chair asked for a later date after the venue changed (asked by: Panel chair)"],
+  ["New schedule", "Best shared option, Thu 15 Oct 2026, 8:00 AM-10:00 AM, On-site, Graduate School Conference Room; constraint \"External panelist prefers a morning start.\""],
+  ["Staff override reason", "Adviser signatures and endorsements are still being collected; panel and date are fixed now so the panel can prepare."]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Read the readiness, panel and shared availability",
+   "steps": [
+    {"text": "Sign in as GS Staff (staff@usls.edu.ph). In the sidebar open **6 · Defense Scheduling**. Confirm that the page offers a student picker and a blue-green banner **Rules applied on this screen** (11 rules from the Graduate School policies, 2 marked as needing review).", "shots": [{"id": "defense-scheduling-01", "caption": "Defense Scheduling before a student is chosen: the picker, the rules applied on this screen and the \"How this works\" note (booking opens only after Panel Matching)."}]},
+    {"text": "Type **Tolentino** in **Search a student** and choose **GS-2026-UD-03 - Tolentino, Gab - MBA**. The form **Coordinate the defense schedule** opens.", "shots": [{"id": "defense-scheduling-02", "caption": "Gab Tolentino selected; the Student readiness card shows the stage, the research title and the adviser."}]},
+    "Under **Student readiness** confirm the stage is **Proposal Defense** and the adviser is **Dr. Paolo Navarro**. The status reads **Missing Requirements**: the proposal manuscript is waiting for the adviser signature, the endorsement and the statistical consultation form still need to be uploaded. The panel assignment and the ethics clearance show as completed. Because requirements are pending, a **Staff override** tick box is offered.",
+    {"text": "Scroll to **Panel members**. Confirm the four panelists with their role, their availability status (**Entered**) and an invitation chip: three show **Accepted** and Dr. Angela Cruz shows **Invited**.", "shots": [{"id": "defense-scheduling-03", "caption": "Panel members with the invitation chip of each panelist."}]},
+    {"text": "Scroll to **Availability of the panel**. Confirm that the adviser and the four panelists each show **Entered** (their weekly hours are on record).", "shots": [{"id": "defense-scheduling-04", "caption": "Availability of the panel: who has entered availability. Nobody is assumed to be free."}]},
+    {"text": "Scroll to **Availability overlap**. Confirm the note \"14-day lead time applied. Suggestions begin Thu, Oct 15, 2026.\" and that the grid is dark green (5/5) from 8:00 AM to 4:30 PM and grey (0/5) from 5:00 PM.", "shots": [{"id": "defense-scheduling-05", "caption": "Availability overlap: darker green means more participants are free at that half hour."}]},
+    {"text": "Scroll to **Best shared options**. Confirm the counter (for example **645 conflict-free found**) and that the first card is **Earliest option - Thu, Oct 15, 2026**, 8:00 AM-10:00 AM, \"all 5 who entered availability are free\".", "shots": [{"id": "defense-scheduling-06", "caption": "Best shared options: two-hour windows in which the adviser and every panelist are free and nothing else is booked."}]}
+   ]
+  },
+  {
+   "title": "Part B - Ask for availability; a faculty member blocks a date",
+   "intro": "Staff can ask the adviser and the panel to enter their hours. A faculty member answers by saving weekly hours or a specific date in the faculty availability editor.",
+   "steps": [
+    {"text": "In the box **Ask the adviser and the panel for their available dates** keep the proposed window (**Dates needed from** 10/15/2026, **Until** 11/12/2026), type the **Message (optional)** \"Please confirm your hours for the Proposal Defense of Gab Tolentino.\" and select **Ask for availability**.", "shots": [{"id": "defense-scheduling-07", "caption": "The availability request filled in before it is sent."}]},
+    {"text": "Confirm the notice \"Asked 5 people to enter their availability.\" and the table **Who answered**: each person is listed with the window and the status **Open** until he or she answers. Each panelist's card now reads \"Asked on Oct 1, 2026; waiting for an answer.\"", "shots": [{"id": "defense-scheduling-08", "caption": "Availability request sent to the adviser and the four panelists; the table shows who answered."}]},
+    "Sign out and sign in as Dr. Teodoro Ramos (teodoro.ramos@usls.edu.ph). In the faculty portal open **My Availability**. Read **Weekly hours** (Monday to Friday, with Saturday and Sunday marked not available) and, under **Requests from the Graduate School**, the open request. Note the sentence \"Saving your weekly hours or a specific date also answers these requests.\"",
+    {"text": "Under **Specific dates** select **I am NOT available**, enter **First date** 10/22/2026, leave the hours empty (whole day) and type the **Note** \"Out of town\". Select **Add date**.", "shots": [{"id": "defense-scheduling-09", "caption": "The faculty availability editor before the date is added."}, {"id": "defense-scheduling-10", "caption": "A not-available date filled in: Thu 22 Oct, note \"Out of town\"."}]},
+    {"text": "Confirm the message **Date saved.** and that **Your dates** lists \"Thu, Oct 22, 2026, whole day — Out of town\" with the badge **Not available**. The request is now shown as answered (\"No open requests. The Graduate School is not waiting on you.\").", "shots": [{"id": "defense-scheduling-11", "caption": "The date is saved and the Graduate School request is answered."}]}
+   ]
+  },
+  {
+   "title": "Part C - A panelist declines the invitation",
+   "steps": [
+    {"text": "Sign out and sign in as Dr. Angela Cruz (angela.cruz@usls.edu.ph). Open **Panel Invitations** in the faculty sidebar. Under **Waiting for your answer** find Gab Tolentino's card: his role (**External Panel**), the other panel members and the date shown for the booked defense, with the buttons **Accept**, **Decline** and **I cannot attend this defense**.", "shots": [{"id": "defense-scheduling-12", "caption": "Panel invitations: the card waiting for an answer shows the panel, the booked date and the choices."}]},
+    {"text": "Select **Decline**. A reason box opens: type \"Clinical rotation clash on the proposed dates; please find a replacement.\"", "shots": [{"id": "defense-scheduling-13", "caption": "A reason is required to decline."}]},
+    {"text": "Select the red **Decline** button inside the reason box. Confirm that Gab's card moves to **Declined (1)** under the sentence \"The Research Coordinator has been asked to find a replacement.\"", "shots": [{"id": "defense-scheduling-14", "caption": "The invitation is now in the Declined group."}]},
+    {"text": "Sign out and sign in again as GS Staff. Open **6 · Defense Scheduling** and choose Gab Tolentino again. In **Panel members** Dr. Angela Cruz now shows the chip **Declined** with the text \"Declined: Clinical rotation clash ... Replace this panelist or ask them to accept.\"", "shots": [{"id": "defense-scheduling-15", "caption": "Staff see the declined invitation and the reason on the panelist's card."}]},
+    {"text": "Scroll to **Final schedule**. Enter **Selected date** 10/16/2026, **Start time** 09:00 AM, **End time** 11:00 AM and **Venue / meeting link** \"Graduate School Conference Room\". Read the red box **Cannot be booked**: \"Dr. Angela Cruz declined the panel invitation (...); replace them on the panel or ask them to accept.\" The submit button stays disabled. This is a HARD warning: even a date everybody else is free on is blocked.", "shots": [{"id": "defense-scheduling-16", "caption": "HARD warning: a declined invitation blocks the booking."}]},
+    {"text": "Sign out and sign in as Dr. Angela Cruz again. On **Panel Invitations**, open Gab Tolentino's card (now under **Declined**) and select **Accept**. Confirm the card returns to **Accepted**.", "shots": [{"id": "defense-scheduling-17", "caption": "The panelist changes her answer: the card is back under Accepted."}]}
+   ]
+  },
+  {
+   "title": "Part D - Read the warnings for other slots",
+   "intro": "Back as GS Staff on Defense Scheduling with Gab Tolentino selected, try slots in **Final schedule**. The slot is checked as soon as the date and times are filled in; nothing is saved.",
+   "steps": [
+    {"text": "Enter **Selected date** 10/22/2026, **Start time** 10:00 AM, **End time** 12:00 PM and the venue \"Graduate School Conference Room\". Read **Cannot be booked**: \"Dr. Teodoro Ramos is not available 10:00-12:00 on 2026-10-22\". This is a HARD warning that comes from the date Dr. Ramos entered in Part B.", "shots": [{"id": "defense-scheduling-19", "caption": "HARD warning: a panelist is outside the availability he entered."}]},
+    {"text": "Enter **Selected date** 10/05/2026, **Start time** 01:00 PM, **End time** 02:30 PM. Read the amber box **Needs a reason**: \"Proposal Defense needs at least 14 days after today (no manuscript receipt date recorded); the earliest date is 2026-10-15\" and \"To book anyway, tick the override box below and write why.\" This is a SOFT warning: it can be overridden with a recorded reason.", "shots": [{"id": "defense-scheduling-20", "caption": "SOFT warning: before the 14-day lead time. The override box and a reason are needed."}]}
+   ]
+  },
+  {
+   "title": "Part E - Cancel the old booking and set the new schedule",
+   "steps": [
+    {"text": "Scroll down to the blue box \"This stage is already booked for Tue, Oct 20, 2026. Saving will reschedule it: the old record is kept and linked.\" Select **Cancel this booking instead**. Two prompts appear: answer \"Why is this defense being cancelled?\" with \"Panel chair asked for a later date after the venue changed\" and \"Who asked for the cancellation?\" with \"Panel chair\".", "shots": [{"id": "defense-scheduling-21", "caption": "The existing booking and the Cancel this booking instead button."}]},
+    {"text": "Confirm the message **Defense cancelled. Book a new schedule when a date is agreed.** The blue box is gone and the form is ready for a new booking (the button reads **Set defense schedule**).", "shots": [{"id": "defense-scheduling-22", "caption": "The booking is cancelled with a recorded reason and the form is clean again."}]},
+    {"text": "Scroll to **Best shared options** and select **Earliest option - Thu, Oct 15, 2026** (8:00 AM-10:00 AM). The date and times are filled in. Type the venue \"Graduate School Conference Room\", keep **Mode** On-site and write the **Scheduling constraints** \"External panelist prefers a morning start.\" Confirm the green box **No conflicts found (5 of 5 checked)**.", "shots": []},
+    {"text": "Because the requirements are still pending, tick **Staff override: I reviewed the pending Research Gate requirements and still want to schedule this defense.** and type the **Reason for the staff override**: \"Adviser signatures and endorsements are still being collected; panel and date are fixed now so the panel can prepare.\" Scroll to the end of the form.", "shots": [{"id": "defense-scheduling-23", "caption": "The Final schedule filled from the earliest shared option, with the staff override reason."}]},
+    {"text": "Select **Set defense schedule**. Confirm the green notice \"Saved. The student record, queue, and monitoring indicators were updated.\" and that the blue box now reads \"This stage is already booked for Thu, Oct 15, 2026\".", "shots": [{"id": "defense-scheduling-24", "caption": "The defense is booked for Thu 15 Oct 2026, 8:00 AM-10:00 AM."}]},
+    {"text": "Reload the page and look at **Panel members**: the four chips still read **Accepted** (a panelist who already accepted does not have to answer again). Open **View schedule history**: the new booking is **Scheduled** with the override reason, the earlier bookings show **Cancelled** with the reason \"Panel chair asked for a later date after the venue changed\", and the earlier Title Defense shows **Finished**. Each booking has an **Add to calendar (.ics)** link.", "shots": [{"id": "defense-scheduling-25", "caption": "Panel chips after booking."}, {"id": "defense-scheduling-26", "caption": "Schedule history: the new booking, the cancelled ones with their reasons, and the finished Title Defense."}]}
+   ]
+  },
+  {
+   "title": "Part F - A second student cannot take the same slot; what the faculty receive",
+   "steps": [
+    {"text": "Still as GS Staff, clear the selected student and choose **Salonga** (Bea Salonga, DBA). Enter **Selected date** 10/15/2026, **Start time** 08:00 AM, **End time** 10:00 AM and the venue \"Graduate School Conference Room\". Read **Cannot be booked**: \"Panel conflict with Gab Tolentino (GS-2026-UD-03): Dr. Teodoro Ramos, Dr. Benjamin Reyes, Dr. Angela Cruz, Dr. Marco Villanueva, Dr. Paolo Navarro already scheduled.\" and \"Venue conflict with Gab Tolentino (GS-2026-UD-03): Graduate School Conference Room is already booked.\" Nothing is saved. This is a HARD warning for a double-booked panel and a double-booked room.", "shots": [{"id": "defense-scheduling-29", "caption": "HARD warning for a second student: the same panelists and the same room are already booked."}]},
+    {"text": "Sign out and sign in as Dr. Angela Cruz. Open **Panel Invitations**: Gab Tolentino's card is under **Accepted** and shows the new date (Thu, Oct 15, 2026, 8:00 AM - 10:00 AM) and the venue.", "shots": [{"id": "defense-scheduling-27", "caption": "The panelist's invitation page shows the new date."}]},
+    {"text": "Select the bell at the top of the page. Read the notifications created by the scheduling: \"Proposal Defense of Gab Tolentino is scheduled\" (2026-10-15 08:00-10:00, venue and mode), \"Proposal Defense of Gab Tolentino was cancelled\" with the reason, \"Please enter your availability for Gab Tolentino's defense\", and the reminder \"Defense in 14 days (14-day reminder)\".", "shots": [{"id": "defense-scheduling-28", "caption": "The faculty notification bell after the scheduling."}]},
+    "Dr. Teodoro Ramos can now remove the 22 October date from **My Availability** (**Remove**, then confirm **Remove**); the capture does this so later cases see his availability unchanged. Sign out."
+   ]
+  }
+ ],
+ "notes": [
+  "The warnings are computed live from what each person entered. HARD warnings cannot be overridden: a panelist or the adviser outside the hours he or she entered, a panelist, adviser, student or room that is already booked, a declined invitation, and a date or time in the past. SOFT warnings need the override tick box and a written reason: booking before the lead time (14 days after the panel received the manuscript, or after today when no receipt date is recorded) and a participant who has not entered availability.",
+  "Staff can also change the panel from this screen (**Change panel**, reason required). A booked defense whose panel changes is flagged **Needs Re-confirmation** and must be re-confirmed or cancelled before a verdict can be recorded.",
+  "No email is sent: invitations, scheduling notices and reminders are in-app notifications (the bell) and calendar entries. The Google Calendar link is read-only (it only reads busy times); nothing is written to Google.",
+  "The sample student GS-2026-UD-03 is part of the demonstration data created in demo mode. Running this case a second time works on whatever booking is active, so the history lists the earlier cancelled bookings as well."
+ ]
+}

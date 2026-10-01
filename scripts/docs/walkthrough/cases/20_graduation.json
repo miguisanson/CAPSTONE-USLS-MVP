@@ -1,0 +1,70 @@
+{
+ "slug": "graduation",
+ "title": "Graduation endorsement — application, return, batch on the staged board, Dean export",
+ "kind": "live",
+ "owner": "Student, GS Staff, Academic Coordinator, Research Coordinator, Dean",
+ "duration": "14 min",
+ "story": [
+  "Carlo Mendoza (MAED) has completed coursework and research and needs no practicum, so the platform lists him as academically eligible. He still has to submit a signed graduation application PDF for the open school year. He uploads a PDF whose name and student number are wrong; Graduate School Staff return it for clarification, the platform keeps the original PDF in the file history and reopens the upload step, and Carlo resubmits a corrected file.",
+  "Staff then create a graduation batch on the staged Graduation board by dragging Carlo's card to the batch column. The batch moves one stage at a time, by drag and drop, through the Academic Coordinator (coursework check), the Research Coordinator (research and practicum validation), Staff (endorsement list) and the Dean (approval). The Dean exports the approved list as a CSV; the portal sends no email, so the Dean must email the file to the Registrar and wait for acknowledgement."
+ ],
+ "accounts": [
+  ["Student demo", "graduation.carlo@usls.edu.ph", "Carlo Mendoza, GS-2026-GRAD-02, MAED"],
+  ["Graduate School Staff", "staff@usls.edu.ph", "Returns the application, creates the batch, prepares and sends the endorsement list"],
+  ["Academic Coordinator", "academic@usls.edu.ph", "Coursework completion check"],
+  ["Research Coordinator", "research@usls.edu.ph", "Research and practicum validation"],
+  ["Dean", "dean@usls.edu.ph", "Approves the endorsement list and exports the CSV"],
+  ["Password", "DemoPass123!", "same for every demo account. Bianca Santos (graduation.bianca@usls.edu.ph) is another eligible student on the board and is not used."]
+ ],
+ "data": [
+  ["School year", "AY 2026-2027 (the only open year; the others are grey and cannot be selected)"],
+  ["First application file", "Carlo_Mendoza_Incorrect_Graduation_Application.pdf (generated; wrong name and number)"],
+  ["Corrected application file", "Carlo_Mendoza_Corrected_Graduation_Application.pdf"],
+  ["Return message (Staff)", "The name and student number in the submitted application do not match the official student record. Upload a corrected signed application."],
+  ["Batch", "Batch No. 2, October, 2026, school year AY 2026-2027 (label: Batch 2 October 2026)"]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Application, return for clarification, resubmission",
+   "intro": "Carlo's demo account is reset first. The Graduation board is large and loads after a short delay; wait for the stage columns to appear.",
+   "steps": [
+    {"text": "Sign in as Carlo and open **Graduation**. The page reads \"Graduation Endorsement - Not submitted\". **Step 1, Application / Review Window** is the current stage; Steps 2 to 6 are Locked (Staff and Coursework Review, Requirements Validation, Dean Endorsement, Endorsement Export, Dean Emails List and Waits for Acknowledgement). The monitoring recommendation reads **Eligible**.", "shots": [{"id": "graduation-01", "caption": "Student's Graduation page before the application."}]},
+    {"text": "Select the **Graduation school year** (AY 2026-2027 - Current school year; other years read \"Not currently open\"), choose the application PDF and add a remark, then click **Submit graduation application**. Step 1 becomes Completed and the application is read-only during review; the status reads **For Review**.", "shots": [{"id": "graduation-02", "caption": "Application form with the first PDF chosen."}, {"id": "graduation-03", "caption": "After submitting: status For Review, application saved."}]},
+    {"text": "Sign in as GS Staff and open **8 - Graduation**. One board holds every stage: **1 - Academically Eligible - Awaiting Student Application** (Bianca Santos, Hector Ong and Paolo Ramirez are waiting for their applications), **2 - Application Submitted - Ready for Batch Creation** (Carlo, with a **View PDF** button), and the batch columns 3 to 8 and an Exception Queue to the right. Only students in column 2 can be selected for a batch.", "shots": [{"id": "graduation-04", "caption": "Graduation board, columns 1 and 2 and the first batch column."}, {"id": "graduation-05", "caption": "Carlo's card in column 2 with the View PDF button."}]},
+    {"text": "Click **View student** on Carlo's card. The window shows the program, batch (none), the **Student graduation application PDF** with **View submitted PDF**, the four checks (Coursework completed, Thesis / research completed, Practicum not required, Eligible for graduation), the stage history, the case discussion and the buttons **Reset demo case** (do not use it), **Message / Return** and **Create batch**.", "shots": [{"id": "graduation-06", "caption": "Student window with the submitted PDF."}]},
+    {"text": "Click **Message / Return**. Set **Action** to Return for clarification, **Recipient / next stage** to Student, tick **Have student resubmit document** (\"Graduation Step 1 is reset. The existing PDF stays in file history\"), type the **Remarks** and click **Return to student**. Carlo's status becomes **Returned for Clarification**.", "shots": [{"id": "graduation-07", "caption": "Return for clarification, recipient Student, resubmit ticked."}, {"id": "graduation-08", "caption": "Status Returned for Clarification."}]},
+    {"text": "Reload the board. Carlo is no longer in column 2: he is back in **1 - Awaiting Student Application**, so he cannot be added to a batch. (He is not in the Exception Queue, which holds batch candidates whose revalidation failed.)", "shots": [{"id": "graduation-09", "caption": "Carlo is back in column 1; column 2 is empty of him."}]},
+    {"text": "Sign in as Carlo and open **Graduation**. A red notice says \"Step 1 has been reopened. Upload a replacement graduation application PDF before resubmitting.\", the badge **New PDF required** is shown, and the staff message is the newest post, highlighted in green. Step 1 shows **Needs revision**, and the first PDF stays under Already submitted.", "shots": [{"id": "graduation-10", "caption": "Student: Step 1 reopened, staff message in green, first PDF kept in history."}]},
+    {"text": "Choose the corrected PDF, keep AY 2026-2027 and click **Resubmit graduation application**. The status returns to For Review and the staff's message is marked Responded.", "shots": [{"id": "graduation-11", "caption": "Corrected PDF chosen (the button reads Resubmit graduation application)."}, {"id": "graduation-12", "caption": "After resubmission."}]},
+    {"text": "As GS Staff, reload the board. Carlo is back in **2 - Application Submitted - Ready for Batch Creation** with the corrected PDF behind **View PDF**.", "shots": [{"id": "graduation-13", "caption": "Carlo is again in column 2."}]}
+   ]
+  },
+  {
+   "title": "Part B - The batch moves across the board by drag and drop",
+   "intro": "Each drop opens the same confirmation window the card buttons open, and the server checks the rules again; a card can only be dropped on the column its next step leads to.",
+   "steps": [
+    {"text": "Drag Carlo's card from column 2 and drop it on column **3 - Graduation Batch Created**. The **Create batch** window opens: Batch No., Month, Year, Graduation school year (only AY 2026-2027 can be selected), an optional note and the list of eligible candidates (1 of 1 selected). Set Batch No. to 2 (the label reads Batch 2 October 2026) and click **Create batch**. A card **Batch 2 October 2026** appears in column 3 next to the seeded Batch 1 October 2026.", "shots": [{"id": "graduation-14", "caption": "Create batch window opened by the drop."}, {"id": "graduation-15", "caption": "Batch 2 October 2026 in column 3."}]},
+    {"text": "Drag the batch card to **4 - Academic Coordinator Coursework Review**. The window is **Forward to Academic Coordinator** (GS Staff to Academic Coordinator) with an optional note; confirm it. The card is in column 4, status Coursework Review, **Next: Academic Coordinator**.", "shots": [{"id": "graduation-16", "caption": "Forward to Academic Coordinator window opened by the drop."}, {"id": "graduation-17", "caption": "Batch in column 4; staff see \"No action due\"."}]},
+    {"text": "Sign in as the Academic Coordinator and open **8 - Graduation**. The batch is in column 4 with the button **Check coursework completion**. Drag it to **5 - Research and Practicum Validation**; the window **Check coursework completion** (Academic Coordinator to Research Coordinator or GS Staff) lists Carlo with a **View coursework completed** link. Confirm. The batch moves to column 5, status Research Review.", "shots": [{"id": "graduation-18", "caption": "Academic Coordinator's board with the batch in column 4."}, {"id": "graduation-19", "caption": "Check coursework completion window opened by the drop."}, {"id": "graduation-20", "caption": "Batch now in column 5."}]},
+    {"text": "Sign in as the Research Coordinator and open **8 - Graduation**. The batch is in column 5 with **Validate research and practicum requirements**. Drag it to **6 - Endorsement Preparation or Revision**; the window offers **View research completion details** and **View practicum completion details** for Carlo. Confirm. The status becomes Eligibility Confirmed.", "shots": [{"id": "graduation-21", "caption": "Research Coordinator's board with the batch in column 5."}, {"id": "graduation-22", "caption": "Validate research and practicum requirements window opened by the drop."}, {"id": "graduation-23", "caption": "Batch now in column 6, Eligibility Confirmed."}]},
+    {"text": "As GS Staff, reload the board. The batch is in column 6 with the button **Prepare endorsement list**. This step does not change columns, so it is a button, not a drag: click it and confirm in the window. The status becomes **Endorsement Prepared** and the card button changes to **Send endorsement list to Dean**.", "shots": [{"id": "graduation-24", "caption": "Batch in column 6 with Prepare endorsement list."}, {"id": "graduation-25", "caption": "Prepare endorsement list window."}, {"id": "graduation-26", "caption": "Endorsement Prepared; the card now offers Send endorsement list to Dean."}]},
+    {"text": "Drag the batch to **7 - Dean Review**. The window **Send endorsement list to Dean** (GS Staff to Dean) opens; confirm it. The card is in column 7 with the tag **Ready for Dean review**, **Next: Dean**.", "shots": [{"id": "graduation-27", "caption": "Send endorsement list to Dean window opened by the drop."}, {"id": "graduation-28", "caption": "Batch in column 7."}]}
+   ]
+  },
+  {
+   "title": "Part C - Dean approval and CSV export",
+   "steps": [
+    {"text": "Sign in as the Dean and open **Graduation Endorsement**. The page shows \"1 waiting\" and two tabs, **Roster & workflow** and **Endorsement batches**. The Roster & workflow tab shows the same staged board, so the Dean can see every stage and the students in each batch. Column 7 holds the batch.", "shots": [{"id": "graduation-29", "caption": "Dean's Graduation Endorsement page with the batch in Dean Review."}]},
+    {"text": "Drag the batch to **8 - Dean Approved and Ready for Export**. The window **Approve endorsement list** opens with **Dean decision** (Approve endorsement list or Return endorsement list for revision) and an optional comment. Confirm the approval. The batch is in column 8, status **Dean Approved**.", "shots": [{"id": "graduation-30", "caption": "Approve endorsement list window opened by the drop."}, {"id": "graduation-31", "caption": "Batch in column 8, Dean Approved."}]},
+    {"text": "Click **Export approved list** on the batch card. The file graduate-school-endorsed-list.csv downloads and a window reads \"Graduation CSV export complete - The file was downloaded successfully. No email was sent by the portal.\" It tells the Dean to email the endorsed list to the Registrar through the official channel and to wait for Registrar acknowledgement. Click **Got it**. The card now offers **Export approved list again**.", "shots": [{"id": "graduation-32", "caption": "Post-export notice: the portal did not send any email."}, {"id": "graduation-33", "caption": "Batch card after the export: Export approved list again."}]},
+    {"text": "As GS Staff, reload the board: the batch is in column 8 with \"No action due\". As Carlo, open Graduation: the status is **Dean Approved**, Steps 1 to 5 are Completed (Step 5, Endorsement Export, reads \"The Dean-approved endorsed list has been downloaded as a CSV file\"), both application PDFs are kept, and Step 6 (Dean Emails List and Waits for Acknowledgement) is Pending review, with the note that the portal does not send this email.", "shots": [{"id": "graduation-34", "caption": "Staff board: batch in column 8."}, {"id": "graduation-35", "caption": "Student's Graduation page after the export."}]}
+   ]
+  }
+ ],
+ "notes": [
+  "Only students whose coursework, research and any required practicum are complete appear on the Graduation board; being eligible does not allow batch selection until the signed application PDF is on file (column 2).",
+  "Dropping a card never changes data by itself: it opens the confirmation window of the matching button, and the server checks the rules again. Prepare endorsement list is the one step that stays in its column and is therefore a button.",
+  "The portal does not send email. The Dean must email the downloaded CSV to the Registrar and wait for acknowledgement; the screens show the batch as Dean Approved (Export approved list again) after the download and do not record any Registrar acknowledgement.",
+  "The seeded Batch 1 October 2026 (Isabel Flores) belongs to other demo data; the walkthrough batch is numbered 2 so the two never merge."
+ ]
+}

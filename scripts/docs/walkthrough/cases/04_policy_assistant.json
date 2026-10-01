@@ -1,0 +1,59 @@
+{
+ "slug": "policy-assistant",
+ "title": "Policy Assistant — live questions with a cited source",
+ "kind": "live",
+ "owner": "GS Staff, Student, Dean, Faculty",
+ "duration": "8 min",
+ "story": [
+  "Each role has a Policy Assistant page. It answers from the policy document library (Handbook, Research Protocol and the Draft Operations Manual; see {case:policy-documents}) and always shows the document and the page or section it used, so an answer can be checked instead of trusted. Staff and administrators can also focus the assistant on one student record; the Dean, Faculty and Student pages answer policy questions only (the student page can also read that student's own record).",
+  "In this case the questions are typed live, the way the panel would ask them. The answers below were observed in this run. The assistant is running in its local retrieval mode: the label under each answer reads Policy documents - Local retrieval, meaning the passages were found by search and quoted, with no generative AI involved. It can therefore quote the right passage, but it does not rephrase it, and a question worded differently can find different passages."
+ ],
+ "accounts": [
+  ["Graduate School Staff", "staff@usls.edu.ph", "Policy & Case Guidance chat (can focus on a student)"],
+  ["Student (Miguel Yu)", "student@usls.edu.ph", "Student Policy Assistant with manual references"],
+  ["Dean (Dr. Manuel Villaruz)", "dean@usls.edu.ph", "Dean's Policy Assistant (policy documents only)"],
+  ["Faculty (Dr. Liwayway Bautista)", "liwayway.bautista@usls.edu.ph", "Faculty Policy Assistant (policy documents only)"]
+ ],
+ "data": [
+  ["Staff question 1", "Can a student withdraw a subject on Day 1, and how much is the fee?"],
+  ["Staff question 2", "Is time on leave of absence included in the maximum years to finish a master's degree?"],
+  ["Staff question 3", "Adding a subject is allowed until when?"],
+  ["Student question", "Can I file a leave of absence during the last two weeks of the semester?"],
+  ["Dean question", "What is the maximum residence for a master's program?"],
+  ["Faculty question", "How many advisees can a faculty member handle in a semester?"]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Staff: Policy & Case Guidance",
+   "steps": [
+    {"text": "Sign in as **staff@usls.edu.ph** and open **Policy Assistant** under Monitoring & support. The page is titled **Policy & Case Guidance**. The chat opens with a greeting that says answers come from live records and the policy library and always show the sources. On the right are an optional **Focus on a student** box and **Example questions**, which are shortcuts only: any question can be typed.", "shots": [{"id": "policy-assistant-01", "caption": "Staff Policy & Case Guidance page: the chat, the optional student focus, and the example questions."}]},
+    {"text": "Click the question box and type **Can a student withdraw a subject on Day 1, and how much is the fee?** Press Enter. The answer quotes the Operations Manual, section 4.4 Withdrawal of subject: Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free; 10% of the term's total due is charged in the first week and 20% in the second. Below it appear the line **Draft - pending Graduate School validation**, the source label **Policy documents - Local retrieval**, and a **Sources** list naming the document and the section.", "shots": [{"id": "policy-assistant-02", "caption": "The Day 1 question: the answer, the Draft warning, and the cited source (Operations Manual, section 4.4)."}]},
+    {"text": "Ask **Is time on leave of absence included in the maximum years to finish a master's degree?** The first passage is the Handbook, p. 59: a master's program must be finished within seven academic years including Leave of Absence, a doctoral program within nine. The second is the Operations Manual, section What the sources say, which adds that the platform counts leave inside the residency clock. The Sources list names both.", "shots": [{"id": "policy-assistant-03", "caption": "Leave and maximum residence: the Handbook passage and the Operations Manual passage, each cited."}]},
+    {"text": "Ask **Adding a subject is allowed until when?** The answer quotes the Handbook, p. 53: adding subjects is allowed during the first week of classes upon the written approval of the Associate Dean, and the Operations Manual passage that changing or adding a subject is first week only.", "shots": [{"id": "policy-assistant-04", "caption": "Adding a subject: first week only, cited to the Handbook and the Operations Manual."}]}
+   ]
+  },
+  {
+   "title": "Part B - Student, Dean and Faculty",
+   "steps": [
+    {"text": "In a separate session sign in as **student@usls.edu.ph** and open **Policy Assistant** under Support. The **Student Policy Assistant** states that it is private and read-only: it can use approved handbook content and the signed-in student's own record, cannot see other students and cannot change grades, enrollment, requests or records. Suggested questions sit on the right.", "shots": [{"id": "policy-assistant-05", "caption": "Student Policy Assistant: private and read-only, with suggested questions."}]},
+    {"text": "Type **Can I file a leave of absence during the last two weeks of the semester?** and select **Ask assistant**. The answer quotes the Handbook, p. 57: a leave filed in the second half of a semester marks the courses W, and no leave is granted within two weeks before the last day of classes. A second passage from the Operations Manual says the same and is flagged as a Draft. A **Manual references** list at the bottom names each document and page.", "shots": [{"id": "policy-assistant-06", "caption": "Student question: the answer with its Manual references (Handbook p. 57 and the Draft Operations Manual)."}]},
+    {"text": "In a separate session sign in as **dean@usls.edu.ph** and open **Policy Assistant** under Monitoring & support. The chat is labelled **Policy documents only**. Type **What is the maximum residence for a master's program?** The answer is the Handbook, p. 58: seven academic years for a master's program and nine for a doctoral program, both including Leave of Absence. The Sources list shows the Handbook with pages 58 and 59.", "shots": [{"id": "policy-assistant-07", "caption": "Dean: the same assistant, policy documents only, with the Handbook page cited."}]},
+    {"text": "In a separate session sign in as **liwayway.bautista@usls.edu.ph** and open **Policy Assistant** under Support. Type **How many advisees can a faculty member handle in a semester?** The answer is the Handbook, p. 63: a maximum of five advisees per semester, and in some cases more where there are fewer faculty in the program.", "shots": [{"id": "policy-assistant-08", "caption": "Faculty: maximum of five advisees per semester, cited to Handbook p. 63."}]}
+   ]
+  },
+  {
+   "title": "Part C - What the panel should know about the answers",
+   "steps": [
+    "The assistant retrieves passages by keyword and quotes them; it does not interpret them. Wording matters. In the same run, **Is time on leave of absence included in the maximum years...** found the exact Handbook sentence, while the shorter **Does time on leave of absence count toward the maximum residence?** returned the open-questions table of the Operations Manual instead. If an answer looks off, rephrase using the words of the policy (leave of absence, maximum, first week, written approval).",
+    "Page numbers come from the PDF pages of the Handbook. They run about four pages later than the printed page numbers that the Business Rules register cites (for example, the withdrawal rule is on printed p. 49 and the assistant quotes p. 53). Both refer to the same passage.",
+    "A Draft source is labelled every time it is used. Answers that rest on the Operations Manual say so in the answer text, and the Graduate School is asked to validate that document before it is treated as policy."
+   ]
+  }
+ ],
+ "notes": [
+  "Guidance only: the assistant does not approve anything. Final decisions stay with authorized personnel.",
+  "The assistant runs in local retrieval mode here (label: Policy documents - Local retrieval). No Gemini key was in use, so no answer was written by an AI model. With a key configured the label reads Policy documents - Gemini and the answer is generated from the same retrieved excerpts; this walkthrough did not run that mode.",
+  "The student assistant can also answer from the student's own record (for example, What should I do next based on my record? answers from Miguel Yu's record with no policy citation).",
+  "In this run, questions about the required number of panel members returned the 14-Day Rule passage rather than the panel size; the panel size rule is in the Business Rules register ({case:business-rules}). Questions outside the library (for example, who pays for printing of hard-bound copies) return loosely related passages instead of saying the answer is not in the library."
+ ]
+}

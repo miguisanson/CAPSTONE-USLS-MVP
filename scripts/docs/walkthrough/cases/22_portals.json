@@ -1,0 +1,70 @@
+{
+  "slug": "portals",
+  "title": "The Dean, Faculty and Student portals",
+  "kind": "live",
+  "owner": "Dean, Faculty, Student",
+  "duration": "5 min",
+  "story": [
+    "Every role signs in through the same page and lands in the same kind of workspace: a sidebar of separate pages, a breadcrumb, the notification bell and the account chip. What differs is which pages the role is given. The Dean sees only what is waiting for a decision. A faculty member sees only their own advisees, panels and calendar. A student sees only their own record.",
+    "This case is a short, read-only tour. It shows that the portals are not one long scrolling page and that each role's sidebar is limited to its own transactions. Nothing is changed in the records."
+  ],
+  "accounts": [
+    ["Dean", "dean@usls.edu.ph", "Approvals, decision history, analytics, rules"],
+    ["Faculty", "liwayway.bautista@usls.edu.ph", "Advisees, panels, invitations, availability, calendar"],
+    ["Student", "handoff.sofia@usls.edu.ph", "Sofia Reyes, a new MAED student (demo key student-handoff-sofia)"]
+  ],
+  "data": [
+    ["Changes made", "None. This is a read-only tour."],
+    ["Student", "Sofia Reyes, GS-2026-HO-01, reset before the tour"]
+  ],
+  "parts": [
+    {
+      "title": "Part A - The Dean portal",
+      "steps": [
+        {"text": "Sign in as the Dean by typing the email and password. The Dean lands on the **Dean Dashboard**: decisions waiting by process (Course Adjustments, Leave / Readmission / AWOL, Withdrawal Requests, Practicum Reports, Graduation Endorsement), the items that have waited longest, how long items have waited, and the most recent decisions.",
+         "shots": [{"id": "portals-dean-01", "caption": "Dean Dashboard: decisions waiting by process and how long they have waited."}]},
+        {"text": "Open **Approvals Queue** in the sidebar. Every process that needs the Dean is grouped on this page, with search, program and status filters. The sidebar also has one page per process, and a badge showing how many items wait in each.",
+         "shots": [{"id": "portals-dean-02", "caption": "Approvals Queue, grouped by process."}]},
+        {"text": "Open **Decision History**. Each decision taken by the Dean account is listed with its date and outcome; every entry keeps its full stage history on the case page.",
+         "shots": [{"id": "portals-dean-03", "caption": "Decision History: what the Dean has decided, newest first."}]},
+        {"text": "Open **Reports & Analytics** in the Dean portal. The figures are computed from the approvals records: waiting now, recent decisions, approval share and the load by process.",
+         "shots": [{"id": "portals-dean-04", "caption": "Dean Reports & Analytics: decisions by process."}]},
+        {"text": "Open **Business Rules**. The Dean can read the same register of rules as the staff, with the source page of each rule. The page states that only Graduate School staff and the administrator can change a value.",
+         "shots": [{"id": "portals-dean-05", "caption": "Business Rules as the Dean sees them (read only)."}]}
+      ]
+    },
+    {
+      "title": "Part B - The Faculty portal",
+      "steps": [
+        {"text": "Sign out and sign in as the faculty member. The portal opens on the **Faculty Dashboard**.",
+         "shots": [{"id": "portals-faculty-01", "caption": "Faculty Dashboard."}]},
+        {"text": "Open **My Advisees**. The page shows how many advisees the faculty member holds against the limit of five, the adviser requests waiting for an answer, and each advisee's stage and documents.",
+         "shots": [{"id": "portals-faculty-02", "caption": "My Advisees with the five-advisee limit."}]},
+        {"text": "Open **Panel Invitations**. Each invitation names the student, the defense stage, the faculty member's role on the panel and the other panel members, with **Accept** and **Decline** buttons.",
+         "shots": [{"id": "portals-faculty-03", "caption": "Panel Invitations waiting for an answer."}]},
+        {"text": "Open **My Availability**. Weekly hours are set per day, one-off dates can mark the faculty member unavailable, and requests from the Graduate School are answered here. A Google Calendar connection is offered but optional.",
+         "shots": [{"id": "portals-faculty-04", "caption": "My Availability: weekly hours, specific dates and requests from the Graduate School."}]},
+        {"text": "Open **My Calendar**. Defenses, deadlines, availability and (when connected) Google busy times appear in Month, Week and Agenda views, with a private subscription link that can be created for a phone or Google Calendar.",
+         "shots": [{"id": "portals-faculty-05", "caption": "My Calendar in the Faculty portal."}]}
+      ]
+    },
+    {
+      "title": "Part C - The Student portal",
+      "steps": [
+        {"text": "Sign out and sign in as Sofia Reyes. The **Student Dashboard** shows her stage, progress, coursework and research status, open tasks, unread messages, workflow status, deadlines, notifications and the defense schedule.",
+         "shots": [{"id": "portals-student-01", "caption": "Student Dashboard for a new student."}]},
+        {"text": "Open **My Progress**. The academic status strip, the workflow status and the full curriculum (Basic, Cognate and Major subjects with units and status) are read from the monitoring record.",
+         "shots": [{"id": "portals-student-02", "caption": "My Progress: stage strip and curriculum."}]},
+        {"text": "Open **Enrollment**. Published subjects are marked Offered or Not offered for the current semester; subjects already on the record stay locked.",
+         "shots": [{"id": "portals-student-03", "caption": "Student Enrollment: offered and not-offered subjects."}]},
+        {"text": "Open **Request Center**. Every request a student can file is here with its status: Research Submission, Defense Schedule, Leave of Absence, Readmission, Return from AWOL, Subject Withdrawal, Practicum and Graduation Endorsement. Requests that do not apply to the student are shown as locked with the reason.",
+         "shots": [{"id": "portals-student-04", "caption": "Request Center with locked requests explained."}]},
+        {"text": "Open **Messages**. Clarification requests and staff replies for the student's requests are kept here and can be filtered by workflow.",
+         "shots": [{"id": "portals-student-05", "caption": "Messages: clarifications and staff replies."}]}
+      ]
+    }
+  ],
+  "notes": [
+    "Each portal footer states the scope of the role: the Dean's decisions are recorded against the Dean account with the date and time; a faculty member sees only assigned advisees and panels; a student's record updates as staff act on requests and nothing on these pages changes official grades or enrollment."
+  ]
+}

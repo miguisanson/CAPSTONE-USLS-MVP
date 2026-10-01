@@ -1,0 +1,61 @@
+{
+ "slug": "reports",
+ "title": "Reports and Analytics — what the Graduate School knows about all students at once",
+ "kind": "live",
+ "owner": "GS Staff",
+ "duration": "6 min",
+ "story": [
+  "The lifecycle cases follow one student at a time. This case answers the other question: what does the Graduate School know about all of its students at once. Every figure on these screens is computed from the records and recorded events rather than entered by hand, so the numbers move as the other cases are run. The case reads them off the screen instead of quoting fixed values.",
+  "Reports has two layers. The operational reports list who needs what (missing requirements, at-risk students, open tasks and so on). The analytics layer measures the process itself: how long students sit in each stage, how old the open cases are, who carries the workload, and who is nearing the residency limit. Above every report sits a strip of module KPI measurements, each with a target and a basis line that states the count it was computed from, so the number can be checked instead of trusted."
+ ],
+ "accounts": [
+  ["Graduate School Staff", "staff@usls.edu.ph", "Dashboard and Reports"],
+  ["Password", "DemoPass123!", ""]
+ ],
+ "data": [
+  ["Screens", "Dashboard, then Reports"],
+  ["Report set", "17 reports: 10 operational (Dashboard summary, Daily changes, Graduation candidates, Missing requirements, Practicum monitoring, Withdrawal requests, LOA/readmission, At-risk, Open/overdue tasks, Research completion) and 7 analytics (Queue aging and backlog, Stage bottlenecks, Workload and turnaround, Residency watchlist, Completion and attrition, Scheduling cycle time, Follow-up closure)"],
+  ["Indicators", "9 module KPI measurements, shown above every report"],
+  ["Filters", "Program, Progress, Risk, Standing and Workflow, left at All"]
+ ],
+ "parts": [
+  {
+   "title": "Part A — The overview and the operational picture",
+   "steps": [
+    {"text": "Sign in as Graduate School Staff and stay on the **Dashboard** (Graduate School Overview). The tiles read Students monitored (with the active count), At risk or delayed (with the delayed count), Open tasks (with the overdue count) and Confirmed defenses, followed by Active, On leave, Completed and Overdue tasks. Read the actual figures; they are computed live.",
+     "shots": [{"id": "reports-01", "caption": "Dashboard overview tiles."}]},
+    {"text": "Scroll the Dashboard. **Lifecycle stage distribution** counts students at each stage, and the charts below it show risk level, students by college, research gate position, defense scheduling outcomes, the open work queue by owner and recent activity.",
+     "shots": [{"id": "reports-02", "caption": "Lifecycle stage distribution."}]},
+    {"text": "Open **Reports** from Overview. Under the filters, ten operational report buttons are listed and each shows its record count where one applies (for example Missing requirements, At-risk, Open/overdue tasks, Withdrawal requests, LOA/readmission). Below them is the heading **Analytics & decision support** with seven more. The **Dashboard summary** is shown first: Students monitored, Needing attention, Open tasks, Overdue tasks, Practicum records, Withdrawal requests, Graduation candidates and Confirmed defenses.",
+     "shots": [{"id": "reports-03", "caption": "Reports: filters, the operational report buttons and the analytics group."}, {"id": "reports-04", "caption": "The summary counts, read from the screen."}]},
+    {"text": "Click **Missing requirements**. Each student is listed with the coursework still missing, research and practicum status and the next owner. Then click **At-risk**: each student is listed with the risk level, a recommendation and the owner who must act.",
+     "shots": [{"id": "reports-05", "caption": "Missing requirements report."}, {"id": "reports-06", "caption": "At-risk report with the recommendation and owner."}]},
+    {"text": "Click **LOA/readmission** (leave and readmission requests with status, period or return semester, next owner and Registrar list state) and **Open/overdue tasks** (task, student, owner, due date and status).",
+     "shots": [{"id": "reports-07", "caption": "LOA/readmission report."}, {"id": "reports-08", "caption": "Open/overdue tasks report."}]}
+   ]
+  },
+  {
+   "title": "Part B — The analytics and the indicators",
+   "steps": [
+    {"text": "Click **Stage bottlenecks**. Above the report, **Module KPI measurements** shows nine indicators, each with a module heading, a value, a target and a basis line: Access control enforcement rate, Audit event coverage, Required monitoring field completion rate, Next-action ownership coverage, Scheduling record completeness, Follow-up closure logging rate, Analytics report generation rate, Policy-grounded response match rate and Required report availability. Green values meet the target; amber values do not.",
+     "shots": [{"id": "reports-09", "caption": "Nine module KPI measurements with targets and basis lines."}]},
+    "Read the basis line under each indicator. In the capture run two were amber, and the basis lines say why: Required monitoring field completion rate was 0% because no active record carried every required field (most often missing: Curriculum tag), and Follow-up closure logging rate was 33.3% (1 closed of 3 flagged cases) against a target of 90%. A value below target describes the state of the records, not a fault in the measurement.",
+    {"text": "Below the indicators, the **Stage bottlenecks** table has one row per lifecycle stage with Students, Median days in stage, Average days in stage, Longest days and the Longest-waiting student. None of it is typed in: it is computed from the timestamps of recorded events. In the demonstration data every duration reads 0 because all of the events were recorded within the same day; with real use the columns spread out.",
+     "shots": [{"id": "reports-10", "caption": "Stage bottlenecks: computed from recorded event history."}]},
+    {"text": "Click **Queue aging & backlog**. The totals show open cases, the number over 30 days and the share over 30 days, and each process area (Student Handoff, Enrollment, AWOL & Residency, Defense Scheduling, Research Gate, Leave of Absence, Readmission, Panel Matching, Practicum, Graduation, Withdrawal) shows its open cases split into 0-7, 8-14, 15-30 and over-30-day buckets with the median and oldest age.",
+     "shots": [{"id": "reports-12", "caption": "Queue aging and backlog by process area."}]},
+    {"text": "Click **Residency watchlist**. It applies the same handbook residence limits used on a single student in the AWOL and residency case to the whole population, and shows Approaching absolute limit, Exceeded absolute limit, Past normal period and Within normal period. In the capture run every student was within the normal period, so the list reads Nothing to report.",
+     "shots": [{"id": "reports-13", "caption": "Residency watchlist across all students."}]},
+    {"text": "Open **Workload & turnaround** (open and overdue tasks, students, actions recorded and median turnaround per owner), **Completion & attrition** (students, completed, active, on leave, AWOL, withdrawn, completion and attrition percentages and average years to finish, by program), **Scheduling cycle time** (requests, confirmed, awaiting and rescheduled by defense type) and **Follow-up closure** (flagged cases with follow-up, closed and still open). This completes the seven analytics reports.",
+     "shots": [{"id": "reports-14", "caption": "Workload and turnaround by owner."}, {"id": "reports-15", "caption": "Completion and attrition by program."}, {"id": "reports-16", "caption": "Scheduling cycle time by defense type."}, {"id": "reports-17", "caption": "Follow-up closure."}]},
+    "Confirm the availability claim the last indicator makes: the basis line of Required report availability reads 17 of 17 agreed reports available (7/7 analytics, 10 operational), the same seventeen buttons counted in Part A."
+   ]
+  }
+ ],
+ "notes": [
+  "The indicators are measurements, not constants. A value below target reflects the current state of the records, and the basis line always states the count it was computed from.",
+  "Every report and analytics table has an Export CSV button. The reports respect the Program, Progress, Risk, Standing and Workflow filters at the top.",
+  "Durations such as median days in stage are 0 in the demonstration data because the events were recorded in one sitting; the computation is real but the sample has no history.",
+  "Risk is shown from monitoring signals; where the official risk rules are not confirmed it reads Not Yet Assessed rather than an invented Low, Medium or High."
+ ]
+}

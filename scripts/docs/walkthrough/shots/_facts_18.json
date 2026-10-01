@@ -1,0 +1,27 @@
+{
+ "booked": [
+  {
+   "label": "Title Defense",
+   "date": "2026-10-01",
+   "start": "08:49",
+   "end": "10:49"
+  },
+  {
+   "label": "Proposal Defense",
+   "date": "2026-10-01",
+   "start": "08:52",
+   "end": "10:52"
+  },
+  {
+   "label": "Final Defense",
+   "date": "2026-10-01",
+   "start": "08:55",
+   "end": "10:55"
+  }
+ ],
+ "signed_documents": [
+  3,
+  2
+ ],
+ "proposal_table": "RANK / FACULTY\nEXPERTISE MATCH\nAVAILABILITY & WORKLOAD\nSCORE BREAKDOWN\n1\nDr. Patricia Salvador\nSUGGESTED: PANEL CHAIR\n\nEducation\n\nlearning management\nmanagement system\ncourses\narts education\nmaster arts\n\nOnline learning, learning management systems, education technology, and curriculum development\n\nWhy this score\n\nAvailable\n\n3 conflict-free windows\n\n2 other student panels\n\n87.2/100\n\n60/60 \u00b7 17.2/25 \u00b7 10/15\n\n2\nDr. Teodoro Ramos\nSUGGESTED: METHOD SPECIALIST\n\nEducation\n\nOverloaded\nlearning analytics\ninterview data\nquestionnaire\nmethod design\nsequential explanatory\n\nLearning analytics, online learning assessment, and educational data science\n\nWhy this score\n\nLimited availability\n\n2 conflict-free windows\n\n7 other student panels\n\n66.2/100\n\n52.1/60 \u00b7 14.1/25 \u00b7 0/15\n\n3\nDr. Celeste Tan\nSUGGESTED: CONTENT SPECIALIST\n\nArts and Sciences\n\nacademic\nstructured interviews\npersistence\nhabits\nschool\n\nPsychology, student well-being, and behavioral research\n\nWhy this score\n\nLimited availability\n\n2 conflict-free windows\n\n0 other student panels\n\n61.6/100\n\n32.5/60 \u00b7 14.1/25 \u00b7 15/15\n\n4\nDr. Paolo Navarro\nSUGGESTED: EXTERNAL PANEL\n\nBusiness\n\nengagement\nschool\n\nHuman resource management, organizational behavior, leadership, and workplace research\n\nWhy this score\n\nAvailable\n\n5 conflict-free windows\n\n2 other student panels\n\n46.1/100\n\n12.7/60 \u00b7 23.4/25 \u00b7 10/15\n\n5\nDr. Marlon Geronimo\n\nEducation\n\ncourse\nlogs\nregression\n\nMachine learning, educational data analytics, and predicting student performance\n\nWhy this score\n\nAvailable\n\n4 conflict-free windows\n\n2 other student panels\n\n44.1/100\n\n13.8/60 \u00b7 20.3/25 \u00b7 10/15\n\n6\nDr. Teresa Lim\n\nBusiness\n\nengagement\n\nMarketing strategy, consumer behavior, digital commerce, and brand analytics\n\nWhy this score\n\nLimited availability\n\n2 conflict-free windows\n\n2 other student panels\n\n31.8/100\n\n7.7/60 \u00b7 14.1/25 \u00b7 10/15\n\n7\nDr. Marco Villanueva\n\nBusiness\n\nOverloaded\ntime\n\nOperations management, supply chain analytics, quality systems, and process improvement\n\nWhy this score\n\nAvailable\n\n3 conflict-free windows\n\n5 other student panels\n\n29.5/100\n\n9.8/60 \u00b7 17.2/25 \u00b7 2.5/15\n\n8\nDr. Daniel Uy\n\nEngineering and Technology\n\nNo topic match\n\nNo distinctive topic in common with the paper\n\nEngineering systems, automation, data modeling, and predictive analytics\n\nWhy this score\n\nAvailable\n\n5 conflict-free windows\n\n0 other student panels\n\n41.2/100\n\n2.8/60 \u00b7 23.4/25 \u00b7 15/15\n\n9\nDr. Adriana Santos\n\nNursing\n\nNo topic match\n\nNo distinctive topic in common with the paper\n\nHealth info"
+}
