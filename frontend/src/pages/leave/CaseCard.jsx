@@ -1,6 +1,6 @@
 import { Eye } from "lucide-react";
 import { LeaveStatusBadge, leaveCaseStatusBadge } from "../../components/leaveStatus";
-import { caseFlags, whenDates, whenText } from "./leaveHelpers";
+import { caseFlags, cardLines, whenDates } from "./leaveHelpers";
 
 export function FlagList({ item, role }) {
   const flags = caseFlags(item, role);
@@ -47,8 +47,9 @@ export default function CaseCard({ item, role, selectable, selected, onToggleSel
         {item.kind === "LOA_EXTENSION" && <LeaveStatusBadge label="Extension" tone="muted" className="!text-[11px]" />}
       </div>
 
-      <p className="mt-2.5 text-xs font-medium text-slate-700">{whenText(item)}</p>
-      {item.reason_category && <p className="mt-0.5 text-xs text-slate-500">Reason: {item.reason_category}</p>}
+      {cardLines(item).map((line, index) => (
+        <p key={index} className={index === 0 ? "mt-2.5 text-xs font-medium text-slate-700" : "mt-0.5 text-xs text-slate-500"}>{line}</p>
+      ))}
 
       <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">{ownerText(item)}</p>
 
@@ -74,7 +75,7 @@ export function CaseTable({ items, role, selectableIds, selectedIds, onToggle, o
   const allSelected = selectable.length > 0 && selectable.every((item) => selectedIds.has(item.id));
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200">
-      <table className="w-full min-w-[60rem] text-left text-sm">
+      <table className="w-full min-w-[52rem] text-left text-sm">
         <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
           <tr>
             <th scope="col" className="w-10 px-3 py-2.5">
@@ -84,14 +85,13 @@ export function CaseTable({ items, role, selectableIds, selectedIds, onToggle, o
                   checked={allSelected}
                   onChange={() => onToggleAll(selectable, !allSelected)}
                   className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                  aria-label="Select every request that can be forwarded"
+                  aria-label="Select every request that can be moved as a group"
                 />
               )}
             </th>
             <th scope="col" className="px-3 py-2.5">Student</th>
             <th scope="col" className="px-3 py-2.5">Type</th>
-            <th scope="col" className="px-3 py-2.5">Period or return semester</th>
-            <th scope="col" className="px-3 py-2.5">Reason</th>
+            <th scope="col" className="px-3 py-2.5">What it is about</th>
             <th scope="col" className="px-3 py-2.5">Status</th>
             <th scope="col" className="px-3 py-2.5">Next</th>
             <th scope="col" className="px-3 py-2.5">Notes</th>
@@ -120,10 +120,11 @@ export function CaseTable({ items, role, selectableIds, selectedIds, onToggle, o
               </td>
               <td className="px-3 py-3 align-top text-slate-700">{item.kind_label}</td>
               <td className="px-3 py-3 align-top text-slate-700">
-                <p>{whenText(item)}</p>
+                {cardLines(item).map((line, index) => (
+                  <p key={index} className={index === 0 ? "" : "text-xs text-slate-500"}>{line}</p>
+                ))}
                 {whenDates(item) && <p className="text-xs text-slate-500">{whenDates(item)}</p>}
               </td>
-              <td className="px-3 py-3 align-top text-slate-700">{item.reason_category || "-"}</td>
               <td className="px-3 py-3 align-top">{leaveCaseStatusBadge(item)}</td>
               <td className="px-3 py-3 align-top text-slate-700">{item.owner || "-"}</td>
               <td className="px-3 py-3 align-top">

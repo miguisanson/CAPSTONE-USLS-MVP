@@ -3332,6 +3332,8 @@ from business_rules_catalog import (  # noqa: E402
     BUSINESS_RULE_BY_KEY,
     BUSINESS_RULE_CATALOG,
     BUSINESS_RULE_PROCESSES,
+    HANDBOOK as _RULE_SOURCE_HANDBOOK,
+    PROTOCOL as _RULE_SOURCE_PROTOCOL,
 )
 
 BUSINESS_RULE_PROCESS_LABELS = dict(BUSINESS_RULE_PROCESSES)
@@ -3436,12 +3438,48 @@ def rule_citation(key: str) -> str:
     return _format_rule_citation(fields.get("source_title"), fields.get("source_page"))
 
 
+def business_rule_is_locked(rule: BusinessRule) -> bool:
+    """Handbook and Research Protocol rules are official: nobody edits them in the portal.
+
+    They change only when the Graduate School issues a new policy. Uploading or replacing
+    a policy document flags the rules linked to it "needs review", which opens them for one
+    check-and-confirm; saving the change locks them again. Prototype rules stay editable.
+    """
+    return (
+        rule.source_title in (_RULE_SOURCE_HANDBOOK, _RULE_SOURCE_PROTOCOL)
+        and rule.status != "needs_review"
+    )
+
+
+def business_rule_lock_message(rule: BusinessRule) -> str:
+    citation = _format_rule_citation(rule.source_title, rule.source_page)
+    if not (rule.source_page or "").strip() and rule.source_section:
+        citation = f"{citation} ({rule.source_section})"
+    return (
+        f"This rule is set by the {citation}. It changes only when the Graduate School "
+        "issues a new policy; upload the new policy under Policy Documents."
+    )
+
+
+def business_rule_edit_label(rule: BusinessRule) -> str:
+    if rule.source_title in (_RULE_SOURCE_HANDBOOK, _RULE_SOURCE_PROTOCOL):
+        if rule.status == "needs_review":
+            return "A policy document changed: check this value against the new policy, then confirm or update it"
+        return ""
+    return "Pending validation — can be adjusted until the Graduate School confirms"
+
+
 def business_rule_dict(rule: BusinessRule, history: list | None = None) -> dict:
     try:
         typed = _coerce_rule_value(rule.value, rule.value_type)
     except (TypeError, ValueError):
         typed = rule.value
+    locked = business_rule_is_locked(rule)
     return {
+        "locked": locked,
+        "editable": not locked,
+        "lock_message": business_rule_lock_message(rule) if locked else None,
+        "edit_label": business_rule_edit_label(rule),
         "id": rule.id,
         "key": rule.key,
         "process": rule.process,
@@ -5464,6 +5502,20 @@ def retrieve_policy(query: str, k: int = 3) -> list[dict]:
     return [sn for _, sn in scored[:k]]
 
 
+def _relevant_policy_snippets(question: str, snippets: list[dict]) -> list[dict]:
+    """Drop curated snippets that share only one stray word with the question ("last" is not "last day")."""
+    question_terms = set(_prag.terms(question))
+    if not question_terms:
+        return []
+    kept = []
+    for snippet in snippets:
+        text = f"{snippet.get('title', '')} {snippet.get('text', '')} {' '.join(snippet.get('tags', []))}"
+        shared = question_terms & set(_prag.terms(text))
+        if len(shared) >= min(2, len(question_terms)):
+            kept.append(snippet)
+    return kept
+
+
 def loa_term_position_map() -> dict[int, int]:
     return {term.id: index for index, term in enumerate(AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all())}
 
@@ -7443,6 +7495,15 @@ def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) 
         for item in LeaveCase.query.filter(LeaveCase.student_id == case.student_id, LeaveCase.id != case.id)
         .order_by(LeaveCase.id.desc()).limit(12).all()
     ]
+    approved_for_registrar = bool(case.decided_at and case.status in APPROVED_LEAVE_STATUSES)
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": ("Dean-approved requests go on the Registrar list below the board. The portal does not send any email: "
+                 "download the list, email it through the official channel and wait for the Registrar's acknowledgement."),
+        "links": ([{"label": "Registrar sheet for this request (CSV)",
+                    "url": f"/api/standing-changes/{SLUG_FOR_KIND[kind]}/{case.student_id}/registrar-report"}]
+                  if approved_for_registrar else []),
+    }
     payload["events"] = [
         {
             "id": event.id,
@@ -8280,6 +8341,634 @@ def awol_residency_roster_payload() -> list[dict]:
     return sorted(rows, key=lambda item: item.get("updated_at") or item.get("created_at") or "", reverse=True)
 
 
+# ---------------------------------------------------------------------------
+# Standalone process board: AWOL & Residency and Withdrawal
+# ---------------------------------------------------------------------------
+# Leave of Absence and Readmission already run on case records with a guarded board
+# (leave_workflow.py). These builders give AWOL / Residency and Withdrawal the SAME case
+# shape and the same kind of guarded move (standalone_process.py), so one React board can
+# show all four. They add no business rule: every move is applied by the code that already
+# owned it (handle_withdrawal, handle_awol, the Dean's decision route, the message "return").
+import standalone_process as _sp  # noqa: E402
+
+
+class ProcessError(ValueError):
+    """A refused move on the standalone board, with the HTTP status the API answers with."""
+
+    def __init__(self, message: str, status: int = 409):
+        super().__init__(message)
+        self.status = status
+
+
+def process_slug_or_error(slug: str) -> str:
+    slug = (slug or "").strip()
+    if slug not in _sp.STANDALONE_SLUGS:
+        raise ProcessError("Choose leave-of-absence, readmission, awol or withdrawal.", 400)
+    return slug
+
+
+def process_load_record(slug: str, ref) -> tuple[str, object]:
+    """(kind, record) for a board reference: a withdrawal id, or 'awol-3' / 'residency-2' / 'legacy-7'."""
+    if slug == _sp.SLUG_WITHDRAWAL:
+        record = db.session.get(WithdrawalApplication, safe_int(ref))
+        if not record:
+            raise ProcessError("That request was not found. It may already have been removed.", 404)
+        return _sp.KIND_WITHDRAWAL, record
+    prefix, _, number = str(ref).partition("-")
+    number = safe_int(number)
+    if prefix == "awol":
+        record = db.session.get(AwolCase, number)
+        kind = _sp.KIND_AWOL
+    elif prefix == "residency":
+        record = db.session.get(ResidencyEnrollment, number)
+        kind = _sp.KIND_RESIDENCY
+    elif prefix == "legacy":
+        record = db.session.get(Student, number)
+        kind = _sp.KIND_AWOL
+        if record and record.enrollment_tag != "AWOL":
+            record = None
+    else:
+        record = None
+        kind = _sp.KIND_AWOL
+    if not record:
+        raise ProcessError("That case was not found. It may already have been removed.", 404)
+    return kind, record
+
+
+def process_actions_for(slug: str, kind: str, status: str, role: str, record=None) -> list[dict]:
+    """The moves this role may make on a case now. Dean approval names its concrete target."""
+    actions = []
+    for move in _sp.transitions_from(slug, status, kind, role):
+        target = move["to"]
+        if move["to"] == "*approved*" and isinstance(record, AwolCase):
+            if record.full_reenrollment_required:
+                target = "Re-enrollment Required"
+            elif record.refresher_required:
+                target = "Extension Approved - Refresher Required"
+            else:
+                target = "Return Approved"
+        actions.append({
+            "action": move["action"],
+            "label": move["label"],
+            "to": target,
+            "targets": [target],
+            "needs_comment": move["needs_comment"],
+            "tone": move["tone"],
+            "batch": move["batch"],
+            "confirm": move["confirm"],
+            "opens": move["opens"],
+        })
+    return actions
+
+
+def process_recent_activity(slug: str, limit: int = 30) -> list[dict]:
+    """The newest log rows of one process, for the page's 'recent activity' window."""
+    slugs = [slug]
+    if slug == _sp.SLUG_AWOL:
+        slugs = ["awol", "awol-return"]
+    rows = (
+        TransactionLog.query.filter(TransactionLog.transaction_slug.in_(slugs))
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [log_dict(item) for item in rows]
+
+
+def _process_events_from_logs(logs: list[dict]) -> list[dict]:
+    """Stage history ('who moved it from where to where') read from the activity log, oldest first."""
+    rows = [item for item in logs if item.get("new_status")]
+    rows.sort(key=lambda item: (item.get("created_at") or "", item.get("id") or 0))
+    return [
+        {
+            "id": item["id"],
+            "from_status": item.get("previous_status"),
+            "to_status": item.get("new_status"),
+            "action": item.get("result") or "update",
+            "actor_role": "",
+            "actor_name": item.get("actor_role") or "",
+            "comment": item.get("notes") or "",
+            "created_at": item.get("created_at"),
+        }
+        for item in rows
+    ]
+
+
+def _process_status_fields(slug: str, status: str) -> dict:
+    info = _sp.status_by_key(slug).get(status, {})
+    return {
+        "status": status,
+        "status_label": info.get("label", status),
+        "status_tone": info.get("tone", "info"),
+        "owner": info.get("owner", ""),
+    }
+
+
+def _process_brief_for_earlier(slug: str, kind_label: str, status: str, period: str, decided_at, record_id) -> dict:
+    info = _sp.status_by_key(slug).get(status, {})
+    return {
+        "id": record_id,
+        "kind_label": kind_label,
+        "status": status,
+        "status_label": info.get("label", status),
+        "period_text": period,
+        "decided_at": decided_at,
+    }
+
+
+def withdrawal_process_case(application: WithdrawalApplication, role: str = "staff", detail: bool = False) -> dict:
+    student = application.student
+    subject = application.subject_enrollment
+    course = subject.course if subject else None
+    term_label = application.effective_term or (subject.term.label if subject and subject.term else "")
+    subject_text = f"{course.code} - {course.title}" if course else "Subject pending"
+    window = (
+        subject_withdrawal_window(subject, application.created_at.date() if application.created_at else date.today())
+        if subject else None
+    )
+    logs = [
+        log_dict(item)
+        for item in TransactionLog.query.filter_by(transaction_slug="withdrawal", student_id=application.student_id)
+        .filter(or_(TransactionLog.workflow_request_id == application.id, TransactionLog.workflow_request_id.is_(None)))
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc()).limit(60).all()
+    ]
+    open_messages = WorkflowMessage.query.filter(
+        WorkflowMessage.transaction_slug == "withdrawal",
+        WorkflowMessage.student_id == application.student_id,
+        WorkflowMessage.status == "Open",
+        or_(WorkflowMessage.workflow_request_id == application.id, WorkflowMessage.workflow_request_id.is_(None)),
+    ).count()
+    flags = []
+    if window and window.get("fee_percent") is not None:
+        flags.append({"key": "fee", "tone": "muted", "text": f"Fee {window['fee_percent']}% of the term"})
+    if window and window.get("eligible") is False:
+        flags.append({"key": "window", "tone": "bad", "text": "Window closed"})
+    registrar = application.registrar_status
+    if registrar and registrar not in {"Pending", "Pending Subject Tag"}:
+        flags.append({"key": "registrar", "tone": "info", "text": f"Registrar: {registrar}"})
+    payload = {
+        "id": application.id,
+        "ref": application.id,
+        "kind": _sp.KIND_WITHDRAWAL,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_WITHDRAWAL],
+        "slug": "withdrawal",
+        **_process_status_fields("withdrawal", application.status),
+        "student": leave_student_brief(student),
+        "card_lines": [subject_text, " · ".join(part for part in [term_label, window["status"] if window else ""] if part)],
+        "flags": flags,
+        "subject": {"code": course.code if course else "", "title": course.title if course else ""},
+        "term_label": term_label,
+        "window": ({"status": window["status"], "deadline": window.get("deadline"), "fee_percent": window.get("fee_percent"),
+                    "fee_tier": window.get("fee_tier")} if window else None),
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": registrar, "exported_at": iso(application.registrar_report_generated_at),
+                      "sent_at": iso(application.registrar_sent_at), "acknowledged_at": iso(application.registrar_confirmed_at)},
+        "actions": process_actions_for("withdrawal", _sp.KIND_WITHDRAWAL, application.status, role, application),
+        "timeline": _sp.timeline_steps("withdrawal", _sp.KIND_WITHDRAWAL, application.status,
+                                       {item["new_status"] for item in logs if item.get("new_status")}),
+        "unresolved_messages": open_messages,
+        "submitted_at": iso(application.created_at),
+        "decided_at": iso(application.decided_at),
+        "last_activity_at": logs[0]["created_at"] if logs else iso(application.updated_at),
+        "created_at": iso(application.created_at),
+        "updated_at": iso(application.updated_at),
+    }
+    if not detail:
+        return payload
+    payload["summary_rows"] = [
+        {"label": "Type", "value": payload["kind_label"]},
+        {"label": "Subject", "value": subject_text},
+        {"label": "Semester", "value": term_label or "Not recorded"},
+        {"label": "Reason", "value": application.reason or "No reason provided", "full": True},
+        {"label": "Withdrawal window", "value": (window or {}).get("status") or "Not recorded"},
+        {"label": "Window deadline", "value": (window or {}).get("deadline") or "Not recorded"},
+        {"label": "Fee consequence (information only)", "value": (window or {}).get("fee_consequence") or "Not recorded", "full": True},
+        {"label": "Academic record effect", "value": WITHDRAWAL_RECORD_EFFECT, "full": True},
+        {"label": "Dean decision", "value": application.dean_decision},
+        {"label": "Registrar list", "value": application.registrar_status or "Pending"},
+        {"label": "Filed", "value": iso(application.created_at), "date": True},
+        {"label": "Dean decided", "value": iso(application.decided_at), "date": True},
+        {"label": "Staff notes", "value": application.staff_remarks or "None", "full": True},
+    ]
+    student_view = _lw.role_key(role) == "student"
+    if student_view:
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+    checks = []
+    if window:
+        checks.append({"label": "Withdrawal window", "status": "Pass" if window["eligible"] else "Needs Review",
+                       "detail": f"{window['status']}. Deadline: {window.get('deadline') or 'not recorded'}."})
+    checks.append({
+        "label": "Subject is still active",
+        "status": "Pass" if subject and (subject.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES or subject.status == "Withdrawn") else "Needs Review",
+        "detail": f"The selected subject is {subject.status}." if subject else "No subject is attached to this request.",
+    })
+    checks.append({
+        "label": "Signed request form",
+        "status": "Pass" if application.request_attachment and attachment_dict(application.request_attachment)["file_exists"] else "Needs Review",
+        "detail": "The request form is on file." if application.request_attachment else "No request form was uploaded.",
+    })
+    ok = all(item["status"] == "Pass" for item in checks)
+    if not student_view:
+        payload["policy_review"] = {
+            "recommendation": "Eligible for Dean Review" if ok else "Needs Human Review",
+            "suggested_dean_action": "Approve" if ok else "Check before deciding",
+            "summary": (window or {}).get("policy") or withdrawal_policy_statement(),
+            "checks": checks,
+        }
+    earlier = (
+        WithdrawalApplication.query.filter(
+            WithdrawalApplication.student_id == application.student_id, WithdrawalApplication.id != application.id
+        ).order_by(WithdrawalApplication.id.desc()).limit(12).all()
+    )
+    payload["earlier_cases"] = [
+        _process_brief_for_earlier(
+            "withdrawal", _sp.KIND_LABELS[_sp.KIND_WITHDRAWAL], item.status,
+            (f"{item.subject_enrollment.course.code} · {item.effective_term}" if item.subject_enrollment and item.subject_enrollment.course else item.effective_term or ""),
+            iso(item.decided_at), item.id,
+        ) for item in earlier
+    ]
+    payload["events"] = _process_events_from_logs(logs)
+    payload["history"] = [item for item in logs if not student_view or item.get("visibility") != "internal"]
+    payload["messages"] = workflow_messages_for("withdrawal", application.student_id, request_id=application.id,
+                                                 student_visible_only=student_view)
+    payload["files"] = workflow_attachments(application.student_id, "withdrawal", request_id=application.id)
+    links = []
+    if application.dean_decision == "Approved" and application.status in {
+        "Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar"}:
+        links.append({"label": "Registrar report for this withdrawal (CSV)", "url": f"/api/withdrawal/{application.id}/registrar-report"})
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": ("Tagged withdrawals go out on the approved-withdrawals Excel list. The portal does not send any email: "
+                 "export the list, email it through the official channel and wait for the Registrar's acknowledgement."),
+        "links": links,
+    }
+    return payload
+
+
+def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False) -> dict:
+    student = item.student
+    logs = [
+        log_dict(row)
+        for row in TransactionLog.query.filter(
+            TransactionLog.transaction_slug.in_(("awol", "awol-return")),
+            TransactionLog.student_id == item.student_id,
+        ).order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc()).limit(60).all()
+    ]
+    open_messages = WorkflowMessage.query.filter_by(
+        transaction_slug="awol", student_id=item.student_id, status="Open"
+    ).count()
+    flags = []
+    if item.detection_source:
+        flags.append({"key": "source", "tone": "muted", "text": item.detection_source})
+    if item.refresher_required:
+        flags.append({"key": "refresher", "tone": "warn", "text": "6-unit refresher"})
+    if item.full_reenrollment_required:
+        flags.append({"key": "reenroll", "tone": "warn", "text": "Full re-enrollment"})
+    if item.years_in_program is not None and item.absolute_residence_years and item.years_in_program > item.absolute_residence_years:
+        flags.append({"key": "residence", "tone": "bad", "text": "Past the absolute residence limit"})
+    second = " · ".join(part for part in [
+        f"Returning: {item.target_return_term}" if item.target_return_term else "No return filed yet",
+        f"AWOL since {item.awol_effective_date.isoformat()}" if item.awol_effective_date else "",
+    ] if part)
+    payload = {
+        "id": f"awol-{item.id}",
+        "ref": f"awol-{item.id}",
+        "record_id": item.id,
+        "kind": _sp.KIND_AWOL,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_AWOL],
+        "slug": "awol",
+        **_process_status_fields("awol", item.status),
+        "student": leave_student_brief(student),
+        "card_lines": [item.policy_classification or "Policy check not run yet", second],
+        "flags": flags,
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": "", "exported_at": None, "sent_at": None, "acknowledged_at": None},
+        "actions": process_actions_for("awol", _sp.KIND_AWOL, item.status, role, item),
+        "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, item.status, {row["new_status"] for row in logs if row.get("new_status")}),
+        "unresolved_messages": open_messages,
+        "submitted_at": iso(item.return_requested_at or item.created_at),
+        "decided_at": iso(item.decided_at),
+        "last_activity_at": logs[0]["created_at"] if logs else iso(item.updated_at),
+        "created_at": iso(item.created_at),
+        "updated_at": iso(item.updated_at),
+    }
+    if not detail:
+        return payload
+    payload["summary_rows"] = [
+        {"label": "Type", "value": payload["kind_label"]},
+        {"label": "AWOL effective date", "value": iso(item.awol_effective_date), "date": True},
+        {"label": "Detection source", "value": item.detection_source or "Imported standing"},
+        {"label": "Last enrolled semester", "value": item.last_enrolled_term or "Not recorded"},
+        {"label": "Returning in", "value": item.target_return_term or "Not chosen yet"},
+        {"label": "Policy classification", "value": item.policy_classification or "Not reviewed yet"},
+        {"label": "Years in the program", "value": "Not calculated" if item.years_in_program is None else str(item.years_in_program)},
+        {"label": "Residence limits", "value": (f"{item.normal_residence_years} normal / {item.absolute_residence_years} absolute"
+                                                 if item.normal_residence_years else "Not calculated")},
+        {"label": "Student's written intention", "value": item.return_intent or "Not filed yet", "full": True},
+        {"label": "Reason for return", "value": item.return_reason or "None", "full": True},
+        {"label": "Dean decision", "value": item.dean_decision},
+        {"label": "Dean decided", "value": iso(item.decided_at), "date": True},
+        {"label": "Staff notes", "value": item.staff_notes or "None", "full": True},
+    ]
+    student_view = _lw.role_key(role) == "student"
+    if student_view:
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+    if not student_view:
+        review = awol_policy_review(student, {
+            "workflow_action": "return_from_awol",
+            "application_reference": "Structured portal return declaration" if item.return_intent else "",
+        })
+        payload["policy_review"] = {
+            "recommendation": review["recommendation"],
+            "suggested_dean_action": review["suggested_action"],
+            "summary": review["summary"],
+            "checks": review["checks"],
+        }
+        limits = review["limits"]
+        payload["student_summary"] = {
+            "years_in_program": limits["years_in_program"],
+            "normal_years": limits["normal_years"],
+            "absolute_years": limits["absolute_years"],
+            "program_level": limits["program_level"],
+        }
+    earlier = [
+        _process_brief_for_earlier("awol", _sp.KIND_LABELS[_sp.KIND_AWOL], row.status,
+                                   row.target_return_term or "", iso(row.decided_at), f"awol-{row.id}")
+        for row in AwolCase.query.filter(AwolCase.student_id == item.student_id, AwolCase.id != item.id)
+        .order_by(AwolCase.id.desc()).limit(12).all()
+    ]
+    earlier += [
+        _process_brief_for_earlier("awol", _sp.KIND_LABELS[_sp.KIND_RESIDENCY], residency_enrollment_dict(row)["status"],
+                                   row.term.label if row.term else "", None, f"residency-{row.id}")
+        for row in ResidencyEnrollment.query.filter_by(student_id=item.student_id).order_by(ResidencyEnrollment.id.desc()).limit(6).all()
+    ]
+    payload["earlier_cases"] = earlier
+    payload["events"] = _process_events_from_logs(logs)
+    payload["history"] = [row for row in logs if not student_view or row.get("visibility") != "internal"]
+    payload["messages"] = workflow_messages_for("awol", item.student_id, student_visible_only=student_view)
+    files = workflow_attachments(item.student_id, "awol")
+    if item.intent_attachment and not any(row["id"] == item.intent_attachment.id for row in files):
+        files.append(attachment_dict(item.intent_attachment))
+    payload["files"] = files
+    links = []
+    if str(item.dean_decision or "").startswith("Approved"):
+        links.append({"label": "AWOL return report for the Registrar (CSV)", "url": f"/api/awol/{item.id}/registrar-report"})
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": ("After the Dean approves a return, staff download the return report and send it to the Registrar through the "
+                 "official channel. Enrollment itself stays a separate Academic Coordinator step."),
+        "links": links,
+    }
+    return payload
+
+
+def residency_process_case(item: ResidencyEnrollment, role: str = "staff", detail: bool = False) -> dict:
+    student = item.student
+    shown = residency_enrollment_dict(item)
+    status = shown["status"]
+    term_label = item.term.label if item.term else ""
+    payload = {
+        "id": f"residency-{item.id}",
+        "ref": f"residency-{item.id}",
+        "record_id": item.id,
+        "kind": _sp.KIND_RESIDENCY,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_RESIDENCY],
+        "slug": "awol",
+        **_process_status_fields("awol", status),
+        "student": leave_student_brief(student),
+        "card_lines": [item.reason or "Residency", term_label],
+        "flags": [{"key": "policy", "tone": "muted", "text": item.policy_status}] if item.policy_status else [],
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": "", "exported_at": None, "sent_at": None, "acknowledged_at": None},
+        "actions": process_actions_for("awol", _sp.KIND_RESIDENCY, status, role, item) if item.status == "Active" else [],
+        "timeline": _sp.timeline_steps("awol", _sp.KIND_RESIDENCY, status),
+        "unresolved_messages": 0,
+        "submitted_at": iso(item.created_at),
+        "decided_at": None,
+        "last_activity_at": iso(item.updated_at),
+        "created_at": iso(item.created_at),
+        "updated_at": iso(item.updated_at),
+    }
+    if not detail:
+        return payload
+    payload["summary_rows"] = [
+        {"label": "Type", "value": payload["kind_label"]},
+        {"label": "Semester", "value": term_label or "Not recorded"},
+        {"label": "Purpose", "value": item.reason},
+        {"label": "Policy result when recorded", "value": item.policy_status},
+        {"label": "Recorded", "value": iso(item.created_at), "date": True},
+        {"label": "Closed", "value": iso(item.ended_at), "date": True},
+        {"label": "Staff notes", "value": item.staff_notes or "None", "full": True},
+    ]
+    if _lw.role_key(role) == "student":
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+    else:
+        review = awol_policy_review(student, {"workflow_action": "record_residency", "residency_reason": item.reason})
+        payload["policy_review"] = {
+            "recommendation": review["recommendation"],
+            "suggested_dean_action": review["suggested_action"],
+            "summary": review["summary"],
+            "checks": review["checks"],
+        }
+    logs = [
+        log_dict(row)
+        for row in TransactionLog.query.filter(
+            TransactionLog.transaction_slug == "awol", TransactionLog.student_id == item.student_id,
+            TransactionLog.source_reference.in_(("Residency policy review", "Residency record")),
+        ).order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc()).limit(30).all()
+    ]
+    payload["events"] = _process_events_from_logs(logs)
+    payload["history"] = logs
+    payload["messages"] = []
+    payload["files"] = []
+    payload["earlier_cases"] = [
+        _process_brief_for_earlier("awol", _sp.KIND_LABELS[_sp.KIND_RESIDENCY], residency_enrollment_dict(row)["status"],
+                                   row.term.label if row.term else "", None, f"residency-{row.id}")
+        for row in ResidencyEnrollment.query.filter(
+            ResidencyEnrollment.student_id == item.student_id, ResidencyEnrollment.id != item.id
+        ).order_by(ResidencyEnrollment.id.desc()).limit(12).all()
+    ]
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": "The term enrollment and monitoring records were updated when staff recorded this residency.",
+        "links": [{"label": "Residency report for the Registrar (CSV)", "url": f"/api/residency/{item.id}/registrar-report"}],
+    }
+    return payload
+
+
+def legacy_awol_process_case(student: Student, role: str = "staff", detail: bool = False) -> dict:
+    """A student tagged AWOL by the monitoring import who has no case row yet."""
+    payload = {
+        "id": f"legacy-{student.id}",
+        "ref": f"legacy-{student.id}",
+        "record_id": None,
+        "kind": _sp.KIND_AWOL,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_AWOL],
+        "slug": "awol",
+        **_process_status_fields("awol", "AWOL Declared"),
+        "student": leave_student_brief(student),
+        "card_lines": ["Policy check not run yet", "Flagged from the imported standing"],
+        "flags": [],
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": "", "exported_at": None, "sent_at": None, "acknowledged_at": None},
+        "actions": [],
+        "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, "AWOL Declared"),
+        "unresolved_messages": 0,
+        "submitted_at": None, "decided_at": None, "last_activity_at": None, "created_at": None, "updated_at": None,
+    }
+    if detail:
+        payload["summary_rows"] = [
+            {"label": "Type", "value": payload["kind_label"]},
+            {"label": "Status", "value": "AWOL, flagged from the imported standing. The student has not filed a return yet.", "full": True},
+        ]
+        payload.update({"events": [], "history": [], "messages": [], "files": [], "earlier_cases": [],
+                        "follow_up": None})
+    return payload
+
+
+def student_standalone_cases(student: Student) -> dict:
+    """The student's own AWOL / residency and withdrawal cases in the board's case shape (student view).
+
+    The student pages show them with the same card and timeline the staff board uses.
+    """
+    awol = [
+        awol_process_case(item, "student", detail=True)
+        for item in AwolCase.query.filter_by(student_id=student.id).order_by(AwolCase.id.desc()).limit(6).all()
+    ]
+    residency = [
+        residency_process_case(item, "student", detail=True)
+        for item in ResidencyEnrollment.query.filter_by(student_id=student.id).order_by(ResidencyEnrollment.id.desc()).limit(4).all()
+    ]
+    withdrawals = [
+        withdrawal_process_case(item, "student", detail=True)
+        for item in WithdrawalApplication.query.filter_by(student_id=student.id).order_by(WithdrawalApplication.id.desc()).limit(6).all()
+    ]
+    return {"awol": awol + residency, "withdrawal": withdrawals}
+
+
+def process_case_dict(slug: str, kind: str, record, role: str = "staff", detail: bool = False) -> dict:
+    if slug == _sp.SLUG_WITHDRAWAL:
+        return withdrawal_process_case(record, role, detail)
+    if isinstance(record, Student):
+        return legacy_awol_process_case(record, role, detail)
+    if kind == _sp.KIND_RESIDENCY:
+        return residency_process_case(record, role, detail)
+    return awol_process_case(record, role, detail)
+
+
+def process_case_rows(slug: str, role: str) -> list[dict]:
+    if slug == _sp.SLUG_WITHDRAWAL:
+        return [
+            withdrawal_process_case(item, role)
+            for item in WithdrawalApplication.query.order_by(WithdrawalApplication.updated_at.desc(), WithdrawalApplication.id.desc()).all()
+            if item.student
+        ]
+    rows = [
+        awol_process_case(item, role)
+        for item in AwolCase.query.order_by(AwolCase.updated_at.desc(), AwolCase.id.desc()).limit(150).all()
+        if item.student
+    ]
+    case_students = {row["student"]["id"] for row in rows}
+    for student in Student.query.filter(Student.enrollment_tag == "AWOL", ~Student.id.in_(case_students or {-1})).order_by(Student.last_name).all():
+        rows.append(legacy_awol_process_case(student, role))
+    rows.extend(
+        residency_process_case(item, role)
+        for item in ResidencyEnrollment.query.order_by(ResidencyEnrollment.updated_at.desc()).limit(150).all()
+        if item.student
+    )
+    return rows
+
+
+def _process_dean_decide(case_type: str, item_id: int, decision: str, note: str) -> None:
+    """Run the Dean's existing decision route for one case (same rules, same side effects)."""
+    _flask_g.process_decision_override = {"decision": decision, "note": note}
+    try:
+        outcome = PROCESS_DEAN_DECIDE(case_type, item_id)
+    finally:
+        _flask_g.process_decision_override = None
+    response, status = (outcome if isinstance(outcome, tuple) else (outcome, 200))[:2]
+    body = response.get_json(silent=True) or {}
+    if status >= 400:
+        raise ProcessError(body.get("error") or "The Dean's decision was refused.", 409 if status == 400 else status)
+
+
+PROCESS_DEAN_DECIDE = None  # set by the route block once the Dean decision route exists
+
+
+def process_case_apply(slug: str, kind: str, record, action: str, account: UserAccount, *, comment: str = "", data=None) -> dict:
+    """Apply one guarded move. Everything a drag, a menu choice or a button does ends here."""
+    data = data or {}
+    comment = (comment or data.get("staff_notes") or "").strip()
+    status = record.status if not isinstance(record, Student) else "AWOL Declared"
+    if isinstance(record, ResidencyEnrollment):
+        status = residency_enrollment_dict(record)["status"]
+    role = account.role
+    move = _sp.find_transition(slug, status, action, kind, role)
+    if not move:
+        raise ProcessError(_sp.refusal_reason(slug, status, action, kind, role), 409)
+    if move["needs_comment"] and not comment:
+        raise ProcessError("Please write the reason first. It is required for this step.", 400)
+    student = record if isinstance(record, Student) else record.student
+    before = status
+    if slug == _sp.SLUG_WITHDRAWAL:
+        latest = latest_withdrawal_application(record.student_id)
+        if not latest or latest.id != record.id:
+            raise ProcessError("This is not the student's current withdrawal request, so it can no longer be moved.", 409)
+        try:
+            if action in {"forward", "tag"}:
+                payload = MultiDict({
+                    "student_id": str(record.student_id),
+                    "workflow_action": {"forward": "forward_to_dean", "tag": "tag_subject_withdrawn"}[action],
+                })
+                if comment:
+                    payload["workflow_comment"] = comment
+                handle_withdrawal(payload)
+            elif action in {"approve", "deny"}:
+                _process_dean_decide("withdrawal", record.id, action, comment)
+            elif action == "return":
+                create_workflow_message("withdrawal", student, account, "Student", "Remarks", comment, "return", "student_visible")
+            elif action == "export":
+                raise ProcessError(
+                    "Exporting downloads the Registrar's Excel list, so it is done from 'Prepare Excel export', not by moving the card.", 409)
+        except ProcessError:
+            raise
+        except ValueError as exc:
+            raise ProcessError(str(exc), 409) from exc
+    else:
+        try:
+            if action in {"forward", "complete_reenrollment", "end_residency"}:
+                payload = MultiDict({"student_id": str(record.student_id)})
+                if action == "forward":
+                    payload["workflow_action"] = "forward_return_to_dean"
+                    payload["case_id"] = str(record.id)
+                elif action == "complete_reenrollment":
+                    payload["workflow_action"] = "complete_reenrollment"
+                    payload["case_id"] = str(record.id)
+                else:
+                    payload["workflow_action"] = "end_residency"
+                    payload["residency_id"] = str(record.id)
+                payload["staff_notes"] = comment
+                handle_awol(payload)
+            elif action in {"approve", "deny", "return"}:
+                _process_dean_decide("awol-return", record.id, action, comment)
+        except ProcessError:
+            raise
+        except ValueError as exc:
+            raise ProcessError(str(exc), 409) from exc
+    recompute_risk(student)
+    db.session.flush()
+    fresh = student if isinstance(record, Student) else record
+    after = fresh.status if not isinstance(fresh, Student) else before
+    if isinstance(fresh, ResidencyEnrollment):
+        after = residency_enrollment_dict(fresh)["status"]
+    label = _sp.status_by_key(slug).get(after, {}).get("label", after)
+    return {"message": f"{move['label']}: now '{label}'.", "from": before, "to": after}
+
+
 def _status_sentence(student: Student, ind: dict) -> str:
     bits = [f"{student.name} ({student.student_number}, {student.program.code}) is at the {ind['stage']} stage"]
     bits.append(f"standing {ind['standing']}, progress status {student_priority(student)['level']}")
@@ -8293,6 +8982,10 @@ class PolicyPassageNotFound(RuntimeError):
     """The policy library is empty or has no passage that is relevant to the question."""
 
 
+class PolicyAnswerNotFound(PolicyPassageNotFound):
+    """The library is loaded, but none of its passages answers the question."""
+
+
 class PolicyOcrUnavailable(ValueError):
     """A scanned PDF needs OCR, but OCR cannot be used on this computer."""
 
@@ -8300,7 +8993,8 @@ class PolicyOcrUnavailable(ValueError):
 POLICY_DRAFT_WARNING = "Draft — pending Graduate School validation"
 POLICY_DOCUMENT_CATEGORIES = ["Handbook", "Research Protocol", "Operations Manual", "Memo", "Form", "Other"]
 POLICY_DOCUMENT_STATUSES = ["active", "draft", "archived"]
-POLICY_SECTIONS_VERSION = 3
+POLICY_SECTIONS_VERSION = 4
+import policy_rag as _prag  # noqa: E402  (key-free retrieval and answers for the Policy Assistant)
 POLICY_OCR_MAX_PAGES = int(os.getenv("POLICY_OCR_MAX_PAGES", "40"))
 _WML = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 # Display names for the stakeholder files that ship with the project. Anything
@@ -8476,13 +9170,8 @@ def _reset_rag_indexes() -> None:
 
 # --- reading policy files -------------------------------------------------
 def _clean_policy_text(text: str) -> str:
-    text = (text or "").replace("\x00", " ")
-    # Drop lone surrogates, then repair the broken apostrophes/bullets that
-    # some PDF exports leave behind as U+FFFD.
-    text = text.encode("utf-8", "ignore").decode("utf-8", "ignore")
-    text = re.sub(r"(?<=\w)�(?=\w)", "’", text)
-    text = re.sub(r"(?m)^[ \t]*�[ \t]+", "• ", text)
-    return text.replace("�", "’")
+    # Repairs broken apostrophes/bullets (U+FFFD), ligatures and stray symbols from PDF/Word exports.
+    return _prag.clean_text(text)
 
 
 _OCR_INSTALL_HINT = (
@@ -8615,6 +9304,12 @@ def _pdf_sections(file_bytes: bytes) -> tuple[list[tuple[str, str]], int, bool]:
                 if readable_word_count(cleaned) > readable_word_count(texts[index]):
                     texts[index] = cleaned
                     ocr_used = True
+    flat_words = sum(readable_word_count(text) for text in texts)
+    if not ocr_used:
+        # Real structure: printed page numbers, bold headings as section titles, repaired line breaks.
+        structured = _prag.structured_pdf_sections(file_bytes, page_count)
+        if structured and sum(len(body.split()) for _label, body in structured) >= 0.8 * flat_words:
+            return structured, page_count, ocr_used
     texts = _strip_running_headers(texts)
     sections = [(f"p. {number}", text) for number, text in enumerate(texts, start=1) if text.strip()]
     return sections, page_count, ocr_used
@@ -8957,7 +9652,7 @@ def _rag_index_signature(sources: list) -> dict:
         "files": files,
         "chunk_size": int(os.getenv("RAG_CHUNK_SIZE", "180")),
         "chunk_overlap": int(os.getenv("RAG_CHUNK_OVERLAP", "30")),
-        "parser": POLICY_SECTIONS_VERSION,
+        "parser": f"{POLICY_SECTIONS_VERSION}.{_prag.CHUNK_VERSION}",
     }
 
 
@@ -9000,16 +9695,7 @@ def _chunk_rag_text(
 
 
 def _chunk_policy_sections(title: str, sections: list[tuple[str, str]]) -> list[dict]:
-    chunks: list[dict] = []
-    part = 0
-    for label, text in sections:
-        if label:
-            chunks.extend(_chunk_rag_text(text, title, title=title, location=label))
-            continue
-        for body in _rag_split_words(text):
-            part += 1
-            chunks.append({"id": "", "title": title, "source": f"{title}, part {part}", "text": body})
-    return chunks
+    return _prag.chunk_sections(title, sections)
 
 
 def _read_rag_document_chunks(sources: list) -> list[dict]:
@@ -9026,6 +9712,7 @@ def _read_rag_document_chunks(sources: list) -> list[dict]:
             print(f"Policy Assistant skipped {path.name}: {exc}")
             continue
         for chunk in document_chunks:
+            chunk["sec"] = f"{path.name}#{chunk.get('sec')}"
             chunk.update({
                 "file_name": path.name,
                 "kind": source.get("kind") or "system",
@@ -9763,6 +10450,11 @@ def _retrieve_rag_document_chunks(
     chunks: list[dict],
     limit: int | None = None,
 ) -> list[dict]:
+    """Hybrid retrieval with a Gemini key: embeddings and BM25 keyword search, fused by rank.
+
+    A passage that only the keyword search finds (an exact rule name, a form number, a figure) is never lost
+    because the embedding missed it, and vice versa. Without embeddings the keyword ranking stands alone.
+    """
     limit = limit or max(1, int(os.getenv("RAG_TOP_K", "3")))
     try:
         vectors = _load_rag_vector_index(chunks)
@@ -9777,21 +10469,38 @@ def _retrieve_rag_document_chunks(
         ]
         scored.sort(key=lambda item: (-item[0], item[1].get("id", "")))
         if scored:
-            top = [
-                {**chunk, "_retrieval": "vector", "_score": round(score, 6)}
-                for score, chunk in scored[:limit]
-            ]
-            # Exact wording still matters: a passage that contains nearly every
-            # term of the question is never left out because of the embedding.
-            lexical = _retrieve_rag_document_chunks_lexically(question, chunks, 1)
-            if lexical and lexical[0]["_coverage"] >= 0.75 and lexical[0]["id"] not in {item["id"] for item in top}:
-                top = [{**lexical[0], "_retrieval": "lexical-boost"}] + top[: limit - 1]
+            pool = max(limit * 4, 12)
+            vector_ranked = {
+                chunk["id"]: {**chunk, "_retrieval": "vector", "_score": round(score, 6)}
+                for score, chunk in scored[:pool]
+            }
+            keyword_ranked = {item["id"]: item for item in _prag.search(question, chunks, pool)}
+            fused: dict[str, float] = {}
+            for rank, chunk_id in enumerate(vector_ranked):
+                fused[chunk_id] = fused.get(chunk_id, 0.0) + 1.0 / (60 + rank)
+            for rank, chunk_id in enumerate(keyword_ranked):
+                fused[chunk_id] = fused.get(chunk_id, 0.0) + 1.0 / (60 + rank)
+            top = []
+            for chunk_id in sorted(fused, key=lambda key: (-fused[key], key))[:limit]:
+                if chunk_id in vector_ranked:
+                    top.append({**vector_ranked[chunk_id], "_rrf": round(fused[chunk_id], 5)})
+                else:
+                    top.append({**keyword_ranked[chunk_id], "_retrieval": "bm25-boost", "_rrf": round(fused[chunk_id], 5)})
             return top
     except Exception:  # noqa: BLE001
         # Keep policy guidance available during an embedding outage. Generation
         # still receives retrieved source text and remains citation-grounded.
         pass
-    return _retrieve_rag_document_chunks_lexically(question, chunks, limit)
+    return [{**item, "_retrieval": "lexical-fallback"} for item in _prag.search(question, chunks, limit)]
+
+
+def prewarm_keyword_index() -> None:
+    """Without an AI key: read the documents and build the keyword index before the first question."""
+    try:
+        chunks = _in_app_context(_load_rag_document_index)
+        _prag.get_index(chunks)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Policy Assistant keyword index prewarm skipped: {exc}")
 
 
 def prewarm_document_rag() -> None:
@@ -9799,6 +10508,7 @@ def prewarm_document_rag() -> None:
     try:
         def build():
             chunks = _load_rag_document_index()
+            _prag.get_index(chunks)
             return chunks, _ensure_rag_vectors(chunks)
 
         chunks, vectors = _in_app_context(build)
@@ -9834,6 +10544,9 @@ def _policy_citation(chunk: dict) -> dict:
         "title": chunk["title"],
         "source": chunk["source"],
         "text": chunk["text"][:700],
+        "quote": chunk.get("quote") or chunk["text"][:700],
+        "page": chunk.get("page"),
+        "section": chunk.get("section"),
         "retrieval": chunk.get("_retrieval", "vector"),
         "similarity": chunk.get("_score"),
         "status": status,
@@ -9865,32 +10578,37 @@ def _finalize_document_answer(answer: str, chunks: list[dict]) -> str:
 
 def call_document_rag(question: str, snippets: list[dict], payload: dict | None, student: Student | None) -> tuple[str, list[dict]]:
     document_chunks = _load_rag_document_index()
-    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks)
+    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks, max(5, int(os.getenv("RAG_TOP_K", "3"))))
     if not retrieved_chunks:
         raise PolicyPassageNotFound("No matching policy passage was found.")
     case_context = _case_context_for_rag(student, payload, snippets)
     prompt = (
-        "Answer as the USLS Graduate School assistant. Use the retrieved policy document excerpts (handbook, "
-        "research protocol, memos, manuals) as the primary source; when two excerpts disagree, prefer the one "
-        "marked as the newer or staff-uploaded document and say so. Name the source document title and page or "
-        "section you rely on. If an excerpt is marked DRAFT, say the rule is a draft pending Graduate School "
-        "validation. If student context is provided, use it only for that student's live "
-        "status and do not invent approvals, decisions, or missing records. Answer the question directly in no "
-        "more than 120 words. Include only the rules needed to answer it; do not paste long source passages. "
-        "If the documents do not answer the question, say what is missing.\n\n"
+        "You are the USLS Graduate School policy assistant. Answer using ONLY the numbered excerpts below "
+        "(handbook, research protocol, memos, manuals); never use outside knowledge and never guess. "
+        "Start with the direct answer in one or two plain sentences, then quote the exact rule in quotation marks. "
+        "Finish with the source in the form (Document title, p. N, section name); use the page and section shown "
+        "in the excerpt heading. If two excerpts disagree, prefer the one marked as newer or staff-uploaded and say so. "
+        "If an excerpt is marked DRAFT, say the rule is a draft pending Graduate School validation. "
+        "If the excerpts do not contain the answer, reply exactly: "
+        f"\"{_prag.NOT_FOUND_ANSWER}\" and add nothing else. "
+        "If student context is provided, use it only for that student's live status and do not invent approvals, "
+        "decisions, or missing records. Use at most 120 words and do not paste long passages.\n\n"
     )
     if case_context:
         prompt += case_context + "\n\n"
     prompt += "Retrieved document excerpts:\n"
     prompt += "\n\n".join(
-        f"[{chunk['source']}"
+        f"[{number}. {chunk['source']}"
         + (" — DRAFT, pending Graduate School validation" if (chunk.get("status") or "active") == "draft" else "")
         + (" — staff-uploaded" if chunk.get("kind") == "managed" else "")
         + f"]\n{chunk['text']}"
-        for chunk in retrieved_chunks
+        for number, chunk in enumerate(retrieved_chunks, start=1)
     )
     prompt += f"\n\nQuestion: {question}"
-    response = _finalize_document_answer(_gemini_generate(prompt), retrieved_chunks)
+    generated = _gemini_generate(prompt)
+    if (generated or "").strip().lower().startswith("i could not find this in the handbook"):
+        return _prag.NOT_FOUND_ANSWER, []  # the model found nothing in the passages: show no unrelated sources
+    response = _finalize_document_answer(generated, retrieved_chunks)
     return response, [_policy_citation(chunk) for chunk in retrieved_chunks]
 
 
@@ -10208,60 +10926,31 @@ def _local_answer_location(chunk: dict) -> str:
     return source[len(title):].lstrip(", ") if source.startswith(title) else source
 
 
-def call_local_document_rag(question: str) -> tuple[str, list[dict]]:
-    """Answer from the policy library without an AI service: cited, extractive, short."""
+def search_policy_passages(question: str, limit: int = 3) -> list[dict]:
+    """Best passages for a question with no AI key: BM25 + the older lexical score, reranked on sentences."""
     document_chunks = _load_rag_document_index()
-    retrieved_chunks = _retrieve_rag_document_chunks_lexically(
-        question,
-        document_chunks,
-        max(8, int(os.getenv("RAG_TOP_K", "3"))),
+    legacy = _retrieve_rag_document_chunks_lexically(question, document_chunks, 20)
+    return _prag.search(
+        question, document_chunks, limit, extra_rank=[chunk["id"] for chunk in legacy],
     )
-    relevant = [chunk for chunk in retrieved_chunks if chunk.get("_relevant")]
-    if not relevant:
-        raise PolicyPassageNotFound("No matching policy passage was found.")
 
-    # Keep the response strictly extractive: sentences are copied from the
-    # strongest passage (and a second one only when it is nearly as strong), so
-    # an answer can never blend in a loosely matching rule.
-    top = relevant[0]
-    selected_chunks = [top]
-    for other in relevant[1:]:
-        if len(selected_chunks) >= 2:
-            break
-        if other["source"] != top["source"] and other["_score"] >= 0.6 * top["_score"]:
-            selected_chunks.append(other)
 
-    page_texts = [_merge_rag_source_chunks(chunk, document_chunks) for chunk in selected_chunks]
-    total_limit = max(500, int(os.getenv("LOCAL_RAG_MAX_ANSWER_CHARS", "1050")))
-    targeted_answer = _targeted_local_rag_answer(question, page_texts)
-    paragraphs: list[str] = []
-    cited = list(selected_chunks)
-    if targeted_answer:
-        paragraphs.append(f"According to {top['title']}, {_local_answer_location(top)}: {targeted_answer}")
-    else:
-        idf = _rag_query_idf(
-            set(_rag_terms(question)),
-            [set(_rag_chunk_terms(chunk)) for chunk in document_chunks],
-        )
-        cited = []
-        first_score = 0.0
-        for chunk, page_text in zip(selected_chunks, page_texts, strict=True):
-            text, score = _select_answer_sentences(question, page_text, idf, total_limit // len(selected_chunks))
-            if not text:
-                text = _focused_local_rag_excerpt(page_text, question, total_limit // len(selected_chunks))
-                score = 0.0
-            if not text:
-                continue
-            if cited and score < 0.6 * first_score:
-                continue  # the second passage adds nothing that answers the question
-            if not cited:
-                first_score = score
-            cited.append(chunk)
-            paragraphs.append(f"According to {chunk['title']}, {_local_answer_location(chunk)}: {text}")
-    if not paragraphs:
-        raise PolicyPassageNotFound("No readable policy passage was found.")
-    answer = _finalize_document_answer("\n\n".join(paragraphs), cited)
-    citations = [{**_policy_citation(chunk), "retrieval": "lexical"} for chunk in cited]
+def call_local_document_rag(question: str) -> tuple[str, list[dict]]:
+    """Answer from the policy library without an AI service: a short, cited, quoted answer.
+
+    Raises PolicyAnswerNotFound when the library is loaded but does not answer the question, so the caller says
+    so plainly instead of showing an unrelated passage.
+    """
+    document_chunks = _load_rag_document_index()
+    passages = search_policy_passages(question, max(3, int(os.getenv("RAG_TOP_K", "3"))))
+    composed = _prag.compose_answer(
+        question, passages, document_chunks, max(400, int(os.getenv("LOCAL_RAG_MAX_ANSWER_CHARS", "900"))),
+    )
+    if not composed:
+        raise PolicyAnswerNotFound("The policy documents do not answer this question.")
+    answer, used = composed
+    answer = _finalize_document_answer(answer, used)
+    citations = [{**_policy_citation(chunk), "retrieval": chunk.get("_retrieval", "bm25")} for chunk in used]
     return answer, citations
 
 
@@ -10630,16 +11319,20 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
             "Retrieved from the curated local policy library without AI generation.", False,
         ),
         "document-rag": (
-            "Policy documents · Gemini",
-            "Generated by Gemini from retrieved policy document excerpts (handbook, protocol, uploads).", True,
+            "AI answer grounded in the documents",
+            "Written by Gemini using only the retrieved passages of the Handbook, Research Protocol and uploaded policies; every answer names its page and section.", True,
         ),
         "document-rag-cache": (
-            "Policy documents · Gemini (cached)",
-            "Previously generated by Gemini from retrieved policy document excerpts.", True,
+            "AI answer grounded in the documents (saved)",
+            "Written earlier by Gemini using only the retrieved passages of the policy documents.", True,
         ),
         "document-rag-local": (
-            "Policy documents · Local retrieval",
-            "Extracted directly from matching policy document passages without AI generation.", False,
+            "Answered from the documents (keyword search)",
+            "Found by keyword search in the Handbook, Research Protocol and uploaded policies and quoted from them. No AI service was used; add a Gemini key for fuller, reworded answers.", False,
+        ),
+        "policy-not-found": (
+            "Not found in the documents",
+            "The Handbook, Research Protocol and uploaded policies were searched and none of them answers this question.", False,
         ),
         "role-guarded": (
             "Policy library · Role limits",
@@ -10661,7 +11354,11 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
         label = "Live record · Gemini interpreted"
         detail = "Gemini classified the question only; verified database rules produced the answer."
         ai_used = True
-    return {"label": label, "detail": detail, "ai_used": ai_used}
+    ai_configured = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
+    note = None
+    if not ai_configured and mode in {"document-rag-local", "policy-not-found", "student-document-rag-local"}:
+        note = "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers."
+    return {"label": label, "detail": detail, "ai_used": ai_used, "ai_configured": ai_configured, "note": note}
 
 
 def _attention_report(portfolio: dict, display_limit: int = 5) -> dict:
@@ -10808,8 +11505,7 @@ def local_grounded_answer(
             if recs:
                 out.append("Suggested action: " + recs[0]["recommendation"] + f" ({recs[0]['owner']}).")
         if not snippets and not student:
-            out.append("I could not find a matching policy. Try mentioning a stage, form, or topic "
-                       "(e.g. LOA, Form 4, panel, ethics, completion).")
+            out.append(_prag.NOT_FOUND_ANSWER)
 
     return " ".join(out).strip()
 
@@ -11043,7 +11739,7 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
     database_intents = ASSISTANT_DATABASE_INTENTS
     if policy_only and intent in database_intents:
         return assistant_role_guarded_response(role)
-    snippets = retrieve_policy(question, k=3) if intent in {"policy", "unknown"} else []
+    snippets = _relevant_policy_snippets(question, retrieve_policy(question, k=3)) if intent in {"policy", "unknown"} else []
     mode = "database-rules" if intent in database_intents else "policy-retrieval"
     rag_citations = []
     attention_portfolio = portfolio_recommendations() if intent == "student_attention" else None
@@ -11066,6 +11762,9 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
             try:
                 answer, rag_citations = call_local_document_rag(question)
                 mode = "document-rag-local"
+            except PolicyAnswerNotFound:
+                # The library is there but does not answer this: say so, never show an unrelated passage.
+                answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "policy-not-found"
             except PolicyPassageNotFound:
                 # No passage in the library is relevant: only now do the curated snippets answer.
                 answer = local_grounded_answer(
@@ -11156,7 +11855,7 @@ def generate_student_answer(question: str, student: Student) -> dict:
             "read_only": True,
         }
     payload = student_recommendations(student)
-    snippets = retrieve_policy(question, k=3)
+    snippets = _relevant_policy_snippets(question, retrieve_policy(question, k=3))
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     mode = "student-fast"
     rag_citations = []
@@ -11178,6 +11877,8 @@ def generate_student_answer(question: str, student: Student) -> dict:
             try:
                 answer, rag_citations = call_local_document_rag(question)
                 mode = "student-document-rag-local"
+            except PolicyAnswerNotFound:
+                answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "student-document-not-found"
             except Exception:
                 answer = _student_policy_fallback(snippets)
                 mode = "student-policy-fallback"
@@ -11186,6 +11887,11 @@ def generate_student_answer(question: str, student: Student) -> dict:
     return {
         "answer": answer,
         "mode": mode,
+        "source": _assistant_source({
+            "student-document-rag": "document-rag",
+            "student-document-rag-local": "document-rag-local",
+            "student-document-not-found": "policy-not-found",
+        }.get(mode, mode)),
         "citations": rag_citations or (
             [
                 {"id": item["id"], "title": item["title"], "source": item["source"], "text": item["text"]}
@@ -11945,6 +12651,7 @@ def register_routes(app: Flask) -> None:
                 "research_milestones": [research_milestone_payload(student, gate) for gate in RESEARCH_MILESTONES],
                 "loa_allowed_reasons": LOA_ALLOWED_REASONS,
                 "leave_overview": leave_student_overview(student),
+                "standalone_cases": student_standalone_cases(student),
                 "readmission_requirements": readmission_requirements(),
                 "upcoming_semesters": upcoming_semester_labels(5),
                 "future_semesters": future_semester_labels(5),
@@ -16065,7 +16772,8 @@ def register_routes(app: Flask) -> None:
     @require_api_login("dean")
     def workflow_approval_decide(case_type: str, item_id: int):
         account = current_account()
-        data = request.get_json(silent=True) or {}
+        # The standalone board (process_case_apply) runs this same route for a Dean's drag or button.
+        data = getattr(_flask_g, "process_decision_override", None) or request.get_json(silent=True) or {}
         decision = (data.get("decision") or "").lower()
         note = (data.get("note") or "").strip()
         if decision not in {"approve", "return", "deny", "review"}:
@@ -17020,6 +17728,8 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def business_rule_update(rule_id: int):
         rule = BusinessRule.query.get_or_404(rule_id)
+        if business_rule_is_locked(rule):
+            return jsonify({"error": business_rule_lock_message(rule), "locked": True}), 403
         data = request.get_json(silent=True) or {}
         reason = str(data.get("reason") or "").strip()
         if len(reason) < 3:
@@ -17382,6 +18092,8 @@ def register_routes(app: Flask) -> None:
             "counts": counts,
             "programs": sorted({row["student"]["program_code"] for row in rows}),
             "reasons": sorted({row["reason_category"] for row in rows if row["reason_category"]}),
+            "recent_activity": process_recent_activity(slug),
+            "policy_questions": DEPLOYMENT_POLICY_QUESTIONS,
         })
 
     @app.route("/api/leave-cases/<int:case_id>")
@@ -17514,6 +18226,142 @@ def register_routes(app: Flask) -> None:
             query = query.filter_by(slug=slug)
         rows = query.order_by(LeaveExportLog.id.desc()).limit(30).all()
         return jsonify({"items": [leave_export_log_dict(item) for item in rows]})
+
+    # ---- The standalone process board: one set of routes for all four processes -------------
+    # Leave of Absence and Readmission answer from the leave case routes above; AWOL & Residency
+    # and Withdrawal answer from standalone_process.py. Every drag, menu choice and button on
+    # every board ends in process_case_transition().
+    globals()["PROCESS_DEAN_DECIDE"] = workflow_approval_decide
+
+    def _process_error_response(exc: ProcessError):
+        return jsonify({"error": str(exc)}), exc.status
+
+    def _process_slug_arg(slug: str):
+        try:
+            return process_slug_or_error(slug), None
+        except ProcessError as exc:
+            return None, _process_error_response(exc)
+
+    @app.route("/api/process-cases")
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_cases_list():
+        slug, error = _process_slug_arg(request.args.get("slug") or "")
+        if error:
+            return error
+        account = current_account()
+        if account.role == "academic_coordinator" and slug != _sp.SLUG_AWOL:
+            return jsonify({"error": "This process is not assigned to your role."}), 403
+        if slug in LEAVE_SLUGS:
+            return leave_cases_list()
+        rows = process_case_rows(slug, account.role)
+        counts: dict[str, int] = {}
+        for row in rows:
+            key = _sp.column_key_for_status(slug, row["status"]) or "other"
+            counts[key] = counts.get(key, 0) + 1
+        return jsonify({
+            "slug": slug,
+            "vocabulary": _sp.vocabulary_payload(slug),
+            "cases": rows,
+            "counts": counts,
+            "programs": sorted({row["student"]["program_code"] for row in rows}),
+            "reasons": [],
+            "recent_activity": process_recent_activity(slug),
+            "policy_questions": DEPLOYMENT_POLICY_QUESTIONS,
+            "residency_reasons": list(RESIDENCY_REASONS) if slug == _sp.SLUG_AWOL else [],
+        })
+
+    @app.route("/api/process-cases/<slug>/<ref>")
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_case_detail(slug: str, ref: str):
+        slug, error = _process_slug_arg(slug)
+        if error:
+            return error
+        if slug in LEAVE_SLUGS:
+            return leave_case_detail(safe_int(ref))
+        account = current_account()
+        try:
+            kind, record = process_load_record(slug, ref)
+        except ProcessError as exc:
+            return _process_error_response(exc)
+        return jsonify({
+            "case": process_case_dict(slug, kind, record, account.role, detail=True),
+            "vocabulary": _sp.vocabulary_payload(slug),
+        })
+
+    @app.route("/api/process-cases/<slug>/<ref>/transition", methods=["POST"])
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_case_transition(slug: str, ref: str):
+        """Every button, menu choice and drag and drop on every standalone board ends up here."""
+        slug, error = _process_slug_arg(slug)
+        if error:
+            return error
+        if slug in LEAVE_SLUGS:
+            return leave_case_transition(safe_int(ref))
+        account = current_account()
+        data = request_payload()
+        action = (data.get("action") or "").strip()
+        try:
+            kind, record = process_load_record(slug, ref)
+            outcome = process_case_apply(slug, kind, record, action, account, comment=(data.get("comment") or ""), data=data)
+            db.session.commit()
+        except ProcessError as exc:
+            db.session.rollback()
+            return _process_error_response(exc)
+        except Exception as exc:  # noqa: BLE001 - a refused step must never be a server error
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        kind, record = process_load_record(slug, ref)
+        return jsonify({
+            "ok": True,
+            "message": outcome["message"],
+            "case": process_case_dict(slug, kind, record, account.role, detail=True),
+        })
+
+    @app.route("/api/process-cases/<slug>/batch", methods=["POST"])
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_cases_batch(slug: str):
+        slug, error = _process_slug_arg(slug)
+        if error:
+            return error
+        if slug in LEAVE_SLUGS:
+            return leave_cases_batch()
+        account = current_account()
+        data = request_payload()
+        refs = []
+        for value in data.getlist("case_ids"):
+            if str(value) not in refs:
+                refs.append(str(value))
+        action = (data.get("action") or "").strip()
+        if not refs:
+            return jsonify({"error": "Select at least one request."}), 400
+        batchable = {item["action"] for item in _sp.TRANSITIONS[slug] if item["batch"]}
+        if action not in batchable:
+            return jsonify({"error": "That step cannot be applied to several requests at once."}), 400
+        comment = (data.get("comment") or "").strip()
+        if any(item["action"] == action and item["needs_comment"] for item in _sp.TRANSITIONS[slug]) and not comment:
+            return jsonify({"error": "Enter the required reason before applying this step."}), 400
+        updated, skipped = [], []
+        for ref in refs:
+            name = ""
+            case_id = ref
+            try:
+                kind, record = process_load_record(slug, ref)
+                student = record if isinstance(record, Student) else record.student
+                name = student.name
+                student_id = student.id
+                process_case_apply(slug, kind, record, action, account, comment=comment, data=data)
+                db.session.commit()  # each row stands on its own, like the leave batch
+                updated.append({"case_id": case_id, "student_id": student_id, "student_name": name})
+            except ProcessError as exc:
+                db.session.rollback()
+                skipped.append({"case_id": case_id, "student_name": name, "reason": str(exc)})
+            except Exception as exc:  # noqa: BLE001
+                db.session.rollback()
+                skipped.append({"case_id": case_id, "student_name": name, "reason": str(exc)})
+        return jsonify({
+            "ok": True, "updated": updated, "skipped": skipped, "action": action,
+            "message": f"{len(updated)} request(s) updated; {len(skipped)} skipped.",
+        })
 
     @app.route("/api/leave-of-absence/policy-review", methods=["POST"])
     @require_api_login("staff", "academic_coordinator", "dean")
@@ -32298,10 +33146,15 @@ def subject_needs_report_payload(
     program: Program,
     term: AcademicTerm | None = None,
 ) -> dict:
-    """Build the AC's missing-subject report from official and operational status layers.
+    """Build the AC's subject-needs report from the official and operational status layers.
 
-    Completed and currently enrolled subjects are excluded from offering need.
-    All other recorded outcomes count as subject demand.
+    Two different figures per subject (they are never the same number twice):
+    * ``not_taken_count`` - every expected-to-enroll student of the program whose curriculum
+      has the subject and who has neither completed it nor is enrolled in it (the backlog);
+    * ``need_count`` - the part of that backlog that is due NEXT: the subject is in the
+      student's next semester group (the same group the course-demand figure uses), which
+      is what the coordinator has to offer. Failed, dropped and withdrawn subjects are
+      retakes and are counted in both and marked ``reason``.
     """
     students = students_expected_for_planning(program, term)
     rows_by_course: dict[int, dict] = {}
@@ -32317,6 +33170,7 @@ def subject_needs_report_payload(
                     "title": course.title,
                     "category": course.category,
                     "units": course.units or 3,
+                    "recommended_term": course.recommended_term,
                 },
                 "not_taken": [],
             }
@@ -32341,6 +33195,8 @@ def subject_needs_report_payload(
             .all()
         ):
             latest_operational.setdefault(item.course_id, item)
+        due_next_ids = {item["id"] for item in student_semester_subjects(student, term)["next_subjects"]}
+        brief = student_brief(student)
 
         for course in curriculum:
             official_status = (
@@ -32361,22 +33217,25 @@ def subject_needs_report_payload(
                 continue
             reason = status if status in {"Dropped", "Withdrawn", "Failed"} else "Not taken"
             report_row(course)["not_taken"].append({
-                **student_brief(student),
+                **brief,
                 "status": status or "Missing",
                 "reason": reason,
+                "due_next": course.id in due_next_ids,
             })
 
     rows = []
     for item in rows_by_course.values():
-        students_needing = item["not_taken"]
+        backlog = sorted(item["not_taken"], key=lambda entry: (not entry["due_next"], entry["last_name"] or "", entry["first_name"] or ""))
         rows.append({
             "course": item["course"],
-            "need_count": len(students_needing),
-            "not_taken_count": len(item["not_taken"]),
-            "students": students_needing,
+            "need_count": sum(1 for entry in backlog if entry["due_next"]),
+            "not_taken_count": len(backlog),
+            "retake_count": sum(1 for entry in backlog if entry["reason"] != "Not taken"),
+            "students": backlog,
         })
     rows.sort(key=lambda row: (
         -row["need_count"],
+        -row["not_taken_count"],
         row["course"]["code"],
     ))
     return {
@@ -32384,14 +33243,17 @@ def subject_needs_report_payload(
         "term": term_dict(term) if term else None,
         "generated_at": iso(now_utc()),
         "basis": (
-            "Every active student in the selected program who will need subjects (enrolled, not yet enrolled, readmitted or in residency). Official completion and "
-            "the latest semester enrollment status are considered. Completed, taken, and "
-            "current subjects are excluded; all other subjects count as offering need."
+            "Counts every active student of the program who will need subjects (enrolled, not yet enrolled, "
+            "readmitted or in residency). Students on leave, AWOL, withdrawn or graduated are left out. "
+            "\"Needing next\" means the subject is in the student's next semester group, or the student must "
+            "retake it after failing, dropping or withdrawing. \"Not taken\" is the whole backlog: the subject is not "
+            "completed and not being taken now. Completed and current subjects are never counted."
         ),
         "summary": {
             "students_reviewed": len(students),
             "subjects_with_need": sum(1 for row in rows if row["need_count"] > 0),
             "student_subject_needs": sum(row["need_count"] for row in rows),
+            "subjects_not_taken": sum(1 for row in rows if row["not_taken_count"] > 0),
         },
         "rows": rows,
     }
@@ -36648,5 +37510,7 @@ if __name__ == "__main__":
             name="rag-prewarm",
             daemon=True,
         ).start()
+    elif os.getenv("RAG_PREWARM", "1").strip().lower() not in {"0", "false", "no"}:
+        threading.Thread(target=prewarm_keyword_index, name="rag-keyword-prewarm", daemon=True).start()
     print(f"USLS Graduate School platform running at http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)

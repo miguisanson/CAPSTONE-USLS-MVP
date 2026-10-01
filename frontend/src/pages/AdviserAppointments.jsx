@@ -327,7 +327,9 @@ function AppointmentCard({ row, onDone }) {
   );
 }
 
-export default function AdviserAppointments({ role }) {
+// `embedded` drops the page header so the list can sit inside Research Gate (staff, coordinators)
+// or the Dean's Approvals Queue; `onChanged` lets a host refresh its own counts after an action.
+export default function AdviserAppointments({ role, embedded = false, onChanged }) {
   const [tab, setTab] = useState("mine");
   const open = useApi(() => api.adviserAppointments({ scope: "open" }), []);
   const all = useApi(() => (tab === "all" ? api.adviserAppointments({ scope: "all" }) : Promise.resolve(null)), [tab === "all"]);
@@ -340,11 +342,16 @@ export default function AdviserAppointments({ role }) {
   const refetch = () => {
     open.refetch();
     if (tab === "all") all.refetch();
+    if (onChanged) onChanged();
   };
 
   return (
     <div className="space-y-5 animate-fade-up">
-      <PageHeader title="Research adviser appointments" description={PROTOCOL} icon={UserRoundCheck} />
+      {embedded ? (
+        <p className="text-sm text-slate-600">{PROTOCOL}</p>
+      ) : (
+        <PageHeader title="Research adviser appointments" description={PROTOCOL} icon={UserRoundCheck} />
+      )}
 
       {canRecord && <AdviserRecordCard onRecorded={refetch} />}
 

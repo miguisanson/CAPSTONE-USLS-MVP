@@ -15,7 +15,6 @@ import MonitoringGrid from "./pages/MonitoringGrid";
 import CoursePlanning from "./pages/CoursePlanning";
 import EnrollmentClassList from "./pages/EnrollmentClassList";
 import Enrollment from "./pages/Enrollment";
-import DecisionSupport from "./pages/DecisionSupport";
 import Assistant from "./pages/Assistant";
 import { StudentPortalProvider, StudentRoutes } from "./pages/student/StudentRoutes";
 import { DeanProvider, DeanRoutes } from "./pages/dean/DeanRoutes";
@@ -26,8 +25,6 @@ import { FacultyProvider, FacultyRoutes } from "./pages/faculty/FacultyRoutes";
 import TermSettings from "./pages/TermSettings";
 import PolicyDocuments from "./pages/PolicyDocuments";
 import BusinessRules from "./pages/BusinessRules";
-import AdviserAppointments from "./pages/AdviserAppointments";
-import CalendarPage from "./components/calendar/CalendarPage";
 
 // Where each role lands by default.
 function homeFor(user) {
@@ -114,15 +111,14 @@ export default function App() {
                 <Route path="/term-settings" element={<TermSettings />} />
                 <Route path="/work-queue" element={<WorkQueue />} />
                 <Route path="/activity" element={<ActivityLog />} />
-                <Route path="/decision-support" element={<DecisionSupport />} />
+                {/* The Recommendations page was folded into the Work Queue ("At-risk students"). */}
+                <Route path="/decision-support" element={<Navigate to="/work-queue?tab=at-risk" replace />} />
                 <Route path="/assistant" element={<Assistant />} />
                 <Route path="/policy-documents" element={<RoleOnly user={user} roles={["staff", "admin"]}><PolicyDocuments /></RoleOnly>} />
                 <Route path="/business-rules" element={<BusinessRules />} />
-                <Route
-                  path="/calendar"
-                  element={<CalendarPage scope="staff" title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in Defense Scheduling." />}
-                />
-                <Route path="/adviser-appointments" element={<AdviserAppointments role={user?.role} />} />
+                {/* The calendar and adviser designation are steps of the research flow, not processes of their own. */}
+                <Route path="/calendar" element={<Navigate to="/workflow/defense-scheduling?view=calendar" replace />} />
+                <Route path="/adviser-appointments" element={<Navigate to="/workflow/research-gate?view=adviser" replace />} />
                 <Route path="/workflow/:slug" element={<WorkflowPage />} />
                 <Route
                   path="/form1-endorsements"

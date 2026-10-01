@@ -408,6 +408,15 @@ export const api = {
   // Leave of Absence / Readmission cases. `slug` is "leave-of-absence" or "readmission".
   studentLeaveCaseAction: (caseId, action, payload = {}) =>
     request(`/student-portal/leave-cases/${caseId}/${action}`, { method: "POST", body: JSON.stringify(payload) }),
+  // The standalone process board: the same four calls for Leave of Absence, Readmission,
+  // AWOL & Residency and Withdrawal. Every drag, menu choice and button ends in
+  // processCaseTransition.
+  processCases: (slug) => request(`/process-cases?slug=${encodeURIComponent(slug)}`),
+  processCase: (slug, ref) => request(`/process-cases/${encodeURIComponent(slug)}/${encodeURIComponent(ref)}`),
+  processCaseTransition: (slug, ref, payload) =>
+    request(`/process-cases/${encodeURIComponent(slug)}/${encodeURIComponent(ref)}/transition`, { method: "POST", body: JSON.stringify(payload) }),
+  processCasesBatch: (slug, payload) =>
+    request(`/process-cases/${encodeURIComponent(slug)}/batch`, { method: "POST", body: JSON.stringify(payload) }),
   leaveCases: (slug) => request(`/leave-cases?slug=${encodeURIComponent(slug)}`),
   leaveCase: (id) => request(`/leave-cases/${id}`),
   // Every button and every drag and drop on the staff board ends here.

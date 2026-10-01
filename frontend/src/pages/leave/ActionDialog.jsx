@@ -8,6 +8,7 @@ import { statusLabelFor } from "./leaveHelpers";
 
 const COMMENT_LABELS = {
   return: "What should the student fix? (the student will see this)",
+  deny: "Why is it denied? (the student will see this)",
   revoke: "Why is this leave being cancelled? (the student will see this)",
   confirm_awol: "Confirm the student is AWOL: what did you do to reach them?",
 };
@@ -31,6 +32,8 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
   const isForward = action.action === "forward";
   const checklist = item.checklist || [];
   const showChecklist = isForward && item.kind === "READMISSION" && checklist.length > 0;
+  // Only Leave and Readmission have an eligibility result to choose.
+  const showEligibility = isForward && (vocabulary?.eligibility_results || []).length > 0;
 
   const [detail, setDetail] = useState(detailProp);
   const [comment, setComment] = useState("");
@@ -45,7 +48,7 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
     if (!isForward || detailProp) return undefined;
     let active = true;
     api
-      .leaveCase(item.id)
+      .processCase(item.slug, item.id)
       .then((res) => active && setDetail(res.case))
       .catch(() => {});
     return () => {
@@ -77,7 +80,7 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
     const payload = { action: action.action };
     if (action.needs_comment || comment.trim()) payload.comment = comment.trim();
     if (isForward) {
-      if (eligibility) payload.eligibility_result = eligibility;
+      if (showEligibility && eligibility) payload.eligibility_result = eligibility;
       if (staffNotes.trim()) payload.staff_notes = staffNotes.trim();
       if (showChecklist) payload.confirmed_items = checklist.filter((row) => verified.has(row.item)).map((row) => row.item);
     }
@@ -123,10 +126,13 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
           <ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" />
           <span className="text-brand-700">{toLabel}</span>
         </p>
-        {CONFIRM_TEXT[action.action] && <p className="text-sm text-slate-600">{CONFIRM_TEXT[action.action]}</p>}
+        {(CONFIRM_TEXT[action.action] || action.confirm) && (
+          <p className="text-sm text-slate-600">{CONFIRM_TEXT[action.action] || action.confirm}</p>
+        )}
 
         {isForward && (
           <>
+            {showEligibility && (
             <Field
               label="Eligibility result"
               hint={
@@ -142,6 +148,7 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
                 placeholder={`Use the policy check result${recommendation ? ` (${recommendation})` : ""}`}
               />
             </Field>
+            )}
 
             {showChecklist && (
               <fieldset className="rounded-xl border border-slate-200 p-3">
@@ -181,6 +188,12 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
               <Textarea value={staffNotes} onChange={(event) => setStaffNotes(event.target.value)} rows={3} />
             </Field>
           </>
+        )}
+
+        {!action.needs_comment && !isForward && (
+          <Field label="Note (optional)" hint="Kept with this step in the history.">
+            <Textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} />
+          </Field>
         )}
 
         {action.needs_comment && (

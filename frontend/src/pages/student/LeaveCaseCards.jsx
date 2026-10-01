@@ -433,7 +433,7 @@ export function LeaveStatusPanel({ data }) {
           const Icon = row.icon;
           return (
             <div key={row.key} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-              <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
                   <Icon className="h-4 w-4 text-brand-700" /> {row.label}
                 </span>

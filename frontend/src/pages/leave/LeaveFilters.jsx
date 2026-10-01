@@ -22,14 +22,14 @@ export function ViewToggle({ value, onChange }) {
   );
 }
 
-export default function LeaveFilters({ filters, setFilters, programs, statusOptions, reasons, kindOptions, count, total }) {
+export default function LeaveFilters({ filters, setFilters, programs, statusOptions, reasons = [], kindOptions, count, total, noun = "requests" }) {
   const active = Object.values(filters).filter(Boolean).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="relative block">
-          <span className="sr-only">Search requests</span>
+          <span className="sr-only">Search</span>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={filters.query}
@@ -51,12 +51,14 @@ export default function LeaveFilters({ filters, setFilters, programs, statusOpti
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
-        <select value={filters.reason} onChange={update("reason")} className="field-input cursor-pointer" aria-label="Filter by reason">
-          <option value="">All reasons</option>
-          {reasons.map((reason) => (
-            <option key={reason} value={reason}>{reason}</option>
-          ))}
-        </select>
+        {reasons.length > 0 && (
+          <select value={filters.reason} onChange={update("reason")} className="field-input cursor-pointer" aria-label="Filter by reason">
+            <option value="">All reasons</option>
+            {reasons.map((reason) => (
+              <option key={reason} value={reason}>{reason}</option>
+            ))}
+          </select>
+        )}
         {kindOptions.length > 1 && (
           <select value={filters.kind} onChange={update("kind")} className="field-input cursor-pointer" aria-label="Filter by type of request">
             <option value="">All types</option>
@@ -68,7 +70,7 @@ export default function LeaveFilters({ filters, setFilters, programs, statusOpti
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
         <span>
-          Showing {count} of {total} requests
+          Showing {count} of {total} {noun}
         </span>
         {active > 0 && (
           <button

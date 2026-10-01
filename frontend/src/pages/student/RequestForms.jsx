@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { CalendarClock } from "lucide-react";
-import { InlineNotice, StatusBadge } from "../../components/ui";
+import { InlineNotice } from "../../components/ui";
 import { Field, Select, Textarea } from "../../components/forms";
 import { formatDate } from "../../lib/format";
-import WorkflowTimeline, { withdrawalTimelineSteps } from "../../components/WorkflowTimeline";
+import { ProcessCaseList } from "./ProcessCaseCard";
 import { useSubmitRequest, StageCard, SavedWorkflowFiles, SubmitState } from "./shared";
 import {
   EarlierCases,
@@ -384,13 +384,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
 
   return (
     <div className="space-y-4">
-      {existing && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">Current AWOL return case</p><p className="mt-1 text-xs text-slate-500">{existing.policy_classification || "Policy review pending"}</p></div><StatusBadge value={existing.status} dot={false} /></div>
-          {existing.years_in_program !== null && existing.years_in_program !== undefined && <p className="mt-3 text-sm text-slate-600">Years in program: {existing.years_in_program} · normal limit {existing.normal_residence_years} · absolute limit {existing.absolute_residence_years}</p>}
-          {existing.detection_source && <p className="mt-2 text-xs text-slate-500">Detected from: {existing.detection_source}</p>}
-        </div>
-      )}
+      <ProcessCaseList cases={data.standalone_cases?.awol || []} />
       {(student.standing === "AWOL" || student.enrollment_tag === "AWOL") && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
           Your record was automatically flagged AWOL from an official standing or full-semester withdrawal without approved LOA. Registration privileges remain restricted until your return request is reviewed.
@@ -440,15 +434,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
   const status = existing?.status || "Not Submitted";
   const returned = ["Returned", "Returned for Clarification"].includes(status) && existing?.dean_decision !== "Approved";
   const applicationEditable = !existing || returned;
-  const denied = existing?.dean_decision === "Denied" || status === "Denied";
-  const staffForwarded = !["Not Submitted", "Submitted to GS Staff", "Returned", "Returned for Clarification"].includes(status);
-  const deanPending = status === "Dean Review";
-  const deanApproved = existing?.dean_decision === "Approved";
-  const subjectTagged = ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(status);
-  const excelReady = ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(status);
-  const registrarAcknowledged = status === "Withdrawn Confirmed";
   const selectedSubject = activeSubjects.find((item) => String(item.id) === String(form.subject_enrollment_id));
-  const withdrawalSteps = withdrawalTimelineSteps(status);
 
   useEffect(() => {
     setForm({
@@ -459,12 +445,12 @@ export function WithdrawalRequestForm({ data, onSaved }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current subject withdrawal stage</p><p className="mt-1 text-xs text-slate-500">This process applies to one subject only and never changes your active program standing.</p></div><StatusBadge value={status} dot={false} /></div></div>
+      <ProcessCaseList cases={data.standalone_cases?.withdrawal || []} />
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p className="font-semibold">When you can withdraw a subject</p>
         <p className="mt-1 text-xs leading-relaxed text-amber-900">{(selectedSubject || activeSubjects[0])?.withdrawal_window?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of the term's total is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
       </div>
-      <StageCard number={1} title="Send Withdrawal Request" state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}>
+      <StageCard number={1} title={applicationEditable ? "Send your withdrawal request" : "Your withdrawal request"} state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}>
         {applicationEditable ? (
           <div className="space-y-4">
             <Field label="Enrolled subject" required>
@@ -538,13 +524,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
           </div>
         )}
       </StageCard>
-      <StageCard number={2} title="GS Staff Forwards Request to Dean" state={status === "Submitted to GS Staff" ? "pending" : staffForwarded || denied ? "complete" : returned ? "returned" : "locked"} helper={status === "Submitted to GS Staff" ? "Graduate School staff is recording your structured request and forwarding it to the Dean." : staffForwarded || denied ? "Graduate School staff forwarded the request to the Dean." : "Available after Step 1 is submitted."} />
-      <StageCard number={3} title="Dean Reviews Request" state={denied ? "rejected" : deanPending ? "pending" : deanApproved ? "complete" : "locked"} helper={denied ? "The Dean denied this request. The subject remains enrolled and your record is unchanged." : deanPending ? "The Dean is reviewing the selected subject, request date, and eligibility window." : deanApproved ? "The Dean approved the request and returned it to Graduate School staff for subject tagging." : "Available after GS Staff forwards the request."} />
-      <StageCard number={4} title="GS Staff Tags Subject as Withdrawn" state={subjectTagged ? "complete" : deanApproved ? "pending" : "locked"} helper={subjectTagged ? `${existing?.subject?.course_code || "The selected subject"} now shows Withdrawn in Official Offered Subjects. Any fee is settled with the Business Office and any grade mark is applied by the Registrar. Your other subjects and active program standing remain unchanged.` : deanApproved ? "Graduate School staff must tag you as Withdrawn from the selected subject before any Registrar Excel list can be prepared." : denied ? "This step does not open for a denied request." : "Available after Dean approval."} />
-      <StageCard number={5} title="GS Staff Exports Approved Excel List" state={excelReady ? "complete" : subjectTagged ? "pending" : "locked"} helper={excelReady ? "Your tagged withdrawal was included in the Excel list for the Registrar." : subjectTagged ? "The official subject status is updated, so Graduate School staff can now prepare the Excel list." : "Available after GS Staff tags the selected subject as Withdrawn."} />
-      <StageCard number={6} title="GS Staff Emails Update and Waits for Acknowledgement" state={registrarAcknowledged ? "complete" : excelReady ? "pending" : "locked"} helper={registrarAcknowledged ? "Registrar acknowledgement was recorded." : excelReady ? "Graduate School staff must email the downloaded Excel list through the official channel and wait for the Registrar's acknowledgement. The portal does not send this email." : "Available after the approved list is exported."} />
       {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} />}
-      <WorkflowTimeline steps={withdrawalSteps} title="Detailed withdrawal timeline" />
     </form>
   );
 }

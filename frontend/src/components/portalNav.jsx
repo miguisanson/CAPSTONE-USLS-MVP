@@ -53,12 +53,18 @@ export const STUDENT_NAV_GROUPS = [
     label: "Academics",
     items: [
       { to: "/student/enrollment", label: "Enrollment", icon: BookPlus },
-      { to: "/student/research", label: "Research", icon: FileCheck },
+      { to: "/student/practicum", label: "Practicum", icon: Briefcase, hideWhen: "noPracticum" },
+      { to: "/student/graduation", label: "Graduation", icon: GraduationCap },
+    ],
+  },
+  {
+    // Adviser, defense schedule and calendar are steps of the research flow, not processes of their own.
+    label: "Research",
+    items: [
+      { to: "/student/research", label: "Research Progress", icon: FileCheck },
       { to: "/student/adviser", label: "Research Adviser", icon: UserRoundCheck },
       { to: "/student/defense-schedule", label: "Defense Schedule", icon: CalendarCheck },
       { to: "/student/calendar", label: "Research Calendar", icon: CalendarDays },
-      { to: "/student/practicum", label: "Practicum", icon: Briefcase, hideWhen: "noPracticum" },
-      { to: "/student/graduation", label: "Graduation", icon: GraduationCap },
     ],
   },
   {
@@ -91,20 +97,21 @@ export const DEAN_NAV_GROUPS = [
   {
     label: "Approvals",
     items: [
+      // The queue also holds the adviser-designation decisions (research flow) as one more process group.
       { to: "/dean/approvals", label: "Approvals Queue", icon: Inbox, end: true, matches: ["/dean/case"], badge: "pendingTotal" },
       { to: "/dean/approvals/course-adjustments", label: "Course Adjustments", icon: SlidersHorizontal, badge: "pendingPlans" },
-      { to: "/dean/approvals/leave", label: "Leave / Readmission / AWOL", icon: CalendarOff, badge: "pendingLeave" },
+      { to: "/dean/approvals/leave-of-absence", label: "Leave of Absence", icon: CalendarOff, badge: "pendingLeaveOfAbsence" },
+      { to: "/dean/approvals/readmission", label: "Readmission", icon: UserCheck, badge: "pendingReadmission" },
+      { to: "/dean/approvals/awol", label: "AWOL & Residency", icon: UserX, badge: "pendingAwol" },
       { to: "/dean/approvals/withdrawal", label: "Withdrawal Requests", icon: LogOut, badge: "pendingWithdrawal" },
       { to: "/dean/approvals/practicum", label: "Practicum Reports", icon: Briefcase, badge: "pendingPracticum" },
       { to: "/dean/approvals/graduation", label: "Graduation Endorsement", icon: GraduationCap, badge: "pendingGraduation" },
-      { to: "/dean/adviser-appointments", label: "Adviser Appointments", icon: UserRoundCheck, badge: "pendingAdviser" },
       { to: "/dean/gate-reports", label: "Admission & Coursework Reports", icon: ClipboardCheck },
     ],
   },
   {
     label: "Monitoring & Support",
     items: [
-      { to: "/dean/calendar", label: "Defense Calendar", icon: CalendarDays },
       { to: "/dean/analytics", label: "Reports & Analytics", icon: BarChart3 },
       { to: "/dean/activity", label: "Decision History", icon: Activity },
       { to: "/dean/assistant", label: "Policy Assistant", icon: Bot },
@@ -126,6 +133,8 @@ export const FACULTY_NAV_GROUPS = [
       { to: "/faculty-portal/panels", label: "Panel Assignments & Papers", icon: FileText },
       { to: "/faculty-portal/invitations", label: "Panel Invitations", icon: MailCheck, badge: "pendingInvitations" },
       { to: "/faculty-portal/defenses", label: "Defense Schedule", icon: CalendarClock },
+      { to: "/faculty-portal/calendar", label: "My Calendar", icon: CalendarDays },
+      { to: "/faculty-portal/availability", label: "My Availability", icon: CalendarCheck },
       { to: "/faculty-portal/verdicts", label: "Verdicts", icon: Scale, badge: "pendingVerdicts" },
     ],
   },
@@ -133,8 +142,6 @@ export const FACULTY_NAV_GROUPS = [
     label: "Teaching",
     items: [
       { to: "/faculty-portal/classes", label: "Assigned Classes", icon: BookOpenCheck },
-      { to: "/faculty-portal/calendar", label: "My Calendar", icon: CalendarDays },
-      { to: "/faculty-portal/availability", label: "My Availability", icon: CalendarCheck },
     ],
   },
   {

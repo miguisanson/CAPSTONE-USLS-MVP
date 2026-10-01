@@ -11,7 +11,9 @@ import { DeanDecisionModal } from "./DeanParts";
 // page (LOA, readmission and AWOL returns are all standing changes).
 export const DEAN_PROCESSES = {
   "course-adjustments": { label: "Course Adjustments", types: [] },
-  leave: { label: "Leave / Readmission / AWOL", types: ["leave-of-absence", "readmission", "awol-return"] },
+  "leave-of-absence": { label: "Leave of Absence", types: ["leave-of-absence"] },
+  readmission: { label: "Readmission", types: ["readmission"] },
+  awol: { label: "AWOL & Residency", types: ["awol-return"] },
   withdrawal: { label: "Withdrawal Requests", types: ["withdrawal"] },
   practicum: { label: "Practicum Reports", types: ["practicum"] },
   graduation: { label: "Graduation Endorsement", types: ["graduation"] },
@@ -85,12 +87,14 @@ export function DeanProvider({ children }) {
     const byProcess = (key) => workflowPending.filter((item) => DEAN_PROCESSES[key].types.includes(item.type)).length;
     return {
       pendingPlans: pendingPlans.length,
-      pendingLeave: byProcess("leave"),
+      pendingLeaveOfAbsence: byProcess("leave-of-absence"),
+      pendingReadmission: byProcess("readmission"),
+      pendingAwol: byProcess("awol"),
       pendingWithdrawal: byProcess("withdrawal"),
       pendingPracticum: byProcess("practicum"),
       pendingGraduation: byProcess("graduation"),
       pendingAdviser,
-      pendingTotal: pendingPlans.length + workflowPending.length,
+      pendingTotal: pendingPlans.length + workflowPending.length + pendingAdviser,
     };
   }, [workflowPending, pendingPlans, pendingAdviser]);
 

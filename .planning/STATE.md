@@ -8,25 +8,21 @@
   Codex, because Codex's sandbox cannot run the tests and nobody is here to
   unblock it. Main session = architect: briefs, merges, gate, live check.
 
-### Progress (updated as work lands)
+### Progress (2026-10-01 ~09:00, usage limit reached)
 
-Merged and pushed: health, monitor, portals, opsmanual, panel, docs, policy, rules,
-research-core, crosscut, academic, docs2, loa. Gate at the LOA merge: 412 tests, all
-green after two test expectations were aligned (report now lists LOA cases; years in
-program use the academic-year count). Live check: LOA board drag-and-drop really moves
-a card and runs the guarded step (headless Edge, `E:/Temp/claude/usls-check/dnd.py`).
+Everything is merged into `v5.1-migui_clean` and pushed except the walkthrough
+(`pkt/walkthrough`, still running; commit due 10:15, scripts re-runnable).
+Last merges: rulesux (locked handbook rules, Recommendations -> Work Queue tab,
+calendar/adviser as tabs), layoutfix (no page h-scroll, corrected subject-needs report),
+standalone (one template + drag-and-drop for LOA/Readmission/AWOL/Withdrawal), assistant2
+(policy_rag.py BM25 retrieval; eval 94% hit@1 / 100% hit@3).
+Gate before assistant2: running (`E:/Temp/claude/usls-check/gate.log`). After assistant2:
+policy/assistant tests 59/60 — the one failure is
+`test_seed_folder_is_tracked_and_real_uploads_are_not_ignored_by_accident`, which the helper
+says fails only when run as named modules and passes under `discover`; verify with the full gate.
 
-Running (worktrees under `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`):
-
-| Branch | Job |
-|---|---|
-| `pkt/calendar` | Availability, adviser appointment, calendars, invitations, notifications, private .ics (resumed after a rate limit; has WIP commits) |
-| `pkt/polish` | Undefined identifiers, live-check polish, Ops Manual as Draft policy doc, monitoring stubs, drop rule on all paths, rules metadata sync, LOA running semester, demo reset button, a11y sweep, stale workflow descriptions, breadcrumb names |
-| `pkt/docs3` | Proposal ch. 5–6 + Appendices V/W/Y/Z regenerated from code (`scripts/docs/sync_proposal_inventories.py`) |
-
-Then: merge calendar, polish, docs3 (gate after each); re-run the proposal pipeline on the
-final code (see `PROPOSAL_EDIT_NOTES.md`); walkthrough rewrite re-walked in the live app with
-fresh screenshots (also Appendix U screenshots); README/CHANGELOG; final gate + live check; push.
+Next: full gate on HEAD; merge `pkt/walkthrough`, re-run its capture + build on final code;
+re-run `scripts/docs/rebuild_proposal.py`; README/CHANGELOG; push.
 
 ## If this session died
 

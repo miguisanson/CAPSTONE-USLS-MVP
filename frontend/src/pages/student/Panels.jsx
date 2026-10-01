@@ -39,7 +39,7 @@ export function StudentHero({ data }) {
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[520px]">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[400px] lg:grid-cols-2 2xl:w-[560px] 2xl:grid-cols-4">
           <MiniStat label="Stage" value={student.current_stage} />
           <MiniStat label="Progress" value={data.progress_status?.level || "Not yet assessed"} badge />
           <MiniStat label="Coursework" value={`${course_audit.completion_rate}%`} />
@@ -166,7 +166,7 @@ export function WorkflowStatusPanel({ data }) {
           const Icon = row.icon;
           return (
             <div key={row.label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-              <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
                   <Icon className="h-4 w-4 text-brand-700" /> {row.label}
                 </span>

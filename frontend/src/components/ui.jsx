@@ -5,7 +5,7 @@ export function StatusBadge({ value, dot = true, className = "" }) {
   if (!value) return <span className="text-slate-400">—</span>;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusClass(
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusClass(
         value
       )} ${className}`}
     >

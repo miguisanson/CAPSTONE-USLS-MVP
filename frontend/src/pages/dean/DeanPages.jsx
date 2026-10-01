@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -17,15 +16,20 @@ import { DEAN_PROCESSES, DeanFeedback, DeanGate, processOfType, useDean } from "
 import { AgeBadge, CaseTable, casePath, daysSince, processLabel, useDeanFilters } from "./DeanShared";
 import { DeanListFilters, DeanWorkflowBoard, WorkflowApprovalCard } from "./DeanParts";
 import { deanItemDate } from "./deanHelpers";
-import { LeaveCaseSummary, isLeaveCaseItem, isLeaveDecisionDue } from "./DeanLeaveParts";
-import { LeaveBatchBar, LeaveBatchModal, LeavePendingTable } from "./DeanLeaveBatch";
+import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
+import ProcessBoardPage from "../../components/ProcessBoardPage";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
+import AdviserAppointments from "../AdviserAppointments";
 
-const PROCESS_ORDER = ["course-adjustments", "leave", "withdrawal", "practicum", "graduation"];
+const PROCESS_ORDER = ["course-adjustments", "leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"];
+// The four standalone processes are one page template (the same board staff use).
+const STANDALONE_PROCESSES = ["leave-of-absence", "readmission", "awol", "withdrawal"];
 const PROCESS_COUNT_KEY = {
   "course-adjustments": "pendingPlans",
-  leave: "pendingLeave",
+  "leave-of-absence": "pendingLeaveOfAbsence",
+  readmission: "pendingReadmission",
+  awol: "pendingAwol",
   withdrawal: "pendingWithdrawal",
   practicum: "pendingPracticum",
   graduation: "pendingGraduation",
@@ -96,7 +100,7 @@ function DeanDashboardBody() {
           <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="blue" to={`/dean/approvals/${key}`} />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {PROCESS_ORDER.slice(3).map((key) => (
           <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="blue" to={`/dean/approvals/${key}`} />
         ))}
@@ -174,7 +178,7 @@ export function DeanQueue() {
 }
 
 function DeanQueueBody() {
-  const { workflowPending, pendingPlans, counts } = useDean();
+  const { workflowPending, pendingPlans, counts, refetch } = useDean();
   const { filters, setFilters, programs, statuses, apply, matches } = useDeanFilters([...workflowPending, ...pendingPlans]);
   const plans = pendingPlans.filter(matches);
   return (
@@ -208,6 +212,15 @@ function DeanQueueBody() {
           </Card>
         );
       })}
+      {/* Adviser designation belongs to the research flow (BPMN 7); the Dean decides it here with the other approvals. */}
+      <Card className="p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-ink">
+            Adviser Designation <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{counts.pendingAdviser}</span>
+          </h2>
+        </div>
+        <AdviserAppointments role="dean" embedded onChanged={refetch} />
+      </Card>
     </div>
   );
 }
@@ -298,19 +311,33 @@ function PlanCards() {
 
 const PROCESS_COPY = {
   "course-adjustments": "Course offering plans submitted by the Academic Coordinator. Approve them or return them for revision.",
-  leave: "Leave of Absence, Readmission and AWOL return requests forwarded by Graduate School staff.",
-  withdrawal: "Subject withdrawal requests forwarded for a Dean decision. Approved requests continue to staff for tagging and the Registrar list.",
+
   practicum: "Practicum completion reports sent to the Dean for final review.",
   graduation: "Graduation endorsement lists prepared by Graduate School staff.",
 };
 
 export function DeanProcessPage() {
   const { process } = useParams();
+  if (process === "leave") return <Navigate to="/dean/approvals/leave-of-absence" replace />;
   if (!DEAN_PROCESSES[process]) return <Navigate to="/dean/approvals" replace />;
   return (
     <DeanGate>
-      <DeanProcessBody process={process} />
+      {STANDALONE_PROCESSES.includes(process) ? <DeanStandaloneBody slug={process} /> : <DeanProcessBody process={process} />}
     </DeanGate>
+  );
+}
+
+// The Dean's Leave of Absence, Readmission, AWOL & Residency and Withdrawal pages are the same
+// board staff use (ProcessBoardPage): the server lists the Dean's steps (approve, return,
+// deny) on the cards that are waiting for a decision, so dragging a card or using its buttons
+// decides it through the same guarded call.
+function DeanStandaloneBody({ slug }) {
+  const { refetch } = useDean();
+  return (
+    <div className="space-y-5">
+      <DeanFeedback />
+      <ProcessBoardPage key={slug} slug={slug} onChanged={refetch} />
+    </div>
   );
 }
 
@@ -336,11 +363,8 @@ function DecidedRow({ item }) {
 
 function DeanProcessBody({ process }) {
   const navigate = useNavigate();
-  const { workflowPending, workflowRecent, workflowOverview, counts, refetch, setMsg } = useDean();
-  const [selectedLeave, setSelectedLeave] = useState(() => new Set());
-  const [batchModal, setBatchModal] = useState(null); // { action, rows } kept as a snapshot so the result stays visible after the list refreshes
+  const { workflowPending, workflowRecent, workflowOverview, counts } = useDean();
   const types = DEAN_PROCESSES[process].types;
-  const isStanding = process === "leave";
   const pending = workflowPending.filter((item) => types.includes(item.type));
   const overview = workflowOverview.filter((item) => types.includes(item.type));
   const recent = workflowRecent.filter((item) => types.includes(item.type));
@@ -348,20 +372,6 @@ function DeanProcessBody({ process }) {
   const visiblePending = apply(pending);
   const boardRows = apply(overview);
   const visibleRecent = apply(recent);
-  // Other cases (for example on leave or waiting for staff) that are in neither list above.
-  const listedKeys = new Set([...pending, ...recent].map((item) => `${item.type}-${item.id}`));
-  const visibleOther = isStanding ? apply(overview.filter((item) => isLeaveCaseItem(item) && !listedKeys.has(`${item.type}-${item.id}`))) : [];
-  const batchRows = isStanding ? visiblePending.filter((item) => isLeaveDecisionDue(item) && selectedLeave.has(item.id)) : [];
-  const toggleLeave = (id) => setSelectedLeave((current) => {
-    const next = new Set(current);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const toggleAllLeave = (rows, on) => setSelectedLeave((current) => {
-    const next = new Set(current);
-    rows.forEach((item) => (on ? next.add(item.id) : next.delete(item.id)));
-    return next;
-  });
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -377,38 +387,18 @@ function DeanProcessBody({ process }) {
       ) : (
         <>
           <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
-          {!isStanding && boardRows.length > 0 && (
+          {boardRows.length > 0 && (
             <DeanWorkflowBoard rows={boardRows} onOpen={(item) => navigate(casePath(item))} selectedIds={new Set()} onToggle={() => {}} />
           )}
           <Card className="p-5">
             <SectionTitle title="Waiting for your decision" subtitle="Open a case to review it and decide" icon={Inbox} />
-            {isStanding && visiblePending.some(isLeaveDecisionDue) && <p className="-mt-2 mb-3 text-xs text-slate-500">Tick several leave or readmission requests to approve, return or deny them together.</p>}
-            {isStanding && <LeaveBatchBar count={batchRows.length} onPick={(action) => setBatchModal({ action, rows: batchRows })} onClear={() => setSelectedLeave(new Set())} />}
-            {isStanding && visiblePending.length > 0
-              ? <LeavePendingTable items={visiblePending} selectedIds={selectedLeave} onToggle={toggleLeave} onToggleAll={toggleAllLeave} />
-              : <CaseTable items={visiblePending} emptyTitle="Nothing to review in this section" emptyHint={isStanding ? "LOA, readmission and AWOL reviews will appear here when routed to the Dean." : "Submitted items for this role will appear here."} />}
+            <CaseTable items={visiblePending} emptyTitle="Nothing to review in this section" emptyHint="Submitted items for this role will appear here." />
           </Card>
-          {batchModal && (
-            <LeaveBatchModal
-              action={batchModal.action}
-              rows={batchModal.rows}
-              onClose={() => { setBatchModal(null); setSelectedLeave(new Set()); }}
-              onSaved={async (result) => { setMsg(result?.message || ""); await refetch(); }}
-            />
-          )}
           {visibleRecent.length > 0 && (
             <Card className="p-5">
               <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Clock className="h-3.5 w-3.5" /> Recent workflow decisions</p>
               <ul className="divide-y divide-slate-100">
                 {visibleRecent.map((item) => <DecidedRow key={`${item.type}-${item.id}`} item={item} />)}
-              </ul>
-            </Card>
-          )}
-          {visibleOther.length > 0 && (
-            <Card className="p-5">
-              <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Clock className="h-3.5 w-3.5" /> Other cases in progress</p>
-              <ul className="divide-y divide-slate-100">
-                {visibleOther.map((item) => <DecidedRow key={`${item.type}-${item.id}`} item={item} />)}
               </ul>
             </Card>
           )}
