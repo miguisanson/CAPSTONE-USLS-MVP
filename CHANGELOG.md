@@ -38,6 +38,18 @@ Ownership shown below is based on Git commit author metadata. A linked GitHub ac
 - **July 13, 2026 (Monday) - Research-gate workflow expansion:** Expanded research-gate backend and interface behavior, added faculty research workspace and signature-pad components, refined faculty/Form 1/workflow screens, and removed generated upload artifacts from version control. **Commit owner:** [@natamndz](https://github.com/natamndz), commit [`b68fcd5`](https://github.com/miguisanson/CAPSTONE-USLS-MVP/commit/b68fcd5666f1d95ce28cee611514fe62bee31d89).
 - **July 14, 2026 (Tuesday) - Development tooling and demo-file reorganization:** Added the Intelligence Layer skill configuration for Claude and Codex, moved simulation materials into `Documents/Demo_Files`, and removed superseded concept-paper copies. **Commit owner:** [@miguisanson](https://github.com/miguisanson), commit [`393710a`](https://github.com/miguisanson/CAPSTONE-USLS-MVP/commit/393710acf284184ca9717f7e6a4eb3f6d0f9dd84).
 - **July 14, 2026 (Tuesday) - Workflow fixes, navigation, and naming consistency:** Removed the Registrar as an in-app actor; simplified withdrawal and graduation handoffs; added defense-panel reassignment; redesigned the Faculty Portal with consistent navigation; corrected demo materials and tests; added the BPM gap plan and change documentation; and renamed the Course Adjustments page heading to match the navigation. **Commit owner:** [@miguisanson](https://github.com/miguisanson), commit [`1461490`](https://github.com/miguisanson/CAPSTONE-USLS-MVP/commit/14614902505af693faac150778959a2de49cbb21).
+- **August 13–14, 2026 - Defense revisions, first round (branch `v5-myrine-revisions`):** Added policy-document upload and a local document search for the Policy Assistant (myrine), and varied panel-matching demo data (natamndz).
+- **September 30 – October 1, 2026 - Defense revisions completed (branch `v5.1-migui_clean`):** Closed the Stage 1 defense items (see `DEFENSE_REVISIONS.md`):
+  - Business-rules register with handbook values and page citations on every workflow screen; handbook and protocol rules are locked, prototype rules await Graduate School validation.
+  - Policy documents with versions, draft status and OCR; Policy Assistant rebuilt (section-aware BM25 retrieval, sentence answers with page citations, AI answers when a Gemini key is set) for every role.
+  - Panel matching by text similarity over faculty expertise records, with explainable scores and protocol panel composition.
+  - Monitoring Sheet add/edit in the portal with provenance and history.
+  - Leave of Absence and Readmission rebuilt on a case record; the four standalone processes share one page and drag-and-drop board; Graduation drag and drop works.
+  - Research flow per the protocol: verdict outcomes, signed evidence kept, stage-checked scheduling with lead times, reschedule/cancel, adviser designation, faculty availability, calendar and conflict warnings, panel invitations, notifications.
+  - Dean, Student and Faculty portals on the shared sidebar layout; no page-level horizontal scrolling; corrected subject-needs report; Recommendations folded into the Work Queue.
+  - Sign-in hardening and a `DEMO_MODE` switch; one enrollment guard; consistent report counts and owner names; 80 → 570+ automated tests.
+  - Documents: proposal pagination, table of contents, business-rules sections and chapters 5–6 regenerated from the code; draft Graduate School Operations Manual for validation; walkthrough rewritten against the live app.
+  **Commit owner:** [@miguisanson](https://github.com/miguisanson), with Claude Opus 5.5 as co-author.
 
 ## Contributor Ownership Reference
 
