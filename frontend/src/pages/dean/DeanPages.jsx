@@ -21,6 +21,7 @@ import { LeaveCaseSummary, isLeaveCaseItem, isLeaveDecisionDue } from "./DeanLea
 import { LeaveBatchBar, LeaveBatchModal, LeavePendingTable } from "./DeanLeaveBatch";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
+import AdviserAppointments from "../AdviserAppointments";
 
 const PROCESS_ORDER = ["course-adjustments", "leave", "withdrawal", "practicum", "graduation"];
 const PROCESS_COUNT_KEY = {
@@ -174,7 +175,7 @@ export function DeanQueue() {
 }
 
 function DeanQueueBody() {
-  const { workflowPending, pendingPlans, counts } = useDean();
+  const { workflowPending, pendingPlans, counts, refetch } = useDean();
   const { filters, setFilters, programs, statuses, apply, matches } = useDeanFilters([...workflowPending, ...pendingPlans]);
   const plans = pendingPlans.filter(matches);
   return (
@@ -208,6 +209,15 @@ function DeanQueueBody() {
           </Card>
         );
       })}
+      {/* Adviser designation belongs to the research flow (BPMN 7); the Dean decides it here with the other approvals. */}
+      <Card className="p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-ink">
+            Adviser Designation <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{counts.pendingAdviser}</span>
+          </h2>
+        </div>
+        <AdviserAppointments role="dean" embedded onChanged={refetch} />
+      </Card>
     </div>
   );
 }

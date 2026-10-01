@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ListTodo, AlertTriangle, Search, Flag, CheckCircle2, ShieldCheck, RefreshCw } from "lucide-react";
+import { ListTodo, AlertTriangle, Search, Flag, CheckCircle2, ShieldCheck, RefreshCw, ArrowRight, ShieldAlert } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
-import { formatDate, relativeDays } from "../lib/format";
+import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { useAuth } from "../auth";
 
 const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
@@ -18,7 +18,10 @@ const ACCOUNT_OWNER = {
 
 export default function WorkQueue() {
   const { user } = useAuth();
-  const [tab, setTab] = useState("tasks");
+  const [searchParams] = useSearchParams();
+  // Suggested next steps come from the staff-only decision-support endpoint.
+  const canSeeAtRisk = user?.role === "staff" || user?.role === "admin";
+  const [tab, setTab] = useState(() => (searchParams.get("tab") === "at-risk" && canSeeAtRisk ? "at-risk" : "tasks"));
   const canSeeConflicts = CONFLICT_ROLES.includes(user?.role);
   // Research Coordinators cannot read conflicts (the server refuses), so do not ask.
   const conflicts = useApi(
@@ -32,16 +35,17 @@ export default function WorkQueue() {
       <div>
         <h1 className="font-display text-2xl font-semibold text-ink">Work Queue</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Everything that needs attention in one place — pending tasks and open monitoring conflicts.
+          Everything that needs attention in one place — pending tasks, students at risk of delay with the next step for each, and open monitoring conflicts.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200">
         <TabButton active={tab === "tasks"} onClick={() => setTab("tasks")} icon={ListTodo}>Tasks</TabButton>
+        {canSeeAtRisk && <TabButton active={tab === "at-risk"} onClick={() => setTab("at-risk")} icon={ShieldAlert}>At-risk students</TabButton>}
         {canSeeConflicts && <TabButton active={tab === "conflicts"} onClick={() => setTab("conflicts")} icon={Flag} badge={openConflicts}>Conflicts</TabButton>}
       </div>
 
-      {tab === "tasks" || !canSeeConflicts ? <TasksPanel user={user} /> : <ConflictsPanel state={conflicts} />}
+      {tab === "at-risk" && canSeeAtRisk ? <AtRiskPanel /> : tab === "conflicts" && canSeeConflicts ? <ConflictsPanel state={conflicts} /> : <TasksPanel user={user} />}
     </div>
   );
 }
@@ -61,6 +65,88 @@ function TabButton({ active, onClick, icon: Icon, children, badge }) {
         <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-bold ${active ? "bg-brand-600 text-white" : "bg-amber-100 text-amber-700"}`}>{badge}</span>
       )}
     </button>
+  );
+}
+
+// One row per flagged student with the single next step the system recommends
+// (the highest-scoring recommendation). The system suggests; people decide.
+function AtRiskPanel() {
+  const { data, loading, error } = useApi(() => api.decisionSupport(), []);
+  const [severity, setSeverity] = useState("");
+
+  const students = useMemo(() => {
+    const byStudent = new Map();
+    for (const item of data?.items || []) {
+      const entry = byStudent.get(item.student_id);
+      if (!entry) byStudent.set(item.student_id, { ...item, others: 0 });
+      else entry.others += 1;
+    }
+    return [...byStudent.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+  }, [data]);
+  const shown = students.filter((row) => !severity || row.severity === severity);
+  const counts = { high: 0, medium: 0, low: 0 };
+  students.forEach((row) => { counts[row.severity] = (counts[row.severity] || 0) + 1; });
+
+  if (loading) return <Spinner label="Finding students at risk…" />;
+  if (error) return <EmptyState icon={AlertTriangle} title="Could not load at-risk students" hint={error} />;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterChip active={severity === ""} onClick={() => setSeverity("")}>All flagged ({students.length})</FilterChip>
+        {["high", "medium", "low"].filter((key) => counts[key] > 0).map((key) => (
+          <FilterChip key={key} active={severity === key} onClick={() => setSeverity(key)}>{SEVERITY[key].label} priority ({counts[key]})</FilterChip>
+        ))}
+      </div>
+      <p className="text-xs text-slate-500">
+        Students who are delayed, stalled, overdue or missing documents. Each row shows the one next step to take; open the student to see every flag.
+      </p>
+      <Card className="overflow-hidden">
+        {shown.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title="No students flagged" hint="Nobody needs a follow-up right now." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <th className="px-5 py-3">Student</th>
+                  <th className="px-3 py-3">Priority</th>
+                  <th className="px-3 py-3">Suggested next step</th>
+                  <th className="px-3 py-3">Owner</th>
+                  <th className="px-3 py-3"><span className="sr-only">Open</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((row) => {
+                  const sev = SEVERITY[row.severity] || SEVERITY.low;
+                  return (
+                    <tr key={row.student_id} className="border-b border-slate-50 align-top hover:bg-slate-50/60">
+                      <td className="px-5 py-3">
+                        <p className="font-semibold text-ink">{row.student_name}</p>
+                        <p className="text-xs text-slate-400">{row.program_code} · {row.stage}</p>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${sev.badge}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${sev.dot}`} />{sev.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <p className="font-semibold text-ink">{row.recommendation}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">Why: {row.trigger}{row.others > 0 ? ` · ${row.others} more flag${row.others === 1 ? "" : "s"}` : ""}</p>
+                      </td>
+                      <td className="px-3 py-3 text-slate-600">{row.owner}</td>
+                      <td className="px-3 py-3 text-right">
+                        <Link to={`/students/${row.student_id}`} className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">Open <ArrowRight className="h-3.5 w-3.5" /></Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 

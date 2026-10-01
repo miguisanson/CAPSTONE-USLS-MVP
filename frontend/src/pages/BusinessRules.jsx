@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, FilePenLine, FileText, Scale, Search, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FilePenLine, FileText, Lock, Scale, Search, ShieldCheck, X } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, Spinner } from "../components/ui";
@@ -12,7 +12,21 @@ const FILTERS = [
   { id: "enforced", label: "Enforced by the system" },
   { id: "documented", label: "Documented only" },
   { id: "review", label: "Needs review" },
+  { id: "official", label: "Official (locked)" },
+  { id: "adjustable", label: "Pending validation" },
 ];
+
+// "Official — Handbook p. 49" / "Official — Research Protocol": the lock badge text.
+function officialLabel(rule) {
+  const title = String(rule.source_title || "");
+  const page = String(rule.source_page || "").trim();
+  if (title.includes("Handbook")) {
+    const pages = /[-,]/.test(page) ? "pp." : "p.";
+    return page ? `Official — Handbook ${pages} ${page}` : "Official — Handbook";
+  }
+  if (title.includes("Protocol")) return "Official — Research Protocol";
+  return "Official";
+}
 
 // The register the workflows read from: every rule, its value, and the policy
 // document page it comes from. Read-only except for Graduate School staff/admin.
@@ -30,6 +44,8 @@ export default function BusinessRules() {
       if (filter === "enforced" && !rule.enforced) return false;
       if (filter === "documented" && rule.enforced) return false;
       if (filter === "review" && rule.status !== "needs_review") return false;
+      if (filter === "official" && !rule.locked) return false;
+      if (filter === "adjustable" && rule.locked) return false;
       if (!term) return true;
       return [rule.title, rule.description, rule.key, rule.source_title, rule.source_section, rule.citation]
         .some((value) => String(value || "").toLowerCase().includes(term));
@@ -55,7 +71,7 @@ export default function BusinessRules() {
             <div>
               <h1 className="font-display text-2xl font-semibold">Business rules</h1>
               <p className="mt-1 max-w-3xl text-sm leading-relaxed text-white/85">
-                The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. {canEdit ? "You can change a value when a policy changes; every change is recorded with your reason." : "Only Graduate School staff and the administrator can change a value."}
+                The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy (upload it under Policy Documents). {canEdit ? "Prototype rules awaiting Graduate School validation can be adjusted; every change is recorded with your reason." : "Only Graduate School staff and the administrator can adjust the prototype rules."}
               </p>
             </div>
           </div>
@@ -135,18 +151,27 @@ function RuleRow({ rule, canEdit, onEdit }) {
             Source: {rule.citation}{rule.source_section ? ` · ${rule.source_section}` : ""}
             {rule.policy_document ? ` · linked to "${rule.policy_document.title}"` : ""}
           </p>
-          <div className="mt-2"><RuleBadges rule={rule} /></div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <RuleBadges rule={rule} />
+            {rule.locked && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-white" title={rule.lock_message}>
+                <Lock className="h-3 w-3" aria-hidden="true" /> {officialLabel(rule)}
+              </span>
+            )}
+          </div>
+          {rule.locked && <p className="mt-1.5 text-xs text-slate-500">{rule.lock_message}</p>}
+          {!rule.locked && rule.edit_label && <p className="mt-1.5 text-xs font-semibold text-slate-600">{rule.edit_label}</p>}
           {!rule.enforced && rule.not_enforced_reason && <p className="mt-1.5 text-xs text-slate-500">Not enforced: {rule.not_enforced_reason}</p>}
-          {rule.status === "needs_review" && <p className="mt-1.5 text-xs font-semibold text-amber-800">Check this value against the policy, then confirm or change it to clear the flag.</p>}
+          {rule.status === "needs_review" && <p className="mt-1.5 text-xs font-semibold text-amber-800">Check this value against the policy, then confirm or adjust it to clear the flag.</p>}
           <p className="mt-1.5 text-[11px] text-slate-400">
             {rule.key}{rule.updated_by ? ` · last changed by ${rule.updated_by} on ${formatDate(rule.updated_at)}` : ""}{rule.effective_date ? ` · effective ${formatDate(rule.effective_date)}` : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end">
           <span className="rounded-xl bg-brand-600 px-3.5 py-1.5 text-sm font-bold text-white">{formatRuleValue(rule)}</span>
-          {canEdit && (
+          {canEdit && !rule.locked && (
             <button type="button" onClick={onEdit} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs">
-              <FilePenLine className="h-4 w-4" aria-hidden="true" /> {rule.status === "needs_review" ? "Confirm or change" : "Change value"}
+              <FilePenLine className="h-4 w-4" aria-hidden="true" /> {rule.status === "needs_review" ? "Confirm or adjust" : "Adjust value"}
             </button>
           )}
         </div>

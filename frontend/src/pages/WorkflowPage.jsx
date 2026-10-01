@@ -68,6 +68,8 @@ import { OnboardingGatePanel } from "../components/ProcessGates";
 import { Form1EndorsementQueue } from "./Form1Endorsements";
 import PolicyRules from "../components/PolicyRules";
 import LeaveCasesBoard from "./LeaveCasesBoard";
+import AdviserAppointments from "./AdviserAppointments";
+import CalendarPage from "../components/calendar/CalendarPage";
 
 // Which business-rules process each workflow screen applies.
 const RULE_PROCESS_BY_SLUG = {
@@ -131,6 +133,42 @@ const NEEDS_STUDENT = {
   withdrawal: false,
   graduation: false,
 };
+
+// The defense calendar and adviser designation are steps of the research flow, not processes of their
+// own: they open as tabs inside Research Gate and Defense Scheduling (?view=adviser / ?view=calendar).
+const SUBVIEW_TABS = {
+  "research-gate": [
+    { key: "", label: "Research Gate", icon: FileCheck },
+    { key: "adviser", label: "Adviser designation", icon: UserRoundCheck },
+  ],
+  "defense-scheduling": [
+    { key: "", label: "Scheduling", icon: CalendarCheck },
+    { key: "calendar", label: "Calendar", icon: CalendarDays },
+  ],
+};
+
+function SubviewTabs({ tabs, active, onChange }) {
+  return (
+    <div role="tablist" aria-label="Views" className="flex flex-wrap gap-2">
+      {tabs.map((tab) => {
+        const selected = active === tab.key;
+        const TabIcon = tab.icon;
+        return (
+          <button
+            key={tab.key || "main"}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(tab.key)}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors cursor-pointer ${selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
+          >
+            <TabIcon className="h-4 w-4" aria-hidden="true" /> {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation", "leave-of-absence", "readmission", "awol"]);
 
@@ -198,7 +236,27 @@ export default function WorkflowPage() {
   const needsStudent = NEEDS_STUDENT[slug];
   const usesQueue = USES_REQUEST_QUEUE[slug];
   const overviewWorkflow = OVERVIEW_WORKFLOWS.has(slug);
-  const hideSideRail = overviewWorkflow || slug === "course-audit";
+  const subviewTabs = SUBVIEW_TABS[slug] || null;
+  const subview = subviewTabs && subviewTabs.some((tab) => tab.key && tab.key === searchParams.get("view")) ? searchParams.get("view") : "";
+  const hideSideRail = overviewWorkflow || slug === "course-audit" || Boolean(subview);
+
+  function changeSubview(key) {
+    const next = new URLSearchParams(searchParams);
+    if (key) next.set("view", key);
+    else next.delete("view");
+    setSearchParams(next, { replace: true });
+  }
+
+  // A link such as "Open in Defense Scheduling" from the calendar tab changes only the URL:
+  // follow the student it names.
+  const urlStudentId = searchParams.get("student_id");
+  useEffect(() => {
+    if (urlStudentId && Number(urlStudentId) !== studentId) {
+      setStudentId(Number(urlStudentId));
+      setStudentLabel("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlStudentId]);
 
   useEffect(() => {
     if (!usesQueue || loading || !studentId || !context?.submitted_requests) return;
@@ -294,6 +352,8 @@ export default function WorkflowPage() {
 
       <PolicyRules process={RULE_PROCESS_BY_SLUG[slug]} />
 
+      {subviewTabs && <SubviewTabs tabs={subviewTabs} active={subview} onChange={changeSubview} />}
+
       {slug !== "defense-scheduling" && result && (
         <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800 animate-fade-up">
           <CheckCircle2 className="h-5 w-5" /> {result.message}
@@ -303,7 +363,11 @@ export default function WorkflowPage() {
 
       <div className={hideSideRail ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
         <div className={hideSideRail ? "space-y-5" : "space-y-5 lg:col-span-2"}>
-          {needsStudent && !usesQueue && (
+          {subview === "adviser" && <AdviserAppointments role={user?.role} embedded />}
+          {subview === "calendar" && (
+            <CalendarPage scope="staff" embedded title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in the Scheduling tab." />
+          )}
+          {!subview && needsStudent && !usesQueue && (
             <Card className="p-6">
               <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
               <StudentPicker
@@ -325,7 +389,7 @@ export default function WorkflowPage() {
             </Card>
           )}
 
-          {needsStudent && !studentId ? (
+          {subview ? null : needsStudent && !studentId ? (
             usesQueue ? null : (
               <Card className="p-6">
                 <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
@@ -359,7 +423,7 @@ export default function WorkflowPage() {
 
           {/* BPMN 1 Admission: the onboarding report and the Dean's approval
               gate that turns an import batch into a recorded admission completion. */}
-          {slug === "student-handoff" ? (
+          {!subview && slug === "student-handoff" ? (
             <div className="mt-5"><OnboardingGatePanel role={user?.role} /></div>
           ) : null}
         </div>
@@ -2024,7 +2088,7 @@ function DefenseSchedulingForm({ context, studentId, submit, submitting, result,
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
         <span>Availability comes only from what each person entered (weekly hours and dates) or their connected Google Calendar. Nobody is assumed free. All times are Philippine time.</span>
         <span className="flex flex-wrap items-center gap-3">
-          <Link to="/calendar" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">Open the defense calendar <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+          <Link to="/workflow/defense-scheduling?view=calendar" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">Open the defense calendar <ArrowUpRight className="h-3.5 w-3.5" /></Link>
           <Link to="/faculty" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" /></Link>
         </span>
       </div>
