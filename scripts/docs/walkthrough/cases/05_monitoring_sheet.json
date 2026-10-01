@@ -1,0 +1,64 @@
+{
+ "slug": "monitoring-sheet",
+ "title": "Monitoring Sheet — the record the platform maintains",
+ "kind": "live",
+ "owner": "GS Staff (Academic Coordinator can also edit)",
+ "duration": "8 min",
+ "story": [
+  "The Monitoring Sheet is the curriculum grid the Graduate School used to keep in Excel: one row per student, one column per subject. In the portal the record is maintained in the screen itself. Staff can add a student, add subject rows, correct a row and remove a row, and every entry is marked with where it came from (Imported from a workbook, or Manual entry), who made it and when, with the reason where one is needed. Official values that arrived from a workbook are never overwritten silently.",
+  "This case adds a new student with a time-stamped name so a re-run does not collide, gives the student two subject rows, edits one, removes one with a reason and reads the change history. It ends on an imported student to show how an imported value is protected. Grades are not entered here; AIMS remains the official source for grades."
+ ],
+ "accounts": [
+  ["Graduate School Staff (Grace Fernandez)", "staff@usls.edu.ph", "Adds the student and edits the rows. The Academic Coordinator (academic@usls.edu.ph) opens the same screen and can edit; the Research Coordinator and Dean can view only."]
+ ],
+ "data": [
+  ["Program, semester", "MSN (Master of Science in Nursing), AY 2026-2027 1st Semester"],
+  ["New student", "Dana Monitor<time stamp>, for example Monitor080216; Student ID 9 followed by the time stamp (9080216); AY entry 26-27; Enrollment status left at its default; Email left blank"],
+  ["Subject row 1", "MSN-FED, Completed, term AY 2025-2026 2nd Semester, remarks Credited from a transfer record"],
+  ["Subject row 2", "MSN-MOR, Completed, term AY 2025-2026 2nd Semester, remarks Credited from a transfer record"],
+  ["Edit", "MSN-FED remarks changed to Credited from a transfer record; verified against the transcript"],
+  ["Remove", "MSN-MOR, reason Entered by mistake: the subject was not credited"]
+ ],
+ "parts": [
+  {
+   "title": "Part A - The sheet and a new student",
+   "steps": [
+    {"text": "Sign in as **staff@usls.edu.ph** and open **Monitoring Sheet** under Records. The header says: Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff. Choose **MSN** in the **Program** filter. The row of filters also offers Semester, Progress, Risk, Enrollment status and Sort, and the **Export workbook** button. A note explains that everything typed here is marked **Manual entry** with the person's name and the time, and is kept in the change history, and that a later upload that disagrees with a portal entry is held for review. A legend lists Officially completed, Taken, Enrolled, Failed, Dropped, Planned, INC, Not taken and Manual entry.", "shots": [{"id": "monitoring-sheet-01", "caption": "The Monitoring Sheet for MSN: filters, the note on manual entries, and the legend."}]},
+    {"text": "Select **Add student**. The **Add student** dialog opens. It uses the same required fields and duplicate checks as the workbook import: **Student ID**, **Program**, **First name**, **Last name** and **School year / AY entry**, then Enrollment status, Email (left blank to generate the school address) and an optional Adviser.", "shots": [{"id": "monitoring-sheet-02", "caption": "The Add student dialog."}]},
+    {"text": "Type the Student ID, the first name **Dana**, the last name **Monitor<time stamp>** and **26-27** as the AY entry. Leave the other fields as they are.", "shots": [{"id": "monitoring-sheet-03", "caption": "The new student's details typed in. The last name carries a time stamp so a re-run does not collide."}]},
+    {"text": "Select **Add student**. The dialog confirms that Dana Monitor<stamp> was added to the MSN monitoring sheet, that it is recorded as a manual entry with your name and the time, and that a student login was created (dana.monitor<stamp>@student.usls.edu.ph) with the shared demo password, the same as the sheet import gives new students.", "shots": [{"id": "monitoring-sheet-04", "caption": "Confirmation: the student is added as a manual entry and a student login is created."}]}
+   ]
+  },
+  {
+   "title": "Part B - Add, edit and remove subject rows",
+   "steps": [
+    {"text": "Select **Add subjects now**. The student's record panel opens on the **Subjects** tab. The header shows IDNO, program, AY entry and the badge **Manual entry**. Below it: 0 of 18 curriculum subjects completed, 0/54 units, and the 18 curriculum subjects of MSN, each Not taken with an **Add** link. The other tabs are **Student details** and **Change history**.", "shots": [{"id": "monitoring-sheet-05", "caption": "The record panel of the new student: 18 curriculum subjects, all Not taken."}]},
+    {"text": "Select **Add** on **MSN-FED**. An inline form opens with **Status**, **Term taken** and **Remarks**. Choose **Completed**, type the term **AY 2025-2026 2nd Semester** and the remarks **Credited from a transfer record**, then select **Add row**.", "shots": [{"id": "monitoring-sheet-06", "caption": "Adding a subject row: status, term taken and remarks."}]},
+    {"text": "Add **MSN-MOR** the same way with the same term and remarks. The panel now reads 2 of 18 curriculum subjects completed, 6/54 units, 2 manual rows. Both rows carry the badge **Manual entry** in the Source column.", "shots": [{"id": "monitoring-sheet-07", "caption": "Two manual rows, each marked Manual entry; the completed count updates at once."}]},
+    {"text": "Select **Edit** on **MSN-FED** and change the remarks to **Credited from a transfer record; verified against the transcript**. A hint reads Enter to save, Esc to cancel. Select **Save changes**. The row shows the new remarks. A reason is not asked here because the row is the portal's own manual entry.", "shots": [{"id": "monitoring-sheet-08", "caption": "Editing a manual row: only the remarks change."}]},
+    {"text": "Select the red bin on **MSN-MOR**. The dialog **Remove MSN-MOR?** explains that the row goes back to not taken, is not erased, stays in the change history and can be re-added, and it requires a **Reason**. Type **Entered by mistake: the subject was not credited** and select **Remove row**.", "shots": [{"id": "monitoring-sheet-09", "caption": "Removing a row requires a reason; the row is kept in the change history."}]},
+    {"text": "The panel now reads 1 of 18 curriculum subjects completed, 3/54 units, 1 manual row, and a notice says MSN-MOR was removed and the row stays in the change history.", "shots": [{"id": "monitoring-sheet-10", "caption": "After the removal: one manual row remains."}]}
+   ]
+  },
+  {
+   "title": "Part C - Who, when and source: the change history",
+   "steps": [
+    {"text": "Open the **Change history** tab. The newest entries come first. Each entry shows the action (Subject row added, changed, removed), the subject, the field with its old value and new value (for example status: Completed to Removed), the date and time, the source badge **Manual entry**, **by Grace Fernandez**, and the reason where one was given. Adding a row appears as one entry per field (status, term, remarks).", "shots": [{"id": "monitoring-sheet-11", "caption": "Change history: every add, change and removal with who, when, source and reason."}]},
+    {"text": "Close the panel with the X. In the grid, the new student is listed with a **Manual** tag next to the name, and a small orange dot marks the cell that was entered manually (the legend item Manual entry).", "shots": [{"id": "monitoring-sheet-12", "caption": "The new student in the MSN grid, tagged Manual, with the manually entered cell dotted."}]}
+   ]
+  },
+  {
+   "title": "Part D - An imported student: imported values are protected",
+   "steps": [
+    {"text": "Open the record of an imported student, for example **Cabrera, Katrina** (MSN, IDNO 2260073), with the pencil beside the name. The header badge reads **Imported** and every row in the Source column reads **Imported**. All 18 of 18 subjects are completed.", "shots": [{"id": "monitoring-sheet-13", "caption": "An imported student: the source of every row is Imported."}]},
+    {"text": "Select **Edit** on **MSN-FED**. The form has the same fields as before plus a required field, **Reason for changing this imported value**, with the note that it is kept in the change history with your name. **Save changes** stays disabled until a reason is typed. Cancel the form; nothing is changed.", "shots": [{"id": "monitoring-sheet-14", "caption": "Changing an imported value needs a reason, and the Save button stays disabled without one."}]}
+   ]
+  }
+ ],
+ "notes": [
+  "The Monitoring Sheet holds the curriculum record only. Grades, official enrollment and subject results stay in AIMS and are never entered here.",
+  "A later workbook upload that disagrees with a value entered in the portal is held for review instead of overwriting it (see {case:student-handoff}).",
+  "Adding a student creates a student login for the Student Portal with the shared demonstration password.",
+  "The Research Coordinator and the Dean can open the sheet and the record panel but cannot edit; the screen is read-only for them."
+ ]
+}

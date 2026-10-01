@@ -1,0 +1,138 @@
+[
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-01"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-02"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "A1 staff opens the calendar and selects a defense"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-03"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "A2 staff filters Everything in the agenda view"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "Dean calendar page removed: /dean/calendar redirects to the Approvals Queue; no Dean calendar shots"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-06"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-07"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-08"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "C1 faculty 'My calendar' week, month and a defense"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-09"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "C2 faculty availability editor"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-10"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "D1 faculty creates the private calendar link and the link is read back"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-11"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-12"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "E1 student research calendar and bell"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-13"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "F1 faculty notification bell"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-14"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "G1 staff adviser appointment screen"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-15"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "G2 student adviser page"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "note",
+  "message": "shot calendars-16"
+ },
+ {
+  "case": "case_16_calendars",
+  "kind": "ok",
+  "message": "G3 faculty advisees page"
+ },
+ {
+  "case": "case_17_verdicts",
+  "kind": "note",
+  "message": "slots: nico 11:04-11:08, bea 11:10-11:14, gab 11:16-11:20, bea2 11:22-11:26"
+ },
+ {
+  "case": "case_17_verdicts",
+  "kind": "FAIL",
+  "message": "precondition: fresh demo database",
+  "detail": "RuntimeError: NEEDS A FRESH DATABASE: Nico, Bea and Gab (GS-2026-UD-01..03) already hold their verdicts, so case 17 cannot be repeated. Restart the demo on a new SQLite file; the existing verdicts-*.png are kept."
+ }
+]

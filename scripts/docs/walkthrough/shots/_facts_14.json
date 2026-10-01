@@ -1,0 +1,987 @@
+{
+ "miguel": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses",
+  "roles": "panel needs 3 members: Panel Chair, Content Specialist, Method Specialist.",
+  "excluded": [
+   "Dr. Liwayway Bautista: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Marlon Geronimo",
+    "score": 90.3,
+    "expertise": 60.0,
+    "availability": 20.3,
+    "workload": 10.0,
+    "suggested": "PANEL CHAIR",
+    "windows": "4",
+    "other_panels": "2",
+    "topics": [
+     "educational data",
+     "data mining",
+     "random forest"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Celeste Tan",
+    "score": 70.4,
+    "expertise": 41.3,
+    "availability": 14.1,
+    "workload": 15.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "2",
+    "other_panels": "0",
+    "topics": [
+     "academic",
+     "persistence",
+     "structured interviews"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Patricia Salvador",
+    "score": 66.9,
+    "expertise": 39.7,
+    "availability": 17.2,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "3",
+    "other_panels": "2",
+    "topics": [
+     "management system",
+     "online courses",
+     "arts education"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Daniel Uy",
+    "score": 51.5,
+    "expertise": 13.1,
+    "availability": 23.4,
+    "workload": 15.0,
+    "suggested": "",
+    "windows": "5",
+    "other_panels": "0",
+    "topics": [
+     "signal",
+     "machine learning"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Teodoro Ramos",
+    "score": 51.0,
+    "expertise": 36.9,
+    "availability": 14.1,
+    "workload": 0.0,
+    "suggested": "METHOD SPECIALIST",
+    "windows": "2",
+    "other_panels": "7",
+    "topics": [
+     "learning analytics",
+     "validation",
+     "case"
+    ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Paolo Navarro",
+    "score": 45.2,
+    "expertise": 11.8,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "burnout",
+     "engagement",
+     "school"
+    ]
+   }
+  ]
+ },
+ "miguel_why": "1\nDr. Marlon Geronimo\nSUGGESTED: PANEL CHAIR\n\nEducation\n\neducational data\nmachine learning\ndata mining\nlogs\nrandom forest\n\nMachine learning, educational data analytics, and predicting student performance\n\nHide why\n\nAvailable\n\n4 conflict-free windows\n\n2 other student panels\n\n90.3/100\n\n60/60 \u00b7 20.3/25 \u00b7 10/15\n\nHOW THE SCORE WAS BUILT\n\nExpertise match\n60 / 60\nAvailability\n20.3 / 25\nWorkload\n10 / 15\nTotal\n90.3 / 100\n\nExpertise is scaled across the candidate pool, so the closest match gets full marks and others are proportional. 4 conflict-free defense windows; 2 other student panels.\n\nMethod: Similarity match (keyword TF-IDF) (similarity 0.3049).\n\nWHY THIS FACULTY MATCHES\n\nDr. Marlon Geronimo: expertise records (publication, research interest, specialization) strongly match the paper on 'educational data', 'machine learning', 'data mining'; 4 conflict-free defense windows; 2 other student panels.\n\nPASSAGE OF THE PAPER THAT MATCHED\nThe study asks how accurately logistic regression and random forest models can predict course\n\nEXPERTISE RECORDS USED\n\nPublication\n2023\nDemo data\n\nRandom forest and logistic regression models for predicting course failure in online programs\n\nMatched: random forest, logistic regression, models predicting\n\nSpecialization\nfaculty profile\n\nMachine learning, educational data analytics, and predicting student performance\n\nMatched: predicting, educational data, machine learning\n\nResearch interest\nDemo data\n\nEducational data mining and predictive modeling of student performance and attrition\n\nMatched: educational data, data mining, predictive",
+ "miguel_seats": {
+  "Panel Chair": "#1 Dr. Marlon Geronimo - 90.3/100",
+  "Content Specialist": "#3 Dr. Patricia Salvador - 66.9/100",
+  "Method Specialist": "#5 Dr. Teodoro Ramos - 51/100"
+ },
+ "miguel_rules": "Panel composition rules\n\nSuggested panel satisfies the protocol",
+ "invitation_text": {
+  "marlon.geronimo@usls.edu.ph": "Panel invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\nAccepted (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nAccepted\n\nYour role on the panel: Panel Chair\n\nOTHER PANEL MEMBERS\n\nDr. Patricia Salvador \u00b7 Content Specialist\nDr. Teodoro Ramos \u00b7 Method Specialist\n\nNo date has been booked yet.\n\nAnswered Oct 1, 2026, 10:32 AM\n\nDecline",
+  "patricia.salvador@usls.edu.ph": "Panel invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\nAccepted (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nAccepted\n\nYour role on the panel: Content Specialist\n\nOTHER PANEL MEMBERS\n\nDr. Marlon Geronimo \u00b7 Panel Chair\nDr. Teodoro Ramos \u00b7 Method Specialist\n\nNo date has been booked yet.\n\nAnswered Oct 1, 2026, 10:32 AM\n\nDecline",
+  "teodoro.ramos@usls.edu.ph": "Panel invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\n1 invitation is waiting for your answer.\nWaiting for your answer (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nInvited\n\nYour role on the panel: Method Specialist\n\nOTHER PANEL MEMBERS\n\nDr. Marlon Geronimo \u00b7 Panel Chair\nDr. Patricia Salvador \u00b7 Content Specialist\n\nNo date has been booked yet.\n\nAccept\nDecline\nAccepted (3)\n\nGab Tolentino\n\nMBA \u00b7 GS-2026-UD-03\n\nProposal Defense\nAccepted\n\nYour role on the panel: Method Specialist\n\nOTHER P"
+ },
+ "GS-2026-PM-01": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Text-Message Reminders and Medication Adherence among Adults with Hypertension",
+  "roles": "panel needs 3 members: Panel Chair, Content Specialist, Method Specialist.",
+  "excluded": [
+   "Dr. Teodoro Ramos: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Adriana Santos",
+    "score": 95.3,
+    "expertise": 60.0,
+    "availability": 20.3,
+    "workload": 15.0,
+    "suggested": "PANEL CHAIR",
+    "windows": "4",
+    "other_panels": "0",
+    "topics": [
+     "nursing",
+     "patients hypertension",
+     "documentation"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Celeste Tan",
+    "score": 40.7,
+    "expertise": 11.6,
+    "availability": 14.1,
+    "workload": 15.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "2",
+    "other_panels": "0",
+    "topics": [
+     "patient",
+     "nursing",
+     "health"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Paolo Navarro",
+    "score": 38.8,
+    "expertise": 5.4,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "staff",
+     "centers"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Marlon Geronimo",
+    "score": 32.1,
+    "expertise": 4.3,
+    "availability": 20.3,
+    "workload": 7.5,
+    "suggested": "METHOD SPECIALIST",
+    "windows": "4",
+    "other_panels": "3",
+    "topics": [
+     "health"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Teresa Lim",
+    "score": 25.4,
+    "expertise": 1.3,
+    "availability": 14.1,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "2",
+    "other_panels": "2",
+    "topics": [
+     "electronic"
+    ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Marco Villanueva",
+    "score": 22.6,
+    "expertise": 2.9,
+    "availability": 17.2,
+    "workload": 2.5,
+    "suggested": "",
+    "windows": "3",
+    "other_panels": "5",
+    "topics": [
+     "quality",
+     "logistic"
+    ]
+   }
+  ]
+ },
+ "GS-2026-PM-02": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Academic Burnout, Coping, and Psychological Well-Being of Working Graduate Students",
+  "roles": "panel needs 3 members: Panel Chair, Content Specialist, Method Specialist.",
+  "excluded": [
+   "Dr. Liwayway Bautista: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Celeste Tan",
+    "score": 89.1,
+    "expertise": 60.0,
+    "availability": 14.1,
+    "workload": 15.0,
+    "suggested": "PANEL CHAIR",
+    "windows": "2",
+    "other_panels": "0",
+    "topics": [
+     "psychological",
+     "adult learners",
+     "persistence adult"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Paolo Navarro",
+    "score": 37.4,
+    "expertise": 4.0,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "burnout"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Adriana Santos",
+    "score": 36.5,
+    "expertise": 1.2,
+    "availability": 20.3,
+    "workload": 15.0,
+    "suggested": "",
+    "windows": "4",
+    "other_panels": "0",
+    "topics": [
+     "follow"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Teresa Lim",
+    "score": 27.2,
+    "expertise": 3.1,
+    "availability": 14.1,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "2",
+    "other_panels": "2",
+    "topics": [
+     "behavior"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Benjamin Reyes",
+    "score": 26.4,
+    "expertise": 1.7,
+    "availability": 17.2,
+    "workload": 7.5,
+    "suggested": "",
+    "windows": "3",
+    "other_panels": "3",
+    "topics": [
+     "behavior"
+    ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Teodoro Ramos",
+    "score": 23.2,
+    "expertise": 9.1,
+    "availability": 14.1,
+    "workload": 0.0,
+    "suggested": "METHOD SPECIALIST",
+    "windows": "2",
+    "other_panels": "8",
+    "topics": [
+     "interview",
+     "thematic",
+     "survey"
+    ]
+   }
+  ]
+ },
+ "GS-2026-PM-03": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning",
+  "roles": "panel needs 3 members: Panel Chair, Content Specialist, Method Specialist.",
+  "excluded": [
+   "Dr. Marlon Geronimo: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Daniel Uy",
+    "score": 98.4,
+    "expertise": 60.0,
+    "availability": 23.4,
+    "workload": 15.0,
+    "suggested": "PANEL CHAIR",
+    "windows": "5",
+    "other_panels": "0",
+    "topics": [
+     "optimization",
+     "motors",
+     "automation"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Paolo Navarro",
+    "score": 34.6,
+    "expertise": 1.2,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "manufacturing"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Marco Villanueva",
+    "score": 26.9,
+    "expertise": 7.2,
+    "availability": 17.2,
+    "workload": 2.5,
+    "suggested": "",
+    "windows": "3",
+    "other_panels": "5",
+    "topics": [
+     "optimization",
+     "manufacturing plant",
+     "scheduling"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Patricia Salvador",
+    "score": 26.0,
+    "expertise": 1.3,
+    "availability": 17.2,
+    "workload": 7.5,
+    "suggested": "",
+    "windows": "3",
+    "other_panels": "3",
+    "topics": [
+     "training"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Adriana Santos",
+    "score": 35.3,
+    "expertise": 0.0,
+    "availability": 20.3,
+    "workload": 15.0,
+    "suggested": "",
+    "windows": "4",
+    "other_panels": "0",
+    "topics": []
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Liwayway Bautista",
+    "score": 33.4,
+    "expertise": 0.0,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "METHOD SPECIALIST",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": []
+   }
+  ]
+ },
+ "GS-2026-PM-04": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults",
+  "roles": "panel needs 3 members: Panel Chair, Content Specialist, Method Specialist.",
+  "excluded": [
+   "Dr. Angela Cruz: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Benjamin Reyes",
+    "score": 84.7,
+    "expertise": 60.0,
+    "availability": 17.2,
+    "workload": 7.5,
+    "suggested": "PANEL CHAIR",
+    "windows": "3",
+    "other_panels": "3",
+    "topics": [
+     "financial",
+     "digital payment",
+     "accounting information"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Adriana Santos",
+    "score": 40.0,
+    "expertise": 4.7,
+    "availability": 20.3,
+    "workload": 15.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "4",
+    "other_panels": "0",
+    "topics": [
+     "quality",
+     "adoption"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Liwayway Bautista",
+    "score": 35.2,
+    "expertise": 1.8,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "METHOD SPECIALIST",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "adoption"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Paolo Navarro",
+    "score": 34.7,
+    "expertise": 1.3,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "behavior"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Celeste Tan",
+    "score": 30.6,
+    "expertise": 1.5,
+    "availability": 14.1,
+    "workload": 15.0,
+    "suggested": "",
+    "windows": "2",
+    "other_panels": "0",
+    "topics": [
+     "behavior"
+    ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Marlon Geronimo",
+    "score": 30.1,
+    "expertise": 2.3,
+    "availability": 20.3,
+    "workload": 7.5,
+    "suggested": "",
+    "windows": "4",
+    "other_panels": "3",
+    "topics": [
+     "risk"
+    ]
+   }
+  ]
+ },
+ "GS-2026-PM-05": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Demand Forecasting and Safety Stock Policy for a Consumer Goods Distributor",
+  "roles": "panel needs 4 members: Panel Chair, Content Specialist, Method Specialist, External Panel.",
+  "excluded": [
+   "Dr. Paolo Navarro: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Marco Villanueva",
+    "score": 82.2,
+    "expertise": 60.0,
+    "availability": 17.2,
+    "workload": 5.0,
+    "suggested": "METHOD SPECIALIST",
+    "windows": "3",
+    "other_panels": "4",
+    "topics": [
+     "policy",
+     "supply chain",
+     "demand forecasting"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Daniel Uy",
+    "score": 39.5,
+    "expertise": 1.1,
+    "availability": 23.4,
+    "workload": 15.0,
+    "suggested": "PANEL CHAIR",
+    "windows": "5",
+    "other_panels": "0",
+    "topics": [
+     "chain"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Adriana Santos",
+    "score": 36.6,
+    "expertise": 1.3,
+    "availability": 20.3,
+    "workload": 15.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "4",
+    "other_panels": "0",
+    "topics": [
+     "safety"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Marlon Geronimo",
+    "score": 30.0,
+    "expertise": 2.2,
+    "availability": 20.3,
+    "workload": 7.5,
+    "suggested": "EXTERNAL PANEL",
+    "windows": "4",
+    "other_panels": "3",
+    "topics": [
+     "forecasting"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Benjamin Reyes",
+    "score": 28.5,
+    "expertise": 1.3,
+    "availability": 17.2,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "3",
+    "other_panels": "2",
+    "topics": [
+     "consumer"
+    ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Angela Cruz",
+    "score": 27.7,
+    "expertise": 2.4,
+    "availability": 20.3,
+    "workload": 5.0,
+    "suggested": "",
+    "windows": "4",
+    "other_panels": "4",
+    "topics": [
+     "regional"
+    ]
+   }
+  ]
+ },
+ "GS-2026-PM-06": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Succession Planning and Firm Continuity in Philippine Family Enterprises",
+  "roles": "panel needs 5 members: Panel Chair, Content Specialist 1, Content Specialist 2, Method Specialist, External Panel.",
+  "excluded": [
+   "Dr. Benjamin Reyes: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Angela Cruz",
+    "score": 85.3,
+    "expertise": 60.0,
+    "availability": 20.3,
+    "workload": 5.0,
+    "suggested": "PANEL CHAIR",
+    "windows": "4",
+    "other_panels": "4",
+    "topics": [
+     "governance",
+     "firm continuity",
+     "philippine family"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Paolo Navarro",
+    "score": 42.2,
+    "expertise": 6.3,
+    "availability": 23.4,
+    "workload": 12.5,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "5",
+    "other_panels": "1",
+    "topics": [
+     "leadership",
+     "succession"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Celeste Tan",
+    "score": 31.8,
+    "expertise": 2.7,
+    "availability": 14.1,
+    "workload": 15.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "2",
+    "other_panels": "0",
+    "topics": [
+     "interview"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Teresa Lim",
+    "score": 29.6,
+    "expertise": 3.0,
+    "availability": 14.1,
+    "workload": 12.5,
+    "suggested": "EXTERNAL PANEL",
+    "windows": "2",
+    "other_panels": "1",
+    "topics": [
+     "family owned"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Marlon Geronimo",
+    "score": 29.2,
+    "expertise": 1.4,
+    "availability": 20.3,
+    "workload": 7.5,
+    "suggested": "",
+    "windows": "4",
+    "other_panels": "3",
+    "topics": [
+     "board"
+    ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Marco Villanueva",
+    "score": 24.9,
+    "expertise": 2.7,
+    "availability": 17.2,
+    "workload": 5.0,
+    "suggested": "",
+    "windows": "3",
+    "other_panels": "4",
+    "topics": [
+     "family owned"
+    ]
+   }
+  ]
+ },
+ "GS-2026-PM-07": {
+  "method": "Similarity match (keyword TF-IDF)",
+  "title": "Influencer Credibility and Purchase Intention on Short-Video Platforms",
+  "roles": "panel needs 3 members: Panel Chair, Content Specialist, Method Specialist.",
+  "excluded": [
+   "Dr. Angela Cruz: Adviser of this student; an adviser cannot sit on the student's panel."
+  ],
+  "rows": [
+   {
+    "rank": 1,
+    "name": "Dr. Teresa Lim",
+    "score": 84.1,
+    "expertise": 60.0,
+    "availability": 14.1,
+    "workload": 10.0,
+    "suggested": "PANEL CHAIR",
+    "windows": "2",
+    "other_panels": "2",
+    "topics": [
+     "brand equity",
+     "online retail",
+     "marketing"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Liwayway Bautista",
+    "score": 37.1,
+    "expertise": 3.7,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "METHOD SPECIALIST",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "engagement"
+    ]
+   },
+   {
+    "rank": 3,
+    "name": "Dr. Adriana Santos",
+    "score": 36.4,
+    "expertise": 1.1,
+    "availability": 20.3,
+    "workload": 15.0,
+    "suggested": "CONTENT SPECIALIST",
+    "windows": "4",
+    "other_panels": "0",
+    "topics": [
+     "electronic"
+    ]
+   },
+   {
+    "rank": 4,
+    "name": "Dr. Paolo Navarro",
+    "score": 35.7,
+    "expertise": 2.3,
+    "availability": 23.4,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "5",
+    "other_panels": "2",
+    "topics": [
+     "intention",
+     "engagement"
+    ]
+   },
+   {
+    "rank": 5,
+    "name": "Dr. Celeste Tan",
+    "score": 29.9,
+    "expertise": 0.8,
+    "availability": 14.1,
+    "workload": 15.0,
+    "suggested": "",
+    "windows": "2",
+    "other_panels": "0",
+    "topics": [
+     "behavior"
+    ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Marlon Geronimo",
+    "score": 29.5,
+    "expertise": 1.7,
+    "availability": 20.3,
+    "workload": 7.5,
+    "suggested": "",
+    "windows": "4",
+    "other_panels": "3",
+    "topics": [
+     "regression"
+    ]
+   }
+  ]
+ },
+ "pm04_before": [
+  {
+   "rank": 1,
+   "name": "Dr. Benjamin Reyes",
+   "score": 84.7,
+   "expertise": 60.0,
+   "availability": 17.2,
+   "workload": 7.5,
+   "suggested": "PANEL CHAIR",
+   "windows": "3",
+   "other_panels": "3",
+   "topics": [
+    "financial",
+    "digital payment",
+    "accounting information"
+   ]
+  },
+  {
+   "rank": 2,
+   "name": "Dr. Adriana Santos",
+   "score": 40.0,
+   "expertise": 4.7,
+   "availability": 20.3,
+   "workload": 15.0,
+   "suggested": "CONTENT SPECIALIST",
+   "windows": "4",
+   "other_panels": "0",
+   "topics": [
+    "quality",
+    "adoption"
+   ]
+  },
+  {
+   "rank": 3,
+   "name": "Dr. Liwayway Bautista",
+   "score": 35.2,
+   "expertise": 1.8,
+   "availability": 23.4,
+   "workload": 10.0,
+   "suggested": "METHOD SPECIALIST",
+   "windows": "5",
+   "other_panels": "2",
+   "topics": [
+    "adoption"
+   ]
+  },
+  {
+   "rank": 4,
+   "name": "Dr. Paolo Navarro",
+   "score": 34.7,
+   "expertise": 1.3,
+   "availability": 23.4,
+   "workload": 10.0,
+   "suggested": "",
+   "windows": "5",
+   "other_panels": "2",
+   "topics": [
+    "behavior"
+   ]
+  },
+  {
+   "rank": 5,
+   "name": "Dr. Celeste Tan",
+   "score": 30.6,
+   "expertise": 1.5,
+   "availability": 14.1,
+   "workload": 15.0,
+   "suggested": "",
+   "windows": "2",
+   "other_panels": "0",
+   "topics": [
+    "behavior"
+   ]
+  },
+  {
+   "rank": 6,
+   "name": "Dr. Marlon Geronimo",
+   "score": 30.1,
+   "expertise": 2.3,
+   "availability": 20.3,
+   "workload": 7.5,
+   "suggested": "",
+   "windows": "4",
+   "other_panels": "3",
+   "topics": [
+    "risk"
+   ]
+  }
+ ],
+ "pm04_target_before": {
+  "rank": "7",
+  "score": "30",
+  "expertise": "5.9"
+ },
+ "pm04_after": [
+  {
+   "rank": 1,
+   "name": "Dr. Benjamin Reyes",
+   "score": 84.7,
+   "expertise": 60.0,
+   "availability": 17.2,
+   "workload": 7.5,
+   "suggested": "PANEL CHAIR",
+   "windows": "3",
+   "other_panels": "3",
+   "topics": [
+    "financial",
+    "digital payment",
+    "business analytics"
+   ]
+  },
+  {
+   "rank": 2,
+   "name": "Dr. Adriana Santos",
+   "score": 39.9,
+   "expertise": 4.6,
+   "availability": 20.3,
+   "workload": 15.0,
+   "suggested": "CONTENT SPECIALIST",
+   "windows": "4",
+   "other_panels": "0",
+   "topics": [
+    "quality"
+   ]
+  },
+  {
+   "rank": 3,
+   "name": "Dr. Teresa Lim",
+   "score": 35.6,
+   "expertise": 11.5,
+   "availability": 14.1,
+   "workload": 10.0,
+   "suggested": "",
+   "windows": "2",
+   "other_panels": "2",
+   "topics": [
+    "digital",
+    "behavior",
+    "trust"
+   ]
+  },
+  {
+   "rank": 4,
+   "name": "Dr. Liwayway Bautista",
+   "score": 35.1,
+   "expertise": 1.7,
+   "availability": 23.4,
+   "workload": 10.0,
+   "suggested": "METHOD SPECIALIST",
+   "windows": "5",
+   "other_panels": "2",
+   "topics": [
+    "technology"
+   ]
+  },
+  {
+   "rank": 5,
+   "name": "Dr. Paolo Navarro",
+   "score": 34.8,
+   "expertise": 1.4,
+   "availability": 23.4,
+   "workload": 10.0,
+   "suggested": "",
+   "windows": "5",
+   "other_panels": "2",
+   "topics": [
+    "behavior"
+   ]
+  },
+  {
+   "rank": 6,
+   "name": "Dr. Celeste Tan",
+   "score": 30.6,
+   "expertise": 1.5,
+   "availability": 14.1,
+   "workload": 15.0,
+   "suggested": "",
+   "windows": "2",
+   "other_panels": "0",
+   "topics": [
+    "behavior"
+   ]
+  }
+ ],
+ "pm04_target_after": {
+  "rank": "3",
+  "score": "35.6",
+  "expertise": "11.5"
+ }
+}

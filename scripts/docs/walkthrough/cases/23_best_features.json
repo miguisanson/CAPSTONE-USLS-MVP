@@ -1,0 +1,47 @@
+{
+  "slug": "best-features",
+  "title": "Best Features — the closing statement",
+  "kind": "live",
+  "owner": "Presenters (no sign-in needed)",
+  "duration": "2 min",
+  "story": [
+    "The demonstration ends here and the team returns to the closing slides. This is not a screen walkthrough. It names the features the team considers strongest and, for each one, the reason it is more than record keeping. Every feature named has already been demonstrated, so each point refers the panel back to a case they have watched and, if asked, the screen can be opened again with the account named in that case.",
+    "The features are presented after the demonstration rather than before it. The presentation that opened the session was a problem statement; the features only mean something once the panel has seen them run."
+  ],
+  "accounts": [
+    ["No sign-in required", "-", "Presented over the closing slides"],
+    ["If a screen is requested again", "the account named in the case referred to", "Sign in by typing, as in {case:signin}"]
+  ],
+  "data": [
+    ["Feature 1", "Rules with a source on every screen: {case:business-rules}, and the rule panels inside {case:withdrawal}, {case:enrollment} and {case:leave-of-absence}"],
+    ["Feature 2", "A policy library and an assistant that cites its source, asked live: {case:policy-documents}, {case:policy-assistant}"],
+    ["Feature 3", "Panel matching that differs per paper and shows why: {case:panel_matching}"],
+    ["Feature 4", "Defense scheduling with hard and soft conflict warnings, and calendars for every role: {case:defense-scheduling}, {case:calendars}"],
+    ["Feature 5", "Staged boards and computed indicators: {case:leave-of-absence}, {case:graduation}, {case:reports}"],
+    ["Time", "About two minutes in total"]
+  ],
+  "parts": [
+    {
+      "title": "Part A — Name the five features",
+      "intro": "These are statements for the presenters to say, one per feature. Each ends with the case to point back to.",
+      "steps": [
+        "**Rules with a source.** Every rule the workflows follow sits in one register, with the Handbook or Protocol page it comes from, a label saying whether the system enforces it or only documents it, and a Needs review label on the rules that are still prototype assumptions. The same rule appears on the workflow screen where it applies, and a refusal message quotes it. This answers the panel's question about dropping a subject on Day 1 ({case:business-rules}, {case:withdrawal}, {case:dropping}).",
+        "**A policy library and a cited answer.** Staff add policy documents, keep versions and mark one as Draft until the Graduate School validates it. The Policy Assistant answers from those documents and names the document and the page it used, for staff, Dean, faculty and students ({case:policy-documents}, {case:policy-assistant}).",
+        "**Panel matching that explains itself.** The shortlist is scored from the similarity between the paper and each faculty member's expertise records, their availability and their workload, and the breakdown is on screen. Different papers produce different rankings, the student's own adviser is never offered, and a person chooses the panel ({case:panel_matching}).",
+        "**Scheduling that checks before it books.** The system reads availability, shows the best shared options, warns of conflicts and says whether a warning is a hard stop or a soft one and why, sends invitations that faculty answer, and shows the result in a calendar for staff, Dean, faculty and student ({case:defense-scheduling}, {case:calendars}).",
+        "**Staged boards and indicators computed from records.** Leave of Absence, Readmission and Graduation run on staged boards where a card is moved from stage to stage and every move is recorded; the reports and indicators are computed from those recorded events, not typed in ({case:leave-of-absence}, {case:graduation}, {case:reports})."
+      ]
+    },
+    {
+      "title": "Part B — State the common thread and close",
+      "steps": [
+        "Say plainly what connects the five: each one takes data the Graduate School already holds, together with the policy that governs it, and produces a decision, a warning or a measurement from it, instead of only storing and retrieving a record.",
+        "Invite the panel to return to any screen already demonstrated if they want a feature shown again.",
+        "Close with the declared limits in Section 8, Honest Notes & Limitations: no email is sent, no write-back to Google Calendar, grades are out of scope, the Operations Manual is a Draft until the Graduate School validates it, and rules marked Needs review are prototype values."
+      ]
+    }
+  ],
+  "notes": [
+    "Features are named after the demonstration, on the closing slides, because each of them refers to something the panel has already watched run."
+  ]
+}

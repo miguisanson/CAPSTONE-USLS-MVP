@@ -1,0 +1,87 @@
+{
+ "slug": "research_title",
+ "title": "Research Gate — Title Defense package, verification, Form 1 endorsement and adviser",
+ "kind": "live",
+ "owner": "Student, GS Staff, Academic Coordinator, Research Coordinator, Faculty adviser",
+ "duration": "10 min",
+ "story": [
+  "Miguel Yu (2260004, Master of Arts in Education) has finished coursework and has an adviser. He is at the Title Defense stage of the research lifecycle. He uploads his Form 1 (Application for Title Defense) and three concept papers in the student portal. Graduate School Staff then verify what he uploaded in Research Gate, and the Academic Coordinator endorses Form 1 by drawing a signature on the signature pad. The case stops at the point where the panel is chosen; that is the next case ({case:panel_matching}).",
+  "Two things are worth saying to the panel. First, the system reads the stored PDFs: the research title is taken from the Form 1 file, and the concept papers are checked against the concept-paper guidelines. Staff cannot mark a missing document as received. Second, the screens show the Graduate School rules that apply to them, with the source, and say honestly which rules the system enforces and which are only documented."
+ ],
+ "accounts": [
+  ["Student", "student@usls.edu.ph", "Miguel Yu: uploads Form 1 and the concept papers and submits the Title Defense package"],
+  ["GS Staff", "staff@usls.edu.ph", "Verifies the submitted requirements in Research Gate (4 · Research Gate)"],
+  ["Academic Coordinator", "academic@usls.edu.ph", "Endorses Form 1 with the signature pad"],
+  ["Research Coordinator", "research@usls.edu.ph", "Opens the adviser appointment record"],
+  ["Faculty (adviser)", "liwayway.bautista@usls.edu.ph", "Dr. Liwayway Bautista: Miguel's adviser; has her advisee list in the Faculty Portal"]
+ ],
+ "data": [
+  ["Student", "Miguel Yu, 2260004, MAED, demo key research-miguel (reset first from the sign-in page)"],
+  ["Form 1 file", "Yu_Miguel_Form1_Application_for_Title_Defense.pdf (one page; has the line \"Research Title:\")"],
+  ["Research title (read from Form 1)", "Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses"],
+  ["Concept paper files", "Yu_Miguel_ConceptPaper1_Dashboard_Feedback_Engagement.pdf; Yu_Miguel_ConceptPaper2_Predicting_Course_Persistence.pdf; Yu_Miguel_ConceptPaper3_Student_Perceptions_Online_Courses.pdf (each has title, background, statement of the problem, objectives, methodology, significance and references)"],
+  ["Adviser", "Dr. Liwayway Bautista (already recorded and accepted for this demo student)"]
+ ],
+ "parts": [
+  {
+   "title": "Part A — The student submits the Title Defense package",
+   "steps": [
+    "Reset the demo student Miguel Yu from the sign-in page (the reset button next to his name). Sign in by typing **student@usls.edu.ph** and the demo password, then open **Research Progress** in the sidebar.",
+    {"text": "Confirm that the page title is Research with the status **Missing Requirements**, that the automatically detected stage is **Title Defense**, that the research title still reads \"Research title pending Form 1 submission\" and the adviser is Dr. Liwayway Bautista. The four stage tabs (Title Defense, Proposal Defense, Final Defense, Completion) show where he is in the lifecycle. The Adviser and panel card says that no panel has been matched yet.", "shots": [{"id": "research_title-01", "caption": "Miguel Yu's Research page at the start: stage Title Defense, title pending, adviser shown."}]},
+    {"text": "Open the bar **Rules applied on this screen** (8 rules from the Graduate School policies, 1 needs review). Each rule shows its value, a plain description, the source (handbook page or Research Protocol section) and a tag: **Enforced by the system** or **Documented only**.", "shots": [{"id": "research_title-02", "caption": "The rules bar opened on the student's Research screen."}]},
+    {"text": "Scroll to **Similarity index of at most 15%** (the Turnitin rule). Read the tag **Documented only** and the explanation: staff check the uploaded Turnitin certificate, the percentage is not read from the file automatically. Scroll to the last rule, **Adviser signature waiting: remind after 3 days**: its source is \"Prototype rule — pending Graduate School validation\", enforced by the system, and it carries the amber tag **Needs review**. Collapse the bar again.", "shots": [{"id": "research_title-03", "caption": "The Turnitin rule (documented only), the one-change rules and the advising-contract rule."}]},
+    {"text": "In the **Form 1 application** card click **Upload PDF** and choose Yu_Miguel_Form1_Application_for_Title_Defense.pdf. Confirm that the field **Research title from uploaded Form 1** fills in by itself with \"Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses\" and the line \"Auto-filled from Yu_Miguel_Form1_Application_for_Title_Defense.pdf\" appears. The card now reads 1 of 1 file uploaded, status Submitted for review.", "shots": [{"id": "research_title-04", "caption": "Form 1 uploaded; the research title was read from the PDF."}]},
+    {"text": "In the **Concept papers** card upload the three concept paper PDFs one after the other. Confirm \"3 of 3 files uploaded\" and that every file shows the badge **Compliant** with **100%**, a **Recheck** button and a one-line summary.", "shots": [{"id": "research_title-05", "caption": "Three concept papers uploaded, each checked for compliance."}]},
+    {"text": "Click the summary line of one concept paper to open the compliance check. Confirm the seven checks (Research title, Background / rationale, Statement of the problem, Objectives / research questions, Proposed methodology, Significance / scope, References / citations), each marked Present with the text found, and the **Sources** list taken from the concept-paper guidelines (03_concept_paper_guidelines.txt).", "shots": [{"id": "research_title-06", "caption": "Concept paper compliance check: each required section found, with its source."}]},
+    {"text": "Scroll to the bottom. The block **Completed by staff or the system** lists what the student cannot do: Academic Coordinator endorsement (Pending), Confirmed title defense schedule and Title defense result (Pending confirmed schedule). Click **Submit Title Defense for review**. Confirm the message \"Submitted. Research staff will review your application.\" and the page status **Awaiting Review**.", "shots": [{"id": "research_title-07", "caption": "Title Defense package submitted for review."}]}
+   ]
+  },
+  {
+   "title": "Part B — The adviser",
+   "intro": "Miguel is an imported student whose adviser was recorded outside the portal, so this part shows the record and how the protocol would have run; the full application route (Form 3) is handled in the Adviser designation tab of Research Gate and in the Faculty Portal.",
+   "steps": [
+    {"text": "As the student open **Research Adviser**. Confirm \"Your research adviser: Dr. Liwayway Bautista\", Education, appointed Thu, Oct 1, 2026, status **Accepted**. Below it, the Form 3.1.1 change request form explains the rule: a change is allowed once and only before the proposal defense, needs both the current and the new adviser to agree, then the Dean decides.", "shots": [{"id": "research_title-08", "caption": "The student's Research Adviser page: adviser accepted."}]},
+    {"text": "Sign in as the Research Coordinator (**research@usls.edu.ph**), open **4 · Research Gate** and choose the tab **Adviser designation** (next to the tab Research Gate). The page repeats the protocol line and offers \"Record an adviser appointed outside the portal\" and the list tabs; open the tab **All**. Confirm one record: Miguel Yu, 2260004 · MAED · Thesis, with the badges **Recorded** and **Accepted**, the nominated adviser Dr. Liwayway Bautista (1 of 5 advisees) and the protocol steps: Form 3 submitted, Academic Coordinator notes the application, Research Coordinator sends it to the Dean, Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued), adviser accepts Form 3.1. For a student who applies through the portal, each step is done by the person named, and the adviser accepts in the Faculty Portal; Forms 3.2 and 3.3 are due within 5 days.", "shots": [{"id": "research_title-09", "caption": "Research Gate, tab Adviser designation: the appointment record with the protocol steps."}]},
+    {"text": "Sign in as the adviser (**liwayway.bautista@usls.edu.ph**) and open **My Advisees**. Confirm the capacity bar (1 of 5 advisees, 4 places left), the line \"No adviser requests are waiting for you\" and Miguel Yu, 2260004, listed with the appointment date Thu, Oct 1, 2026 and the contract column (Forms 3.2 / 3.3) showing Not applicable because the appointment was recorded rather than applied for.", "shots": [{"id": "research_title-10", "caption": "The adviser's own list of advisees and the faculty-side record of the appointment."}]}
+   ]
+  },
+  {
+   "title": "Part C — GS Staff verify the requirements in Research Gate",
+   "steps": [
+    {"text": "Sign in as **staff@usls.edu.ph** and open **4 · Research Gate**. Under **Choose a student** type **2260004** and select **Miguel Yu**. In the **Research Gate record** confirm the student, ID 2260004, program Master of Arts in Education, adviser Dr. Liwayway Bautista, the research title read from Form 1, current stage Title Defense, and the progress tiles Title Defense (Awaiting Review), Proposal Defense, Final Defense and Completion (all Locked). The counters read 0 completed and 5 pending requirements.", "shots": [{"id": "research_title-11", "caption": "Research Gate record of Miguel Yu for the Title Defense stage."}]},
+    {"text": "Scroll to **Title Defense requirements**. Confirm that Form 1 application (1/1 files) and Concept papers (3/3 files) show the files the student uploaded, with their dates and a link to open each PDF, and the status **Submitted for review**. The Academic Coordinator endorsement, the confirmed title defense schedule and the title defense result are staff or system managed and still Pending.", "shots": [{"id": "research_title-12", "caption": "The files uploaded by the student are visible to staff."}]},
+    {"text": "Click **Verify submitted requirements**. Confirm the message \"Saved. The student record, queue, and monitoring indicators were updated.\" and that Form 1 application and Concept papers now show **Verified**. The Panel Matching card at the bottom of the record shows the status of the matching for this student.", "shots": [{"id": "research_title-13", "caption": "Form 1 and the concept papers verified."}, {"id": "research_title-14", "caption": "The verify button, the saved message and the read-only defense result gate."}]}
+   ]
+  },
+  {
+   "title": "Part D — The Academic Coordinator endorses Form 1",
+   "steps": [
+    {"text": "Sign in as **academic@usls.edu.ph** (Dr. Ramon Alvarez, Academic Coordinator) and open **4 · Research Gate**. Select **Miguel Yu** (2260004) as before and scroll to **Form 1 Endorsements**. Click Miguel Yu in the list **Waiting and endorsed** (status Waiting). Confirm his research title, adviser, current stage, upload date and the file link of the uploaded Form 1.", "shots": [{"id": "research_title-15", "caption": "Form 1 endorsement queue with Miguel Yu waiting."}]},
+    {"text": "In **Draw signature**, draw a signature on the canvas with the mouse. Use **Clear drawing** to start again if needed.", "shots": [{"id": "research_title-16", "caption": "A signature drawn on the pad; the endorse button is still disabled."}]},
+    {"text": "Click **Finalize signature**. Confirm the text \"Signature finalized and ready to submit.\" and that **Endorse and sign Form 1** is now enabled.", "shots": [{"id": "research_title-17", "caption": "Signature finalized."}]},
+    {"text": "Click **Endorse and sign Form 1**. The message \"Form 1 endorsed successfully.\" appears. After the click the queue did not refresh by itself in this run and a red line \"Cannot read properties of null (reading 'getContext')\" appeared above the message; reloading the page shows the correct state, so reload Research Gate, select Miguel Yu again and click his name in the list. His status is now **Endorsed**.", "shots": [{"id": "research_title-18", "caption": "After a reload: Miguel Yu listed as Endorsed."}, {"id": "research_title-19", "caption": "The endorsement card: Endorsed by Dr. Ramon Alvarez, date and time, drawn signature saved, signature image."}]}
+   ]
+  },
+  {
+   "title": "Part E — Back to GS Staff: what is next",
+   "steps": [
+    {"text": "As GS Staff open **4 · Research Gate** and select Miguel Yu. Confirm that **Academic Coordinator endorsement** now shows **Endorsed**, while the confirmed title defense schedule and the title defense result stay Pending. The **Panel Matching** card reads \"Recommended panel available\" with an **Open matching** button. Choosing the panel is the next case ({case:panel_matching}); the schedule and the verdict follow in {case:defense-scheduling}.", "shots": [{"id": "research_title-20", "caption": "Academic Coordinator endorsement recorded."}, {"id": "research_title-21", "caption": "The Panel Matching card: recommended panel available, Open matching."}]}
+   ]
+  },
+  {
+   "title": "Part F — Faculty expertise records",
+   "steps": [
+    {"text": "Open **Faculty** in the sidebar and click **Dr. Liwayway Bautista**. The profile shows the department (Education), her panel assignments, the specialization as keywords and her contact and login e-mail.", "shots": [{"id": "research_title-22", "caption": "Faculty profile of the adviser."}]},
+    {"text": "Scroll to **Expertise records** (7 records for Dr. Bautista). The text under the heading explains that Panel Matching reads all of them. Each record shows its kind (research interest, publication, past advisee title, past panel title, degree), a year where there is one, and **Demo data** or **Manual entry**. Panel Matching in the next case compares the concept papers with these records.", "shots": [{"id": "research_title-23", "caption": "Expertise records of Dr. Bautista, with the Demo data tags."}]}
+   ]
+  }
+ ],
+ "notes": [
+  "The research title is read from the \"Research Title:\" line of the Form 1 PDF. If the PDF has no such line the upload is refused with a message.",
+  "The concept paper check is advisory decision support (a keyword check of the required sections, with the concept-paper guideline text as source); the Academic Coordinator and the panel decide.",
+  "Removing Form 1 or any concept paper later withdraws the endorsement and clears Panel Matching; once a panel is matched the title package is locked.",
+  "The Turnitin similarity rule (15% or less) is documented only: staff read the certificate, the system does not read the percentage. The adviser-reminder rule is a prototype rule marked Needs review.",
+  "Miguel's adviser is a recorded appointment (made outside the portal). The Form 3 application route (student, Academic Coordinator, Research Coordinator, Dean, adviser acceptance, Forms 3.2 and 3.3) is described in the Adviser designation tab of Research Gate but was not run end to end here.",
+  "No e-mail is sent by these steps. The expertise records and the sample papers are demonstration data."
+ ]
+}

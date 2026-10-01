@@ -1,0 +1,385 @@
+{
+ "cover": {
+  "institution": "University of St. La Salle",
+  "title": "Graduate School Lifecycle Portal",
+  "subtitle": "Demonstration Walkthrough & Demo Kit",
+  "tagline": "A step-by-step guide for demonstrating the graduate student lifecycle: business rules and policies  •  records and handoff  •  course offering and enrollment  •  standing changes  •  research, panel and defense  •  practicum  •  graduation  •  reports",
+  "password_line": "Every demo account uses the password  DemoPass123!  (type it on the sign-in page; nothing is pre-filled)."
+ },
+ "before_cases": [
+  {
+   "heading": "1.  About the System",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Graduate School Lifecycle Portal is a web application that gives the University of St. La Salle (USLS) Graduate School one consolidated workspace for monitoring and coordinating the full graduate student lifecycle. It replaces the manual, spreadsheet-only process the Graduate School uses today to track where each student stands."
+    },
+    {
+     "type": "p",
+     "text": "The portal does not replace AIMS, the university's official academic information system. AIMS remains the official source for student identity, enrollment, enrolled subjects, grades and course completion. Authorized staff export an approved monitoring workbook and import it here; those official values are labelled with their source. The portal adds the coordination, decision-support and exception-reporting layer on top of that official data, and it also lets staff add and correct records directly, with the source of every entry kept."
+    },
+    {
+     "type": "label",
+     "text": "What the portal lets each role do"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "**Graduate School staff** keep the Monitoring Sheet (add a student, add, edit or remove a subject row with its provenance, or import an Excel workbook), route research submissions, panel matching and defense scheduling, and process standing changes.",
+      "**Academic Coordinator** sets up the subjects offered for a semester from live subject demand, enrolls and records drops, and runs the practicum and coursework review.",
+      "**Research Coordinator** records ethics clearance and validates research completion before graduation.",
+      "**Dean** decides what is routed for approval: course-offering plans, leave, readmission and AWOL returns, withdrawals, practicum reports and graduation endorsements.",
+      "**Faculty** answer adviser requests, sign research papers, accept panel invitations, keep their availability and record defense verdicts.",
+      "**Students** see their own progress, enroll in published subjects, upload research documents and file leave, readmission, AWOL-return, withdrawal, practicum and graduation requests.",
+      "**Everyone** can read the Business Rules register, see the rule that applies on each workflow screen with the handbook page it comes from, and ask the Policy Assistant a question and receive the cited source."
+     ]
+    }
+   ]
+  },
+  {
+   "heading": "2.  System Requirements",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "To run the demonstration smoothly, the presenting machine should meet the following:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "A modern browser (Microsoft Edge or Google Chrome), kept up to date, at a window size of about 1366 x 768 or larger.",
+      "At least 4 GB of RAM and a few GB of free disk space for the local database and demo files.",
+      "Python 3.11 or newer and Node.js 18 or newer, so the backend server and the built front end can run locally. The database is a local SQLite file; nothing else needs to be installed.",
+      "The demonstration runs locally on the presenter's machine. An internet connection (and a Gemini API key in the environment) is only needed for the optional semantic layers of the Policy Assistant and of panel matching; without a key the same screens answer from keyword retrieval and keyword similarity and say so on screen."
+     ]
+    }
+   ]
+  },
+  {
+   "heading": "3.  Before You Start (Setup Notes)",
+   "blocks": [
+    {
+     "type": "note",
+     "label": "Note",
+     "text": "On the first start the system prepares its demonstration database and seeds every demo account and sample record described in this document. This can take a few minutes on a slow machine. Wait until the sign-in page loads before you begin."
+    },
+    {
+     "type": "label",
+     "text": "Start-up sequence (performed once before the demonstration)"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "**Step 1.**  From the project folder run `npm run setup` once. It creates the virtual environment, installs the Python and front-end dependencies, builds the front end and seeds the database.",
+      "**Step 2.**  Start the application with `npm run dev`. Demo mode is on by default, which is what shows the Demo accounts panel on the sign-in page. Set `DEMO_MODE=0` for anything that is not a demonstration.",
+      "**Step 3.**  Open the address the server prints (port 5000 by default; `FLASK_PORT=5001 npm run dev` uses another port).",
+      "**Step 4.**  You land on the sign-in page. Use the accounts in Section 4, typing the email and password."
+     ]
+    },
+    {
+     "type": "image",
+     "id": "front-login",
+     "caption": "The sign-in page. The form starts empty; the optional Demo accounts panel is collapsed."
+    }
+   ]
+  },
+  {
+   "heading": "4.  Demo Accounts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every account below uses the same password, **DemoPass123!** . The sign-in page has no role picker: the server decides the role from the account, so typing a staff email opens the staff portal and typing a student email opens the student portal. A presenter may expand the Demo accounts panel on the sign-in page to see the same list and use Fill form, which only copies the email and password into the form; Sign in still checks the password."
+    },
+    {
+     "type": "label",
+     "text": "Staff, approver and faculty accounts"
+    },
+    {
+     "type": "table",
+     "header": [
+      "Role",
+      "Name",
+      "Email (username)"
+     ],
+     "widths": [
+      1.9,
+      2.0,
+      2.6
+     ],
+     "rows": [
+      [
+       "Graduate School Staff",
+       "Grace Fernandez",
+       "staff@usls.edu.ph"
+      ],
+      [
+       "Academic Coordinator",
+       "Dr. Ramon Alvarez",
+       "academic@usls.edu.ph"
+      ],
+      [
+       "Research Coordinator",
+       "Dr. Sofia Mendoza",
+       "research@usls.edu.ph"
+      ],
+      [
+       "Dean (approver)",
+       "Graduate School Dean",
+       "dean@usls.edu.ph"
+      ],
+      [
+       "Administrator",
+       "System Administrator",
+       "admin@usls.edu.ph"
+      ],
+      [
+       "Faculty (adviser / panel chair)",
+       "Dr. Liwayway Bautista",
+       "liwayway.bautista@usls.edu.ph"
+      ],
+      [
+       "Student (research demo)",
+       "Miguel Yu, 2260004",
+       "student@usls.edu.ph"
+      ]
+     ]
+    },
+    {
+     "type": "note",
+     "label": "There is no Registrar login",
+     "text": "The Registrar is an external office. The portal produces export files for the Registrar; a person emails them. No Registrar account exists and none is demonstrated."
+    },
+    {
+     "type": "label",
+     "text": "Student demo accounts (one or two ready for each case)"
+    },
+    {
+     "type": "table",
+     "header": [
+      "Student",
+      "Student No.",
+      "Email",
+      "Ready for",
+      "Case"
+     ],
+     "widths": [
+      1.05,
+      1.0,
+      1.75,
+      1.85,
+      0.85
+     ],
+     "small": true,
+     "rows": [
+      [
+       "Miguel Yu",
+       "2260004",
+       "student@usls.edu.ph",
+       "Ready to submit Title Defense requirements",
+       "{case:research_title}, {case:panel_matching}"
+      ],
+      [
+       "Andrea Villanueva",
+       "GS-2026-PRAC-01",
+       "practicum.andrea@usls.edu.ph",
+       "Psychology student ready to begin the Practicum process",
+       "{case:practicum}"
+      ],
+      [
+       "Paolo Ramirez",
+       "GS-2026-PRAC-02",
+       "practicum.paolo@usls.edu.ph",
+       "MSGC student ready to begin the Practicum process",
+       "{case:practicum}"
+      ],
+      [
+       "Bianca Santos",
+       "GS-2026-GRAD-01",
+       "graduation.bianca@usls.edu.ph",
+       "Ready to submit a Graduation application",
+       "{case:graduation}"
+      ],
+      [
+       "Carlo Mendoza",
+       "GS-2026-GRAD-02",
+       "graduation.carlo@usls.edu.ph",
+       "Ready to submit a Graduation application",
+       "{case:graduation}"
+      ],
+      [
+       "Elena Navarro",
+       "GS-2026-WD-01",
+       "withdrawal.elena@usls.edu.ph",
+       "Enrolled in three active subjects; ready to choose one for a Withdrawal request",
+       "{case:withdrawal}"
+      ],
+      [
+       "Joshua Lim",
+       "GS-2026-WD-02",
+       "withdrawal.joshua@usls.edu.ph",
+       "Enrolled in three active subjects; ready to choose one for a Withdrawal request",
+       "{case:withdrawal}"
+      ],
+      [
+       "Clarissa Dela Cruz",
+       "GS-2026-ENR-01",
+       "enrollment.clarissa@usls.edu.ph",
+       "Active student with no current subjects; ready for single-student enrollment",
+       "{case:enrollment}"
+      ],
+      [
+       "Martin Gonzales",
+       "GS-2026-ENR-02",
+       "enrollment.martin@usls.edu.ph",
+       "Active student with completed prerequisites; ready for offered-subject enrollment",
+       "{case:enrollment}"
+      ],
+      [
+       "Sofia Reyes",
+       "GS-2026-HO-01",
+       "handoff.sofia@usls.edu.ph",
+       "New student with a complete admissions handoff and portal profile",
+       "{case:monitoring_sheet}"
+      ],
+      [
+       "Anton Bautista",
+       "GS-2026-HO-02",
+       "anton.bautista@student.usls.edu.ph",
+       "New student with one handoff item awaiting staff follow-up",
+       "{case:monitoring_sheet}"
+      ],
+      [
+       "Lianne Mercado",
+       "GS-2026-CA-01",
+       "adjustments.lianne@usls.edu.ph",
+       "Demand persona with several missing MAED subjects",
+       "{case:course_adjustments}"
+      ],
+      [
+       "Roberto Aquino",
+       "GS-2026-CA-02",
+       "roberto.aquino@student.usls.edu.ph",
+       "Demand persona nearing completion with focused subject needs",
+       "{case:course_adjustments}"
+      ],
+      [
+       "Maureen Castillo",
+       "GS-2026-LOA-01",
+       "maureen.castillo@student.usls.edu.ph",
+       "Active student ready to submit a structured one-semester LOA request",
+       "{case:leave_of_absence}"
+      ],
+      [
+       "Daniel Fernandez",
+       "GS-2026-LOA-02",
+       "loa.daniel@usls.edu.ph",
+       "Active student ready to demonstrate the two-semester LOA policy check",
+       "{case:leave_of_absence}"
+      ],
+      [
+       "Therese Lacson",
+       "GS-2026-READ-01",
+       "readmission.therese@usls.edu.ph",
+       "On approved LOA; ready to submit a structured readmission request",
+       "{case:readmission}"
+      ],
+      [
+       "Gabriel Domingo",
+       "GS-2026-READ-02",
+       "readmission.gabriel@usls.edu.ph",
+       "On approved LOA; ready to demonstrate return-semester policy checks",
+       "{case:readmission}"
+      ],
+      [
+       "Maya Torres",
+       "GS-2026-AWOL-01",
+       "awol.maya@usls.edu.ph",
+       "Automatically flagged AWOL; ready to submit a structured return declaration",
+       "{case:awol}"
+      ],
+      [
+       "Nicolas Valdez",
+       "GS-2026-RES-01",
+       "residency.nicolas@usls.edu.ph",
+       "Active research-stage student ready for a residency policy review",
+       "{case:residency}"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The seeded faculty roster, the seven panel-matching students (GS-2026-PM-01 to GS-2026-PM-07) and the seeded defenses used by the scheduling cases are described where they are used. Each workflow demo student can be reset from the Student workflow demos list on the sign-in page, or from the same reset call; the reset restores that student's own workflow state only."
+    }
+   ]
+  },
+  {
+   "heading": "5.  Navigating the Portal",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "After signing in, the left sidebar is grouped into sections and every role uses the same layout: a sidebar of separate pages, a breadcrumb at the top, the notification bell, and the account chip with Sign out. The staff portal groups its pages as follows; the Dean, Faculty and Student portals have their own, shorter sidebars (see {case:portals})."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "**Overview**: Dashboard, Reports, Academic Semesters.",
+      "**Records**: Students, Faculty, Monitoring Sheet, Enrollment Class List.",
+      "**Lifecycle Workflows**, numbered in lifecycle order: 1 Student Handoff, 2 Course Adjustments, 3 Enrollment, 4 Research Gate, 5 Panel Matching, 6 Defense Scheduling, 7 Practicum, 8 Graduation.",
+      "**Standalone Processes**: Leave of Absence, Readmission, AWOL & Residency, Withdrawal Requests.",
+      "**Monitoring & support**: Work Queue, Activity Log, Policy Assistant, Policy Documents and Business Rules (the last two are the policy layer of the system). Defense calendar and adviser designation are tabs inside Defense Scheduling and Research Gate, and the at-risk student list is a tab of the Work Queue."
+     ]
+    },
+    {
+     "type": "note",
+     "label": "Numbers",
+     "text": "The numbers in the sidebar are the order of the lifecycle, not the order of this walkthrough. The walkthrough follows the order in Section 6, which starts with the rules and the policy layer, then the records, then the lifecycle."
+    },
+    {
+     "type": "image",
+     "id": "front-dashboard",
+     "caption": "The staff dashboard after sign-in, showing the sidebar sections and the lifecycle overview."
+    }
+   ]
+  }
+ ],
+ "running_order_intro": "The cases below are numbered in the order they are demonstrated. The order answers the panel's questions first: what rules the system follows and where they come from, how a policy document enters the system and how the assistant answers from it, and how the record of a student is kept. It then follows the real academic process: Course Adjustments runs before Enrollment because the system only enrolls into a published offering; the standalone processes (withdrawal, dropping, leave, readmission, AWOL) sit before research because that is where they fall in a student's life; research, panel, scheduling, calendars and verdicts follow; practicum, graduation and reports close the lifecycle. Cases marked reference only are not part of the live demonstration; they are included so the panel can read the process if it is raised.",
+ "running_order_notes": [
+  "The presentation before the demonstration is a problem statement. The best features are presented after the demonstration, not before it.",
+  "Reset the demo students named in each case immediately before the demonstration begins ({case:signin} explains how). The capture script that produced this document does the same at the start of every run."
+ ],
+ "cases_intro": "Each case below is self-contained: it names the accounts to use, the story behind it, the data to enter and the steps to follow. Every step was performed in the running application by script, and every screenshot was captured from that run; where the screen shows a value, the text reads the same value from the screen. Cases are numbered in demonstration order, which is listed in the running-order table.",
+ "after_cases": [
+  {
+   "heading": "8.  Honest Notes & Limitations",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For an accurate demonstration, keep these points in mind and state them plainly if asked:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "**AIMS is the official source and is not connected live.** The portal uses an approved export/import workbook. Values that come from AIMS are shown with their source. A student, or a subject row, that staff add directly in the Monitoring Sheet is recorded with who added it, when and from what source; it is not an AIMS value until AIMS agrees.",
+      "**The portal records enrollment; it does not perform official enrollment.** The Registrar remains the office of record. Enrollment, dropping and subject withdrawal are transacted with the Registrar; the portal records them and applies the Graduate School's own checks.",
+      "**Grades are out of scope** (a stakeholder decision). Rules about grades (retention, INC removal, weighted average) are in the Business Rules register as Documented only, with their handbook page, and are not enforced. Course completion comes from the official export.",
+      "**No email leaves the portal.** Every Registrar hand-off is a file that a person downloads and emails. Notices to faculty and students are in the portal (notification bell, Messages, Panel Invitations), not sent by email. The portal does not claim an acknowledgement it never received.",
+      "**There is no Registrar login.** The Registrar is external and receives exports only.",
+      "**No write-back to Google Calendar.** A faculty member may connect Google Calendar read-only so that staff see real busy times; the portal never creates or changes events there. The private calendar link is a one-way feed (an .ics file) that a phone or calendar app subscribes to.",
+      "**The Handbook 2022-2023 is the policy in force; where the system and the handbook disagree, the handbook wins.** Every rule in the register cites its source page. Rules set by the Handbook or the Research Protocol are locked and change only when a new policy is uploaded; rules whose value is a prototype assumption are marked Needs review (Pending validation), and the register shows how many there are.",
+      "**The Operations Manual is a Draft.** It was written by the team from the handbook and the Research Protocol so that the Graduate School can correct and validate it. It appears in Policy Documents with the status Draft and answers carry the line Draft - pending Graduate School validation.",
+      "**The Policy Assistant is decision support, not an official ruling.** In the demonstration no Gemini key was configured, so every answer was labelled Local retrieval: the right passage is quoted with its source, but nothing is rephrased, and a differently worded question can find different passages. A question the library does not answer returns loosely related passages rather than a clear \"not found\". Page numbers in assistant answers are PDF pages and can differ by about four from the printed pages cited in the rules register.",
+      "**Panel matching is a ranked suggestion with its working shown.** The score combines similarity between the paper and the faculty expertise records, availability and workload; it is labelled Similarity match (keyword TF-IDF), or Semantic match (Gemini embeddings) when a key is set. The faculty expertise in the demonstration database is illustrative, not the real expertise of USLS faculty; the real records are still to be supplied by the Graduate School. A person selects the panel.",
+      "**Scheduling warnings are advice with a reason.** A hard warning cannot be overridden (a panelist outside the hours entered, a declined invitation, a double-booked panel or room, a date in the past). A soft warning, such as booking before the 14-day lead time, needs a ticked override box and a written reason. The system cannot see anything outside the portal and the optional Google busy times. A verdict cannot be entered before the defense starts.",
+      "**Withdrawal and drop windows depend on the dates in Academic Semesters.** The demonstration clock is later than the first week of the current term, so the withdrawal window is closed for every student until a presenter edits the semester start date, as {case:withdrawal} does and then restores. Dropping needs unexcused absences above 20 percent and can be recorded only by the Academic Coordinator.",
+      "**The enrollment guard has limits.** The 12-unit load check and the add-after-the-first-week check are enforced on the Enrollment screen; the add-after-the-first-week check only applies once the student already has a subject that term, and a confirmed class-list import does not apply it.",
+      "**Residency can be recorded even when the checker says Needs Human Review**, because the checker supports a staff judgement and does not take it.",
+      "**Risk is shown as Not Yet Assessed** for new or incomplete records instead of an invented Low, Medium or High score, until the official risk rules are confirmed.",
+      "**Faculty availability is a declaration**: weekly hours and specific dates, optionally combined with Google busy times. It does not include undergraduate teaching load.",
+      "**Drag and drop is available on the staged boards** (Leave of Absence, Readmission, Graduation). Dragging a card to the next stage opens the action window for that stage, the same one its button opens. Some boards (for example AWOL & Residency and Practicum) still use buttons and lists.",
+      "**The demonstration data is reset per student** from the sign-in page, or with the same reset call. The reset restores the seeded starting position for that student's workflow and is not part of the operational product. Demo mode (the Demo accounts panel and the reset) must be switched off for any real use.",
+      "**Testing.** The back end has an automated test suite; the front end has no automated test runner. The screens in this document were exercised by the capture script that produced it, which re-walks every case in the running application."
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,292 @@
+{
+ "slug": "signin",
+ "title": "Sign-in, demo accounts and role landing pages",
+ "kind": "live",
+ "owner": "Every role",
+ "duration": "5 min",
+ "story": [
+  "The portal has no role picker. A person types an email and a password, and the server decides from the account which portal to open: the staff workspace, the Dean portal, the Faculty portal or the Student portal. This case shows that real typed sign-in, the demo-only shortcut panel that a presenter can use instead, the way a demo student is reset to a clean state, and the page each role lands on.",
+  "Demo accounts exist only in demonstration mode. With demonstration mode off, the sign-in page is only the two-field form. Every demo account uses the same password, DemoPass123!."
+ ],
+ "accounts": [
+  [
+   "Graduate School Staff (Grace Fernandez)",
+   "staff@usls.edu.ph",
+   "Typed sign-in and sign-out; lands on the Dashboard"
+  ],
+  [
+   "Academic Coordinator (Dr. Ramon Alvarez)",
+   "academic@usls.edu.ph",
+   "Lands on the Monitoring Sheet; coursework and practicum screens"
+  ],
+  [
+   "Research Coordinator (Dr. Sofia Mendoza)",
+   "research@usls.edu.ph",
+   "Lands on Graduation Endorsement; research completion screens"
+  ],
+  [
+   "Administrator (System Administrator)",
+   "admin@usls.edu.ph",
+   "Lands on the Dashboard; every staff screen, for review"
+  ],
+  [
+   "Dean (Dr. Manuel Villaruz)",
+   "dean@usls.edu.ph",
+   "Lands on the Dean Dashboard; approvals"
+  ],
+  [
+   "Faculty (Dr. Liwayway Bautista)",
+   "liwayway.bautista@usls.edu.ph",
+   "Lands on the Faculty Portal; adviser and panel work"
+  ],
+  [
+   "Student (Miguel Yu, 2260004, MAED)",
+   "student@usls.edu.ph",
+   "Lands on the Student Portal; research demo student"
+  ]
+ ],
+ "data": [
+  [
+   "Sign-in typed",
+   "staff@usls.edu.ph / DemoPass123! (typed character by character into the empty form)"
+  ],
+  [
+   "Refused attempt",
+   "staff@usls.edu.ph with the password not-the-password"
+  ],
+  [
+   "Student reset in the panel",
+   "Anton Bautista (GS-2026-HO-02), Student-Handoff group"
+  ],
+  [
+   "Demo student: Sofia Reyes GS-2026-HO-01 handoff.sofia@usls.edu.ph",
+   "complete admissions handoff and portal profile"
+  ],
+  [
+   "Demo student: Anton Bautista GS-2026-HO-02 anton.bautista@student.usls.edu.ph",
+   "one handoff item awaiting staff follow-up"
+  ],
+  [
+   "Demo student: Lianne Mercado GS-2026-CA-01 adjustments.lianne@usls.edu.ph",
+   "several missing MAED subjects (course-demand example)"
+  ],
+  [
+   "Demo student: Roberto Aquino GS-2026-CA-02 roberto.aquino@student.usls.edu.ph",
+   "nearing completion, focused subject needs"
+  ],
+  [
+   "Demo student: Clarissa Dela Cruz GS-2026-ENR-01 enrollment.clarissa@usls.edu.ph",
+   "active, no current subjects, single-student enrollment"
+  ],
+  [
+   "Demo student: Martin Gonzales GS-2026-ENR-02 enrollment.martin@usls.edu.ph",
+   "completed prerequisites, offered-subject enrollment"
+  ],
+  [
+   "Demo student: Miguel Yu 2260004 student@usls.edu.ph",
+   "ready for Title Defense requirements (Research Gate, Panel Matching, Defense Scheduling)"
+  ],
+  [
+   "Demo student: Andrea Villanueva GS-2026-PRAC-01 practicum.andrea@usls.edu.ph",
+   "Psychology, ready to begin Practicum"
+  ],
+  [
+   "Demo student: Paolo Ramirez GS-2026-PRAC-02 practicum.paolo@usls.edu.ph",
+   "MSGC, ready to begin Practicum"
+  ],
+  [
+   "Demo student: Bianca Santos GS-2026-GRAD-01 graduation.bianca@usls.edu.ph",
+   "ready to submit a Graduation application"
+  ],
+  [
+   "Demo student: Carlo Mendoza GS-2026-GRAD-02 graduation.carlo@usls.edu.ph",
+   "ready to submit a Graduation application"
+  ],
+  [
+   "Demo student: Maureen Castillo GS-2026-LOA-01 maureen.castillo@student.usls.edu.ph",
+   "active, structured one-semester LOA request"
+  ],
+  [
+   "Demo student: Daniel Fernandez GS-2026-LOA-02 loa.daniel@usls.edu.ph",
+   "active, two-semester LOA policy check"
+  ],
+  [
+   "Demo student: Therese Lacson GS-2026-READ-01 readmission.therese@usls.edu.ph",
+   "on approved LOA, readmission request"
+  ],
+  [
+   "Demo student: Gabriel Domingo GS-2026-READ-02 readmission.gabriel@usls.edu.ph",
+   "on approved LOA, return-semester policy checks"
+  ],
+  [
+   "Demo student: Maya Torres GS-2026-AWOL-01 awol.maya@usls.edu.ph",
+   "automatically flagged AWOL, return declaration"
+  ],
+  [
+   "Demo student: Nicolas Valdez GS-2026-RES-01 residency.nicolas@usls.edu.ph",
+   "research-stage, residency policy review"
+  ],
+  [
+   "Demo student: Elena Navarro GS-2026-WD-01 withdrawal.elena@usls.edu.ph",
+   "three active subjects, subject Withdrawal"
+  ],
+  [
+   "Demo student: Joshua Lim GS-2026-WD-02 withdrawal.joshua@usls.edu.ph",
+   "three active subjects, subject Withdrawal"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - A real typed sign-in",
+   "steps": [
+    {
+     "text": "Open the portal address in a new browser window. The **Sign in** form is shown with the **Email** and **Password** fields empty; nothing is pre-filled. The heading reads Graduate School Lifecycle Portal and the note under it says the screens you see depend on the role your account holds.",
+     "shots": [
+      {
+       "id": "signin-01",
+       "caption": "The sign-in page: empty Email and Password fields, and the collapsed Demo accounts panel marked Demo mode."
+      }
+     ]
+    },
+    "Type the email staff@usls.edu.ph and a wrong password, then select **Sign in**. The page stays on the sign-in screen and shows the message **Incorrect email or password.** The portal does not open for a wrong password.",
+    {
+     "text": "Expect the form to show the red message only. Note that this attempt is refused by the server, not by the page.",
+     "shots": [
+      {
+       "id": "signin-02",
+       "caption": "A wrong password is refused with the message Incorrect email or password."
+      }
+     ]
+    },
+    {
+     "text": "Type staff@usls.edu.ph in **Email** and DemoPass123! in **Password**. The password is masked while you type.",
+     "shots": [
+      {
+       "id": "signin-03",
+       "caption": "Credentials typed into the empty form."
+      }
+     ]
+    },
+    {
+     "text": "Select **Sign in**. The staff workspace opens on the **Dashboard**. The top bar shows Grace Fernandez - Graduate School Staff, and the left sidebar lists Overview, Records, Lifecycle Workflows, Standalone Processes and Monitoring & support.",
+     "shots": [
+      {
+       "id": "signin-04",
+       "caption": "The staff landing page: the Graduate School Overview dashboard with the role-specific sidebar."
+      }
+     ]
+    },
+    {
+     "text": "Select the bell icon in the top bar. The **Notifications** panel opens. In this run it reads **You have no notifications.** because nothing was due for the staff account; reminders and request updates appear here as they occur.",
+     "shots": [
+      {
+       "id": "signin-05",
+       "caption": "The notification bell open on the staff dashboard."
+      }
+     ]
+    },
+    {
+     "text": "Select the sign-out icon (tooltip **Sign out**) at the right of the top bar. The portal returns to the sign-in page and the session is closed.",
+     "shots": [
+      {
+       "id": "signin-06",
+       "caption": "After sign-out, the sign-in page is shown again."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - The demo accounts panel and demo student reset",
+   "intro": "This panel is shown only when the server runs in demonstration mode. It lists every ready-made account so a presenter does not have to remember emails. Nothing is filled in until a button is chosen.",
+   "steps": [
+    {
+     "text": "Select **Demo accounts** on the sign-in page to expand it. The panel shows the shared demo password, the seven staff, Dean, Faculty and Student accounts (each with **Fill form** and **Sign in**), and the **Student workflow demos** grouped in the lifecycle order: 1 Student Handoff, 2 Course Adjustments, 3 Enrollment, 4-6 Research, Panel & Defense, 7 Practicum, 8 Graduation, then the standalone groups Leave of Absence, Readmission, AWOL & Residency and Withdrawal.",
+     "shots": [
+      {
+       "id": "signin-07",
+       "caption": "The expanded Demo accounts panel: staff and role accounts, and the workflow demo student groups."
+      }
+     ]
+    },
+    "**Fill form** copies an account into the two sign-in fields (and reveals the password) so it can be submitted with the normal **Sign in** button. The **Sign in** button inside the panel signs in at once. Both are demonstration conveniences; the typed sign-in in Part A is the same sign-in.",
+    {
+     "text": "Open the group **1 · Student Handoff** and select the red **Reset** button beside Anton Bautista. The browser asks for confirmation (Reset Anton Bautista's Student-Handoff demo?); confirm it. A green notice at the bottom of the panel confirms that the demo was reset and the student is ready to begin again.",
+     "shots": [
+      {
+       "id": "signin-08",
+       "caption": "Anton Bautista reset: the green notice confirms the Student-Handoff demo data was cleared."
+      }
+     ]
+    },
+    "Use this reset before any demonstration case that changes a student, so the case starts from a known state. Reset clears only that student's submissions, messages, tasks and staff actions for that workflow."
+   ]
+  },
+  {
+   "title": "Part C - Where each role lands",
+   "intro": "Each account below was signed in by typing its email and DemoPass123! into the empty form. The server, not the form, decides the portal.",
+   "steps": [
+    {
+     "text": "Sign in as **academic@usls.edu.ph**. The portal opens on the **Monitoring Sheet**. The sidebar is shortened: Reports; Students, Faculty, Monitoring Sheet, Enrollment Class List; lifecycle workflows 2 to 8 (there is no 1 · Student Handoff); AWOL & Residency as the only standalone process; and Work Queue, Policy Assistant and Business Rules. There is no Leave of Absence, Readmission, Withdrawal Requests, Activity Log or Policy Documents entry.",
+     "shots": [
+      {
+       "id": "signin-09",
+       "caption": "Academic Coordinator (Dr. Ramon Alvarez): landing on the Monitoring Sheet."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as **research@usls.edu.ph**. The portal opens on **Graduation Endorsement**. The sidebar is limited to Monitoring Sheet; 4 · Research Gate, 5 · Panel Matching, 6 · Defense Scheduling and 8 · Graduation; and Work Queue, Policy Assistant and Business Rules.",
+     "shots": [
+      {
+       "id": "signin-10",
+       "caption": "Research Coordinator (Dr. Sofia Mendoza): landing on Graduation Endorsement."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as **admin@usls.edu.ph**. The portal opens on the Dashboard with the full staff sidebar (the same entries as the staff account). The top bar reads System Administrator - Administrator.",
+     "shots": [
+      {
+       "id": "signin-11",
+       "caption": "Administrator: the same full workspace as staff, for review."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as **dean@usls.edu.ph**. The **Dean Portal** opens on the Dean Dashboard (decisions waiting, by process). Its sidebar has an **Approvals** group (Approvals Queue, Course Adjustments, Leave of Absence, Readmission, AWOL & Residency, Withdrawal Requests, Practicum Reports, Graduation Endorsement, Admission & Coursework Reports) and a Monitoring & support group (Reports & Analytics, Decision History, Policy Assistant, Business Rules).",
+     "shots": [
+      {
+       "id": "signin-12",
+       "caption": "Dean (Dr. Manuel Villaruz): the Dean Dashboard and approvals navigation."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as **liwayway.bautista@usls.edu.ph**. The **Faculty Portal** opens on a welcome dashboard. The sidebar has Advising & research (My Advisees, Signatures & Endorsements, Panel Assignments & Papers, Panel Invitations, Defense Schedule, My Calendar, My Availability, Verdicts), Teaching (Assigned Classes) and Support (Policy Assistant, Business Rules). The footer says a faculty member sees only the advisees and panels assigned to them.",
+     "shots": [
+      {
+       "id": "signin-13",
+       "caption": "Faculty (Dr. Liwayway Bautista): the Faculty Portal dashboard."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as **student@usls.edu.ph**. The **Student Portal** opens on the Dashboard with a welcome for Miguel Yu, 2260004, MAED. The sidebar groups are Overview, Academics, Research, Requests and Support.",
+     "shots": [
+      {
+       "id": "signin-14",
+       "caption": "Student (Miguel Yu): the Student Portal dashboard."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "There is no Registrar login. The Registrar is an external office; the platform only exports and imports files for it.",
+  "Staff, Academic Coordinator, Research Coordinator and Administrator share the staff workspace; the sidebar is trimmed to what each role may open. The Dean, Faculty and Student accounts have their own portals.",
+  "The demo accounts panel and the reset button exist only in demonstration mode and are not a production feature. The shared password is a demonstration value.",
+  "After a refused sign-in the form fields are cleared; the message stays on screen."
+ ]
+}
