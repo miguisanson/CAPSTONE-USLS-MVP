@@ -93,7 +93,9 @@ export const DEAN_NAV_GROUPS = [
     items: [
       { to: "/dean/approvals", label: "Approvals Queue", icon: Inbox, end: true, matches: ["/dean/case"], badge: "pendingTotal" },
       { to: "/dean/approvals/course-adjustments", label: "Course Adjustments", icon: SlidersHorizontal, badge: "pendingPlans" },
-      { to: "/dean/approvals/leave", label: "Leave / Readmission / AWOL", icon: CalendarOff, badge: "pendingLeave" },
+      { to: "/dean/approvals/leave-of-absence", label: "Leave of Absence", icon: CalendarOff, badge: "pendingLeaveOfAbsence" },
+      { to: "/dean/approvals/readmission", label: "Readmission", icon: UserCheck, badge: "pendingReadmission" },
+      { to: "/dean/approvals/awol", label: "AWOL & Residency", icon: UserX, badge: "pendingAwol" },
       { to: "/dean/approvals/withdrawal", label: "Withdrawal Requests", icon: LogOut, badge: "pendingWithdrawal" },
       { to: "/dean/approvals/practicum", label: "Practicum Reports", icon: Briefcase, badge: "pendingPracticum" },
       { to: "/dean/approvals/graduation", label: "Graduation Endorsement", icon: GraduationCap, badge: "pendingGraduation" },
