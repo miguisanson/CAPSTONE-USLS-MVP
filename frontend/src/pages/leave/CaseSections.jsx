@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, FileCheck, Eye, GraduationCap, History, ListChecks, ShieldCheck, Users } from "lucide-react";
+import { CheckCircle2, Circle, Download, FileCheck, FileSpreadsheet, Eye, GraduationCap, History, ListChecks, ShieldCheck, Users } from "lucide-react";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { EmptyState, ProgressBar, StatusBadge } from "../../components/ui";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
@@ -14,7 +14,29 @@ function Row({ label, children, full = false }) {
   );
 }
 
+// AWOL and Withdrawal send their own rows (`summary_rows`); the layout is the same as Leave's.
+function SummaryRows({ item }) {
+  return (
+    <Block title="The request">
+      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        <Row label="Student">
+          {item.student.name}
+          <span className="block text-xs text-slate-500">
+            {item.student.student_number} · {item.student.program_name || item.student.program_code}
+          </span>
+        </Row>
+        {item.summary_rows.map((row) => (
+          <Row key={row.label} label={row.label} full={Boolean(row.full)}>
+            {row.date ? formatDate(row.value) : row.value || "-"}
+          </Row>
+        ))}
+      </dl>
+    </Block>
+  );
+}
+
 export function CaseSummary({ item }) {
+  if (item.summary_rows) return <SummaryRows item={item} />;
   const readmission = item.kind === "READMISSION";
   const linked = item.linked_case;
   const before = [item.prior_stage, item.prior_enrollment_tag].filter(Boolean).join(" / ");
@@ -111,13 +133,15 @@ export function StudentSummary({ detail }) {
           </p>
           <ProgressBar className="mt-2" value={absolute ? (years / absolute) * 100 : 0} />
         </div>
-        <div>
-          <p className="text-sm font-semibold text-ink">
-            {leave} of {leaveMax} leave semesters already approved
-          </p>
-          <p className="text-xs text-slate-500">Earlier leaves count toward the total limit.</p>
-          <ProgressBar className="mt-2" value={leaveMax ? (leave / leaveMax) * 100 : 0} />
-        </div>
+        {leaveMax > 0 && (
+          <div>
+            <p className="text-sm font-semibold text-ink">
+              {leave} of {leaveMax} leave semesters already approved
+            </p>
+            <p className="text-xs text-slate-500">Earlier leaves count toward the total limit.</p>
+            <ProgressBar className="mt-2" value={leaveMax ? (leave / leaveMax) * 100 : 0} />
+          </div>
+        )}
       </div>
     </Block>
   );
@@ -128,7 +152,7 @@ export function EarlierCases({ detail }) {
   return (
     <Block title="Earlier requests by this student" icon={Users}>
       {!rows.length ? (
-        <p className="text-sm text-slate-500">No earlier leave or readmission requests.</p>
+        <p className="text-sm text-slate-500">No earlier requests in this process.</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((row) => (
@@ -172,6 +196,31 @@ export function ChecklistView({ detail }) {
           </li>
         ))}
       </ul>
+    </Block>
+  );
+}
+
+// The same "what happens after the Dean decides" block in all four processes.
+export function FollowUpBlock({ detail }) {
+  const followUp = detail.follow_up;
+  if (!followUp) return null;
+  return (
+    <Block title={followUp.title || "Registrar follow-up"} icon={FileSpreadsheet}>
+      <p className="text-sm text-slate-600">{followUp.text}</p>
+      {detail.registrar?.status && detail.registrar.status !== "Not Ready" && (
+        <p className="mt-2 text-xs font-semibold text-slate-600">Registrar list: {detail.registrar.status}</p>
+      )}
+      {(followUp.links || []).length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {followUp.links.map((link) => (
+            <a key={link.url} href={link.url} className="btn-ghost px-3 py-1.5">
+              <Download className="h-3.5 w-3.5" /> {link.label}
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-slate-500">Nothing to send yet. The link appears after the Dean approves.</p>
+      )}
     </Block>
   );
 }

@@ -1,8 +1,8 @@
 import { formatDate } from "../../lib/format";
 
-// Small pure helpers for the Leave of Absence / Readmission staff screen.
-// Nothing here decides what is allowed: the server sends `case.actions` for the signed-in
-// role, and every move is checked again by the server.
+// Small pure helpers for the standalone process board (Leave of Absence, Readmission,
+// AWOL & Residency, Withdrawal). Nothing here decides what is allowed: the server sends
+// `case.actions` for the signed-in role, and every move is checked again by the server.
 
 export const EMPTY_FILTERS = { query: "", program: "", status: "", reason: "", kind: "" };
 
@@ -14,6 +14,7 @@ export function plural(count, one, many) {
 }
 
 export function actionTargets(action) {
+  if (action.targets?.length) return action.targets;
   return action.to === "*approved*" ? APPROVED_STATUSES : [action.to];
 }
 
@@ -26,8 +27,25 @@ export function actionsIntoColumn(item, column) {
   return (item.actions || []).filter((action) => actionTargets(action).some((status) => column.statuses.includes(status)));
 }
 
-export function batchForwardAction(item) {
-  return (item.actions || []).find((action) => action.action === "forward" && action.batch) || null;
+// The steps that can be applied to several requests at once (the server marks them `batch`).
+export function batchActionsOf(item) {
+  return (item.actions || []).filter((action) => action.batch);
+}
+
+// The batch steps every selected request shares, so the bar only offers what works for all of them.
+export function commonBatchActions(items) {
+  if (!items.length) return [];
+  const [first, ...rest] = items.map(batchActionsOf);
+  return first.filter((action) => rest.every((list) => list.some((other) => other.action === action.action)));
+}
+
+// Up to three short lines describing what the request is about. The server sends `card_lines`
+// for AWOL and Withdrawal; Leave and Readmission still build theirs from the period and reason.
+export function cardLines(item) {
+  if (item.card_lines) return item.card_lines.filter(Boolean);
+  const lines = [whenText(item)];
+  if (item.reason_category) lines.push(`Reason: ${item.reason_category}`);
+  return lines;
 }
 
 function nothingToDoReason(item, vocabulary) {
@@ -66,8 +84,13 @@ export function whenDates(item) {
 }
 
 export function caseFlags(item, role) {
-  const flags = [];
+  const flags = item.flags ? [...item.flags] : [];
   const hasActions = (item.actions || []).length > 0;
+  if (item.flags) {
+    // AWOL and Withdrawal: the server already listed what to know; only messages are added here.
+    if (item.unresolved_messages > 0) flags.push({ key: "messages", tone: "warn", text: plural(item.unresolved_messages, "open message") });
+    return flags;
+  }
   if (role === "staff" && ["Submitted", "Staff Review"].includes(item.status) && hasActions) {
     flags.push({ key: "review", tone: "info", text: "Awaiting your review" });
   }

@@ -7481,6 +7481,15 @@ def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) 
         for item in LeaveCase.query.filter(LeaveCase.student_id == case.student_id, LeaveCase.id != case.id)
         .order_by(LeaveCase.id.desc()).limit(12).all()
     ]
+    approved_for_registrar = bool(case.decided_at and case.status in APPROVED_LEAVE_STATUSES)
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": ("Dean-approved requests go on the Registrar list below the board. The portal does not send any email: "
+                 "download the list, email it through the official channel and wait for the Registrar's acknowledgement."),
+        "links": ([{"label": "Registrar sheet for this request (CSV)",
+                    "url": f"/api/standing-changes/{SLUG_FOR_KIND[kind]}/{case.student_id}/registrar-report"}]
+                  if approved_for_registrar else []),
+    }
     payload["events"] = [
         {
             "id": event.id,
@@ -8316,6 +8325,634 @@ def awol_residency_roster_payload() -> list[dict]:
         for item in ResidencyEnrollment.query.order_by(ResidencyEnrollment.updated_at.desc()).limit(150).all()
     )
     return sorted(rows, key=lambda item: item.get("updated_at") or item.get("created_at") or "", reverse=True)
+
+
+# ---------------------------------------------------------------------------
+# Standalone process board: AWOL & Residency and Withdrawal
+# ---------------------------------------------------------------------------
+# Leave of Absence and Readmission already run on case records with a guarded board
+# (leave_workflow.py). These builders give AWOL / Residency and Withdrawal the SAME case
+# shape and the same kind of guarded move (standalone_process.py), so one React board can
+# show all four. They add no business rule: every move is applied by the code that already
+# owned it (handle_withdrawal, handle_awol, the Dean's decision route, the message "return").
+import standalone_process as _sp  # noqa: E402
+
+
+class ProcessError(ValueError):
+    """A refused move on the standalone board, with the HTTP status the API answers with."""
+
+    def __init__(self, message: str, status: int = 409):
+        super().__init__(message)
+        self.status = status
+
+
+def process_slug_or_error(slug: str) -> str:
+    slug = (slug or "").strip()
+    if slug not in _sp.STANDALONE_SLUGS:
+        raise ProcessError("Choose leave-of-absence, readmission, awol or withdrawal.", 400)
+    return slug
+
+
+def process_load_record(slug: str, ref) -> tuple[str, object]:
+    """(kind, record) for a board reference: a withdrawal id, or 'awol-3' / 'residency-2' / 'legacy-7'."""
+    if slug == _sp.SLUG_WITHDRAWAL:
+        record = db.session.get(WithdrawalApplication, safe_int(ref))
+        if not record:
+            raise ProcessError("That request was not found. It may already have been removed.", 404)
+        return _sp.KIND_WITHDRAWAL, record
+    prefix, _, number = str(ref).partition("-")
+    number = safe_int(number)
+    if prefix == "awol":
+        record = db.session.get(AwolCase, number)
+        kind = _sp.KIND_AWOL
+    elif prefix == "residency":
+        record = db.session.get(ResidencyEnrollment, number)
+        kind = _sp.KIND_RESIDENCY
+    elif prefix == "legacy":
+        record = db.session.get(Student, number)
+        kind = _sp.KIND_AWOL
+        if record and record.enrollment_tag != "AWOL":
+            record = None
+    else:
+        record = None
+        kind = _sp.KIND_AWOL
+    if not record:
+        raise ProcessError("That case was not found. It may already have been removed.", 404)
+    return kind, record
+
+
+def process_actions_for(slug: str, kind: str, status: str, role: str, record=None) -> list[dict]:
+    """The moves this role may make on a case now. Dean approval names its concrete target."""
+    actions = []
+    for move in _sp.transitions_from(slug, status, kind, role):
+        target = move["to"]
+        if move["to"] == "*approved*" and isinstance(record, AwolCase):
+            if record.full_reenrollment_required:
+                target = "Re-enrollment Required"
+            elif record.refresher_required:
+                target = "Extension Approved - Refresher Required"
+            else:
+                target = "Return Approved"
+        actions.append({
+            "action": move["action"],
+            "label": move["label"],
+            "to": target,
+            "targets": [target],
+            "needs_comment": move["needs_comment"],
+            "tone": move["tone"],
+            "batch": move["batch"],
+            "confirm": move["confirm"],
+            "opens": move["opens"],
+        })
+    return actions
+
+
+def process_recent_activity(slug: str, limit: int = 30) -> list[dict]:
+    """The newest log rows of one process, for the page's 'recent activity' window."""
+    slugs = [slug]
+    if slug == _sp.SLUG_AWOL:
+        slugs = ["awol", "awol-return"]
+    rows = (
+        TransactionLog.query.filter(TransactionLog.transaction_slug.in_(slugs))
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [log_dict(item) for item in rows]
+
+
+def _process_events_from_logs(logs: list[dict]) -> list[dict]:
+    """Stage history ('who moved it from where to where') read from the activity log, oldest first."""
+    rows = [item for item in logs if item.get("new_status")]
+    rows.sort(key=lambda item: (item.get("created_at") or "", item.get("id") or 0))
+    return [
+        {
+            "id": item["id"],
+            "from_status": item.get("previous_status"),
+            "to_status": item.get("new_status"),
+            "action": item.get("result") or "update",
+            "actor_role": "",
+            "actor_name": item.get("actor_role") or "",
+            "comment": item.get("notes") or "",
+            "created_at": item.get("created_at"),
+        }
+        for item in rows
+    ]
+
+
+def _process_status_fields(slug: str, status: str) -> dict:
+    info = _sp.status_by_key(slug).get(status, {})
+    return {
+        "status": status,
+        "status_label": info.get("label", status),
+        "status_tone": info.get("tone", "info"),
+        "owner": info.get("owner", ""),
+    }
+
+
+def _process_brief_for_earlier(slug: str, kind_label: str, status: str, period: str, decided_at, record_id) -> dict:
+    info = _sp.status_by_key(slug).get(status, {})
+    return {
+        "id": record_id,
+        "kind_label": kind_label,
+        "status": status,
+        "status_label": info.get("label", status),
+        "period_text": period,
+        "decided_at": decided_at,
+    }
+
+
+def withdrawal_process_case(application: WithdrawalApplication, role: str = "staff", detail: bool = False) -> dict:
+    student = application.student
+    subject = application.subject_enrollment
+    course = subject.course if subject else None
+    term_label = application.effective_term or (subject.term.label if subject and subject.term else "")
+    subject_text = f"{course.code} - {course.title}" if course else "Subject pending"
+    window = (
+        subject_withdrawal_window(subject, application.created_at.date() if application.created_at else date.today())
+        if subject else None
+    )
+    logs = [
+        log_dict(item)
+        for item in TransactionLog.query.filter_by(transaction_slug="withdrawal", student_id=application.student_id)
+        .filter(or_(TransactionLog.workflow_request_id == application.id, TransactionLog.workflow_request_id.is_(None)))
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc()).limit(60).all()
+    ]
+    open_messages = WorkflowMessage.query.filter(
+        WorkflowMessage.transaction_slug == "withdrawal",
+        WorkflowMessage.student_id == application.student_id,
+        WorkflowMessage.status == "Open",
+        or_(WorkflowMessage.workflow_request_id == application.id, WorkflowMessage.workflow_request_id.is_(None)),
+    ).count()
+    flags = []
+    if window and window.get("fee_percent") is not None:
+        flags.append({"key": "fee", "tone": "muted", "text": f"Fee {window['fee_percent']}% of the term"})
+    if window and window.get("eligible") is False:
+        flags.append({"key": "window", "tone": "bad", "text": "Window closed"})
+    registrar = application.registrar_status
+    if registrar and registrar not in {"Pending", "Pending Subject Tag"}:
+        flags.append({"key": "registrar", "tone": "info", "text": f"Registrar: {registrar}"})
+    payload = {
+        "id": application.id,
+        "ref": application.id,
+        "kind": _sp.KIND_WITHDRAWAL,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_WITHDRAWAL],
+        "slug": "withdrawal",
+        **_process_status_fields("withdrawal", application.status),
+        "student": leave_student_brief(student),
+        "card_lines": [subject_text, " · ".join(part for part in [term_label, window["status"] if window else ""] if part)],
+        "flags": flags,
+        "subject": {"code": course.code if course else "", "title": course.title if course else ""},
+        "term_label": term_label,
+        "window": ({"status": window["status"], "deadline": window.get("deadline"), "fee_percent": window.get("fee_percent"),
+                    "fee_tier": window.get("fee_tier")} if window else None),
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": registrar, "exported_at": iso(application.registrar_report_generated_at),
+                      "sent_at": iso(application.registrar_sent_at), "acknowledged_at": iso(application.registrar_confirmed_at)},
+        "actions": process_actions_for("withdrawal", _sp.KIND_WITHDRAWAL, application.status, role, application),
+        "timeline": _sp.timeline_steps("withdrawal", _sp.KIND_WITHDRAWAL, application.status,
+                                       {item["new_status"] for item in logs if item.get("new_status")}),
+        "unresolved_messages": open_messages,
+        "submitted_at": iso(application.created_at),
+        "decided_at": iso(application.decided_at),
+        "last_activity_at": logs[0]["created_at"] if logs else iso(application.updated_at),
+        "created_at": iso(application.created_at),
+        "updated_at": iso(application.updated_at),
+    }
+    if not detail:
+        return payload
+    payload["summary_rows"] = [
+        {"label": "Type", "value": payload["kind_label"]},
+        {"label": "Subject", "value": subject_text},
+        {"label": "Semester", "value": term_label or "Not recorded"},
+        {"label": "Reason", "value": application.reason or "No reason provided", "full": True},
+        {"label": "Withdrawal window", "value": (window or {}).get("status") or "Not recorded"},
+        {"label": "Window deadline", "value": (window or {}).get("deadline") or "Not recorded"},
+        {"label": "Fee consequence (information only)", "value": (window or {}).get("fee_consequence") or "Not recorded", "full": True},
+        {"label": "Academic record effect", "value": WITHDRAWAL_RECORD_EFFECT, "full": True},
+        {"label": "Dean decision", "value": application.dean_decision},
+        {"label": "Registrar list", "value": application.registrar_status or "Pending"},
+        {"label": "Filed", "value": iso(application.created_at), "date": True},
+        {"label": "Dean decided", "value": iso(application.decided_at), "date": True},
+        {"label": "Staff notes", "value": application.staff_remarks or "None", "full": True},
+    ]
+    student_view = _lw.role_key(role) == "student"
+    if student_view:
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+    checks = []
+    if window:
+        checks.append({"label": "Withdrawal window", "status": "Pass" if window["eligible"] else "Needs Review",
+                       "detail": f"{window['status']}. Deadline: {window.get('deadline') or 'not recorded'}."})
+    checks.append({
+        "label": "Subject is still active",
+        "status": "Pass" if subject and (subject.status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES or subject.status == "Withdrawn") else "Needs Review",
+        "detail": f"The selected subject is {subject.status}." if subject else "No subject is attached to this request.",
+    })
+    checks.append({
+        "label": "Signed request form",
+        "status": "Pass" if application.request_attachment and attachment_dict(application.request_attachment)["file_exists"] else "Needs Review",
+        "detail": "The request form is on file." if application.request_attachment else "No request form was uploaded.",
+    })
+    ok = all(item["status"] == "Pass" for item in checks)
+    if not student_view:
+        payload["policy_review"] = {
+            "recommendation": "Eligible for Dean Review" if ok else "Needs Human Review",
+            "suggested_dean_action": "Approve" if ok else "Check before deciding",
+            "summary": (window or {}).get("policy") or withdrawal_policy_statement(),
+            "checks": checks,
+        }
+    earlier = (
+        WithdrawalApplication.query.filter(
+            WithdrawalApplication.student_id == application.student_id, WithdrawalApplication.id != application.id
+        ).order_by(WithdrawalApplication.id.desc()).limit(12).all()
+    )
+    payload["earlier_cases"] = [
+        _process_brief_for_earlier(
+            "withdrawal", _sp.KIND_LABELS[_sp.KIND_WITHDRAWAL], item.status,
+            (f"{item.subject_enrollment.course.code} · {item.effective_term}" if item.subject_enrollment and item.subject_enrollment.course else item.effective_term or ""),
+            iso(item.decided_at), item.id,
+        ) for item in earlier
+    ]
+    payload["events"] = _process_events_from_logs(logs)
+    payload["history"] = [item for item in logs if not student_view or item.get("visibility") != "internal"]
+    payload["messages"] = workflow_messages_for("withdrawal", application.student_id, request_id=application.id,
+                                                 student_visible_only=student_view)
+    payload["files"] = workflow_attachments(application.student_id, "withdrawal", request_id=application.id)
+    links = []
+    if application.dean_decision == "Approved" and application.status in {
+        "Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar"}:
+        links.append({"label": "Registrar report for this withdrawal (CSV)", "url": f"/api/withdrawal/{application.id}/registrar-report"})
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": ("Tagged withdrawals go out on the approved-withdrawals Excel list. The portal does not send any email: "
+                 "export the list, email it through the official channel and wait for the Registrar's acknowledgement."),
+        "links": links,
+    }
+    return payload
+
+
+def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False) -> dict:
+    student = item.student
+    logs = [
+        log_dict(row)
+        for row in TransactionLog.query.filter(
+            TransactionLog.transaction_slug.in_(("awol", "awol-return")),
+            TransactionLog.student_id == item.student_id,
+        ).order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc()).limit(60).all()
+    ]
+    open_messages = WorkflowMessage.query.filter_by(
+        transaction_slug="awol", student_id=item.student_id, status="Open"
+    ).count()
+    flags = []
+    if item.detection_source:
+        flags.append({"key": "source", "tone": "muted", "text": item.detection_source})
+    if item.refresher_required:
+        flags.append({"key": "refresher", "tone": "warn", "text": "6-unit refresher"})
+    if item.full_reenrollment_required:
+        flags.append({"key": "reenroll", "tone": "warn", "text": "Full re-enrollment"})
+    if item.years_in_program is not None and item.absolute_residence_years and item.years_in_program > item.absolute_residence_years:
+        flags.append({"key": "residence", "tone": "bad", "text": "Past the absolute residence limit"})
+    second = " · ".join(part for part in [
+        f"Returning: {item.target_return_term}" if item.target_return_term else "No return filed yet",
+        f"AWOL since {item.awol_effective_date.isoformat()}" if item.awol_effective_date else "",
+    ] if part)
+    payload = {
+        "id": f"awol-{item.id}",
+        "ref": f"awol-{item.id}",
+        "record_id": item.id,
+        "kind": _sp.KIND_AWOL,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_AWOL],
+        "slug": "awol",
+        **_process_status_fields("awol", item.status),
+        "student": leave_student_brief(student),
+        "card_lines": [item.policy_classification or "Policy check not run yet", second],
+        "flags": flags,
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": "", "exported_at": None, "sent_at": None, "acknowledged_at": None},
+        "actions": process_actions_for("awol", _sp.KIND_AWOL, item.status, role, item),
+        "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, item.status, {row["new_status"] for row in logs if row.get("new_status")}),
+        "unresolved_messages": open_messages,
+        "submitted_at": iso(item.return_requested_at or item.created_at),
+        "decided_at": iso(item.decided_at),
+        "last_activity_at": logs[0]["created_at"] if logs else iso(item.updated_at),
+        "created_at": iso(item.created_at),
+        "updated_at": iso(item.updated_at),
+    }
+    if not detail:
+        return payload
+    payload["summary_rows"] = [
+        {"label": "Type", "value": payload["kind_label"]},
+        {"label": "AWOL effective date", "value": iso(item.awol_effective_date), "date": True},
+        {"label": "Detection source", "value": item.detection_source or "Imported standing"},
+        {"label": "Last enrolled semester", "value": item.last_enrolled_term or "Not recorded"},
+        {"label": "Returning in", "value": item.target_return_term or "Not chosen yet"},
+        {"label": "Policy classification", "value": item.policy_classification or "Not reviewed yet"},
+        {"label": "Years in the program", "value": "Not calculated" if item.years_in_program is None else str(item.years_in_program)},
+        {"label": "Residence limits", "value": (f"{item.normal_residence_years} normal / {item.absolute_residence_years} absolute"
+                                                 if item.normal_residence_years else "Not calculated")},
+        {"label": "Student's written intention", "value": item.return_intent or "Not filed yet", "full": True},
+        {"label": "Reason for return", "value": item.return_reason or "None", "full": True},
+        {"label": "Dean decision", "value": item.dean_decision},
+        {"label": "Dean decided", "value": iso(item.decided_at), "date": True},
+        {"label": "Staff notes", "value": item.staff_notes or "None", "full": True},
+    ]
+    student_view = _lw.role_key(role) == "student"
+    if student_view:
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+    if not student_view:
+        review = awol_policy_review(student, {
+            "workflow_action": "return_from_awol",
+            "application_reference": "Structured portal return declaration" if item.return_intent else "",
+        })
+        payload["policy_review"] = {
+            "recommendation": review["recommendation"],
+            "suggested_dean_action": review["suggested_action"],
+            "summary": review["summary"],
+            "checks": review["checks"],
+        }
+        limits = review["limits"]
+        payload["student_summary"] = {
+            "years_in_program": limits["years_in_program"],
+            "normal_years": limits["normal_years"],
+            "absolute_years": limits["absolute_years"],
+            "program_level": limits["program_level"],
+        }
+    earlier = [
+        _process_brief_for_earlier("awol", _sp.KIND_LABELS[_sp.KIND_AWOL], row.status,
+                                   row.target_return_term or "", iso(row.decided_at), f"awol-{row.id}")
+        for row in AwolCase.query.filter(AwolCase.student_id == item.student_id, AwolCase.id != item.id)
+        .order_by(AwolCase.id.desc()).limit(12).all()
+    ]
+    earlier += [
+        _process_brief_for_earlier("awol", _sp.KIND_LABELS[_sp.KIND_RESIDENCY], residency_enrollment_dict(row)["status"],
+                                   row.term.label if row.term else "", None, f"residency-{row.id}")
+        for row in ResidencyEnrollment.query.filter_by(student_id=item.student_id).order_by(ResidencyEnrollment.id.desc()).limit(6).all()
+    ]
+    payload["earlier_cases"] = earlier
+    payload["events"] = _process_events_from_logs(logs)
+    payload["history"] = [row for row in logs if not student_view or row.get("visibility") != "internal"]
+    payload["messages"] = workflow_messages_for("awol", item.student_id, student_visible_only=student_view)
+    files = workflow_attachments(item.student_id, "awol")
+    if item.intent_attachment and not any(row["id"] == item.intent_attachment.id for row in files):
+        files.append(attachment_dict(item.intent_attachment))
+    payload["files"] = files
+    links = []
+    if str(item.dean_decision or "").startswith("Approved"):
+        links.append({"label": "AWOL return report for the Registrar (CSV)", "url": f"/api/awol/{item.id}/registrar-report"})
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": ("After the Dean approves a return, staff download the return report and send it to the Registrar through the "
+                 "official channel. Enrollment itself stays a separate Academic Coordinator step."),
+        "links": links,
+    }
+    return payload
+
+
+def residency_process_case(item: ResidencyEnrollment, role: str = "staff", detail: bool = False) -> dict:
+    student = item.student
+    shown = residency_enrollment_dict(item)
+    status = shown["status"]
+    term_label = item.term.label if item.term else ""
+    payload = {
+        "id": f"residency-{item.id}",
+        "ref": f"residency-{item.id}",
+        "record_id": item.id,
+        "kind": _sp.KIND_RESIDENCY,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_RESIDENCY],
+        "slug": "awol",
+        **_process_status_fields("awol", status),
+        "student": leave_student_brief(student),
+        "card_lines": [item.reason or "Residency", term_label],
+        "flags": [{"key": "policy", "tone": "muted", "text": item.policy_status}] if item.policy_status else [],
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": "", "exported_at": None, "sent_at": None, "acknowledged_at": None},
+        "actions": process_actions_for("awol", _sp.KIND_RESIDENCY, status, role, item) if item.status == "Active" else [],
+        "timeline": _sp.timeline_steps("awol", _sp.KIND_RESIDENCY, status),
+        "unresolved_messages": 0,
+        "submitted_at": iso(item.created_at),
+        "decided_at": None,
+        "last_activity_at": iso(item.updated_at),
+        "created_at": iso(item.created_at),
+        "updated_at": iso(item.updated_at),
+    }
+    if not detail:
+        return payload
+    payload["summary_rows"] = [
+        {"label": "Type", "value": payload["kind_label"]},
+        {"label": "Semester", "value": term_label or "Not recorded"},
+        {"label": "Purpose", "value": item.reason},
+        {"label": "Policy result when recorded", "value": item.policy_status},
+        {"label": "Recorded", "value": iso(item.created_at), "date": True},
+        {"label": "Closed", "value": iso(item.ended_at), "date": True},
+        {"label": "Staff notes", "value": item.staff_notes or "None", "full": True},
+    ]
+    if _lw.role_key(role) == "student":
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+    else:
+        review = awol_policy_review(student, {"workflow_action": "record_residency", "residency_reason": item.reason})
+        payload["policy_review"] = {
+            "recommendation": review["recommendation"],
+            "suggested_dean_action": review["suggested_action"],
+            "summary": review["summary"],
+            "checks": review["checks"],
+        }
+    logs = [
+        log_dict(row)
+        for row in TransactionLog.query.filter(
+            TransactionLog.transaction_slug == "awol", TransactionLog.student_id == item.student_id,
+            TransactionLog.source_reference.in_(("Residency policy review", "Residency record")),
+        ).order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc()).limit(30).all()
+    ]
+    payload["events"] = _process_events_from_logs(logs)
+    payload["history"] = logs
+    payload["messages"] = []
+    payload["files"] = []
+    payload["earlier_cases"] = [
+        _process_brief_for_earlier("awol", _sp.KIND_LABELS[_sp.KIND_RESIDENCY], residency_enrollment_dict(row)["status"],
+                                   row.term.label if row.term else "", None, f"residency-{row.id}")
+        for row in ResidencyEnrollment.query.filter(
+            ResidencyEnrollment.student_id == item.student_id, ResidencyEnrollment.id != item.id
+        ).order_by(ResidencyEnrollment.id.desc()).limit(12).all()
+    ]
+    payload["follow_up"] = {
+        "title": "Registrar follow-up",
+        "text": "The term enrollment and monitoring records were updated when staff recorded this residency.",
+        "links": [{"label": "Residency report for the Registrar (CSV)", "url": f"/api/residency/{item.id}/registrar-report"}],
+    }
+    return payload
+
+
+def legacy_awol_process_case(student: Student, role: str = "staff", detail: bool = False) -> dict:
+    """A student tagged AWOL by the monitoring import who has no case row yet."""
+    payload = {
+        "id": f"legacy-{student.id}",
+        "ref": f"legacy-{student.id}",
+        "record_id": None,
+        "kind": _sp.KIND_AWOL,
+        "kind_label": _sp.KIND_LABELS[_sp.KIND_AWOL],
+        "slug": "awol",
+        **_process_status_fields("awol", "AWOL Declared"),
+        "student": leave_student_brief(student),
+        "card_lines": ["Policy check not run yet", "Flagged from the imported standing"],
+        "flags": [],
+        "reason_category": "",
+        "batch_name": None,
+        "registrar": {"status": "", "exported_at": None, "sent_at": None, "acknowledged_at": None},
+        "actions": [],
+        "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, "AWOL Declared"),
+        "unresolved_messages": 0,
+        "submitted_at": None, "decided_at": None, "last_activity_at": None, "created_at": None, "updated_at": None,
+    }
+    if detail:
+        payload["summary_rows"] = [
+            {"label": "Type", "value": payload["kind_label"]},
+            {"label": "Status", "value": "AWOL, flagged from the imported standing. The student has not filed a return yet.", "full": True},
+        ]
+        payload.update({"events": [], "history": [], "messages": [], "files": [], "earlier_cases": [],
+                        "follow_up": None})
+    return payload
+
+
+def student_standalone_cases(student: Student) -> dict:
+    """The student's own AWOL / residency and withdrawal cases in the board's case shape (student view).
+
+    The student pages show them with the same card and timeline the staff board uses.
+    """
+    awol = [
+        awol_process_case(item, "student", detail=True)
+        for item in AwolCase.query.filter_by(student_id=student.id).order_by(AwolCase.id.desc()).limit(6).all()
+    ]
+    residency = [
+        residency_process_case(item, "student", detail=True)
+        for item in ResidencyEnrollment.query.filter_by(student_id=student.id).order_by(ResidencyEnrollment.id.desc()).limit(4).all()
+    ]
+    withdrawals = [
+        withdrawal_process_case(item, "student", detail=True)
+        for item in WithdrawalApplication.query.filter_by(student_id=student.id).order_by(WithdrawalApplication.id.desc()).limit(6).all()
+    ]
+    return {"awol": awol + residency, "withdrawal": withdrawals}
+
+
+def process_case_dict(slug: str, kind: str, record, role: str = "staff", detail: bool = False) -> dict:
+    if slug == _sp.SLUG_WITHDRAWAL:
+        return withdrawal_process_case(record, role, detail)
+    if isinstance(record, Student):
+        return legacy_awol_process_case(record, role, detail)
+    if kind == _sp.KIND_RESIDENCY:
+        return residency_process_case(record, role, detail)
+    return awol_process_case(record, role, detail)
+
+
+def process_case_rows(slug: str, role: str) -> list[dict]:
+    if slug == _sp.SLUG_WITHDRAWAL:
+        return [
+            withdrawal_process_case(item, role)
+            for item in WithdrawalApplication.query.order_by(WithdrawalApplication.updated_at.desc(), WithdrawalApplication.id.desc()).all()
+            if item.student
+        ]
+    rows = [
+        awol_process_case(item, role)
+        for item in AwolCase.query.order_by(AwolCase.updated_at.desc(), AwolCase.id.desc()).limit(150).all()
+        if item.student
+    ]
+    case_students = {row["student"]["id"] for row in rows}
+    for student in Student.query.filter(Student.enrollment_tag == "AWOL", ~Student.id.in_(case_students or {-1})).order_by(Student.last_name).all():
+        rows.append(legacy_awol_process_case(student, role))
+    rows.extend(
+        residency_process_case(item, role)
+        for item in ResidencyEnrollment.query.order_by(ResidencyEnrollment.updated_at.desc()).limit(150).all()
+        if item.student
+    )
+    return rows
+
+
+def _process_dean_decide(case_type: str, item_id: int, decision: str, note: str) -> None:
+    """Run the Dean's existing decision route for one case (same rules, same side effects)."""
+    _flask_g.process_decision_override = {"decision": decision, "note": note}
+    try:
+        outcome = PROCESS_DEAN_DECIDE(case_type, item_id)
+    finally:
+        _flask_g.process_decision_override = None
+    response, status = (outcome if isinstance(outcome, tuple) else (outcome, 200))[:2]
+    body = response.get_json(silent=True) or {}
+    if status >= 400:
+        raise ProcessError(body.get("error") or "The Dean's decision was refused.", 409 if status == 400 else status)
+
+
+PROCESS_DEAN_DECIDE = None  # set by the route block once the Dean decision route exists
+
+
+def process_case_apply(slug: str, kind: str, record, action: str, account: UserAccount, *, comment: str = "", data=None) -> dict:
+    """Apply one guarded move. Everything a drag, a menu choice or a button does ends here."""
+    data = data or {}
+    comment = (comment or data.get("staff_notes") or "").strip()
+    status = record.status if not isinstance(record, Student) else "AWOL Declared"
+    if isinstance(record, ResidencyEnrollment):
+        status = residency_enrollment_dict(record)["status"]
+    role = account.role
+    move = _sp.find_transition(slug, status, action, kind, role)
+    if not move:
+        raise ProcessError(_sp.refusal_reason(slug, status, action, kind, role), 409)
+    if move["needs_comment"] and not comment:
+        raise ProcessError("Please write the reason first. It is required for this step.", 400)
+    student = record if isinstance(record, Student) else record.student
+    before = status
+    if slug == _sp.SLUG_WITHDRAWAL:
+        latest = latest_withdrawal_application(record.student_id)
+        if not latest or latest.id != record.id:
+            raise ProcessError("This is not the student's current withdrawal request, so it can no longer be moved.", 409)
+        try:
+            if action in {"forward", "tag"}:
+                payload = MultiDict({
+                    "student_id": str(record.student_id),
+                    "workflow_action": {"forward": "forward_to_dean", "tag": "tag_subject_withdrawn"}[action],
+                })
+                if comment:
+                    payload["workflow_comment"] = comment
+                handle_withdrawal(payload)
+            elif action in {"approve", "deny"}:
+                _process_dean_decide("withdrawal", record.id, action, comment)
+            elif action == "return":
+                create_workflow_message("withdrawal", student, account, "Student", "Remarks", comment, "return", "student_visible")
+            elif action == "export":
+                raise ProcessError(
+                    "Exporting downloads the Registrar's Excel list, so it is done from 'Prepare Excel export', not by moving the card.", 409)
+        except ProcessError:
+            raise
+        except ValueError as exc:
+            raise ProcessError(str(exc), 409) from exc
+    else:
+        try:
+            if action in {"forward", "complete_reenrollment", "end_residency"}:
+                payload = MultiDict({"student_id": str(record.student_id)})
+                if action == "forward":
+                    payload["workflow_action"] = "forward_return_to_dean"
+                    payload["case_id"] = str(record.id)
+                elif action == "complete_reenrollment":
+                    payload["workflow_action"] = "complete_reenrollment"
+                    payload["case_id"] = str(record.id)
+                else:
+                    payload["workflow_action"] = "end_residency"
+                    payload["residency_id"] = str(record.id)
+                payload["staff_notes"] = comment
+                handle_awol(payload)
+            elif action in {"approve", "deny", "return"}:
+                _process_dean_decide("awol-return", record.id, action, comment)
+        except ProcessError:
+            raise
+        except ValueError as exc:
+            raise ProcessError(str(exc), 409) from exc
+    recompute_risk(student)
+    db.session.flush()
+    fresh = student if isinstance(record, Student) else record
+    after = fresh.status if not isinstance(fresh, Student) else before
+    if isinstance(fresh, ResidencyEnrollment):
+        after = residency_enrollment_dict(fresh)["status"]
+    label = _sp.status_by_key(slug).get(after, {}).get("label", after)
+    return {"message": f"{move['label']}: now '{label}'.", "from": before, "to": after}
 
 
 def _status_sentence(student: Student, ind: dict) -> str:
@@ -11983,6 +12620,7 @@ def register_routes(app: Flask) -> None:
                 "research_milestones": [research_milestone_payload(student, gate) for gate in RESEARCH_MILESTONES],
                 "loa_allowed_reasons": LOA_ALLOWED_REASONS,
                 "leave_overview": leave_student_overview(student),
+                "standalone_cases": student_standalone_cases(student),
                 "readmission_requirements": readmission_requirements(),
                 "upcoming_semesters": upcoming_semester_labels(5),
                 "future_semesters": future_semester_labels(5),
@@ -16103,7 +16741,8 @@ def register_routes(app: Flask) -> None:
     @require_api_login("dean")
     def workflow_approval_decide(case_type: str, item_id: int):
         account = current_account()
-        data = request.get_json(silent=True) or {}
+        # The standalone board (process_case_apply) runs this same route for a Dean's drag or button.
+        data = getattr(_flask_g, "process_decision_override", None) or request.get_json(silent=True) or {}
         decision = (data.get("decision") or "").lower()
         note = (data.get("note") or "").strip()
         if decision not in {"approve", "return", "deny", "review"}:
@@ -17422,6 +18061,8 @@ def register_routes(app: Flask) -> None:
             "counts": counts,
             "programs": sorted({row["student"]["program_code"] for row in rows}),
             "reasons": sorted({row["reason_category"] for row in rows if row["reason_category"]}),
+            "recent_activity": process_recent_activity(slug),
+            "policy_questions": DEPLOYMENT_POLICY_QUESTIONS,
         })
 
     @app.route("/api/leave-cases/<int:case_id>")
@@ -17554,6 +18195,142 @@ def register_routes(app: Flask) -> None:
             query = query.filter_by(slug=slug)
         rows = query.order_by(LeaveExportLog.id.desc()).limit(30).all()
         return jsonify({"items": [leave_export_log_dict(item) for item in rows]})
+
+    # ---- The standalone process board: one set of routes for all four processes -------------
+    # Leave of Absence and Readmission answer from the leave case routes above; AWOL & Residency
+    # and Withdrawal answer from standalone_process.py. Every drag, menu choice and button on
+    # every board ends in process_case_transition().
+    globals()["PROCESS_DEAN_DECIDE"] = workflow_approval_decide
+
+    def _process_error_response(exc: ProcessError):
+        return jsonify({"error": str(exc)}), exc.status
+
+    def _process_slug_arg(slug: str):
+        try:
+            return process_slug_or_error(slug), None
+        except ProcessError as exc:
+            return None, _process_error_response(exc)
+
+    @app.route("/api/process-cases")
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_cases_list():
+        slug, error = _process_slug_arg(request.args.get("slug") or "")
+        if error:
+            return error
+        account = current_account()
+        if account.role == "academic_coordinator" and slug != _sp.SLUG_AWOL:
+            return jsonify({"error": "This process is not assigned to your role."}), 403
+        if slug in LEAVE_SLUGS:
+            return leave_cases_list()
+        rows = process_case_rows(slug, account.role)
+        counts: dict[str, int] = {}
+        for row in rows:
+            key = _sp.column_key_for_status(slug, row["status"]) or "other"
+            counts[key] = counts.get(key, 0) + 1
+        return jsonify({
+            "slug": slug,
+            "vocabulary": _sp.vocabulary_payload(slug),
+            "cases": rows,
+            "counts": counts,
+            "programs": sorted({row["student"]["program_code"] for row in rows}),
+            "reasons": [],
+            "recent_activity": process_recent_activity(slug),
+            "policy_questions": DEPLOYMENT_POLICY_QUESTIONS,
+            "residency_reasons": list(RESIDENCY_REASONS) if slug == _sp.SLUG_AWOL else [],
+        })
+
+    @app.route("/api/process-cases/<slug>/<ref>")
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_case_detail(slug: str, ref: str):
+        slug, error = _process_slug_arg(slug)
+        if error:
+            return error
+        if slug in LEAVE_SLUGS:
+            return leave_case_detail(safe_int(ref))
+        account = current_account()
+        try:
+            kind, record = process_load_record(slug, ref)
+        except ProcessError as exc:
+            return _process_error_response(exc)
+        return jsonify({
+            "case": process_case_dict(slug, kind, record, account.role, detail=True),
+            "vocabulary": _sp.vocabulary_payload(slug),
+        })
+
+    @app.route("/api/process-cases/<slug>/<ref>/transition", methods=["POST"])
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_case_transition(slug: str, ref: str):
+        """Every button, menu choice and drag and drop on every standalone board ends up here."""
+        slug, error = _process_slug_arg(slug)
+        if error:
+            return error
+        if slug in LEAVE_SLUGS:
+            return leave_case_transition(safe_int(ref))
+        account = current_account()
+        data = request_payload()
+        action = (data.get("action") or "").strip()
+        try:
+            kind, record = process_load_record(slug, ref)
+            outcome = process_case_apply(slug, kind, record, action, account, comment=(data.get("comment") or ""), data=data)
+            db.session.commit()
+        except ProcessError as exc:
+            db.session.rollback()
+            return _process_error_response(exc)
+        except Exception as exc:  # noqa: BLE001 - a refused step must never be a server error
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        kind, record = process_load_record(slug, ref)
+        return jsonify({
+            "ok": True,
+            "message": outcome["message"],
+            "case": process_case_dict(slug, kind, record, account.role, detail=True),
+        })
+
+    @app.route("/api/process-cases/<slug>/batch", methods=["POST"])
+    @require_api_login("staff", "dean", "academic_coordinator")
+    def process_cases_batch(slug: str):
+        slug, error = _process_slug_arg(slug)
+        if error:
+            return error
+        if slug in LEAVE_SLUGS:
+            return leave_cases_batch()
+        account = current_account()
+        data = request_payload()
+        refs = []
+        for value in data.getlist("case_ids"):
+            if str(value) not in refs:
+                refs.append(str(value))
+        action = (data.get("action") or "").strip()
+        if not refs:
+            return jsonify({"error": "Select at least one request."}), 400
+        batchable = {item["action"] for item in _sp.TRANSITIONS[slug] if item["batch"]}
+        if action not in batchable:
+            return jsonify({"error": "That step cannot be applied to several requests at once."}), 400
+        comment = (data.get("comment") or "").strip()
+        if any(item["action"] == action and item["needs_comment"] for item in _sp.TRANSITIONS[slug]) and not comment:
+            return jsonify({"error": "Enter the required reason before applying this step."}), 400
+        updated, skipped = [], []
+        for ref in refs:
+            name = ""
+            case_id = ref
+            try:
+                kind, record = process_load_record(slug, ref)
+                student = record if isinstance(record, Student) else record.student
+                name = student.name
+                student_id = student.id
+                process_case_apply(slug, kind, record, action, account, comment=comment, data=data)
+                db.session.commit()  # each row stands on its own, like the leave batch
+                updated.append({"case_id": case_id, "student_id": student_id, "student_name": name})
+            except ProcessError as exc:
+                db.session.rollback()
+                skipped.append({"case_id": case_id, "student_name": name, "reason": str(exc)})
+            except Exception as exc:  # noqa: BLE001
+                db.session.rollback()
+                skipped.append({"case_id": case_id, "student_name": name, "reason": str(exc)})
+        return jsonify({
+            "ok": True, "updated": updated, "skipped": skipped, "action": action,
+            "message": f"{len(updated)} request(s) updated; {len(skipped)} skipped.",
+        })
 
     @app.route("/api/leave-of-absence/policy-review", methods=["POST"])
     @require_api_login("staff", "academic_coordinator", "dean")

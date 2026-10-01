@@ -5,10 +5,12 @@ import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatu
 import ModalShell from "./ModalShell";
 import { ActionButton } from "./leaveUi";
 import CaseConversation from "./CaseConversation";
-import { CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, PolicyCheck, StudentSummary } from "./CaseSections";
+import { CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, FollowUpBlock, PolicyCheck, StudentSummary } from "./CaseSections";
 
 /**
- * The full window for one request. It loads the full case itself and reloads whenever
+ * The full window for one request, the same in all four standalone processes: timeline, the
+ * request, policy check, earlier requests, messages, files, Registrar follow-up and stage
+ * history, with the steps as buttons at the bottom. It loads the full case itself and reloads whenever
  * `version` changes (the board bumps it after any step). Every button at the bottom
  * hands the action to `onAction`, which opens the same confirm box as "Move to...".
  */
@@ -20,20 +22,20 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
     let active = true;
     setError("");
     api
-      .leaveCase(caseId)
+      .processCase(slug, caseId)
       .then((res) => active && setLoaded(res.case))
       .catch((err) => active && setError(err.message || "This request could not be loaded."));
     return () => {
       active = false;
     };
-  }, [caseId, version]);
+  }, [slug, caseId, version]);
 
   const detail = loaded && loaded.id === caseId ? loaded : null;
   const actions = detail?.actions || [];
 
   return (
     <ModalShell
-      id={`leave-case-${caseId}`}
+      id={`${slug}-case-${caseId}`}
       size="wide"
       title={detail ? detail.student.name : "Request details"}
       subtitle={detail ? `${detail.kind_label} · ${detail.student.student_number} · ${detail.student.program_code}` : "Loading the request..."}
@@ -77,6 +79,7 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
           </div>
           <CaseConversation slug={slug} detail={detail} onTransition={onTransition} onNoteSent={onNoteSent} />
           <FileList files={detail.files} />
+          <FollowUpBlock detail={detail} />
           <CaseHistory detail={detail} vocabulary={vocabulary} />
         </div>
       )}

@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   UserPlus,
-  CalendarOff,
-  UserCheck,
   ClipboardCheck,
   FileCheck,
   FileText,
@@ -11,7 +9,6 @@ import {
   CalendarCheck,
   Briefcase,
   GraduationCap,
-  LogOut,
   CheckCircle2,
   Info,
   Sparkles,
@@ -53,7 +50,7 @@ import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from "../components/ui";
 import { Field, Input, Textarea, Select, CheckList } from "../components/forms";
 import StudentPicker from "../components/StudentPicker";
-import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../components/WorkflowTimeline";
+import WorkflowTimeline, { graduationTimelineSteps } from "../components/WorkflowTimeline";
 import WorkflowDiscussion from "../components/WorkflowDiscussion";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import HandoffResult from "../components/HandoffResult";
@@ -68,16 +65,13 @@ import { useAuth } from "../auth";
 import { OnboardingGatePanel } from "../components/ProcessGates";
 import { Form1EndorsementQueue } from "./Form1Endorsements";
 import PolicyRules from "../components/PolicyRules";
-import LeaveCasesBoard from "./LeaveCasesBoard";
 import AdviserAppointments from "./AdviserAppointments";
 import CalendarPage from "../components/calendar/CalendarPage";
+import ProcessBoardPage from "../components/ProcessBoardPage";
+import { PROCESS_SLUGS } from "../components/processConfig";
 
 // Which business-rules process each workflow screen applies.
 const RULE_PROCESS_BY_SLUG = {
-  "leave-of-absence": "loa",
-  readmission: "readmission",
-  awol: "awol_residency",
-  withdrawal: "withdrawal",
   "research-gate": "research",
   "panel-matching": "defense",
   "defense-scheduling": "defense",
@@ -101,37 +95,26 @@ const PANEL_MATCHING_RECOMMENDED_COUNT = 4;
 
 const ICONS = {
   "student-handoff": UserPlus,
-  "leave-of-absence": CalendarOff,
-  readmission: UserCheck,
-  awol: UserX,
   "course-audit": ClipboardCheck,
   "research-gate": FileCheck,
   "panel-matching": Users,
   "defense-scheduling": CalendarCheck,
   practicum: Briefcase,
-  withdrawal: LogOut,
   graduation: GraduationCap,
 };
 
 // Student-initiated workflows: staff pick from the submitted-request queue,
 // not the full student list (students file these from their own portal).
-// (Leave of Absence and Readmission now have their own case board: LeaveCasesBoard.)
-const USES_REQUEST_QUEUE = {
-  "leave-of-absence": false,
-  readmission: false,
-  awol: false,
-};
+// (The four standalone processes are not here: they all use ProcessBoardPage.)
+const USES_REQUEST_QUEUE = {};
 
 const NEEDS_STUDENT = {
   "student-handoff": false,
-  "leave-of-absence": false,
-  readmission: false,
   "course-audit": false,
   "research-gate": true,
   "panel-matching": true,
   "defense-scheduling": true,
   practicum: false,
-  withdrawal: false,
   graduation: false,
 };
 
@@ -171,17 +154,17 @@ function SubviewTabs({ tabs, active, onChange }) {
   );
 }
 
-const OVERVIEW_WORKFLOWS = new Set(["practicum", "withdrawal", "graduation", "leave-of-absence", "readmission", "awol"]);
+const OVERVIEW_WORKFLOWS = new Set(["practicum", "graduation"]);
 
-const AWOL_BOARD_COLUMNS = [
-  { label: "AWOL", statuses: ["AWOL Declared"] },
-  { label: "Return Review", statuses: ["Return Submitted", "Returned for Revision"] },
-  { label: "Dean Review", statuses: ["Dean Review"] },
-  { label: "Return Outcome", statuses: ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required", "Re-enrollment Completed", "Return Denied"] },
-  { label: "Residency", statuses: ["Residency", "Residency Completed"] },
-];
-
+// Leave of Absence, Readmission, AWOL & Residency and Withdrawal are one page template
+// (ProcessBoardPage) with a different process. Every other workflow keeps its own screen.
 export default function WorkflowPage() {
+  const { slug } = useParams();
+  if (PROCESS_SLUGS.includes(slug)) return <ProcessBoardPage key={slug} slug={slug} />;
+  return <SingleWorkflowPage key={slug} />;
+}
+
+function SingleWorkflowPage() {
   const { slug } = useParams();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -415,10 +398,7 @@ export default function WorkflowPage() {
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
               {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
               {slug === "practicum" && <PracticumRoster {...formProps} />}
-              {slug === "withdrawal" && <WithdrawalRoster {...formProps} />}
               {slug === "graduation" && <GraduationRoster {...formProps} />}
-              {slug === "awol" && <AwolResidencyPanel {...formProps} />}
-              {(slug === "leave-of-absence" || slug === "readmission") && <LeaveCasesBoard slug={slug} />}
             </Card>
           )}
 
@@ -2517,38 +2497,6 @@ function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, foo
 }
 
 const WORKFLOW_GUIDES = {
-  "leave-of-absence": {
-    purpose: "Follows every Leave of Absence request from filing to the end of the leave, and keeps the student's record correct at each step.",
-    submitter: "The student fills in the start and end semester, an allowed reason and the circumstances. A student already on leave can ask once for an extension.",
-    reviewers: "Graduate School Staff check the request against the handbook rules and forward it; the Dean approves, returns or denies; staff send the approved leaves to the Registrar.",
-    stages: ["Submitted", "Staff review", "With the Dean", "Leave scheduled", "On leave", "Return due", "Closed"],
-    incomplete: "Staff or the Dean can return a request with a comment. The student corrects the same request and sends it again. A denial tells the student what happens next.",
-    final: "The leave starts when its first semester begins: the student becomes On Leave, subjects of that semester are closed (marked W if filed in the second half), and a leave record is kept for each semester. When the leave is ending, staff see it as Return due. A leave that ends with no return is only proposed as AWOL; a staff member confirms it.",
-  },
-  readmission: {
-    purpose: "Brings a student back from an approved leave and restores their record.",
-    submitter: "The student on leave chooses a return semester, writes their intention and ticks the return checklist. The leave they are ending is filled in from their record.",
-    reviewers: "Graduate School Staff verify each checklist item and forward the request; the Dean decides; the Academic Coordinator plans the subjects after approval.",
-    stages: ["Submitted", "Staff review", "With the Dean", "Approved"],
-    incomplete: "A request can be returned with a comment. The student corrects it and sends it again. Returning before the leave ends is an early return and is flagged for the Dean.",
-    final: "Approval makes the student Active again at the stage they left, with the tag Not Enrolled until the Academic Coordinator enrolls them. The leave is closed.",
-  },
-  awol: {
-    purpose: "Automatically flags evidence-backed AWOL standing, reviews return declarations, and tracks valid no-subject residency.",
-    submitter: "A returning AWOL student completes a written return declaration; staff reviews alerts and may record policy-valid residency.",
-    reviewers: "Graduate School Staff performs the policy review and routes return cases to the Dean.",
-    stages: ["Automatic AWOL flag", "Return declaration", "Policy review", "Dean review", "Return or residency update"],
-    incomplete: "Reviewers can message or return an AWOL case while its return declaration and audit trail remain visible.",
-    final: "A decided return updates the student standing; residency remains a separate active, no-subject enrollment record.",
-  },
-  withdrawal: {
-    purpose: "Withdraws a student from one enrolled subject until the end of the second week of classes (10% of the term is charged in the first week, 20% in the second), without changing program standing or unrelated classes.",
-    submitter: "The student chooses an eligible enrolled subject and states the reason for withdrawing.",
-    reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval returns to GS Staff for Excel export followed by manual Registrar email.",
-    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Subject removal", "Excel list export", "Manual email and acknowledgement outside the portal"],
-    incomplete: "A Dean denial closes this subject request and leaves every enrollment unchanged. Messages and action comments remain in the case history.",
-    final: "The portal ends at Excel export. GS Staff emails the file through the official channel and waits for Registrar acknowledgement outside the portal.",
-  },
   practicum: {
     purpose: "Tracks the practicum MOA, placement, required hours, certificates, completion review, and Dean report for programs that require practicum.",
     submitter: "The student submits the MOA first, then separately submits certificates and completion evidence.",
@@ -3679,16 +3627,6 @@ const PRACTICUM_BOARD_COLUMNS = [
   { label: "Returned", statuses: ["Returned for Clarification", "Not Accepted - New Organization Required"] },
 ];
 
-const WITHDRAWAL_BOARD_COLUMNS = [
-  { label: "Submitted", statuses: ["Submitted to GS Staff"] },
-  { label: "Dean Review", statuses: ["Dean Review"] },
-  { label: "Returned for Clarification", statuses: ["Returned", "Returned for Clarification"] },
-  { label: "Subject Tagging", statuses: ["Approved - Awaiting Subject Tag", "Approved - Registrar Preparation"] },
-  { label: "Excel Export / Manual Email", statuses: ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send"] },
-  { label: "Legacy Acknowledgement", statuses: ["Sent to Registrar", "Withdrawn Confirmed"] },
-  { label: "Rejected / Cancelled", statuses: ["Denied", "Cancelled"] },
-];
-
 const GRADUATION_BOARD_COLUMNS = [
   {
     label: "3 · Graduation Batch Created",
@@ -3793,19 +3731,6 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
       {row.messages?.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"><p className="text-[11px] font-bold uppercase tracking-wide text-amber-700">{row.messages.length} visible message{row.messages.length === 1 ? "" : "s"}</p><p className="mt-1 line-clamp-2 text-xs text-amber-900">{latestMessage?.comment || latestMessage?.template}</p></div>}
       <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || "Awaiting review"}</p>
       <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button>{record && <button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}</div>
-    </article>
-  );
-}
-
-function WithdrawalBoardCard({ item, onOpen, onMessage }) {
-  const readyForDean = withdrawalReadyForDeanReview(item);
-  return (
-    <article key={item.id} className="cursor-grab rounded-xl border border-emerald-300 bg-emerald-50 p-3 shadow-sm transition-colors hover:border-emerald-500 active:cursor-grabbing">
-      <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-400">{item.student.student_number} · {item.student.program_code}</p></div><div className="flex flex-wrap justify-end gap-1.5">{readyForDean && <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>}{item.unresolved_messages > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">Concern</span>}</div></div>
-      <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.reason || "No reason provided"}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500"><span>Submitted {formatDate(item.created_at)}</span><span className="text-right">Updated {formatDate(item.updated_at)}</span><span className="col-span-2 font-semibold text-slate-700">{item.subject?.course_code || "Subject pending"} · {item.effective_term || item.subject?.term_label || "Semester pending"}</span></div>
-      <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {item.next_action_owner || "Awaiting review"}</p>
-      <div className="mt-3 flex gap-2"><button type="button" onClick={onOpen} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button><button type="button" onClick={onMessage} className="btn-ghost flex-1 cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button></div>
     </article>
   );
 }
@@ -4408,290 +4333,6 @@ function PracticumCaseDetails({ row }) {
   );
 }
 
-function WithdrawalRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
-  const [selectedCaseId, setSelectedCaseId] = useState(null);
-  const [selectedSnapshot, setSelectedSnapshot] = useState(null);
-  const [messageRow, setMessageRow] = useState(null);
-  const [messageNotice, setMessageNotice] = useState("");
-  const [viewMode, setViewMode] = useState("board");
-  const [pendingAction, setPendingAction] = useState(null);
-  const [registrarOpen, setRegistrarOpen] = useState(false);
-  const [registrarBusy, setRegistrarBusy] = useState("");
-  const [registrarError, setRegistrarError] = useState("");
-  const [selectedRegistrarIds, setSelectedRegistrarIds] = useState(() => new Set());
-  const [exportNotice, setExportNotice] = useState(null);
-  const autoOpenedRegistrarSignature = useRef("");
-  const reset = useDemoCaseReset("withdrawal", refetch);
-  const rows = context.roster || [];
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
-  const programs = useMemo(() => uniqueValues(rows.map((item) => item.student.program_code)), [rows]);
-  const statuses = useMemo(() => uniqueValues(rows.map((item) => item.status)), [rows]);
-  const filteredRows = useMemo(() => sortWorkflowRows(rows.filter((item) => {
-    const haystack = `${item.student.name} ${item.student.student_number} ${item.student.program_code} ${item.reason || ""} ${item.effective_term || ""}`.toLowerCase();
-    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
-      && (!filters.program || item.student.program_code === filters.program)
-      && (!filters.status || item.status === filters.status)
-      && (!filters.secondary || item.dean_decision === filters.secondary)
-      && dateMatches(item.last_activity_at || item.updated_at || item.created_at, filters.dateFrom, filters.dateTo);
-  }), filters.sort, (item) => item.last_activity_at || item.updated_at || item.created_at, (item) => item.student.name), [rows, filters]);
-  function actionFor(item) {
-    const base = { student_id: item.student_id };
-    if (accountRole === "staff" && item.dean_decision === "Pending" && item.status === "Submitted to GS Staff") return { label: "Record & forward to Dean", payload: { ...base, workflow_action: "forward_to_dean" } };
-    if (accountRole === "staff" && item.dean_decision === "Approved" && ["Approved - Awaiting Subject Tag", "Approved - Registrar Preparation"].includes(item.status)) return { label: "Tag student as withdrawn from subject", payload: { ...base, workflow_action: "tag_subject_withdrawn" } };
-    return null;
-  }
-  const selectedCurrent = rows.find((item) => item.id === selectedCaseId) || null;
-  const selectedItem = selectedCurrent || selectedSnapshot;
-  const selectedAction = selectedCurrent ? actionFor(selectedCurrent) : null;
-  const withdrawalSteps = withdrawalTimelineSteps(selectedCurrent?.status || (reset.resetMessage ? undefined : selectedItem?.status));
-  const registrarRows = useMemo(
-    () => rows.filter((item) => item.dean_decision === "Approved" && ["Subject Tagged - Registrar Preparation", "Exported - Ready to Send"].includes(item.status)),
-    [rows],
-  );
-  const pendingRegistrarRows = useMemo(
-    () => registrarRows.filter((item) => item.registrar_status !== "Exported - Ready to Send"),
-    [registrarRows],
-  );
-  const selectedRegistrarRows = useMemo(
-    () => registrarRows.filter((item) => selectedRegistrarIds.has(item.id)),
-    [registrarRows, selectedRegistrarIds],
-  );
-  const selectedRegistrarReady = selectedRegistrarRows.length > 0 && selectedRegistrarRows.every(
-    (item) => item.registrar_status === "Exported - Ready to Send",
-  );
-
-  useEffect(() => {
-    if (selectedCurrent) setSelectedSnapshot(selectedCurrent);
-  }, [selectedCurrent]);
-
-  useEffect(() => {
-    if (accountRole !== "staff" || !pendingRegistrarRows.length) return;
-    const signature = pendingRegistrarRows.map((item) => item.id).sort((a, b) => a - b).join("-");
-    if (autoOpenedRegistrarSignature.current === signature) return;
-    autoOpenedRegistrarSignature.current = signature;
-    setSelectedRegistrarIds(new Set(pendingRegistrarRows.map((item) => item.id)));
-    setRegistrarError("");
-    setRegistrarOpen(true);
-  }, [accountRole, pendingRegistrarRows]);
-
-  function openCase(item) {
-    clearSubmitFeedback();
-    reset.clearResetFeedback();
-    setSelectedCaseId(item.id);
-    setSelectedSnapshot(item);
-  }
-
-  function closeCase() {
-    setSelectedCaseId(null);
-    setSelectedSnapshot(null);
-  }
-
-  function toggleRegistrarRow(applicationId) {
-    setSelectedRegistrarIds((current) => {
-      const next = new Set(current);
-      if (next.has(applicationId)) next.delete(applicationId); else next.add(applicationId);
-      return next;
-    });
-  }
-
-  async function exportRegistrarWorkbook() {
-    const applicationIds = selectedRegistrarRows.map((item) => item.id);
-    if (!applicationIds.length) return;
-    setRegistrarBusy("export");
-    setRegistrarError("");
-    try {
-      const exported = await api.exportWithdrawalXlsx(applicationIds);
-      setExportNotice({
-        filename: exported.filename,
-        count: exported.count,
-      });
-      setMessageNotice(`${exported.count} approved subject withdrawal${exported.count === 1 ? "" : "s"} exported as ${exported.filename}.`);
-      setRegistrarOpen(false);
-      setSelectedRegistrarIds(new Set());
-      await refetch();
-    } catch (error) {
-      setRegistrarError(error.message || "Could not export the approved-withdrawals workbook.");
-    } finally {
-      setRegistrarBusy("");
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <SectionTitle title="Submitted subject withdrawal requests" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · Student request → GS Staff → Dean → GS Staff subject tag → Excel export → manual Registrar email; a fee of 10% (first week) or 20% (second week) of the term applies and is settled with the Business Office`} icon={LogOut} />
-      {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
-      <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-      {accountRole === "staff" && registrarRows.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-emerald-900">{registrarRows.length} tagged withdrawal{registrarRows.length === 1 ? "" : "s"} ready for Excel export</p>
-            <p className="mt-0.5 text-xs text-emerald-800">Download the Excel workbook, email it to the Registrar through the official channel, and wait for acknowledgement.</p>
-          </div>
-          <button type="button" onClick={() => { setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id))); setRegistrarError(""); setRegistrarOpen(true); }} className="btn cursor-pointer bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">
-            <FileSpreadsheet className="h-4 w-4" /> Prepare Excel export
-          </button>
-        </div>
-      )}
-      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Dean decision" secondaryOptions={uniqueValues(rows.map((item) => item.dean_decision))} count={filteredRows.length} total={rows.length} />
-      <div className="flex justify-end"><ViewModeToggle value={viewMode} onChange={setViewMode} /></div>
-      {viewMode === "board" ? (
-        <WorkflowBoard
-          columns={WITHDRAWAL_BOARD_COLUMNS}
-          rows={filteredRows}
-          getStatus={(item) => item.status}
-          isDraggable={(item) => Boolean(item.id)}
-          getDragId={(item) => item.id}
-          empty="No recent withdrawal requests match the filters."
-          renderCard={(item) => <WithdrawalBoardCard key={item.id} item={item} onOpen={() => openCase(item)} onMessage={() => setMessageRow(item)} />}
-        />
-      ) : <WorkflowTable headers={["Student", "Request date", "Subject / semester", "Reason", "Status", "Next owner", "Action"]} empty="No withdrawal requests match the selected filters." rows={filteredRows} render={(item) => {
-        return (
-          <tr
-            key={item.id}
-            onClick={() => openCase(item)}
-            className="cursor-pointer border-b border-slate-100 align-top transition-colors hover:bg-brand-50/60"
-          >
-            <StudentCell student={item.student} />
-            <td className="px-3 py-3 text-sm text-slate-600">{formatDate(item.created_at)}</td>
-            <td className="px-3 py-3 text-sm text-slate-600"><span className="font-semibold text-ink">{item.subject?.course_code || "Subject pending"}</span><span className="block text-xs">{item.effective_term || item.subject?.term_label || "—"}</span></td>
-            <td className="max-w-[240px] px-3 py-3 text-sm text-slate-600"><span className="line-clamp-2">{item.reason || "No reason provided"}</span></td>
-            <td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td>
-            <td className="px-3 py-3 text-xs font-semibold text-slate-600">{item.next_action_owner || "—"}{item.unresolved_messages > 0 && <p className="mt-1 text-amber-700">{item.unresolved_messages} concern(s)</p>}</td>
-            <td className="px-3 py-3"><button type="button" onClick={(event) => { event.stopPropagation(); openCase(item); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> Open case</button></td>
-          </tr>
-        );
-      }} />}
-      {selectedItem && (
-        <WorkflowCaseModal
-          id={`withdrawal-case-${selectedItem.id}`}
-          title={selectedItem.student.name}
-          subtitle={`${selectedItem.student.student_number} · ${selectedItem.student.program_code} · Subject withdrawal`}
-          status={selectedCurrent?.status || (reset.resetMessage ? "Reset" : selectedItem.status)}
-          onClose={closeCase}
-          footer={(
-            <>
-              {accountRole === "staff" && selectedCurrent && <DemoResetButton student={selectedCurrent.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
-              {selectedCurrent && <button type="button" onClick={() => setMessageRow(selectedCurrent)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
-              {selectedAction ? (
-                <button type="button" disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedCurrent.status, toStatus: selectedAction.label })} className="btn-primary cursor-pointer px-4 py-2">
-                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
-                </button>
-              ) : (
-                <span className="self-center text-xs font-semibold text-slate-500">{selectedCurrent ? `No ${WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.` : "This demo case has been reset."}</span>
-              )}
-            </>
-          )}
-        >
-          <div className="space-y-4">
-            <WorkflowSubmitFeedback result={result} error={submitError} />
-            <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Detail label="Dean" value={selectedCurrent?.dean_decision || selectedItem.dean_decision} />
-              <Detail label="Registrar handoff" value={selectedItem.registrar_status || "Pending"} />
-              <Detail label="Selected subject" value={`${selectedItem.subject?.course_code || "Pending"} — ${selectedItem.subject?.course_title || "No subject attached"}`} />
-              <Detail label="Official offered-subject status" value={["Subject Tagged - Registrar Preparation", "Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"].includes(selectedCurrent?.status || selectedItem.status) ? "Withdrawn" : "Awaiting GS Staff tag"} />
-              <Detail label="Semester" value={selectedItem.effective_term || selectedItem.subject?.term_label || "Pending"} />
-              <Detail label="Eligibility window" value={selectedItem.withdrawal_window?.status || "Not recorded"} />
-              <Detail label="Academic record effect" value={selectedItem.academic_record_effect || "Recorded as Withdrawn; any grade mark is applied by the Registrar"} />
-              <Detail label="Fee consequence (information only)" value={selectedItem.withdrawal_window?.fee_consequence || "Not recorded"} />
-            </div>
-            <WorkflowTimeline steps={withdrawalSteps} title="Withdrawal workflow timeline" />
-            <CaseMessageHistory messages={selectedCurrent?.messages || selectedItem.messages} />
-            <WorkflowActivityList logs={selectedCurrent?.history || selectedItem.history || []} />
-            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Request</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{selectedItem.subject?.course_code || "Subject pending"} — {selectedItem.subject?.course_title || "Selected subject"}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">{selectedItem.effective_term || selectedItem.subject?.term_label || "Semester pending"}</p>
-              <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedItem.reason || "No reason provided"}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {selectedItem.request_attachment?.file_exists && <a href={selectedItem.request_attachment.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">Request form <ArrowUpRight className="h-3.5 w-3.5" /></a>}
-                {selectedItem.request_attachment?.file_exists === false && <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">The saved request form is unavailable</span>}
-              </div>
-            </div>
-            <WorkflowFileHistory files={selectedCurrent?.attachments || selectedItem.attachments || []} />
-          </div>
-        </WorkflowCaseModal>
-      )}
-      {registrarOpen && accountRole === "staff" && (
-        <WorkflowCaseModal
-          id="withdrawal-registrar-handoff"
-          title="Approved subject withdrawals"
-          subtitle={`${selectedRegistrarRows.length} selected · Export the Excel list for manual Registrar email`}
-          status={selectedRegistrarReady ? "Exported - Ready to Send" : "Pending Excel Export"}
-          onClose={() => { if (!registrarBusy) setRegistrarOpen(false); }}
-          size="wide"
-          footer={(
-            <>
-              <button type="button" disabled={Boolean(registrarBusy)} onClick={() => setRegistrarOpen(false)} className="btn-ghost cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
-              <button type="button" disabled={Boolean(registrarBusy) || !selectedRegistrarRows.length} onClick={exportRegistrarWorkbook} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <Download className="h-4 w-4" /> {registrarBusy === "export" ? "Exporting…" : "Download Excel list"}
-              </button>
-            </>
-          )}
-        >
-          <div className="space-y-4">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p className="text-sm font-semibold text-emerald-900">Excel export sequence</p>
-              <ol className="mt-2 grid gap-2 text-xs font-semibold text-emerald-800 sm:grid-cols-2">
-                <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 1: Select approved students</li>
-                <li className="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-emerald-200">Step 2: Download the Excel list</li>
-              </ol>
-            </div>
-            {registrarError && <div role="alert"><ErrorNote message={registrarError} /></div>}
-            <div className="overflow-hidden rounded-xl border border-slate-200">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-ink">Tagged withdrawn students</p>
-                  <p className="text-xs text-slate-500">Every selected subject already shows Withdrawn in Official Offered Subjects. Fees are settled with the Business Office.</p>
-                </div>
-                <button type="button" onClick={() => setSelectedRegistrarIds(new Set(registrarRows.map((item) => item.id)))} className="btn-ghost cursor-pointer px-3 py-1.5">Select all</button>
-              </div>
-              <div className="max-h-[48vh] overflow-auto">
-                <table className="w-full min-w-[860px] text-left text-sm">
-                  <thead className="sticky top-0 bg-white text-xs font-bold uppercase tracking-wide text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">Select</th>
-                      <th className="px-4 py-3">Student</th>
-                      <th className="px-4 py-3">Subject</th>
-                      <th className="px-4 py-3">Semester / deadline</th>
-                      <th className="px-4 py-3">Academic record</th>
-                      <th className="px-4 py-3">Registrar status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {registrarRows.map((item) => (
-                      <tr key={item.id} className="border-t border-slate-100 align-top transition-colors hover:bg-emerald-50/50">
-                        <td className="px-4 py-3"><input type="checkbox" checked={selectedRegistrarIds.has(item.id)} onChange={() => toggleRegistrarRow(item.id)} className="h-4 w-4 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" aria-label={`Select ${item.student.name}`} /></td>
-                        <td className="px-4 py-3"><p className="font-semibold text-ink">{item.student.name}</p><p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p></td>
-                        <td className="px-4 py-3"><p className="font-semibold text-slate-700">{item.subject?.course_code || "Subject pending"}</p><p className="text-xs text-slate-500">{item.subject?.course_title || "No title"}</p></td>
-                        <td className="px-4 py-3 text-xs text-slate-600"><p className="font-semibold">{item.effective_term || item.subject?.term_label || "Not recorded"}</p><p>Deadline: {item.withdrawal_window?.deadline || "Not recorded"}</p></td>
-                        <td className="px-4 py-3 text-xs font-semibold text-emerald-700">{item.withdrawal_window?.fee_percent != null ? `${item.withdrawal_window.fee_percent}% of term (${item.withdrawal_window.fee_tier})` : "Fee not stated"}</td>
-                        <td className="px-4 py-3"><StatusBadge value={item.registrar_status || "Pending Excel Export"} dot={false} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </WorkflowCaseModal>
-      )}
-      {exportNotice && (
-        <ExportFollowUpModal
-          id="withdrawal-export-follow-up"
-          title="Withdrawal Excel export complete"
-          filename={exportNotice.filename}
-          actorLabel="Graduate School Staff"
-          fileLabel="withdrawal update"
-          onClose={() => setExportNotice(null)}
-        />
-      )}
-      {messageRow && <WorkflowMessageModal slug="withdrawal" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
-      {pendingAction && selectedCurrent && <WorkflowTransitionModal slug="withdrawal" student={selectedCurrent.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
-    </div>
-  );
-}
-
 export function GraduationRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
@@ -5279,297 +4920,6 @@ function timeRange(start, end) {
 // ---------------------------------------------------------------------------
 // AWOL & Residency
 // ---------------------------------------------------------------------------
-function AwolResidencyPanel({ context, meta, submit, submitting, refreshing, result, submitError, setStudentId, setStudentLabel, refetch, accountRole }) {
-  const rows = context?.roster || [];
-  const [viewMode, setViewMode] = useState("board");
-  const [filters, setFilters] = useState({ query: "", status: "" });
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [selectedStudent, setSelectedStudent] = useState({ id: null, label: "" });
-  const [form, setForm] = useState({
-    residency_reason: "",
-    term_id: "",
-    staff_notes: "",
-  });
-  const [review, setReview] = useState(null);
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewError, setReviewError] = useState("");
-  const [reviewNotice, setReviewNotice] = useState("");
-  const [messageRow, setMessageRow] = useState(null);
-  const [messageNotice, setMessageNotice] = useState("");
-  const statuses = uniqueValues(rows.map((item) => item.status));
-  const filteredRows = rows.filter((item) => {
-    const student = item.student || {};
-    const haystack = `${student.name || ""} ${student.student_number || ""} ${student.program_code || ""} ${item.status || ""} ${item.policy_classification || ""} ${item.reason || ""}`.toLowerCase();
-    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
-      && (!filters.status || item.status === filters.status);
-  });
-  const selectedTerm = form.term_id || String(meta?.terms?.find((item) => item.is_active_planning_term)?.id || "");
-
-  useEffect(() => {
-    if (!selectedRow) return;
-    const current = rows.find((item) => item.kind === selectedRow.kind && item.id === selectedRow.id);
-    if (current && current !== selectedRow) setSelectedRow(current);
-  }, [rows, selectedRow?.kind, selectedRow?.id]);
-
-  function chooseStudent(id, label) {
-    setSelectedStudent({ id, label });
-    setStudentId(id);
-    setStudentLabel(label || "");
-    setReview(null);
-    setReviewNotice("");
-  }
-
-  async function runReview(reviewAction = "record_residency", row = selectedRow) {
-    const studentId = row?.student_id || selectedStudent.id;
-    if (!studentId) {
-      setReviewError("Choose a student before running the policy review.");
-      return;
-    }
-    setReviewing(true);
-    setReviewError("");
-    setReviewNotice("");
-    try {
-      const response = await api.awolPolicyReview({
-        student_id: studentId,
-        workflow_action: reviewAction === "forward_return_to_dean" ? "return_from_awol" : reviewAction,
-        residency_reason: form.residency_reason,
-        application_reference: row?.return_intent ? "Structured portal return declaration" : "",
-      });
-      setReview(response.review);
-    } catch (error) {
-      setReviewError(error.message || "Could not run the AWOL/residency policy review.");
-    } finally {
-      setReviewing(false);
-    }
-  }
-
-  async function saveNewAction(event) {
-    event.preventDefault();
-    if (!selectedStudent.id) return;
-    const saved = await submit({
-      student_id: selectedStudent.id,
-      workflow_action: "record_residency",
-      residency_reason: form.residency_reason,
-      term_id: selectedTerm,
-      staff_notes: form.staff_notes,
-    });
-    if (saved) {
-      setSelectedStudent({ id: null, label: "" });
-      setStudentId(null);
-      setStudentLabel("");
-      setReview(null);
-      setForm((current) => ({ ...current, residency_reason: "", staff_notes: "" }));
-    }
-  }
-
-  async function forwardReturn() {
-    if (!selectedRow) return;
-    const saved = await submit({
-      student_id: selectedRow.student_id,
-      case_id: selectedRow.id,
-      workflow_action: "forward_return_to_dean",
-      staff_notes: form.staff_notes,
-    });
-    if (saved) {
-      setSelectedRow(null);
-      setReview(null);
-      setReviewNotice("");
-    }
-  }
-
-  async function completeReenrollment() {
-    if (!selectedRow) return;
-    const saved = await submit({
-      student_id: selectedRow.student_id,
-      case_id: selectedRow.id,
-      workflow_action: "complete_reenrollment",
-      staff_notes: form.staff_notes,
-    });
-    if (saved) {
-      setSelectedRow(null);
-      setForm((current) => ({ ...current, staff_notes: "" }));
-    }
-  }
-
-  async function endResidency() {
-    if (!selectedRow) return;
-    const saved = await submit({
-      student_id: selectedRow.student_id,
-      residency_id: selectedRow.id,
-      workflow_action: "end_residency",
-      staff_notes: form.staff_notes,
-    });
-    if (saved) setSelectedRow(null);
-  }
-
-  return (
-    <div className="space-y-5">
-      {messageNotice && (
-        <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
-          {messageNotice}
-        </div>
-      )}
-      <Card className="p-6">
-        <SectionTitle title="Automatic AWOL alerts and residency" subtitle="AWOL is created from source evidence; staff only review alerts, return requests, and valid residency enrollment" icon={UserX} />
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">AWOL cannot be declared manually</p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-800">The system flags an imported AWOL standing or a full-semester withdrawal without approved LOA, then creates an Academic Coordinator work item. A missing pre-enrollment record by itself is not enough.</p>
-        </div>
-        <form onSubmit={saveNewAction} className="mt-5 space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <p className="field-label">Student</p>
-              <StudentPicker value={selectedStudent.id} selectedLabel={selectedStudent.label} meta={meta} onChange={chooseStudent} />
-            </div>
-            <Field label="Residency purpose" required><Select value={form.residency_reason} onChange={(event) => { setForm((current) => ({ ...current, residency_reason: event.target.value })); setReview(null); }} placeholder="Select handbook purpose" options={context?.residency_reasons || []} required /></Field>
-          </div>
-          <Field label="Semester" required><Select value={selectedTerm} onChange={(event) => setForm((current) => ({ ...current, term_id: event.target.value }))} placeholder="Select semester" options={(meta?.terms || []).map((term) => ({ value: String(term.id), label: term.label }))} required /></Field>
-          <Field label="Staff verification notes" hint="Required when the residency policy result needs human review."><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>
-          {review && <PolicyReviewCard title="Residency policy review" description="Checks against the handbook using the student's recorded academic state. The Dean makes the decision." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview()} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}. The saved action will recalculate this policy result.`)} />}
-          {!review && reviewError && <ErrorNote message={reviewError} />}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => runReview()} disabled={reviewing || !selectedStudent.id || !form.residency_reason} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run residency policy checker"}</button>
-            <button type="submit" disabled={submitting || !selectedStudent.id || !review || !form.residency_reason} className="btn-primary cursor-pointer">{submitting ? "Saving…" : "Record residency"}</button>
-          </div>
-          <WorkflowSubmitFeedback result={result} error={submitError} />
-        </form>
-      </Card>
-
-      <Card className="p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <SectionTitle title="AWOL, return, and residency cases" subtitle="Board and table views share the same policy-derived case status" icon={UserX} />
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
-        </div>
-        <div className="mb-4 flex flex-wrap gap-2">
-          <label className="relative min-w-[220px] flex-1"><span className="sr-only">Search AWOL and residency cases</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} className="field-input pl-9" placeholder="Search student, program, status…" /></label>
-          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="field-input cursor-pointer sm:w-64" aria-label="Filter AWOL and residency cases by status"><option value="">All statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
-        </div>
-        {viewMode === "board" ? (
-          <WorkflowBoard columns={AWOL_BOARD_COLUMNS} rows={filteredRows} getStatus={(item) => item.status} empty="No AWOL or residency cases match the filters." renderCard={(item) => <AwolBoardCard key={`${item.kind}-${item.id}`} item={item} onOpen={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} onMessage={item.kind === "awol" && item.request_id ? () => setMessageRow(item) : null} />} />
-        ) : (
-          <WorkflowTable headers={["Student", "Type", "Status", "Policy classification", "Semester / date", "Action"]} rows={filteredRows} empty="No AWOL or residency cases match the filters." render={(item) => <tr key={`${item.kind}-${item.id}`} className="border-b border-slate-100"><StudentCell student={item.student} /><td className="px-3 py-3 text-sm text-slate-600">{item.kind === "residency" ? "Residency" : "AWOL / Return"}</td><td className="px-3 py-3"><StatusBadge value={item.status} dot={false} /></td><td className="px-3 py-3 text-sm text-slate-600">{item.policy_classification || item.policy_status || "Not reviewed"}</td><td className="px-3 py-3 text-sm text-slate-600">{item.term_label || item.target_return_term || item.awol_effective_date || "—"}</td><td className="px-3 py-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setSelectedRow(item); setReview(null); setReviewNotice(""); }} className="btn-ghost cursor-pointer px-3 py-2"><Eye className="h-4 w-4" /> View</button>{item.kind === "awol" && item.request_id && <button type="button" onClick={() => setMessageRow(item)} className="btn-ghost cursor-pointer px-3 py-2"><MessageSquare className="h-4 w-4" /> Message</button>}</div></td></tr>} />
-        )}
-      </Card>
-
-      {selectedRow && (
-        <WorkflowCaseModal id={`awol-residency-${selectedRow.kind}-${selectedRow.id}`} title={selectedRow.student?.name || "Standing case"} subtitle={`${selectedRow.student?.student_number || ""} · ${selectedRow.student?.program_code || ""} · ${selectedRow.kind === "residency" ? "Residency" : "AWOL / Return"}`} status={selectedRow.status} onClose={() => { setSelectedRow(null); setReview(null); }} footer={<>{selectedRow.kind === "awol" && selectedRow.request_id && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn-ghost cursor-pointer px-4 py-2"><MessageSquare className="h-4 w-4" /> Message / Return</button>}{selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) ? <button type="button" disabled={submitting || !review} onClick={forwardReturn} className="btn-primary cursor-pointer">Forward to Dean</button> : selectedRow.kind === "residency" && selectedRow.record_status === "Active" ? <button type="button" disabled={submitting} onClick={endResidency} className="btn-primary cursor-pointer">Close residency</button> : null}</>}>
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3"><Detail label="Status" value={selectedRow.status} /><Detail label="Policy classification" value={selectedRow.policy_classification || selectedRow.policy_status || "Not reviewed"} /><Detail label="Dean decision" value={selectedRow.dean_decision || "Not applicable"} /></div>
-            {selectedRow.kind === "awol" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="AWOL effective date" value={formatDate(selectedRow.awol_effective_date)} /><Detail label="Automatic detection source" value={selectedRow.detection_source || "Imported standing"} /><Detail label="Last enrolled semester" value={selectedRow.last_enrolled_term || "Not recorded"} /><Detail label="Target return semester" value={selectedRow.target_return_term || "Not submitted"} /><Detail label="Years in program" value={selectedRow.years_in_program ?? "Not calculated"} /><Detail label="Residence limits" value={selectedRow.normal_residence_years ? `${selectedRow.normal_residence_years} normal / ${selectedRow.absolute_residence_years} absolute` : "Not calculated"} /></div>}
-            {selectedRow.kind === "residency" && <div className="grid gap-3 sm:grid-cols-2"><Detail label="Semester" value={selectedRow.term_label} /><Detail label="Purpose" value={selectedRow.reason} /></div>}
-            {selectedRow.kind === "awol" && selectedRow.return_intent && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Student's written intention</p><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selectedRow.return_intent}</p>{selectedRow.return_reason && <><p className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500">Reason for return</p><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selectedRow.return_reason}</p></>}</div>}
-            {selectedRow.kind === "awol" && ["Return Submitted", "Returned for Revision"].includes(selectedRow.status) && <><Field label="Staff review notes"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} /></Field>{review && <PolicyReviewCard title="Return-from-AWOL policy review" description="Deterministic checks for written intent and program-specific maximum residence before Dean routing." emptyText="" review={review} busy={reviewing} error={reviewError} notice={reviewNotice} onReview={() => runReview("forward_return_to_dean", selectedRow)} onApply={() => setReviewNotice(`Applied guidance: ${review.suggested_action}.`)} />}<button type="button" onClick={() => runReview("forward_return_to_dean", selectedRow)} disabled={reviewing} className="btn-ghost cursor-pointer"><ClipboardCheck className="h-4 w-4" /> {reviewing ? "Checking…" : "Run policy checker"}</button></>}
-            {selectedRow.kind === "awol" && ["staff", "academic_coordinator"].includes(accountRole) && selectedRow.status === "Re-enrollment Required" && (
-              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm font-semibold text-ink">The Dean approved a full re-enrollment</p>
-                <p className="text-xs leading-relaxed text-slate-600">The student stays AWOL until the courses are re-enrolled. When that is done, mark it complete: the student becomes Active again and this case closes. Nothing else opens a second AWOL case in the meantime.</p>
-                <Field label="Note for the record"><Textarea value={form.staff_notes} onChange={(event) => setForm((current) => ({ ...current, staff_notes: event.target.value }))} placeholder="For example: all courses re-enrolled with the Academic Coordinator." /></Field>
-                <button type="button" disabled={submitting} onClick={completeReenrollment} className="btn-primary cursor-pointer"><CheckCircle2 className="h-4 w-4" /> {submitting ? "Saving…" : "Mark re-enrollment complete"}</button>
-              </div>
-            )}
-            {selectedRow.kind === "awol" && accountRole === "staff" && ["Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required", "Re-enrollment Completed"].includes(selectedRow.status) && (
-              <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
-                <p className="text-sm font-semibold text-ink">Dean decision applied</p>
-                <p className="text-xs text-slate-600">The approved standing outcome is already reflected. Enrollment remains a separate Academic Coordinator action.</p>
-                <a href={selectedRow.registrar_report_url} className="btn-ghost w-fit cursor-pointer"><Download className="h-4 w-4" /> Export AWOL return report for Registrar</a>
-              </div>
-            )}
-            {selectedRow.kind === "residency" && accountRole === "staff" && selectedRow.status === "Residency" && (
-              <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
-                <p className="text-sm font-semibold text-ink">Residency active</p>
-                <p className="text-xs text-slate-600">The term-enrollment and monitoring records were updated when staff recorded this residency.</p>
-                <a href={selectedRow.registrar_report_url} className="btn-ghost w-fit cursor-pointer"><Download className="h-4 w-4" /> Export residency report for Registrar</a>
-              </div>
-            )}
-            {selectedRow.kind === "awol" && <CaseMessageHistory messages={selectedRow.messages || []} />}
-            {selectedRow.kind === "awol" && <WorkflowActivityList logs={selectedRow.history || []} />}
-            <WorkflowSubmitFeedback result={result} error={submitError} />
-          </div>
-        </WorkflowCaseModal>
-      )}
-      {messageRow && <WorkflowMessageModal slug="awol" row={messageRow} context={context} onClose={() => setMessageRow(null)} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
-    </div>
-  );
-}
-
-function AwolBoardCard({ item, onOpen, onMessage }) {
-  return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-brand-300 hover:bg-brand-50/30">
-      <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{item.student?.name}</p><p className="text-xs text-slate-400">{item.student?.student_number} · {item.student?.program_code}</p></div><StatusBadge value={item.status} dot={false} /></div>
-      <p className="mt-2 line-clamp-2 text-xs text-slate-600">{item.policy_classification || item.policy_status || item.reason || "Policy review not yet recorded"}</p>
-      <p className="mt-2 text-xs font-semibold text-brand-700">{item.kind === "residency" ? item.term_label : item.target_return_term || formatDate(item.awol_effective_date)}</p>
-      {item.unresolved_messages > 0 && <p className="mt-2 text-xs font-semibold text-amber-700">{item.unresolved_messages} concern(s)</p>}
-      <div className={`mt-3 grid gap-2 ${onMessage ? "grid-cols-2" : "grid-cols-1"}`}>
-        <button type="button" onClick={onOpen} className="btn-ghost cursor-pointer px-2 py-1.5"><Eye className="h-3.5 w-3.5" /> View</button>
-        {onMessage && <button type="button" onClick={onMessage} className="btn-ghost cursor-pointer px-2 py-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message</button>}
-      </div>
-    </article>
-  );
-}
-
-function PolicyReviewCard({ title, description, emptyText, review, busy, error, notice, onReview, onApply }) {
-  const citations = review?.citations || [];
-  return (
-    <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-brand-700 ring-1 ring-brand-100">
-            <ClipboardCheck className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-ink">{title}</p>
-            <p className="mt-0.5 text-xs text-slate-600">
-              {description}
-            </p>
-          </div>
-        </div>
-        {review?.recommendation && <StatusBadge value={review.recommendation} dot={false} />}
-      </div>
-      {review ? (
-        <div className="mt-4 space-y-3">
-          <p className="text-sm text-slate-700">{review.summary}</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(review.checks || []).map((check) => (
-              <div key={check.label} className="rounded-xl bg-white px-3 py-2 ring-1 ring-black/5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{check.label}</p>
-                  <StatusBadge value={check.status} dot={false} />
-                </div>
-                <p className="mt-1 text-xs text-slate-600">{check.detail}</p>
-              </div>
-            ))}
-          </div>
-          {citations.length > 0 && (
-            <details className="rounded-xl bg-white px-3 py-2 ring-1 ring-black/5">
-              <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-500">Policy sources</summary>
-              <div className="mt-2 space-y-2">
-                {citations.map((citation) => (
-                  <div key={citation.id || citation.title} className="text-xs text-slate-600">
-                    <p className="font-semibold text-slate-700">{citation.title} · {citation.source}</p>
-                    <p className="mt-0.5">{citation.text}</p>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-slate-600">{emptyText}</p>
-      )}
-      {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
-      {notice && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{notice}</p>}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={onReview} disabled={busy} className="btn-ghost">
-          <ClipboardCheck className="h-4 w-4" /> {busy ? "Checking..." : "Run policy checker"}
-        </button>
-        <button type="button" onClick={onApply} disabled={busy || !review} className="btn-primary">
-          Apply suggestion
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function MiniBox({ label, value, tone }) {
   const tones = {
     brand: "text-brand-700 bg-brand-50",
@@ -5589,12 +4939,6 @@ function workflowGuidance(slug) {
   const map = {
     "student-handoff":
       "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program and curriculum, and marks the subjects already completed automatically — no manual typing. A NOTE of LOA, AWOL or withdrawn on a new student is taken in as their standing. Subjects a student is enrolled in this semester come from the class list (Enrollment), not from this sheet.",
-    "leave-of-absence":
-      "A leave of absence means the student does not enroll for the semesters of the leave; the time on leave still counts toward the maximum residence. Each request is a case that moves across the board: staff check it, the Dean decides, and the student goes on leave when the first semester of the leave begins. Drag a card to the next column or use its Move to menu; both do exactly what the buttons do.",
-    readmission:
-      "Readmission brings a student back from an approved leave. The student names the leave they are ending, a return semester and a checklist; staff verify each item, and the Dean decides. Approval makes the student active again; enrolling in subjects is a separate step for the Academic Coordinator.",
-    awol:
-      "AWOL restricts registration after a student leaves without formal LOA. A return requires written intent routed through the Dean. The policy review applies the 5/7-year normal and 7/9-year absolute residence limits, while valid no-subject residency remains a separate active enrollment state.",
     "course-audit":
       "Run at the end of the semester. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":
@@ -5605,8 +4949,6 @@ function workflowGuidance(slug) {
       "Opens only after panel matching. GS staff and the Research Coordinator book the defense for the student's current stage only. Title defense needs 14 days after the Form 1 endorsement; proposal and final need 14 days after the panel received the manuscript. Past slots are refused, an override needs a recorded reason, and a booking is moved or cancelled with a reason instead of being overwritten.",
     practicum:
       "Available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students. Staff record MOA receipt, review certificates and hours, request additional certificates when hours are short, and route completed reports to the Dean.",
-    withdrawal:
-      "Withdrawal applies to one subject and is allowed until the end of the second week of classes (Handbook p. 49). GS Staff forwards the student request to the Dean; approval returns to GS Staff for Excel export. GS Staff emails the file manually and waits for Registrar acknowledgement outside the portal.",
     graduation:
       "This is the Graduate School monitoring and endorsement layer. It checks coursework, research completion evidence, practicum when required, and pending tasks before staff send the endorsement list for Dean review and export.",
   };
