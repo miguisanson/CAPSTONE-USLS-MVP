@@ -8,6 +8,15 @@
   Codex, because Codex's sandbox cannot run the tests and nobody is here to
   unblock it. Main session = architect: briefs, merges, gate, live check.
 
+### Handover (2026-10-01, paused by the owner)
+
+Branch `v5.1-migui_clean` is the whole state — committed and pushed, in sync with GitHub.
+All `pkt/*` helper branches were merged and deleted; temporary worktrees removed
+(`E:/Github_Projects/CAPSTONE-USLS-MVP-wt/monitor` is a leftover locked folder, safe to delete
+after a reboot). To run it: see README (`npm run setup`, then `npm run dev`; demo password
+`DemoPass123!`). The work queue for whoever continues: `DEFENSE_REVISIONS.md` section J, then
+the "Next session" list below.
+
 ### Progress (2026-10-01 11:00)
 
 Everything is merged into `v5.1-migui_clean` and pushed, including the walkthrough.
