@@ -7,6 +7,7 @@ import {
 import { api } from "../../api";
 import { Card, ErrorNote, SectionTitle } from "../../components/ui";
 import { Field, Textarea } from "../../components/forms";
+import { AnswerBadge, SourceList } from "../../components/AssistantSources";
 
 export function StudentPolicyAssistant() {
   const maxQuestionLength = 1500;
@@ -71,7 +72,7 @@ export function StudentPolicyAssistant() {
         {result && (
           <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{result.answer}</p>
-            {result.citations?.length > 0 && <div className="mt-4 border-t border-slate-100 pt-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Manual references</p><ul className="mt-2 space-y-2">{result.citations.map((item) => <li key={item.id} className="text-xs text-slate-600"><span className="font-semibold text-ink">{item.title}</span> · {item.source}</li>)}</ul></div>}
+            <div className="mt-3 space-y-3"><AnswerBadge source={result.source} /><SourceList citations={result.citations} heading="Sources" /></div>
           </div>
         )}
       </Card>

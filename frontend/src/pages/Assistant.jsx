@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Send, Sparkles, BookText, Info, Bot, User, CornerDownLeft } from "lucide-react";
+import { Send, Sparkles, Info, Bot, User, CornerDownLeft } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle } from "../components/ui";
 import StudentPicker from "../components/StudentPicker";
 import { useAuth } from "../auth";
+import { AnswerBadge, SourceList } from "../components/AssistantSources";
 
 // Staff and admin can focus the chat on a student record; every other signed-in
 // role (Dean, coordinators, faculty) asks policy questions only.
@@ -195,7 +196,9 @@ export default function Assistant({ policyOnly: policyOnlyProp = false }) {
             <SectionTitle title="How this works" icon={Info} />
             <p className="text-sm leading-relaxed text-slate-600">
               The assistant retrieves the relevant policy and the student's computed indicators first, then explains them
-              — it never invents status. Every answer lists its sources. The backend stays the source of truth.
+              — it never invents status. Every answer lists its sources: open one to see the document, page, section and
+              the exact passage. If the documents do not answer a question it says so instead of guessing. The backend
+              stays the source of truth.
             </p>
           </Card>
         </div>
@@ -230,16 +233,7 @@ function Message({ m }) {
           </div>
         )}
 
-        {m.source && (
-          <div
-            title={m.source.detail}
-            aria-label={`Answer source: ${m.source.label}. ${m.source.detail}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600"
-          >
-            {m.source.ai_used ? <Sparkles className="h-3 w-3 text-brand-600" /> : <Info className="h-3 w-3 text-slate-500" />}
-            {m.source.label}
-          </div>
-        )}
+        <AnswerBadge source={m.source} />
 
         {m.student && (
           <Link
@@ -250,25 +244,7 @@ function Message({ m }) {
           </Link>
         )}
 
-        {m.citations && m.citations.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-              <BookText className="h-3.5 w-3.5" /> Sources
-            </p>
-            <div className="space-y-1.5">
-              {m.citations.map((c) => (
-                <details key={c.id} className="group rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
-                  <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-700">
-                    <span>{c.title}</span>
-                    <span className="text-[10px] font-medium text-slate-400">{c.source}</span>
-                  </summary>
-                  {c.warning && <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1 font-semibold text-amber-800">{c.warning}</p>}
-                  <p className="mt-1.5 leading-relaxed text-slate-500">{c.text}</p>
-                </details>
-              ))}
-            </div>
-          </div>
-        )}
+        <SourceList citations={m.citations} />
       </div>
     </div>
   );

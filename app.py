@@ -5502,6 +5502,20 @@ def retrieve_policy(query: str, k: int = 3) -> list[dict]:
     return [sn for _, sn in scored[:k]]
 
 
+def _relevant_policy_snippets(question: str, snippets: list[dict]) -> list[dict]:
+    """Drop curated snippets that share only one stray word with the question ("last" is not "last day")."""
+    question_terms = set(_prag.terms(question))
+    if not question_terms:
+        return []
+    kept = []
+    for snippet in snippets:
+        text = f"{snippet.get('title', '')} {snippet.get('text', '')} {' '.join(snippet.get('tags', []))}"
+        shared = question_terms & set(_prag.terms(text))
+        if len(shared) >= min(2, len(question_terms)):
+            kept.append(snippet)
+    return kept
+
+
 def loa_term_position_map() -> dict[int, int]:
     return {term.id: index for index, term in enumerate(AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all())}
 
@@ -8968,6 +8982,10 @@ class PolicyPassageNotFound(RuntimeError):
     """The policy library is empty or has no passage that is relevant to the question."""
 
 
+class PolicyAnswerNotFound(PolicyPassageNotFound):
+    """The library is loaded, but none of its passages answers the question."""
+
+
 class PolicyOcrUnavailable(ValueError):
     """A scanned PDF needs OCR, but OCR cannot be used on this computer."""
 
@@ -8975,7 +8993,8 @@ class PolicyOcrUnavailable(ValueError):
 POLICY_DRAFT_WARNING = "Draft — pending Graduate School validation"
 POLICY_DOCUMENT_CATEGORIES = ["Handbook", "Research Protocol", "Operations Manual", "Memo", "Form", "Other"]
 POLICY_DOCUMENT_STATUSES = ["active", "draft", "archived"]
-POLICY_SECTIONS_VERSION = 3
+POLICY_SECTIONS_VERSION = 4
+import policy_rag as _prag  # noqa: E402  (key-free retrieval and answers for the Policy Assistant)
 POLICY_OCR_MAX_PAGES = int(os.getenv("POLICY_OCR_MAX_PAGES", "40"))
 _WML = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 # Display names for the stakeholder files that ship with the project. Anything
@@ -9151,13 +9170,8 @@ def _reset_rag_indexes() -> None:
 
 # --- reading policy files -------------------------------------------------
 def _clean_policy_text(text: str) -> str:
-    text = (text or "").replace("\x00", " ")
-    # Drop lone surrogates, then repair the broken apostrophes/bullets that
-    # some PDF exports leave behind as U+FFFD.
-    text = text.encode("utf-8", "ignore").decode("utf-8", "ignore")
-    text = re.sub(r"(?<=\w)�(?=\w)", "’", text)
-    text = re.sub(r"(?m)^[ \t]*�[ \t]+", "• ", text)
-    return text.replace("�", "’")
+    # Repairs broken apostrophes/bullets (U+FFFD), ligatures and stray symbols from PDF/Word exports.
+    return _prag.clean_text(text)
 
 
 _OCR_INSTALL_HINT = (
@@ -9290,6 +9304,12 @@ def _pdf_sections(file_bytes: bytes) -> tuple[list[tuple[str, str]], int, bool]:
                 if readable_word_count(cleaned) > readable_word_count(texts[index]):
                     texts[index] = cleaned
                     ocr_used = True
+    flat_words = sum(readable_word_count(text) for text in texts)
+    if not ocr_used:
+        # Real structure: printed page numbers, bold headings as section titles, repaired line breaks.
+        structured = _prag.structured_pdf_sections(file_bytes, page_count)
+        if structured and sum(len(body.split()) for _label, body in structured) >= 0.8 * flat_words:
+            return structured, page_count, ocr_used
     texts = _strip_running_headers(texts)
     sections = [(f"p. {number}", text) for number, text in enumerate(texts, start=1) if text.strip()]
     return sections, page_count, ocr_used
@@ -9632,7 +9652,7 @@ def _rag_index_signature(sources: list) -> dict:
         "files": files,
         "chunk_size": int(os.getenv("RAG_CHUNK_SIZE", "180")),
         "chunk_overlap": int(os.getenv("RAG_CHUNK_OVERLAP", "30")),
-        "parser": POLICY_SECTIONS_VERSION,
+        "parser": f"{POLICY_SECTIONS_VERSION}.{_prag.CHUNK_VERSION}",
     }
 
 
@@ -9675,16 +9695,7 @@ def _chunk_rag_text(
 
 
 def _chunk_policy_sections(title: str, sections: list[tuple[str, str]]) -> list[dict]:
-    chunks: list[dict] = []
-    part = 0
-    for label, text in sections:
-        if label:
-            chunks.extend(_chunk_rag_text(text, title, title=title, location=label))
-            continue
-        for body in _rag_split_words(text):
-            part += 1
-            chunks.append({"id": "", "title": title, "source": f"{title}, part {part}", "text": body})
-    return chunks
+    return _prag.chunk_sections(title, sections)
 
 
 def _read_rag_document_chunks(sources: list) -> list[dict]:
@@ -9701,6 +9712,7 @@ def _read_rag_document_chunks(sources: list) -> list[dict]:
             print(f"Policy Assistant skipped {path.name}: {exc}")
             continue
         for chunk in document_chunks:
+            chunk["sec"] = f"{path.name}#{chunk.get('sec')}"
             chunk.update({
                 "file_name": path.name,
                 "kind": source.get("kind") or "system",
@@ -10438,6 +10450,11 @@ def _retrieve_rag_document_chunks(
     chunks: list[dict],
     limit: int | None = None,
 ) -> list[dict]:
+    """Hybrid retrieval with a Gemini key: embeddings and BM25 keyword search, fused by rank.
+
+    A passage that only the keyword search finds (an exact rule name, a form number, a figure) is never lost
+    because the embedding missed it, and vice versa. Without embeddings the keyword ranking stands alone.
+    """
     limit = limit or max(1, int(os.getenv("RAG_TOP_K", "3")))
     try:
         vectors = _load_rag_vector_index(chunks)
@@ -10452,21 +10469,38 @@ def _retrieve_rag_document_chunks(
         ]
         scored.sort(key=lambda item: (-item[0], item[1].get("id", "")))
         if scored:
-            top = [
-                {**chunk, "_retrieval": "vector", "_score": round(score, 6)}
-                for score, chunk in scored[:limit]
-            ]
-            # Exact wording still matters: a passage that contains nearly every
-            # term of the question is never left out because of the embedding.
-            lexical = _retrieve_rag_document_chunks_lexically(question, chunks, 1)
-            if lexical and lexical[0]["_coverage"] >= 0.75 and lexical[0]["id"] not in {item["id"] for item in top}:
-                top = [{**lexical[0], "_retrieval": "lexical-boost"}] + top[: limit - 1]
+            pool = max(limit * 4, 12)
+            vector_ranked = {
+                chunk["id"]: {**chunk, "_retrieval": "vector", "_score": round(score, 6)}
+                for score, chunk in scored[:pool]
+            }
+            keyword_ranked = {item["id"]: item for item in _prag.search(question, chunks, pool)}
+            fused: dict[str, float] = {}
+            for rank, chunk_id in enumerate(vector_ranked):
+                fused[chunk_id] = fused.get(chunk_id, 0.0) + 1.0 / (60 + rank)
+            for rank, chunk_id in enumerate(keyword_ranked):
+                fused[chunk_id] = fused.get(chunk_id, 0.0) + 1.0 / (60 + rank)
+            top = []
+            for chunk_id in sorted(fused, key=lambda key: (-fused[key], key))[:limit]:
+                if chunk_id in vector_ranked:
+                    top.append({**vector_ranked[chunk_id], "_rrf": round(fused[chunk_id], 5)})
+                else:
+                    top.append({**keyword_ranked[chunk_id], "_retrieval": "bm25-boost", "_rrf": round(fused[chunk_id], 5)})
             return top
     except Exception:  # noqa: BLE001
         # Keep policy guidance available during an embedding outage. Generation
         # still receives retrieved source text and remains citation-grounded.
         pass
-    return _retrieve_rag_document_chunks_lexically(question, chunks, limit)
+    return [{**item, "_retrieval": "lexical-fallback"} for item in _prag.search(question, chunks, limit)]
+
+
+def prewarm_keyword_index() -> None:
+    """Without an AI key: read the documents and build the keyword index before the first question."""
+    try:
+        chunks = _in_app_context(_load_rag_document_index)
+        _prag.get_index(chunks)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Policy Assistant keyword index prewarm skipped: {exc}")
 
 
 def prewarm_document_rag() -> None:
@@ -10474,6 +10508,7 @@ def prewarm_document_rag() -> None:
     try:
         def build():
             chunks = _load_rag_document_index()
+            _prag.get_index(chunks)
             return chunks, _ensure_rag_vectors(chunks)
 
         chunks, vectors = _in_app_context(build)
@@ -10509,6 +10544,9 @@ def _policy_citation(chunk: dict) -> dict:
         "title": chunk["title"],
         "source": chunk["source"],
         "text": chunk["text"][:700],
+        "quote": chunk.get("quote") or chunk["text"][:700],
+        "page": chunk.get("page"),
+        "section": chunk.get("section"),
         "retrieval": chunk.get("_retrieval", "vector"),
         "similarity": chunk.get("_score"),
         "status": status,
@@ -10540,32 +10578,37 @@ def _finalize_document_answer(answer: str, chunks: list[dict]) -> str:
 
 def call_document_rag(question: str, snippets: list[dict], payload: dict | None, student: Student | None) -> tuple[str, list[dict]]:
     document_chunks = _load_rag_document_index()
-    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks)
+    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks, max(5, int(os.getenv("RAG_TOP_K", "3"))))
     if not retrieved_chunks:
         raise PolicyPassageNotFound("No matching policy passage was found.")
     case_context = _case_context_for_rag(student, payload, snippets)
     prompt = (
-        "Answer as the USLS Graduate School assistant. Use the retrieved policy document excerpts (handbook, "
-        "research protocol, memos, manuals) as the primary source; when two excerpts disagree, prefer the one "
-        "marked as the newer or staff-uploaded document and say so. Name the source document title and page or "
-        "section you rely on. If an excerpt is marked DRAFT, say the rule is a draft pending Graduate School "
-        "validation. If student context is provided, use it only for that student's live "
-        "status and do not invent approvals, decisions, or missing records. Answer the question directly in no "
-        "more than 120 words. Include only the rules needed to answer it; do not paste long source passages. "
-        "If the documents do not answer the question, say what is missing.\n\n"
+        "You are the USLS Graduate School policy assistant. Answer using ONLY the numbered excerpts below "
+        "(handbook, research protocol, memos, manuals); never use outside knowledge and never guess. "
+        "Start with the direct answer in one or two plain sentences, then quote the exact rule in quotation marks. "
+        "Finish with the source in the form (Document title, p. N, section name); use the page and section shown "
+        "in the excerpt heading. If two excerpts disagree, prefer the one marked as newer or staff-uploaded and say so. "
+        "If an excerpt is marked DRAFT, say the rule is a draft pending Graduate School validation. "
+        "If the excerpts do not contain the answer, reply exactly: "
+        f"\"{_prag.NOT_FOUND_ANSWER}\" and add nothing else. "
+        "If student context is provided, use it only for that student's live status and do not invent approvals, "
+        "decisions, or missing records. Use at most 120 words and do not paste long passages.\n\n"
     )
     if case_context:
         prompt += case_context + "\n\n"
     prompt += "Retrieved document excerpts:\n"
     prompt += "\n\n".join(
-        f"[{chunk['source']}"
+        f"[{number}. {chunk['source']}"
         + (" — DRAFT, pending Graduate School validation" if (chunk.get("status") or "active") == "draft" else "")
         + (" — staff-uploaded" if chunk.get("kind") == "managed" else "")
         + f"]\n{chunk['text']}"
-        for chunk in retrieved_chunks
+        for number, chunk in enumerate(retrieved_chunks, start=1)
     )
     prompt += f"\n\nQuestion: {question}"
-    response = _finalize_document_answer(_gemini_generate(prompt), retrieved_chunks)
+    generated = _gemini_generate(prompt)
+    if (generated or "").strip().lower().startswith("i could not find this in the handbook"):
+        return _prag.NOT_FOUND_ANSWER, []  # the model found nothing in the passages: show no unrelated sources
+    response = _finalize_document_answer(generated, retrieved_chunks)
     return response, [_policy_citation(chunk) for chunk in retrieved_chunks]
 
 
@@ -10883,60 +10926,31 @@ def _local_answer_location(chunk: dict) -> str:
     return source[len(title):].lstrip(", ") if source.startswith(title) else source
 
 
-def call_local_document_rag(question: str) -> tuple[str, list[dict]]:
-    """Answer from the policy library without an AI service: cited, extractive, short."""
+def search_policy_passages(question: str, limit: int = 3) -> list[dict]:
+    """Best passages for a question with no AI key: BM25 + the older lexical score, reranked on sentences."""
     document_chunks = _load_rag_document_index()
-    retrieved_chunks = _retrieve_rag_document_chunks_lexically(
-        question,
-        document_chunks,
-        max(8, int(os.getenv("RAG_TOP_K", "3"))),
+    legacy = _retrieve_rag_document_chunks_lexically(question, document_chunks, 20)
+    return _prag.search(
+        question, document_chunks, limit, extra_rank=[chunk["id"] for chunk in legacy],
     )
-    relevant = [chunk for chunk in retrieved_chunks if chunk.get("_relevant")]
-    if not relevant:
-        raise PolicyPassageNotFound("No matching policy passage was found.")
 
-    # Keep the response strictly extractive: sentences are copied from the
-    # strongest passage (and a second one only when it is nearly as strong), so
-    # an answer can never blend in a loosely matching rule.
-    top = relevant[0]
-    selected_chunks = [top]
-    for other in relevant[1:]:
-        if len(selected_chunks) >= 2:
-            break
-        if other["source"] != top["source"] and other["_score"] >= 0.6 * top["_score"]:
-            selected_chunks.append(other)
 
-    page_texts = [_merge_rag_source_chunks(chunk, document_chunks) for chunk in selected_chunks]
-    total_limit = max(500, int(os.getenv("LOCAL_RAG_MAX_ANSWER_CHARS", "1050")))
-    targeted_answer = _targeted_local_rag_answer(question, page_texts)
-    paragraphs: list[str] = []
-    cited = list(selected_chunks)
-    if targeted_answer:
-        paragraphs.append(f"According to {top['title']}, {_local_answer_location(top)}: {targeted_answer}")
-    else:
-        idf = _rag_query_idf(
-            set(_rag_terms(question)),
-            [set(_rag_chunk_terms(chunk)) for chunk in document_chunks],
-        )
-        cited = []
-        first_score = 0.0
-        for chunk, page_text in zip(selected_chunks, page_texts, strict=True):
-            text, score = _select_answer_sentences(question, page_text, idf, total_limit // len(selected_chunks))
-            if not text:
-                text = _focused_local_rag_excerpt(page_text, question, total_limit // len(selected_chunks))
-                score = 0.0
-            if not text:
-                continue
-            if cited and score < 0.6 * first_score:
-                continue  # the second passage adds nothing that answers the question
-            if not cited:
-                first_score = score
-            cited.append(chunk)
-            paragraphs.append(f"According to {chunk['title']}, {_local_answer_location(chunk)}: {text}")
-    if not paragraphs:
-        raise PolicyPassageNotFound("No readable policy passage was found.")
-    answer = _finalize_document_answer("\n\n".join(paragraphs), cited)
-    citations = [{**_policy_citation(chunk), "retrieval": "lexical"} for chunk in cited]
+def call_local_document_rag(question: str) -> tuple[str, list[dict]]:
+    """Answer from the policy library without an AI service: a short, cited, quoted answer.
+
+    Raises PolicyAnswerNotFound when the library is loaded but does not answer the question, so the caller says
+    so plainly instead of showing an unrelated passage.
+    """
+    document_chunks = _load_rag_document_index()
+    passages = search_policy_passages(question, max(3, int(os.getenv("RAG_TOP_K", "3"))))
+    composed = _prag.compose_answer(
+        question, passages, document_chunks, max(400, int(os.getenv("LOCAL_RAG_MAX_ANSWER_CHARS", "900"))),
+    )
+    if not composed:
+        raise PolicyAnswerNotFound("The policy documents do not answer this question.")
+    answer, used = composed
+    answer = _finalize_document_answer(answer, used)
+    citations = [{**_policy_citation(chunk), "retrieval": chunk.get("_retrieval", "bm25")} for chunk in used]
     return answer, citations
 
 
@@ -11305,16 +11319,20 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
             "Retrieved from the curated local policy library without AI generation.", False,
         ),
         "document-rag": (
-            "Policy documents · Gemini",
-            "Generated by Gemini from retrieved policy document excerpts (handbook, protocol, uploads).", True,
+            "AI answer grounded in the documents",
+            "Written by Gemini using only the retrieved passages of the Handbook, Research Protocol and uploaded policies; every answer names its page and section.", True,
         ),
         "document-rag-cache": (
-            "Policy documents · Gemini (cached)",
-            "Previously generated by Gemini from retrieved policy document excerpts.", True,
+            "AI answer grounded in the documents (saved)",
+            "Written earlier by Gemini using only the retrieved passages of the policy documents.", True,
         ),
         "document-rag-local": (
-            "Policy documents · Local retrieval",
-            "Extracted directly from matching policy document passages without AI generation.", False,
+            "Answered from the documents (keyword search)",
+            "Found by keyword search in the Handbook, Research Protocol and uploaded policies and quoted from them. No AI service was used; add a Gemini key for fuller, reworded answers.", False,
+        ),
+        "policy-not-found": (
+            "Not found in the documents",
+            "The Handbook, Research Protocol and uploaded policies were searched and none of them answers this question.", False,
         ),
         "role-guarded": (
             "Policy library · Role limits",
@@ -11336,7 +11354,11 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
         label = "Live record · Gemini interpreted"
         detail = "Gemini classified the question only; verified database rules produced the answer."
         ai_used = True
-    return {"label": label, "detail": detail, "ai_used": ai_used}
+    ai_configured = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
+    note = None
+    if not ai_configured and mode in {"document-rag-local", "policy-not-found", "student-document-rag-local"}:
+        note = "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers."
+    return {"label": label, "detail": detail, "ai_used": ai_used, "ai_configured": ai_configured, "note": note}
 
 
 def _attention_report(portfolio: dict, display_limit: int = 5) -> dict:
@@ -11483,8 +11505,7 @@ def local_grounded_answer(
             if recs:
                 out.append("Suggested action: " + recs[0]["recommendation"] + f" ({recs[0]['owner']}).")
         if not snippets and not student:
-            out.append("I could not find a matching policy. Try mentioning a stage, form, or topic "
-                       "(e.g. LOA, Form 4, panel, ethics, completion).")
+            out.append(_prag.NOT_FOUND_ANSWER)
 
     return " ".join(out).strip()
 
@@ -11718,7 +11739,7 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
     database_intents = ASSISTANT_DATABASE_INTENTS
     if policy_only and intent in database_intents:
         return assistant_role_guarded_response(role)
-    snippets = retrieve_policy(question, k=3) if intent in {"policy", "unknown"} else []
+    snippets = _relevant_policy_snippets(question, retrieve_policy(question, k=3)) if intent in {"policy", "unknown"} else []
     mode = "database-rules" if intent in database_intents else "policy-retrieval"
     rag_citations = []
     attention_portfolio = portfolio_recommendations() if intent == "student_attention" else None
@@ -11741,6 +11762,9 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
             try:
                 answer, rag_citations = call_local_document_rag(question)
                 mode = "document-rag-local"
+            except PolicyAnswerNotFound:
+                # The library is there but does not answer this: say so, never show an unrelated passage.
+                answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "policy-not-found"
             except PolicyPassageNotFound:
                 # No passage in the library is relevant: only now do the curated snippets answer.
                 answer = local_grounded_answer(
@@ -11831,7 +11855,7 @@ def generate_student_answer(question: str, student: Student) -> dict:
             "read_only": True,
         }
     payload = student_recommendations(student)
-    snippets = retrieve_policy(question, k=3)
+    snippets = _relevant_policy_snippets(question, retrieve_policy(question, k=3))
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     mode = "student-fast"
     rag_citations = []
@@ -11853,6 +11877,8 @@ def generate_student_answer(question: str, student: Student) -> dict:
             try:
                 answer, rag_citations = call_local_document_rag(question)
                 mode = "student-document-rag-local"
+            except PolicyAnswerNotFound:
+                answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "student-document-not-found"
             except Exception:
                 answer = _student_policy_fallback(snippets)
                 mode = "student-policy-fallback"
@@ -11861,6 +11887,11 @@ def generate_student_answer(question: str, student: Student) -> dict:
     return {
         "answer": answer,
         "mode": mode,
+        "source": _assistant_source({
+            "student-document-rag": "document-rag",
+            "student-document-rag-local": "document-rag-local",
+            "student-document-not-found": "policy-not-found",
+        }.get(mode, mode)),
         "citations": rag_citations or (
             [
                 {"id": item["id"], "title": item["title"], "source": item["source"], "text": item["text"]}
@@ -37479,5 +37510,7 @@ if __name__ == "__main__":
             name="rag-prewarm",
             daemon=True,
         ).start()
+    elif os.getenv("RAG_PREWARM", "1").strip().lower() not in {"0", "false", "no"}:
+        threading.Thread(target=prewarm_keyword_index, name="rag-keyword-prewarm", daemon=True).start()
     print(f"USLS Graduate School platform running at http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
