@@ -3,12 +3,11 @@ import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   CheckCircle2,
   Circle,
   ClipboardList,
-  Download,
   Eye,
-  FileSearch,
   Send,
   Settings2,
   Users,
@@ -16,6 +15,7 @@ import {
 import { api } from "../api";
 import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
+import SubjectNeedsReport from "../components/SubjectNeedsReport";
 
 const STEPS = ["Draft", "Submitted", "Approved", "Published"];
 export default function CourseAdjustments({ embedded = false }) {
@@ -307,10 +307,7 @@ export default function CourseAdjustments({ embedded = false }) {
           </div>
 
           {subjectNeedsReport && (
-            <SubjectNeedsReport
-              report={subjectNeedsReport}
-              onDownload={() => downloadSubjectNeedsCsv(subjectNeedsReport)}
-            />
+            <SubjectNeedsReport report={subjectNeedsReport} termLabel={subjectNeedsReport.term?.label ? formatTermLabel(subjectNeedsReport.term.label) : ""} />
           )}
 
           <Card className="overflow-hidden">
@@ -323,119 +320,118 @@ export default function CourseAdjustments({ embedded = false }) {
             {data.demand.length === 0 ? (
               <EmptyState icon={CheckCircle2} title="No curriculum subjects found" hint="This program has no curriculum subjects yet. Import the program's monitoring sheet in Student Handoff first." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1380px] text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                      <th className="px-5 py-3">Subject</th>
-                      <th className="px-3 py-3">Basis</th>
-                      <th className="px-3 py-3">Demand</th>
-                      <th className="px-3 py-3">Affected students / delay impact</th>
-                      <th className="px-3 py-3">Status</th>
-                      <th className="px-3 py-3">Sections</th>
-                      <th className="px-3 py-3">Suggested faculty / coordinator choice</th>
-                      <th className="px-5 py-3 text-right">Offer?</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.demand.map((row) => {
-                      const s = sel[row.course.id] || defaultSelection(row);
-                      return (
-                        <tr key={row.course.id} className="border-b border-slate-50">
-                          <td className="px-5 py-3">
-                            <p className="font-semibold text-ink">{row.course.code}</p>
-                            <p className="text-xs text-slate-500">{row.course.title}</p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
-                              row.selection_source === "Demand"
-                                ? "bg-blue-50 text-blue-700"
-                                : "bg-slate-100 text-slate-600"
+              <ul className="divide-y divide-slate-100">
+                {data.demand.map((row) => {
+                  const s = sel[row.course.id] || defaultSelection(row);
+                  const affected = row.affected_students || [];
+                  return (
+                    <li key={row.course.id} className="px-5 py-4">
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <p className="min-w-0 truncate font-semibold text-ink" title={row.course.title && row.course.title !== row.course.code ? `${row.course.code} · ${row.course.title}` : row.course.code}>
+                              {row.course.code}
+                              {row.course.title && row.course.title !== row.course.code && <span className="font-normal text-slate-600"> · {row.course.title}</span>}
+                            </p>
+                            <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                              row.selection_source === "Demand" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"
                             }`}>
                               {row.selection_source || (row.demand_count > 0 ? "Demand" : "Manual")}
                             </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex min-w-40 items-center gap-3">
-                              <span className="h-2 w-28 overflow-hidden rounded-full bg-slate-100">
-                                <span className={`block h-full rounded-full ${demandBarClass(row.demand_status)}`} style={{ width: `${demandWidth(row)}%` }} />
-                              </span>
-                              <span className="font-bold text-slate-700">{row.demand_count}</span>
-                            </div>
-                          </td>
-                          <td className="max-w-md px-3 py-3 align-top">
-                            {row.affected_students?.length ? (
-                              <div className="max-h-32 space-y-1 overflow-y-auto pr-1">
-                                {row.affected_students.map((student) => (
-                                  <div key={student.id} className={`rounded-lg border px-2.5 py-2 text-xs ${student.will_be_delayed ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
-                                    <p className="font-semibold text-ink">{student.name} <span className="font-normal text-slate-500">({student.student_number})</span></p>
-                                    <p className={student.will_be_delayed ? "text-amber-800" : "text-slate-600"}>{student.impact_basis} · {student.will_be_delayed ? "Will be delayed if not offered" : "Affected, no confirmed delay"}</p>
-                                  </div>
+                            <OfferingStatusBadge status={s.status} />
+                          </div>
+                          <div className="mt-2 flex min-w-0 items-center gap-3">
+                            <span className="h-2 w-full max-w-[14rem] overflow-hidden rounded-full bg-slate-100">
+                              <span className={`block h-full rounded-full ${demandBarClass(row.demand_status)}`} style={{ width: `${demandWidth(row)}%` }} />
+                            </span>
+                            <span className="shrink-0 text-sm font-bold text-slate-700">{row.demand_count}</span>
+                            <span className="truncate text-xs text-slate-500">
+                              {row.demand_count === 1 ? "student affected" : "students affected"}
+                              {row.delayed_count ? ` · ${row.delayed_count} delayed if withheld` : ""}
+                            </span>
+                          </div>
+                          {affected.length > 0 && (
+                            <details className="group mt-2">
+                              <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800">
+                                <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                                <span className="group-open:hidden">Show the {affected.length} affected student{affected.length === 1 ? "" : "s"}</span>
+                                <span className="hidden group-open:inline">Hide affected students</span>
+                              </summary>
+                              <ul className="mt-2 grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto pr-1 md:grid-cols-2">
+                                {affected.map((student) => (
+                                  <li key={student.id} className={`min-w-0 rounded-lg border px-2.5 py-1.5 text-xs ${student.will_be_delayed ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                                    <p className="truncate font-semibold text-ink" title={`${student.name} (${student.student_number})`}>{student.name} <span className="font-normal text-slate-500">({student.student_number})</span></p>
+                                    <p className={`truncate ${student.will_be_delayed ? "text-amber-800" : "text-slate-600"}`}>{student.impact_basis} · {student.will_be_delayed ? "delayed if not offered" : "no confirmed delay"}</p>
+                                  </li>
                                 ))}
-                              </div>
-                            ) : <span className="text-xs text-slate-400">No students affected</span>}
-                          </td>
-                          <td className="px-3 py-3"><OfferingStatusBadge status={s.status} /></td>
-                          <td className="px-3 py-3">
-                            <input
-                              type="number"
-                              min="0"
-                              value={s.sections}
-                              onChange={(e) => updateSections(row, e.target.value)}
-                              disabled={!canEdit}
-                              className="field-input w-20 px-2 py-1 disabled:cursor-not-allowed disabled:bg-slate-100"
-                              aria-label={`Sections for ${row.course.code}`}
-                            />
-                          </td>
-                          <td className="px-3 py-3 align-top">
-                            <select
-                              value={s.facultyId}
-                              onChange={(event) => updateFaculty(row, event.target.value)}
-                              disabled={!canEdit || !s.offer}
-                              className="field-input min-w-56 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100"
-                              aria-label={`Faculty assignment for ${row.course.code}`}
-                            >
-                              <option value="">Unassigned</option>
-                              {(data.faculty_profiles || []).map((faculty) => {
-                                const candidate = (row.faculty_candidates || []).find((item) => item.id === faculty.id);
-                                return <option key={faculty.id} value={faculty.id}>
-                                  {faculty.name}{candidate?.preferred ? " · preferred" : ""} · {candidate ? `${candidate.projected_load}/24u` : faculty.specialization}
-                                </option>;
-                              })}
-                            </select>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              {row.faculty_candidates?.[0] && (
-                                <span className="text-xs text-brand-700">Suggested: {row.faculty_candidates[0].name}</span>
-                              )}
-                              {s.facultyId && (
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedFaculty((data.faculty_profiles || []).find((faculty) => faculty.id === Number(s.facultyId)) || null)}
-                                  className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-slate-600 hover:text-brand-700"
-                                >
-                                  <Eye className="h-3.5 w-3.5" /> View profile
-                                </button>
-                              )}
-                            </div>
-                            <p className="mt-1 text-[11px] text-slate-500">Recommendation uses preferences, availability, specialization, and current teaching load. You can change it.</p>
-                          </td>
-                          <td className="px-5 py-3 text-right">
+                              </ul>
+                            </details>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-end gap-3">
+                            <label className="block">
+                              <span className="field-label">Sections</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={s.sections}
+                                onChange={(e) => updateSections(row, e.target.value)}
+                                disabled={!canEdit}
+                                className="field-input w-full px-2 py-1 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                aria-label={`Sections for ${row.course.code}`}
+                              />
+                            </label>
+                            <label className="block min-w-0">
+                              <span className="field-label">Faculty</span>
+                              <select
+                                value={s.facultyId}
+                                onChange={(event) => updateFaculty(row, event.target.value)}
+                                disabled={!canEdit || !s.offer}
+                                className="field-input w-full min-w-0 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100"
+                                aria-label={`Faculty assignment for ${row.course.code}`}
+                              >
+                                <option value="">Unassigned</option>
+                                {(data.faculty_profiles || []).map((faculty) => {
+                                  const candidate = (row.faculty_candidates || []).find((item) => item.id === faculty.id);
+                                  return <option key={faculty.id} value={faculty.id}>
+                                    {faculty.name}{candidate?.preferred ? " · preferred" : ""} · {candidate ? `${candidate.projected_load}/24u` : faculty.specialization}
+                                  </option>;
+                                })}
+                              </select>
+                            </label>
                             <button
                               type="button"
                               onClick={() => toggleOffer(row)}
                               disabled={!canEdit}
-                              className={`inline-grid h-9 w-9 place-items-center rounded-full border transition-colors ${s.offer ? "border-brand-200 bg-brand-50 text-brand-600" : "border-slate-200 bg-white text-slate-400"} disabled:cursor-not-allowed disabled:opacity-40`}
+                              className={`inline-grid h-10 w-10 place-items-center rounded-full border transition-colors ${s.offer ? "border-brand-200 bg-brand-50 text-brand-600" : "border-slate-200 bg-white text-slate-400"} disabled:cursor-not-allowed disabled:opacity-40`}
                               aria-label={`${s.offer ? "Hold" : "Offer"} ${row.course.code}`}
+                              title={s.offer ? "Offered - click to hold" : "Not offered - click to offer"}
                             >
                               {s.offer ? <Check className="h-5 w-5" strokeWidth={3} /> : <Circle className="h-5 w-5" />}
                             </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                            {row.faculty_candidates?.[0] && (
+                              <span className="min-w-0 truncate text-brand-700" title="Recommended from preferences, availability, specialization and teaching load. You can change it.">Suggested: {row.faculty_candidates[0].name}</span>
+                            )}
+                            {s.facultyId && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedFaculty((data.faculty_profiles || []).find((faculty) => faculty.id === Number(s.facultyId)) || null)}
+                                className="inline-flex cursor-pointer items-center gap-1 font-semibold text-slate-600 hover:text-brand-700"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View profile
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </Card>
         </>
@@ -509,144 +505,6 @@ function OfferingStatusBadge({ status }) {
     "No decision": "bg-slate-100 text-slate-500 ring-slate-200",
   };
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${styles[label] || styles["No decision"]}`}>{label}</span>;
-}
-
-function SubjectNeedsReport({ report, onDownload }) {
-  const rows = report.rows || [];
-  const visibleRows = rows.filter((row) => row.need_count > 0);
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileSearch className="h-5 w-5 text-brand-600" />
-            <h2 className="text-lg font-semibold text-ink">Subject-needs report</h2>
-          </div>
-          <p className="mt-1 text-sm text-slate-600">
-            {report.program.code} · {formatTermLabel(report.term?.label)} · Generated {formatGeneratedAt(report.generated_at)}
-          </p>
-          <p className="mt-1 max-w-4xl text-xs text-slate-500">{report.basis}</p>
-        </div>
-        <button type="button" onClick={onDownload} className="btn-ghost shrink-0">
-          <Download className="h-4 w-4" /> Download CSV
-        </button>
-      </div>
-      <div className="grid grid-cols-1 gap-3 border-b border-slate-100 bg-slate-50/70 p-4 sm:grid-cols-3">
-        <ReportMetric label="Students reviewed" value={report.summary.students_reviewed} />
-        <ReportMetric label="Subjects with need" value={report.summary.subjects_with_need} />
-        <ReportMetric label="Student-subject needs" value={report.summary.student_subject_needs} />
-      </div>
-      {visibleRows.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                <th className="px-5 py-3">Subject</th>
-                <th className="px-3 py-3 text-center">Students needing</th>
-                <th className="px-3 py-3 text-center">Not taken</th>
-                <th className="px-5 py-3">Affected students</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRows.map((row) => (
-                <tr key={row.course.id} className="border-b border-slate-50 align-top">
-                  <td className="px-5 py-3">
-                    <p className="font-semibold text-ink">{row.course.code}</p>
-                    <p className="text-xs text-slate-500">{row.course.title}</p>
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    <span className="inline-flex min-w-8 justify-center rounded-full bg-brand-50 px-2.5 py-1 font-bold text-brand-700">
-                      {row.need_count}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-center font-semibold text-slate-700">{row.not_taken_count}</td>
-                  <td className="px-5 py-3">
-                    <StudentNeedNames students={row.students} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="px-5 py-8 text-center">
-          <CheckCircle2 className="mx-auto h-8 w-8 text-brand-500" />
-          <p className="mt-2 font-semibold text-ink">No missing-subject demand found</p>
-          <p className="mt-1 text-sm text-slate-500">All active monitored students are covered by completed or current subjects.</p>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function ReportMetric({ label, value, tone = "brand" }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${tone === "amber" ? "text-amber-700" : "text-brand-700"}`}>{value ?? 0}</p>
-    </div>
-  );
-}
-
-function StudentNeedNames({ students = [] }) {
-  if (!students.length) return <span className="text-xs text-slate-400">No confirmed offering need</span>;
-  const shown = students.slice(0, 4);
-  return (
-    <p className="text-xs leading-5 text-slate-600">
-      {shown.map((student) => `${student.name} (${student.student_number})`).join(", ")}
-      {students.length > shown.length ? `, +${students.length - shown.length} more` : ""}
-    </p>
-  );
-}
-
-function downloadSubjectNeedsCsv(report) {
-  const metadata = [
-    ["Program", `${report.program.code} - ${report.program.name}`],
-    ["Planning semester", report.term?.label || "Not selected"],
-    ["Generated", report.generated_at || ""],
-    ["Basis", report.basis || ""],
-    [],
-  ];
-  const header = [
-    "Subject Code",
-    "Subject Title",
-    "Category",
-    "Students Needing",
-    "Not Taken",
-    "Students Needing Subject",
-  ];
-  const rows = (report.rows || []).map((row) => [
-    row.course.code,
-    row.course.title,
-    row.course.category || "",
-    row.need_count,
-    row.not_taken_count,
-    (row.students || []).map((student) => `${student.student_number} - ${student.name} (${student.reason})`).join("; "),
-  ]);
-  const csv = [...metadata, header, ...rows]
-    .map((row) => row.map(csvCell).join(","))
-    .join("\r\n");
-  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const program = (report.program.code || "program").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  link.href = url;
-  link.download = `${program}-subject-needs-report.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function csvCell(value) {
-  const text = String(value ?? "");
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
-function formatGeneratedAt(value) {
-  if (!value) return "now";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function ActionButton({ busy, onClick, icon: Icon, children, primary = false, disabled = false }) {

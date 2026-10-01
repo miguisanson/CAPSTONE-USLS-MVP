@@ -32338,10 +32338,15 @@ def subject_needs_report_payload(
     program: Program,
     term: AcademicTerm | None = None,
 ) -> dict:
-    """Build the AC's missing-subject report from official and operational status layers.
+    """Build the AC's subject-needs report from the official and operational status layers.
 
-    Completed and currently enrolled subjects are excluded from offering need.
-    All other recorded outcomes count as subject demand.
+    Two different figures per subject (they are never the same number twice):
+    * ``not_taken_count`` - every expected-to-enroll student of the program whose curriculum
+      has the subject and who has neither completed it nor is enrolled in it (the backlog);
+    * ``need_count`` - the part of that backlog that is due NEXT: the subject is in the
+      student's next semester group (the same group the course-demand figure uses), which
+      is what the coordinator has to offer. Failed, dropped and withdrawn subjects are
+      retakes and are counted in both and marked ``reason``.
     """
     students = students_expected_for_planning(program, term)
     rows_by_course: dict[int, dict] = {}
@@ -32357,6 +32362,7 @@ def subject_needs_report_payload(
                     "title": course.title,
                     "category": course.category,
                     "units": course.units or 3,
+                    "recommended_term": course.recommended_term,
                 },
                 "not_taken": [],
             }
@@ -32381,6 +32387,8 @@ def subject_needs_report_payload(
             .all()
         ):
             latest_operational.setdefault(item.course_id, item)
+        due_next_ids = {item["id"] for item in student_semester_subjects(student, term)["next_subjects"]}
+        brief = student_brief(student)
 
         for course in curriculum:
             official_status = (
@@ -32401,22 +32409,25 @@ def subject_needs_report_payload(
                 continue
             reason = status if status in {"Dropped", "Withdrawn", "Failed"} else "Not taken"
             report_row(course)["not_taken"].append({
-                **student_brief(student),
+                **brief,
                 "status": status or "Missing",
                 "reason": reason,
+                "due_next": course.id in due_next_ids,
             })
 
     rows = []
     for item in rows_by_course.values():
-        students_needing = item["not_taken"]
+        backlog = sorted(item["not_taken"], key=lambda entry: (not entry["due_next"], entry["last_name"] or "", entry["first_name"] or ""))
         rows.append({
             "course": item["course"],
-            "need_count": len(students_needing),
-            "not_taken_count": len(item["not_taken"]),
-            "students": students_needing,
+            "need_count": sum(1 for entry in backlog if entry["due_next"]),
+            "not_taken_count": len(backlog),
+            "retake_count": sum(1 for entry in backlog if entry["reason"] != "Not taken"),
+            "students": backlog,
         })
     rows.sort(key=lambda row: (
         -row["need_count"],
+        -row["not_taken_count"],
         row["course"]["code"],
     ))
     return {
@@ -32424,14 +32435,17 @@ def subject_needs_report_payload(
         "term": term_dict(term) if term else None,
         "generated_at": iso(now_utc()),
         "basis": (
-            "Every active student in the selected program who will need subjects (enrolled, not yet enrolled, readmitted or in residency). Official completion and "
-            "the latest semester enrollment status are considered. Completed, taken, and "
-            "current subjects are excluded; all other subjects count as offering need."
+            "Counts every active student of the program who will need subjects (enrolled, not yet enrolled, "
+            "readmitted or in residency). Students on leave, AWOL, withdrawn or graduated are left out. "
+            "\"Needing next\" means the subject is in the student's next semester group, or the student must "
+            "retake it after failing, dropping or withdrawing. \"Not taken\" is the whole backlog: the subject is not "
+            "completed and not being taken now. Completed and current subjects are never counted."
         ),
         "summary": {
             "students_reviewed": len(students),
             "subjects_with_need": sum(1 for row in rows if row["need_count"] > 0),
             "student_subject_needs": sum(row["need_count"] for row in rows),
+            "subjects_not_taken": sum(1 for row in rows if row["not_taken_count"] > 0),
         },
         "rows": rows,
     }
