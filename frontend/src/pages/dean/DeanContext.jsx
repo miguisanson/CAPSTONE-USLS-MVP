@@ -90,7 +90,7 @@ export function DeanProvider({ children }) {
       pendingPracticum: byProcess("practicum"),
       pendingGraduation: byProcess("graduation"),
       pendingAdviser,
-      pendingTotal: pendingPlans.length + workflowPending.length,
+      pendingTotal: pendingPlans.length + workflowPending.length + pendingAdviser,
     };
   }, [workflowPending, pendingPlans, pendingAdviser]);
 

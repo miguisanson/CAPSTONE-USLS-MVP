@@ -11,14 +11,11 @@ import {
   ClipboardCheck,
   FileCheck,
   CalendarCheck,
-  CalendarDays,
-  UserRoundCheck,
   Menu,
   X,
   GraduationCap,
   Briefcase,
   ChevronRight,
-  Lightbulb,
   Bot,
   Table2,
   FileText,
@@ -71,13 +68,6 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "Calendar & Advising",
-    items: [
-      { to: "/calendar", label: "Defense Calendar", icon: CalendarDays },
-      { to: "/adviser-appointments", label: "Adviser Appointments", icon: UserRoundCheck },
-    ],
-  },
-  {
     label: "Standalone Processes",
     items: [
       { to: "/workflow/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
@@ -91,7 +81,6 @@ const NAV_GROUPS = [
     items: [
       { to: "/work-queue", label: "Work Queue", icon: ListTodo },
       { to: "/activity", label: "Activity Log", icon: Activity },
-      { to: "/decision-support", label: "Recommendations", icon: Lightbulb },
       { to: "/assistant", label: "Policy Assistant", icon: Bot },
       { to: "/policy-documents", label: "Policy Documents", icon: LibraryBig, roles: ["staff", "admin"] },
       { to: "/business-rules", label: "Business Rules", icon: Scale },
@@ -110,9 +99,9 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/calendar", "/adviser-appointments", "/work-queue", "/assistant", "/business-rules"]),
+  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
   // Protocol: the Research Coordinator nominates the panel and informs panel and student of the date.
-  research_coordinator: new Set(["/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/calendar", "/adviser-appointments", "/work-queue", "/assistant", "/business-rules"]),
+  research_coordinator: new Set(["/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
 };
 
 function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {

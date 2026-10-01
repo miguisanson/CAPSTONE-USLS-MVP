@@ -196,7 +196,8 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
   );
 }
 
-export default function CalendarPage({ scope = "staff", title, description }) {
+// `embedded` drops the big page header (used as a tab inside Defense Scheduling).
+export default function CalendarPage({ scope = "staff", title, description, embedded = false }) {
   const isFaculty = scope === "faculty";
   const [anchor, setAnchor] = useState(() => new Date());
   const [view, setView] = useState(isFaculty ? "week" : "month");
@@ -233,12 +234,19 @@ export default function CalendarPage({ scope = "staff", title, description }) {
 
   return (
     <div className="space-y-5 animate-fade-up">
-      <PageHeader
-        title={title}
-        description={description}
-        icon={CalendarDays}
-        actions={<button type="button" className="btn-ghost text-xs" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button>}
-      />
+      {embedded ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <p className="max-w-3xl text-sm text-slate-600">{description}</p>
+          <button type="button" className="btn-ghost text-xs" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button>
+        </div>
+      ) : (
+        <PageHeader
+          title={title}
+          description={description}
+          icon={CalendarDays}
+          actions={<button type="button" className="btn-ghost text-xs" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button>}
+        />
+      )}
       <ErrorNote message={error} />
       {!isFaculty && <Card className="p-4"><FilterBar filters={filters} options={payload?.filters || {}} onChange={setFilters} /></Card>}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">

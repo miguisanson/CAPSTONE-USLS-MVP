@@ -3332,6 +3332,8 @@ from business_rules_catalog import (  # noqa: E402
     BUSINESS_RULE_BY_KEY,
     BUSINESS_RULE_CATALOG,
     BUSINESS_RULE_PROCESSES,
+    HANDBOOK as _RULE_SOURCE_HANDBOOK,
+    PROTOCOL as _RULE_SOURCE_PROTOCOL,
 )
 
 BUSINESS_RULE_PROCESS_LABELS = dict(BUSINESS_RULE_PROCESSES)
@@ -3436,12 +3438,48 @@ def rule_citation(key: str) -> str:
     return _format_rule_citation(fields.get("source_title"), fields.get("source_page"))
 
 
+def business_rule_is_locked(rule: BusinessRule) -> bool:
+    """Handbook and Research Protocol rules are official: nobody edits them in the portal.
+
+    They change only when the Graduate School issues a new policy. Uploading or replacing
+    a policy document flags the rules linked to it "needs review", which opens them for one
+    check-and-confirm; saving the change locks them again. Prototype rules stay editable.
+    """
+    return (
+        rule.source_title in (_RULE_SOURCE_HANDBOOK, _RULE_SOURCE_PROTOCOL)
+        and rule.status != "needs_review"
+    )
+
+
+def business_rule_lock_message(rule: BusinessRule) -> str:
+    citation = _format_rule_citation(rule.source_title, rule.source_page)
+    if not (rule.source_page or "").strip() and rule.source_section:
+        citation = f"{citation} ({rule.source_section})"
+    return (
+        f"This rule is set by the {citation}. It changes only when the Graduate School "
+        "issues a new policy; upload the new policy under Policy Documents."
+    )
+
+
+def business_rule_edit_label(rule: BusinessRule) -> str:
+    if rule.source_title in (_RULE_SOURCE_HANDBOOK, _RULE_SOURCE_PROTOCOL):
+        if rule.status == "needs_review":
+            return "A policy document changed: check this value against the new policy, then confirm or update it"
+        return ""
+    return "Pending validation — can be adjusted until the Graduate School confirms"
+
+
 def business_rule_dict(rule: BusinessRule, history: list | None = None) -> dict:
     try:
         typed = _coerce_rule_value(rule.value, rule.value_type)
     except (TypeError, ValueError):
         typed = rule.value
+    locked = business_rule_is_locked(rule)
     return {
+        "locked": locked,
+        "editable": not locked,
+        "lock_message": business_rule_lock_message(rule) if locked else None,
+        "edit_label": business_rule_edit_label(rule),
         "id": rule.id,
         "key": rule.key,
         "process": rule.process,
@@ -17020,6 +17058,8 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff")
     def business_rule_update(rule_id: int):
         rule = BusinessRule.query.get_or_404(rule_id)
+        if business_rule_is_locked(rule):
+            return jsonify({"error": business_rule_lock_message(rule), "locked": True}), 403
         data = request.get_json(silent=True) or {}
         reason = str(data.get("reason") or "").strip()
         if len(reason) < 3:

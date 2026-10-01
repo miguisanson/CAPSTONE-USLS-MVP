@@ -27,6 +27,7 @@ from app import (  # noqa: E402
     UserAccount,
     WithdrawalApplication,
     app,
+    business_rule_is_locked,
     comprehensive_exam_eligibility,
     db,
     defense_lead_days,
@@ -155,6 +156,13 @@ class BusinessRulesTests(unittest.TestCase):
             return BusinessRule.query.filter_by(key=key).one().id
 
     def _set_rule(self, key, value, reason="Test change"):
+        # Handbook and Protocol rules are locked in the portal and open for one change only
+        # after a new policy document flags them "needs review"; do the same here.
+        with app.app_context():
+            rule = BusinessRule.query.filter_by(key=key).one()
+            if business_rule_is_locked(rule):
+                rule.status = "needs_review"
+                db.session.commit()
         response = self._client(self.staff_id, "staff").patch(
             f"/api/business-rules/{self._rule_id(key)}",
             json={"value": value, "reason": reason},
@@ -280,7 +288,7 @@ class BusinessRulesTests(unittest.TestCase):
 
     def test_only_staff_and_admin_can_change_a_rule_and_must_give_a_reason(self):
         self._seed()
-        rule_id = self._rule_id("withdrawal.window_days")
+        rule_id = self._rule_id("faculty.teaching_load_limit_units")  # a prototype rule; official rules are locked
         url = f"/api/business-rules/{rule_id}"
         for account_id, role in (
             (self.dean_id, "dean"),
@@ -294,10 +302,12 @@ class BusinessRulesTests(unittest.TestCase):
         self.assertEqual(staff.patch(url, json={"value": 10, "reason": " "}).status_code, 400)
         self.assertEqual(staff.patch(url, json={"value": "abc", "reason": "Not a number"}).status_code, 400)
         self.assertEqual(staff.patch(url, json={"value": -3, "reason": "Negative"}).status_code, 400)
-        self.assertEqual(staff.patch(url, json={"value": 14, "reason": "Same value"}).status_code, 400)
         with app.app_context():
-            self.assertEqual(rule_value("withdrawal.window_days"), 14)
+            self.assertEqual(rule_value("faculty.teaching_load_limit_units"), 24)
             self.assertEqual(BusinessRuleRevision.query.count(), 0)
+        # Once confirmed, repeating the current value is refused.
+        self.assertEqual(staff.patch(url, json={"value": 24, "reason": "Confirmed as is"}).status_code, 200)
+        self.assertEqual(staff.patch(url, json={"value": 24, "reason": "Same value"}).status_code, 400)
 
     def test_changing_a_rule_writes_revision_activity_log_and_clears_needs_review(self):
         self._seed()
