@@ -2,8 +2,8 @@
 name: intelligence-layer
 description: >
   Generic model-orchestration layer: the strongest available model acts as
-  architect and QA while cheaper, appropriate models (subagents or the Codex
-  CLI) execute the individual tasks. Works for any multi-step job — code,
+  architect and QA while cheaper, appropriate models (Claude
+  subagents) execute the individual tasks. Works for any multi-step job — code,
   content, research, migrations — not just codebase audits. Use when the user
   says "intelligence layer", "orchestrate this", "use cheap models for the
   grunt work", "architect and QA this", "delegate but check the work",
@@ -37,13 +37,11 @@ comes from the gate, not from hoping the executor is smart.
 | **Architect / QA** | The session's model — must be the strongest in the current lineup (tell the user to switch via /model if not) | Decompose the job, write task cards, choose executors, review every deliverable against its acceptance criteria, integrate, ship. QA is NEVER delegated below this tier. |
 | **Executor: standard** | Workhorse tier, one below architect (today a "sonnet"-class model, via the Agent tool `model` param) | Implementation tasks with judgment inside a bounded scope: write the feature, draft the document, build the analysis. |
 | **Executor: mechanical** | Fastest/cheapest tier (today a "haiku"-class model) | Zero-judgment work: bulk renames, format conversions, list gathering, boilerplate from an exact template, search sweeps. |
-| **Executor: external** | Codex CLI (`codex exec --full-auto -C <dir> "<card>"`), if installed & logged in (`codex --version`) | Alternative standard executor — useful when subagent quota is tight, for second opinions, or when the user prefers it. Reads AGENTS.md automatically. |
-| **Executor: local (free)** | Ollama models through the Codex harness: `codex exec --oss --local-provider ollama -m <model> --full-auto -C <dir> "<card>"` — check `ollama list` for installed models | Zero-API-cost execution: well-bounded low-risk cards, bulk piecework, quota outages, or when the user wants the run free. Match model size to card difficulty (≈14B coder for real implementation, ≈12B for text/docs, 3–4B only for trivial transforms). For text-only piecework touching no files, pipe directly: `ollama run <model> "<prompt>"` and apply the output yourself. |
+| **Executor: local (free)** | Ollama models: `mcp__ollama__ask_local` (or `ollama run <model> "<prompt>"`) — check `ollama list` for installed models | Zero-API-cost execution: well-bounded low-risk text cards, bulk piecework, quota outages, or when the user wants the run free. It cannot edit files: apply the output yourself. Match model size to card difficulty (≈14B coder for real implementation, ≈12B for text/docs, 3–4B only for trivial transforms). |
 
 Escalation ladder: local fails ONCE → standard (local models are the weakest
 tier; don't burn retries). Mechanical fails → standard. Standard fails twice
-on the same card → architect does it directly (or Codex as a second opinion
-first). Never solve a bad task card by throwing a bigger model at it —
+on the same card → architect does it directly. Never solve a bad task card by throwing a bigger model at it —
 rewrite the card. Local-executor cards need the tightest specs of all:
 prefer single-file changes and fully enumerated steps.
 

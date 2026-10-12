@@ -2,8 +2,8 @@
 
 **Read [`AGENTS.md`](AGENTS.md) first.** It holds the rules every agent
 follows (test first, targeted tests, stay inside the item, official-data
-read-only, leave the repo ready) and how work is split between Claude, Codex,
-and the local model. Do not restate them here.
+read-only, leave the repo ready) and how work is split between Claude, Sonnet
+subagents, and the local model. Do not restate them here.
 
 - **The work queue** is first [`DEFENSE_REVISIONS.md`](DEFENSE_REVISIONS.md)
   (panel revisions from the 2026-08-07 defense — highest priority), then
@@ -18,7 +18,7 @@ and the local model. Do not restate them here.
   or reviewing anything under `frontend/src/**`.
 - **Load `intelligence-layer`** (`.claude/skills/intelligence-layer/`) for a
   large multi-step job that benefits from architect/QA + cheaper-model
-  delegation, beyond the Claude/Codex/Ollama split AGENTS.md already defines.
+  delegation, beyond the Claude/Sonnet-subagent/Ollama split AGENTS.md already defines.
 - **Stakeholder policy sources** in `Documents/CAPSTONE_ONLY/USLS_Documents/`
   (Graduate School Handbook, Research Protocol) and the proposal
   `Documents/CAPSTONE_ONLY/Final Proposal Document - CAP-IT1.docx` are the

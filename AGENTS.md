@@ -1,6 +1,6 @@
 # Rules for any agent working on this repo
 
-These apply to every agent — Claude Code, Codex, a local model, or a human.
+These apply to every agent — Claude Code, a Claude subagent, a local model, or a human.
 This is the **USLS Graduate School Lifecycle Monitoring & Analytics Platform**
 (school capstone): a Flask 3 + Flask-SQLAlchemy JSON API (`app.py`) with a
 React + Vite + Tailwind SPA (`frontend/`), SQLite by default. See
@@ -153,48 +153,46 @@ correctly).
 | Agent | Does | Does not |
 |---|---|---|
 | **Claude** | Architecture, models/contracts, writing the failing tests, reviewing and merging, anything touching official-data integrity or licensing | Grind through bulk mechanical work |
-| **Codex** | Makes a written failing test pass; implements a route, model, or screen against a stated contract; works in its own git worktree | Change a test to match its code; widen scope |
+| **Sonnet subagent** (`Agent`, `model: "sonnet"`) | Makes a written failing test pass; implements a route, model, or screen against a stated contract; works in its own git worktree and can run the tests | Change a test to match its code; widen scope |
 | **Local model** (Ollama, `mcp__ollama__ask_local`) | Mechanical work: boilerplate, summaries of long text (e.g. BPMN/proposal docs), commit messages, docstrings | Design, multi-file reasoning, anything unverified |
 
 The failing test is the handoff: a precise, machine-checkable spec. Every
 delegated result is reviewed and gated before it merges.
 
-### When an agent is unavailable — the fallback ladder
+### When a helper is unavailable — the fallback ladder
 
-Best is all three. If one is out — Codex at its usage limit or erroring,
-Ollama not running — the work moves down the ladder instead of stopping:
+If one is out — Ollama not running, subagents unavailable — the work moves
+down the ladder instead of stopping:
 
-1. **Codex unavailable:** implementation goes to a **Claude subagent on a
-   cheaper model** (`Agent` with `model: "sonnet"`) in the same worktree, with
-   the same brief Codex would get. Independent packets run in parallel.
-   The main Claude session keeps to tests, contracts, review and the gate.
-2. **Local model unavailable:** its mechanical work goes to a Claude subagent on
-   `haiku` (or `sonnet` when it needs judgement).
-3. **Both unavailable:** Claude subagents do both, cheapest model that can.
-4. **Only the main session:** it implements inline, in the smallest packets.
+1. **Local model unavailable (Ollama down):** its mechanical work goes to a
+   Claude subagent on `haiku` (or `sonnet` when it needs judgement).
+2. **Subagents unavailable:** the main session implements inline, in the
+   smallest packets.
 
 Every rung keeps the same shape: failing test first, review, gate, commit test
-and implementation together. Return to Codex as soon as it is back. Note in
-`.planning/STATE.md` which rung a packet used.
+and implementation together. Note in `.planning/STATE.md` which rung a packet
+used.
 
 - **Pilot before a batch.** Repetitive delegated work goes out as one item
   first; the rest follow only after that one is reviewed.
 - **Escalate, don't retry.** If a packet fails twice, or passing it would
-  change a locked type, contract or test, it comes back to Claude.
+  change a locked type, contract or test, it comes back to the main session.
 
-### Parallel Codex packets
+### Parallel subagent packets
 
 ```bash
 git worktree add -b <branch> E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<short> HEAD
-codex exec -C "E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<short>" -s workspace-write \
-  --add-dir "E:/Github_Projects/CAPSTONE-USLS-MVP/.git" --skip-git-repo-check \
-  -o <short>.out.md - < <short>.prompt.md
 ```
+
+Then one `Agent` call per packet with `model: "sonnet"`, telling it to work
+only in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<short>`. Independent packets go out in
+parallel, each in its own worktree.
 
 The prompt starts with: read `AGENTS.md`; the test is the spec, **do not modify
 it**; stop and explain if something looks wrong; touch only the named files.
-**Codex's sandbox cannot spawn processes** — it cannot run the tests. Always run
-them yourself before landing a packet. Remove the worktree after landing.
+Subagents can run the tests themselves, but the main session still re-runs the
+targeted tests and the gate before landing a packet. Remove the worktree after
+landing.
 
 ### The process: one owner per job
 
@@ -203,21 +201,21 @@ one owner. When a skill's default disagrees with this file, this file wins.
 
 | Job | Owner | Not used for this job |
 |---|---|---|
-| Memory across sessions, the phase loop, context rot | **GSD Core** (local install, `budget` model profile). `/gsd-progress` or `/gsd-resume-work` to start; per phase `/gsd-discuss-phase` → `/gsd-plan-phase` → `/gsd-execute-phase` → `/gsd-verify-work`; `/gsd-pause-work` to stop; `/gsd-complete-milestone` | Superpowers `brainstorming`, `writing-plans`, `executing-plans`, `subagent-driven-development`, `dispatching-parallel-agents`; hand-written handoff files |
+| Memory across sessions, the phase loop, context rot | **GSD Core** (local install, `balanced` model profile). `/gsd-progress` or `/gsd-resume-work` to start; per phase `/gsd-discuss-phase` → `/gsd-plan-phase` → `/gsd-execute-phase` → `/gsd-verify-work`; `/gsd-pause-work` to stop; `/gsd-complete-milestone` | Superpowers `brainstorming`, `writing-plans`, `executing-plans`, `subagent-driven-development`, `dispatching-parallel-agents`; hand-written handoff files |
 | Discipline inside a task: test first, debugging, proving it works, code review, worktrees, closing a branch | **Superpowers**: `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review`, `using-git-worktrees`, `finishing-a-development-branch` | GSD `/gsd-add-tests`, `/gsd-debug`, `/gsd-code-review`, `/gsd-audit-fix` |
 | Stress-testing a design decision that is the owner's to make (e.g. a Decision Register entry D1–D10 in `CHECKLIST_PHASE_PLAN.md`, a BPMN conflict) | **grill-me** (user-level skill, never committed: it has no licence) | ad-hoc question batches |
-| Writing implementation code | **Codex**, else the fallback ladder above | Claude subagents writing implementations while Codex is available, including GSD's executor |
+| Writing implementation code | **Sonnet subagent** in a worktree, else the fallback ladder above | The main Opus session writing implementations |
 | Mechanical text work | **Local model** (Ollama) | Opus |
 | Frontend UI/UX work (`frontend/src/**`) | project skill `ui-ux-pro-max` (`.claude/skills/ui-ux-pro-max/`) — load it while planning or reviewing a screen for layout, accessibility, color, and component patterns | game-dev/domain-craft skills (`game-ui-ux`, `game-feel`, `save-systems`, `audio-design`, `create-game-assets`, `threejs-*`) — this is not a game, don't load them |
 | Cost-efficient delegation with review gates on a large, multi-step job | project skill `intelligence-layer` (`.claude/skills/intelligence-layer/`) | — |
 
 **The task shape inside `/gsd-execute-phase` is fixed:** (1) Claude writes the
 failing test and watches it fail for the right reason; (2) Claude writes the
-contract and hands implementation to Codex in a worktree; (3) Claude runs the
+contract and hands implementation to a `sonnet` subagent in a worktree; (3) Claude runs the
 targeted tests and the gate itself; (4) `requesting-code-review` on the diff;
 (5) `verification-before-completion`; (6) commit test and implementation
-together. If GSD's executor starts writing the implementation in a Claude
-subagent while Codex is available, stop and route the task to Codex.
+together. Implementation goes to a `sonnet` subagent in a worktree; GSD's
+executor on the `balanced` profile is acceptable.
 
 ## Where things are
 
