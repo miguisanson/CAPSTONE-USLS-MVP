@@ -20,7 +20,9 @@ Your decisions: `DECISIONS.md`. How unattended work runs: `IMPROVE.md`.
 
 ## Ready for your review
 
-(nothing yet — each commit on `v5.2-migui_again` will be listed here with its screenshots)
+- **Unused files moved to `archive/`** (merge 55c142b) — nothing visible changes; see `archive/README.md`.
+- **SQLite only** (merge 4a996ba) — MySQL removed; an outdated database now stops the app with "Run `npm run seed`". See the `.env` step under "Waiting on you".
+- **Automatic walkthroughs** (merge ada73ad) — `npm run e2e` logs in as all 7 roles, opens all 116 pages, and saves 348 screenshots (laptop, desktop, phone) to `frontend/e2e-artifacts/screens/`. Its first run found 9 problems (I-031…I-039 in `ISSUES.md`), mostly pages that run off the screen on a phone; fixes are in progress.
 
 ## Waiting on you (whenever convenient)
 
