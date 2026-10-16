@@ -493,7 +493,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
                   </div>
                 </div>
               )}
-              {!eligibleSubjects.length && <p role="alert" className="mt-2 text-xs font-semibold text-amber-700">No active subject is currently inside the withdrawal window (until the end of the second week of classes). Contact Graduate School staff if the recorded semester dates are incorrect.</p>}
+              {!eligibleSubjects.length && <div className="mt-2"><InlineNotice>No active subject is currently inside the withdrawal window (until the end of the second week of classes). Contact Graduate School staff if the recorded semester dates are incorrect.</InlineNotice></div>}
             </Field>
             <Field label="Reason for withdrawing from this subject" required>
               <Textarea value={form.reason} onChange={set("reason")} required />
