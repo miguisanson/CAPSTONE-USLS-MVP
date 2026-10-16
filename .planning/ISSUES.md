@@ -51,6 +51,6 @@ hunt — becomes one row here. Rules adapted from DD-Project-GameMaker.
 | I-025 | DEBT | P2 | audit: the permission matrix is written 3 times (`@require_api_login`, `ACCESS_CONTROL_SPEC` `app.py:22975`, `Layout.jsx:102`); role names are bare strings (`"staff"` ×182). | `codebase/CONCERNS.md` §1 | confirmed |
 | I-026 | DEBT | P3 | audit: commit/rollback/error block written ~24 times; leave and standalone-process workflows each carry their own transition engine. | `codebase/CONCERNS.md` §1 | confirmed |
 | I-027 | DEBT | P3 | audit: certain-unused — `templates/`, `static/`, `.codex/`, `_handout/`, `RoleAssistantPage.jsx`, 7 `api.js` methods, 18 Python functions (~400 lines), 4 uncalled routes incl. `/api/terms/active`. | `codebase/CLEANUP-CANDIDATES.md` | confirmed |
-| I-028 | DEBT | P3 | audit: `outputs/` (27 MB) and `scripts/docs/` (71 MB) are tracked; `.git` is 513 MB. Owner: archive and untrack (IM17). | `codebase/CLEANUP-CANDIDATES.md` | confirmed |
+| I-028 | DEBT | P3 | audit: `outputs/` (27 MB) and `scripts/docs/` (71 MB) are tracked; `.git` is 513 MB. Owner: move to `archive/`, keep tracked (IM17). | `codebase/CLEANUP-CANDIDATES.md` | confirmed |
 | I-029 | BUG | P2 | audit: all test modules share one app process, so probably only the first module's temp database is used (likely, not confirmed). | `codebase/TESTING.md` | needs-repro |
 | I-030 | DEBT | P3 | audit: dates mix `date.today()` (100) and `now_utc()` (265); ~2,370 lines of seed/demo code run from `app.py` at startup. | `codebase/CONCERNS.md` §6 | confirmed |

@@ -12,7 +12,7 @@
 - **Counters:** open P1 issues 5 (I-001, I-002, I-005, I-010, I-012 — unconfirmed repros,
   copied from section J) + I-015 confirmed. Regressions since last stable: 0.
 - **Resume:** scheduled task `capstone-resume-after-limit` runs `/continue_CAPSTONE-USLS-MVP` at 2026-10-17 06:35 +08:00 (after the 5-hour usage reset) unless another session is working here.
-- **Next action:** Phase 1 (dates relative to seed day IM16; big generated folders to gitignored `archive/generated/` IM17) — `/gsd-discuss-phase 1` then plan: write R-001 (seed fingerprint
+- **Next action:** Phase 1 (dates relative to seed day IM16; big generated folders to `archive/`, still tracked in git, IM17) — `/gsd-discuss-phase 1` then plan: write R-001 (seed fingerprint
   test, two temp dirs, plus "normal start changes nothing"), watch it fail, then remove MySQL,
   replace `run_schema_upgrades` with model-built schema, make start side-effect-free, unify
   the seed command; move proven-unused files to `archive/`.
