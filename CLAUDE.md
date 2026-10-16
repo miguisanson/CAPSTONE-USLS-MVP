@@ -10,8 +10,13 @@ subagents, and the local model. Do not restate them here.
   [`CHECKLIST_PHASE_PLAN.md`](CHECKLIST_PHASE_PLAN.md) (numbered, phase-gated
   acceptance checklist, items 1–92) and
   [`NEXT_SESSION_PLAN.md`](NEXT_SESSION_PLAN.md) (BPMN-compliance gaps). They
-  are the single source of truth for what to build next — `.planning/` must
+  are the single source of truth for what the app must do — `.planning/` must
   never drift from them.
+- **Improvement mode (v5.2, from 2026-10-17):** work lands on
+  `v5.2-migui_again` in the order of `.planning/ROADMAP.md`. The owner reads
+  `.planning/BOARD.md`; owner decisions are `.planning/DECISIONS.md`
+  (IM1–IM15); bugs and findings are rows in `.planning/ISSUES.md`; the
+  unattended loop is `.planning/IMPROVE.md`. Code map: `.planning/codebase/`.
 - **`Documents/CAPSTONE_ONLY/CAPRIT2 OLD/` is archived pre-defense material** —
   do not use it as a spec, do not edit it.
 - **Load `ui-ux-pro-max`** (`.claude/skills/ui-ux-pro-max/`) before planning

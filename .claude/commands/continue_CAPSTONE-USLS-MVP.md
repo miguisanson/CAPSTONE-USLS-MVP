@@ -6,13 +6,32 @@ Continue building CAPSTONE-USLS-MVP on your own. Work through the open items
 one after another until the work is done or you are blocked on something only
 the owner can do.
 
+**This is the only start command, attended or unattended.** Since 2026-10-17
+it runs **improvement mode** exactly as `.planning/IMPROVE.md` describes ("The
+loop", bug hunts, stop conditions, reviewer rules). Keep going until a stop
+condition in that file is hit, the owner types `stop`, or
+`.planning/IMPROVE_STOP` exists. Questions only the owner can answer become
+`QUESTION` rows in `.planning/ISSUES.md` plus a line under "Waiting on you" in
+`.planning/BOARD.md`, and work continues on other items; use grill-me only
+while the owner is present. **Usage limits are not a stop:** before the
+window runs out, commit, push `v5.2-migui_again`, and write the exact next
+step into `.planning/STATE.md` so the next session (or the scheduled resume
+task) picks it up.
+
 ## Ground rules (these override any skill's defaults)
 
 1. Read `CLAUDE.md` and `AGENTS.md` first. AGENTS.md "The process: one owner
    per job" decides which skill does which job. Use every skill that owns a
    job. Do **not** use the ones it marks as not used.
-2. `DEFENSE_REVISIONS.md` (the panel's required revisions from the 2026-08-07
-   defense) is worked **first**, top to bottom. After it is fully closed,
+2. **Since 2026-10-17 the project is in improvement mode (v5.2).** Work lands
+   on branch `v5.2-migui_again`; the order is `.planning/ROADMAP.md` (owner
+   decision IM8: data → walkthroughs → section J bugs → backend split →
+   design system → performance), fed by `.planning/ISSUES.md`. The owner's
+   decisions are `.planning/DECISIONS.md` (IM1–IM15); the owner reads
+   `.planning/BOARD.md` — keep it current with STATE.md. For an unattended
+   run the same command runs `.planning/IMPROVE.md`.
+   For what the app must *do*: `DEFENSE_REVISIONS.md` (the panel's required
+   revisions from the 2026-08-07 defense) is worked **first**, top to bottom. After it is fully closed,
    `CHECKLIST_PHASE_PLAN.md` (numbered, phase-gated, items 1–92) and
    `NEXT_SESSION_PLAN.md` (BPMN-compliance gaps) are what to build
    and in what order — closed in numerical/phase order, one phase at a time.
@@ -31,12 +50,10 @@ the owner can do.
 
 ## Start of every session
 
-1. **Onboarding check.** If `.planning/PROJECT.md` or `.planning/ROADMAP.md` is
-   missing, GSD was installed but never onboarded: run `/gsd-onboard` (it maps
-   the codebase with parallel agents, reads existing docs and asks the owner
-   about goals), then continue below. Do not invent goals — and do not treat
-   GSD's ROADMAP as authoritative over `CHECKLIST_PHASE_PLAN.md` /
-   `NEXT_SESSION_PLAN.md` even after onboarding.
+1. **Onboarding check.** GSD was onboarded on 2026-10-17 (`.planning/PROJECT.md`,
+   `ROADMAP.md`, `codebase/`). If either file is missing again, run
+   `/gsd-onboard`. `ROADMAP.md` orders the v5.2 code work; it never overrides
+   `CHECKLIST_PHASE_PLAN.md` / `NEXT_SESSION_PLAN.md` on what the app does.
 2. Run `/gsd-progress` (or `/gsd-resume-work` if a pause handoff exists).
 3. Run `git status`, `git worktree list`, and the gate from AGENTS.md
    (`.venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py" -v`).
@@ -54,7 +71,11 @@ the owner can do.
 
 ## The loop — repeat until done
 
-Pick the next open item in `DEFENSE_REVISIONS.md`. Items marked
+Pick the next item from the current `ROADMAP.md` phase or the top open row of
+`.planning/ISSUES.md` (P1 first; `DEFENSE_REVISIONS.md` section J is copied
+there as I-001…I-014), as `.planning/IMPROVE.md` "Inputs" orders them. After
+v5.2 is done, fall back to the order below. Pick the next open item in
+`DEFENSE_REVISIONS.md`. Items marked
 **WAITING ON OWNER / STAKEHOLDER** are skipped (remind the owner in one line);
 everything else is fair game. Only when that file has no open buildable item:
 pick the next open item in `CHECKLIST_PHASE_PLAN.md` order (current phase
@@ -94,8 +115,9 @@ e. When a milestone is done: `/gsd-audit-milestone`, then `/gsd-complete-milesto
   (`.env*`) or user uploads (`uploads/*`); commit a `*.sqlite3` database;
   force-push or `reset --hard`; add a code path that lets a user hand-edit
   an official AIMS-sourced value (student number, enrollment, grade,
-  completion status) — see AGENTS.md Rule 4; write a destructive schema
-  migration; build a live AIMS integration, login, or scraper.
+  completion status) — see AGENTS.md Rule 4; add MySQL or a startup schema
+  patch back (IM3/IM4); build a live AIMS integration, login, or scraper;
+  merge into `v5.1-migui_clean` without the owner's word (IM9).
 
 ## Keeping this command current
 

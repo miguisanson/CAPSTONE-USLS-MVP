@@ -3,9 +3,21 @@
 These apply to every agent — Claude Code, a Claude subagent, a local model, or a human.
 This is the **USLS Graduate School Lifecycle Monitoring & Analytics Platform**
 (school capstone): a Flask 3 + Flask-SQLAlchemy JSON API (`app.py`) with a
-React + Vite + Tailwind SPA (`frontend/`), SQLite by default. See
-[`README.md`](README.md) for what it does. The work queue is, in priority
-order:
+React + Vite + Tailwind SPA (`frontend/`), SQLite only (owner decision IM3).
+See [`README.md`](README.md) for what it does.
+
+**Improvement mode (v5.2, from 2026-10-17).** The owner's decisions IM1–IM15
+are in [`.planning/DECISIONS.md`](.planning/DECISIONS.md); how unattended work
+runs is [`.planning/IMPROVE.md`](.planning/IMPROVE.md); the owner's tracker is
+[`.planning/BOARD.md`](.planning/BOARD.md); every bug or finding is a row in
+[`.planning/ISSUES.md`](.planning/ISSUES.md); every fixed bug adds a row to
+[`.planning/REGRESSION.md`](.planning/REGRESSION.md); ideas wait in
+[`.planning/IDEAS.md`](.planning/IDEAS.md). All work lands on branch
+`v5.2-migui_again`; only the owner merges it into `v5.1-migui_clean` (IM9).
+`.planning/ROADMAP.md` orders *how the code is made right* (data → walkthroughs
+→ section J bugs → backend split → design system → performance). What the app
+must *do* still comes from the files below. The work queue for behaviour is,
+in priority order:
 
 1. [`DEFENSE_REVISIONS.md`](DEFENSE_REVISIONS.md) — what the panel required at
    the Stage 1 defense (2026-08-07, Conditional Pass) and what is still open.
@@ -54,7 +66,7 @@ underspecified.
 | `app.py` routes, models, workflow/business logic | a `unittest.TestCase` method in `tests/test_bpm_workflows.py` (or a new `tests/test_<area>.py`), using the Flask app context and test client the way the existing tests do — see the imports and fixtures at the top of `tests/test_bpm_workflows.py` |
 | `scripts/*.py` (AIMS export template, monitoring-workbook import/export, class-list build) | a targeted `unittest` test against a small in-memory or temp-file fixture, in `tests/` |
 | A checklist item or BPMN gap (`CHECKLIST_PHASE_PLAN.md`, `NEXT_SESSION_PLAN.md`) | translate every "Required closure" / acceptance-criteria bullet into one or more `test_*` methods before touching `app.py` |
-| `frontend/src/**` | **no test runner is installed yet** (`frontend/package.json` has no vitest/jest/testing-library). Don't invent one silently mid-task — flag the gap, and until it's added, describe the manual verification you did (which screen, which role, what you clicked) in the commit message instead of skipping verification |
+| `frontend/src/**` | a **Playwright** walkthrough step (owner decision IM7; the harness is built in ROADMAP Phase 2 under `frontend/e2e/`) that logs in as the role, reaches the screen through the real UI and asserts what it shows; for layout work also the screenshots at 1366, 1920 and 390 px (IM15), opened and reviewed. Until Phase 2 lands, describe the manual verification you did (which screen, which role, what you clicked) in the commit message |
 
 ## Rule 2 — Run only the tests that matter
 
@@ -73,7 +85,7 @@ until the current phase passes its exit gate" — don't reach into Phase N+1
 while working Phase N. Read the files the item needs, not the whole
 1.1M-character `app.py`.
 
-## Rule 4 — Official data is read-only; schema changes only add
+## Rule 4 — Official data is read-only; the demo database is rebuilt, never patched
 
 The confirmed architectural rule (`CHECKLIST_PHASE_PLAN.md`, decisions locked
 2026-07-20): **AIMS is the official source for student identity, enrollment,
@@ -91,14 +103,15 @@ a system of record for it.
 - Never overwrite an official value in place; keep provenance/revision
   history the way `MonitoringSheetUpload` / `MonitoringValidationIssue`
   already do in `app.py`.
-- Schema changes follow the existing startup pattern in `app.py`: an
-  additive `ALTER TABLE … ADD COLUMN`, guarded by a column-existence check,
-  inside `with app.app_context():` near the top of the startup block (see
-  the many `ALTER TABLE` calls around line 22000+ in `app.py`, and the
-  "Build order" note in `NEXT_SESSION_PLAN.md` about putting new migrations
-  at the **top** of that block). This runs against the live SQLite/MySQL
-  file on every app start — never write a destructive migration (no
-  `DROP COLUMN`, no in-place type change, no silent data loss).
+- **Schema changes (owner decisions IM2–IM4, 2026-10-17): the app is a demo
+  only and never holds real data, so the database is disposable.** The
+  schema comes from the SQLAlchemy models; a new column is added by editing
+  the model and the seed, and every machine rebuilds its database with the
+  one seed command. The startup `ALTER TABLE` patches (`run_schema_upgrades`)
+  are being removed in ROADMAP Phase 1 — do not add new ones. A normal app
+  start must not change any data (only the seed command writes demo data),
+  and the seed must give identical data on every machine (R-001).
+- SQLite only. Do not add MySQL, Postgres or any other database path back (IM3).
 - Never commit `.env`, `uploads/*`, or `*.sqlite3` (including
   `usls_gs_demo.sqlite3*` backups) — `.gitignore` already excludes them;
   keep it that way, and never read `.env` contents into a commit, a test
@@ -137,16 +150,21 @@ Claude, by reading this file and `.planning/STATE.md` and running
 ```
 
 There is no `pytest` in `requirements.txt` and no `package.json` test
-script — the suite is plain stdlib `unittest` (`tests/test_bpm_workflows.py`,
-one file, ~79 tests as of this writing). It builds its own temp SQLite DB
+script — the suite is plain stdlib `unittest` (19 files under `tests/`, ~590
+test methods on 2026-10-17). It builds its own temp SQLite DB
 (`tempfile.NamedTemporaryFile` + `DATABASE_URL` set before `app` is
 imported), so it does not touch `usls_gs_demo.sqlite3` or need `.env`. If
 `pytest` happens to be installed it will also collect and run these
 `unittest.TestCase` classes, but don't add it as a dependency just for that.
 
-No frontend gate exists yet (`npm run build:web` / `vite build` is the
-closest thing — it only proves the SPA compiles, not that it behaves
-correctly).
+The frontend gate is `npm run build:web` (proves the SPA compiles) plus, once
+ROADMAP Phase 2 lands, the Playwright role walkthroughs (IM7) — their run
+command will be recorded here. Run only the walkthrough for the touched area
+while working; all roles once before merging a packet that touches
+`frontend/src/**` or a route the frontend calls.
+
+Before the owner merges `v5.2-migui_again` into `v5.1-migui_clean`, every
+automated row in `.planning/REGRESSION.md` runs on that commit.
 
 ## How the team splits work
 
@@ -186,7 +204,32 @@ git worktree add -b <branch> E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<short> HEA
 
 Then one `Agent` call per packet with `model: "sonnet"`, telling it to work
 only in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<short>`. Independent packets go out in
-parallel, each in its own worktree.
+parallel, each in its own worktree, branched from `v5.2-migui_again`.
+
+- **At most 3 implementer subagents at once** (owner, IM10), and only if their
+  file sets do not overlap. While `app.py` is still one file, only **one**
+  packet at a time may edit it. Read-only research/audit agents are not capped.
+  **WIP cap 4.** **One integrator** (the main session) merges one packet at a
+  time and **re-runs the gate after every merge**. Drop to 1 implementer after
+  a regression, a red gate after a merge, or a merge that needed manual
+  conflict resolution.
+- **Packets** are one behaviour, about 300 changed lines and about 5 files at
+  most (a backend-split move may be larger, but one module per packet).
+- **Reviewer rules** (never the builder; assume the report is wrong): run the
+  tests yourself; flip the fix and watch the new test go red; take expected
+  values from the policy text or the owner, not the code's own output; list
+  removed or changed assertions by name; open every changed screenshot at
+  1366/1920/390 px; reach the feature through the real UI; grep siblings of the
+  changed pattern; no stray `console.log`/`print`, no secrets, nothing outside
+  the packet's file list. Fix small findings in the same session.
+- **Unused files and folders are moved to `archive/`, not deleted** (owner,
+  IM12), each listed in `archive/README.md` with where it came from and the
+  grep evidence that nothing uses it. Dead code inside a file is deleted
+  (git history keeps it). "Proven unused" = nothing references it and the gate
+  passes without it.
+- **Cheap improvements** (IM13: frontend-only or one small endpoint, no new
+  table, no workflow-rule or permission change, under ~150 lines) may be built
+  without asking; anything bigger goes to `.planning/IDEAS.md` for the owner.
 
 The prompt starts with: read `AGENTS.md`; the test is the spec, **do not modify
 it**; stop and explain if something looks wrong; touch only the named files.
@@ -221,24 +264,29 @@ executor on the `balanced` profile is acceptable.
 
 ```
 app.py             single Flask app — every model, route, and workflow/business
-                    rule (~23k lines). The whole backend lives here; there is
-                    no separate models/routes/services split yet.
-templates/          legacy server-rendered Flask pages (base/index/transaction) —
-                    the React SPA in frontend/ is the primary UI, not these.
-static/             Flask-served static assets for the templates above.
+                    rule (~37,500 lines; 55 models, 210 routes inside
+                    register_routes). Being split into modules in ROADMAP
+                    Phase 4; line map in .planning/codebase/ARCHITECTURE.md.
+templates/, static/ legacy server-rendered pages — never served (no
+                    render_template; static_folder=None). Moving to archive/.
+archive/            (from Phase 1) unused files kept for reference; see its README.
 frontend/           React 18 + Vite 5 + Tailwind 3 SPA (src/pages, src/components,
                     src/api.js, src/auth.jsx) — the actual staff/student UI.
 scripts/            setup (.venv + npm install), seed, AIMS export template
                     generation, monitoring-workbook import/export, class-list
                     and demo-walkthrough tooling.
-tests/              unittest suite — test_bpm_workflows.py, run against a
-                    disposable temp SQLite DB, never the real one.
+tests/              unittest suite (19 files), run against a disposable temp
+                    SQLite DB, never the real one.
 Documents/          capstone documentation: BPMN diagrams (References_Context/
                     FINAL BPMS/), the proposal, AIMS export samples, demo
                     walkthroughs — source of truth for what a workflow should do.
 uploads/            user-submitted files at runtime — gitignored, never commit.
-.planning/          GSD Core's current-phase working plan only — must track,
-                    never replace, CHECKLIST_PHASE_PLAN.md / NEXT_SESSION_PLAN.md.
+.planning/          GSD Core: PROJECT, ROADMAP (v5.2 improvement phases), STATE,
+                    and improvement mode — BOARD (owner's tracker), DECISIONS
+                    (IM1–IM15), IMPROVE, ISSUES, REGRESSION, IDEAS; codebase/
+                    (code map) and research/. Must never contradict
+                    DEFENSE_REVISIONS.md / CHECKLIST_PHASE_PLAN.md /
+                    NEXT_SESSION_PLAN.md on what the app does.
 ```
 
 ## Traps
@@ -255,13 +303,15 @@ uploads/            user-submitted files at runtime — gitignored, never commit
 - **`pytest` and Flask are not on the system/global Python** — only inside
   `.venv`. Don't run tests with a bare `python`/`python3` unless you've
   checked it's the venv's.
-- **`app.py` is ~23,000 lines in one file.** Use `Grep` for the model/route
-  you need; don't try to read it end to end.
-- **Additive-only migrations run on every startup**, guarded by
-  `information_schema`/`PRAGMA`-style existence checks scattered through the
-  `with app.app_context():` block. A new column needs its own guarded
-  `ALTER TABLE`, added near the top of that block per the existing
-  convention (see Rule 4).
+- **`app.py` is ~37,500 lines in one file** (until Phase 4). Use `Grep` for
+  the model/route you need; don't try to read it end to end.
+- **Importing `app` has side effects**: it creates the app, upgrades the
+  schema and runs seed/maintenance code. Tests stay safe only because they set
+  `DATABASE_URL` and temp dirs *before* `import app`. Keep that true in any
+  new test and in the Phase 4 split.
+- **Until Phase 1 lands, a normal start changes demo data** and
+  `npm run seed` vs a plain start give different data (I-015) — compare two
+  machines only after both ran the same seed command.
 - **AIMS is external and read-only by design** (Phase 1 decision). Never
   build a live AIMS integration, login, or scraper — only the approved
   file export/import contract in `Documents/AIMS_Export/`.

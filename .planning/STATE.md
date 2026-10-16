@@ -1,6 +1,24 @@
 # State
 
-## Current Position (2026-10-01, unattended run — owner away ~12 h)
+## Current Position (2026-10-17 — improvement mode set up)
+
+- **Branch:** `v5.2-migui_again` (new, from `v5.1-migui_clean` at e6460e0; not pushed).
+- **Milestone:** v5.2 Improvement mode. Owner decisions IM1–IM15 in `DECISIONS.md`
+  (grill-me 2026-10-17). Plan: `ROADMAP.md` (6 phases). Owner's tracker: `BOARD.md`.
+- **Done this session:** GSD onboarded (PROJECT, ROADMAP, `codebase/` map by two Sonnet
+  mapper agents), reference-portal + team-database research (`research/`), improvement mode
+  ported from DD-Project-GameMaker / shelf-and-sword (IMPROVE, ISSUES, REGRESSION, IDEAS,
+  BOARD, `/continue_CAPSTONE-USLS-MVP`), AGENTS.md / CLAUDE.md / `/continue_` updated.
+- **Counters:** open P1 issues 5 (I-001, I-002, I-005, I-010, I-012 — unconfirmed repros,
+  copied from section J) + I-015 confirmed. Regressions since last stable: 0.
+- **Next action:** Phase 1 — `/gsd-discuss-phase 1` then plan: write R-001 (seed fingerprint
+  test, two temp dirs, plus "normal start changes nothing"), watch it fail, then remove MySQL,
+  replace `run_schema_upgrades` with model-built schema, make start side-effect-free, unify
+  the seed command; move proven-unused files to `archive/`.
+- **Not obvious:** `npm run seed` and a plain start build different data (research); the seed
+  makes 145 students, not 350; importing `app` runs schema upgrade + seed/maintenance.
+
+## Earlier position (2026-10-01, unattended run — owner away ~12 h)
 
 - **Branch:** `v5.1-migui_clean` (pushed). Base commit of the run: `85c32b7`.
 - **Work queue:** `DEFENSE_REVISIONS.md` (owner decisions of 2026-10-01 at top).
