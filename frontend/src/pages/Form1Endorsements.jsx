@@ -160,7 +160,7 @@ export function Form1EndorsementQueue({ embedded = false }) {
       {!items.length ? (
         <Card className="p-6"><EmptyState icon={FileSignature} title="No Form 1 submissions yet" hint="Students appear here after uploading Form 1 in Research Gate." /></Card>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
           <Card className="overflow-hidden">
             <div className="border-b border-slate-200 px-4 py-3"><p className="text-sm font-semibold text-ink">Waiting and endorsed</p><p className="text-xs text-slate-500">{items.filter((item) => !item.endorsement).length} waiting</p></div>
             <div className="max-h-[680px] overflow-y-auto">

@@ -74,7 +74,7 @@ export function CaseTable({ items, role, selectableIds, selectedIds, onToggle, o
   const selectable = items.filter((item) => selectableIds.has(item.id));
   const allSelected = selectable.length > 0 && selectable.every((item) => selectedIds.has(item.id));
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200">
+    <div className="relative overflow-x-auto rounded-xl border border-slate-200">
       <table className="w-full min-w-[52rem] text-left text-sm">
         <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
           <tr>

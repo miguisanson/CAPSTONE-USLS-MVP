@@ -105,7 +105,7 @@ function AtRiskPanel() {
         {shown.length === 0 ? (
           <EmptyState icon={CheckCircle2} title="No students flagged" hint="Nobody needs a follow-up right now." />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -196,7 +196,7 @@ function TasksPanel({ user }) {
         ) : filtered.length === 0 ? (
           <EmptyState icon={ListTodo} title="No tasks match the selected filters" hint="Clear a filter or broaden the search." />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
