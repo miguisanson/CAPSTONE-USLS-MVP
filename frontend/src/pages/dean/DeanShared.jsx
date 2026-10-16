@@ -68,7 +68,7 @@ export function CaseTable({ items, emptyTitle = "Nothing to review here", emptyH
     return <EmptyState icon={Inbox} title={emptyTitle} hint={emptyHint} />;
   }
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">

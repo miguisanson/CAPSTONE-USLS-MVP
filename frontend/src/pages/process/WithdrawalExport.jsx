@@ -133,7 +133,7 @@ export default function WithdrawalExport({ ctx }) {
             {rows.length === 0 ? (
               <p className="text-sm text-slate-500">No tagged withdrawals yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="relative overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-[40rem] text-left text-sm">
                   <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                     <tr>

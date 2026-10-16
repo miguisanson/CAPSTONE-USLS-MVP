@@ -153,7 +153,7 @@ export default function StageBoard({
         )}
       </div>
       <div
-        className="max-w-full overflow-x-auto rounded-xl pb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        className="relative max-w-full overflow-x-auto rounded-xl pb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         role="region"
         aria-label={ariaLabel}
         tabIndex={0}

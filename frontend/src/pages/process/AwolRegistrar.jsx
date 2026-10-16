@@ -37,7 +37,7 @@ export default function AwolRegistrar({ ctx }) {
           ) : (
             <>
               <p className="mt-3 text-xs text-slate-500">{plural(rows.length, "report")} available.</p>
-              <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200">
+              <div className="relative mt-2 overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-[36rem] text-left text-sm">
                   <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                     <tr>

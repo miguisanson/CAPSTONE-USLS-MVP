@@ -3687,7 +3687,7 @@ function graduationReadyForDeanReview(group) {
 function WorkflowBoard({ columns, rows, getStatus, renderCard, empty, isDraggable = () => false, getDragId = () => "" }) {
   if (!rows.length) return <EmptyState title={empty} />;
   return (
-    <div className="max-w-full overflow-x-auto pb-3">
+    <div className="relative max-w-full overflow-x-auto pb-3">
       <div className="flex w-max snap-x gap-4">
         {columns.map((column) => {
           const items = rows.filter((row) => column.statuses.includes(getStatus(row)));

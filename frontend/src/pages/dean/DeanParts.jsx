@@ -454,14 +454,14 @@ export function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
             </div>
             <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-brand-700 ring-1 ring-brand-100">{selectedRows.length}</span>
           </header>
-          <div className="max-w-full overflow-x-auto pb-1">
+          <div className="relative max-w-full overflow-x-auto pb-1">
             <div className="flex w-max gap-3">
               {selectedRows.map((item) => <div key={`${item.type}-${item.id}`} className="w-[285px] shrink-0">{renderCard(item)}</div>)}
             </div>
           </div>
         </section>
       )}
-      <div className="max-w-full overflow-x-auto pb-3">
+      <div className="relative max-w-full overflow-x-auto pb-3">
         <div className="flex w-max snap-x gap-4">
         {DEAN_BOARD_COLUMNS.map((column) => {
           const items = boardRows.filter((item) => deanBoardGroup(item) === column);
