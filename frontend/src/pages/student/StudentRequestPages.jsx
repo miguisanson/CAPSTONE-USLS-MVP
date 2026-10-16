@@ -168,7 +168,7 @@ function AdviserPanelCard({ data }) {
       />
       <p className="mb-3 text-sm text-slate-600">Adviser: <span className="font-semibold text-ink">{data.student.adviser_name || data.research_case?.adviser_name || "Not assigned"}</span></p>
       {panel.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {panel.map((member) => (
             <li key={member.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
               <div className="min-w-0">
@@ -197,7 +197,7 @@ export function StudentDefensePage() {
     <StudentRequestPage
       id="schedule"
       aside={
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <AdviserPanelCard data={data} />
           <StudentSchedulePanel schedules={data.schedules || []} />
         </div>
