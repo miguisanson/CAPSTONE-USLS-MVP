@@ -12,6 +12,8 @@
     "seed": "node scripts/run-python.cjs app.py --seed",
     "dev": "node scripts/run-python.cjs app.py",
     "start": "npm run dev",
-    "dev:web": "npm --prefix frontend run dev"
+    "dev:web": "npm --prefix frontend run dev",
+    "e2e": "npm --prefix frontend run e2e",
+    "e2e:negative": "npm --prefix frontend run e2e:negative"
   }
 }

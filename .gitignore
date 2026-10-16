@@ -71,3 +71,8 @@ uploads/policy_documents/*Operations*Manual*
 
 # Unattended-run watchdog heartbeat
 .planning/.run-heartbeat
+
+# Playwright harness output (screenshots, auth sessions, reports, temp state)
+frontend/e2e-artifacts/
+frontend/playwright-report/
+frontend/test-results/
