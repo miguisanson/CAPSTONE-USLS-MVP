@@ -59,9 +59,11 @@ class OutdatedDatabaseTests(unittest.TestCase):
             text=True,
             timeout=600,
         )
-        self.assertNotEqual(0, result.returncode, "the app started on an outdated database")
         output = result.stdout + result.stderr
-        self.assertTrue("npm run seed" in output, f"no reseed hint in the output; last lines:\n{output[-1500:]}")
+        # A crash must not count as a refusal: exit 1 from the schema check, no traceback.
+        self.assertEqual(1, result.returncode, f"expected a clean refusal (exit 1); last lines:\n{output[-1500:]}")
+        self.assertFalse("Traceback" in output, f"the app crashed instead of refusing; last lines:\n{output[-1500:]}")
+        self.assertTrue("npm run seed" in result.stderr, f"no reseed hint on stderr; last lines:\n{output[-1500:]}")
 
         # The old data was not touched (no patching, no silent rebuild).
         connection = sqlite3.connect(db_file)
