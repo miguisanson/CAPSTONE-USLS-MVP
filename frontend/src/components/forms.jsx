@@ -1,5 +1,3 @@
-import { Check } from "lucide-react";
-
 export function Field({ label, hint, required, children }) {
   return (
     <label className="block">
@@ -31,38 +29,6 @@ export function Select({ options, placeholder = "Select…", ...props }) {
         </option>
       ))}
     </select>
-  );
-}
-
-// Checklist of "received" items. Checked = present, unchecked = missing.
-export function CheckList({ items, selected, onToggle }) {
-  return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {items.map((item) => {
-        const isChecked = selected.includes(item);
-        return (
-          <button
-            key={item}
-            type="button"
-            onClick={() => onToggle(item)}
-            className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors cursor-pointer ${
-              isChecked
-                ? "border-brand-300 bg-brand-50 text-brand-800"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <span
-              className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${
-                isChecked ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white"
-              }`}
-            >
-              {isChecked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-            </span>
-            <span className="font-medium">{item}</span>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

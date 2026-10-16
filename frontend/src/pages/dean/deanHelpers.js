@@ -158,67 +158,6 @@ export function deanGraduationBatchActionLabel(action) {
   return action === "return" ? "Return endorsement list for revision" : "Approve endorsement list";
 }
 
-export function deanGraduationRequirementTone(item) {
-  if (item?.passed === true || item?.complete === true || item?.status === "Passed") return "complete";
-  return "missing";
-}
-
-export function deanGraduationRequirementClasses(tone) {
-  return tone === "complete"
-    ? {
-      card: "border-emerald-200 bg-emerald-50 text-emerald-900",
-      icon: "bg-emerald-600 text-white",
-      text: "text-emerald-800",
-      muted: "text-emerald-700",
-    }
-    : {
-      card: "border-red-200 bg-red-50 text-red-900",
-      icon: "bg-red-600 text-white",
-      text: "text-red-800",
-      muted: "text-red-700",
-    };
-}
-
-export function deanGraduationRequirementDetailLines(item) {
-  const actual = item.actual_value ?? item.actual ?? item.status ?? "Pending";
-  const required = item.required_value ?? item.required;
-  return [
-    String(actual),
-    required != null ? `Required: ${String(required)}` : "",
-    item.note || "",
-  ].filter(Boolean);
-}
-
-export function deanGraduationFallbackChecklist(item) {
-  const eligibility = item.eligibility || {};
-  return [
-    {
-      key: "coursework",
-      label: "Coursework",
-      actual_value: eligibility.coursework_status || "Pending",
-      status: eligibility.coursework_status === "Complete" ? "Passed" : eligibility.coursework_status || "Not met",
-      passed: eligibility.coursework_status === "Complete",
-      note: eligibility.missing_coursework?.length ? `Missing: ${eligibility.missing_coursework.slice(0, 2).join(", ")}${eligibility.missing_coursework.length > 2 ? "..." : ""}` : "",
-    },
-    {
-      key: "research",
-      label: "Thesis / research",
-      actual_value: eligibility.research_status || "Pending",
-      status: eligibility.research_status === "Complete" ? "Passed" : eligibility.research_status || "Not met",
-      passed: eligibility.research_status === "Complete",
-      note: eligibility.missing_research_requirements?.length ? `Missing: ${eligibility.missing_research_requirements.slice(0, 2).join(", ")}${eligibility.missing_research_requirements.length > 2 ? "..." : ""}` : "",
-    },
-    {
-      key: "practicum",
-      label: "Practicum",
-      actual_value: eligibility.practicum_status || "Pending",
-      status: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status) ? "Passed" : eligibility.practicum_status || "Not met",
-      passed: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status),
-      note: eligibility.missing_practicum_requirement || "",
-    },
-  ];
-}
-
 export function sortSelectedDeanItems(items, selectedIds) {
   if (!selectedIds?.size) return items;
   return [...items].sort((left, right) => {

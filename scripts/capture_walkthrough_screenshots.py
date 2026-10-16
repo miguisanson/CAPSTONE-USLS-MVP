@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=ROOT / "outputs" / "walkthrough_screenshots",
+        default=ROOT / "archive" / "outputs" / "walkthrough_screenshots",
     )
     parser.add_argument(
         "--standing-only",

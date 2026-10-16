@@ -27,7 +27,7 @@ from docx.shared import Inches, Pt, RGBColor
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
 OUT = REPO / "Documents" / "CAPSTONE_ONLY" / "CAP-2521-IT-WALKTHROUGH.docx"
-SHOTS = HERE / "shots"
+SHOTS = REPO / "archive" / "scripts-docs" / "walkthrough" / "shots"
 GREEN = RGBColor(0x0F, 0x6B, 0x3E)
 GREY = RGBColor(0x55, 0x5B, 0x63)
 SHOT_WIDTH = 5.4  # inches; --shot-width overrides

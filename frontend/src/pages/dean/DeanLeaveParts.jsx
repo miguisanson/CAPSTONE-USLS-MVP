@@ -11,11 +11,6 @@ export function isLeaveCaseItem(item) {
   return Boolean(item && LEAVE_TYPES.includes(item.type) && item.case);
 }
 
-// A case the Dean can decide on now (and so may be part of a group decision).
-export function isLeaveDecisionDue(item) {
-  return isLeaveCaseItem(item) && item.workflow_status === "Dean Review";
-}
-
 const CHECK_TONES = {
   Pass: "bg-brand-50 text-brand-700 ring-brand-200",
   Present: "bg-brand-50 text-brand-700 ring-brand-200",

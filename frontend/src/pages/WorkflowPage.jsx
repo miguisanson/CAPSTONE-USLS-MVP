@@ -48,7 +48,7 @@ import {
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, SectionTitle, Spinner, StatusBadge, EmptyState, ErrorNote } from "../components/ui";
-import { Field, Input, Textarea, Select, CheckList } from "../components/forms";
+import { Field, Input, Textarea, Select } from "../components/forms";
 import StudentPicker from "../components/StudentPicker";
 import WorkflowTimeline, { graduationTimelineSteps } from "../components/WorkflowTimeline";
 import WorkflowDiscussion from "../components/WorkflowDiscussion";

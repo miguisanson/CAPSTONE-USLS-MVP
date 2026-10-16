@@ -357,10 +357,6 @@ export const api = {
   },
   updateBusinessRule: (id, payload) =>
     request(`/business-rules/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  loaPolicyReview: (payload) =>
-    request("/leave-of-absence/policy-review", { method: "POST", body: JSON.stringify(payload) }),
-  readmissionPolicyReview: (payload) =>
-    request("/readmission/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   awolPolicyReview: (payload) =>
     request("/awol/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   studentPortalContext: () => request("/student-portal/context"),
@@ -403,8 +399,6 @@ export const api = {
     request(`/defense-schedules/${scheduleId}/reconfirm`, { method: "POST", body: JSON.stringify({}) }),
   submitStudentRequest: (type, payload) =>
     request(`/student-portal/requests/${type}`, { method: "POST", body: JSON.stringify(payload) }),
-  withdrawStudentLoaRequest: () =>
-    request("/student-portal/requests/leave-of-absence/withdraw", { method: "POST", body: JSON.stringify({}) }),
   // Leave of Absence / Readmission cases. `slug` is "leave-of-absence" or "readmission".
   studentLeaveCaseAction: (caseId, action, payload = {}) =>
     request(`/student-portal/leave-cases/${caseId}/${action}`, { method: "POST", body: JSON.stringify(payload) }),
@@ -417,13 +411,10 @@ export const api = {
     request(`/process-cases/${encodeURIComponent(slug)}/${encodeURIComponent(ref)}/transition`, { method: "POST", body: JSON.stringify(payload) }),
   processCasesBatch: (slug, payload) =>
     request(`/process-cases/${encodeURIComponent(slug)}/batch`, { method: "POST", body: JSON.stringify(payload) }),
-  leaveCases: (slug) => request(`/leave-cases?slug=${encodeURIComponent(slug)}`),
   leaveCase: (id) => request(`/leave-cases/${id}`),
   // Every button and every drag and drop on the staff board ends here.
   leaveCaseTransition: (id, payload) =>
     request(`/leave-cases/${id}/transition`, { method: "POST", body: JSON.stringify(payload) }),
-  leaveCasesBatch: (payload) =>
-    request("/leave-cases/batch", { method: "POST", body: JSON.stringify(payload) }),
   syncLeaveCases: () => request("/leave-cases/sync", { method: "POST", body: JSON.stringify({}) }),
   leaveExportLog: (slug) => request(`/leave-cases/export-log?slug=${encodeURIComponent(slug)}`),
   leaveHandoff: (caseIds, status) =>
@@ -504,10 +495,6 @@ export const api = {
     request(`/faculty-portal/availability/requests/${id}/answer`, { method: "POST", body: JSON.stringify({}) }),
   requestPanelAvailability: (payload) =>
     request("/availability-requests", { method: "POST", body: JSON.stringify(payload) }),
-  availabilityRequests: (studentId) => {
-    const qs = queryString({ student_id: studentId });
-    return request(`/availability-requests${qs ? `?${qs}` : ""}`);
-  },
   checkDefenseSlot: (payload) =>
     request("/defense-schedules/check", { method: "POST", body: JSON.stringify(payload) }),
   studentAdviser: () => request("/student-portal/adviser"),
@@ -543,10 +530,6 @@ export const api = {
     request(`/faculty-portal/panel-invitations/${id}/respond`, { method: "POST", body: JSON.stringify(payload) }),
   cannotAttendDefense: (scheduleId, payload) =>
     request(`/faculty-portal/defense-schedules/${scheduleId}/cannot-attend`, { method: "POST", body: JSON.stringify(payload) }),
-  panelInvitations: (studentId) => {
-    const qs = queryString({ student_id: studentId });
-    return request(`/panel-invitations${qs ? `?${qs}` : ""}`);
-  },
   notifications: (params = {}) => {
     const qs = queryString(params);
     return request(`/notifications${qs ? `?${qs}` : ""}`);
