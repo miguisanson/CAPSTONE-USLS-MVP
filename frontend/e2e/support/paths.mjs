@@ -43,6 +43,7 @@ export function resolvePython() {
 /** Environment every Playwright process must have (browser cache outside drive C:). */
 export function playwrightEnv(base = process.env) {
   const env = { ...base };
-  if (!env.PLAYWRIGHT_BROWSERS_PATH && isWindows) env.PLAYWRIGHT_BROWSERS_PATH = DEFAULT_BROWSERS_PATH;
+  // Only on a machine that has the E: drive (the owner's PC); teammates get Playwright's default folder.
+  if (!env.PLAYWRIGHT_BROWSERS_PATH && isWindows && existsSync("E:/")) env.PLAYWRIGHT_BROWSERS_PATH = DEFAULT_BROWSERS_PATH;
   return env;
 }

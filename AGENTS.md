@@ -157,9 +157,13 @@ imported), so it does not touch `usls_gs_demo.sqlite3` or need `.env`. If
 `pytest` happens to be installed it will also collect and run these
 `unittest.TestCase` classes, but don't add it as a dependency just for that.
 
-The frontend gate is `npm run build:web` (proves the SPA compiles) plus, once
-ROADMAP Phase 2 lands, the Playwright role walkthroughs (IM7) — their run
-command will be recorded here. Run only the walkthrough for the touched area
+The frontend gate is `npm run build:web` (proves the SPA compiles) plus the
+Playwright role walkthroughs (IM7): `npm run e2e` from the repo root (~4 min;
+seeds its own temp SQLite database, logs in as all 7 roles, opens every page
+in each role's sidebar, fails on console errors, failed `/api` calls, error
+banners and horizontal overflow, and saves screenshots at 1366/1920/390 px to
+`frontend/e2e-artifacts/screens/`). `npm run e2e:negative` must FAIL (it proves
+the checker still sees problems). Details: `frontend/e2e/README.md`. Run only the walkthrough for the touched area
 while working; all roles once before merging a packet that touches
 `frontend/src/**` or a route the frontend calls.
 
