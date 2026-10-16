@@ -20,7 +20,7 @@ from pathlib import Path
 from playwright.sync_api import Page, sync_playwright
 
 HERE = Path(__file__).resolve().parent.parent
-SHOTS = HERE / "shots"
+SHOTS = HERE.parent.parent.parent / "archive" / "scripts-docs" / "walkthrough" / "shots"
 BASE = os.environ.get("WT_BASE", "http://127.0.0.1:5074").rstrip("/")
 PASSWORD = "DemoPass123!"
 VIEWPORT = {"width": 1366, "height": 768}

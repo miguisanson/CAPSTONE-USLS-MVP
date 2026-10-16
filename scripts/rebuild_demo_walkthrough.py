@@ -25,7 +25,7 @@ DEFAULT_SOURCE = ROOT / "Documents" / "USLS GS Portal Demo Walkthrough.docx"
 DEFAULT_OUTPUT = (
     ROOT / "Documents" / "USLS GS Portal Demo Walkthrough - Revised.docx"
 )
-DEFAULT_SCREENSHOTS = ROOT / "outputs" / "walkthrough_screenshots"
+DEFAULT_SCREENSHOTS = ROOT / "archive" / "outputs" / "walkthrough_screenshots"
 
 
 def parse_args() -> argparse.Namespace:

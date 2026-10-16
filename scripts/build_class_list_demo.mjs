@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { FileBlob, SpreadsheetFile, Workbook } from "@oai/artifact-tool";
 
-const outputDir = path.join(process.cwd(), "outputs", "class-list-demo-miguel-sanson");
+const outputDir = path.join(process.cwd(), "archive", "outputs", "class-list-demo-miguel-sanson");
 const outputPath = path.join(outputDir, "MAED_Class_List_Demo_Miguel_Sanson.xlsx");
 await fs.mkdir(outputDir, { recursive: true });
 
