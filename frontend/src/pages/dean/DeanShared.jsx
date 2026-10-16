@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Inbox } from "lucide-react";
-import { Card, EmptyState, StatusBadge } from "../../components/ui";
+import { EmptyState, StatusBadge } from "../../components/ui";
 import { formatDate } from "../../lib/format";
 import { deanDateMatches, deanItemDate, graduationBatchLabel, sortDeanItems } from "./deanHelpers";
 import { DEAN_PROCESSES } from "./DeanContext";
@@ -106,8 +106,4 @@ export function CaseTable({ items, emptyTitle = "Nothing to review here", emptyH
       </table>
     </div>
   );
-}
-
-export function SectionCard({ children, className = "" }) {
-  return <Card className={`p-5 ${className}`}>{children}</Card>;
 }

@@ -3,7 +3,6 @@ import {
   Activity,
   ArrowRight,
   Briefcase,
-  CalendarClock,
   ClipboardCheck,
   FileText,
   FileUp,
@@ -275,31 +274,6 @@ export function MissingDocumentUpload({ doc, onSaved }) {
       </label>
       {error && <p className="mt-1 max-w-32 text-xs font-medium text-red-600">{error}</p>}
     </div>
-  );
-}
-
-export function SchedulePanel({ schedules }) {
-  return (
-    <Card className="p-6">
-      <SectionTitle title="Schedule Requests" icon={CalendarClock} />
-      {schedules.length ? (
-        <ul className="space-y-2.5">
-          {schedules.map((schedule) => (
-            <li key={schedule.id} className="rounded-xl border border-slate-100 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-ink">{formatDate(schedule.preferred_date)}</p>
-                <StatusBadge value={schedule.status} dot={false} />
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {schedule.mode} - {schedule.venue || "Venue/link pending"}
-              </p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState title="No schedule requests" />
-      )}
-    </Card>
   );
 }
 

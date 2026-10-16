@@ -159,12 +159,6 @@ export const PORTAL_NAV = {
   faculty: FACULTY_NAV_GROUPS,
 };
 
-export const PORTAL_ROLE_HOME = {
-  student: "/student",
-  dean: "/dean",
-  faculty: "/faculty-portal",
-};
-
 export const PORTAL_FOOTERS = {
   student: "Your record updates as staff act on your requests. Nothing here changes official grades or enrollment.",
   dean: "Every decision is recorded against your account with the date and time.",

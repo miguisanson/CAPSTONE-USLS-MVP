@@ -21,26 +21,6 @@ const GRADUATION_STEPS = [
   "Endorsed List Exported — Manual Registrar Email Required",
 ];
 
-const LOA_STEPS = [
-  "Request Submitted",
-  "GS Staff Intake and Eligibility Check",
-  "Dean Review",
-  "Student Standing Updated",
-];
-
-export function loaTimelineSteps(status) {
-  const activeByStatus = {
-    "Not Submitted": 0,
-    Submitted: 1,
-    "Dean Review": 2,
-    Approved: 3,
-    "On Leave": 3,
-    Denied: 2,
-    Withdrawn: 0,
-  };
-  return numberedStates(LOA_STEPS, activeByStatus[status] ?? 0);
-}
-
 function numberedStates(labels, activeIndex, optionalIndexes = []) {
   return labels.map((label, index) => ({
     label,
