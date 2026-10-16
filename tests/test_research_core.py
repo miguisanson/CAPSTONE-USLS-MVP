@@ -949,13 +949,13 @@ class TaskClosingTests(ResearchCoreBase):
 
 class StartupTests(ResearchCoreBase):
     def test_startup_sync_does_not_reset_a_password_that_a_faculty_member_chose(self):
-        from app import ensure_faculty_account_schema
+        from app import link_faculty_accounts
         from werkzeug.security import check_password_hash
         with app.app_context():
             account = UserAccount.query.filter_by(faculty_id=self.faculty_ids["Chair Person"]).one()
             account.password_hash = generate_password_hash("my-own-password")
             db.session.commit()
-            ensure_faculty_account_schema()
+            link_faculty_accounts()
             account = UserAccount.query.filter_by(faculty_id=self.faculty_ids["Chair Person"]).one()
             self.assertTrue(check_password_hash(account.password_hash, "my-own-password"))
             self.assertFalse(check_password_hash(account.password_hash, "DemoPass123!"))

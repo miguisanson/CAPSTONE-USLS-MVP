@@ -22,7 +22,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.parse import quote_plus, urlencode, urlparse
+from urllib.parse import quote_plus, urlencode
 from time import monotonic as _monotonic
 from uuid import uuid4
 
@@ -285,53 +285,19 @@ def now_utc() -> datetime:
     return datetime.now()
 
 
-def normalize_database_url(url: str) -> str:
-    if url.startswith("mysql://"):
-        return "mysql+pymysql://" + url.removeprefix("mysql://")
-    return url
-
-
-def is_mysql(url: str) -> bool:
-    return url.startswith("mysql")
-
-
-def ensure_mysql_database(database_url: str) -> None:
-    """Create the MySQL database if it is missing. No-op for SQLite."""
-    if not is_mysql(database_url):
-        return
-
-    import pymysql  # imported lazily so SQLite users do not need it
-
-    parsed = urlparse(database_url)
-    database_name = parsed.path.strip("/")
-    if not database_name:
-        raise RuntimeError("DATABASE_URL must include a database name.")
-
-    connection = pymysql.connect(
-        host=parsed.hostname or "localhost",
-        port=parsed.port or 3306,
-        user=parsed.username or "root",
-        password=parsed.password or "",
-        autocommit=True,
-    )
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"CREATE DATABASE IF NOT EXISTS `{database_name}` "
-                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-            )
-    finally:
-        connection.close()
-
-
 def resolve_database_url() -> str:
-    """Default to a zero-config SQLite file so `python app.py` just runs.
+    """SQLite only. Default to a zero-config file so `python app.py` just runs.
 
-    Set DATABASE_URL (e.g. mysql://root:1234@localhost:3306/usls_gs_demo) to use MySQL.
+    DATABASE_URL may point at another sqlite:/// file; anything else is refused.
     """
-    configured = os.getenv("DATABASE_URL")
+    configured = (os.getenv("DATABASE_URL") or "").strip()
     if configured:
-        return normalize_database_url(configured)
+        if not configured.lower().startswith("sqlite:"):
+            raise RuntimeError(
+                "This app uses SQLite only; remove DATABASE_URL from .env "
+                "or point it at a sqlite:/// file."
+            )
+        return configured
     sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usls_gs_demo.sqlite3")
     return f"sqlite:///{sqlite_path}"
 
@@ -368,7 +334,6 @@ def resolve_secret_key(environ=None) -> str:
 
 def create_app() -> Flask:
     database_url = resolve_database_url()
-    ensure_mysql_database(database_url)
 
     # static_folder disabled: our catch-all route serves both the built assets
     # and the SPA fallback, so Flask's greedy static route does not shadow client routes.
@@ -24055,7 +24020,7 @@ def add_log(
     # Every workflow records what happened, who acted, where the evidence came
     # from, and who owns the next action.
     next_owner = normalize_owner_label(next_owner) if next_owner else next_owner
-    # The log columns are 160 characters; MySQL (strict mode) refuses longer text, SQLite would not.
+    # The log columns are 160 characters; keep stored text within that length.
     source = (source or "")[:160]
     result = (result or "")[:160]
     close_finished_workflow_tasks(slug, student_id, actor, result, new_status)
@@ -29867,8 +29832,8 @@ def revoke_form1_endorsement(student_id: int) -> bool:
 
 def clean_extracted_text(text: str) -> str:
     # PDF extraction can yield lone surrogate code points that the DB driver cannot
-    # encode, and the stored column is a MySQL TEXT (max 65,535 bytes). Drop invalid
-    # characters and cap to a UTF-8 byte budget so storage is safe on both backends.
+    # encode, and the stored column is a bounded TEXT (max 65,535 bytes). Drop invalid
+    # characters and cap to a UTF-8 byte budget so storage is always safe.
     # The first ~60 KB (title, abstract, introduction, methods) is more than enough
     # for keyword matching.
     text = (text or "").encode("utf-8", "ignore").decode("utf-8", "ignore")
@@ -33724,70 +33689,8 @@ def recommend_panel(student: Student, profile: dict | None = None) -> list[dict]
 # Database reset + seed
 # ---------------------------------------------------------------------------
 def reset_database() -> None:
-    # MySQL requires temporarily disabling FK checks before dropping related tables.
-    if is_mysql(db.engine.url.render_as_string(hide_password=True)):
-        db.session.execute(text("SET FOREIGN_KEY_CHECKS=0"))
-        db.drop_all()
-        db.session.execute(text("SET FOREIGN_KEY_CHECKS=1"))
-        db.session.commit()
-    else:
-        db.drop_all()
+    db.drop_all()
     db.create_all()
-
-
-def ensure_schedule_request_schema() -> None:
-    """Add defense-detail columns for existing MVP databases without dropping data."""
-    inspector = inspect(db.engine)
-    if "schedule_request" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("schedule_request")}
-    additions = {
-        "preferred_end_date": "DATE",
-        "start_time": "TIME",
-        "end_time": "TIME",
-        "defense_type": "VARCHAR(60)",
-        "panel_snapshot": "TEXT",
-        "required_forms_status": "VARCHAR(40)",
-        "conflict_reason": "TEXT",
-        "rescheduled_from_id": "INTEGER",
-        "change_reason": "TEXT",
-        "requested_by": "VARCHAR(80)",
-        "cancelled_at": "DATETIME",
-        "override_reason": "TEXT",
-        "manuscript_received_on": "DATE",
-    }
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE schedule_request ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
-
-
-CALENDAR_TABLES = (
-    FacultyAvailabilityException, AvailabilityRequest, AdviserAppointment, PanelInvitation, Notification, CalendarToken,
-)
-
-
-def ensure_calendar_schema() -> None:
-    """Additive schema for availability, adviser appointments, invitations, notifications and feeds.
-
-    New tables are created when missing; new columns on existing tables are added with guarded
-    ALTER TABLEs. Nothing is dropped or rewritten. Rows the system itself once filled in as every
-    faculty member's "Monday-Friday 8-17" are labelled "system default" so they no longer count as
-    availability a person entered.
-    """
-    db.metadata.create_all(bind=db.engine, tables=[model.__table__ for model in CALENDAR_TABLES], checkfirst=True)
-    inspector = inspect(db.engine)
-    tables = set(inspector.get_table_names())
-    if "faculty" in tables:
-        existing = {column["name"] for column in inspector.get_columns("faculty")}
-        if "availability_updated_at" not in existing:
-            db.session.execute(text("ALTER TABLE faculty ADD COLUMN availability_updated_at DATETIME"))
-    if "faculty_working_hour" in tables:
-        existing = {column["name"] for column in inspector.get_columns("faculty_working_hour")}
-        for name, sql_type in {"source": "VARCHAR(40)", "updated_at": "DATETIME"}.items():
-            if name not in existing:
-                db.session.execute(text(f"ALTER TABLE faculty_working_hour ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
 
 
 def label_system_default_working_hours() -> int:
@@ -33808,148 +33711,6 @@ def label_system_default_working_hours() -> int:
     return flagged
 
 
-def ensure_policy_document_schema() -> None:
-    """Add library-management columns and the version-history table; never drops data."""
-    PolicyDocument.__table__.create(bind=db.engine, checkfirst=True)
-    PolicyDocumentVersion.__table__.create(bind=db.engine, checkfirst=True)
-    inspector = inspect(db.engine)
-    existing = {column["name"] for column in inspector.get_columns("policy_document")}
-    additions = {
-        "category": "VARCHAR(40) NOT NULL DEFAULT 'Other'",
-        "effective_date": "DATE",
-        "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
-        "validation_note": "TEXT",
-    }
-    changed = False
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE policy_document ADD COLUMN {name} {sql_type}"))
-            changed = True
-    if changed:
-        db.session.commit()
-
-
-def ensure_monitoring_flag_schema() -> None:
-    """Add subject/field targeting columns to the flag table without dropping data."""
-    inspector = inspect(db.engine)
-    if "student_monitoring_flag" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("student_monitoring_flag")}
-    additions = {
-        "target_kind": "VARCHAR(30) NOT NULL DEFAULT 'Whole record'",
-        "target_label": "VARCHAR(160)",
-    }
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE student_monitoring_flag ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
-
-
-def ensure_monitoring_portal_entry_schema() -> None:
-    """Add portal-entry provenance to existing databases (additive only)."""
-    MonitoringEdit.__table__.create(bind=db.engine, checkfirst=True)
-    inspector = inspect(db.engine)
-    if "course_record" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("course_record")}
-    additions = {
-        "source": "VARCHAR(30)",
-        "source_user": "VARCHAR(160)",
-        "source_at": "DATETIME",
-        "source_reason": "TEXT",
-        "removed_at": "DATETIME",
-        "removed_by": "VARCHAR(160)",
-        "removal_reason": "TEXT",
-        "removed_status": "VARCHAR(40)",
-    }
-    changed = False
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE course_record ADD COLUMN {name} {sql_type}"))
-            changed = True
-    if changed:
-        db.session.commit()
-
-
-def ensure_monitoring_upload_schema() -> None:
-    """Create the additive upload-history table for existing MVP databases."""
-    MonitoringSheetUpload.__table__.create(bind=db.engine, checkfirst=True)
-    MonitoringValidationIssue.__table__.create(bind=db.engine, checkfirst=True)
-    StudentMonitoringFlag.__table__.create(bind=db.engine, checkfirst=True)
-    inspector = inspect(db.engine)
-    issue_columns = {column["name"] for column in inspector.get_columns("monitoring_validation_issue")}
-    if "resolution_upload_id" not in issue_columns:
-        db.session.execute(text("ALTER TABLE monitoring_validation_issue ADD COLUMN resolution_upload_id INTEGER"))
-        db.session.commit()
-        inspector = inspect(db.engine)
-    if "student" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("student")}
-    additions = {
-        "monitoring_new_student": "BOOLEAN NOT NULL DEFAULT 0",
-        "monitoring_imported_at": "DATETIME",
-        "monitoring_upload_id": "INTEGER",
-    }
-    changed = False
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE student ADD COLUMN {name} {sql_type}"))
-            changed = True
-    if changed:
-        db.session.commit()
-
-
-def ensure_awol_structured_request_schema() -> None:
-    """Add structured AWOL detection and return-declaration fields in place."""
-    inspector = inspect(db.engine)
-    if "awol_case" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("awol_case")}
-    additions = {
-        "return_intent": "TEXT",
-        "return_reason": "TEXT",
-        "detection_source": "VARCHAR(180)",
-        "automatically_flagged_at": "DATETIME",
-    }
-    changed = False
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE awol_case ADD COLUMN {name} {sql_type}"))
-            changed = True
-    if changed:
-        db.session.commit()
-
-
-def ensure_student_comprehensive_exam_schema() -> None:
-    """Add explicit comprehensive-exam state without dropping existing student data."""
-    inspector = inspect(db.engine)
-    if "student" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("student")}
-    if "comprehensive_exam_status" not in existing:
-        db.session.execute(text("ALTER TABLE student ADD COLUMN comprehensive_exam_status VARCHAR(30) NOT NULL DEFAULT 'Not Taken'"))
-        db.session.commit()
-
-
-def ensure_student_monitoring_columns_schema() -> None:
-    """Preserve AY ENTRY and YR separately on existing databases."""
-    inspector = inspect(db.engine)
-    if "student" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("student")}
-    additions = {
-        "academic_year_entry": "VARCHAR(20) NOT NULL DEFAULT ''",
-        "year_level": "VARCHAR(20) NOT NULL DEFAULT ''",
-    }
-    changed = False
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE student ADD COLUMN {name} {sql_type}"))
-            changed = True
-    if changed:
-        db.session.commit()
-
-
 def ensure_course_year_consistency() -> int:
     """Derive stored YR from AY Entry and the active academic semester."""
     changed = 0
@@ -33966,12 +33727,6 @@ def ensure_course_year_consistency() -> int:
 
 def ensure_demo_comprehensive_exam_consistency() -> int:
     """Repair legacy generated rows so research never precedes a passed exam."""
-    inspector = inspect(db.engine)
-    if "student" not in inspector.get_table_names():
-        return 0
-    existing = {column["name"] for column in inspector.get_columns("student")}
-    if "comprehensive_exam_status" not in existing:
-        return 0
     research_stages = {"Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense", "Completed"}
     generated = [
         student
@@ -34038,85 +33793,8 @@ def ensure_demo_comprehensive_exam_consistency() -> int:
     return changed
 
 
-def ensure_workflow_activity_schema() -> None:
-    """Add workflow traceability fields without resetting an existing demo DB."""
-    db.create_all()
-    inspector = inspect(db.engine)
-    tables = set(inspector.get_table_names())
-    if "transaction_log" not in tables:
-        return
-    existing = {column["name"] for column in inspector.get_columns("transaction_log")}
-    additions = {
-        "previous_status": "VARCHAR(100)",
-        "new_status": "VARCHAR(100)",
-        "workflow_request_id": "INTEGER",
-        "actor_user_id": "INTEGER",
-        "action_type": "VARCHAR(40)",
-        "visibility": "VARCHAR(30)",
-        # Daily change report: track which changes have been mirrored into AIMS.
-        "reflected_in_aims": "BOOLEAN NOT NULL DEFAULT 0",
-        "reflected_at": "DATETIME",
-        "reflected_by_user_id": "INTEGER",
-    }
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE transaction_log ADD COLUMN {name} {sql_type}"))
-    if "student_request_attachment" in tables:
-        attachment_existing = {
-            column["name"]
-            for column in inspector.get_columns("student_request_attachment")
-        }
-        attachment_additions = {
-            "workflow_request_id": "INTEGER",
-            "workflow_stage": "VARCHAR(100)",
-            "uploaded_by_user_id": "INTEGER",
-            "uploaded_by_name": "VARCHAR(160)",
-            "uploaded_by_role": "VARCHAR(80)",
-        }
-        for name, sql_type in attachment_additions.items():
-            if name not in attachment_existing:
-                db.session.execute(text(
-                    f"ALTER TABLE student_request_attachment ADD COLUMN {name} {sql_type}"
-                ))
-    if "workflow_message" in tables:
-        message_existing = {
-            column["name"]
-            for column in inspector.get_columns("workflow_message")
-        }
-        message_additions = {
-            "workflow_request_id": "INTEGER",
-            "workflow_stage": "VARCHAR(100)",
-            "sender_user_id": "INTEGER",
-            "recipient_user_id": "INTEGER",
-            "reply_to_message_id": "INTEGER",
-            "visibility": "VARCHAR(30)",
-            "read_at": "DATETIME",
-            "requires_document_resubmission": "BOOLEAN NOT NULL DEFAULT 0",
-        }
-        for name, sql_type in message_additions.items():
-            if name not in message_existing:
-                db.session.execute(text(
-                    f"ALTER TABLE workflow_message ADD COLUMN {name} {sql_type}"
-                ))
-    inspector = inspect(db.engine)
-    if "practicum_record" in tables:
-        practicum_existing = {column["name"] for column in inspector.get_columns("practicum_record")}
-        practicum_additions = {
-            "supervisor_name": "VARCHAR(160)",
-            "completion_status": "VARCHAR(80) DEFAULT 'Pending'",
-        }
-        for name, sql_type in practicum_additions.items():
-            if name not in practicum_existing:
-                db.session.execute(text(f"ALTER TABLE practicum_record ADD COLUMN {name} {sql_type}"))
-    if "graduation_endorsement" in tables:
-        graduation_existing = {column["name"] for column in inspector.get_columns("graduation_endorsement")}
-        graduation_additions = {
-            "batch_name": "VARCHAR(120)",
-        }
-        for name, sql_type in graduation_additions.items():
-            if name not in graduation_existing:
-                db.session.execute(text(f"ALTER TABLE graduation_endorsement ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
+def backfill_workflow_activity() -> None:
+    """Fill workflow traceability fields (request link, actor, visibility) on existing rows."""
     student_accounts = {
         account.student_id: account
         for account in UserAccount.query.filter_by(role="student", active=True).all()
@@ -34235,26 +33913,8 @@ def ensure_workflow_activity_schema() -> None:
     db.session.commit()
 
 
-def ensure_withdrawal_subject_schema() -> None:
-    """Add subject/Registrar fields without resetting existing withdrawal cases."""
-    db.create_all()
-    inspector = inspect(db.engine)
-    if "withdrawal_application" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("withdrawal_application")}
-    additions = {
-        "subject_enrollment_id": "INTEGER",
-        "withdrawal_scope": "VARCHAR(30) NOT NULL DEFAULT 'Subject'",
-        "registrar_reference": "VARCHAR(160)",
-        "registrar_report_generated_at": "DATETIME",
-        "registrar_sent_at": "DATETIME",
-        "registrar_confirmed_at": "DATETIME",
-        "effective_date": "DATE",
-    }
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE withdrawal_application ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
+def backfill_withdrawal_subjects() -> None:
+    """Fill the subject/Registrar fields on existing withdrawal cases."""
     db.session.execute(text(
         "UPDATE withdrawal_application SET withdrawal_scope = 'Subject' "
         "WHERE withdrawal_scope IS NULL OR withdrawal_scope = ''"
@@ -34280,14 +33940,8 @@ def ensure_withdrawal_subject_schema() -> None:
     db.session.commit()
 
 
-def ensure_panel_assignment_schema() -> None:
-    inspector = inspect(db.engine)
-    if "panel_assignment" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("panel_assignment")}
-    if "gate" not in existing:
-        db.session.execute(text("ALTER TABLE panel_assignment ADD COLUMN gate VARCHAR(80)"))
-        db.session.commit()
+def backfill_panel_assignment_gates() -> None:
+    """Give every panel assignment without a gate the gate its student's research case is at."""
     assignments = PanelAssignment.query.filter(
         (PanelAssignment.gate.is_(None)) | (PanelAssignment.gate == "")
     ).all()
@@ -34303,41 +33957,8 @@ def ensure_panel_assignment_schema() -> None:
         db.session.commit()
 
 
-def ensure_course_workflow_schema() -> None:
-    """Add coursework grade/drop fields to existing demo databases."""
-    db.create_all()
-    inspector = inspect(db.engine)
-    if "course_record" in inspector.get_table_names():
-        existing = {column["name"] for column in inspector.get_columns("course_record")}
-        additions = {
-            "grade_value": "VARCHAR(40)",
-            "grade_status": "VARCHAR(40) DEFAULT 'No Grade'",
-            "resolved_at": "DATETIME",
-            "remarks": "TEXT",
-        }
-        for name, sql_type in additions.items():
-            if name not in existing:
-                db.session.execute(text(f"ALTER TABLE course_record ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
-
-
-def ensure_subject_enrollment_schema() -> int:
-    """Create/backfill the additive enrollment ledger without resetting data."""
-    SubjectEnrollment.__table__.create(bind=db.engine, checkfirst=True)
-    inspector = inspect(db.engine)
-    existing_columns = {
-        column["name"]
-        for column in inspector.get_columns("subject_enrollment")
-    }
-    for name, sql_type in {
-        "status_note": "TEXT",
-        "status_changed_at": "DATETIME",
-    }.items():
-        if name not in existing_columns:
-            db.session.execute(
-                text(f"ALTER TABLE subject_enrollment ADD COLUMN {name} {sql_type}")
-            )
-    db.session.commit()
+def backfill_subject_enrollments() -> int:
+    """Backfill the enrollment ledger from course records."""
     changed = 0
 
     # Repair legacy semester capitalization so offering filters remain stable.
@@ -34402,53 +34023,6 @@ def ensure_subject_enrollment_schema() -> int:
     return changed
 
 
-def ensure_research_evidence_schema() -> None:
-    """Add concept-paper compliance fields without resetting existing uploads."""
-    db.create_all()
-    inspector = inspect(db.engine)
-    if "research_evidence_file" in inspector.get_table_names():
-        existing = {column["name"] for column in inspector.get_columns("research_evidence_file")}
-        additions = {
-            "compliance_status": "VARCHAR(40)",
-            "compliance_score": "INTEGER",
-            "compliance_summary": "TEXT",
-            "compliance_result_json": "TEXT",
-        }
-        for name, sql_type in additions.items():
-            if name not in existing:
-                db.session.execute(text(f"ALTER TABLE research_evidence_file ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
-
-
-def ensure_research_role_workflow_schema() -> None:
-    """Create additive adviser-approval and chair-verdict tables, add the
-    follow-up columns, and migrate old verdict/status words to the vocabulary."""
-    AdviserDocumentApproval.__table__.create(bind=db.engine, checkfirst=True)
-    DefenseVerdict.__table__.create(bind=db.engine, checkfirst=True)
-    inspector = inspect(db.engine)
-    existing = {column["name"] for column in inspector.get_columns("defense_verdict")}
-    additions = {
-        "revision_status": "VARCHAR(30)",
-        "revision_note": "TEXT",
-        "revisions_submitted_at": "DATETIME",
-        "revisions_confirmed_by": "VARCHAR(160)",
-        "revisions_confirmed_at": "DATETIME",
-        "revision_confirm_note": "TEXT",
-        "evaluation_score": "FLOAT",
-        "selected_title": "VARCHAR(220)",
-        "original_result": "VARCHAR(60)",
-        "correction_reason": "TEXT",
-        "corrected_by": "VARCHAR(160)",
-        "corrected_at": "DATETIME",
-        "reset_log": "TEXT",
-    }
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE defense_verdict ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
-    migrate_research_vocabulary()
-
-
 def migrate_research_vocabulary() -> None:
     """Idempotent: move rows written with older words onto the current vocabulary."""
     for old_word, new_word in LEGACY_VERDICT_ALIASES.items():
@@ -34477,56 +34051,13 @@ def migrate_research_vocabulary() -> None:
     db.session.commit()
 
 
-def ensure_curriculum_offering_schema() -> None:
-    db.create_all()
-    inspector = inspect(db.engine)
-    tables = set(inspector.get_table_names())
-    if "academic_term" in tables:
-        existing = {column["name"] for column in inspector.get_columns("academic_term")}
-        additions = {
-            "is_active_planning_term": "BOOLEAN DEFAULT 0",
-            "planning_window_open": "DATE",
-            "planning_window_close": "DATE",
-            "grade_submission_deadline": "DATE",
-            "status": "VARCHAR(20)",
-        }
-        for name, sql_type in additions.items():
-            if name not in existing:
-                db.session.execute(text(f"ALTER TABLE academic_term ADD COLUMN {name} {sql_type}"))
-        active_count = db.session.execute(text("SELECT COUNT(*) FROM academic_term WHERE is_active_planning_term = 1")).scalar() or 0
-        if active_count == 0:
-            current = get_active_term()  # date-aware current/next semester, not the far-future latest
-            if current:
-                db.session.execute(text("UPDATE academic_term SET is_active_planning_term = 1 WHERE id = :term_id"), {"term_id": current.id})
-    if "course_offering_plan" in tables:
-        existing = {column["name"] for column in inspector.get_columns("course_offering_plan")}
-        additions = {
-            "target_term_id": "INTEGER",
-            "reference_term_id": "INTEGER",
-        }
-        for name, sql_type in additions.items():
-            if name not in existing:
-                db.session.execute(text(f"ALTER TABLE course_offering_plan ADD COLUMN {name} {sql_type}"))
-    FacultyCoursePreference.__table__.create(bind=db.engine, checkfirst=True)
-    if "course_offering" in tables:
-        existing = {column["name"] for column in inspector.get_columns("course_offering")}
-        additions = {
-            "assigned_faculty_id": "INTEGER",
-            "assignment_status": "VARCHAR(40) NOT NULL DEFAULT 'Unassigned'",
-        }
-        for name, sql_type in additions.items():
-            if name not in existing:
-                db.session.execute(text(f"ALTER TABLE course_offering ADD COLUMN {name} {sql_type}"))
-    if "curriculum_offering" in tables:
-        existing = {column["name"] for column in inspector.get_columns("curriculum_offering")}
-        additions = {
-            "assigned_faculty_id": "INTEGER",
-            "schedule": "VARCHAR(160)",
-            "section": "VARCHAR(40)",
-        }
-        for name, sql_type in additions.items():
-            if name not in existing:
-                db.session.execute(text(f"ALTER TABLE curriculum_offering ADD COLUMN {name} {sql_type}"))
+def ensure_active_planning_term() -> None:
+    """Mark the current term as the planning term when no term is marked yet."""
+    active_count = db.session.execute(text("SELECT COUNT(*) FROM academic_term WHERE is_active_planning_term = 1")).scalar() or 0
+    if active_count == 0:
+        current = get_active_term()  # date-aware current/next semester, not the far-future latest
+        if current:
+            db.session.execute(text("UPDATE academic_term SET is_active_planning_term = 1 WHERE id = :term_id"), {"term_id": current.id})
     db.session.commit()
 
 
@@ -34826,11 +34357,6 @@ def panel_matching_demo_evidence_text(
         f"{title}\n\n{body}\n\n"
         f"Verified MAED demo evidence item {file_number} for {document.item_name}."
     )
-
-
-def ensure_faculty_expertise_schema() -> None:
-    """Create the faculty expertise table on an existing database (additive only)."""
-    FacultyExpertise.__table__.create(bind=db.engine, checkfirst=True)
 
 
 def ensure_faculty_expertise_demo() -> int:
@@ -37214,42 +36740,8 @@ def ensure_demo_request_submission_logs() -> int:
     return created
 
 
-def ensure_user_account_schema() -> None:
-    """Add the faculty link column to user_account on existing demo databases."""
-    inspector = inspect(db.engine)
-    if "user_account" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("user_account")}
-    if "faculty_id" not in existing:
-        db.session.execute(text("ALTER TABLE user_account ADD COLUMN faculty_id INTEGER"))
-        db.session.commit()
-    if "must_change_password" not in existing:
-        db.session.execute(text("ALTER TABLE user_account ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0"))
-        db.session.commit()
-
-
-def ensure_faculty_account_schema() -> None:
-    """Add faculty identity/calendar fields and connect every legacy profile to one login."""
-    AdviserAssignment.__table__.create(bind=db.engine, checkfirst=True)
-    inspector = inspect(db.engine)
-    if "faculty" not in inspector.get_table_names():
-        return
-    existing = {column["name"] for column in inspector.get_columns("faculty")}
-    additions = {
-        "email": "VARCHAR(160)",
-        "eligible_roles": "TEXT",
-        "google_calendar_id": "VARCHAR(255)",
-        "google_calendar_email": "VARCHAR(160)",
-        "google_calendar_access_token": "TEXT",
-        "google_calendar_refresh_token": "TEXT",
-        "google_calendar_token_expires_at": "DATETIME",
-        "google_calendar_connected_at": "DATETIME",
-    }
-    for name, sql_type in additions.items():
-        if name not in existing:
-            db.session.execute(text(f"ALTER TABLE faculty ADD COLUMN {name} {sql_type}"))
-    db.session.commit()
-
+def link_faculty_accounts() -> None:
+    """Give every faculty profile an email, eligible roles and one login, and link advisers to their students."""
     default_roles = json.dumps(["Faculty Adviser", "Panel Member", "Panel Chair"])
     for faculty in Faculty.query.order_by(Faculty.id).all():
         if faculty_email_needs_generation(faculty.email):
@@ -37336,65 +36828,61 @@ def ensure_demo_accounts() -> None:
     ensure_workflow_demo_students()
     normalize_withdrawal_workflow_states()
     normalize_immediate_standing_outcomes()
-    # Faculty logins come from the imported faculty roster via ensure_faculty_account_schema().
+    # Faculty logins come from the imported faculty roster via link_faculty_accounts().
 
 app = create_app()
 
 
-def run_schema_upgrades() -> None:
-    """Additive, guarded schema changes and data normalisation. Runs on every start.
+def check_database_matches_models(allow_outdated: bool = False) -> bool:
+    """Create the tables in an empty database; refuse a database the models have outgrown.
 
-    Order matters: anything that reads a table through the ORM must run after the column adders
-    for that table (see tests/test_crosscut.py, old-database startup).
+    The schema comes from the SQLAlchemy models (db.create_all). A database built by an older
+    version of the app is never patched or rebuilt here: the developer reseeds it. With
+    allow_outdated (``python app.py --seed``, which rebuilds the database itself) the mismatch is
+    reported by the return value False instead of stopping the start.
     """
-    # Add newly declared columns before any schema-check queries the affected tables.
-    _early_inspector = inspect(db.engine)
-    if "subject_enrollment" in set(_early_inspector.get_table_names()):
-        _se_existing = {
-            column["name"]
-            for column in _early_inspector.get_columns("subject_enrollment")
-        }
-        for _name, _sql in {
-            "status_note": "TEXT",
-            "status_changed_at": "DATETIME",
-        }.items():
-            if _name not in _se_existing:
-                db.session.execute(
-                    text(
-                        f"ALTER TABLE subject_enrollment "
-                        f"ADD COLUMN {_name} {_sql}"
-                    )
-                )
-        db.session.commit()
-    if "curriculum_offering" in set(_early_inspector.get_table_names()):
-        _co_existing = {c["name"] for c in _early_inspector.get_columns("curriculum_offering")}
-        for _name, _sql in {"assigned_faculty_id": "INTEGER", "schedule": "VARCHAR(160)", "section": "VARCHAR(40)"}.items():
-            if _name not in _co_existing:
-                db.session.execute(text(f"ALTER TABLE curriculum_offering ADD COLUMN {_name} {_sql}"))
-        db.session.commit()
-    # user_account.faculty_id is read by ensure_workflow_activity_schema(), so add it first
-    # (older databases crashed with "no such column: user_account.faculty_id").
-    ensure_user_account_schema()
-    ensure_calendar_schema()  # new calendar/appointment tables and columns: before anything reads Faculty
-    ensure_schedule_request_schema()
-    ensure_monitoring_portal_entry_schema()
-    ensure_monitoring_upload_schema()
-    ensure_monitoring_flag_schema()
-    ensure_awol_structured_request_schema()
-    ensure_student_comprehensive_exam_schema()
-    ensure_student_monitoring_columns_schema()
-    ensure_panel_assignment_schema()
-    ensure_withdrawal_subject_schema()
-    ensure_workflow_activity_schema()
-    ensure_course_workflow_schema()
-    ensure_subject_enrollment_schema()
-    ensure_research_evidence_schema()
-    ensure_research_role_workflow_schema()
-    ensure_curriculum_offering_schema()
-    ensure_faculty_account_schema()
+    inspector = inspect(db.engine)
+    existing_tables = set(inspector.get_table_names())
+    if not existing_tables:
+        db.create_all()
+        return True
+    problems = []
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            problems.append(f"missing table {table.name}")
+            continue
+        existing_columns = {column["name"] for column in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name not in existing_columns:
+                problems.append(f"missing column {table.name}.{column.name}")
+    if problems and allow_outdated:
+        return False
+    if problems:
+        shown = "; ".join(problems[:5]) + (f"; and {len(problems) - 5} more" if len(problems) > 5 else "")
+        print(
+            "Your database was built by an older version of the app. "
+            "Run `npm run seed` to rebuild it (this resets the demo data).\n"
+            f"({shown})",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    return True
+
+
+def run_data_normalisation() -> None:
+    """Data normalisation and backfills that run on every start (no schema changes).
+
+    Order matters: later steps read what earlier ones fill in.
+    """
+    backfill_panel_assignment_gates()
+    backfill_withdrawal_subjects()
+    backfill_workflow_activity()
+    backfill_subject_enrollments()
+    migrate_research_vocabulary()
+    ensure_active_planning_term()
+    link_faculty_accounts()
     label_system_default_working_hours()
     migrate_adviser_appointments()
-    ensure_policy_document_schema()
     normalize_owner_role_vocabulary()
     normalize_stage_vocabulary()
     close_tasks_of_finished_workflows()
@@ -37405,7 +36893,6 @@ def run_schema_upgrades() -> None:
     ensure_business_rules()
     # Demo data for Panel Matching must never block startup.
     try:
-        ensure_faculty_expertise_schema()
         ensure_panel_matching_demo_data()
         db.session.commit()
     except Exception as exc:  # noqa: BLE001
@@ -37414,7 +36901,8 @@ def run_schema_upgrades() -> None:
 
 
 with app.app_context():
-    run_schema_upgrades()
+    if check_database_matches_models(allow_outdated="--seed" in sys.argv):
+        run_data_normalisation()
 
 
 def should_run_startup_tasks(argv=None, environ=None, main_name="unset") -> bool:
@@ -37469,10 +36957,10 @@ def run_startup_tasks(seed_count: int | None = None) -> dict:
             db.session.rollback()
             print(f"The upcoming-defense demo data was not seeded: {exc}")
     seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases
-    ensure_faculty_account_schema()
-    ensure_workflow_activity_schema()
+    link_faculty_accounts()
+    backfill_workflow_activity()
     sync_result = sync_all_curricula()
-    ensure_subject_enrollment_schema()
+    backfill_subject_enrollments()
     sync_automatic_awol_statuses(commit=False)
     db.session.commit()
     sync_leave_cases(commit=True)  # old log-only leave history becomes cases; dates move cases along
@@ -37493,9 +36981,9 @@ if __name__ == "__main__":
         if "--seed" in sys.argv:
             seed_database(seed_count)
             ensure_demo_accounts()
-            ensure_faculty_account_schema()
-            ensure_workflow_activity_schema()
-            ensure_subject_enrollment_schema()
+            link_faculty_accounts()
+            backfill_workflow_activity()
+            backfill_subject_enrollments()
             db.session.commit()
             print(f"Seeded {Student.query.count()} student(s) and {Faculty.query.count()} faculty from imported source sheets.")
             raise SystemExit(0)

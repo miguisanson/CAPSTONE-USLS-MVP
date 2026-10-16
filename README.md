@@ -8,7 +8,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the dated development history from the init
 
 - **Backend:** Python (Flask) JSON API - owns all models, business rules, and the source of truth.
 - **Frontend:** React + Vite + Tailwind CSS single-page app (clean, light, institutional-green UI).
-- **Database:** zero-config **SQLite** by default; **MySQL** supported via `DATABASE_URL`.
+- **Database:** **SQLite** only (a local file, zero setup).
 - **Charts:** Recharts. **Icons:** Lucide (SVG). **Fonts:** Poppins + Open Sans.
 
 ## What It Does
@@ -49,10 +49,10 @@ Assistant's retrieval corpus.
 **Backend**
 - Python 3 + Flask 3 (JSON API and static hosting)
 - Flask-SQLAlchemy (ORM / data models)
-- python-dotenv (config), PyMySQL (only when using MySQL)
+- python-dotenv (config)
 
 **Database**
-- SQLite by default (local file, zero setup) - MySQL 8 optional via `DATABASE_URL`
+- SQLite only (local file, zero setup)
 
 **Tooling**
 - npm + Node.js (frontend), pip (Python), Git
@@ -65,7 +65,6 @@ Assistant's retrieval corpus.
 - Python 3.11+
 - Node.js 18+ and npm
 - Git
-- MySQL 8 is **optional** and only needed if you set `DATABASE_URL`.
 - Tesseract OCR is **optional** and only needed if you want scanned/image-only concept-paper PDFs to be readable.
 
 ## Install and Run
@@ -83,27 +82,9 @@ If you already downloaded or extracted the project, just open a terminal in the 
 
 ### 2. Set up the database
 
-The app uses **SQLite by default**, so there is no separate database server to install for the
-standard setup. Python includes SQLite support, and `npm run setup` will create the local
-`usls_gs_demo.sqlite3` database file automatically.
-
-If you want to use **MySQL** instead of SQLite:
-
-1. Install MySQL 8 and start the MySQL server.
-2. Create a database for the app:
-
-```sql
-CREATE DATABASE usls_gs_demo;
-```
-
-3. Create or update the `.env` file in the project root with your MySQL connection string:
-
-```env
-DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
-```
-
-Replace `root`, `1234`, `localhost`, and `usls_gs_demo` with your actual MySQL username,
-password, host, and database name.
+The app uses **SQLite only**, so there is no separate database server to install. Python includes
+SQLite support, and `npm run setup` will create the local `usls_gs_demo.sqlite3` database file
+automatically.
 
 ### 3. Install dependencies, build the frontend, and seed the database
 
@@ -221,7 +202,7 @@ Set these in the environment or in `.env` (the app never needs `.env` to start).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | local SQLite file | e.g. `mysql+pymysql://root:1234@localhost:3306/usls_gs_demo` |
+| `DATABASE_URL` | local SQLite file | optional; must be a `sqlite:///` file path (anything else is refused) |
 | `FLASK_PORT` | `5000` | port the app listens on |
 | `DEMO_MODE` | `1` | presenter conveniences on/off (see above) |
 | `SECRET_KEY` | public demo value in demo mode | signs the session cookie |
@@ -261,14 +242,11 @@ The whole run takes a few minutes. To run one file or one test:
 
 ## Database
 
-By default the app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no database
-server setup. To use MySQL instead, install MySQL 8, create a database, and set this in `.env`:
-
-```env
-DATABASE_URL=mysql+pymysql://root:1234@localhost:3306/usls_gs_demo
-```
-
-Reseed anytime. This resets data and creates about 350 synthetic students plus related records:
+The app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no database server
+setup. It is SQLite only: the tables are created from the data models, and the app never patches
+an existing database. If you pull a newer version of the app and your database file was built by
+an older one, the app refuses to start and tells you to rebuild it. Reseed anytime (this resets
+the demo data and creates about 350 synthetic students plus related records):
 
 ```cmd
 npm run seed

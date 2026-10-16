@@ -31,7 +31,7 @@ from app import (  # noqa: E402
     app,
     db,
     ensure_authoritative_curricula,
-    ensure_faculty_account_schema,
+    link_faculty_accounts,
     ensure_monitoring_template_courses,
     ensure_panel_matching_demo_data,
     generate_password_hash,
@@ -269,8 +269,8 @@ class PanelMatchingTests(unittest.TestCase):
         with app.app_context():
             # Faculty logins are needed to finalize a panel. Run twice: the first pass
             # creates them, the second links them (existing behaviour of the startup helper).
-            ensure_faculty_account_schema()
-            ensure_faculty_account_schema()
+            link_faculty_accounts()
+            link_faculty_accounts()
             student = self._student("GS-2026-PM-01")
             adviser = self._faculty(student.adviser_name)
             sid = student.id
