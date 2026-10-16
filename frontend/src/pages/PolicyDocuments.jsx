@@ -194,7 +194,7 @@ export default function PolicyDocuments() {
       </div>
     </Card>
 
-    {loading ? <Spinner label="Loading policy documents..." /> : !items.length ? <Card><EmptyState icon={FileText} title="No documents found" hint={query || categoryFilter || statusFilter ? "Try a different search or clear the filters." : "Add the first policy document to begin."} /></Card> : <div className="grid gap-4 lg:grid-cols-2">{items.map((item) =>
+    {loading ? <Spinner label="Loading policy documents..." /> : !items.length ? <Card><EmptyState icon={FileText} title="No documents found" hint={query || categoryFilter || statusFilter ? "Try a different search or clear the filters." : "Add the first policy document to begin."} /></Card> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{items.map((item) =>
       <Card key={`${item.kind}-${item.id}`} className={`p-5 ${item.status === "archived" ? "opacity-75" : ""}`}>
         <div className="flex items-start gap-4">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${item.file_type === "DOCX" ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600"}`}><FileText className="h-5 w-5" /></span>
