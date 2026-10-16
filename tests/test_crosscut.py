@@ -12,7 +12,6 @@ The real-database guard is the existing pattern: create a temp SQLite file and s
 ``DATABASE_URL`` before importing ``app``.
 """
 import os
-import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -43,14 +42,13 @@ from app import (  # noqa: E402
     close_tasks_of_finished_workflows,
     db,
     ensure_demo_accounts,
-    ensure_faculty_account_schema,
     generate_password_hash,
     graduation_eligibility,
+    link_faculty_accounts,
     normalize_owner_role_vocabulary,
-    run_schema_upgrades,
+    run_data_normalisation,
     seed_database,
 )
-from sqlalchemy import inspect as sa_inspect, text  # noqa: E402
 import app as app_module  # noqa: E402
 
 
@@ -602,25 +600,6 @@ class OwnerVocabularyTests(CrossCutBase):
             self.assertEqual(workload["open_tasks"], 3)
 
 
-class OldDatabaseStartupTests(unittest.TestCase):
-    """M08: the start-up steps must not crash on a database from before the faculty-login commit."""
-
-    def test_schema_upgrades_run_on_a_database_without_user_account_faculty_id(self):
-        with app.app_context():
-            db.drop_all()
-            db.create_all()
-            # Rebuild user_account the way it looked before faculty logins existed.
-            ddl = db.session.execute(text("SELECT sql FROM sqlite_master WHERE name='user_account'")).scalar()
-            kept = [line for line in ddl.splitlines() if "faculty_id" not in line]
-            old_ddl = re.sub(r",\s*\)\s*$", chr(10) + ")", chr(10).join(kept))
-            db.session.execute(text("DROP TABLE user_account"))
-            db.session.execute(text(old_ddl))
-            db.session.commit()
-            self.assertNotIn("faculty_id", {c["name"] for c in sa_inspect(db.engine).get_columns("user_account")})
-            run_schema_upgrades()
-            self.assertIn("faculty_id", {c["name"] for c in sa_inspect(db.engine).get_columns("user_account")})
-
-
 class SmallFixesTests(CrossCutBase):
     """L07 (long log text), L11 (faculty details), L09 (no database file tracked in git), uploads root."""
 
@@ -737,8 +716,8 @@ class SeededConsistencyTests(unittest.TestCase):
             db.create_all()
             seed_database(60)
             ensure_demo_accounts()
-            ensure_faculty_account_schema()
-            run_schema_upgrades()
+            link_faculty_accounts()
+            run_data_normalisation()
             db.session.commit()
             cls.staff_id = UserAccount.query.filter_by(role="staff", active=True).first().id
             cls.total_students = Student.query.count()
@@ -859,7 +838,7 @@ class FirstStartTests(unittest.TestCase):
             db.create_all()
             seed_database(60)
             ensure_demo_accounts()
-            ensure_faculty_account_schema()
+            link_faculty_accounts()
             db.session.commit()
             faculty_total = Faculty.query.count()
             self.assertGreater(faculty_total, 0)

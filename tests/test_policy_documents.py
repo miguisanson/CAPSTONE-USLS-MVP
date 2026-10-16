@@ -726,30 +726,6 @@ class HousekeepingTests(PolicyTestBase):
         self.assertNotEqual(self.upload_root, REAL_UPLOAD_ROOT)
         self.assertTrue(REAL_UPLOAD_ROOT.exists())
 
-    def test_startup_migration_adds_the_new_columns_to_an_old_table(self):
-        with app.app_context():
-            db.session.execute(appmod.text("DROP TABLE IF EXISTS policy_document_version"))
-            db.session.execute(appmod.text("DROP TABLE policy_document"))
-            db.session.execute(appmod.text(
-                "CREATE TABLE policy_document (id INTEGER PRIMARY KEY, title VARCHAR(220) NOT NULL, "
-                "description TEXT NOT NULL, original_name VARCHAR(255) NOT NULL, stored_name VARCHAR(255) NOT NULL UNIQUE, "
-                "mime_type VARCHAR(100) NOT NULL, file_size INTEGER NOT NULL, page_count INTEGER NOT NULL, "
-                "chunk_count INTEGER NOT NULL, uploaded_by_user_id INTEGER NOT NULL, created_at DATETIME NOT NULL, "
-                "updated_at DATETIME NOT NULL)"
-            ))
-            db.session.execute(appmod.text(
-                "INSERT INTO policy_document VALUES (1, 'Old', '', 'old.pdf', 'abc-old.pdf', 'application/pdf', 1, 1, 1, 1, "
-                "'2026-01-01 00:00:00', '2026-01-01 00:00:00')"
-            ))
-            db.session.commit()
-            appmod.ensure_policy_document_schema()
-            columns = {c["name"] for c in appmod.inspect(db.engine).get_columns("policy_document")}
-            self.assertTrue({"category", "effective_date", "status", "validation_note"} <= columns, columns)
-            self.assertIn("policy_document_version", appmod.inspect(db.engine).get_table_names())
-            document = db.session.get(appmod.PolicyDocument, 1)
-            self.assertEqual((document.status, document.category), ("active", "Other"))
-            appmod.ensure_policy_document_schema()  # idempotent
-
 
 if __name__ == "__main__":
     unittest.main()
