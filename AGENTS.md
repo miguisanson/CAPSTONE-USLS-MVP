@@ -268,7 +268,7 @@ app.py             single Flask app — every model, route, and workflow/busines
                     register_routes). Being split into modules in ROADMAP
                     Phase 4; line map in .planning/codebase/ARCHITECTURE.md.
 templates/, static/ legacy server-rendered pages — never served (no
-                    render_template; static_folder=None). Moving to archive/.
+                    render_template; static_folder=None). Moved to archive/ (2026-10-17).
 archive/            (from Phase 1) unused files kept for reference; see its README.
 frontend/           React 18 + Vite 5 + Tailwind 3 SPA (src/pages, src/components,
                     src/api.js, src/auth.jsx) — the actual staff/student UI.

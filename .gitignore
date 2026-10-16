@@ -68,3 +68,6 @@ Other_Branches/
 
 # Runtime copy of the Operations Manual draft seeded into the policy library at startup
 uploads/policy_documents/*Operations*Manual*
+
+# Unattended-run watchdog heartbeat
+.planning/.run-heartbeat

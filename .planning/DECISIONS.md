@@ -25,3 +25,9 @@ new grill-me with the owner; agents never re-decide these.
 | IM15 | **Every page must work at 1366 px (laptop), 1920 px (desktop) and 390 px (phone).** | Walkthrough screenshots and the design-system review use these three widths. |
 | IM16 | **Seed dates are relative to the day the seed runs.** | Deadlines and schedules always look current in a demo. The R-001 fingerprint compares dates as offsets from the seed day (and ignores salted password hashes), so two machines seeding on different days still match. |
 | IM17 | **`outputs/` and the generated files under `scripts/docs/` move to `archive/` and stay tracked in git** (owner changed this on 2026-10-17: keep them just in case). | Only generated output (screenshots, built documents) moves; the scripts in `scripts/docs/` stay where they are, and any script that writes to a moved folder is updated to the new path. Everything in `archive/` is tracked. Closes I-028. |
+| IM18 | **During unattended runs the agents never wait for the owner** (owner, 2026-10-17 night: "do not ask for any of my decisions … dont stop building"). | A question that would go to the owner is decided by the main session with its recommended option, logged below as `AD#` (agent decision, owner may veto in the morning), and work continues. Stop condition 5 in `IMPROVE.md` ("queue empty apart from owner items") does not stop the run while any agent-decidable work remains. |
+
+## Agent decisions (owner may veto)
+
+| # | Date | Decision | Why |
+|---|---|---|---|
