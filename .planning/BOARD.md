@@ -24,12 +24,16 @@ Your decisions: `DECISIONS.md`. How unattended work runs: `IMPROVE.md`.
 
 ## Waiting on you (whenever convenient)
 
+- **One small step on your PC (not a decision):** your `.env` file has a `DATABASE_URL=mysql…` line. Once the SQLite-only change lands, the app will refuse to start with it. Delete that line (or put `#` in front of it), then run `npm run seed`. I never open `.env`, so you have to do this one yourself. Teammates do the same.
+
 - **Pick ideas** from `IDEAS.md` (X-06…X-11). My pick: X-06 "Needs my action" page and X-07 reminders.
 - **Tell your teammates** once Phase 1 lands: pull `v5.2-migui_again`, delete their old
   database, run the one seed command. Until then they stay on `v5.1-migui_clean`.
 - Still blocked on the Graduate School (unchanged): `DEFENSE_REVISIONS.md` section G.
 
 ## Done
+
+- 2026-10-17 morning: unused files moved to `archive/` (old templates, static, .codex, outputs, walkthrough screenshots — still in git), ~6,500 lines of dead code/files out of the app; 591 tests green.
 
 - 2026-10-17: grill-me (15 decisions), codebase map (`codebase/`), reference-portal and
   database research (`research/`), improvement mode ported from DD-Project and shelf-and-sword.
