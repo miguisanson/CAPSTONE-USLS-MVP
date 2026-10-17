@@ -201,7 +201,10 @@ for (const viewport of VIEWPORTS) {
     await expect(off.locator(`[id="${labelled}"]`)).toHaveText("Student lifecycle");
 
     // --- the sweep's own rules: no console error, no overflow, no error banner ---------------------------------
-    const report = formatProblems(tracker.problems);
+    // The gallery's "tones" block shows a red notice on purpose; the sweep would call it an error banner, so that one
+    // text is exempt (same as ui-gallery-p1b.spec.js). Everything else must be clean.
+    const exempt = (p) => /error banner visible: danger notice/.test(p.problem);
+    const report = formatProblems(tracker.problems.filter((p) => !exempt(p)));
     expect(report, report.join("\n")).toEqual([]);
 
     // keep a clean screenshot of just this block for the review

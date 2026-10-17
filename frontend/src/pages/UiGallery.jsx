@@ -4,9 +4,11 @@
 // plus a long-text case and an empty case, and extends e2e/ui-gallery.spec.js to match.
 import { Search, Trash2 } from "lucide-react";
 import * as UI from "../components/ui/index.js";
+import { PageHeader } from "../components/ui/index.js";
 import { TONES, TONE_NAMES } from "../lib/tone";
 import UiGalleryP1b from "./UiGalleryP1b.jsx";
 import ModalSection from "./UiGalleryModal.jsx"; // P1c
+import UiGalleryP1e from "./UiGalleryP1e.jsx"; // P1e
 
 const Z_SCALE = [
   ["z-header", "30", "sticky top bar"],
@@ -33,12 +35,12 @@ export default function UiGallery() {
         <div className="page-stack">
           <div>
             <p className="eyebrow">Design system gallery</p>
-            <p role="heading" aria-level={1} className="page-title mt-1" data-gallery="page-title">
-              UI gallery
-            </p>
-            <p className="mt-1 max-w-3xl text-sm text-slate-500">
-              Every token, class and component of the Phase 5 design contract. Development and demo builds only.
-            </p>
+            <PageHeader
+              className="mt-1"
+              title="UI gallery"
+              description="Every token, class and component of the Phase 5 design contract. Development and demo builds only."
+              titleProps={{ "data-gallery": "page-title" }}
+            />
           </div>
 
           <Block id="type-scale" title="Type scale">
@@ -123,6 +125,7 @@ export default function UiGallery() {
 
           <UiGalleryP1b />
           <ModalSection />
+          <UiGalleryP1e />
 
           <Block id="components" title="Components">
             <p className="text-sm text-slate-600" data-gallery="exports">
