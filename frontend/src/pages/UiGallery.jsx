@@ -6,6 +6,7 @@ import { Search, Trash2 } from "lucide-react";
 import * as UI from "../components/ui/index.js";
 import { TONES, TONE_NAMES } from "../lib/tone";
 import UiGalleryP1b from "./UiGalleryP1b.jsx";
+import ModalSection from "./UiGalleryModal.jsx"; // P1c
 
 const Z_SCALE = [
   ["z-header", "30", "sticky top bar"],
@@ -121,6 +122,7 @@ export default function UiGallery() {
           </Block>
 
           <UiGalleryP1b />
+          <ModalSection />
 
           <Block id="components" title="Components">
             <p className="text-sm text-slate-600" data-gallery="exports">
