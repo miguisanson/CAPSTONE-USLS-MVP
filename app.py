@@ -36785,6 +36785,7 @@ def build_demo_database() -> dict:
         migrate_adviser_appointments()  # one appointment per adviser assignment
         ensure_course_year_consistency()
         ensure_delay_status_consistency()
+        ensure_demo_accounts()  # the workflow demo students keep their own year level and standing
         # 4. The policy library and the future defenses that fill the calendars.
         ensure_operations_manual_policy_document()  # the draft manual is searchable as a Draft
         ensure_upcoming_defense_demo()
