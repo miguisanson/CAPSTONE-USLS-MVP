@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, ClipboardCheck, FileCheck2, Send, UserRoundCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, FileCheck2, Send, UserRoundCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, EmptyState, ErrorNote, InlineNotice, PageHeader, Spinner, StatusBadge } from "../components/ui";
-import { Field, Input, Textarea } from "../components/forms";
+import { Button, Card, DecisionPanel, EmptyState, Field, InlineNotice, Input, PageHeader, Spinner, Stepper, StatusChip, Textarea } from "../components/ui/index.js";
+import { toneOf } from "../lib/tone";
 import { useConfirm } from "../components/confirm";
 import { formatDay } from "./faculty/FacultyContext";
 import AdviserRecordCard from "./AdviserRecordCard";
@@ -14,13 +14,8 @@ const PROTOCOL =
 const RECORD_ROLES = ["staff", "research_coordinator", "admin"];
 const IN_PROGRESS = ["Applied", "Noted by AC", "Under deliberation", "Appointed"];
 const KIND_LABEL = { Initial: "New", Change: "Change of adviser", Recorded: "Recorded" };
-const KIND_CLASS = {
-  Initial: "bg-brand-50 text-brand-700 ring-brand-200",
-  Change: "bg-blue-50 text-blue-700 ring-blue-200",
-  Recorded: "bg-slate-100 text-slate-600 ring-slate-200",
-};
-const DANGER_BTN =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 cursor-pointer disabled:opacity-60";
+// The chip's colour comes from this hint (the words "New", "Change of adviser", "Recorded" are not statuses).
+const KIND_TONE = { Initial: "good", Change: "info", Recorded: "muted" };
 
 const needsAction = (row) => (row.actions || []).length > 0;
 const awaitingContract = (row) =>
@@ -33,27 +28,11 @@ const TABS = [
   { key: "all", label: "All", match: () => true, empty: ["No adviser appointments yet", "Applications from students and recorded appointments are listed here."] },
 ];
 
-// Compact progress tracker: done steps get a tick, the current step is outlined.
+// Compact progress tracker: done steps get a tick, the current step is marked.
 function StepsTracker({ steps }) {
   if (!steps?.length) return null;
-  return (
-    <ol className="flex flex-wrap gap-1.5" aria-label="Progress">
-      {steps.map((step) => {
-        const tone = step.done
-          ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-          : step.current
-            ? "bg-white text-brand-700 ring-2 ring-brand-500"
-            : "bg-slate-50 text-slate-400 ring-slate-200";
-        return (
-          <li key={step.key} aria-current={step.current ? "step" : undefined} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${tone}`}>
-            {step.done && <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />}
-            {step.label}
-            <span className="sr-only">{step.done ? " (done)" : step.current ? " (current step)" : " (not yet)"}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
+  const list = steps.map((step) => ({ key: step.key, label: step.label, state: step.done ? "complete" : step.current ? "current" : "upcoming" }));
+  return <Stepper steps={list} compact title="Progress" />;
 }
 
 function AdviseeMeter({ advisees, max }) {
@@ -78,7 +57,7 @@ function NoteLine({ label, who, at, children }) {
   if (!children) return null;
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+      <p className="eyebrow">
         {label}
         {who ? ` - ${who}` : ""}
         {at ? ` · ${formatDay(at)}` : ""}
@@ -101,7 +80,7 @@ function ContractLine({ contract, status }) {
     Overdue: "Forms 3.2 and 3.3: overdue",
   }[contract.status] || `Forms 3.2 and 3.3: ${contract.status}`;
   return (
-    <p className={`text-sm font-semibold ${overdue ? "text-red-700" : contract.status === "Received" ? "text-emerald-700" : "text-slate-600"}`}>
+    <p className={`text-sm font-semibold ${overdue ? "text-red-700" : contract.status === "Received" ? "text-brand-700" : "text-slate-600"}`}>
       {text}
       {contract.status !== "Received" && contract.due_on ? ` - due ${formatDay(contract.due_on)}${leftText}` : ""}
     </p>
@@ -140,56 +119,78 @@ function NoteForm({ busy, onCancel, onSubmit }) {
         <Textarea value={note} rows={2} maxLength={500} onChange={(event) => setNote(event.target.value)} />
       </Field>
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className="btn-primary" disabled={busy}><ClipboardCheck className="h-4 w-4" /> Note this application</button>
-        <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>
+        <Button type="submit" icon={ClipboardCheck} disabled={busy}>Note this application</Button>
+        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
       </div>
     </form>
   );
 }
 
-// One inline form for the Dean: appoint (optional note, Associate Dean name, sixth-advisee exception) or return (reason).
+// One inline panel for the Dean: appoint (optional note, Associate Dean name, sixth-advisee exception) or return (reason).
+// The DecisionPanel holds the comment, its rules and the confirmation; the Associate Dean field and the exception box are its children.
 function DecisionForm({ row, mode, forceException, busy, onCancel, onSubmit }) {
-  const [note, setNote] = useState("");
   const [associate, setAssociate] = useState("");
   const [exception, setException] = useState(false);
-  const [error, setError] = useState("");
   const appoint = mode === "appoint";
   const atLimit = (row.advisees || 0) >= (row.max_advisees || 5) || forceException;
-  const submit = (event) => {
-    event.preventDefault();
-    const text = note.trim();
-    if (!appoint && text.length < 3) return setError("Give the reason this application is not approved. The student will see it.");
-    if (appoint && atLimit && !exception) return setError("Tick the Dean's exception to appoint another advisee.");
-    if (appoint && atLimit && text.length < 3) return setError("A Dean's exception needs a short note.");
-    setError("");
-    onSubmit({ note: text, associate_dean: associate.trim(), cap_exception: appoint && atLimit && exception });
-  };
+  const needsException = appoint && atLimit;
+  const who = `${row.student_name} and ${row.faculty_name}`;
+  const tickRule = "Tick the Dean's exception to appoint another advisee.";
+  const action = appoint
+    ? {
+        key: "appoint",
+        label: "Appoint adviser",
+        tone: "approve",
+        icon: UserRoundCheck,
+        requireComment: atLimit,
+        disabled: atLimit && !exception,
+        hint: atLimit && !exception ? tickRule : undefined,
+        confirm: {
+          title: "Appoint this adviser?",
+          message: `${row.faculty_name} is appointed research adviser of ${row.student_name}. Form 3.1 is issued and the adviser is asked to accept.`,
+          confirmLabel: "Appoint adviser",
+        },
+      }
+    : {
+        key: "return",
+        label: "Return application",
+        tone: "return",
+        requireComment: true,
+        confirm: {
+          title: "Return this application?",
+          message: `${who}: the application is not approved and the student sees your reason. They may nominate again.`,
+          confirmLabel: "Return application",
+          tone: "danger",
+        },
+      };
   return (
-    <form onSubmit={submit} className={`space-y-3 rounded-xl border p-3 ${appoint ? "border-brand-200 bg-brand-50/40" : "border-red-100 bg-red-50/40"}`}>
-      <Field label={appoint ? (atLimit ? "Note for the exception" : "Dean's note (optional)") : "Reason for returning"} required={!appoint || atLimit}>
-        <Textarea value={note} rows={2} maxLength={600} onChange={(event) => setNote(event.target.value)} />
-      </Field>
-      {appoint && (
-        <Field label="Associate Dean name (optional)" hint="Fill in only if an Associate Dean is approving on the Dean's behalf.">
-          <Input value={associate} maxLength={160} onChange={(event) => setAssociate(event.target.value)} />
-        </Field>
-      )}
-      {appoint && atLimit && (
-        <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer" checked={exception} onChange={(event) => setException(event.target.checked)} />
-          <span>Dean's exception: appoint a sixth advisee. {row.faculty_name} already has {row.advisees} of {row.max_advisees}.</span>
-        </label>
-      )}
-      <ErrorNote message={error} />
-      <div className="flex flex-wrap gap-2">
-        {appoint ? (
-          <button type="submit" className="btn-primary" disabled={busy || (atLimit && !exception)}><UserRoundCheck className="h-4 w-4" /> Appoint adviser</button>
-        ) : (
-          <button type="submit" className={DANGER_BTN} disabled={busy}>Return application</button>
+    <div className={`rounded-xl border p-3 ${appoint ? "border-brand-200 bg-brand-50/40" : "border-slate-200 bg-slate-50/60"}`}>
+      <DecisionPanel
+        variant="plain"
+        busy={busy}
+        actions={[action]}
+        commentLabel={appoint ? (atLimit ? "Note for the exception" : "Dean's note (optional)") : "Reason for returning"}
+        commentRows={2}
+        maxLength={600}
+        minCommentLength={3}
+        commentRequiredMessage={appoint ? "A Dean's exception needs a short note." : "Give the reason this application is not approved. The student will see it."}
+        validate={() => (needsException && !exception ? tickRule : "")}
+        onCancel={onCancel}
+        onDecide={(_key, note) => onSubmit({ note, associate_dean: associate.trim(), cap_exception: needsException && exception })}
+      >
+        {appoint && (
+          <Field label="Associate Dean name (optional)" hint="Fill in only if an Associate Dean is approving on the Dean's behalf.">
+            <Input value={associate} maxLength={160} onChange={(event) => setAssociate(event.target.value)} />
+          </Field>
         )}
-        <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>
-      </div>
-    </form>
+        {needsException && (
+          <label className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${toneOf("warning").notice}`}>
+            <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-brand-600" checked={exception} onChange={(event) => setException(event.target.checked)} />
+            <span>Dean's exception: appoint a sixth advisee. {row.faculty_name} already has {row.advisees} of {row.max_advisees}.</span>
+          </label>
+        )}
+      </DecisionPanel>
+    </div>
   );
 }
 
@@ -203,7 +204,8 @@ function AppointmentCard({ row, onDone }) {
   const missing = useMemo(() => missingAgreements(row), [row]);
   const who = `${row.student_name} and ${row.faculty_name}`;
 
-  async function run(call) {
+  // `inline`: the caller is a DecisionPanel, which shows the failure itself and keeps the typed comment.
+  async function run(call, inline = false) {
     setBusy(true);
     setError("");
     try {
@@ -211,8 +213,9 @@ function AppointmentCard({ row, onDone }) {
       setMode(null);
       onDone();
     } catch (e) {
-      setError(e.message || "That did not work. Please try again.");
       if (/exception/i.test(e.message || "")) setForceException(true);
+      if (inline) throw e;
+      setError(e.message || "That did not work. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -227,42 +230,34 @@ function AppointmentCard({ row, onDone }) {
     if (ok) run(() => api.forwardAdviserApplication(row.id));
   }
 
-  async function decide(decision, fields) {
+  // The DecisionPanel has already asked "Appoint this adviser?" / "Return this application?".
+  function decide(decision, fields) {
     const appoint = decision === "appoint";
-    const ok = await confirm({
-      title: appoint ? "Appoint this adviser?" : "Return this application?",
-      message: appoint
-        ? `${row.faculty_name} is appointed research adviser of ${row.student_name}. Form 3.1 is issued and the adviser is asked to accept.`
-        : `${who}: the application is not approved and the student sees your reason. They may nominate again.`,
-      confirmLabel: appoint ? "Appoint adviser" : "Return application",
-      tone: appoint ? "default" : "danger",
-    });
-    if (!ok) return;
     const payload = { decision, note: fields.note };
     if (appoint && fields.associate_dean) payload.associate_dean = fields.associate_dean;
     if (appoint && fields.cap_exception) payload.cap_exception = true;
-    run(() => api.decideAdviserAppointment(row.id, payload));
+    return run(() => api.decideAdviserAppointment(row.id, payload), true);
   }
 
   const toggle = (key) => { setMode((current) => (current === key ? null : key)); setError(""); };
 
   return (
-    <Card className="space-y-3 p-4 sm:p-5">
+    <Card className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-base font-semibold text-ink">{row.student_name}</p>
-          <p className="text-xs text-slate-500">
+          <p className="card-title">{row.student_name}</p>
+          <p className="meta">
             {[row.student_number, row.program_code, row.research_type].filter(Boolean).join(" · ")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${KIND_CLASS[row.kind] || KIND_CLASS.Recorded}`}>{KIND_LABEL[row.kind] || row.kind}</span>
-          <StatusBadge value={row.status} />
+          <StatusChip status={KIND_LABEL[row.kind] || row.kind} tone={KIND_TONE[row.kind] || "muted"} dot={false} />
+          <StatusChip status={row.status} />
         </div>
       </div>
 
       <div className="rounded-xl border border-slate-100 p-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{row.kind === "Change" ? "New adviser" : "Nominated adviser"}</p>
+        <p className="eyebrow">{row.kind === "Change" ? "New adviser" : "Nominated adviser"}</p>
         <p className="text-sm font-semibold text-ink">{row.faculty_name}{row.faculty_college ? <span className="font-normal text-slate-500"> · {row.faculty_college}</span> : null}</p>
         <AdviseeMeter advisees={row.advisees} max={row.max_advisees} />
         {row.kind === "Change" && row.current_adviser_name && <p className="mt-1.5 text-xs text-slate-500">Replaces {row.current_adviser_name}.</p>}
@@ -283,9 +278,7 @@ function AppointmentCard({ row, onDone }) {
       </div>
 
       {(row.warnings || []).map((warning) => (
-        <p key={warning} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {warning}
-        </p>
+        <InlineNotice key={warning} tone="warning" icon={AlertTriangle}>{warning}</InlineNotice>
       ))}
 
       <ContractLine contract={row.contract} status={row.status} />
@@ -301,19 +294,14 @@ function AppointmentCard({ row, onDone }) {
       {actions.length > 0 && (
         <div className="space-y-3 border-t border-slate-100 pt-3">
           <div className="flex flex-wrap gap-2">
-            {actions.includes("note") && <button type="button" className="btn-primary" disabled={busy} onClick={() => toggle("note")}><ClipboardCheck className="h-4 w-4" /> Note application</button>}
-            {actions.includes("forward") && <button type="button" className="btn-primary" disabled={busy} onClick={forward}><Send className="h-4 w-4" /> Send to the Dean</button>}
-            {actions.includes("appoint") && <button type="button" className="btn-primary" disabled={busy} onClick={() => toggle("appoint")}><UserRoundCheck className="h-4 w-4" /> Appoint adviser</button>}
-            {actions.includes("return") && <button type="button" className="btn-ghost" disabled={busy} onClick={() => toggle("return")}>Return application</button>}
+            {actions.includes("note") && <Button icon={ClipboardCheck} disabled={busy} onClick={() => toggle("note")}>Note application</Button>}
+            {actions.includes("forward") && <Button icon={Send} disabled={busy} onClick={forward}>Send to the Dean</Button>}
+            {actions.includes("appoint") && <Button icon={UserRoundCheck} disabled={busy} onClick={() => toggle("appoint")}>Appoint adviser</Button>}
+            {actions.includes("return") && <Button variant="secondary" disabled={busy} onClick={() => toggle("return")}>Return application</Button>}
             {actions.includes("contract-received") && (
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={busy}
-                onClick={() => run(() => api.receiveAdviserContract(row.id))}
-              >
-                <FileCheck2 className="h-4 w-4" /> Forms 3.2 and 3.3 received
-              </button>
+              <Button icon={FileCheck2} disabled={busy} onClick={() => run(() => api.receiveAdviserContract(row.id))}>
+                Forms 3.2 and 3.3 received
+              </Button>
             )}
           </div>
           {mode === "note" && <NoteForm busy={busy} onCancel={() => setMode(null)} onSubmit={(note) => run(() => api.noteAdviserApplication(row.id, note))} />}
@@ -322,7 +310,7 @@ function AppointmentCard({ row, onDone }) {
           )}
         </div>
       )}
-      <ErrorNote message={error} />
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
     </Card>
   );
 }
@@ -346,7 +334,7 @@ export default function AdviserAppointments({ role, embedded = false, onChanged 
   };
 
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className="page-stack animate-fade-up">
       {embedded ? (
         <p className="text-sm text-slate-600">{PROTOCOL}</p>
       ) : (
@@ -366,20 +354,20 @@ export default function AdviserAppointments({ role, embedded = false, onChanged 
               role="tab"
               aria-selected={active}
               onClick={() => setTab(item.key)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors cursor-pointer ${active ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-200 cursor-pointer max-sm:min-h-11 ${active ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
             >
               {item.label}
-              {count ? <span className={`ml-2 rounded-full px-1.5 py-0.5 text-[11px] ${active ? "bg-white/25" : "bg-slate-100 text-slate-600"}`}>{count}</span> : null}
+              {count ? <span className={`ml-2 rounded-full px-1.5 py-0.5 text-2xs ${active ? "bg-white/25" : "bg-slate-100 text-slate-600"}`}>{count}</span> : null}
             </button>
           );
         })}
       </div>
 
-      {source.error && <ErrorNote message={source.error} />}
+      {source.error && <InlineNotice tone="danger">{source.error}</InlineNotice>}
       {source.loading && !source.data ? (
-        <Card className="p-6"><Spinner label="Loading appointments..." /></Card>
+        <Card pad="lg"><Spinner label="Loading appointments..." /></Card>
       ) : rows.length === 0 ? (
-        !source.error && <Card className="p-6"><EmptyState icon={CheckCircle2} title={current.empty[0]} hint={current.empty[1]} /></Card>
+        !source.error && <Card pad="lg"><EmptyState icon={CheckCircle2} title={current.empty[0]} hint={current.empty[1]} /></Card>
       ) : (
         <div role="tabpanel" className="space-y-4">
           {tab === "all" && <InlineNotice>{rows.length} appointment{rows.length === 1 ? "" : "s"}, newest first.</InlineNotice>}
