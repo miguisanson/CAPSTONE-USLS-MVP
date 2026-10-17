@@ -23,7 +23,7 @@ A growing list of things that must stay true. Adapted from DD-Project-GameMaker.
 
 | ID | What must stay true | Tags | How checked | Status | Added | Last run |
 |----|---------------------|------|-------------|--------|-------|----------|
-| R-001 | Two fresh seeds on two machines (or two temp dirs) produce the same database fingerprint, and a normal app start does not change it. (I-015) | seed | UT `tests/test_seed_determinism.py` (Phase 1) | PENDING | 2026-10-17 | NOT RUN |
+| R-001 | Two fresh seeds on two machines (or two temp dirs) produce the same database fingerprint, a first start on an empty database builds the same data, and a normal app start does not change it. (I-015) | seed | UT `tests/test_seed_determinism.py` | ACTIVE | 2026-10-17 | pkt/seed faa46b4: PASS (4/4); fingerprint identical with PYTHONHASHSEED 0 and 4242 |
 | R-002 | Every page of every sign-in role loads with no console error, no failed `/api` call, no error banner, and no horizontal scroll at 1366, 1920 and 390 px. (I-031..I-035, I-037) | ui-layout | PW `frontend/e2e/sweep.spec.js` (`npm run e2e`); negative control `npm run e2e:negative` must fail | ACTIVE (academic-coordinator red until I-036) | 2026-10-17 | ada73ad+mobile: 13 PASS, 1 FAIL (I-036 only) |
 | R-003 | Enrollment "Record dropped subject" dialog fits a 1366×768 screen, scrolls inside itself, and its Save button can be reached and clicked. (I-001, J1) | enrollment, ui-layout | PW `frontend/e2e/section-j.spec.js` I-001 | ACTIVE | 2026-10-17 | after j-frontend merge: PASS |
 | R-004 | Endorsing and signing a Form 1 shows no getContext error and the queue shows Endorsed without a reload. (I-004, J4) | form1 | PW `frontend/e2e/section-j.spec.js` I-004 | ACTIVE | 2026-10-17 | after j-frontend merge: PASS |

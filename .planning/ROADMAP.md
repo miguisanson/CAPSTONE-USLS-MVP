@@ -16,8 +16,8 @@ Rules for every phase:
 
 ## Phases
 
-- [ ] **Phase 1: Reproducible data and archive** - deterministic SQLite seed, MySQL removed, clean schema, no data changes on start, dead files to `archive/`
-- [ ] **Phase 2: Role walkthroughs** - Playwright per role on the seeded data, screenshots at 1366/1920/390
+- [x] **Phase 1: Reproducible data and archive** (done 2026-10-17: gate 593 OK, R-001 green) - deterministic SQLite seed, MySQL removed, clean schema, no data changes on start, dead files to `archive/`
+- [x] **Phase 2: Role walkthroughs** (done 2026-10-17: `npm run e2e`, 7 roles, 116 pages, negative control) - Playwright per role on the seeded data, screenshots at 1366/1920/390
 - [ ] **Phase 3: Section J bugs** - close I-001…I-014 with tests
 - [ ] **Phase 4: Backend split** - `app.py` into models, services and blueprints; duplicates merged
 - [ ] **Phase 5: Design system** - tokens, shared components, every page migrated, cheap ideas X-01…X-05
