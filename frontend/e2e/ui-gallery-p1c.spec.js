@@ -271,7 +271,10 @@ for (const vp of VIEWS) {
       await page.screenshot({ path: join(OUT_DIR, `confirm-danger-${vp.width}.png`) });
       // the safe button has the focus when a destructive dialog opens
       await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
-      // red confirm button
+      // red confirm button. The mouse is still where the opener was clicked, which at 390 px can be right over this
+      // button (a taller gallery page scrolls the opener higher up), and a hovered button is red-700: park it first.
+      await page.mouse.move(vp.width - 5, 5);
+      await page.waitForTimeout(300); // the colour change is a 200 ms transition
       const bg = await dialog.getByRole("button", { name: "Remove record" }).evaluate((el) => getComputedStyle(el).backgroundColor);
       expect(bg, "destructive confirm button is red-600").toBe("rgb(220, 38, 38)");
       await page.keyboard.press("Enter");
