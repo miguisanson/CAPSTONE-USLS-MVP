@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "e2e": "vite build && node scripts/e2e.mjs",
+    "check:ui": "node scripts/check-ui.mjs",
+    "check:ui:strict": "node scripts/check-ui.mjs --strict",
+    "test:check-ui": "node --test scripts/check-ui.test.mjs",
+    "e2e": "npm run check:ui && node scripts/e2e.mjs --build",
     "e2e:negative": "vite build && node scripts/e2e.mjs --negative",
     "e2e:install": "node scripts/e2e.mjs install chromium"
   },

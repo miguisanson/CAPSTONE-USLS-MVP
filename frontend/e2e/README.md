@@ -110,3 +110,17 @@ plus an injected console error, uncaught exception, failing API call and
 5000 px-wide element on the dashboard. It **must fail** (exit code 1) and list
 those problems. If it ever passes, the checker has gone blind and a green sweep
 means nothing.
+
+## UI check and component gallery (Phase 5)
+
+`npm run e2e` first runs `npm run check:ui` (`scripts/check-ui.mjs`): a ratchet over
+`src/` that counts arbitrary text sizes, off-scale sizes, raw `<table>`, `<h1>`, modal
+overlays and local status colour maps. A count may fall, never rise
+(`check-ui.baseline.json`); `npm run check:ui:strict` is the end state (all zero).
+Its own test: `npm run test:check-ui`.
+
+The build step of `npm run e2e` sets `VITE_UI_GALLERY=1`, which adds the `/__ui`
+component gallery (not in any sidebar; also on in `npm run dev`).
+`e2e/ui-gallery.spec.js` (Playwright project `ui-gallery`) opens it at 1366, 1920
+and 390 and checks the type scale, button classes, 16px phone inputs, the page
+width cap and the z-index scale. Screenshots: `e2e-artifacts/screens/ui-gallery/`.

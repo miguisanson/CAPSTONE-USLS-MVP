@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { useAuth } from "./auth";
@@ -26,6 +27,11 @@ import TermSettings from "./pages/TermSettings";
 import PolicyDocuments from "./pages/PolicyDocuments";
 import BusinessRules from "./pages/BusinessRules";
 
+// The component gallery (/__ui) exists only in dev and in the e2e/demo build (VITE_UI_GALLERY=1); in a normal
+// production build the condition is false at build time and the page is left out of the bundle. No sidebar link.
+const UI_GALLERY_ON = import.meta.env.DEV || import.meta.env.VITE_UI_GALLERY === "1";
+const UiGallery = UI_GALLERY_ON ? lazy(() => import("./pages/UiGallery")) : null;
+
 // Where each role lands by default.
 function homeFor(user) {
   if (!user) return "/login";
@@ -49,6 +55,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/change-password" element={<ChangePassword />} />
+      {UiGallery && (
+        <Route path="/__ui" element={<Suspense fallback={null}><UiGallery /></Suspense>} />
+      )}
       {/* Role portals: student, dean and faculty use the same Layout shell as the
           staff side; only the navigation items differ (see components/portalNav.jsx).
           Each provider wraps the Layout so the sidebar can show action badges. */}
