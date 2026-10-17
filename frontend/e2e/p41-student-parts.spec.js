@@ -6,10 +6,12 @@
 // a readmission with a checklist, a process case with messages, a booked defense, a missing document...), the browser
 // answers /api/student-portal/context with the REAL response plus that state (page.route), so nothing is written to the
 // database and every value is fixed. Pages covered:
-//   /student                           hero tiles, My Academic Status (stage list), Workflow Status, Leave and return,
-//                                      Activity History (logs), Schedule requests, Next Step, leave banner
-//   /student/progress                  the same panels; a broken page lands in the section boundary
+//   /student                           the action-first home (IM19): header, key numbers, lifecycle, action rows, the one-line links
+//                                      and the empty states
+//   /student/progress                  My Academic Status (stage list), Workflow Status; a broken page lands in the section boundary
 //   /student/documents                 Administrative Documents (upload / view buttons), Activity History
+//   /student/activity                  Activity History (logs)
+//   /student/defense-schedule          Schedule requests
 //   /student/requests/leave-of-absence the leave case card: chip, waiting line, why it was sent back, facts, reason,
 //                                      timeline, withdraw, stage history, earlier requests (+ their messages)
 //   /student/requests/readmission      the readmission card: checklist, linked leave, intent
@@ -72,9 +74,11 @@ const panel = (page, title) =>
 /** One `label: value` fact of a card (dl > div > dt + dd). */
 const fact = (scope, label) =>
   scope.locator("dl > div").filter({ has: scope.page().locator("dt").filter({ hasText: new RegExp(`^${label}$`, "i") }) });
-/** The tile that holds a label (hero tiles). */
-const tile = (page, label) =>
-  page.locator("main").getByText(new RegExp(`^${label}$`, "i")).first().locator("xpath=..");
+/** The key number (StatCard) with a label, on the action-first home. */
+const stat = (page, label) =>
+  page.locator("main").locator('[data-slot="label"]', { hasText: new RegExp(`^${label}$`, "i") }).locator("xpath=..");
+/** A section of the home, by its heading. */
+const sectionOf = (page, name) => page.locator("main").locator("section", { has: page.getByRole("heading", { name, exact: true }) });
 /** Text A appears above text B on the page. */
 async function above(page, a, b) {
   const ya = (await page.getByText(a, { exact: true }).first().boundingBox()).y;
@@ -195,21 +199,57 @@ function processScenario(data) {
 test.describe("P4.1 shared student parts", () => {
   test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));
 
-  test("Overview (Therese): hero tiles, stage list, workflow rows, leave rows, activity, schedules, next step", async ({ browser }) => {
+  test("Overview (Therese): the action-first home keeps the header, key numbers, lifecycle, action rows and one-line links (IM19)", async ({ browser }) => {
     await runPage(browser, { email: THERESE, mutate: overviewScenario, path: "/student", shot: "overview" }, async (page) => {
-      await expect(page.getByRole("heading", { level: 2, name: "Therese Lacson" })).toBeVisible();
-      await expect(page.getByText("GS-2026-READ-01 - Master of Arts in Education")).toBeVisible();
-      await expect(page.getByText(/AY Entry 2026-2027 · Year 1/)).toBeVisible();
-      await expect(page.getByText("readmission.therese@usls.edu.ph", { exact: true }).first()).toBeVisible();
-      // the four hero tiles: label and value together; Progress and Research are status chips
-      await expect(tile(page, "Stage")).toContainText("LOA");
-      await expect(tile(page, "Progress")).toContainText("On Track");
-      await expect(tile(page, "Coursework")).toContainText("16.7%");
-      await expect(tile(page, "Research")).toContainText("Not started");
+      const m = page.locator("main");
+      // what the old hero showed, as the new header: name, program, student number, AY entry, course year, progress chip
+      await expect(m.locator("h1")).toHaveText("Welcome, Therese");
+      const header = m.locator("h1").locator("xpath=ancestor::*[.//p][1]");
+      await expect(header).toContainText("Master of Arts in Education");
+      await expect(header).toContainText("GS-2026-READ-01");
+      await expect(header).toContainText(/AY entry 2026-2027/);
+      await expect(header).toContainText(/Year 1/);
+      await expect(header).toContainText("On Track");
+      // the key numbers: label and value together (Coursework and Research; Stage moved into the lifecycle card)
+      await expect(stat(page, "Coursework")).toContainText("16.7%");
+      await expect(stat(page, "Research")).toContainText("Not started");
+      await expect(sectionOf(page, "Your lifecycle")).toContainText("You are at: LOA");
 
-      // the leave banner (tone warn): a status region
-      await expect(page.getByRole("status").filter({ hasText: "Spec leave banner" })).toContainText("Spec banner text for the student.");
+      // the leave notice (tone warn) is now an action row, not a banner region
+      const mine = sectionOf(page, "Needs your action");
+      await expect(mine).toContainText("Spec leave banner");
+      await expect(mine).toContainText("Spec banner text for the student.");
+      // Next Step: the first three recommendations become action rows, each with its owner
+      await expect(mine).toContainText("Spec step one");
+      await expect(mine).toContainText("Owner: Student");
+      await expect(mine).toContainText("Spec step three");
+      await expect(mine).toContainText("Owner: Dean");
+      await expect(mine).not.toContainText("Spec step four hidden");
 
+      // Recent activity: title, who and who is next, date
+      const recent = sectionOf(page, "Recent activity");
+      await expect(recent).toContainText("Leave of absence returned");
+      await expect(recent).toContainText("Graduate School Staff - next: Student");
+      await expect(recent).toContainText("Request received");
+      await expect(recent).toContainText("Student - next: Pending");
+      await expect(recent.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/student/activity");
+
+      // the blocks that left the home: one line each and a link to the page that holds the full content
+      const elsewhere = sectionOf(page, "Elsewhere in your portal");
+      const line = (label) => elsewhere.locator("li").filter({ has: page.getByRole("link", { name: label, exact: true }) });
+      await expect(elsewhere.getByRole("link", { name: "Defense Schedule", exact: true })).toHaveAttribute("href", "/student/defense-schedule");
+      await expect(line("Defense Schedule")).toContainText("Your Title Defense is booked for Fri, Dec 4, 2026.");
+      await expect(elsewhere.getByRole("link", { name: "Request Center", exact: true })).toHaveAttribute("href", "/student/requests");
+      await expect(line("Request Center")).toContainText("Graduation: Needs verification");
+      await expect(elsewhere.getByRole("link", { name: "Leave of Absence", exact: true })).toHaveAttribute("href", "/student/requests/leave-of-absence");
+      await expect(line("Leave of Absence")).toContainText("Leave of Absence: On leave · Readmission: In staff review");
+      await expect(elsewhere.getByRole("link", { name: "Research Adviser", exact: true })).toHaveAttribute("href", "/student/adviser");
+      await expect(line("Research Adviser")).toContainText("Dr. Liwayway Bautista");
+    });
+  });
+
+  test("My Progress (Therese): the stage list, coursework and research, and the workflow rows", async ({ browser }) => {
+    await runPage(browser, { email: THERESE, mutate: overviewScenario, path: "/student/progress", shot: "progress-therese" }, async (page) => {
       // My Academic Status: the leave notice, the stage names in order, coursework and research
       const status = panel(page, "My Academic Status");
       await expect(status).toContainText("Your current stage, requirements, and next step");
@@ -240,20 +280,11 @@ test.describe("P4.1 shared student parts", () => {
         await expect(row, label).toContainText(chip);
         await expect(row, label).toContainText(detail);
       }
+    });
+  });
 
-      // Leave and return: chips and details of the (injected) cases, and a link into each request page
-      const leave = panel(page, "Leave and return");
-      await expect(leave).toContainText("Where your leave of absence and readmission requests stand");
-      await expect(leave.getByText("On leave", { exact: true })).toBeVisible(); // the student is on leave
-      await expect(leave.getByText("In staff review", { exact: true })).toBeVisible();
-      await expect(leave).toContainText("Waiting for: you. Open the request to correct it.");
-      await expect(leave).toContainText("Waiting for: Graduate School Staff");
-      const links = leave.getByRole("link", { name: /Open request/ });
-      await expect(links).toHaveCount(2);
-      await expect(links.nth(0)).toHaveAttribute("href", "/student/requests/leave-of-absence");
-      await expect(links.nth(1)).toHaveAttribute("href", "/student/requests/readmission");
-
-      // Activity History: the toggle with a count, the entries when opened
+  test("Activity page (Therese): the logs, their toggle and their entries", async ({ browser }) => {
+    await runPage(browser, { email: THERESE, mutate: overviewScenario, path: "/student/activity", shot: "activity-therese" }, async (page) => {
       const activity = panel(page, "Activity History");
       await expect(activity).toContainText("Submissions, decisions, and next owners");
       const toggle = activity.getByRole("button", { name: /View logs/ });
@@ -268,8 +299,11 @@ test.describe("P4.1 shared student parts", () => {
       await expect(activity).toContainText("Request received");
       await expect(activity).toContainText("next: Pending");
       await expect(activity).toContainText("Aug 18, 2026");
+    });
+  });
 
-      // Schedule requests
+  test("Defense Schedule page (Therese): a booked and a deferred defense in full", async ({ browser }) => {
+    await runPage(browser, { email: THERESE, mutate: overviewScenario, path: "/student/defense-schedule", shot: "defense-therese" }, async (page) => {
       const sched = panel(page, "Schedule requests");
       await expect(sched).toContainText("Title Defense");
       await expect(sched).toContainText(/Fri, Dec 4, 2026/);
@@ -285,32 +319,31 @@ test.describe("P4.1 shared student parts", () => {
       await expect(sched).toContainText("Time not set (Philippine time) - Mode not set - Venue or link not set yet");
       await expect(sched).toContainText("Waiting for the Research Coordinator to set a new date.");
       await expect(sched).toContainText("Panel not complete");
-
-      // Next Step: the first three recommendations, each with its owner
-      const next = panel(page, "Next Step");
-      await expect(next).toContainText("Spec step one");
-      await expect(next).toContainText("Owner: Student");
-      await expect(next).toContainText("Spec step three");
-      await expect(next).toContainText("Owner: Dean");
-      await expect(next).not.toContainText("Spec step four hidden");
     });
   });
 
-  test("Overview (Maya): the empty states of activity, schedules and next step; the AWOL rows", async ({ browser }) => {
+  test("Overview (Maya): the empty states of activity and schedules on the home and on their pages; the AWOL rows", async ({ browser }) => {
     const mutate = (data) => {
       data.logs = [];
       data.schedules = [];
       data.recommendations = [];
     };
     await runPage(browser, { email: MAYA, mutate, path: "/student", shot: "overview-empty" }, async (page) => {
-      await expect(page.getByRole("heading", { level: 2, name: "Maya Torres" })).toBeVisible();
-      await expect(tile(page, "Stage")).toContainText("AWOL");
-      await expect(tile(page, "Progress")).toBeVisible();
+      await expect(page.locator("main h1")).toHaveText("Welcome, Maya");
+      await expect(sectionOf(page, "Your lifecycle")).toContainText("You are at: AWOL");
+      const recent = sectionOf(page, "Recent activity");
+      await expect(recent).toContainText("No activity yet");
+      await expect(recent.getByRole("button")).toHaveCount(0);
+      await expect(sectionOf(page, "Elsewhere in your portal")).toContainText("No defense is booked yet.");
+    });
+    await runPage(browser, { email: MAYA, mutate, path: "/student/activity", shot: "activity-empty" }, async (page) => {
       await expect(panel(page, "Activity History")).toContainText("No activity yet");
       await expect(panel(page, "Activity History").getByRole("button")).toHaveCount(0);
+    });
+    await runPage(browser, { email: MAYA, mutate, path: "/student/defense-schedule", shot: "defense-empty" }, async (page) => {
       await expect(panel(page, "Schedule requests")).toContainText("No schedule requests");
-      await expect(panel(page, "Next Step")).toContainText("On track");
-      await expect(panel(page, "Next Step")).toContainText("No immediate follow-up is flagged.");
+    });
+    await runPage(browser, { email: MAYA, mutate, path: "/student/progress", shot: "progress-maya" }, async (page) => {
       // the stage list shows where Maya is: the on-path stages are listed, and the AWOL stage is named
       const status = await panel(page, "My Academic Status").innerText();
       for (const stage of ["Admission", "Coursework", "Final Defense", "AWOL"]) expect(status).toContain(stage);

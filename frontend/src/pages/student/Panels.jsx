@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Activity,
-  ArrowRight,
   Briefcase,
   ClipboardCheck,
   FileText,
@@ -9,46 +8,13 @@ import {
   GraduationCap,
   Eye,
   LogOut,
-  Mail,
   UserX,
 } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, EmptyState, HistoryPanel, InlineNotice, SectionTitle, StatCard, StatusChip, Stepper } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, HistoryPanel, InlineNotice, SectionTitle, StatusChip, Stepper } from "../../components/ui/index.js";
 import { ProgressBar } from "../../components/ui";
-import { initials } from "../../lib/format";
 import { stageSteps } from "../../lib/stages";
 import { RESEARCH_GATE_KEYS } from "./shared";
-
-export function StudentHero({ data }) {
-  const { student, course_audit, research_case } = data;
-  return (
-    <Card pad="lg">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-4">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-brand-100 text-lg font-semibold text-brand-700">
-            {initials(student.name)}
-          </span>
-          <div>
-            <h2 className="font-display text-2xl font-semibold text-ink">{student.name}</h2>
-            <p className="text-sm text-slate-500">
-              {student.student_number} - {student.program_name}
-            </p>
-            <p className="mt-1 text-xs font-semibold text-brand-700">AY Entry {student.academic_year_entry || "Not recorded"} · {student.course_year_label || "Course year unavailable"}</p>
-            <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500">
-              <Mail className="h-4 w-4" /> {student.email}
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[400px] lg:grid-cols-2 2xl:w-[560px] 2xl:grid-cols-4">
-          <StatCard size="sm" label="Stage" value={student.current_stage} />
-          <StatCard size="sm" label="Progress" value={data.progress_status?.level || "Not yet assessed"} badge />
-          <StatCard size="sm" label="Coursework" value={`${course_audit.completion_rate}%`} />
-          <StatCard size="sm" label="Research" value={research_case?.status || "Not started"} badge />
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 export function ProgressPanel({ data }) {
   const { stages, student, course_audit, research_case } = data;
@@ -242,26 +208,6 @@ export function MissingDocumentUpload({ doc, onSaved }) {
       </label>
       {error && <p className="mt-1 max-w-32 text-xs font-medium text-red-700">{error}</p>}
     </div>
-  );
-}
-
-export function RecommendationsPanel({ recommendations }) {
-  return (
-    <Card pad="lg">
-      <SectionTitle title="Next Step" icon={ArrowRight} />
-      {recommendations.length ? (
-        <ul className="space-y-2">
-          {recommendations.slice(0, 3).map((rec, i) => (
-            <li key={i} className="rounded-xl border border-slate-100 p-3">
-              <p className="text-sm font-semibold text-ink">{rec.recommendation}</p>
-              <p className="meta mt-1">Owner: {rec.owner}</p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState title="On track" hint="No immediate follow-up is flagged." />
-      )}
-    </Card>
   );
 }
 

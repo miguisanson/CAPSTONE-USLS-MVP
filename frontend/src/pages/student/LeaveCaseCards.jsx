@@ -8,15 +8,13 @@ import {
   CheckSquare,
   UserCheck,
   XCircle,
-  FileText,
 } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, HistoryPanel, InlineNotice, SectionTitle, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, HistoryPanel, InlineNotice } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { LeaveStatusBadge, LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
 import { formatDate } from "../../lib/format";
-import { STUDENT_REQUEST_PATHS } from "./requestMeta";
 import { Fact } from "./shared";
 
 // Everything the student sees about Leave of Absence, leave extension and readmission cases.
@@ -347,70 +345,3 @@ export function LeaveReasonNote({ children }) {
   );
 }
 
-function leaveRowDetail(item, overview, slug) {
-  if (!item) {
-    return slug === "readmission" ? "No readmission request yet." : "No leave request yet.";
-  }
-  if (OPEN_LEAVE_STATUSES.includes(item.status)) {
-    return item.status === "Returned" ? "Waiting for: you. Open the request to correct it." : `Waiting for: ${item.owner || "Graduate School Staff"}`;
-  }
-  const days = daysLine(item);
-  if (ACTIVE_LEAVE_STATUSES.includes(item.status)) {
-    return `${item.period?.text || "Leave"}${days ? `. ${days.text}` : ""}`;
-  }
-  if (slug === "readmission") return item.target_term ? `Return semester: ${item.target_term}` : "";
-  return item.period?.text || "";
-}
-
-/** Leave of Absence and Readmission status rows for the Overview, in the look of the Workflow Status panel. */
-export function LeaveStatusPanel({ data }) {
-  const overview = data.leave_overview;
-  if (!overview) return null;
-  const { onLeave } = isOnLeaveOrAwol(data.student);
-  const latestLoa = (overview.cases || []).find((item) => LOA_KINDS.includes(item.kind));
-  const latestReadmission = (overview.cases || []).find((item) => READMISSION_KINDS.includes(item.kind));
-  const rows = [
-    {
-      key: "loa",
-      label: "Leave of Absence",
-      icon: CalendarOff,
-      item: latestLoa,
-      status: onLeave ? "On leave" : latestLoa?.status_label || "Not submitted",
-      detail: leaveRowDetail(latestLoa, overview, "loa"),
-      to: STUDENT_REQUEST_PATHS.loa,
-    },
-    {
-      key: "readmission",
-      label: "Readmission",
-      icon: UserCheck,
-      item: latestReadmission,
-      status: latestReadmission?.status_label || "Not submitted",
-      detail: leaveRowDetail(latestReadmission, overview, "readmission"),
-      to: STUDENT_REQUEST_PATHS.readmission,
-    },
-  ];
-  return (
-    <Card pad="lg">
-      <SectionTitle title="Leave and return" subtitle="Where your leave of absence and readmission requests stand" icon={FileText} />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {rows.map((row) => {
-          const Icon = row.icon;
-          return (
-            <div key={row.key} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
-                  <Icon className="h-4 w-4 text-brand-700" /> {row.label}
-                </span>
-                {row.item && !(row.key === "loa" && onLeave) ? leaveCaseStatusBadge(row.item) : <StatusChip status={row.status} dot={false} />}
-              </div>
-              <p className="meta leading-relaxed">{row.detail}</p>
-              <Link to={row.to} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
-                Open request <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
