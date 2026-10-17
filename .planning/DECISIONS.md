@@ -27,6 +27,16 @@ new grill-me with the owner; agents never re-decide these.
 | IM17 | **`outputs/` and the generated files under `scripts/docs/` move to `archive/` and stay tracked in git** (owner changed this on 2026-10-17: keep them just in case). | Only generated output (screenshots, built documents) moves; the scripts in `scripts/docs/` stay where they are, and any script that writes to a moved folder is updated to the new path. Everything in `archive/` is tracked. Closes I-028. |
 | IM18 | **During unattended runs the agents never wait for the owner** (owner, 2026-10-17 night: "do not ask for any of my decisions … dont stop building"). | A question that would go to the owner is decided by the main session with its recommended option, logged below as `AD#` (agent decision, owner may veto in the morning), and work continues. Stop condition 5 in `IMPROVE.md` ("queue empty apart from owner items") does not stop the run while any agent-decidable work remains. |
 
+## 2026-10-17 midday — grill-me on homes, reports, assistant (I-044..I-046)
+
+| # | Decision | What it means for the work |
+|---|---|---|
+| IM19 | **One action-first home layout for every role** (idea X-06 approved). | Same structure on the student, faculty, dean, staff, coordinator and admin homes: "Needs your action" list first, then 3–4 key numbers (StatCard), then a short recent-activity list; the student home also shows the lifecycle Stepper. Duplicated blocks go. Charts leave the homes and move to Reports (IM20). Built on the Phase 5 components. |
+| IM20 | **Reports = a few real exportable reports AND a short analytics section.** | Reports: (1) students at risk/delayed with the reason, (2) where each cohort is in the lifecycle by program, (3) overdue milestones and pending requests by office with waiting time, (4) defenses held/upcoming with verdicts, (5) graduation candidates — each with program/term/stage filters and Excel/PDF export. Analytics: 3–4 meaningful charts (cleaned-up versions of today's staff-home charts; no two-bar charts, readable axes). |
+| IM21 | **Policy Assistant = Gemini, grounded and personal.** | Gemini (free Flash model) answers only from the uploaded USLS policy documents, always cites the document/section, and says the documents do not cover a question instead of guessing (fixes J13/I-013). It can also answer "what is my next step / what am I missing" from the signed-in user's own record. The keyword search stays as the offline fallback. |
+| IM22 | **The owner adds the Gemini key; agents never open `.env`.** | A helper the owner runs (`npm run setup:env`) adds an empty `GOOGLE_API_KEY=` line if missing and removes the old MySQL `DATABASE_URL` line, printing only what it changed. Until a key exists, tests use a mocked Gemini response plus the fallback. |
+| IM23 | **Priority for the rest of 2026-10-17:** role homes (IM19) first, then the Gemini assistant (IM21/IM22), section J backend bugs in parallel. | The Reports rebuild (IM20), the remaining page migrations, the app.py split and Phase 6 go to the next session via `/continue_CAPSTONE-USLS-MVP`. |
+
 ## Agent decisions (owner may veto)
 
 | # | Date | Decision | Why |
