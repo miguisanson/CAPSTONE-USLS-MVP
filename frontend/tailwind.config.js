@@ -24,6 +24,23 @@ export default {
         sans: ["'Open Sans'", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      // Phase 5 design contract (.planning/phases/05-design-system/05-UI-SPEC.md sections 1-2).
+      // 2xs = the 11px "micro" step that replaces text-[9px] / [10px] / [11px].
+      fontSize: {
+        "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+      },
+      // Page content never stretches past 1440px on wide screens: max-w-page.
+      maxWidth: {
+        page: "90rem",
+      },
+      // One z-index scale instead of z-40 / 50 / [70] / [80] / [90] / [100] / [110].
+      zIndex: {
+        header: "30",
+        drawer: "40",
+        modal: "100",
+        confirm: "110",
+        toast: "120",
+      },
       boxShadow: {
         card: "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06)",
         lift: "0 6px 24px rgba(15, 23, 42, 0.10)",

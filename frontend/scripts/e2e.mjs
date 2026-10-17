@@ -9,6 +9,12 @@ import { FRONTEND_DIR, playwrightEnv } from "../e2e/support/paths.mjs";
 const require = createRequire(import.meta.url);
 const cli = join(dirname(require.resolve("@playwright/test/package.json")), "cli.js");
 const args = process.argv.slice(2);
+if (args.includes("--build")) {
+  args.splice(args.indexOf("--build"), 1);
+  const vite = join(dirname(require.resolve("vite/package.json")), "bin", "vite.js");
+  const build = spawnSync(process.execPath, [vite, "build"], { cwd: FRONTEND_DIR, stdio: "inherit", env: { ...process.env, VITE_UI_GALLERY: "1" } });
+  if (build.status !== 0) process.exit(build.status ?? 1);
+}
 if (args.includes("--negative")) {
   process.env.E2E_NEGATIVE = "1";
   args.splice(args.indexOf("--negative"), 1);
