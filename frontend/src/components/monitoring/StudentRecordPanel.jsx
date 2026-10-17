@@ -3,8 +3,7 @@ import {
   X, Pencil, Trash2, Plus, History, ListChecks, UserRound, Undo2, ListPlus, ExternalLink, AlertTriangle,
 } from "lucide-react";
 import { api } from "../../api";
-import { Spinner, ErrorNote, StatusBadge } from "../ui";
-import { Field, Input, Select } from "../forms";
+import { Button, DataTable, Drawer, EmptyState, Field, InlineNotice, Input, SearchInput, Select, Spinner, StatusChip } from "../ui/index.js";
 import { useConfirm } from "../confirm";
 import { formatDateTime } from "../../lib/format";
 import ProvenanceBadge from "./ProvenanceBadge";
@@ -35,7 +34,6 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const titleId = useId();
 
   const load = useCallback(async () => {
     setError("");
@@ -65,21 +63,20 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
   const student = data?.student;
 
   return (
-    <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/40" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented) onClose(); }}
-        className="flex h-full w-full max-w-3xl flex-col bg-white shadow-2xl"
-      >
-        <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+    <Drawer
+      side="right"
+      label={student ? `${student.last_name}, ${student.first_name}` : "Monitoring record"}
+      width="w-full max-w-[calc(100vw-2.5rem)] sm:max-w-3xl"
+      onClose={onClose}
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
           <div className="min-w-0">
-            <h2 id={titleId} className="truncate text-lg font-semibold text-ink">
+            <h2 className="section-title truncate">
               {student ? `${student.last_name}, ${student.first_name}` : "Monitoring record"}
             </h2>
             {student && (
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <p className="meta mt-1 flex flex-wrap items-center gap-2">
                 <span>IDNO {student.student_number}</span>
                 <span>·</span>
                 <span>{student.program_code}</span>
@@ -89,17 +86,15 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
               </p>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-2">
             {student && onOpenProfile && (
-              <button type="button" onClick={() => onOpenProfile(student.id)} className="btn-ghost px-3 py-2"><ExternalLink className="h-4 w-4" aria-hidden="true" /> Full profile</button>
+              <Button variant="secondary" icon={ExternalLink} onClick={() => onOpenProfile(student.id)}>Full profile</Button>
             )}
-            <button type="button" onClick={onClose} className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100" aria-label="Close record panel">
-              <X className="h-4 w-4" />
-            </button>
+            <Button variant="icon" icon={X} aria-label="Close record panel" onClick={onClose} />
           </div>
         </header>
 
-        <div role="tablist" aria-label="Record sections" className="flex gap-1 border-b border-slate-200 px-4">
+        <div role="tablist" aria-label="Record sections" className="flex shrink-0 gap-1 border-b border-slate-200 px-2 sm:px-4">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -109,20 +104,20 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
               aria-controls={`rec-pane-${id}`}
               type="button"
               onClick={() => setTab(id)}
-              className={`-mb-px inline-flex cursor-pointer items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition-colors ${tab === id ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-ink"}`}
+              className={`-mb-px inline-flex cursor-pointer items-center gap-2 border-b-2 px-2.5 py-3 text-sm font-semibold transition-colors duration-200 sm:px-3 ${tab === id ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-ink"}`}
             >
               <Icon className="h-4 w-4" aria-hidden="true" /> {label}
-              {id === "history" && data?.history_count ? <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{data.history_count}</span> : null}
+              {id === "history" && data?.history_count ? <span className="micro rounded-full bg-slate-100 px-1.5">{data.history_count}</span> : null}
             </button>
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5" role="tabpanel" id={`rec-pane-${tab}`} aria-labelledby={`rec-tab-${tab}`}>
-          {notice && <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-800" role="status">{notice}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5" role="tabpanel" id={`rec-pane-${tab}`} aria-labelledby={`rec-tab-${tab}`}>
+          {notice && <InlineNotice tone="success" className="mb-4">{notice}</InlineNotice>}
           {loading ? (
             <Spinner label="Loading record…" />
           ) : error ? (
-            <ErrorNote message={error} />
+            <InlineNotice tone="danger">{error}</InlineNotice>
           ) : tab === "subjects" ? (
             <SubjectsTab data={data} canEdit={canEdit} focusCourseId={focusCourseId} termLabels={termLabels} onChanged={changed} />
           ) : tab === "details" ? (
@@ -131,8 +126,8 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
             <HistoryTab studentId={studentId} refreshKey={data?.history_count} />
           )}
         </div>
-      </aside>
-    </div>
+      </div>
+    </Drawer>
   );
 }
 
@@ -184,6 +179,66 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, onChanged }) {
     }
   }
 
+  // The subject rows are a DataTable; its rows cannot swap themselves for a form, so the row being added or edited
+  // opens its form in a highlighted block above the table (like "Add other subject" does) and the table keeps the row.
+  const editingRow = canEdit && editing && !editing.readd ? data.subjects.find((row) => row.course_id === editing.courseId && !row.removed) : null;
+
+  const columns = [
+    {
+      key: "subject",
+      header: "Subject",
+      cell: (row) => (
+        <>
+          <p className="font-semibold text-ink">{row.code}</p>
+          <p className="meta">
+            {row.title} · {row.units}u{!row.in_curriculum && <span className="micro ml-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold">Not in curriculum</span>}
+          </p>
+          {row.remarks && <p className="meta mt-0.5 italic">{row.remarks}</p>}
+          {row.operational_status && row.operational_status !== row.status && (
+            <p className="meta mt-0.5 flex items-center gap-1 text-amber-700"><AlertTriangle className="h-3 w-3" aria-hidden="true" /> Enrollment this term shows {row.operational_status}</p>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (row) => (row.status === "Missing" ? <span className="text-slate-500">Not taken</span> : <StatusChip status={row.status} dot={false} />),
+    },
+    { key: "term_label", header: "Term taken", cell: (row) => row.term_label || "—" },
+    {
+      key: "source",
+      header: "Source",
+      cell: (row) => <ProvenanceBadge source={row.source} by={row.source_by} at={row.source_at} reason={row.source_reason} evidence={row.evidence_reference} />,
+    },
+    ...(canEdit
+      ? [{
+          key: "actions",
+          header: "Actions",
+          align: "right",
+          cell: (row) => {
+            const notTaken = row.status === "Missing";
+            return (
+              <div className="flex justify-end gap-1.5">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={notTaken ? Plus : Pencil}
+                  aria-label={`${notTaken ? "Add" : "Edit"} ${row.code}`}
+                  onClick={() => setEditing({ courseId: row.course_id })}
+                >
+                  {notTaken ? "Add" : "Edit"}
+                </Button>
+                {!notTaken && (
+                  <Button variant="icon" icon={Trash2} aria-label={`Remove ${row.code}`} className="text-red-600 hover:bg-red-50" onClick={() => setRemoving(row)} />
+                )}
+              </div>
+            );
+          },
+        }]
+      : []),
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -192,80 +247,75 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, onChanged }) {
           <span className="font-semibold text-ink">{data.summary.completed_units}</span>/{data.summary.total_units} units
           {data.summary.manual_rows > 0 && <> · {data.summary.manual_rows} manual row(s)</>}
         </p>
-        <label className="sr-only" htmlFor="subject-filter">Filter subjects</label>
-        <input id="subject-filter" type="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter subjects…" className="field-input max-w-[14rem] py-2" />
+        <SearchInput
+          value={filter}
+          onChange={setFilter}
+          label="Filter subjects"
+          placeholder="Filter subjects…"
+          className="w-full sm:w-56"
+          // Escape clears the filter; it must not also close the panel
+          onKeyDown={(event) => { if (event.key === "Escape" && filter) event.stopPropagation(); }}
+        />
       </div>
 
       {canEdit && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-ghost px-3 py-2" onClick={() => setShowFreeForm((v) => !v)} aria-expanded={showFreeForm}>
-            <Plus className="h-4 w-4" aria-hidden="true" /> Add other subject
-          </button>
-          <button type="button" className="btn-ghost px-3 py-2" disabled={bulkBusy || notTaken === 0} onClick={bulkAdd}>
-            <ListPlus className="h-4 w-4" aria-hidden="true" /> {bulkBusy ? "Adding…" : `Add remaining curriculum subjects (${notTaken})`}
-          </button>
+          <Button variant="secondary" icon={Plus} onClick={() => setShowFreeForm((v) => !v)} aria-expanded={showFreeForm}>
+            Add other subject
+          </Button>
+          <Button variant="secondary" icon={ListPlus} disabled={bulkBusy || notTaken === 0} onClick={bulkAdd}>
+            {bulkBusy ? "Adding…" : `Add remaining curriculum subjects (${notTaken})`}
+          </Button>
         </div>
       )}
-      {bulkError && <ErrorNote message={bulkError} />}
+      {bulkError && <InlineNotice tone="danger">{bulkError}</InlineNotice>}
       {showFreeForm && canEdit && (
         <FreeFormForm studentId={studentId} statuses={statuses} termLabels={termLabels} onCancel={() => setShowFreeForm(false)} onSaved={(m) => { setShowFreeForm(false); onChanged(m); }} />
       )}
-
-      {visible.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-          {query ? "No subject matches that filter." : "This program has no curriculum subjects yet. Use Add other subject for a free-form row."}
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full min-w-[640px] text-sm">
-            <caption className="sr-only">Subject rows for this student</caption>
-            <thead className="bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th scope="col" className="px-3 py-2">Subject</th>
-                <th scope="col" className="px-3 py-2">Status</th>
-                <th scope="col" className="px-3 py-2">Term taken</th>
-                <th scope="col" className="px-3 py-2">Source</th>
-                {canEdit && <th scope="col" className="px-3 py-2 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((row) => (
-                <SubjectRow
-                  key={row.course_id}
-                  row={row}
-                  canEdit={canEdit}
-                  editing={canEdit && editing?.courseId === row.course_id && !editing?.readd}
-                  statuses={statuses}
-                  termLabels={termLabels}
-                  studentId={studentId}
-                  onEdit={() => setEditing({ courseId: row.course_id })}
-                  onCancel={() => setEditing(null)}
-                  onRemove={() => setRemoving(row)}
-                  onSaved={(m) => { setEditing(null); onChanged(m); }}
-                />
-              ))}
-            </tbody>
-          </table>
+      {editingRow && (
+        <div id={`subject-row-${editingRow.course_id}`} className="rounded-xl border border-brand-200 bg-brand-50/40 p-3">
+          <InlineEditor
+            key={editingRow.course_id}
+            row={editingRow}
+            studentId={studentId}
+            statuses={statuses}
+            termLabels={termLabels}
+            onCancel={() => setEditing(null)}
+            onSaved={(m) => { setEditing(null); onChanged(m); }}
+          />
         </div>
       )}
 
+      <DataTable
+        caption="Subject rows for this student"
+        columns={columns}
+        rows={visible}
+        rowKey="course_id"
+        pageSize={0}
+        empty={{
+          icon: ListChecks,
+          title: query ? "No subject matches that filter." : "This program has no curriculum subjects yet.",
+          hint: query ? "Try a different filter." : "Use Add other subject for a free-form row.",
+        }}
+      />
+
       {removedRows.length > 0 && (
         <div>
-          <button type="button" onClick={() => setShowRemoved((v) => !v)} aria-expanded={showRemoved} className="cursor-pointer text-sm font-semibold text-slate-600 hover:text-ink">
+          <Button variant="secondary" size="sm" onClick={() => setShowRemoved((v) => !v)} aria-expanded={showRemoved}>
             {showRemoved ? "Hide" : "Show"} removed rows ({removedRows.length})
-          </button>
+          </Button>
           {showRemoved && (
             <ul className="mt-2 space-y-2">
               {removedRows.map((row) => (
-                <li key={row.course_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                <li key={row.course_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-700 line-through">{row.code} — {row.title}</p>
-                    <p className="text-xs text-slate-500">Was {row.removed_status || "—"}. Removed by {row.removed_by || "—"} on {formatDateTime(row.removed_at)}. Reason: {row.removal_reason || "—"}</p>
+                    <p className="meta">Was {row.removed_status || "—"}. Removed by {row.removed_by || "—"} on {formatDateTime(row.removed_at)}. Reason: {row.removal_reason || "—"}</p>
                   </div>
                   {canEdit && (
-                    <button type="button" className="btn-ghost px-3 py-1.5" onClick={() => setEditing({ courseId: row.course_id, readd: true })}>
-                      <Undo2 className="h-4 w-4" aria-hidden="true" /> Re-add
-                    </button>
+                    <Button variant="secondary" size="sm" icon={Undo2} onClick={() => setEditing({ courseId: row.course_id, readd: true })}>
+                      Re-add
+                    </Button>
                   )}
                 </li>
               ))}
@@ -295,52 +345,6 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, onChanged }) {
         />
       )}
     </div>
-  );
-}
-
-function SubjectRow({ row, canEdit, editing, statuses, termLabels, studentId, onEdit, onCancel, onRemove, onSaved }) {
-  const notTaken = row.status === "Missing";
-  if (editing) {
-    return (
-      <tr id={`subject-row-${row.course_id}`} className="border-t border-slate-100 bg-brand-50/40">
-        <td colSpan={canEdit ? 5 : 4} className="p-3">
-          <InlineEditor row={row} studentId={studentId} statuses={statuses} termLabels={termLabels} onCancel={onCancel} onSaved={onSaved} />
-        </td>
-      </tr>
-    );
-  }
-  return (
-    <tr id={`subject-row-${row.course_id}`} className="border-t border-slate-100 hover:bg-slate-50/60">
-      <td className="px-3 py-2">
-        <p className="font-semibold text-ink">{row.code}</p>
-        <p className="text-xs text-slate-500">
-          {row.title} · {row.units}u{!row.in_curriculum && <span className="ml-1 rounded bg-slate-100 px-1 font-semibold">Not in curriculum</span>}
-        </p>
-        {row.remarks && <p className="mt-0.5 text-xs italic text-slate-500">{row.remarks}</p>}
-        {row.operational_status && row.operational_status !== row.status && (
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-700"><AlertTriangle className="h-3 w-3" aria-hidden="true" /> Enrollment this term shows {row.operational_status}</p>
-        )}
-      </td>
-      <td className="px-3 py-2">{notTaken ? <span className="text-slate-400">Not taken</span> : <StatusBadge value={row.status} dot={false} />}</td>
-      <td className="px-3 py-2 text-slate-600">{row.term_label || "—"}</td>
-      <td className="px-3 py-2">
-        <ProvenanceBadge source={row.source} by={row.source_by} at={row.source_at} reason={row.source_reason} evidence={row.evidence_reference} />
-      </td>
-      {canEdit && (
-        <td className="px-3 py-2">
-          <div className="flex justify-end gap-1">
-            <button type="button" onClick={onEdit} className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50" aria-label={`${notTaken ? "Add" : "Edit"} ${row.code}`}>
-              {notTaken ? <Plus className="h-4 w-4" aria-hidden="true" /> : <Pencil className="h-4 w-4" aria-hidden="true" />} {notTaken ? "Add" : "Edit"}
-            </button>
-            {!notTaken && (
-              <button type="button" onClick={onRemove} className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-red-600 transition-colors hover:bg-red-50" aria-label={`Remove ${row.code}`}>
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
-            )}
-          </div>
-        </td>
-      )}
-    </tr>
   );
 }
 
@@ -409,6 +413,7 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
   function onKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation(); // cancels the editor only, not the panel around it
       onCancel();
     }
   }
@@ -430,11 +435,11 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
           <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} maxLength={500} required />
         </Field>
       )}
-      {error && <ErrorNote message={error} />}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <span className="mr-auto text-xs text-slate-500">Enter to save · Esc to cancel</span>
-        <button type="button" onClick={onCancel} className="btn-ghost px-3 py-2">Cancel</button>
-        <button type="submit" disabled={busy || !dirty || (needsReason && form.reason.trim().length < 3)} className="btn-primary px-3 py-2">{busy ? "Saving…" : isAdd ? "Add row" : "Save changes"}</button>
+        <span className="meta mr-auto">Enter to save · Esc to cancel</span>
+        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={busy || !dirty || (needsReason && form.reason.trim().length < 3)}>{busy ? "Saving…" : isAdd ? "Add row" : "Save changes"}</Button>
       </div>
     </form>
   );
@@ -465,7 +470,7 @@ function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, 
   }
 
   return (
-    <form onSubmit={save} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onCancel(); } }} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4" aria-label={fixedCourse ? `Re-add ${fixedCourse.code}` : "Add other subject"}>
+    <form onSubmit={save} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onCancel(); } }} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4" aria-label={fixedCourse ? `Re-add ${fixedCourse.code}` : "Add other subject"}>
       <p className="text-sm font-semibold text-ink">{fixedCourse ? `Re-add ${fixedCourse.code} — ${fixedCourse.title}` : "Add a subject that is not in the curriculum"}</p>
       {!fixedCourse && (
         <div className="grid gap-3 sm:grid-cols-3">
@@ -484,10 +489,10 @@ function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, 
       </div>
       {form.status === "Dropped" && <DropEvidenceFields form={form} setForm={setForm} />}
       {!fixedCourse && <p className="text-xs text-slate-500">Free-form rows are kept and exported, but never count toward curriculum completion or eligibility.</p>}
-      {error && <ErrorNote message={error} />}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="btn-ghost px-3 py-2">Cancel</button>
-        <button type="submit" disabled={busy} className="btn-primary px-3 py-2">{busy ? "Saving…" : "Add row"}</button>
+        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Add row"}</Button>
       </div>
     </form>
   );
@@ -567,7 +572,7 @@ function DetailsTab({ data, canEdit, onChanged }) {
       <div className="space-y-4">
         <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {rows.map(([label, value]) => (
-            <div key={label}><dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-0.5 text-sm text-ink">{value || "—"}</dd></div>
+            <div key={label}><dt className="eyebrow">{label}</dt><dd className="mt-0.5 text-sm text-ink">{value || "—"}</dd></div>
           ))}
         </dl>
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -575,7 +580,7 @@ function DetailsTab({ data, canEdit, onChanged }) {
           {student.last_change && <span>Last corrected {formatDateTime(student.last_change.at)}{student.last_change.by ? ` by ${student.last_change.by}` : ""}{student.last_change.reason ? ` — ${student.last_change.reason}` : ""}</span>}
         </div>
         {canEdit ? (
-          <button type="button" className="btn-ghost" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" aria-hidden="true" /> Correct details</button>
+          <Button variant="secondary" icon={Pencil} onClick={() => setEditing(true)}>Correct details</Button>
         ) : (
           <p className="text-xs text-slate-500">You can view this record but not change it.</p>
         )}
@@ -588,7 +593,7 @@ function DetailsTab({ data, canEdit, onChanged }) {
   return (
     <form
       onSubmit={(event) => { event.preventDefault(); if (dirty) setConfirming(true); }}
-      onKeyDown={(event) => { if (event.key === "Escape" && !confirming) { event.preventDefault(); setEditing(false); setForm(initial); } }}
+      onKeyDown={(event) => { if (event.key === "Escape" && !confirming) { event.preventDefault(); event.stopPropagation(); setEditing(false); setForm(initial); } }}
       className="space-y-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -601,8 +606,8 @@ function DetailsTab({ data, canEdit, onChanged }) {
       </div>
       <p className="text-xs text-slate-500">Changing the email also changes the student's login. A reason is asked for next.</p>
       <div className="flex justify-end gap-2">
-        <button type="button" className="btn-ghost" onClick={() => { setEditing(false); setForm(initial); setError(""); }}>Cancel</button>
-        <button type="submit" disabled={!dirty} className="btn-primary">Review correction</button>
+        <Button variant="secondary" onClick={() => { setEditing(false); setForm(initial); setError(""); }}>Cancel</Button>
+        <Button type="submit" disabled={!dirty}>Review correction</Button>
       </div>
       {confirming && (
         <ReasonDialog
@@ -633,9 +638,9 @@ function HistoryTab({ studentId, refreshKey }) {
     return () => { active = false; };
   }, [studentId, refreshKey]);
 
-  if (error) return <ErrorNote message={error} />;
+  if (error) return <InlineNotice tone="danger">{error}</InlineNotice>;
   if (!items) return <Spinner label="Loading history…" />;
-  if (items.length === 0) return <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">No portal changes have been made to this record. Imported values are not listed here.</p>;
+  if (items.length === 0) return <EmptyState icon={History} size="sm" title="No portal changes have been made to this record." hint="Imported values are not listed here." />;
   return (
     <ol className="space-y-2">
       {items.map((item) => (

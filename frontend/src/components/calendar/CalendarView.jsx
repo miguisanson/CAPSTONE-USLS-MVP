@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Flag, MapPin } from "lucide-react";
-import { StatusBadge } from "../ui";
+import { Button, Card, EmptyState, StatusChip } from "../ui/index.js";
 
 // A light month / week / agenda calendar (no calendar library). It only draws what it is given:
 // defense events (date + time range), deadline markers (date only), an optional availability
@@ -121,7 +121,7 @@ const URGENCY_CLASSES = {
   overdue: "border-red-300 bg-red-50 text-red-800",
   soon: "border-amber-300 bg-amber-50 text-amber-900",
   later: "border-slate-300 bg-white text-slate-700",
-  done: "border-slate-200 bg-slate-50 text-slate-400 line-through",
+  done: "border-slate-200 bg-slate-50 text-slate-500 line-through",
 };
 
 function DeadlineChip({ item, onSelect, compact = false }) {
@@ -130,7 +130,7 @@ function DeadlineChip({ item, onSelect, compact = false }) {
       type="button"
       onClick={() => onSelect?.(item)}
       title={`${item.label}${item.student_name ? ` (${item.student_name})` : ""}${item.done ? " — done" : ""}`}
-      className={`flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md border border-dashed px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight ${URGENCY_CLASSES[item.urgency] || URGENCY_CLASSES.later}`}
+      className={`flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md border border-dashed px-1.5 py-0.5 text-left text-2xs font-semibold leading-tight ${URGENCY_CLASSES[item.urgency] || URGENCY_CLASSES.later}`}
     >
       <Flag className="h-3 w-3 shrink-0" aria-hidden="true" />
       <span className="truncate">{compact ? item.label.split(" (")[0] : `${item.label}${item.student_name ? ` · ${item.student_name}` : ""}`}</span>
@@ -145,7 +145,7 @@ function EventChip({ event, onSelect, selected }) {
       type="button"
       onClick={() => onSelect?.(event)}
       title={`${event.title} · ${timeOf(event.start)}–${timeOf(event.end)}${event.venue ? ` · ${event.venue}` : ""} · ${event.status}`}
-      className={`flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md border px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight transition-shadow hover:shadow-card ${style.chip} ${statusMark(event)} ${alertRing(event)} ${selected ? "outline outline-2 outline-brand-600" : ""}`}
+      className={`flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md border px-1.5 py-0.5 text-left text-2xs font-semibold leading-tight transition-shadow hover:shadow-card ${style.chip} ${statusMark(event)} ${alertRing(event)} ${selected ? "outline outline-2 outline-brand-600" : ""}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
       <span className="truncate">{eventLabel(event)}</span>
@@ -174,7 +174,7 @@ function MonthView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline,
     <div className="overflow-x-auto">
       {/* Seven equal columns that shrink with the card (chips truncate); the 30rem floor only matters on a phone. */}
       <div className="min-w-[28rem]">
-        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] border-b border-slate-200 text-center text-[11px] font-bold uppercase tracking-wide text-slate-400">
+        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] border-b border-slate-200 text-center text-2xs font-semibold uppercase tracking-wide text-slate-500">
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((name) => (
             <div key={name} className="py-2">{name}</div>
           ))}
@@ -195,7 +195,7 @@ function MonthView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline,
                   type="button"
                   onClick={() => onPickDay?.(day)}
                   aria-label={`Open ${day.toDateString()} in week view`}
-                  className={`grid h-6 min-w-[1.5rem] cursor-pointer place-items-center rounded-full px-1 text-xs font-bold ${key === today ? "bg-brand-600 text-white" : inMonth ? "text-slate-700 hover:bg-slate-100" : "text-slate-400 hover:bg-slate-100"}`}
+                  className={`grid h-6 min-w-[1.5rem] cursor-pointer place-items-center rounded-full px-1 text-xs font-semibold ${key === today ? "bg-brand-600 text-white" : inMonth ? "text-slate-700 hover:bg-slate-100" : "text-slate-500 hover:bg-slate-100"}`}
                 >
                   {day.getDate()}
                 </button>
@@ -207,7 +207,7 @@ function MonthView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline,
                   ),
                 )}
                 {shown.length > 3 && (
-                  <button type="button" onClick={() => onPickDay?.(day)} className="w-full cursor-pointer rounded px-1 text-left text-[11px] font-bold text-brand-700 hover:underline">
+                  <button type="button" onClick={() => onPickDay?.(day)} className="w-full cursor-pointer rounded-md px-1 text-left text-2xs font-semibold text-brand-700 hover:underline">
                     +{shown.length - 3} more
                   </button>
                 )}
@@ -276,14 +276,14 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
             const key = isoDay(day);
             return (
               <div key={key} className="border-l border-slate-100 px-1.5 py-2 text-center">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{day.toLocaleDateString(undefined, { weekday: "short" })}</p>
-                <p className={`mx-auto mt-0.5 grid h-7 min-w-[1.75rem] place-items-center rounded-full px-1 text-sm font-bold ${key === today ? "bg-brand-600 text-white" : "text-slate-700"}`}>{day.getDate()}</p>
+                <p className="text-2xs font-semibold uppercase tracking-wide text-slate-500">{day.toLocaleDateString(undefined, { weekday: "short" })}</p>
+                <p className={`mx-auto mt-0.5 grid h-7 min-w-[1.75rem] place-items-center rounded-full px-1 text-sm font-semibold ${key === today ? "bg-brand-600 text-white" : "text-slate-700"}`}>{day.getDate()}</p>
               </div>
             );
           })}
         </div>
         <div className="grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] border-b border-slate-200 bg-slate-50/60">
-          <div className="px-1 py-1.5 text-right text-[10px] font-bold uppercase text-slate-400">Due</div>
+          <div className="px-1 py-1.5 text-right text-2xs font-semibold uppercase text-slate-500">Due</div>
           {days.map((day) => (
             <div key={isoDay(day)} className="min-h-[2rem] space-y-1 border-l border-slate-100 p-1">
               {(deadlinesByDay.get(isoDay(day)) || []).map((item) => (
@@ -295,7 +295,7 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
         <div className="grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]" style={{ height: gridHeight }}>
           <div className="relative">
             {hours.map((hour) => (
-              <div key={hour} className="absolute right-1 -translate-y-2 text-[10px] font-semibold text-slate-400" style={{ top: (hour - DAY_START_HOUR) * HOUR_PX }}>
+              <div key={hour} className="absolute right-1 -translate-y-2 text-2xs font-semibold text-slate-500" style={{ top: (hour - DAY_START_HOUR) * HOUR_PX }}>
                 {String(hour).padStart(2, "0")}:00
               </div>
             ))}
@@ -334,13 +334,13 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
                     }
                     title={`Not available${block.note ? `: ${block.note}` : ""}`}
                   >
-                    {block.all_day && <span className="m-1 inline-block rounded bg-white/80 px-1 text-[10px] font-bold text-red-700">Not available{block.note ? ` · ${block.note}` : ""}</span>}
+                    {block.all_day && <span className="m-1 inline-block rounded-md bg-white/80 px-1 text-2xs font-semibold text-red-700">Not available{block.note ? ` · ${block.note}` : ""}</span>}
                   </div>
                 ))}
                 {(busyByDay.get(key) || []).map((block, index) => (
                   <div
                     key={`g${index}`}
-                    className="absolute inset-x-1 rounded bg-slate-300/70 px-1 text-[10px] font-semibold text-slate-700"
+                    className="absolute inset-x-1 rounded-md bg-slate-300/70 px-1 text-2xs font-semibold text-slate-700"
                     style={{ top: Math.max(0, topOf(hhmm(block.start))), height: Math.max(14, topOf(hhmm(block.end)) - Math.max(0, topOf(hhmm(block.start)))) }}
                     title="Busy on Google Calendar"
                   >
@@ -356,7 +356,7 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
                       key={event.id}
                       type="button"
                       onClick={() => onSelectEvent?.(event)}
-                      className={`absolute cursor-pointer overflow-hidden rounded-md border px-1.5 py-1 text-left text-[11px] font-semibold leading-tight shadow-sm hover:shadow-card ${style.bar} ${statusMark(event)} ${alertRing(event)} ${selectedId === event.id ? "outline outline-2 outline-brand-600" : ""}`}
+                      className={`absolute cursor-pointer overflow-hidden rounded-md border px-1.5 py-1 text-left text-2xs font-semibold leading-tight hover:shadow-card ${style.bar} ${statusMark(event)} ${alertRing(event)} ${selectedId === event.id ? "outline outline-2 outline-brand-600" : ""}`}
                       style={{ top, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)` }}
                       title={`${event.title} · ${timeOf(event.start)}–${timeOf(event.end)} · ${event.status}`}
                     >
@@ -394,19 +394,16 @@ function AgendaView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline
   }, [events, deadlines, startKey]);
   if (!rows.length) {
     return (
-      <div className="flex flex-col items-center gap-2 py-14 text-center text-slate-500">
-        <CalendarClock className="h-8 w-8 text-slate-300" aria-hidden="true" />
-        <p className="text-sm font-semibold">Nothing on the calendar in this period.</p>
-      </div>
+      <EmptyState icon={CalendarClock} title="Nothing on the calendar in this period." />
     );
   }
   return (
     <ol className="divide-y divide-slate-100">
       {rows.map((group) => (
         <li key={group.day} className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]">
-          <p className="text-sm font-bold text-ink">
+          <p className="text-sm font-semibold text-ink">
             {parseDay(group.day).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-            {group.day === isoDay(new Date()) && <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">Today</span>}
+            {group.day === isoDay(new Date()) && <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-2xs font-semibold uppercase text-white">Today</span>}
           </p>
           <ul className="space-y-2">
             {group.entries.map(({ type, item }) =>
@@ -420,7 +417,7 @@ function AgendaView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline
                     className={`flex w-full cursor-pointer flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left hover:shadow-card ${(DEFENSE_STYLES[item.defense_type] || FALLBACK_STYLE).chip} ${alertRing(item)} ${selectedId === item.id ? "outline outline-2 outline-brand-600" : ""}`}
                   >
                     <span className={`min-w-0 ${statusMark(item)}`}>
-                      <span className="block text-sm font-bold">{timeOf(item.start)}–{timeOf(item.end)} · {item.defense_type} · {item.student_name}</span>
+                      <span className="block text-sm font-semibold">{timeOf(item.start)}–{timeOf(item.end)} · {item.defense_type} · {item.student_name}</span>
                       <span className="flex flex-wrap items-center gap-x-3 text-xs opacity-80">
                         {item.venue && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" aria-hidden="true" />{item.venue}</span>}
                         {item.my_role && <span>Your role: {item.my_role}</span>}
@@ -428,8 +425,8 @@ function AgendaView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline
                       </span>
                     </span>
                     <span className="flex items-center gap-1.5">
-                      {item.verdict_overdue && <StatusBadge value="Verdict overdue" dot={false} className="!bg-red-50 !text-red-700 !ring-red-200" />}
-                      <StatusBadge value={item.status} dot={false} />
+                      {item.verdict_overdue && <StatusChip status="Verdict overdue" tone="bad" dot={false} />}
+                      <StatusChip status={item.status} dot={false} />
                     </span>
                   </button>
                 </li>
@@ -444,16 +441,16 @@ function AgendaView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline
 
 export function CalendarLegend({ showAvailability = false, showBusy = false }) {
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-500" aria-label="Legend">
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs font-semibold text-slate-500" aria-label="Legend">
       {Object.entries(DEFENSE_STYLES).filter(([name]) => name !== "Public Final Defense").map(([name, style]) => (
         <li key={name} className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />{name}</li>
       ))}
       <li className="inline-flex items-center gap-1.5"><Flag className="h-3 w-3" aria-hidden="true" />Deadline</li>
-      <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm ring-2 ring-amber-400" />Needs attention</li>
-      <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm ring-2 ring-red-400" />Verdict overdue</li>
-      {showAvailability && <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm bg-brand-100" />Available</li>}
-      {showAvailability && <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm bg-red-100" />Not available</li>}
-      {showBusy && <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm bg-slate-300" />Busy (Google)</li>}
+      <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-md ring-2 ring-amber-400" />Needs attention</li>
+      <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-md ring-2 ring-red-400" />Verdict overdue</li>
+      {showAvailability && <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-md bg-brand-100" />Available</li>}
+      {showAvailability && <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-md bg-red-100" />Not available</li>}
+      {showBusy && <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-md bg-slate-300" />Busy (Google)</li>}
     </ul>
   );
 }
@@ -476,17 +473,13 @@ export default function CalendarView({
 }) {
   const go = (direction) => onAnchorChange(direction === 0 ? new Date() : moveAnchor(anchor, view, direction));
   return (
-    <div className="card">
+    <Card pad="none">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div className="flex items-center gap-2">
-          <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={() => go(0)}>Today</button>
-          <button type="button" aria-label="Previous" className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50" onClick={() => go(-1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button type="button" aria-label="Next" className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50" onClick={() => go(1)}>
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <h2 className="ml-1 font-display text-base font-semibold text-ink" aria-live="polite">{toolbarTitle(anchor, view)}</h2>
+          <Button variant="secondary" onClick={() => go(0)}>Today</Button>
+          <Button variant="icon" icon={ChevronLeft} aria-label="Previous" onClick={() => go(-1)} />
+          <Button variant="icon" icon={ChevronRight} aria-label="Next" onClick={() => go(1)} />
+          <h2 className="card-title ml-1" aria-live="polite">{toolbarTitle(anchor, view)}</h2>
           {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" aria-label="Loading" />}
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -498,7 +491,7 @@ export default function CalendarView({
                 type="button"
                 aria-pressed={view === option.id}
                 onClick={() => onViewChange(option.id)}
-                className={`cursor-pointer px-3 py-1.5 text-xs font-bold ${view === option.id ? "bg-brand-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                className={`min-h-10 cursor-pointer px-3.5 py-2 text-sm font-semibold transition-colors duration-200 max-sm:min-h-11 ${view === option.id ? "bg-brand-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
               >
                 {option.label}
               </button>
@@ -537,9 +530,9 @@ export default function CalendarView({
           <AgendaView anchor={anchor} events={events} deadlines={deadlines} onSelectEvent={onSelectEvent} onSelectDeadline={onSelectDeadline} selectedId={selectedId} />
         )}
       </div>
-      <p className="border-t border-slate-100 px-4 py-2 text-[11px] font-semibold text-slate-400">
+      <p className="micro border-t border-slate-100 px-4 py-2 font-semibold">
         All times are Philippine time ({timezone}).
       </p>
-    </div>
+    </Card>
   );
 }
