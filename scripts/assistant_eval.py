@@ -24,6 +24,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Windows consoles default to a legacy code page and turn "§" and "—" into mojibake.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 WORK = Path(tempfile.mkdtemp(prefix="assistant-eval-"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(WORK / 'eval.sqlite3').as_posix()}"
 os.environ["USLS_UPLOAD_DIR"] = str(WORK / "uploads")
