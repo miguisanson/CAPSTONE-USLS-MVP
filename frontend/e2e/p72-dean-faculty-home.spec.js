@@ -164,7 +164,7 @@ test.describe("Dean home", () => {
     await expect(statValue(page, "Oldest wait")).toHaveText(/^(Today|\d+ days?)$/);
     await expect(statValue(page, "Decided this week")).toHaveText(/^\d+$/);
     // the per-process tiles ("... waiting for your decision") are gone; the breakdown is the Approvals Queue
-    await expect(main(page).getByText("waiting for your decision")).toHaveCount(0);
+    await expect(main(page).locator('[data-slot="sub"]', { hasText: "waiting for your decision" })).toHaveCount(0);
     for (const gone of ["Recently decided", "How long items have waited", "Waiting longest"]) {
       await expect(main(page).getByText(gone, { exact: true }), `no "${gone}" block`).toHaveCount(0);
     }

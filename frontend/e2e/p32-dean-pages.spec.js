@@ -142,7 +142,7 @@ test.describe("P3.2 Dean pages", () => {
     for (const [name, type] of [["Maureen Castillo", "leave-of-absence"], ["Daniel Fernandez", "leave-of-absence"], ["Gabriel Domingo", "readmission"]]) {
       const row = mine.getByRole("listitem").filter({ hasText: name }).first();
       await expect(row, `${name} in Needs your action`).toBeVisible();
-      await expect(row.getByRole("link", { name: "Review" })).toHaveAttribute("href", new RegExp(`^/dean/case/${type}/\d+$`));
+      await expect(row.getByRole("link", { name: "Review" })).toHaveAttribute("href", new RegExp(`^/dean/case/${type}/\\d+$`));
     }
     await expect(mine.getByRole("listitem").filter({ hasText: "Maureen Castillo" }).first()).toContainText("Leave of Absence");
 
