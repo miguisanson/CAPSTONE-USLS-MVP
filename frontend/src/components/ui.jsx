@@ -1,41 +1,19 @@
 import { Link } from "react-router-dom";
-import { statusClass } from "../lib/format";
+import { StatusChip } from "./ui/StatusChip.jsx";
+import { Card as UiCard } from "./ui/Card.jsx";
 
+// P1b shims: the status chip, card and section title now live in ./ui/. Every existing import keeps working.
+// Deleted in the last packet (P8) once pages import from "components/ui/index.js".
+export { SectionTitle, SectionCard } from "./ui/Card.jsx";
+
+/** Old name of StatusChip (takes `value`, not `status`). */
 export function StatusBadge({ value, dot = true, className = "" }) {
-  if (!value) return <span className="text-slate-400">—</span>;
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusClass(
-        value
-      )} ${className}`}
-    >
-      {dot && <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />}
-      {value}
-    </span>
-  );
+  return <StatusChip status={value} dot={dot} className={className} />;
 }
 
+/** Old Card: no padding of its own (callers add p-4 / p-5). The new Card in ui/Card.jsx defaults to pad="md". */
 export function Card({ children, className = "" }) {
-  return <div className={`card ${className}`}>{children}</div>;
-}
-
-export function SectionTitle({ title, subtitle, icon: Icon, action }) {
-  return (
-    <div className="flex items-start justify-between gap-3 mb-4">
-      <div className="flex items-start gap-3">
-        {Icon && (
-          <span className="mt-0.5 grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-700">
-            <Icon className="h-5 w-5" strokeWidth={2} />
-          </span>
-        )}
-        <div>
-          <h2 className="text-lg font-semibold text-ink leading-tight">{title}</h2>
-          {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
-        </div>
-      </div>
-      {action}
-    </div>
-  );
+  return <UiCard pad="none" className={className}>{children}</UiCard>;
 }
 
 export function Spinner({ label = "Loading…" }) {

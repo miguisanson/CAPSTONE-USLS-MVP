@@ -1,36 +1,5 @@
-export function Field({ label, hint, required, children }) {
-  return (
-    <label className="block">
-      <span className="field-label">
-        {label} {required && <span className="text-red-500">*</span>}
-      </span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
-    </label>
-  );
-}
-
-export function Input(props) {
-  return <input {...props} className={`field-input ${props.className || ""}`} />;
-}
-
-export function Textarea(props) {
-  return <textarea {...props} className={`field-input ${props.className || ""}`} rows={props.rows || 3} />;
-}
-
-export function Select({ options, placeholder = "Select…", ...props }) {
-  const opts = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
-  return (
-    <select {...props} className={`field-input cursor-pointer ${props.className || ""}`}>
-      {placeholder && <option value="">{placeholder}</option>}
-      {opts.map((o) => (
-        <option key={o.value} value={o.value} disabled={Boolean(o.disabled)}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
-}
+// P1b shim: Field, Input, Textarea and Select now live in ./ui/Field.jsx. RadioRow stays here.
+export { Field, Input, Textarea, Select } from "./ui/Field.jsx";
 
 export function RadioRow({ name, options, value, onChange }) {
   return (
