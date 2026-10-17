@@ -31,3 +31,5 @@ new grill-me with the owner; agents never re-decide these.
 
 | # | Date | Decision | Why |
 |---|---|---|---|
+| AD1 | 2026-10-17 | Accept the Phase 5 UI-SPEC's visible changes: info notices blue (were the same green as success); `Completed` standing green; `Draft` policy docs grey; Enter no longer confirms a destructive dialog; `Login.jsx` keeps its large title as the one size exception. | Standard semantic colours (Carbon/GOV.UK, research §3); info and success looked identical; safer destructive dialogs. Same look otherwise (IM6). |
+| AD2 | 2026-10-17 | "Returned", "Returned for Revision/Clarification", "Returned to student" are **warning (amber)**, not danger (red) — overriding the draft spec. | Returned means someone must act, not that something failed; red is kept for denied/failed/overdue. |
