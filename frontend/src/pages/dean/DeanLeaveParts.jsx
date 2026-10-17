@@ -1,6 +1,8 @@
 import { AlertTriangle, CheckCircle2, Circle } from "lucide-react";
+import { InlineNotice, StatusChip } from "../../components/ui/index.js";
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import { formatDate } from "../../lib/format";
+import { toneOf } from "../../lib/tone";
 
 // Plain-language Dean view of one Leave of Absence / Readmission case.
 // Everything here is read-only: the Dean's buttons and comment box stay in WorkflowApprovalCard.
@@ -11,23 +13,18 @@ export function isLeaveCaseItem(item) {
   return Boolean(item && LEAVE_TYPES.includes(item.type) && item.case);
 }
 
-const CHECK_TONES = {
-  Pass: "bg-brand-50 text-brand-700 ring-brand-200",
-  Present: "bg-brand-50 text-brand-700 ring-brand-200",
-  "Needs Review": "bg-amber-50 text-amber-800 ring-amber-200",
-  Fail: "bg-red-50 text-red-700 ring-red-200",
-};
-
+// One policy rule's result. The colour comes from the status map (Pass / Present green, Needs Review amber, Fail red);
+// a rule with no result yet reads "Not checked" in grey. "Present" is shown as "Provided".
 export function PolicyCheckBadge({ status }) {
-  const text = status === "Present" ? "Provided" : status || "Not checked";
-  const tone = CHECK_TONES[status] || "bg-slate-100 text-slate-600 ring-slate-200";
-  return <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset ${tone}`}>{text}</span>;
+  return <StatusChip status={status} label={status === "Present" ? "Provided" : status || "Not checked"} tone="muted" size="sm" dot={false} className="shrink-0" />;
 }
 
-function Field({ label, children }) {
+// One fact of the request: a term and its value (read-only). The library Field is for form controls, so this stays a
+// definition-list pair.
+function Fact({ label, children }) {
   return (
     <div>
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="eyebrow">{label}</dt>
       <dd className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700">{children}</dd>
     </div>
   );
@@ -36,7 +33,7 @@ function Field({ label, children }) {
 function Panel({ title, children, className = "" }) {
   return (
     <section className={`rounded-xl border border-slate-200 bg-white p-4 ${className}`}>
-      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{title}</h3>
+      <h3 className="eyebrow mb-2">{title}</h3>
       {children}
     </section>
   );
@@ -44,7 +41,7 @@ function Panel({ title, children, className = "" }) {
 
 function Tick({ on, yes, no }) {
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${on ? "text-brand-700" : "text-slate-400"}`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${on ? "text-brand-700" : "text-slate-500"}`}>
       {on ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Circle className="h-3.5 w-3.5" aria-hidden="true" />}
       {on ? yes : no}
     </span>
@@ -55,7 +52,7 @@ function LimitBar({ label, value, limit, detail }) {
   const used = Number(value) || 0;
   const max = Number(limit) || 0;
   const percent = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
-  const tone = max > 0 && used >= max ? "bg-red-500" : max > 0 && used / max >= 0.75 ? "bg-amber-500" : "bg-brand-500";
+  const tone = toneOf(max > 0 && used >= max ? "danger" : max > 0 && used / max >= 0.75 ? "warning" : "success").dot;
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -92,39 +89,38 @@ export function LeaveCaseSummary({ item }) {
       )}
 
       {c.status === "Denied" && (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+        <InlineNotice tone="danger" role="status">
           This request was denied. Follow-up owner: {c.owner || "Graduate School staff"}. Staff follow up with the student.
-        </p>
+        </InlineNotice>
       )}
 
       {early && (
-        <p role="note" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>Early return. The student asks to come back before the approved leave ends. You decide whether the leave ends early.</span>
-        </p>
+        <InlineNotice tone="warning" role="note" icon={AlertTriangle}>
+          Early return. The student asks to come back before the approved leave ends. You decide whether the leave ends early.
+        </InlineNotice>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="What is being asked">
           <dl className="space-y-3">
-            <Field label="Request">{c.kind_label} · Case #{c.id} · {leaveCaseStatusBadge(c)}</Field>
+            <Fact label="Request">{c.kind_label} · Case #{c.id} · {leaveCaseStatusBadge(c)}</Fact>
             {period && (
-              <Field label="Leave period">
+              <Fact label="Leave period">
                 {period.text || `${period.start_label || "—"} to ${period.end_label || "—"}`}
                 {(period.start_date || period.end_date) && <span className="block text-xs text-slate-500">{formatDate(period.start_date)} to {formatDate(period.end_date)}</span>}
                 {period.semesters ? <span className="block text-xs text-slate-500">{period.semesters} semester{period.semesters === 1 ? "" : "s"}</span> : null}
-              </Field>
+              </Fact>
             )}
-            {c.target_term && <Field label="Return semester">{c.target_term}</Field>}
+            {c.target_term && <Fact label="Return semester">{c.target_term}</Fact>}
             {c.linked_case && (
-              <Field label="Leave being ended">
+              <Fact label="Leave being ended">
                 {c.linked_case.kind_label}{c.linked_case.period_text ? ` · ${c.linked_case.period_text}` : ""}{c.linked_case.status_label ? ` · ${c.linked_case.status_label}` : ""}
-              </Field>
+              </Fact>
             )}
-            {c.reason_category && <Field label="Reason">{c.reason_category}</Field>}
-            {c.reason_text && <Field label="Reason in the student's words">{c.reason_text}</Field>}
-            {c.return_intent && <Field label="What the student intends to do">{c.return_intent}</Field>}
-            {c.batch_name && <Field label="Group">{c.batch_name}</Field>}
+            {c.reason_category && <Fact label="Reason">{c.reason_category}</Fact>}
+            {c.reason_text && <Fact label="Reason in the student's words">{c.reason_text}</Fact>}
+            {c.return_intent && <Fact label="What the student intends to do">{c.return_intent}</Fact>}
+            {c.batch_name && <Fact label="Group">{c.batch_name}</Fact>}
           </dl>
         </Panel>
 
@@ -145,8 +141,8 @@ export function LeaveCaseSummary({ item }) {
             <p className="text-sm text-slate-500">No checklist was needed for this request.</p>
           )}
           <dl className="mt-3 space-y-3 border-t border-slate-100 pt-3">
-            <Field label="Staff eligibility result">{c.eligibility_result || "Not recorded"}</Field>
-            <Field label="Staff notes">{c.staff_notes && c.staff_notes.trim() ? c.staff_notes : "No notes from staff."}</Field>
+            <Fact label="Staff eligibility result">{c.eligibility_result || "Not recorded"}</Fact>
+            <Fact label="Staff notes">{c.staff_notes && c.staff_notes.trim() ? c.staff_notes : "No notes from staff."}</Fact>
           </dl>
         </Panel>
       </div>
@@ -170,7 +166,7 @@ export function LeaveCaseSummary({ item }) {
           {review.suggested_dean_action && (
             <p className="mt-2 text-sm text-slate-700">
               <span className="font-semibold">Suggested: {review.suggested_dean_action}</span>
-              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Advice only - you decide</span>
+              <StatusChip label="Advice only - you decide" tone="muted" size="sm" dot={false} className="ml-2" />
             </p>
           )}
         </Panel>
