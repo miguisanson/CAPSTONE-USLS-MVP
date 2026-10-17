@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Eye, FileSignature, PenLine, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Eye, FileSignature, PenLine } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, SectionTitle, Spinner, StatusBadge } from "../components/ui";
@@ -12,13 +12,7 @@ export function Form1EndorsementQueue({ embedded = false }) {
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [message, setMessage] = useState("");
-  const [draftSignature, setDraftSignature] = useState("");
   const [finalizedSignature, setFinalizedSignature] = useState("");
-  const [signatureNotice, setSignatureNotice] = useState("");
-  const [hasDrawing, setHasDrawing] = useState(false);
-  const canvasRef = useRef(null);
-  const drawingRef = useRef(false);
-  const hasDrawingRef = useRef(false);
 
   const items = data?.items || [];
   const selected = items.find((item) => item.student.id === selectedId) || null;
@@ -30,100 +24,12 @@ export function Form1EndorsementQueue({ embedded = false }) {
     }
   }, [items, selectedId]);
 
-  useEffect(() => {
-    drawingRef.current = false;
-    hasDrawingRef.current = false;
-    setDraftSignature("");
-    setFinalizedSignature("");
-    setSignatureNotice("");
-    setHasDrawing(false);
-    const canvas = canvasRef.current;
-    if (canvas) canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
-  }, [selectedId]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !draftSignature) return;
-    const image = new Image();
-    image.onload = () => {
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    };
-    image.src = draftSignature;
-  }, [draftSignature]);
-
-  function point(event) {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: (event.clientX - rect.left) * (canvas.width / rect.width),
-      y: (event.clientY - rect.top) * (canvas.height / rect.height),
-    };
-  }
-
-  function startDrawing(event) {
-    event.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const p = point(event);
-    drawingRef.current = true;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    canvas.setPointerCapture?.(event.pointerId);
-  }
-
-  function draw(event) {
-    if (!drawingRef.current) return;
-    event.preventDefault();
-    const ctx = canvasRef.current.getContext("2d");
-    const p = point(event);
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#172033";
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    if (!hasDrawingRef.current) {
-      hasDrawingRef.current = true;
-      setHasDrawing(true);
-    }
-  }
-
-  function stopDrawing(event) {
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
-    if (hasDrawingRef.current) {
-      const snapshot = canvasRef.current.toDataURL("image/png");
-      setDraftSignature(snapshot);
-      setFinalizedSignature("");
-      setSignatureNotice("Signature captured. Select Finalize signature to lock it in.");
-    }
-  }
-
-  function clearSignature() {
-    const canvas = canvasRef.current;
-    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
-    hasDrawingRef.current = false;
-    setHasDrawing(false);
-    setDraftSignature("");
-    setFinalizedSignature("");
-    setSignatureNotice("");
-    setSubmitError("");
-  }
-
-  function finalizeSignature() {
-    if (!hasDrawingRef.current || !canvasRef.current) return;
-    const snapshot = canvasRef.current.toDataURL("image/png");
-    setDraftSignature(snapshot);
-    setFinalizedSignature(snapshot);
-    setSignatureNotice("Signature finalized and ready to submit.");
-    setSubmitError("");
-  }
+  // The drawing canvas lives inside <SignaturePad>. It clears itself (and reports "" through onChange) when
+  // resetKey - the selected student - changes; this page only keeps the finalized signature it hands back.
 
   async function endorse() {
     if (!selected) return;
-    if (draftSignature && !finalizedSignature) {
+    if (!finalizedSignature) {
       setSubmitError("Finalize the drawn signature before endorsing Form 1.");
       return;
     }
@@ -135,7 +41,8 @@ export function Form1EndorsementQueue({ embedded = false }) {
         signature_data: finalizedSignature,
       });
       setMessage(result.message);
-      clearSignature();
+      setFinalizedSignature("");
+      setSubmitError("");
       await refetch();
     } catch (err) {
       setSubmitError(err.message || "Could not endorse Form 1.");

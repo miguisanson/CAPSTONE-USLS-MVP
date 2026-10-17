@@ -33,6 +33,11 @@ export default defineConfig({
       testMatch: negative ? /negative\.spec\.js$/ : /sweep\.spec\.js$/,
       dependencies: ["setup"],
     },
+    // Section J bug tests (I-001, I-004, I-008). They change data, so they are not part of the read-only
+    // sweep; they only touch demo students the sweep does not read. Not in the negative control.
+    ...(negative
+      ? []
+      : [{ name: "section-j", testMatch: /section-j\.spec\.js$/, dependencies: ["setup"] }]),
   ],
   globalTeardown: "./e2e/support/teardown.mjs",
   webServer: {

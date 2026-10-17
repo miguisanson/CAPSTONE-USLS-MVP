@@ -51,7 +51,7 @@ export function ConfirmProvider({ children }) {
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-ink/40 backdrop-blur-[1px]" onClick={() => close(false)} />
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-lift animate-fade-up">
+          <div className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-lift animate-fade-up">
             <div className="flex items-start gap-3">
               <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${danger ? "bg-red-50 text-red-600" : "bg-brand-50 text-brand-700"}`}>
                 <AlertTriangle className="h-5 w-5" />

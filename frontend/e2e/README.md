@@ -83,6 +83,22 @@ The role sign-in tests it needs run automatically (the `setup` project).
 `--grep` matches the role key (`student`, `faculty`, `dean`, `staff`,
 `academic-coordinator`, `research-coordinator`, `admin`).
 
+## Section J bug tests (data-changing)
+
+`e2e/section-j.spec.js` (Playwright project `section-j`) has one test per defense-walkthrough bug
+(I-001 dropped-subject dialog fits 1366x768, I-004 Form 1 endorsement ends without a `getContext`
+error, I-008 the Dean's "Mark reviewed" window is named after the button). Unlike the sweep these tests
+**change data** (they save a drop, endorse a Form 1, mark a practicum report reviewed); the harness database
+is a throwaway. They only touch demo students the sweep does not read (Joshua Lim, Miguel Yu after a reset,
+Paolo Ramirez). Setup that is not the bug itself (a student's uploads, staff and coordinator hand-offs) goes
+through the JSON API with each role's own login; the screen under test is driven through the browser.
+Screenshots: `frontend/e2e-artifacts/section-j/`. Run on their own:
+
+```bash
+cd frontend
+node scripts/e2e.mjs test --project=section-j
+```
+
 ## Negative control
 
 ```bash

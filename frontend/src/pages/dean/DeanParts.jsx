@@ -186,9 +186,17 @@ export function DeanGraduationStageModal({ batch, onClose }) {
   );
 }
 
+// The wording of the Dean's approving button for each kind of case. The confirmation window uses the same
+// words, so the window is named after the button the Dean clicked (I-008).
+export function deanApproveLabel(item) {
+  const standingChange = ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
+  if (item.type === "practicum") return "Mark reviewed";
+  return standingChange || item.type === "withdrawal" ? "Approve" : "Approve and prepare for export";
+}
+
 export function DeanDecisionModal({ pending, busy, onClose, onConfirm }) {
   const { item, decision, note } = pending;
-  const label = decision === "approve" || decision === "review" ? "Approve current stage" : decision === "deny" ? "Deny request" : "Return for revision";
+  const label = decision === "approve" || decision === "review" ? deanApproveLabel(item) : decision === "deny" ? "Deny request" : "Return for revision";
   return (
     <DeanDialog
       id={`dean-confirm-${item.type}-${item.id}`}
@@ -294,7 +302,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
   const isBusy = busy === key;
   const standingChange = ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
   const decisionOnly = ["practicum", "withdrawal", "graduation"].includes(item.type);
-  const approveLabel = item.type === "practicum" ? "Mark reviewed" : standingChange || item.type === "withdrawal" ? "Approve" : "Approve and prepare for export";
+  const approveLabel = deanApproveLabel(item);
   const returnLabel = "Return for revision";
   const timeline = standingChange
     ? null

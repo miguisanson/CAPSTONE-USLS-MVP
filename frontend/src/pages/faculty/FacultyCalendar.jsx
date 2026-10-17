@@ -140,9 +140,9 @@ export function GoogleCalendarPreviewDialog({ preview, opened, onOpened, onClose
         aria-modal="true"
         aria-labelledby="calendar-preview-title"
         aria-describedby="calendar-preview-description"
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
       >
-        <header className="border-b border-slate-200 bg-gradient-to-r from-brand-800 to-brand-700 px-5 py-5 text-white">
+        <header className="shrink-0 border-b border-slate-200 bg-gradient-to-r from-brand-800 to-brand-700 px-5 py-5 text-white">
           <div className="flex items-start gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/15 ring-1 ring-white/20">
               <CalendarCheck2 className="h-6 w-6" aria-hidden="true" />
@@ -169,7 +169,7 @@ export function GoogleCalendarPreviewDialog({ preview, opened, onOpened, onClose
           </div>
         </header>
 
-        <div className="space-y-4 px-5 py-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">How your calendar will be used</p>
             <div className="mt-3 space-y-2">
@@ -201,7 +201,7 @@ export function GoogleCalendarPreviewDialog({ preview, opened, onOpened, onClose
           )}
         </div>
 
-        <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end">
+        <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="btn-ghost min-h-11 cursor-pointer justify-center px-4">
             Not now
           </button>
