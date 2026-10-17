@@ -69,7 +69,7 @@
     {"text": "The status is **Completed** (\"Completed hours pending report review\"). Click **Send status report to Dean** and confirm (Completed to Report Sent to Dean). The status becomes **Report Sent to Dean**.", "shots": [{"id": "practicum-27", "caption": "Completed: Send status report to Dean is offered."}, {"id": "practicum-27b", "caption": "Confirmation window."}, {"id": "practicum-28", "caption": "Report Sent to Dean."}]},
     {"text": "Sign in as the Dean and open **Practicum Reports**. The page shows \"1 waiting\" and a grouped board with Paolo's card in **Pending Dean Review** (Report Sent to Dean, Ready for Dean review).", "shots": [{"id": "practicum-29", "caption": "Dean's Practicum Reports with the report waiting."}]},
     {"text": "Click **Review**. The report page shows the summary (200/200 hours, certificates: 2, remark), the stage history, all three submitted files (MOA, initial certificates, additional certificate), the whole case discussion and a **Review comment** box with **Mark reviewed** and **Return for revision**.", "shots": [{"id": "practicum-30", "caption": "The Dean's report page."}]},
-    {"text": "Type a review comment and click **Mark reviewed**. The confirmation window is titled \"Confirm: Approve current stage\" and shows Report Sent to Dean to Approved / reviewed with the recorded comment; click **Approve current stage**. The list is empty and Recent workflow decisions shows the report as **Dean Reviewed**.", "shots": [{"id": "practicum-31", "caption": "Confirmation window."}, {"id": "practicum-32", "caption": "Dean Reviewed."}]},
+    {"text": "Type a review comment and click **Mark reviewed**. The confirmation window is titled \"Confirm: Mark reviewed\" and shows Report Sent to Dean to Approved / reviewed with the recorded comment; click **Mark reviewed**. The list is empty and Recent workflow decisions shows the report as **Dean Reviewed**.", "shots": [{"id": "practicum-31", "caption": "Confirmation window."}, {"id": "practicum-32", "caption": "Dean Reviewed."}]},
     {"text": "As GS Staff, the card is in **Completed** with 200/200 hrs and 12 messages. Open **View** and scroll to **Submitted file history**: the MOA, the initial certificates and the additional certificate are all kept.", "shots": [{"id": "practicum-33", "caption": "Staff board: Completed."}, {"id": "practicum-34", "caption": "Submitted file history keeps every upload."}]}
    ]
   }
@@ -77,7 +77,6 @@
  "notes": [
   "Practicum is limited to Psychology and MSGC students. The rules panel on the practicum screens lists five rules, all marked Needs review (prototype values pending Graduate School validation).",
   "The Practicum board is not yet on the shared staged-board layout, so there is no drag and drop here; every step is a button with a confirmation window.",
-  "The Dean's button reads Mark reviewed, but its confirmation window is titled \"Approve current stage\" (shared dialog wording).",
   "A Dean who was already signed in when the Coordinator sent the report did not see it after clicking Practicum Reports in the sidebar; a page reload (or a fresh sign-in) shows it. This was seen in the capture and is reported as a refresh limitation."
  ]
 }

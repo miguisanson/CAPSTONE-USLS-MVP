@@ -230,7 +230,7 @@ def run(rt):
         rt.shot(dean, f"{S}-31")
         dlg = dean.locator("[role=dialog]")
         if dlg.count():
-            dlg.last.get_by_role("button", name=re.compile("Approve current stage", re.I)).click()
+            dlg.last.get_by_role("button", name=re.compile("^Mark reviewed$", re.I)).click()
         rt.settle(dean, 2000)
         rt.shot(dean, f"{S}-32")
 

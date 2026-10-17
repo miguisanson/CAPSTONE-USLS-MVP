@@ -24,14 +24,14 @@ hunt — becomes one row here. Rules adapted from DD-Project-GameMaker.
 
 | ID | Class | Sev | What (source) | Repro / evidence | Status |
 |----|-------|-----|---------------|------------------|--------|
-| I-001 | UI | P1 | Enrollment "Record dropped subject" dialog is taller than the screen at 1366×768 — Save unreachable. (DEFENSE_REVISIONS J1) | `scripts/docs/walkthrough/cases/` | open |
+| I-001 | UI | P1 | Enrollment "Record dropped subject" dialog is taller than the screen at 1366×768 — Save unreachable. (DEFENSE_REVISIONS J1) | `scripts/docs/walkthrough/cases/` | fixed-on-v5.2 (pkt/j-frontend) |
 | I-002 | BUG | P1 | Demo reset sets subjects to "Not Started", which blocks single-student enrollment. (J2) | walkthrough cases | open |
 | I-003 | BUG | P2 | Withdrawal report re-judges the window at report time ("window closed / Fee 100%") instead of using the window recorded at submission. (J3) | walkthrough cases | open |
-| I-004 | BUG | P2 | After "Endorse and sign Form 1" a "Cannot read properties of null (reading 'getContext')" banner appears; the endorsement saves. (J4) | walkthrough cases | open |
+| I-004 | BUG | P2 | After "Endorse and sign Form 1" a "Cannot read properties of null (reading 'getContext')" banner appears; the endorsement saves. (J4) | walkthrough cases | fixed-on-v5.2 (pkt/j-frontend) |
 | I-005 | BUG | P1 | Research Coordinator's student search in Research Gate always says "No students match" (opening with `?student_id=` works). (J5) | walkthrough cases | open |
 | I-006 | BUG | P2 | Defense Scheduling "Change panel" shows existing members under the wrong role labels. (J6) | walkthrough cases | open |
 | I-007 | BUG | P2 | Panel invitation answers survive a demo reset. (J7) | walkthrough cases | open |
-| I-008 | UI | P3 | Practicum: the Dean's "Mark reviewed" window is titled "Approve current stage". (J8) | walkthrough cases | open |
+| I-008 | UI | P3 | Practicum: the Dean's "Mark reviewed" window is titled "Approve current stage". (J8) | walkthrough cases | fixed-on-v5.2 (pkt/j-frontend) |
 | I-009 | BUG | P2 | A signed-in Dean does not see a new practicum report until reload. (J9) | walkthrough cases | open |
 | I-010 | BUG | P1 | Graduation: after the Dean's CSV export the batch stays "Dean Approved" instead of "Exported - Ready to Send". (J10) | walkthrough cases | open |
 | I-011 | BUG | P2 | After a monitoring-sheet import the Onboarding report panel still says "No import batches yet". (J11) | walkthrough cases | open |
@@ -63,3 +63,4 @@ hunt — becomes one row here. Rules adapted from DD-Project-GameMaker.
 | I-037 | UI | P3 | audit (e2e sweep): student Subject Withdrawal shows "No active subject is currently inside the withdrawal window…" as a red error banner; it is an informational state. | `screens/student/student-requests-withdrawal-1366.png` | fixed-on-v5.2 (pkt/mobile) |
 | I-038 | BUG | P2 | audit (e2e sweep, run 1 only): `GET /api/faculty-portal/context` returned 500 `UNIQUE constraint failed: panel_invitation.student_id, faculty_id, gate` — a GET inserts panel invitations and two first loads race. A GET must not write. | e2e findings run 1 | needs-repro |
 | I-039 | DEBT | P3 | audit (e2e sweep): opening Leave of Absence or Readmission as staff/admin fires `POST /api/leave-cases/sync` — a page view writes data. | e2e network log | confirmed |
+| I-040 | UI | P3 | audit (j-frontend review): when a dialog opens, a ~20 px white strip across the top of the page is not covered by the dark backdrop. | `frontend/e2e-artifacts/section-j/i-001-dropped-subject-dialog-1366.png` | confirmed |

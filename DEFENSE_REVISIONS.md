@@ -269,14 +269,14 @@ Found by driving the live app for the new walkthrough (reproduction steps are in
 `scripts/docs/walkthrough/cases/`). None is covered by a failing test yet: write the
 test first.
 
-- [ ] J1. Enrollment "Record dropped subject" dialog is taller than the screen at 1366×768 — Save unreachable.
+- [x] J1. Enrollment "Record dropped subject" dialog is taller than the screen at 1366×768 — Save unreachable.
 - [ ] J2. Demo reset sets subjects to "Not Started", which blocks single-student enrollment.
 - [ ] J3. Withdrawal report re-judges the window at report time ("window closed / Fee 100%") instead of using the window recorded at submission.
-- [ ] J4. After "Endorse and sign Form 1" a "Cannot read properties of null (reading 'getContext')" banner appears (the endorsement saves).
+- [x] J4. After "Endorse and sign Form 1" a "Cannot read properties of null (reading 'getContext')" banner appears (the endorsement saves).
 - [ ] J5. Research Coordinator's student search in Research Gate always says "No students match" (opening with `?student_id=` works).
 - [ ] J6. Defense Scheduling "Change panel" shows existing members under the wrong role labels.
 - [ ] J7. Panel invitation answers survive a demo reset.
-- [ ] J8. Practicum: the Dean's "Mark reviewed" window is titled "Approve current stage".
+- [x] J8. Practicum: the Dean's "Mark reviewed" window is titled "Approve current stage".
 - [ ] J9. A signed-in Dean does not see a new practicum report until reload.
 - [ ] J10. Graduation: after the Dean's CSV export the batch stays "Dean Approved" instead of "Exported - Ready to Send".
 - [ ] J11. After a monitoring-sheet import the Onboarding report panel still says "No import batches yet".
