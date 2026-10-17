@@ -148,64 +148,47 @@ test.describe("Students page", () => {
 });
 
 test.describe("Dashboard page", () => {
-  test("filters keep their API calls and URL; every tile link and the Reports button go where they did", async ({ page }) => {
+  // P7.1 (IM19/IM20): the home became action first and its charts and filter bar moved to Reports > Analytics.
+  // What changed in this block, and why, is listed in the commit message of the packet; e2e/p71-staff-home.spec.js
+  // pins the new home in full. Everything that still exists is pinned here as before.
+  test("every key-number link and the Reports button go where they should; the filter bar is no longer on the home", async ({ page }) => {
     const first = apiGet(page, "/api/dashboard");
     await page.goto("/");
     const { json } = await first;
-    await expect(page.getByRole("heading", { level: 1, name: "Graduate School Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
     const k = json.kpis;
 
-    // tile links (by href: the tiles change layout in the migration, not where they lead)
+    // tile links (by href: the tiles change layout, not where they lead)
     const link = (href) => page.locator(`main a[href="${href}"]`);
     await expect(link("/students").first()).toContainText(String(k.total_students));
     await expect(link("/students?risk=At Risk of Delay/Delayed").or(link("/students?risk=At%20Risk%20of%20Delay/Delayed")).first()).toBeVisible();
-    await expect(link("/work-queue").first()).toBeVisible();
-    await expect(link("/students?standing=Active")).toBeVisible();
-    await expect(link("/students?standing=On+Leave")).toBeVisible();
-    await expect(link("/reports?workflow_type=graduation_candidates")).toBeVisible();
-    await expect(link("/work-queue?status=Overdue")).toBeVisible();
+    await expect(link("/work-queue?owner=Graduate%20School%20Staff").or(link("/work-queue?owner=Graduate School Staff")).first()).toBeVisible();
+    await expect(link("/workflow/defense-scheduling").first()).toBeVisible();
     await expect(link("/reports").first()).toBeVisible();
     // the KPI labels and sublines are still on the page
-    for (const t of ["Students monitored", "At risk or delayed", "Open tasks", "Confirmed defenses", "Active", "On leave", "Completed", "Overdue tasks"]) {
+    for (const t of ["Students monitored", "At risk or delayed", "Your open tasks", "Confirmed defenses"]) {
       await expect(page.locator("main a", { hasText: t }).first(), t).toBeVisible();
     }
     await expect(page.getByText(`${k.active_students} active`)).toBeVisible();
 
     // a tile navigates
-    await link("/students?standing=Active").click();
-    await expect(page).toHaveURL(/\/students\?standing=Active/);
+    await link("/students").first().click();
+    await expect(page).toHaveURL(/\/students$/);
     await page.goBack();
-    await expect(page.getByRole("heading", { level: 1, name: "Graduate School Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
     // the Reports button navigates
     await page.getByRole("link", { name: "Reports", exact: true }).first().click();
     await expect(page).toHaveURL(/\/reports$/);
     await page.goBack();
 
-    // ---- filters: Program, then Standing, then clear
-    const field = (label) => page.locator("label", { has: page.locator(`span:text-is("${label}")`) }).locator("select");
-    const program = field("Program");
-    const programValue = await program.locator("option").nth(1).getAttribute("value");
-    const byProgram = apiGet(page, "/api/dashboard", (p) => p.get("program_id") === programValue);
-    await program.selectOption(programValue);
-    await byProgram;
-    await expect(page).toHaveURL(new RegExp(`[?&]program_id=${programValue}(&|$)`));
-    const byStanding = apiGet(page, "/api/dashboard", (p) => p.get("standing") === "Active" && p.get("program_id") === programValue);
-    await field("Standing").selectOption("Active");
-    await byStanding;
-    await expect(page).toHaveURL(/standing=Active/);
-    for (const label of ["Progress", "Risk", "Owner"]) await expect(field(label), label).toBeVisible();
-    const clear = page.getByRole("button", { name: "Clear dashboard filters" });
-    await expect(clear).toBeVisible();
-    const cleared = apiGet(page, "/api/dashboard", (p) => !p.get("program_id") && !p.get("standing"));
-    await clear.click();
-    await cleared;
-    await expect(page).not.toHaveURL(/program_id|standing/);
-    await expect(clear).toHaveCount(0);
+    // the filters left the home: no select, no clear button (they are on Reports and pinned by p62 and p71)
+    await expect(page.locator("main select")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Clear dashboard filters" })).toHaveCount(0);
   });
 
-  test("a chart category opens the details dialog: loads its rows from the drill-down API and closes with its X button", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "Graduate School Overview" })).toBeVisible();
+  test("a chart category on Reports > Analytics opens the details dialog: loads its rows from the drill-down API and closes with its X button", async ({ page }) => {
+    await page.goto("/reports?workflow_type=analytics");
+    await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true })).toBeVisible();
     const chip = page.locator('button[aria-label^="Show "]').first();
     await expect(chip).toBeVisible();
     const label = (await chip.getAttribute("aria-label")).replace(/^Show /, "").replace(/: \d+ records?$/, "");
@@ -219,28 +202,25 @@ test.describe("Dashboard page", () => {
     await expect(dialog.getByRole("heading", { level: 2 })).toHaveText(json.title);
     await expect(dialog.getByText("Loading filtered details…")).toBeHidden();
     if (json.rows?.length) {
-      // schedule + student drill-downs are tables; the owner drill-down is a list. Either way the first row's name shows.
       await expect(dialog).toContainText(json.rows[0].name || json.rows[0].student?.name || json.rows[0].title);
     } else {
       await expect(dialog.getByText("No records in this category")).toBeVisible();
     }
     // the page behind is still there
-    await expect(page.getByRole("heading", { level: 1, name: "Graduate School Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
     await page.getByRole("button", { name: "Close dashboard details" }).click();
     await expect(dialog).toHaveCount(0);
   });
 
-  test("the two work lists link to the work queue and the activity log; student rows in the dialog link to records", async ({ page }) => {
+  test("the activity list links to the activity log; student rows in the drill-down dialog link to records", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "Graduate School Overview" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Open the work queue/ })).toHaveAttribute("href", "/work-queue");
-    // recent activity is behind a disclosure
-    const toggle = page.getByRole("button", { name: /View logs/ });
-    if (await toggle.count()) {
-      await toggle.click();
-      await expect(page.getByRole("link", { name: /Open full activity log/ })).toHaveAttribute("href", "/activity");
-    }
-    // stage drill-down lists students that link to their record
+    await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
+    await expect(page.getByRole("link", { name: "View all" }).last()).toHaveAttribute("href", "/activity");
+    // Waiting on others (when another office holds tasks) leads to the work queue
+    const waiting = page.locator("main section", { has: page.getByRole("heading", { name: "Waiting on others", exact: true }) });
+    if (await waiting.count()) await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/work-queue");
+    // stage drill-down (now on Reports) lists students that link to their record
+    await page.goto("/reports?workflow_type=analytics");
     const chip = page.locator('button[aria-label^="Show "]').first();
     await chip.click();
     const dialog = page.getByRole("dialog");

@@ -25,11 +25,13 @@ export const MAX_WAITING = 3;
  * @param actionsTitle   heading of the list (default "Needs your action")
  * @param actionsSubtitle one short line under the heading
  * @param actionsEmpty   { title, hint } shown when `actions` is empty (default "Nothing is waiting on you")
+ * @param actionsAll     optional { to, label } "View all" link in the heading, for a list that is capped (the back-office home)
  * @param waiting        optional second group under the actions for things that wait on SOMEONE ELSE (AD7: an office
  *                       holds the task, the viewer has nothing to do): { title, subtitle, items, all: { to, label } }.
  *                       Same row shape as `actions`, at most MAX_WAITING rows, hidden when `items` is empty.
  * @param stats          3-4 StatCard prop objects ({ label, value, sub, to, icon, tone, badge })
- * @param activity       [{ key, title, detail, time, to, unread }] newest first; the first MAX_ACTIVITY are shown
+ * @param activity       [{ key, title, detail, time, to, unread }] newest first; the first MAX_ACTIVITY are shown.
+ *                       `null` leaves the activity card out (a role that may not read the activity log)
  * @param activityTitle  heading (default "Recent activity")
  * @param activityAll    { to, label } the "View all" link
  * @param activityEmpty  { title, hint } shown when `activity` is empty
@@ -41,6 +43,7 @@ export default function RoleHome({
   actionsTitle = "Needs your action",
   actionsSubtitle,
   actionsEmpty = {},
+  actionsAll,
   waiting,
   stats = [],
   activity = [],
@@ -49,7 +52,7 @@ export default function RoleHome({
   activityEmpty = {},
   extra = null,
 }) {
-  const shownActivity = activity.slice(0, MAX_ACTIVITY);
+  const shownActivity = (activity || []).slice(0, MAX_ACTIVITY);
   const waitingItems = waiting?.items || [];
   return (
     <div className="space-y-5 animate-fade-up">
@@ -62,6 +65,16 @@ export default function RoleHome({
             title={actionsTitle}
             subtitle={actionsSubtitle}
             icon={ListChecks}
+            action={
+              actionsAll && (
+                <Link
+                  to={actionsAll.to}
+                  className="inline-flex shrink-0 items-center text-sm font-semibold text-brand-700 hover:underline max-sm:min-h-11"
+                >
+                  {actionsAll.label || "View all"}
+                </Link>
+              )
+            }
             className="order-1 lg:order-none"
           >
             {actions.length ? (
@@ -117,32 +130,34 @@ export default function RoleHome({
               ))}
             </div>
           )}
-          <SectionCard
-            as="section"
-            title={activityTitle}
-            icon={Activity}
-            action={
-              activityAll && (
-                <Link
-                  to={activityAll.to}
-                  className="inline-flex shrink-0 items-center text-sm font-semibold text-brand-700 hover:underline max-sm:min-h-11"
-                >
-                  {activityAll.label || "View all"}
-                </Link>
-              )
-            }
-            className="order-4 lg:order-none"
-          >
-            {shownActivity.length ? (
-              <ul className="space-y-3">
-                {shownActivity.map((entry) => (
-                  <ActivityRow key={entry.key ?? entry.title} entry={entry} />
-                ))}
-              </ul>
-            ) : (
-              <EmptyState size="sm" title={activityEmpty.title || "No activity yet"} hint={activityEmpty.hint} />
-            )}
-          </SectionCard>
+          {activity !== null && (
+            <SectionCard
+              as="section"
+              title={activityTitle}
+              icon={Activity}
+              action={
+                activityAll && (
+                  <Link
+                    to={activityAll.to}
+                    className="inline-flex shrink-0 items-center text-sm font-semibold text-brand-700 hover:underline max-sm:min-h-11"
+                  >
+                    {activityAll.label || "View all"}
+                  </Link>
+                )
+              }
+              className="order-4 lg:order-none"
+            >
+              {shownActivity.length ? (
+                <ul className="space-y-3">
+                  {shownActivity.map((entry) => (
+                    <ActivityRow key={entry.key ?? entry.title} entry={entry} />
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState size="sm" title={activityEmpty.title || "No activity yet"} hint={activityEmpty.hint} />
+              )}
+            </SectionCard>
+          )}
         </div>
       </div>
     </div>
