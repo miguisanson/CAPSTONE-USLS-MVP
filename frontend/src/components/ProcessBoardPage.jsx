@@ -3,7 +3,7 @@ import { HelpCircle, History, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { formatDateTime } from "../lib/format";
-import { Card, EmptyState, ErrorNote, Spinner } from "./ui";
+import { Button, EmptyState, InlineNotice, PageHeader, Spinner } from "./ui/index.js";
 import PolicyRules from "./PolicyRules";
 import StageBoard from "./StageBoard";
 import { GUIDES, PROCESS_CONFIG } from "./processConfig";
@@ -13,7 +13,6 @@ import CaseCard, { CaseTable } from "../pages/leave/CaseCard";
 import CaseDetailModal from "../pages/leave/CaseDetailModal";
 import LeaveFilters, { ViewToggle } from "../pages/leave/LeaveFilters";
 import ModalShell from "../pages/leave/ModalShell";
-import { Banner } from "../pages/leave/leaveUi";
 import {
   EMPTY_FILTERS,
   actionsIntoColumn,
@@ -31,7 +30,7 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
   const guide = GUIDES[slug];
   const Line = ({ label, children }) => (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="eyebrow">{label}</p>
       <p className="mt-1 text-sm text-ink">{children}</p>
     </div>
   );
@@ -43,7 +42,7 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
       subtitle="A short guide for students and reviewers"
       onClose={onClose}
       closeLabel="Close the guide"
-      footer={<button type="button" onClick={onClose} className="btn-ghost px-4 py-2">Close</button>}
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
     >
       {guide && (
         <div className="space-y-5">
@@ -54,11 +53,11 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
             <Line label="When something is incomplete">{guide.incomplete}</Line>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Main stages</p>
+            <p className="eyebrow">Main stages</p>
             <ol className="mt-2 grid gap-2 sm:grid-cols-2">
               {guide.stages.map((stage, index) => (
                 <li key={stage} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs text-brand-700">{index + 1}</span>
+                  <span className="meta grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 font-semibold text-brand-700">{index + 1}</span>
                   {stage}
                 </li>
               ))}
@@ -95,7 +94,7 @@ function ActivityWindow({ logs, onClose }) {
       subtitle="A timestamped trail of the latest steps and handoffs in this process"
       onClose={onClose}
       closeLabel="Close recent activity"
-      footer={<button type="button" onClick={onClose} className="btn-ghost px-4 py-2">Close</button>}
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
     >
       {!logs.length ? (
         <EmptyState title="No activity yet" hint="New filings, messages and decisions will appear here." />
@@ -106,12 +105,12 @@ function ActivityWindow({ logs, onClose }) {
               <span className="absolute -left-[27px] top-4 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="text-sm font-semibold text-ink">{log.result}</p>
-                <time className="text-xs text-slate-400" dateTime={log.created_at || undefined}>{formatDateTime(log.created_at)}</time>
+                <time className="meta" dateTime={log.created_at || undefined}>{formatDateTime(log.created_at)}</time>
               </div>
-              <p className="mt-1 text-xs text-slate-500">{log.actor_role}{log.student_name ? ` · ${log.student_name}` : ""}</p>
+              <p className="meta mt-1">{log.actor_role}{log.student_name ? ` · ${log.student_name}` : ""}</p>
               {(log.previous_status || log.new_status) && (
                 <p className="mt-2 text-xs font-semibold text-slate-600">
-                  {log.previous_status || "-"} <span className="mx-1 text-slate-300">to</span> {log.new_status || "-"}
+                  {log.previous_status || "-"} <span className="mx-1 font-normal text-slate-500">to</span> {log.new_status || "-"}
                 </p>
               )}
               {log.notes && <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-500">{log.notes}</p>}
@@ -347,15 +346,15 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
       return (
         <header className="mb-3">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
+            <h3 className="section-title">{column.label}</h3>
             <span
-              className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200"
+              className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200"
               aria-label={filteredOut ? `${columnItems.length} shown of ${total}` : `${plural(total, "request")}`}
             >
               {filteredOut ? `${columnItems.length} of ${total}` : total}
             </span>
           </div>
-          {column.description && <p className="mt-1 text-xs leading-relaxed text-slate-500">{column.description}</p>}
+          {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
         </header>
       );
     },
@@ -370,7 +369,7 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
         <button
           type="button"
           onClick={() => setMany(columnItems, !allOn)}
-          className="mt-3 cursor-pointer rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="mt-3 cursor-pointer rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-700 transition-colors duration-200 hover:bg-brand-50 focus:outline-none focus:ring-2 focus:ring-brand-500 max-sm:min-h-11"
         >
           {allOn ? "Clear selection in this column" : "Select all in this column"}
         </button>
@@ -402,36 +401,26 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
   if (!data) {
     return (
       <div className="space-y-3">
-        <ErrorNote message={state.error || "The requests could not be loaded."} />
-        <button type="button" onClick={() => load()} className="btn-ghost px-4 py-2">
-          <RefreshCw className="h-4 w-4" /> Try again
-        </button>
+        <InlineNotice tone="danger">{state.error || "The requests could not be loaded."}</InlineNotice>
+        <Button variant="secondary" icon={RefreshCw} onClick={() => load()}>Try again</Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className="page-stack animate-fade-up">
       {/* Header: the same in every process */}
-      <Card className="p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white">
-            <Icon className="h-6 w-6" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-2xl font-semibold text-ink">{config.title}</h1>
-            <p className="mt-1 text-sm text-slate-600">{config.description}</p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:justify-end">
-            <button type="button" onClick={() => setSupport("guide")} className="btn-ghost cursor-pointer px-3 py-2">
-              <HelpCircle className="h-4 w-4" /> How this works
-            </button>
-            <button type="button" onClick={() => setSupport("activity")} className="btn-ghost cursor-pointer px-3 py-2">
-              <History className="h-4 w-4" /> View recent activity
-            </button>
-          </div>
-        </div>
-      </Card>
+      <PageHeader
+        title={config.title}
+        description={config.description}
+        icon={Icon}
+        actions={
+          <>
+            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupport("guide")}>How this works</Button>
+            <Button variant="secondary" icon={History} onClick={() => setSupport("activity")}>View recent activity</Button>
+          </>
+        }
+      />
 
       <PolicyRules process={config.rulesProcess} />
 
@@ -448,11 +437,11 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
         {HeaderActions && <div className="flex flex-wrap gap-2"><HeaderActions ctx={ctx} /></div>}
       </div>
 
-      {state.error && <ErrorNote message={state.error} />}
+      {state.error && <InlineNotice tone="danger">{state.error}</InlineNotice>}
       {banner && (
-        <Banner tone={banner.tone} onDismiss={() => setBanner(null)}>
+        <InlineNotice tone={banner.tone} icon onDismiss={() => setBanner(null)}>
           {banner.text}
-        </Banner>
+        </InlineNotice>
       )}
 
       {AboveBoard && <AboveBoard ctx={ctx} />}

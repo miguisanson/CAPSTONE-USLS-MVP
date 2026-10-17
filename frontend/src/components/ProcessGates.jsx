@@ -2,28 +2,25 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Send, FileSpreadsheet, GraduationCap, ClipboardList, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import { Card, EmptyState, SectionTitle, Spinner } from "./ui";
+import { Button, DataTable, EmptyState, Field, InlineNotice, Input, SectionCard, Select, Spinner, StatusChip } from "./ui/index.js";
 
 /* Panels for the process steps the BPMN models require but that previously had
    no screen: the Dean onboarding gate (BPMN 1), the derived study plan and
    curriculum version tagging (BPMN 2), and the coursework report routed to the
    Dean (BPMN 4). */
 
-function Banner({ tone = "info", children }) {
-  if (!children) return null;
-  const tones = {
-    info: "bg-brand-50 text-brand-700",
-    error: "bg-rose-50 text-rose-700",
-    ok: "bg-emerald-50 text-emerald-700",
-  };
-  return <div className={`rounded-lg px-3 py-2 text-sm font-semibold ${tones[tone]}`}>{children}</div>;
+/** The message of the last step: a refused or failed call (`danger`). Empty when there is nothing to say. */
+function Notice({ msg }) {
+  if (!msg || !msg.text) return null;
+  return <InlineNotice tone={msg.tone}>{msg.text}</InlineNotice>;
 }
 
-function Pill({ children }) {
+/** A remark from the person who reviewed the item (Dean, Coordinator). */
+function Remark({ who, children }) {
   return (
-    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-slate-600">
-      {children}
-    </span>
+    <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      <span className="font-semibold">{who}:</span> {children}
+    </p>
   );
 }
 
@@ -37,54 +34,50 @@ export function OnboardingGatePanel({ role }) {
   const load = useCallback(() => {
     api.onboardingReviews()
       .then((res) => setItems(res.items || []))
-      .catch((err) => setMsg({ tone: "error", text: err.message }));
+      .catch((err) => setMsg({ tone: "danger", text: err.message }));
   }, []);
   useEffect(() => { load(); }, [load]);
 
   async function act(fn) {
     setBusy(true); setMsg(null);
     try { await fn(); load(); }
-    catch (err) { setMsg({ tone: "error", text: err.message }); }
+    catch (err) { setMsg({ tone: "danger", text: err.message }); }
     finally { setBusy(false); }
   }
 
   if (items === null) return <Spinner label="Loading onboarding reports..." />;
 
   return (
-    <Card className="p-5">
-      <SectionTitle
-        title="Onboarding report & Dean approval"
-        icon={GraduationCap}
-        action={<button type="button" onClick={load} className="btn-ghost"><RefreshCw className="h-4 w-4" /> Refresh</button>}
-      />
-      <p className="-mt-1 mb-3 text-xs text-slate-500">
-        Each import batch is checked, reported to the Dean, and only then recorded as an admission completion.
-        The checklist is derived from the import — it is not ticked by hand.
-      </p>
-      {msg ? <div className="mb-3"><Banner tone={msg.tone}>{msg.text}</Banner></div> : null}
+    <SectionCard
+      title="Onboarding report & Dean approval"
+      icon={GraduationCap}
+      action={<Button variant="secondary" icon={RefreshCw} onClick={load}>Refresh</Button>}
+    >
+      <p className="text-sm text-slate-500">Each import batch is checked, reported to the Dean, and only then recorded as an admission completion. The checklist is derived from the import — it is not ticked by hand.</p>
+      <Notice msg={msg} />
       {!items.length ? (
         <EmptyState icon={FileSpreadsheet} title="No import batches yet" hint="Import a monitoring sheet to open an onboarding report." />
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
-            <div key={item.id} className="rounded-xl border border-slate-200 p-4">
+            <div key={item.id} className="space-y-3 rounded-xl border border-slate-200 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="font-semibold text-ink">
+                  <p className="card-title">
                     {item.program_code} · {item.student_count} student{item.student_count === 1 ? "" : "s"}
                     {item.new_student_count ? ` · ${item.new_student_count} new` : ""}
                   </p>
-                  <p className="text-xs text-slate-500">{item.source_file}</p>
+                  <p className="meta">{item.source_file}</p>
                 </div>
-                <Pill>{item.status}</Pill>
+                <StatusChip status={item.status} dot={false} />
               </div>
 
-              <ul className="mt-3 space-y-1.5">
+              <ul className="space-y-1.5">
                 {item.checklist.map((check) => (
                   <li key={check.label} className="flex items-start gap-2 text-sm">
                     {check.passed
-                      ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                      : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}
+                      ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
+                      : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />}
                     <span className="text-slate-600">
                       <span className="font-semibold text-ink">{check.label}</span> — {check.detail}
                     </span>
@@ -92,44 +85,44 @@ export function OnboardingGatePanel({ role }) {
                 ))}
               </ul>
 
-              {item.dean_remarks ? (
-                <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  <span className="font-bold">Dean:</span> {item.dean_remarks}
-                </p>
-              ) : null}
+              {item.dean_remarks ? <Remark who="Dean">{item.dean_remarks}</Remark> : null}
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {role !== "dean" && (item.status === "Draft" || item.status === "Returned") ? (
-                  <button
-                    type="button"
+                  <Button
+                    icon={Send}
                     disabled={busy || !item.checklist_complete}
                     onClick={() => act(() => api.submitOnboardingReview(item.id))}
-                    className="btn-primary disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    <Send className="h-4 w-4" /> Send onboarding report to Dean
-                  </button>
+                    Send onboarding report to Dean
+                  </Button>
                 ) : null}
                 {role === "dean" && item.status === "Dean Review" ? (
                   <>
-                    <input
+                    <Input
                       value={remarks[item.id] || ""}
                       onChange={(e) => setRemarks((r) => ({ ...r, [item.id]: e.target.value }))}
                       placeholder="Remarks (required to return)"
                       aria-label="Dean remarks (required to return)"
-                      className="field-input max-w-xs"
+                      className="max-w-xs"
                     />
-                    <button type="button" disabled={busy} className="btn-primary"
-                      onClick={() => act(() => api.decideOnboardingReview(item.id, { decision: "approve", remarks: remarks[item.id] || "" }))}>
+                    <Button
+                      disabled={busy}
+                      onClick={() => act(() => api.decideOnboardingReview(item.id, { decision: "approve", remarks: remarks[item.id] || "" }))}
+                    >
                       Approve onboarding
-                    </button>
-                    <button type="button" disabled={busy} className="btn-ghost"
-                      onClick={() => act(() => api.decideOnboardingReview(item.id, { decision: "return", remarks: remarks[item.id] || "" }))}>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => act(() => api.decideOnboardingReview(item.id, { decision: "return", remarks: remarks[item.id] || "" }))}
+                    >
                       Return
-                    </button>
+                    </Button>
                   </>
                 ) : null}
                 {item.admission_completed_at ? (
-                  <span className="text-xs font-semibold text-emerald-700">
+                  <span className="meta font-semibold text-brand-700">
                     Admission completion recorded {new Date(item.admission_completed_at).toLocaleDateString()}
                   </span>
                 ) : null}
@@ -138,7 +131,7 @@ export function OnboardingGatePanel({ role }) {
           ))}
         </div>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -156,7 +149,7 @@ export function StudyPlanPanel({ students = [] }) {
   const role = user?.role;
 
   const load = useCallback(() => {
-    api.studyPlans().then((res) => setPlans(res.items || [])).catch((e) => setMsg({ tone: "error", text: e.message }));
+    api.studyPlans().then((res) => setPlans(res.items || [])).catch((e) => setMsg({ tone: "danger", text: e.message }));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -164,152 +157,169 @@ export function StudyPlanPanel({ students = [] }) {
     if (!studentId) { setTag(null); return; }
     api.curriculumTag(studentId)
       .then((res) => { setTag(res); setVersion(res.tag?.curriculum_version || ""); })
-      .catch((e) => setMsg({ tone: "error", text: e.message }));
+      .catch((e) => setMsg({ tone: "danger", text: e.message }));
   }, [studentId]);
 
   async function act(fn) {
     setBusy(true); setMsg(null);
     try { await fn(); load(); }
-    catch (err) { setMsg({ tone: "error", text: err.message }); }
+    catch (err) { setMsg({ tone: "danger", text: err.message }); }
     finally { setBusy(false); }
   }
 
   const multipleVersions = (tag?.available_versions || []).length > 1;
+  const studentOptions = students.map((s) => ({ value: String(s.id), label: `${s.name} · ${s.student_number}` }));
+  const versionOptions = (tag?.available_versions || []).map((v) => ({ value: v, label: v }));
+
+  const planColumns = [
+    { key: "student", header: "Student", cell: (p) => <span className="font-semibold text-ink">{p.student?.name}</span> },
+    { key: "term", header: "Term", cell: (p) => p.term_label || "—" },
+    { key: "version", header: "Version", cell: (p) => p.curriculum_version || "—" },
+    { key: "subjects", header: "Proposed subjects", cell: (p) => p.subjects.join(", ") || "—" },
+    { key: "remaining", header: "Still required", cell: (p) => p.remaining_count },
+    {
+      key: "status",
+      header: "Status",
+      cell: (p) => (
+        <>
+          <StatusChip status={p.status} dot={false} />
+          {p.coordinator_remarks ? (
+            <p className="mt-1.5 max-w-xs rounded-xl bg-slate-50 px-2.5 py-1.5 text-xs font-normal text-slate-600">
+              <span className="font-semibold">Coordinator:</span> {p.coordinator_remarks}
+            </p>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">Actions</span>,
+      cell: (p) => (
+        <>
+          {p.status === "Draft" ? (
+            <Button variant="secondary" icon={Send} disabled={busy} onClick={() => act(() => api.sendStudyPlan(p.id))}>
+              Send to AC
+            </Button>
+          ) : null}
+          {p.status === "Returned for Revision" && role === "staff" ? (
+            <Button variant="secondary" icon={Send} disabled={busy} onClick={() => act(() => api.sendStudyPlan(p.id))}>
+              Send to AC again
+            </Button>
+          ) : null}
+          {p.status === "Sent to Academic Coordinator" && role === "academic_coordinator" ? (
+            <div className="space-y-2">
+              <Input
+                value={reviewRemarks[p.id] || ""}
+                onChange={(e) => setReviewRemarks((r) => ({ ...r, [p.id]: e.target.value }))}
+                placeholder="Remarks (required to return)"
+                aria-label="Review remarks (required to return)"
+                className="min-w-[200px]"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={busy}
+                  onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "approve", remarks: (reviewRemarks[p.id] || "").trim() }))}
+                >
+                  Approve plan
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={busy || !(reviewRemarks[p.id] || "").trim()}
+                  title={(reviewRemarks[p.id] || "").trim() ? "" : "Write a comment to return the plan"}
+                  onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "return", remarks: (reviewRemarks[p.id] || "").trim() }))}
+                >
+                  Return with comment
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ),
+    },
+  ];
 
   return (
-    <Card className="p-5">
-      <SectionTitle title="Curriculum version & study plan draft" icon={ClipboardList} />
-      <p className="-mt-1 mb-3 text-xs text-slate-500">
-        Tag the curriculum version the student is tracked against, then generate the study plan from the
-        curriculum audit and send it to the Academic Coordinator. The plan is derived, never typed.
-      </p>
-      {msg ? <div className="mb-3"><Banner tone={msg.tone}>{msg.text}</Banner></div> : null}
+    <SectionCard
+      title="Curriculum version & study plan draft"
+      icon={ClipboardList}
+    >
+      <p className="text-sm text-slate-500">Tag the curriculum version the student is tracked against, then generate the study plan from the curriculum audit and send it to the Academic Coordinator. The plan is derived, never typed.</p>
+      <Notice msg={msg} />
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div>
-          <label className="field-label">Student</label>
-          <select className="field-input" aria-label="Student" value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-            <option value="">Select a student…</option>
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} · {s.student_number}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="field-label">Curriculum version</label>
-          <select className="field-input" aria-label="Curriculum version" value={version} onChange={(e) => setVersion(e.target.value)} disabled={!studentId}>
-            <option value="">Select a version…</option>
-            {(tag?.available_versions || []).map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="Student">
+          <Select
+            aria-label="Student"
+            options={studentOptions}
+            placeholder="Select a student…"
+            value={studentId}
+            onChange={(e) => setStudentId(e.target.value)}
+          />
+        </Field>
+        <Field label="Curriculum version">
+          <Select
+            aria-label="Curriculum version"
+            options={versionOptions}
+            placeholder="Select a version…"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            disabled={!studentId}
+          />
+        </Field>
       </div>
 
       {multipleVersions ? (
-        <div className="mt-3">
-          <label className="field-label">
-            Reason for this version <span className="text-rose-600">· required, more than one version is published</span>
-          </label>
-          <input className="field-input" aria-label="Reason for this version" value={rationale} onChange={(e) => setRationale(e.target.value)}
-            placeholder="e.g. Entered under this curriculum; no bridging subjects required." />
-        </div>
+        <Field label={<>Reason for this version <span className="text-red-600">· required, more than one version is published</span></>}>
+          <Input
+            aria-label="Reason for this version"
+            value={rationale}
+            onChange={(e) => setRationale(e.target.value)}
+            placeholder="e.g. Entered under this curriculum; no bridging subjects required."
+          />
+        </Field>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="btn-ghost" disabled={busy || !studentId || !version}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          disabled={busy || !studentId || !version}
           onClick={() => act(async () => {
             await api.setCurriculumTag(studentId, { curriculum_version: version, rationale });
             const res = await api.curriculumTag(studentId); setTag(res);
-          })}>
+          })}
+        >
           Tag curriculum version
-        </button>
-        <button type="button" className="btn-primary" disabled={busy || !studentId}
-          onClick={() => act(() => api.generateStudyPlan({ student_id: Number(studentId) }))}>
+        </Button>
+        <Button
+          disabled={busy || !studentId}
+          onClick={() => act(() => api.generateStudyPlan({ student_id: Number(studentId) }))}
+        >
           Generate study plan draft
-        </button>
+        </Button>
       </div>
 
       {tag?.tag ? (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="meta">
           Tagged <span className="font-semibold text-ink">{tag.tag.curriculum_version}</span>
           {tag.tag.rationale ? ` — ${tag.tag.rationale}` : ""}
         </p>
       ) : null}
 
-      <div className="mt-4">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Recent study plan drafts</p>
+      <div>
+        <p className="eyebrow mb-2">Recent study plan drafts</p>
         {plans === null ? <Spinner label="Loading…" /> : !plans.length ? (
           <EmptyState icon={ClipboardList} title="No study plan drafts yet" />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-100">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  {["Student", "Term", "Version", "Proposed subjects", "Still required", "Status", ""].map((h) => (
-                    <th key={h} className="px-4 py-2.5">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {plans.slice(0, 8).map((p) => (
-                  <tr key={p.id} className="border-b border-slate-50 align-top">
-                    <td className="px-4 py-2.5 font-semibold text-ink">{p.student?.name}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{p.term_label || "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{p.curriculum_version || "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{p.subjects.join(", ") || "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{p.remaining_count}</td>
-                    <td className="px-4 py-2.5">
-                      <Pill>{p.status}</Pill>
-                      {p.coordinator_remarks ? (
-                        <p className="mt-1.5 max-w-xs rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-normal normal-case text-slate-600">
-                          <span className="font-bold">Coordinator:</span> {p.coordinator_remarks}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {p.status === "Draft" ? (
-                        <button type="button" className="btn-ghost" disabled={busy}
-                          onClick={() => act(() => api.sendStudyPlan(p.id))}>
-                          <Send className="h-4 w-4" /> Send to AC
-                        </button>
-                      ) : null}
-                      {p.status === "Returned for Revision" && role === "staff" ? (
-                        <button type="button" className="btn-ghost" disabled={busy}
-                          onClick={() => act(() => api.sendStudyPlan(p.id))}>
-                          <Send className="h-4 w-4" /> Send to AC again
-                        </button>
-                      ) : null}
-                      {p.status === "Sent to Academic Coordinator" && role === "academic_coordinator" ? (
-                        <div className="space-y-2">
-                          <input
-                            value={reviewRemarks[p.id] || ""}
-                            onChange={(e) => setReviewRemarks((r) => ({ ...r, [p.id]: e.target.value }))}
-                            placeholder="Remarks (required to return)"
-                            aria-label="Review remarks (required to return)"
-                            className="field-input min-w-[200px]"
-                          />
-                          <div className="flex flex-wrap gap-2">
-                            <button type="button" className="btn-primary" disabled={busy}
-                              onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "approve", remarks: (reviewRemarks[p.id] || "").trim() }))}>
-                              Approve plan
-                            </button>
-                            <button type="button" className="btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
-                              disabled={busy || !(reviewRemarks[p.id] || "").trim()}
-                              title={(reviewRemarks[p.id] || "").trim() ? "" : "Write a comment to return the plan"}
-                              onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "return", remarks: (reviewRemarks[p.id] || "").trim() }))}>
-                              Return with comment
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            caption="Recent study plan drafts"
+            columns={planColumns}
+            rows={plans.slice(0, 8)}
+            minWidth="md"
+            pageSize={0}
+          />
         )}
       </div>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -321,76 +331,77 @@ export function CourseworkReportPanel({ role }) {
   const [remarks, setRemarks] = useState({});
 
   const load = useCallback(() => {
-    api.courseworkReports().then((res) => setItems(res.items || [])).catch((e) => setMsg({ tone: "error", text: e.message }));
+    api.courseworkReports().then((res) => setItems(res.items || [])).catch((e) => setMsg({ tone: "danger", text: e.message }));
   }, []);
   useEffect(() => { load(); }, [load]);
 
   async function act(fn) {
     setBusy(true); setMsg(null);
     try { await fn(); load(); }
-    catch (err) { setMsg({ tone: "error", text: err.message }); }
+    catch (err) { setMsg({ tone: "danger", text: err.message }); }
     finally { setBusy(false); }
   }
 
   if (items === null) return <Spinner label="Loading coursework reports..." />;
 
   return (
-    <Card className="p-5">
-      <SectionTitle
-        title="Coursework status report to the Dean"
-        icon={FileSpreadsheet}
-        action={role !== "dean" ? (
-          <button type="button" className="btn-primary" disabled={busy}
-            onClick={() => act(() => api.generateCourseworkReport({}))}>
-            Generate report
-          </button>
-        ) : null}
-      />
-      <p className="-mt-1 mb-3 text-xs text-slate-500">
-        Completion issues and missing subjects for the active term, compiled for the Dean's review.
-      </p>
-      {msg ? <div className="mb-3"><Banner tone={msg.tone}>{msg.text}</Banner></div> : null}
+    <SectionCard
+      title="Coursework status report to the Dean"
+      icon={FileSpreadsheet}
+      action={role !== "dean" ? (
+        <Button disabled={busy} onClick={() => act(() => api.generateCourseworkReport({}))}>
+          Generate report
+        </Button>
+      ) : null}
+    >
+      <p className="text-sm text-slate-500">Completion issues and missing subjects for the active term, compiled for the Dean's review.</p>
+      <Notice msg={msg} />
       {!items.length ? (
         <EmptyState icon={FileSpreadsheet} title="No coursework reports yet" hint="Generate one to send to the Dean." />
       ) : (
         <div className="space-y-3">
           {items.slice(0, 5).map((item) => (
-            <div key={item.id} className="rounded-xl border border-slate-200 p-4">
+            <div key={item.id} className="space-y-2 rounded-xl border border-slate-200 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-ink">
+                <p className="card-title">
                   {item.term_label || "Active term"}{item.program ? ` · ${item.program.code}` : " · All programs"}
                 </p>
-                <Pill>{item.status}</Pill>
+                <StatusChip status={item.status} dot={false} />
               </div>
-              <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-600">
-                <span><span className="font-bold text-ink">{item.students_reviewed}</span> reviewed</span>
-                <span><span className="font-bold text-ink">{item.completion_issue_count}</span> with completion issues</span>
-                <span><span className="font-bold text-ink">{item.missing_subject_count}</span> missing subjects</span>
+              <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+                <span><span className="font-semibold text-ink">{item.students_reviewed}</span> reviewed</span>
+                <span><span className="font-semibold text-ink">{item.completion_issue_count}</span> with completion issues</span>
+                <span><span className="font-semibold text-ink">{item.missing_subject_count}</span> missing subjects</span>
               </div>
-              {item.dean_remarks ? (
-                <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  <span className="font-bold">Dean:</span> {item.dean_remarks}
-                </p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              {item.dean_remarks ? <Remark who="Dean">{item.dean_remarks}</Remark> : null}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
                 {role !== "dean" && item.status === "Draft" ? (
-                  <button type="button" className="btn-ghost" disabled={busy}
-                    onClick={() => act(() => api.sendCourseworkReport(item.id))}>
-                    <Send className="h-4 w-4" /> Send to Dean
-                  </button>
+                  <Button variant="secondary" icon={Send} disabled={busy} onClick={() => act(() => api.sendCourseworkReport(item.id))}>
+                    Send to Dean
+                  </Button>
                 ) : null}
                 {role === "dean" && item.status === "Dean Review" ? (
                   <>
-                    <input value={remarks[item.id] || ""} onChange={(e) => setRemarks((r) => ({ ...r, [item.id]: e.target.value }))}
-                      placeholder="Remarks (required to return)" aria-label="Dean remarks (required to return)" className="field-input max-w-xs" />
-                    <button type="button" className="btn-primary" disabled={busy}
-                      onClick={() => act(() => api.decideCourseworkReport(item.id, { decision: "acknowledge", remarks: remarks[item.id] || "" }))}>
+                    <Input
+                      value={remarks[item.id] || ""}
+                      onChange={(e) => setRemarks((r) => ({ ...r, [item.id]: e.target.value }))}
+                      placeholder="Remarks (required to return)"
+                      aria-label="Dean remarks (required to return)"
+                      className="max-w-xs"
+                    />
+                    <Button
+                      disabled={busy}
+                      onClick={() => act(() => api.decideCourseworkReport(item.id, { decision: "acknowledge", remarks: remarks[item.id] || "" }))}
+                    >
                       Acknowledge
-                    </button>
-                    <button type="button" className="btn-ghost" disabled={busy}
-                      onClick={() => act(() => api.decideCourseworkReport(item.id, { decision: "return", remarks: remarks[item.id] || "" }))}>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => act(() => api.decideCourseworkReport(item.id, { decision: "return", remarks: remarks[item.id] || "" }))}
+                    >
                       Return
-                    </button>
+                    </Button>
                   </>
                 ) : null}
               </div>
@@ -398,6 +409,6 @@ export function CourseworkReportPanel({ role }) {
           ))}
         </div>
       )}
-    </Card>
+    </SectionCard>
   );
 }
