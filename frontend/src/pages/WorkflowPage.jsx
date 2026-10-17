@@ -35,8 +35,6 @@ import {
   Download,
   HelpCircle,
   MessageSquare,
-  Columns3,
-  List,
   Send,
   CheckSquare,
   Printer,
@@ -56,6 +54,7 @@ import HistoryDisclosure from "../components/HistoryDisclosure";
 import HandoffResult from "../components/HandoffResult";
 import ExportFollowUpModal from "../components/ExportFollowUpModal";
 import StageBoard from "../components/StageBoard";
+import { ViewToggle } from "./leave/LeaveFilters";
 import { formatDate } from "../lib/format";
 import SlotCheck, { useSlotCheck } from "../components/scheduling/SlotCheck";
 import AvailabilityRequestPanel, { InvitationChip } from "../components/scheduling/AvailabilityRequestPanel";
@@ -3627,6 +3626,12 @@ const PRACTICUM_BOARD_COLUMNS = [
   { label: "Returned", statuses: ["Returned for Clarification", "Not Accepted - New Organization Required"] },
 ];
 
+// The same columns for the shared StageBoard (each needs a key).
+const PRACTICUM_STAGE_COLUMNS = PRACTICUM_BOARD_COLUMNS.map((column) => ({ ...column, key: column.label }));
+const practicumBoardItemId = (row) => row.student.id;
+const practicumBoardColumnKey = (row) =>
+  PRACTICUM_STAGE_COLUMNS.find((column) => column.statuses.includes(row.record?.status || "Not Submitted"))?.key || "";
+
 const GRADUATION_BOARD_COLUMNS = [
   {
     label: "3 · Graduation Batch Created",
@@ -3682,41 +3687,6 @@ function withdrawalReadyForDeanReview(item) {
 
 function graduationReadyForDeanReview(group) {
   return group.boardStatus === "Ready for Dean Review";
-}
-
-function WorkflowBoard({ columns, rows, getStatus, renderCard, empty, isDraggable = () => false, getDragId = () => "" }) {
-  if (!rows.length) return <EmptyState title={empty} />;
-  return (
-    <div className="relative max-w-full overflow-x-auto pb-3">
-      <div className="flex w-max snap-x gap-4">
-        {columns.map((column) => {
-          const items = rows.filter((row) => column.statuses.includes(getStatus(row)));
-          return (
-            <section key={column.label} className="w-[290px] shrink-0 snap-start rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-              <header className="mb-3 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
-              </header>
-              <div className="space-y-3">{items.length ? items.map((item, index) => {
-                const ready = isDraggable(item);
-                const dragId = getDragId(item) || item.student?.id || item.id || index;
-                return <div key={dragId} draggable={ready} onDragStart={(event) => { if (!ready) return; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(dragId)); }} className={ready ? "cursor-grab rounded-xl outline-none ring-2 ring-emerald-200 active:cursor-grabbing" : "rounded-xl"}>{renderCard(item)}</div>;
-              }) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">No requests</p>}</div>
-            </section>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ViewModeToggle({ value, onChange }) {
-  return (
-    <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1" aria-label="Choose request overview layout">
-      <button type="button" onClick={() => onChange("board")} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${value === "board" ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}><Columns3 className="h-4 w-4" /> Board</button>
-      <button type="button" onClick={() => onChange("table")} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${value === "table" ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}><List className="h-4 w-4" /> Table</button>
-    </div>
-  );
 }
 
 function PracticumBoardCard({ row, onOpen, onMessage }) {
@@ -3990,6 +3960,18 @@ function graduationBoardCanDrag(item, accountRole) {
   return Boolean(selection.action) || (graduationReadyForDeanReview(item.group) && accountRole === "dean");
 }
 
+// The short reason a graduation card sits still (StageBoard's lockReason), same wording as the process boards.
+function graduationBoardLockReason(item, accountRole) {
+  if (item.kind === "student") {
+    if (item.stage === "stage-1") return "Waiting for: Student (signed application)";
+    return "Only Graduate School Staff create a graduation batch.";
+  }
+  const group = item.group;
+  if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Use Export on the batch card." : "Waiting for: Dean (export)";
+  const owners = (group.nextOwners || []).filter(Boolean);
+  return owners.length ? `Waiting for: ${owners.join(", ")}` : "No step is open right now";
+}
+
 function graduationBoardCheckMove(item, toColumn, accountRole) {
   if (item.kind === "student") {
     if (item.stage === "stage-1") return { allowed: false, reason: "Waiting for the student to submit the signed graduation application in the student portal." };
@@ -4154,6 +4136,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
   const [messageNotice, setMessageNotice] = useState("");
   const [viewMode, setViewMode] = useState("board");
   const [pendingAction, setPendingAction] = useState(null);
+  const [moveRow, setMoveRow] = useState(null); // the card a drop or "Move to..." opened the confirm window for
   const reset = useDemoCaseReset("practicum", refetch);
   const rows = (context.roster || []).filter((row) => row.eligibility?.eligible === true);
   const [filters, setFilters] = useState({ query: "", program: "", status: "" });
@@ -4195,6 +4178,36 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
   const selectedRow = rows.find((row) => row.student.id === selectedStudentId) || null;
   const selectedAction = selectedRow ? actionFor(selectedRow) : null;
 
+  // ---- the board: a move is the same step as the button in the case window ---------------
+  // The step for a card is the one actionFor() gives; it can be moved only to the column that
+  // step really leads to. A step that stays in the same column is done from the case window.
+  function practicumMoveFor(row) {
+    const action = actionFor(row);
+    if (!action) return null;
+    const from = practicumBoardColumnKey(row);
+    const to = PRACTICUM_STAGE_COLUMNS.find((column) => column.statuses.includes(action.payload.status));
+    return to && to.key !== from ? { action, to } : null;
+  }
+  function practicumLockReason(row) {
+    if (!row.record) return "Waiting for: Student";
+    const action = actionFor(row);
+    if (action) return `Open the case to: ${action.label}`;
+    return `Waiting for: ${row.next_action_owner || "the next reviewer"}`;
+  }
+  function practicumCheckMove(row, column) {
+    const move = practicumMoveFor(row);
+    if (move && move.to.key === column.key) return { allowed: true };
+    if (move) return { allowed: false, reason: `From here you can: ${move.action.label}.` };
+    return { allowed: false, reason: practicumLockReason(row) };
+  }
+  function movePracticumRow(row) {
+    const move = practicumMoveFor(row);
+    if (!move) throw new Error(practicumLockReason(row));
+    setMoveRow(row);
+    setPendingAction({ ...move.action, fromStatus: row.record.status, toStatus: move.action.payload.status });
+    return undefined;
+  }
+
   function openCase(studentId) {
     clearSubmitFeedback();
     reset.clearResetFeedback();
@@ -4215,19 +4228,28 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
       </div>
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
-      <div className="flex justify-end"><ViewModeToggle value={viewMode} onChange={setViewMode} /></div>
-      {viewMode === "board" ? (
-        <WorkflowBoard
-          columns={PRACTICUM_BOARD_COLUMNS}
-          rows={filteredRows}
-          getStatus={(row) => row.record?.status || "Not Submitted"}
-          isDraggable={(row) => Boolean(row.has_submitted_documents) || practicumReadyForDeanReview(row)}
-          getDragId={(row) => row.student.id}
-          empty="No recent practicum submissions match the filters."
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} secondaryLabel="Eligibility" secondaryOptions={["Eligible", "Not eligible", "Needs verification"]} count={filteredRows.length} total={rows.length} />
+        </div>
+        <ViewToggle value={viewMode} onChange={setViewMode} />
+      </div>
+      {filteredRows.length > 0 && viewMode === "board" ? (
+        <StageBoard
+          ariaLabel="Practicum workflow board"
+          columns={PRACTICUM_STAGE_COLUMNS}
+          items={filteredRows}
+          getItemId={practicumBoardItemId}
+          getColumnKey={practicumBoardColumnKey}
           renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
+          canDrag={(row) => Boolean(practicumMoveFor(row))}
+          lockReason={practicumLockReason}
+          checkMove={practicumCheckMove}
+          onMove={movePracticumRow}
+          emptyText="No requests here"
+          columnClassName="w-[300px]"
         />
-      ) : <WorkflowTable
+      ) : viewMode === "board" ? <EmptyState title="No recent practicum submissions match the filters." /> : <WorkflowTable
         headers={["Student", "Eligibility", "MOA", "Documents", "Hours", "Coordinator", "Dean report", "Action"]}
         empty="No eligible Psychology or MSGC practicum students found."
         rows={filteredRows}
@@ -4284,7 +4306,7 @@ function PracticumRoster({ context, submit, submitting, refreshing, result, subm
         </WorkflowCaseModal>
       )}
       {messageRow && <WorkflowMessageModal slug="practicum" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
-      {pendingAction && selectedRow && <WorkflowTransitionModal slug="practicum" student={selectedRow.student} action={pendingAction} busy={submitting || refreshing} onClose={() => setPendingAction(null)} onConfirm={submit} />}
+      {pendingAction && (moveRow || selectedRow) && <WorkflowTransitionModal slug="practicum" student={(moveRow || selectedRow).student} action={pendingAction} busy={submitting || refreshing} onClose={() => { setPendingAction(null); setMoveRow(null); }} onConfirm={submit} />}
     </div>
   );
 }
@@ -4533,6 +4555,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
         getColumnKey={graduationBoardColumnKey}
         renderCard={renderGraduationBoardCard}
         canDrag={(item) => graduationBoardCanDrag(item, accountRole)}
+        lockReason={(item) => graduationBoardLockReason(item, accountRole)}
         showMoveMenu={(item) => !(item.kind === "student" && item.stage === "stage-1")}
         checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}
         onMove={moveGraduationBoardItem}

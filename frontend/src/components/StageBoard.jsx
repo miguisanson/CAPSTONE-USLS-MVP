@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Move } from "lucide-react";
+import { Lock, Move } from "lucide-react";
 import { InlineNotice } from "./ui/index.js";
 
 /**
@@ -19,6 +19,9 @@ import { InlineNotice } from "./ui/index.js";
  *   getColumnKey   (item) => the key of the column the item is in now
  *   renderCard     (item) => node (the card body; the board adds drag and the move menu)
  *   canDrag        (item) => boolean (default true)
+ *   lockReason     (item) => string: why a card that cannot be moved cannot be moved, e.g.
+ *                  "Waiting for: Student". A card that cannot be dragged shows a lock and this text
+ *                  (real text, not a tooltip) and has no "Move to..." menu - the same on every board.
  *   showMoveMenu   (item) => boolean (default true): the "Move to..." button under a card
  *   checkMove      (item, toColumn) => { allowed: boolean, reason?: string }
  *                  default: allowed everywhere else
@@ -38,6 +41,7 @@ export default function StageBoard({
   getColumnKey,
   renderCard,
   canDrag = () => true,
+  lockReason,
   showMoveMenu = () => true,
   checkMove,
   onMove,
@@ -75,11 +79,17 @@ export default function StageBoard({
     [checkMove, columnByKey, getColumnKey],
   );
 
+  const lockText = useCallback((item) => (lockReason && lockReason(item)) || "Not movable right now.", [lockReason]);
+
   const attemptMove = useCallback(
     async (item, toKey) => {
       const fromKey = getColumnKey(item);
       const target = columnByKey[toKey];
       if (!target || fromKey === toKey) return;
+      if (!readOnly && !canDrag(item)) {
+        show("error", `${lockText(item).replace(/\.$/, "")}. This card cannot be moved right now.`);
+        return;
+      }
       const check = verdict(item, toKey);
       if (!check.allowed) {
         show("error", check.reason || `This item cannot move to "${target.label}".`);
@@ -95,7 +105,7 @@ export default function StageBoard({
         setBusyId(null);
       }
     },
-    [columnByKey, getColumnKey, getItemId, onMove, show, verdict],
+    [canDrag, columnByKey, getColumnKey, getItemId, lockText, onMove, readOnly, show, verdict],
   );
 
   function onDragStart(event, item) {
@@ -197,12 +207,15 @@ export default function StageBoard({
                           onDragStart={draggable ? (event) => onDragStart(event, item) : undefined}
                           onDragEnd={onDragEnd}
                           aria-busy={busyId === id}
+                          data-locked={!readOnly && !draggable ? "true" : undefined}
                           className={`rounded-xl transition-opacity ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
                             dragging?.id === id ? "opacity-50" : busyId === id ? "opacity-60" : ""
                           }`}
                         >
                           {renderCard(item)}
-                          {!readOnly && showMoveMenu(item) && (
+                          {!readOnly && !draggable ? (
+                            <LockedNote reason={lockText(item)} />
+                          ) : !readOnly && showMoveMenu(item) && (
                             <MoveMenu
                               item={item}
                               columns={columns}
@@ -226,6 +239,17 @@ export default function StageBoard({
         </div>
       </div>
     </div>
+  );
+}
+
+// Shown instead of the drag handle and the "Move to..." menu on a card that cannot be moved.
+// The reason is plain text so a screen reader and a keyboard user get it too.
+function LockedNote({ reason }) {
+  return (
+    <p className="mt-1.5 flex items-start justify-end gap-1.5 px-2 py-1 text-xs font-semibold text-slate-600">
+      <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{reason}</span>
+    </p>
   );
 }
 

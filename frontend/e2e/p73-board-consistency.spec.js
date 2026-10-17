@@ -32,8 +32,6 @@ async function shot(page, name) {
   await page.screenshot({ path: join(SHOTS, name), fullPage: true });
 }
 
-test.describe.configure({ mode: "serial" });
-
 test.describe("P7.3 boards of the same kind behave the same", () => {
   test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });

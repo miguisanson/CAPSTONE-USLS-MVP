@@ -56,6 +56,14 @@ function nothingToDoReason(item, vocabulary) {
   return "No step is open for this request right now.";
 }
 
+// The short reason a card sits still, shown on the card itself (StageBoard's lockReason).
+export function lockReasonFor(item, vocabulary) {
+  if (item.owner) return `Waiting for: ${item.owner}`;
+  const info = (vocabulary?.statuses || []).find((status) => status.key === item.status);
+  if (info?.phase === "done") return "Finished - nothing more to do";
+  return "No step is open right now";
+}
+
 // Used by the board for every drop and every "Move to..." choice.
 export function checkMoveFor(item, column, vocabulary) {
   const actions = item.actions || [];
