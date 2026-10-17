@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness, Building2, CalendarDays, ChevronLeft,
-  ChevronRight, ExternalLink, FileSearch, Link2, Mail, Search, UsersRound, X, BookOpenCheck, Save,
+  ChevronRight, ExternalLink, FileSearch, Link2, Mail, Search, UsersRound, BookOpenCheck, Save,
   Pencil, Plus, Trash2, Microscope,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
-import { Card, EmptyState, ErrorNote, Spinner, StatusBadge } from "../components/ui";
+import { Button, Card, DataTable, Field, InlineNotice, Input, Modal, PageHeader, SearchInput, Select, Spinner, StatusChip, Textarea } from "../components/ui/index.js";
 import { initials } from "../lib/format";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import { useConfirm } from "../components/confirm";
 
 const FACULTY_ROLE_OPTIONS = ["Faculty Adviser", "Panel Member", "Panel Chair", "Academic Coordinator", "Research Coordinator"];
+const AVAILABILITY_OPTIONS = ["Available", "Unavailable", "Not entered", "Google Calendar connected"];
+const STATUS_OPTIONS = ["Active", "Inactive"];
 
 export default function Faculty() {
   const { user } = useAuth();
@@ -23,8 +25,8 @@ export default function Faculty() {
   const [formFor, setFormFor] = useState(null); // null = closed, "new" = add form, faculty object = edit form
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
-  const [department, setDepartment] = useState("All departments");
-  const [availability, setAvailability] = useState("All availability");
+  const [department, setDepartment] = useState(""); // "" = all departments
+  const [availability, setAvailability] = useState(""); // "" = all availability
   const faculty = data?.items || [];
   const requestedId = Number(params.get("faculty")) || null;
   const [selectedId, setSelectedId] = useState(requestedId);
@@ -33,13 +35,6 @@ export default function Faculty() {
     if (requestedId) setSelectedId(requestedId);
   }, [requestedId]);
 
-  useEffect(() => {
-    if (!selectedId) return undefined;
-    const closeOnEscape = (event) => event.key === "Escape" && closeFaculty();
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedId]);
-
   const departments = useMemo(() => [...new Set(faculty.map((item) => item.college))].sort(), [faculty]);
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -47,8 +42,8 @@ export default function Faculty() {
       const matchesText = !needle || [item.name, item.college, item.role, item.specialization, item.email, item.account?.email, ...(item.matching_keywords || [])]
         .some((value) => value?.toLowerCase().includes(needle));
       return matchesText
-        && (department === "All departments" || item.college === department)
-        && (availability === "All availability" || item.availability_status === availability);
+        && (!department || item.college === department)
+        && (!availability || item.availability_status === availability);
     });
   }, [faculty, query, department, availability]);
   const selected = faculty.find((item) => item.id === selectedId) || null;
@@ -67,96 +62,113 @@ export default function Faculty() {
     setParams(next, { replace: true });
   }
 
-  return (
-    <div className="space-y-5 animate-fade-up">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Faculty Profiles</h1>
-          <p className="mt-1 text-sm text-slate-500">Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered.</p>
+  const columns = [
+    {
+      key: "name",
+      header: "Faculty",
+      cell: (item) => (
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">{initials(item.name)}</span>
+          <div className="min-w-0">
+            <button type="button" onClick={() => selectFaculty(item.id)} className="block max-w-full cursor-pointer truncate text-left font-semibold text-ink hover:text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-400">{item.name}</button>
+            <p className="meta truncate" title={item.account?.email || item.email}>{item.role} · {item.account?.email || item.email}</p>
+          </div>
         </div>
-        {canManage && <button type="button" onClick={() => { setNotice(""); setFormFor("new"); }} className="btn-primary shrink-0 cursor-pointer"><Plus className="h-4 w-4" /> Add faculty</button>}
-      </header>
-      {notice && <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{notice}</div>}
+      ),
+    },
+    {
+      key: "college",
+      header: "Department / specialization",
+      hideBelow: "lg",
+      className: "max-w-xs text-slate-600",
+      cell: (item) => (
+        <>
+          <p className="meta truncate font-semibold" title={item.college}>{item.college}</p>
+          <p className="line-clamp-2" title={item.specialization}>{item.specialization}</p>
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (item) => (
+        <div className="flex flex-col items-start gap-1">
+          <StatusChip status={item.active ? "Active" : "Inactive"} dot={false} />
+          <StatusChip status={item.account?.active ? "Active login" : "No account"} dot={false} />
+        </div>
+      ),
+    },
+    { key: "availability_status", header: "Availability", hideBelow: "md", cell: (item) => <AvailabilityBadge faculty={item} /> },
+    {
+      key: "panel_load",
+      header: "Panel load",
+      align: "right",
+      cell: (item) => <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{item.panel_load}</span>,
+    },
+    canManage && {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (item) => (
+        <Button variant="secondary" size="sm" icon={Pencil} onClick={() => { setNotice(""); setFormFor(item); }}>Edit</Button>
+      ),
+    },
+  ].filter(Boolean);
 
-      <Card className="p-4">
+  return (
+    <div className="page-stack animate-fade-up">
+      <PageHeader
+        title="Faculty Profiles"
+        description="Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered."
+        actions={canManage ? <Button icon={Plus} onClick={() => { setNotice(""); setFormFor("new"); }}>Add faculty</Button> : null}
+      />
+      {notice && <InlineNotice tone="success">{notice}</InlineNotice>}
+
+      <Card>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <label className="relative flex-1">
-            <span className="sr-only">Search faculty</span>
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} className="field-input pl-10" placeholder="Search by name, department, or specialization…" />
-          </label>
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            label="Search faculty"
+            placeholder="Search by name, department, or specialization…"
+            className="flex-1"
+          />
           <div className="grid gap-3 sm:grid-cols-2">
-            <select className="field-input cursor-pointer" value={department} onChange={(event) => setDepartment(event.target.value)} aria-label="Filter by department">
-              <option>All departments</option>
-              {departments.map((item) => <option key={item}>{item}</option>)}
-            </select>
-            <select className="field-input cursor-pointer" value={availability} onChange={(event) => setAvailability(event.target.value)} aria-label="Filter by availability">
-              <option>All availability</option>
-              <option>Available</option>
-              <option>Unavailable</option>
-              <option>Not entered</option>
-              <option>Google Calendar connected</option>
-            </select>
+            <Select aria-label="Filter by department" placeholder="All departments" value={department} onChange={(event) => setDepartment(event.target.value)} options={departments} />
+            <Select aria-label="Filter by availability" placeholder="All availability" value={availability} onChange={(event) => setAvailability(event.target.value)} options={AVAILABILITY_OPTIONS} />
           </div>
         </div>
       </Card>
 
-      <Card className="overflow-hidden">
-        {loading ? <Spinner label="Loading faculty profiles…" /> : error ? (
-          <EmptyState icon={UsersRound} title="Could not load faculty" hint={error} />
-        ) : !filtered.length ? (
-          <EmptyState icon={Search} title="No faculty match your filters" hint="Try a broader search or change a filter." />
-        ) : (
-          <>
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+      {loading ? (
+        <Card><Spinner label="Loading faculty profiles…" /></Card>
+      ) : error ? (
+        <InlineNotice tone="danger" title="Could not load faculty">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
+          </div>
+        </InlineNotice>
+      ) : (
+        <div className="space-y-3">
+          {filtered.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-slate-500">Showing <span className="font-semibold text-ink">{filtered.length}</span> of <span className="font-semibold text-ink">{faculty.length}</span> faculty</p>
-              <p className="text-xs text-slate-400">Select a faculty member to open their profile</p>
+              <p className="meta">Select a faculty member to open their profile</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                    <th className="px-5 py-3">Faculty</th>
-                    <th className="hidden px-3 py-3 lg:table-cell">Department / specialization</th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="hidden px-3 py-3 md:table-cell">Availability</th>
-                    <th className="px-3 py-3 text-right">Panel load</th>
-                    {canManage && <th className="px-5 py-3 text-right">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((item) => (
-                    <tr key={item.id} onClick={() => selectFaculty(item.id)} className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-brand-50/50">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{initials(item.name)}</span>
-                          <div className="min-w-0">
-                            <button type="button" onClick={() => selectFaculty(item.id)} className="block max-w-full cursor-pointer truncate text-left font-semibold text-ink hover:text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-400">{item.name}</button>
-                            <p className="truncate text-xs text-slate-400" title={item.account?.email || item.email}>{item.role} · {item.account?.email || item.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hidden max-w-xs px-3 py-3 text-slate-600 lg:table-cell">
-                        <p className="truncate text-xs font-semibold text-slate-500" title={item.college}>{item.college}</p>
-                        <p className="line-clamp-2" title={item.specialization}>{item.specialization}</p>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex flex-col items-start gap-1">
-                          <StatusBadge value={item.active ? "Active" : "Inactive"} dot={false} />
-                          <StatusBadge value={item.account?.active ? "Active login" : "No account"} dot={false} />
-                        </div>
-                      </td>
-                      <td className="hidden px-3 py-3 md:table-cell"><AvailabilityBadge faculty={item} /></td>
-                      <td className="px-3 py-3 text-right"><span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{item.panel_load}</span></td>
-                      {canManage && <td className="px-5 py-3 text-right"><button type="button" onClick={(event) => { event.stopPropagation(); setNotice(""); setFormFor(item); }} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Edit</button></td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </Card>
+          )}
+          <DataTable
+            caption="Faculty directory"
+            columns={columns}
+            rows={filtered}
+            rowKey="id"
+            onRowClick={(item) => selectFaculty(item.id)}
+            minWidth="md"
+            pageSize={0}
+            empty={{ icon: Search, title: "No faculty match your filters", hint: "Try a broader search or change a filter." }}
+          />
+        </div>
+      )}
 
       {formFor && <FacultyFormModal faculty={formFor === "new" ? null : formFor} onClose={() => setFormFor(null)} onSaved={async (message) => { setFormFor(null); setNotice(message); await refetch(); }} />}
       {selected && <FacultyProfileModal faculty={selected} courses={data?.courses || []} onSaved={refetch} onClose={closeFaculty} />}
@@ -179,12 +191,6 @@ function FacultyFormModal({ faculty, onClose, onSaved }) {
   const [error, setError] = useState("");
   const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const toggleRole = (role) => set("eligible_roles", form.eligible_roles.includes(role) ? form.eligible_roles.filter((item) => item !== role) : [...form.eligible_roles, role]);
-
-  useEffect(() => {
-    const closeOnEscape = (event) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
 
   async function submit(event) {
     event.preventDefault();
@@ -226,39 +232,44 @@ function FacultyFormModal({ faculty, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="faculty-form-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <Card className="max-h-[94vh] w-full max-w-2xl overflow-y-auto shadow-2xl">
-        <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <h2 id="faculty-form-title" className="text-lg font-semibold text-ink">{isNew ? "Add faculty" : `Edit ${faculty.name}`}</h2>
-            <button type="button" onClick={onClose} className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
+    <Modal
+      title={isNew ? "Add faculty" : `Edit ${faculty.name}`}
+      size="md"
+      onClose={onClose}
+      dismissible={!busy}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button type="submit" form="faculty-form" icon={Save} disabled={busy}>{busy ? "Saving..." : isNew ? "Add faculty" : "Save changes"}</Button>
+        </>
+      }
+    >
+      <form id="faculty-form" onSubmit={submit} className="space-y-4">
+        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Full name"><Input value={form.full_name} onChange={(event) => set("full_name", event.target.value)} /></Field>
+          <Field label="Department"><Input value={form.department} onChange={(event) => set("department", event.target.value)} /></Field>
+          <div className="sm:col-span-2"><Field label="Specialization"><Textarea rows={2} value={form.specialization} onChange={(event) => set("specialization", event.target.value)} /></Field></div>
+          <Field label="Email (also the login)"><Input type="email" value={form.email} onChange={(event) => set("email", event.target.value)} /></Field>
+          <Field label="Status"><Select placeholder="" value={form.status} onChange={(event) => set("status", event.target.value)} options={STATUS_OPTIONS} /></Field>
+          <div className="sm:col-span-2">
+            <Field label={isNew ? "Temporary password (at least 8 characters)" : "New password (leave blank to keep the current one)"}>
+              <Input type="password" autoComplete="new-password" value={form.password} onChange={(event) => set("password", event.target.value)} />
+            </Field>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block"><span className="field-label">Full name</span><input className="field-input" value={form.full_name} onChange={(event) => set("full_name", event.target.value)} /></label>
-            <label className="block"><span className="field-label">Department</span><input className="field-input" value={form.department} onChange={(event) => set("department", event.target.value)} /></label>
-            <label className="block sm:col-span-2"><span className="field-label">Specialization</span><textarea className="field-input" rows={2} value={form.specialization} onChange={(event) => set("specialization", event.target.value)} /></label>
-            <label className="block"><span className="field-label">Email (also the login)</span><input type="email" className="field-input" value={form.email} onChange={(event) => set("email", event.target.value)} /></label>
-            <label className="block"><span className="field-label">Status</span><select className="field-input cursor-pointer" value={form.status} onChange={(event) => set("status", event.target.value)}><option>Active</option><option>Inactive</option></select></label>
-            <label className="block sm:col-span-2"><span className="field-label">{isNew ? "Temporary password (at least 8 characters)" : "New password (leave blank to keep the current one)"}</span><input type="password" autoComplete="new-password" className="field-input" value={form.password} onChange={(event) => set("password", event.target.value)} /></label>
+        </div>
+        <div>
+          <span className="field-label">Roles this person can take</span>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {FACULTY_ROLE_OPTIONS.map((role) => (
+              <label key={role} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 transition-colors duration-200 hover:bg-brand-50 max-sm:min-h-11">
+                <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.eligible_roles.includes(role)} onChange={() => toggleRole(role)} />{role}
+              </label>
+            ))}
           </div>
-          <div>
-            <span className="field-label">Roles this person can take</span>
-            <div className="mt-1 grid gap-2 sm:grid-cols-2">
-              {FACULTY_ROLE_OPTIONS.map((role) => (
-                <label key={role} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-brand-50">
-                  <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.eligible_roles.includes(role)} onChange={() => toggleRole(role)} />{role}
-                </label>
-              ))}
-            </div>
-          </div>
-          <ErrorNote message={error} />
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn-ghost cursor-pointer">Cancel</button>
-            <button type="submit" disabled={busy} className="btn-primary cursor-pointer"><Save className="h-4 w-4" />{busy ? "Saving..." : isNew ? "Add faculty" : "Save changes"}</button>
-          </div>
-        </form>
-      </Card>
-    </div>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -272,31 +283,36 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
   const feedUrl = calendar.feed_url || `/api/faculty/${faculty.id}/calendar.ics`;
   const [showCvAssistant, setShowCvAssistant] = useState(false);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="faculty-profile-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <Card className="max-h-[94vh] w-full max-w-7xl overflow-hidden shadow-2xl">
-        <div className="flex items-start gap-4 bg-gradient-to-r from-brand-800 to-brand-700 p-5 text-white sm:p-6">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 font-bold ring-1 ring-white/20">{initials(faculty.name)}</span>
-          <div className="min-w-0 flex-1">
-            <h2 id="faculty-profile-title" className="text-xl font-semibold">{faculty.name}</h2>
-            <p className="mt-0.5 text-sm text-white/75">{faculty.role}</p>
-            <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-white/85"><Building2 className="h-3.5 w-3.5" />{faculty.college}</p>
-          </div>
-          <div className="hidden flex-wrap items-center justify-end gap-2 sm:flex">
+    <>
+      <Modal
+        title={faculty.name}
+        subtitle={
+          <>
+            <span className="block">{faculty.role}</span>
+            <span className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600"><Building2 className="h-3.5 w-3.5" aria-hidden="true" />{faculty.college}</span>
+          </>
+        }
+        icon={<span className="text-sm font-semibold">{initials(faculty.name)}</span>}
+        badge={
+          <>
             <AvailabilityBadge faculty={faculty} />
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold ring-1 ring-white/15">{faculty.panel_load} panel assignments</span>
-          </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg bg-white/10 transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white" aria-label="Close faculty profile"><X className="h-5 w-5" /></button>
-        </div>
-
-        <div className="max-h-[calc(94vh-104px)] space-y-6 overflow-y-auto p-4 sm:p-6">
-          {detailLoading && <p className="text-xs font-semibold text-slate-500" role="status">Refreshing calendar status and schedule...</p>}
-          {detailError && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800" role="alert">Live calendar details could not be refreshed: {detailError}</p>}
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">{faculty.panel_load} panel assignments</span>
+          </>
+        }
+        size="xl"
+        onClose={onClose}
+        closeLabel="Close faculty profile"
+      >
+        {/* data-autofocus: the dialog opens at the top of its content, not on a control far down the page */}
+        <div className="space-y-6 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0" tabIndex={-1} data-autofocus>
+          {detailLoading && <p className="meta font-semibold" role="status">Refreshing calendar status and schedule...</p>}
+          {detailError && <InlineNotice tone="warning" role="alert">Live calendar details could not be refreshed: {detailError}</InlineNotice>}
           <div className="grid gap-6 lg:grid-cols-3">
             <ProfileSection icon={BriefcaseBusiness} title="Specialization">
               <p className="text-sm leading-relaxed text-slate-600">{faculty.specialization}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">{(faculty.matching_keywords || []).slice(0, 8).map((keyword) => <span key={keyword} className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700">{keyword}</span>)}</div>
-              <p className="mt-2 text-xs text-slate-500">Panel Matching compares the student's paper with this text and with the expertise records below.</p>
-              {faculty.cv_profile && <button type="button" onClick={() => setShowCvAssistant(true)} className="btn-ghost mt-3 cursor-pointer"><FileSearch className="h-4 w-4" /> Open CV reference assistant</button>}
+              <div className="mt-2 flex flex-wrap gap-1.5">{(faculty.matching_keywords || []).slice(0, 8).map((keyword) => <span key={keyword} className="rounded-full bg-brand-50 px-2 py-1 text-2xs font-semibold text-brand-700">{keyword}</span>)}</div>
+              <p className="meta mt-2">Panel Matching compares the student's paper with this text and with the expertise records below.</p>
+              {faculty.cv_profile && <Button variant="secondary" icon={FileSearch} className="mt-3" onClick={() => setShowCvAssistant(true)}>Open CV reference assistant</Button>}
             </ProfileSection>
 
             <ProfileSection icon={BookOpenCheck} title="Preferred teaching subjects">
@@ -307,38 +323,38 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
               <ProfileSection icon={Mail} title="Contact">
                 <a className="text-sm font-medium text-brand-700 hover:underline" href={`mailto:${faculty.email}`}>{faculty.email}</a>
                 <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty login</p>
+                  <p className="eyebrow">Faculty login</p>
                   <p className="mt-1 text-sm font-semibold text-ink">{faculty.account?.email || faculty.email}</p>
                 </div>
               </ProfileSection>
               <ProfileSection icon={UsersRound} title="Current assignments">
                 <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-slate-600">Teaching load</span><span className="text-sm font-bold text-ink">{faculty.teaching_load_units || 0}/{faculty.teaching_load_limit || 24} units</span></div>
+                  <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-slate-600">Teaching load</span><span className="text-sm font-semibold text-ink">{faculty.teaching_load_units || 0}/{faculty.teaching_load_limit || 24} units</span></div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><span className="block h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, ((faculty.teaching_load_units || 0) / (faculty.teaching_load_limit || 24)) * 100)}%` }} /></div>
                 </div>
-                {(faculty.teaching_assignments || []).length ? <div className="mb-3 space-y-2">{faculty.teaching_assignments.slice(0, 4).map((assignment) => <div key={assignment.id} className="rounded-lg border border-slate-100 p-3"><p className="text-sm font-semibold text-ink">{assignment.course_code} · {assignment.units} units</p><p className="mt-1 text-xs text-slate-500">{assignment.term_label} · {assignment.status}</p></div>)}</div> : null}
+                {(faculty.teaching_assignments || []).length ? <div className="mb-3 space-y-2">{faculty.teaching_assignments.slice(0, 4).map((assignment) => <div key={assignment.id} className="rounded-lg border border-slate-100 p-3"><p className="text-sm font-semibold text-ink">{assignment.course_code} · {assignment.units} units</p><p className="meta mt-1">{assignment.term_label} · {assignment.status}</p></div>)}</div> : null}
                 {(faculty.current_assignments || []).length ? <div className="space-y-2">{faculty.current_assignments.slice(0, 3).map((assignment) => (
-                  <div key={assignment.id} className="rounded-lg border border-slate-100 p-3"><div className="flex justify-between gap-2"><p className="text-sm font-semibold text-ink">{assignment.student_name}</p><span className="text-[11px] font-bold text-brand-700">{assignment.panel_role}</span></div><p className="mt-1 line-clamp-2 text-xs text-slate-500">{assignment.research_title}</p></div>
+                  <div key={assignment.id} className="rounded-lg border border-slate-100 p-3"><div className="flex justify-between gap-2"><p className="text-sm font-semibold text-ink">{assignment.student_name}</p><span className="text-2xs font-semibold text-brand-700">{assignment.panel_role}</span></div><p className="meta mt-1 line-clamp-2">{assignment.research_title}</p></div>
                 ))}</div> : <p className="text-sm text-slate-500">No current panel assignments.</p>}
               </ProfileSection>
             </div>
 
             <ProfileSection icon={Link2} title="Calendar connection">
-              <div className={`rounded-xl border p-3 ${calendar.connected ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+              <div className={`rounded-xl border p-3 ${calendar.connected ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-slate-50"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-ink">{calendar.provider || "Google Calendar"}</p>
                     <p className="mt-1 text-xs text-slate-600">{calendar.sync_status}</p>
-                    {calendar.connected_email && <p className="mt-1 text-xs font-medium text-slate-500">{calendar.connected_email}</p>}
+                    {calendar.connected_email && <p className="meta mt-1 font-medium">{calendar.connected_email}</p>}
                   </div>
-                  <StatusBadge value={calendar.connected ? "Connected" : "Not connected"} dot={calendar.connected} />
+                  <StatusChip status={calendar.connected ? "Connected" : "Not connected"} dot={calendar.connected} />
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-slate-600">
                   {calendar.connected
                     ? "Google busy periods are the source used by Defense Scheduling. Event names and details remain private."
                     : "This faculty member must connect Google Calendar from their own Faculty Portal. Until then, only the hours they enter in their own portal are used."}
                 </p>
-                <a className="btn-ghost mt-3 w-full justify-center" href={feedUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />View availability feed</a>
+                <Button as="a" variant="secondary" icon={ExternalLink} className="mt-3 w-full justify-center" href={feedUrl} target="_blank" rel="noreferrer">View availability feed</Button>
               </div>
             </ProfileSection>
           </div>
@@ -347,9 +363,9 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
 
           <WeeklyCalendar faculty={faculty} />
         </div>
-      </Card>
+      </Modal>
       {showCvAssistant && <FacultyAssignmentProfile faculty={faculty} onClose={() => setShowCvAssistant(false)} />}
-    </div>
+    </>
   );
 }
 
@@ -366,6 +382,7 @@ function ExpertiseEditor({ faculty, onChanged }) {
   const { data, loading, error, refetch } = useApi(() => api.facultyExpertise(faculty.id), [faculty.id]);
   const items = data?.items || [];
   const kinds = data?.kinds || [];
+  const kindOptions = kinds.map((kind) => ({ value: kind.value, label: kind.label }));
   const blank = { kind: "research_interest", text: "", year: "" };
   const [draft, setDraft] = useState(blank);
   const [editingId, setEditingId] = useState(null);
@@ -434,44 +451,46 @@ function ExpertiseEditor({ faculty, onChanged }) {
 
   return (
     <section aria-labelledby={`expertise-${faculty.id}`}>
-      <div className="mb-2 flex items-center gap-2"><Microscope className="h-4 w-4 text-brand-700" /><h3 id={`expertise-${faculty.id}`} className="text-sm font-semibold text-ink">Expertise records</h3><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{items.length}</span></div>
-      <p className="mb-3 text-xs text-slate-500">Research interests, publications, past advisee and panel titles, and degrees. Panel Matching reads all of them, so the more accurate they are the better the panel recommendations. Records marked <span className="font-semibold text-amber-800">Demo data</span> are sample entries; editing one turns it into a manual entry.</p>
-      {loading && !data ? <p className="text-xs text-slate-500" role="status">Loading expertise records…</p> : error ? <p className="text-xs font-semibold text-red-600" role="alert">{error}</p> : (
+      <div className="mb-2 flex items-center gap-2"><Microscope className="h-4 w-4 text-brand-700" /><h3 id={`expertise-${faculty.id}`} className="text-sm font-semibold text-ink">Expertise records</h3><span className="rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-semibold text-slate-600">{items.length}</span></div>
+      <p className="meta mb-3">Research interests, publications, past advisee and panel titles, and degrees. Panel Matching reads all of them, so the more accurate they are the better the panel recommendations. Records marked <span className="font-semibold text-amber-800">Demo data</span> are sample entries; editing one turns it into a manual entry.</p>
+      {loading && !data ? <p className="meta" role="status">Loading expertise records…</p> : error ? <InlineNotice tone="danger">{error}</InlineNotice> : (
         <div className="space-y-2">
           {!items.length && <p className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">No expertise records yet. Add the first one below.</p>}
           {items.map((item) => editingId === item.id ? (
             <form key={item.id} onSubmit={saveEdit} className="grid gap-2 rounded-lg border border-brand-200 bg-brand-50/40 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
-              <select aria-label="Kind of record" className="field-input cursor-pointer" value={editDraft.kind} onChange={(event) => setEditDraft({ ...editDraft, kind: event.target.value })}>{kinds.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}</select>
-              <textarea aria-label="Record text" className="field-input" rows={2} value={editDraft.text} onChange={(event) => setEditDraft({ ...editDraft, text: event.target.value })} />
-              <input aria-label="Year" type="number" className="field-input" placeholder="Year" value={editDraft.year} onChange={(event) => setEditDraft({ ...editDraft, year: event.target.value })} />
-              <div className="flex items-start gap-2"><button type="submit" disabled={busy} className="btn-primary px-3 py-2 text-xs"><Save className="h-4 w-4" />Save</button><button type="button" onClick={() => setEditingId(null)} className="btn-ghost px-3 py-2 text-xs">Cancel</button></div>
+              <Select aria-label="Kind of record" placeholder="" value={editDraft.kind} onChange={(event) => setEditDraft({ ...editDraft, kind: event.target.value })} options={kindOptions} />
+              <Textarea aria-label="Record text" rows={2} value={editDraft.text} onChange={(event) => setEditDraft({ ...editDraft, text: event.target.value })} />
+              <Input aria-label="Year" type="number" placeholder="Year" value={editDraft.year} onChange={(event) => setEditDraft({ ...editDraft, year: event.target.value })} />
+              <div className="flex items-start gap-2"><Button type="submit" size="sm" icon={Save} disabled={busy}>Save</Button><Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>Cancel</Button></div>
             </form>
           ) : (
             <div key={item.id} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700">{item.kind_label}</span>
-                  {item.year && <span className="text-[11px] text-slate-400">{item.year}</span>}
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.source === "demo seed" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600"}`}>{item.source === "demo seed" ? "Demo data" : "Manual entry"}</span>
+                  <StatusChip status={item.kind_label} tone="good" size="sm" dot={false} />
+                  {item.year && <span className="micro">{item.year}</span>}
+                  {item.source === "demo seed"
+                    ? <StatusChip status="Demo data" tone="warn" size="sm" dot={false} />
+                    : <StatusChip status="Manual entry" tone="muted" size="sm" dot={false} />}
                 </div>
                 <p className="mt-1 text-sm leading-relaxed text-slate-700">{item.text}</p>
               </div>
               <div className="flex shrink-0 gap-1">
-                <button type="button" onClick={() => startEdit(item)} className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-400" aria-label={`Edit record: ${item.text}`}><Pencil className="h-4 w-4" /></button>
-                <button type="button" onClick={() => remove(item)} className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-red-400" aria-label={`Remove record: ${item.text}`}><Trash2 className="h-4 w-4" /></button>
+                <Button variant="icon" icon={Pencil} onClick={() => startEdit(item)} aria-label={`Edit record: ${item.text}`} />
+                <Button variant="icon" icon={Trash2} onClick={() => remove(item)} aria-label={`Remove record: ${item.text}`} />
               </div>
             </div>
           ))}
           <form onSubmit={add} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
-            <select aria-label="Kind of new record" className="field-input cursor-pointer" value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value })}>{kinds.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}</select>
-            <input aria-label="Text of new record" className="field-input" value={draft.text} onChange={(event) => setDraft({ ...draft, text: event.target.value })} placeholder={EXPERTISE_KIND_HINTS[draft.kind] || "Describe the expertise"} required minLength={5} maxLength={600} />
-            <input aria-label="Year of new record" type="number" min="1950" className="field-input" value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} placeholder="Year" />
-            <button type="submit" disabled={busy || draft.text.trim().length < 5} className="btn-primary px-3 py-2 text-xs"><Plus className="h-4 w-4" />Add record</button>
+            <Select aria-label="Kind of new record" placeholder="" value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value })} options={kindOptions} />
+            <Input aria-label="Text of new record" value={draft.text} onChange={(event) => setDraft({ ...draft, text: event.target.value })} placeholder={EXPERTISE_KIND_HINTS[draft.kind] || "Describe the expertise"} required minLength={5} maxLength={600} />
+            <Input aria-label="Year of new record" type="number" min="1950" value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} placeholder="Year" />
+            <Button type="submit" icon={Plus} disabled={busy || draft.text.trim().length < 5}>Add record</Button>
           </form>
         </div>
       )}
-      {message && <p className="mt-2 text-xs font-semibold text-brand-700" role="status">{message}</p>}
-      {problem && <p className="mt-2 text-xs font-semibold text-red-600" role="alert">{problem}</p>}
+      {message && <InlineNotice tone="success" className="mt-2">{message}</InlineNotice>}
+      {problem && <InlineNotice tone="danger" className="mt-2">{problem}</InlineNotice>}
     </section>
   );
 }
@@ -514,19 +533,19 @@ function PreferenceEditor({ faculty, courses, onSaved }) {
 
   return (
     <div>
-      <p className="text-xs text-slate-500">These choices are ranked first when course assignments are generated. Availability and the 24-unit ceiling are still enforced.</p>
+      <p className="meta">These choices are ranked first when course assignments are generated. Availability and the 24-unit ceiling are still enforced.</p>
       <div className="mt-3 max-h-52 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
         {available.map((course) => (
-          <label key={course.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-brand-50">
+          <label key={course.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors duration-200 hover:bg-brand-50">
             <input type="checkbox" checked={selected.has(course.id)} onChange={() => toggle(course.id)} className="mt-0.5 h-4 w-4 accent-brand-600" />
-            <span><span className="block text-xs font-semibold text-ink">{course.code}</span><span className="block text-[11px] text-slate-500">{course.title} · {course.units} units</span></span>
+            <span><span className="block text-xs font-semibold text-ink">{course.code}</span><span className="micro block">{course.title} · {course.units} units</span></span>
           </label>
         ))}
-        {!available.length && <p className="p-2 text-xs text-slate-500">No curriculum subjects are available for this college.</p>}
+        {!available.length && <p className="meta p-2">No curriculum subjects are available for this college.</p>}
       </div>
-      <button type="button" onClick={save} disabled={busy} className="btn-primary mt-3 cursor-pointer px-3 py-2 text-xs"><Save className="h-4 w-4" />{busy ? "Saving…" : "Save preferences"}</button>
-      {message && <p className="mt-2 text-xs font-semibold text-brand-700">{message}</p>}
-      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+      <Button size="sm" icon={Save} className="mt-3" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save preferences"}</Button>
+      {message && <InlineNotice tone="success" className="mt-2">{message}</InlineNotice>}
+      {error && <InlineNotice tone="danger" className="mt-2">{error}</InlineNotice>}
     </div>
   );
 }
@@ -559,34 +578,33 @@ function WeeklyCalendar({ faculty }) {
     <section>
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-brand-700" /><h3 className="font-semibold text-ink">Weekly availability & schedule</h3></div>
-          <p className="mt-1 text-xs text-slate-500">
+          <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-brand-700" /><h3 className="card-title">Weekly availability & schedule</h3></div>
+          <p className="meta mt-1">
             {calendarConnected
               ? "Weekly hours the faculty member entered, plus live Google Calendar busy periods."
               : "Weekly hours and available dates the faculty member entered. Nothing is assumed."}
           </p>
         </div>
         {hasAnything && <div className="flex items-center gap-1.5">
-          <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))} className="btn-ghost px-2" aria-label="Previous week"><ChevronLeft className="h-4 w-4" /></button>
-          <button type="button" onClick={() => setWeekStart(startOfWeek(new Date()))} className="btn-ghost px-3">Today</button>
-          <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))} className="btn-ghost px-2" aria-label="Next week"><ChevronRight className="h-4 w-4" /></button>
+          <Button variant="icon" icon={ChevronLeft} onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week" />
+          <Button variant="secondary" onClick={() => setWeekStart(startOfWeek(new Date()))}>Today</Button>
+          <Button variant="icon" icon={ChevronRight} onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week" />
         </div>}
       </div>
 
       {!hasAnything && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">Not entered</p>
-          <p className="mt-0.5 text-xs">The faculty member enters their weekly hours in their own portal. Until then, Defense Scheduling does not assume any free time for them.</p>
-        </div>
+        <InlineNotice tone="warning" title="Not entered">
+          The faculty member enters their weekly hours in their own portal. Until then, Defense Scheduling does not assume any free time for them.
+        </InlineNotice>
       )}
 
       {hasAnything && <>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-slate-700">{formatWeekRange(weekStart, weekEnd)}</p>
-        <div className="flex flex-wrap gap-3 text-[11px] font-medium text-slate-500">
-          <Legend color="border-emerald-300 bg-emerald-50" label="Weekly hours entered" />
-          <Legend color="border-emerald-600 bg-emerald-500" label="Available slot" />
+        <div className="flex flex-wrap gap-3 text-2xs font-medium text-slate-500">
+          <Legend color="border-brand-300 bg-brand-50" label="Weekly hours entered" />
+          <Legend color="border-brand-600 bg-brand-500" label="Available slot" />
           <Legend color="border-blue-600 bg-blue-500" label="Blocked / busy" />
         </div>
       </div>
@@ -595,11 +613,11 @@ function WeeklyCalendar({ faculty }) {
         <div className="min-w-[920px]">
           <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-slate-200 bg-slate-50">
             <div className="border-r border-slate-200" />
-            {days.map((day) => <div key={day.toISOString()} className="border-r border-slate-200 px-2 py-2.5 text-center last:border-r-0"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{day.toLocaleDateString("en-US", { weekday: "short" })}</p><p className={`mt-0.5 text-sm font-semibold ${isToday(day) ? "text-brand-700" : "text-slate-700"}`}>{day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p></div>)}
+            {days.map((day) => <div key={day.toISOString()} className="border-r border-slate-200 px-2 py-2.5 text-center last:border-r-0"><p className="eyebrow">{day.toLocaleDateString("en-US", { weekday: "short" })}</p><p className={`mt-0.5 text-sm font-semibold ${isToday(day) ? "text-brand-700" : "text-slate-700"}`}>{day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p></div>)}
           </div>
           <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))]">
             <div className="relative border-r border-slate-200" style={{ height: (CALENDAR_END_HOUR - CALENDAR_START_HOUR) * HOUR_HEIGHT }}>
-              {Array.from({ length: CALENDAR_END_HOUR - CALENDAR_START_HOUR + 1 }, (_, index) => <span key={index} className="absolute right-2 -translate-y-1/2 text-[10px] font-medium text-slate-400" style={{ top: index * HOUR_HEIGHT }}>{formatHour(CALENDAR_START_HOUR + index)}</span>)}
+              {Array.from({ length: CALENDAR_END_HOUR - CALENDAR_START_HOUR + 1 }, (_, index) => <span key={index} className="absolute right-2 -translate-y-1/2 text-2xs font-medium text-slate-500" style={{ top: index * HOUR_HEIGHT }}>{formatHour(CALENDAR_START_HOUR + index)}</span>)}
             </div>
             {days.map((day, dayIndex) => {
               const workingDay = faculty.working_hours?.find((item) => item.weekday === dayIndex);
@@ -609,14 +627,14 @@ function WeeklyCalendar({ faculty }) {
                   {Array.from({ length: CALENDAR_END_HOUR - CALENDAR_START_HOUR }, (_, index) => <div key={index} className="absolute inset-x-0 border-t border-slate-100" style={{ top: index * HOUR_HEIGHT }} />)}
                   {workingDay?.enabled && <CalendarBlock event={{ start: workingDay.start, end: workingDay.end, title: "Weekly hours", status: "working" }} />}
                   {dayEvents.map((event, index) => <CalendarBlock key={`${event.date}-${event.start}-${event.title}-${index}`} event={event} index={index} />)}
-                  {!workingDay?.enabled && <p className="absolute inset-x-2 top-3 text-center text-[10px] font-semibold text-slate-300">No hours</p>}
+                  {!workingDay?.enabled && <p className="absolute inset-x-2 top-3 text-center text-2xs font-semibold text-slate-400">No hours</p>}
                 </div>
               );
             })}
           </div>
         </div>
       </div>
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="meta mt-2">
         {calendarConnected
           ? "Defense Scheduling excludes every blue Google Calendar busy block. Event details stay private."
           : "Times are Philippine time."}
@@ -636,17 +654,17 @@ function CalendarBlock({ event, index = 0 }) {
   const height = Math.max(22, ((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT);
   const isWorking = event.status === "working";
   const isAvailable = event.status === "available";
-  const color = isWorking ? "border-emerald-300 bg-emerald-50/70 text-emerald-800" : isAvailable ? "border-emerald-600 bg-emerald-500 text-white" : "border-blue-600 bg-blue-500 text-white";
+  const color = isWorking ? "border-brand-300 bg-brand-50/70 text-brand-800" : isAvailable ? "border-brand-600 bg-brand-500 text-white" : "border-blue-600 bg-blue-500 text-white";
   return (
-    <div className={`absolute overflow-hidden rounded-md border px-1.5 py-1 text-[10px] shadow-sm ${isWorking ? "z-0" : "z-10"} ${color}`} style={{ top, height, left: isWorking ? 4 : 7 + (index % 2) * 4, right: isWorking ? 4 : 7 }} title={`${event.title}: ${event.start}–${event.end}`}>
-      <p className="truncate font-bold">{event.title}</p>
-      {height >= 36 && <p className={`truncate ${isWorking ? "text-emerald-700" : "text-white/85"}`}>{event.start}–{event.end}</p>}
+    <div className={`absolute overflow-hidden rounded-md border px-1.5 py-1 text-2xs ${isWorking ? "z-0" : "z-10"} ${color}`} style={{ top, height, left: isWorking ? 4 : 7 + (index % 2) * 4, right: isWorking ? 4 : 7 }} title={`${event.title}: ${event.start}–${event.end}`}>
+      <p className="truncate font-semibold">{event.title}</p>
+      {height >= 36 && <p className={`truncate ${isWorking ? "text-brand-700" : "text-white/85"}`}>{event.start}–{event.end}</p>}
     </div>
   );
 }
 
 function Legend({ color, label }) {
-  return <span className="inline-flex items-center gap-1.5"><i className={`h-2.5 w-2.5 rounded-sm border ${color}`} />{label}</span>;
+  return <span className="inline-flex items-center gap-1.5"><i className={`h-2.5 w-2.5 rounded-md border ${color}`} />{label}</span>;
 }
 
 function minutesFromTime(value) {
@@ -696,8 +714,8 @@ function AvailabilityBadge({ faculty }) {
   const updated = faculty.availability_entered && faculty.availability_updated_at ? formatUpdated(faculty.availability_updated_at) : "";
   return (
     <span className="inline-flex flex-col items-start gap-0.5">
-      <StatusBadge value={status} dot={false} />
-      {updated && <span className="text-[10px] font-medium text-slate-400">updated {updated}</span>}
+      <StatusChip status={status} dot={false} />
+      {updated && <span className="micro font-medium">updated {updated}</span>}
     </span>
   );
 }
