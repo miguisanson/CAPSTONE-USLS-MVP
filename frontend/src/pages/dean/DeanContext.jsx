@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, EmptyState, Spinner } from "../../components/ui";
+import { Card, EmptyState, InlineNotice, Spinner } from "../../components/ui/index.js";
 import { PortalNavProvider } from "../../components/portalNav";
 
 // Approval "processes" as the Dean sees them. Several workflow types share a
@@ -204,14 +204,14 @@ export function DeanGate({ children }) {
   const { data, loading, error } = useDean();
   if (loading && !data) {
     return (
-      <Card className="p-6">
+      <Card pad="lg">
         <Spinner label="Loading approvals…" />
       </Card>
     );
   }
   if (error && !data) {
     return (
-      <Card className="p-6">
+      <Card pad="lg">
         <EmptyState icon={AlertTriangle} title="Could not load approvals" hint={error} />
       </Card>
     );
@@ -225,16 +225,8 @@ export function DeanFeedback() {
   const { msg, actErr } = useDean();
   return (
     <>
-      {msg && (
-        <div role="status" className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
-          <CheckCircle2 className="h-5 w-5 shrink-0" /> {msg}
-        </div>
-      )}
-      {actErr && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {actErr}
-        </div>
-      )}
+      {msg && <InlineNotice tone="success" icon={CheckCircle2}>{msg}</InlineNotice>}
+      {actErr && <InlineNotice tone="danger">{actErr}</InlineNotice>}
     </>
   );
 }

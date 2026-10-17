@@ -10,8 +10,9 @@ import {
   RotateCcw,
   SearchX,
 } from "lucide-react";
-import { Card, EmptyState, PageHeader, SectionTitle, StatCard, StatusBadge } from "../../components/ui";
+import { Button, Card, DataTable, EmptyState, HistoryPanel, InlineNotice, Input, PageHeader, SectionCard, StatCard, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
+import { toneOf } from "../../lib/tone";
 import { DEAN_PROCESSES, DeanFeedback, DeanGate, processOfType, useDean } from "./DeanContext";
 import { AgeBadge, CaseTable, casePath, daysSince, processLabel, useDeanFilters } from "./DeanShared";
 import { DeanListFilters, DeanWorkflowBoard, WorkflowApprovalCard } from "./DeanParts";
@@ -19,7 +20,6 @@ import { deanItemDate } from "./deanHelpers";
 import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
 import AdviserAppointments from "../AdviserAppointments";
 
 const PROCESS_ORDER = ["course-adjustments", "leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"];
@@ -35,27 +35,33 @@ const PROCESS_COUNT_KEY = {
   graduation: "pendingGraduation",
 };
 
+// The number beside a section title.
+function CountChip({ count }) {
+  return <StatusChip label={String(count)} tone="muted" size="sm" dot={false} className="ml-1 align-middle" />;
+}
+
+const VIEW_ALL_LINK = "text-xs font-semibold text-brand-700 hover:underline";
+
 // ---------------------------------------------------------------- Dashboard
 function AgingPanel({ pending }) {
   const buckets = [
-    { label: "0-2 days", test: (days) => days <= 2, tone: "bg-brand-500" },
-    { label: "3-7 days", test: (days) => days >= 3 && days <= 7, tone: "bg-blue-500" },
-    { label: "8-14 days", test: (days) => days >= 8 && days <= 14, tone: "bg-amber-500" },
-    { label: "15+ days", test: (days) => days >= 15, tone: "bg-red-500" },
+    { label: "0-2 days", test: (days) => days <= 2, tone: toneOf("success").dot },
+    { label: "3-7 days", test: (days) => days >= 3 && days <= 7, tone: toneOf("info").dot },
+    { label: "8-14 days", test: (days) => days >= 8 && days <= 14, tone: toneOf("warning").dot },
+    { label: "15+ days", test: (days) => days >= 15, tone: toneOf("danger").dot },
   ].map((bucket) => ({ ...bucket, count: pending.filter((item) => {
     const days = daysSince(item.submitted_at || deanItemDate(item));
     return days !== null && bucket.test(days);
   }).length }));
   const max = Math.max(1, ...buckets.map((bucket) => bucket.count));
   return (
-    <Card className="p-6">
-      <SectionTitle title="How long items have waited" subtitle="Pending decisions grouped by age" icon={Clock} />
+    <SectionCard pad="lg" title="How long items have waited" subtitle="Pending decisions grouped by age" icon={Clock}>
       <ul className="space-y-3">
         {buckets.map((bucket) => (
           <li key={bucket.label}>
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-600">{bucket.label}</span>
-              <span className="font-bold text-ink">{bucket.count}</span>
+              <span className="font-semibold text-ink">{bucket.count}</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
               <div className={`h-full rounded-full ${bucket.tone}`} style={{ width: `${(bucket.count / max) * 100}%` }} />
@@ -63,7 +69,7 @@ function AgingPanel({ pending }) {
           </li>
         ))}
       </ul>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -91,54 +97,54 @@ function DeanDashboardBody() {
         title="Dean Dashboard"
         description="Decisions waiting on you, by process, and how long they have waited."
         icon={Gavel}
-        actions={<Link to="/dean/approvals" className="btn-primary"><Inbox className="h-4 w-4" /> Open approvals queue</Link>}
+        actions={<Button as={Link} to="/dean/approvals" icon={Inbox}>Open approvals queue</Button>}
       />
       <DeanFeedback />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Inbox} label="Decisions waiting" value={counts.pendingTotal} sub={oldest !== undefined ? `Oldest waiting ${oldest} day${oldest === 1 ? "" : "s"}` : "Nothing is waiting"} tone={counts.pendingTotal ? "amber" : "brand"} to="/dean/approvals" />
+        <StatCard icon={Inbox} label="Decisions waiting" value={counts.pendingTotal} sub={oldest !== undefined ? `Oldest waiting ${oldest} day${oldest === 1 ? "" : "s"}` : "Nothing is waiting"} tone={counts.pendingTotal ? "warning" : "success"} to="/dean/approvals" />
         {PROCESS_ORDER.slice(0, 3).map((key) => (
-          <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="blue" to={`/dean/approvals/${key}`} />
+          <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="info" to={`/dean/approvals/${key}`} />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {PROCESS_ORDER.slice(3).map((key) => (
-          <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="blue" to={`/dean/approvals/${key}`} />
+          <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="info" to={`/dean/approvals/${key}`} />
         ))}
-        <StatCard icon={CheckCircle2} label="Recently decided" value={workflowRecent.length + recentPlans.length} sub="See Decision History" tone="slate" to="/dean/activity" />
+        <StatCard icon={CheckCircle2} label="Recently decided" value={workflowRecent.length + recentPlans.length} sub="See Decision History" tone="neutral" to="/dean/activity" />
       </div>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <Card className="p-6 lg:col-span-8">
-          <SectionTitle
-            title="Waiting longest"
-            subtitle="Oldest pending workflow decisions first"
-            icon={Inbox}
-            action={<Link to="/dean/approvals" className="text-xs font-semibold text-brand-700 hover:underline">View all</Link>}
-          />
+        <SectionCard
+          pad="lg"
+          className="lg:col-span-8"
+          title="Waiting longest"
+          subtitle="Oldest pending workflow decisions first"
+          icon={Inbox}
+          action={<Link to="/dean/approvals" className={VIEW_ALL_LINK}>View all</Link>}
+        >
           <CaseTable items={queue} showProcess emptyTitle="No workflow decisions are waiting" emptyHint="New requests routed to the Dean will appear here." />
           {pendingPlans.length > 0 && (
-            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            <InlineNotice tone="warning">
               {pendingPlans.length} course offering plan{pendingPlans.length === 1 ? " is" : "s are"} also waiting.{" "}
               <Link to="/dean/approvals/course-adjustments" className="underline">Review course adjustments</Link>
-            </p>
+            </InlineNotice>
           )}
-        </Card>
+        </SectionCard>
         <div className="space-y-5 lg:col-span-4">
           <AgingPanel pending={[...workflowPending, ...pendingPlans]} />
-          <Card className="p-6">
-            <SectionTitle title="Recent decisions" icon={CheckCircle2} action={<Link to="/dean/activity" className="text-xs font-semibold text-brand-700 hover:underline">History</Link>} />
+          <SectionCard pad="lg" title="Recent decisions" icon={CheckCircle2} action={<Link to="/dean/activity" className={VIEW_ALL_LINK}>History</Link>}>
             {recent.length ? (
               <ul className="divide-y divide-slate-100">
                 {recent.map((item) => (
                   <li key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-3 py-2 text-sm">
                     <span className="min-w-0 truncate text-slate-700">{item.title}</span>
-                    <StatusBadge value={item.status} dot={false} />
+                    <StatusChip status={item.status} dot={false} />
                   </li>
                 ))}
               </ul>
             ) : (
               <EmptyState title="No decisions yet" />
             )}
-          </Card>
+          </SectionCard>
         </div>
       </div>
     </div>
@@ -156,11 +162,11 @@ function PlanRows({ plans }) {
           <li key={plan.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">Course offerings · {plan.program_code}</p>
-              <p className="text-xs text-slate-500">{plan.term_label} · {offered.length} subject(s) proposed · submitted {formatDate(plan.submitted_at)}</p>
+              <p className="meta">{plan.term_label} · {offered.length} subject(s) proposed · submitted {formatDate(plan.submitted_at)}</p>
             </div>
             <div className="flex items-center gap-2">
               <AgeBadge value={plan.submitted_at} />
-              <Link to="/dean/approvals/course-adjustments" className="btn-ghost px-3 py-1.5 text-xs">Review</Link>
+              <Button as={Link} to="/dean/approvals/course-adjustments" variant="secondary" size="sm">Review</Button>
             </div>
           </li>
         );
@@ -187,7 +193,7 @@ function DeanQueueBody() {
         title="Approvals Queue"
         description="Everything waiting on the Dean, grouped by process. Open a case to review the files, history and messages before you decide."
         icon={Inbox}
-        badge={<StatusBadge value={`${counts.pendingTotal} waiting`} dot={false} />}
+        badge={<StatusChip status={`${counts.pendingTotal} waiting`} tone="muted" dot={false} />}
       />
       <DeanFeedback />
       <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
@@ -195,43 +201,51 @@ function DeanQueueBody() {
         const items = key === "course-adjustments" ? [] : apply(workflowPending.filter((item) => DEAN_PROCESSES[key].types.includes(item.type)));
         const count = key === "course-adjustments" ? plans.length : items.length;
         return (
-          <Card key={key} className="p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-base font-semibold text-ink">
-                {DEAN_PROCESSES[key].label} <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{count}</span>
-              </h2>
-              <Link to={`/dean/approvals/${key}`} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
+          <SectionCard
+            key={key}
+            title={<>{DEAN_PROCESSES[key].label} <CountChip count={count} /></>}
+            action={
+              <Link to={`/dean/approvals/${key}`} className={`inline-flex shrink-0 items-center gap-1 ${VIEW_ALL_LINK}`}>
                 Open {DEAN_PROCESSES[key].label} <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-            </div>
+            }
+          >
             {key === "course-adjustments" ? (
               <PlanRows plans={plans} />
             ) : (
               <CaseTable items={items} emptyTitle="Nothing waiting" emptyHint="No request of this kind needs a Dean decision right now." />
             )}
-          </Card>
+          </SectionCard>
         );
       })}
       {/* Adviser designation belongs to the research flow (BPMN 7); the Dean decides it here with the other approvals. */}
-      <Card className="p-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-ink">
-            Adviser Designation <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{counts.pendingAdviser}</span>
-          </h2>
-        </div>
+      <SectionCard title={<>Adviser Designation <CountChip count={counts.pendingAdviser} /></>}>
         <AdviserAppointments role="dean" embedded onChanged={refetch} />
-      </Card>
+      </SectionCard>
     </div>
   );
 }
 
 // ----------------------------------------------------------- Process pages
+// The subjects of one course offering plan.
+const PLAN_COLUMNS = [
+  {
+    key: "subject",
+    header: "Subject",
+    sortValue: (o) => o.code,
+    cell: (o) => <><span className="font-semibold text-ink">{o.code}</span><span className="ml-1 text-slate-500">{o.title}</span></>,
+  },
+  { key: "demand", header: "Demand", sortValue: (o) => o.demand_count, cell: (o) => o.demand_count },
+  { key: "sections", header: "Sections", sortValue: (o) => o.section_count, cell: (o) => o.section_count },
+  { key: "decision", header: "Decision", sortValue: (o) => o.status, cell: (o) => <StatusChip status={o.status} dot={false} /> },
+];
+
 function PlanCards() {
   const { pendingPlans, recentPlans, note, setNote, busy, decidePlan } = useDean();
   return (
     <>
       {pendingPlans.length === 0 ? (
-        <Card className="p-6">
+        <Card pad="lg">
           <EmptyState icon={Inbox} title="No course offering plans waiting" hint="Plans the Academic Coordinator submits for approval appear here." />
         </Card>
       ) : (
@@ -239,67 +253,46 @@ function PlanCards() {
           {pendingPlans.map((plan) => {
             const offered = plan.offerings.filter((o) => o.status === "Offered" || o.status === "Suggested");
             return (
-              <Card key={plan.id} className="p-5">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <h2 className="font-display text-lg font-semibold text-ink">Course offerings · {plan.program_code}</h2>
-                    <p className="text-sm text-slate-500">{plan.term_label} · {offered.length} subject(s) proposed · submitted {formatDate(plan.submitted_at)}</p>
-                  </div>
-                  <StatusBadge value={plan.status} dot={false} />
-                </div>
-                <div className="mt-3 overflow-x-auto rounded-xl border border-slate-100">
-                  <table className="w-full min-w-[520px] text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                        <th className="px-4 py-2">Subject</th>
-                        <th className="px-3 py-2">Demand</th>
-                        <th className="px-3 py-2">Sections</th>
-                        <th className="px-3 py-2">Decision</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {plan.offerings.map((o) => (
-                        <tr key={o.id} className="border-b border-slate-50">
-                          <td className="px-4 py-2"><span className="font-semibold text-ink">{o.code}</span><span className="ml-1 text-slate-500">{o.title}</span></td>
-                          <td className="px-3 py-2 text-slate-600">{o.demand_count}</td>
-                          <td className="px-3 py-2 text-slate-600">{o.section_count}</td>
-                          <td className="px-3 py-2"><StatusBadge value={o.status} dot={false} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <input
+              <SectionCard
+                key={plan.id}
+                title={`Course offerings · ${plan.program_code}`}
+                subtitle={`${plan.term_label} · ${offered.length} subject(s) proposed · submitted ${formatDate(plan.submitted_at)}`}
+                action={<StatusChip status={plan.status} dot={false} />}
+              >
+                <DataTable
+                  caption={`Subjects proposed for ${plan.program_code} ${plan.term_label}`}
+                  columns={PLAN_COLUMNS}
+                  rows={plan.offerings}
+                  rowKey="id"
+                  pageSize={0}
+                  empty={{ icon: Inbox, title: "No subjects in this plan" }}
+                />
+                <Input
                   value={note[plan.id] || ""}
                   onChange={(e) => setNote((n) => ({ ...n, [plan.id]: e.target.value }))}
                   placeholder="Optional note to the Graduate School…"
                   aria-label={`Optional decision note for ${plan.program_code} ${plan.term_label}`}
-                  className="field-input mt-3"
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" disabled={busy === plan.id} onClick={() => decidePlan(plan, "approve")} className="btn-primary">
-                    <CheckCircle2 className="h-4 w-4" /> Approve
-                  </button>
-                  <button type="button" disabled={busy === plan.id} onClick={() => decidePlan(plan, "return")} className="btn-ghost">
-                    <RotateCcw className="h-4 w-4" /> Return for revision
-                  </button>
+                <div className="flex flex-wrap gap-2">
+                  <Button icon={CheckCircle2} disabled={busy === plan.id} onClick={() => decidePlan(plan, "approve")}>Approve</Button>
+                  <Button variant="secondary" icon={RotateCcw} disabled={busy === plan.id} onClick={() => decidePlan(plan, "return")}>Return for revision</Button>
                 </div>
-              </Card>
+              </SectionCard>
             );
           })}
         </div>
       )}
       {recentPlans.length > 0 && (
-        <Card className="p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Clock className="h-3.5 w-3.5" /> Recent decisions</p>
+        <Card>
+          <p className="eyebrow mb-3 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Recent decisions</p>
           <ul className="divide-y divide-slate-100">
             {recentPlans.map((p) => (
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate-700">
                   {p.program_code} · {p.term_label}
-                  {p.approved_by && <span className="text-slate-400"> · by {p.approved_by}</span>}
+                  {p.approved_by && <span className="text-slate-500"> · by {p.approved_by}</span>}
                 </span>
-                <StatusBadge value={p.status} dot={false} />
+                <StatusChip status={p.status} dot={false} />
               </li>
             ))}
           </ul>
@@ -349,13 +342,13 @@ function DecidedRow({ item }) {
     <li className="py-2 text-sm">
       <div className="flex items-center justify-between gap-3">
         <Link to={casePath(item)} className="min-w-0 truncate text-slate-700 hover:text-brand-700 hover:underline">{item.title}</Link>
-        {leaveCase ? leaveCaseStatusBadge(leaveCase) : <StatusBadge value={item.status} dot={false} />}
+        {leaveCase ? leaveCaseStatusBadge(leaveCase) : <StatusChip status={item.status} dot={false} />}
       </div>
-      {leaveCase?.status === "Denied" && <p className="mt-1 text-xs font-semibold text-red-700">Follow-up owner: {leaveCase.owner || "Graduate School staff"}</p>}
+      {leaveCase?.status === "Denied" && <p className="meta mt-1 font-semibold text-red-700">Follow-up owner: {leaveCase.owner || "Graduate School staff"}</p>}
       {leaveCase && (
-        <HistoryDisclosure className="mt-2" label="View details" hideLabel="Hide details">
+        <HistoryPanel className="mt-2" label="View details" hideLabel="Hide details">
           <LeaveCaseSummary item={item} />
-        </HistoryDisclosure>
+        </HistoryPanel>
       )}
     </li>
   );
@@ -378,8 +371,8 @@ function DeanProcessBody({ process }) {
         title={DEAN_PROCESSES[process].label}
         description={PROCESS_COPY[process]}
         icon={Gavel}
-        badge={<StatusBadge value={`${counts[PROCESS_COUNT_KEY[process]]} waiting`} dot={false} />}
-        actions={<Link to="/dean/approvals" className="btn-ghost"><ArrowLeft className="h-4 w-4" /> All approvals</Link>}
+        badge={<StatusChip status={`${counts[PROCESS_COUNT_KEY[process]]} waiting`} tone="muted" dot={false} />}
+        actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>All approvals</Button>}
       />
       <DeanFeedback />
       {process === "course-adjustments" ? (
@@ -390,13 +383,12 @@ function DeanProcessBody({ process }) {
           {boardRows.length > 0 && (
             <DeanWorkflowBoard rows={boardRows} onOpen={(item) => navigate(casePath(item))} selectedIds={new Set()} onToggle={() => {}} />
           )}
-          <Card className="p-5">
-            <SectionTitle title="Waiting for your decision" subtitle="Open a case to review it and decide" icon={Inbox} />
+          <SectionCard title="Waiting for your decision" subtitle="Open a case to review it and decide" icon={Inbox}>
             <CaseTable items={visiblePending} emptyTitle="Nothing to review in this section" emptyHint="Submitted items for this role will appear here." />
-          </Card>
+          </SectionCard>
           {visibleRecent.length > 0 && (
-            <Card className="p-5">
-              <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Clock className="h-3.5 w-3.5" /> Recent workflow decisions</p>
+            <Card>
+              <p className="eyebrow mb-3 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Recent workflow decisions</p>
               <ul className="divide-y divide-slate-100">
                 {visibleRecent.map((item) => <DecidedRow key={`${item.type}-${item.id}`} item={item} />)}
               </ul>
@@ -426,9 +418,9 @@ function DeanCaseBody() {
   if (!item) {
     return (
       <div className="space-y-5 animate-fade-up">
-        <PageHeader title="Case not found" description="This request is no longer in your approvals lists. It may already have been decided." icon={SearchX} actions={<Link to="/dean/approvals" className="btn-ghost"><ArrowLeft className="h-4 w-4" /> Approvals queue</Link>} />
+        <PageHeader title="Case not found" description="This request is no longer in your approvals lists. It may already have been decided." icon={SearchX} actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>Approvals queue</Button>} />
         <DeanFeedback />
-        <Card className="p-6"><EmptyState icon={AlertTriangle} title="Nothing to show" hint="Go back to the approvals queue to see what is still waiting." /></Card>
+        <Card pad="lg"><EmptyState icon={AlertTriangle} title="Nothing to show" hint="Go back to the approvals queue to see what is still waiting." /></Card>
       </div>
     );
   }
@@ -438,8 +430,8 @@ function DeanCaseBody() {
         title={item.title}
         description={`${item.student?.name || ""} · ${item.student?.student_number || ""} · ${processLabel(item.type)}`}
         icon={Gavel}
-        badge={<StatusBadge value={item.status} dot={false} />}
-        actions={<Link to={backTo} className="btn-ghost"><ArrowLeft className="h-4 w-4" /> Back to list</Link>}
+        badge={<StatusChip status={item.status} dot={false} />}
+        actions={<Button as={Link} to={backTo} variant="secondary" icon={ArrowLeft}>Back to list</Button>}
       />
       <DeanFeedback />
       <WorkflowApprovalCard
