@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle,
   ArrowRight,
   CalendarOff,
-  CheckCircle2,
-  Info,
   Lock,
   Square,
   CheckSquare,
@@ -14,13 +11,13 @@ import {
   FileText,
 } from "lucide-react";
 import { api } from "../../api";
-import { Card, ErrorNote, SectionTitle, StatusBadge } from "../../components/ui";
+import { Button, Card, HistoryPanel, InlineNotice, SectionTitle, StatusChip } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { LeaveStatusBadge, LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
-import { formatDate, formatDateTime } from "../../lib/format";
+import { formatDate } from "../../lib/format";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
+import { Fact } from "./shared";
 
 // Everything the student sees about Leave of Absence, leave extension and readmission cases.
 // The words, the tone and the next owner of each case come from the server
@@ -69,42 +66,18 @@ export function leaveRequestStatus(data, slug) {
   return latest?.status_label || "Not submitted";
 }
 
-const BANNER_STYLES = {
-  bad: { box: "border-red-300 bg-red-50 text-red-900", icon: AlertTriangle, iconClass: "text-red-600" },
-  warn: { box: "border-amber-300 bg-amber-50 text-amber-900", icon: AlertTriangle, iconClass: "text-amber-600" },
-  info: { box: "border-blue-200 bg-blue-50 text-blue-900", icon: Info, iconClass: "text-blue-600" },
-  good: { box: "border-brand-200 bg-brand-50 text-brand-900", icon: CheckCircle2, iconClass: "text-brand-600" },
-  muted: { box: "border-slate-200 bg-slate-50 text-slate-800", icon: Info, iconClass: "text-slate-500" },
-};
-
 /** The notice at the top of the leave pages: AWOL, leave ending, on leave, leave scheduled. */
 export function LeaveBanner({ banner, linkTo = "", linkLabel = "", className = "" }) {
   if (!banner) return null;
-  const style = BANNER_STYLES[banner.tone] || BANNER_STYLES.info;
-  const Icon = style.icon;
   return (
-    <div role={banner.tone === "bad" ? "alert" : "status"} className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${style.box} ${className}`}>
-      <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${style.iconClass}`} aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold">{banner.title}</p>
-        {banner.text && <p className="mt-0.5 text-sm">{banner.text}</p>}
-        {linkTo && (
-          <Link to={linkTo} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold underline">
-            {linkLabel || "Open"} <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Fact({ label, children }) {
-  if (children === null || children === undefined || children === "") return null;
-  return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm font-semibold text-ink">{children}</dd>
-    </div>
+    <InlineNotice tone={banner.tone || "info"} title={banner.title} icon className={className}>
+      {banner.text && <p>{banner.text}</p>}
+      {linkTo && (
+        <Link to={linkTo} className="mt-2 inline-flex items-center gap-1 font-semibold underline">
+          {linkLabel || "Open"} <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      )}
+    </InlineNotice>
   );
 }
 
@@ -127,25 +100,18 @@ function daysLine(item) {
 
 const DAYS_TONE = { bad: "text-red-700", warn: "text-amber-800", info: "text-slate-600" };
 
-function HistoryList({ history }) {
-  if (!history.length) return <p className="text-sm text-slate-500">Nothing has happened on this request yet.</p>;
-  return (
-    <ol className="space-y-2">
-      {history.map((entry, index) => (
-        <li key={entry.id ?? `${entry.created_at}-${index}`} className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-semibold text-ink">{entry.result || "Update"}</p>
-            <p className="text-[11px] text-slate-400">{formatDateTime(entry.created_at)}</p>
-          </div>
-          {entry.previous_status && entry.new_status && entry.previous_status !== entry.new_status && (
-            <p className="mt-0.5 text-xs text-slate-500">{entry.previous_status} → {entry.new_status}</p>
-          )}
-          {entry.notes && <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">{entry.notes}</p>}
-        </li>
-      ))}
-    </ol>
-  );
-}
+// One entry of the case's stage history. The status change is shown only when the status really changed.
+const historyEntry = (entry) => {
+  const changed = entry.previous_status && entry.new_status && entry.previous_status !== entry.new_status;
+  return {
+    id: entry.id,
+    title: entry.result || "Update",
+    at: entry.created_at,
+    from: changed ? entry.previous_status : undefined,
+    to: changed ? entry.new_status : undefined,
+    note: entry.notes,
+  };
+};
 
 /**
  * One Leave of Absence, leave extension or readmission request.
@@ -213,14 +179,14 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
   }
 
   return (
-    <article className={`rounded-2xl border p-4 sm:p-5 ${current ? "border-brand-200 bg-white" : "border-slate-200 bg-white"}`}>
+    <Card as="article" className={current ? "border-brand-200" : ""}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
             <Icon className="h-4 w-4" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-ink">{item.kind_label}</h3>
+            <h3 className="card-title">{item.kind_label}</h3>
             <p className="mt-0.5 text-sm text-slate-600">{summary}</p>
           </div>
         </div>
@@ -236,24 +202,19 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
       {item.closed_reason && !open && <p className="mt-2 text-sm text-slate-600">{item.closed_reason}</p>}
 
       {returned && returnComment && (
-        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Why it was sent back</p>
-          <p className="mt-1 whitespace-pre-line text-sm font-medium">{returnComment}</p>
-        </div>
+        <InlineNotice tone="warning" title="Why it was sent back" className="mt-3">
+          <span className="whitespace-pre-line">{returnComment}</span>
+        </InlineNotice>
       )}
       {deanComment && (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Comment from the Dean</p>
-          <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{deanComment}</p>
-        </div>
+        <InlineNotice tone="neutral" title="Comment from the Dean" className="mt-3">
+          <span className="whitespace-pre-line">{deanComment}</span>
+        </InlineNotice>
       )}
       {staffMessage && (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Latest message from {staffMessage.sender_name || staffMessage.sender_role}
-          </p>
-          <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{staffMessage.comment}</p>
-        </div>
+        <InlineNotice tone="neutral" title={`Latest message from ${staffMessage.sender_name || staffMessage.sender_role}`} className="mt-3">
+          <span className="whitespace-pre-line">{staffMessage.comment}</span>
+        </InlineNotice>
       )}
 
       <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -289,21 +250,21 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
 
       {!isReadmission && (item.reason_category || item.reason_text) && (
         <div className="mt-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Your reason</p>
+          <p className="eyebrow">Your reason</p>
           {item.reason_category && <p className="mt-0.5 text-sm font-semibold text-ink">{item.reason_category}</p>}
           {item.reason_text && <p className="mt-0.5 whitespace-pre-line text-sm text-slate-600">{item.reason_text}</p>}
         </div>
       )}
       {isReadmission && item.return_intent && (
         <div className="mt-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">What you told us</p>
+          <p className="eyebrow">What you told us</p>
           <p className="mt-0.5 whitespace-pre-line text-sm text-slate-600">{item.return_intent}</p>
         </div>
       )}
 
       {isReadmission && checklist.length > 0 && (
         <div className="mt-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Return checklist</p>
+          <p className="eyebrow">Return checklist</p>
           <ul className="mt-1.5 space-y-1">
             {checklist.map((entry) => (
               <li key={entry.item} className="flex items-start gap-2 text-sm text-slate-700">
@@ -330,31 +291,35 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
       {(canWithdraw || canCancel) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {canWithdraw && (
-            <button type="button" onClick={() => run("withdraw")} disabled={busy} className="btn-ghost cursor-pointer text-red-700 hover:bg-red-50">
-              <XCircle className="h-4 w-4" /> {busy ? "Working…" : "Withdraw request"}
-            </button>
+            <Button variant="secondary" icon={XCircle} onClick={() => run("withdraw")} loading={busy} className="text-red-700 hover:bg-red-50">
+              {busy ? "Working…" : "Withdraw request"}
+            </Button>
           )}
           {canCancel && (
-            <button type="button" onClick={() => run("cancel")} disabled={busy} className="btn-ghost cursor-pointer text-red-700 hover:bg-red-50">
-              <XCircle className="h-4 w-4" /> {busy ? "Working…" : "Cancel this leave"}
-            </button>
+            <Button variant="secondary" icon={XCircle} onClick={() => run("cancel")} loading={busy} className="text-red-700 hover:bg-red-50">
+              {busy ? "Working…" : "Cancel this leave"}
+            </Button>
           )}
         </div>
       )}
-      {notice && <p aria-live="polite" className="mt-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-800">{notice}</p>}
-      <div className="mt-3"><ErrorNote message={error} /></div>
+      {notice && <InlineNotice tone="success" className="mt-3">{notice}</InlineNotice>}
+      {error && <InlineNotice tone="danger" className="mt-3">{error}</InlineNotice>}
 
       <div className="mt-4 space-y-2">
         {!current && messages.length > 0 && (
-          <HistoryDisclosure label="View messages" hideLabel="Hide messages" count={messages.length}>
+          <HistoryPanel label="View messages" hideLabel="Hide messages" count={messages.length}>
             <WorkflowDiscussion messages={messages} embedded showHeader={false} title={`${item.kind_label} messages`} />
-          </HistoryDisclosure>
+          </HistoryPanel>
         )}
-        <HistoryDisclosure label="View stage history" hideLabel="Hide stage history" count={history.length}>
-          <HistoryList history={history} />
-        </HistoryDisclosure>
+        <HistoryPanel
+          label="View stage history"
+          hideLabel="Hide stage history"
+          entries={history.map(historyEntry)}
+          sort="given"
+          emptyText="Nothing has happened on this request yet."
+        />
       </div>
-    </article>
+    </Card>
   );
 }
 
@@ -362,13 +327,13 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
 export function EarlierCases({ cases, onChanged }) {
   if (!cases.length) return null;
   return (
-    <HistoryDisclosure label="Earlier requests" hideLabel="Hide earlier requests" count={cases.length}>
+    <HistoryPanel label="Earlier requests" hideLabel="Hide earlier requests" count={cases.length}>
       <div className="space-y-3">
         {cases.map((item) => (
           <LeaveCaseCard key={item.id} item={item} current={false} onChanged={onChanged} />
         ))}
       </div>
-    </HistoryDisclosure>
+    </HistoryPanel>
   );
 }
 
@@ -376,10 +341,9 @@ export function EarlierCases({ cases, onChanged }) {
 export function LeaveReasonNote({ children }) {
   if (!children) return null;
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-      <p>{children}</p>
-    </div>
+    <InlineNotice tone="neutral" icon={Lock}>
+      <span className="font-normal">{children}</span>
+    </InlineNotice>
   );
 }
 
@@ -426,7 +390,7 @@ export function LeaveStatusPanel({ data }) {
     },
   ];
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <SectionTitle title="Leave and return" subtitle="Where your leave of absence and readmission requests stand" icon={FileText} />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {rows.map((row) => {
@@ -437,9 +401,9 @@ export function LeaveStatusPanel({ data }) {
                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
                   <Icon className="h-4 w-4 text-brand-700" /> {row.label}
                 </span>
-                {row.item && !(row.key === "loa" && onLeave) ? leaveCaseStatusBadge(row.item) : <StatusBadge value={row.status} dot={false} />}
+                {row.item && !(row.key === "loa" && onLeave) ? leaveCaseStatusBadge(row.item) : <StatusChip status={row.status} dot={false} />}
               </div>
-              <p className="text-xs leading-relaxed text-slate-500">{row.detail}</p>
+              <p className="meta leading-relaxed">{row.detail}</p>
               <Link to={row.to} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
                 Open request <ArrowRight className="h-3.5 w-3.5" />
               </Link>

@@ -1,9 +1,10 @@
 import { LogOut, UserX } from "lucide-react";
-import { formatDate, formatDateTime } from "../../lib/format";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
+import { Card, HistoryPanel, InlineNotice } from "../../components/ui/index.js";
+import { formatDate } from "../../lib/format";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
 import { returnCommentOf } from "./LeaveCaseCards";
+import { Fact } from "./shared";
 
 // The student's view of one AWOL / residency or withdrawal case. It is the same card the
 // student sees for a Leave of Absence or a Readmission (LeaveCaseCard): title and summary,
@@ -14,35 +15,15 @@ import { returnCommentOf } from "./LeaveCaseCards";
 const RETURNED = ["Returned for Revision", "Returned for Clarification", "Returned"];
 const ICONS = { AWOL: UserX, RESIDENCY: UserX, WITHDRAWAL: LogOut };
 
-function Fact({ label, children }) {
-  if (children === null || children === undefined || children === "") return null;
-  return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm font-semibold text-ink">{children}</dd>
-    </div>
-  );
-}
-
-function StageHistory({ events }) {
-  if (!events.length) return <p className="text-sm text-slate-500">Nothing has happened on this request yet.</p>;
-  return (
-    <ol className="space-y-2">
-      {events.map((entry) => (
-        <li key={entry.id} className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-semibold text-ink">{entry.action || "Update"}</p>
-            <p className="text-[11px] text-slate-400">{formatDateTime(entry.created_at)}</p>
-          </div>
-          {entry.from_status && entry.to_status && entry.from_status !== entry.to_status && (
-            <p className="mt-0.5 text-xs text-slate-500">{entry.from_status} → {entry.to_status}</p>
-          )}
-          {entry.comment && <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">{entry.comment}</p>}
-        </li>
-      ))}
-    </ol>
-  );
-}
+// One stage event of the case as a history entry. The status change is shown only when the status really changed.
+const eventEntry = (entry) => ({
+  id: entry.id,
+  title: entry.action || "Update",
+  at: entry.created_at,
+  from: entry.from_status && entry.to_status && entry.from_status !== entry.to_status ? entry.from_status : undefined,
+  to: entry.from_status && entry.to_status && entry.from_status !== entry.to_status ? entry.to_status : undefined,
+  note: entry.comment,
+});
 
 export function ProcessCaseCard({ item, current = true }) {
   const Icon = ICONS[item.kind] || LogOut;
@@ -55,16 +36,16 @@ export function ProcessCaseCard({ item, current = true }) {
   const facts = rows.filter((row) => !row.full && row.value && row.value !== "None" && row.value !== "Not recorded");
   const texts = rows.filter((row) => row.full && row.value && row.value !== "None");
   return (
-    <article className={`rounded-2xl border p-4 sm:p-5 ${current ? "border-brand-200 bg-white" : "border-slate-200 bg-white"}`}>
+    <Card as="article" className={current ? "border-brand-200" : ""}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
             <Icon className="h-4 w-4" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-ink">{item.kind_label}</h3>
+            <h3 className="card-title">{item.kind_label}</h3>
             {(item.card_lines || []).filter(Boolean).map((line, index) => (
-              <p key={index} className={index === 0 ? "mt-0.5 text-sm text-slate-600" : "text-xs text-slate-500"}>{line}</p>
+              <p key={index} className={index === 0 ? "mt-0.5 text-sm text-slate-600" : "meta"}>{line}</p>
             ))}
           </div>
         </div>
@@ -80,10 +61,9 @@ export function ProcessCaseCard({ item, current = true }) {
       )}
 
       {returned && returnComment && (
-        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Why it was sent back</p>
-          <p className="mt-1 whitespace-pre-line text-sm font-medium">{returnComment}</p>
-        </div>
+        <InlineNotice tone="warning" title="Why it was sent back" className="mt-3">
+          <span className="whitespace-pre-line">{returnComment}</span>
+        </InlineNotice>
       )}
 
       {facts.length > 0 && (
@@ -95,7 +75,7 @@ export function ProcessCaseCard({ item, current = true }) {
       )}
       {texts.map((row) => (
         <div key={row.label} className="mt-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{row.label}</p>
+          <p className="eyebrow">{row.label}</p>
           <p className="mt-0.5 whitespace-pre-line text-sm text-slate-600">{row.value}</p>
         </div>
       ))}
@@ -106,15 +86,19 @@ export function ProcessCaseCard({ item, current = true }) {
 
       <div className="mt-4 space-y-2">
         {messages.length > 0 && (
-          <HistoryDisclosure label="View messages" hideLabel="Hide messages" count={messages.length}>
+          <HistoryPanel label="View messages" hideLabel="Hide messages" count={messages.length}>
             <WorkflowDiscussion messages={messages} embedded showHeader={false} title={`${item.kind_label} messages`} />
-          </HistoryDisclosure>
+          </HistoryPanel>
         )}
-        <HistoryDisclosure label="View stage history" hideLabel="Hide stage history" count={events.length}>
-          <StageHistory events={events} />
-        </HistoryDisclosure>
+        <HistoryPanel
+          label="View stage history"
+          hideLabel="Hide stage history"
+          entries={events.map(eventEntry)}
+          sort="given"
+          emptyText="Nothing has happened on this request yet."
+        />
       </div>
-    </article>
+    </Card>
   );
 }
 
@@ -126,11 +110,11 @@ export function ProcessCaseList({ cases = [] }) {
     <div className="space-y-3">
       <ProcessCaseCard item={current} />
       {earlier.length > 0 && (
-        <HistoryDisclosure label="Earlier requests" hideLabel="Hide earlier requests" count={earlier.length}>
+        <HistoryPanel label="Earlier requests" hideLabel="Hide earlier requests" count={earlier.length}>
           <div className="space-y-3">
             {earlier.map((item) => <ProcessCaseCard key={item.id} item={item} current={false} />)}
           </div>
-        </HistoryDisclosure>
+        </HistoryPanel>
       )}
     </div>
   );

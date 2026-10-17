@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Activity,
   ArrowRight,
@@ -13,18 +13,19 @@ import {
   UserX,
 } from "lucide-react";
 import { api } from "../../api";
-import { Card, EmptyState, ProgressBar, SectionTitle, StatusBadge } from "../../components/ui";
-import { formatDate, initials } from "../../lib/format";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
+import { Button, Card, EmptyState, HistoryPanel, InlineNotice, SectionTitle, StatCard, StatusChip, Stepper } from "../../components/ui/index.js";
+import { ProgressBar } from "../../components/ui";
+import { initials } from "../../lib/format";
+import { stageSteps } from "../../lib/stages";
 import { RESEARCH_GATE_KEYS } from "./shared";
 
 export function StudentHero({ data }) {
   const { student, course_audit, research_case } = data;
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-brand-100 text-xl font-bold text-brand-700">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-brand-100 text-lg font-semibold text-brand-700">
             {initials(student.name)}
           </span>
           <div>
@@ -39,78 +40,46 @@ export function StudentHero({ data }) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[400px] lg:grid-cols-2 2xl:w-[560px] 2xl:grid-cols-4">
-          <MiniStat label="Stage" value={student.current_stage} />
-          <MiniStat label="Progress" value={data.progress_status?.level || "Not yet assessed"} badge />
-          <MiniStat label="Coursework" value={`${course_audit.completion_rate}%`} />
-          <MiniStat label="Research" value={research_case?.status || "Not started"} badge />
+          <StatCard size="sm" label="Stage" value={student.current_stage} />
+          <StatCard size="sm" label="Progress" value={data.progress_status?.level || "Not yet assessed"} badge />
+          <StatCard size="sm" label="Coursework" value={`${course_audit.completion_rate}%`} />
+          <StatCard size="sm" label="Research" value={research_case?.status || "Not started"} badge />
         </div>
       </div>
     </Card>
   );
 }
 
-export function MiniStat({ label, value, badge }) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-      <p className="text-xs font-bold uppercase text-slate-400">{label}</p>
-      <div className="mt-1 min-h-6">
-        {badge ? <StatusBadge value={value} dot={false} /> : <p className="text-sm font-semibold text-ink">{value}</p>}
-      </div>
-    </div>
-  );
-}
-
 export function ProgressPanel({ data }) {
-  const { stages, stage_index, student, course_audit, research_case } = data;
-  const progressStages = stages
-    .filter((stage) => stage !== "LOA")
-    .map((stage) => (stage === "Completed" ? "Completion Evidence" : stage));
-  const currentStage = student.current_stage === "Completed" ? "Completion Evidence" : student.current_stage;
-  const displayIndex = progressStages.indexOf(currentStage);
+  const { stages, student, course_audit, research_case } = data;
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <SectionTitle title="My Academic Status" subtitle="Your current stage, requirements, and next step" icon={ClipboardCheck} />
       {student.standing === "On Leave" && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+        <InlineNotice tone="warning" className="mb-4">
           You are on Leave of Absence, so you cannot enroll in subjects. The time on leave still counts toward your maximum residence. Readmission becomes available while this status is active.
-        </div>
+        </InlineNotice>
       )}
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        {progressStages.map((stage, i) => {
-          const done = displayIndex >= 0 && i < displayIndex;
-          const current = i === displayIndex;
-          return (
-            <span
-              key={stage}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                current ? "bg-brand-600 text-white" : done ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-400"
-              }`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${current || done ? "bg-current" : "bg-slate-300"}`} />
-              {stage}
-            </span>
-          );
-        })}
-      </div>
+      <Stepper steps={stageSteps(student.current_stage, stages)} compact className="mb-5" />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <div className="mb-1 flex items-center justify-between text-sm">
             <span className="font-semibold text-slate-700">Coursework completion</span>
-            <span className="font-bold text-brand-700">{course_audit.completion_rate}%</span>
+            <span className="font-semibold text-brand-700">{course_audit.completion_rate}%</span>
           </div>
           <ProgressBar value={course_audit.completion_rate} />
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="meta mt-2">
             {course_audit.completed.length} completed, {course_audit.current.length} current, {course_audit.missing_count} missing.
           </p>
         </div>
         <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
           <p className="text-sm font-semibold text-ink">{research_case?.title || "No research case opened yet"}</p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="meta mt-1">
             Adviser: {student.adviser_name || research_case?.adviser_name || "Not assigned"}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusBadge value={research_case?.current_gate_label || "Research not started"} dot={false} />
-            {research_case?.status && <StatusBadge value={research_case.status} />}
+            <StatusChip status={research_case?.current_gate_label || "Research not started"} dot={false} />
+            {research_case?.status && <StatusChip status={research_case.status} />}
           </div>
         </div>
       </div>
@@ -158,7 +127,7 @@ export function WorkflowStatusPanel({ data }) {
   });
 
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <SectionTitle title="Workflow Status" subtitle="Administrative and completion requests currently visible to you" icon={FileText} />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {rows.map((row) => {
@@ -169,9 +138,9 @@ export function WorkflowStatusPanel({ data }) {
                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
                   <Icon className="h-4 w-4 text-brand-700" /> {row.label}
                 </span>
-                <StatusBadge value={row.status} dot={false} />
+                <StatusChip status={row.status} dot={false} />
               </div>
-              <p className="text-xs leading-relaxed text-slate-500">{row.detail}</p>
+              <p className="meta leading-relaxed">{row.detail}</p>
             </div>
           );
         })}
@@ -184,7 +153,7 @@ export function AdministrativeDocumentsPanel({ documentsByGate, onSaved }) {
   const entries = Object.entries(documentsByGate || {}).filter(([gate]) => !RESEARCH_GATE_KEYS.has(gate));
   if (!entries.length) return null;
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <SectionTitle title="Administrative Documents" subtitle="Admission and general records outside your research submissions" icon={FileText} />
       <div className="space-y-4">
         {entries.map(([gate, docs]) => (
@@ -195,7 +164,7 @@ export function AdministrativeDocumentsPanel({ documentsByGate, onSaved }) {
                 <div key={doc.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
                   <div className="flex items-center gap-3">
                     <span className="min-w-0 flex-1 truncate text-sm text-slate-600">{doc.display_name || doc.item_name}</span>
-                    <StatusBadge value={doc.status_label || doc.status} dot={false} />
+                    <StatusChip status={doc.status_label || doc.status} dot={false} />
                     {doc.status === "Missing" ? (
                       <MissingDocumentUpload doc={doc} onSaved={onSaved} />
                     ) : (
@@ -227,16 +196,15 @@ export function DocumentViewButton({ doc }) {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="icon"
+      icon={Eye}
       onClick={viewReference}
       disabled={!canView}
       aria-label="View document"
       title={canView ? `View document: ${reference}` : "No document reference recorded yet"}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <Eye className="h-3.5 w-3.5" />
-    </button>
+      className="shrink-0"
+    />
   );
 }
 
@@ -265,28 +233,28 @@ export function MissingDocumentUpload({ doc, onSaved }) {
   return (
     <div className="shrink-0">
       <label
-        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-brand-700 hover:bg-brand-50"
+        className="btn-icon cursor-pointer text-brand-700 hover:bg-brand-50"
         title="Upload PDF"
         aria-label="Upload PDF"
       >
-        <FileUp className="h-3.5 w-3.5" />
+        <FileUp className="h-4 w-4" />
         <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => submit(e.target.files?.[0])} />
       </label>
-      {error && <p className="mt-1 max-w-32 text-xs font-medium text-red-600">{error}</p>}
+      {error && <p className="mt-1 max-w-32 text-xs font-medium text-red-700">{error}</p>}
     </div>
   );
 }
 
 export function RecommendationsPanel({ recommendations }) {
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <SectionTitle title="Next Step" icon={ArrowRight} />
       {recommendations.length ? (
-        <ul className="space-y-2.5">
+        <ul className="space-y-2">
           {recommendations.slice(0, 3).map((rec, i) => (
             <li key={i} className="rounded-xl border border-slate-100 p-3">
               <p className="text-sm font-semibold text-ink">{rec.recommendation}</p>
-              <p className="mt-1 text-xs text-slate-500">Owner: {rec.owner}</p>
+              <p className="meta mt-1">Owner: {rec.owner}</p>
             </li>
           ))}
         </ul>
@@ -297,26 +265,22 @@ export function RecommendationsPanel({ recommendations }) {
   );
 }
 
+// Each log becomes one history entry: what happened, who did it and who has it next, when, and the notes.
+const logEntry = (log) => ({
+  id: log.id,
+  title: log.result,
+  at: log.created_at,
+  actor: `${log.actor_role} - next: ${log.next_owner || "Pending"}`,
+  note: log.notes,
+});
+
 export function ActivityPanel({ logs }) {
-  const visibleLogs = useMemo(() => logs || [], [logs]);
+  const visibleLogs = logs || [];
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <SectionTitle title="Activity History" subtitle="Submissions, decisions, and next owners" icon={Activity} />
       {visibleLogs.length ? (
-        <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={visibleLogs.length}>
-          <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
-            {visibleLogs.map((log) => (
-              <li key={log.id} className="relative">
-                <span className="absolute -left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
-                <p className="text-sm font-semibold text-ink">{log.result}</p>
-                <p className="text-xs text-slate-500">
-                  {log.actor_role} - next: {log.next_owner || "Pending"} - {formatDate(log.created_at)}
-                </p>
-                {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
-              </li>
-            ))}
-          </ol>
-        </HistoryDisclosure>
+        <HistoryPanel label="View logs" hideLabel="Hide logs" entries={visibleLogs.map(logEntry)} sort="given" />
       ) : (
         <EmptyState title="No activity yet" />
       )}
