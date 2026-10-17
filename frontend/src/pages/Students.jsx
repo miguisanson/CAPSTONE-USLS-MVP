@@ -147,13 +147,13 @@ export default function Students() {
       />
 
       <Card>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
           <SearchInput
             value={q}
             onChange={setQ}
             placeholder="Search by name, student number, email, or program…"
             label="Search students"
-            className="flex-1"
+            className="flex-1 2xl:min-w-64"
           />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             {filterControls.map((f) => (
