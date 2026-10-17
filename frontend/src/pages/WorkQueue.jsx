@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ListTodo, AlertTriangle, Search, Flag, CheckCircle2, ShieldCheck, RefreshCw, ArrowRight, ShieldAlert } from "lucide-react";
+import { ListTodo, AlertTriangle, Flag, CheckCircle2, ShieldCheck, RefreshCw, ArrowRight, ShieldAlert } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
+import { Button, Card, DataTable, EmptyState, Field, InlineNotice, PageHeader, Pagination, SearchInput, Spinner, StatCard, StatusChip, Textarea } from "../components/ui/index.js";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { useAuth } from "../auth";
 
@@ -31,13 +31,11 @@ export default function WorkQueue() {
   const openConflicts = conflicts.data?.summary?.open_total ?? 0;
 
   return (
-    <div className="space-y-5 animate-fade-up">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Work Queue</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Everything that needs attention in one place — pending tasks, students at risk of delay with the next step for each, and open monitoring conflicts.
-        </p>
-      </div>
+    <div className="page-stack animate-fade-up">
+      <PageHeader
+        title="Work Queue"
+        description="Everything that needs attention in one place — pending tasks, students at risk of delay with the next step for each, and open monitoring conflicts."
+      />
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200">
         <TabButton active={tab === "tasks"} onClick={() => setTab("tasks")} icon={ListTodo}>Tasks</TabButton>
@@ -62,7 +60,7 @@ function TabButton({ active, onClick, icon: Icon, children, badge }) {
       <Icon className="h-4 w-4" />
       {children}
       {badge > 0 && (
-        <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-bold ${active ? "bg-brand-600 text-white" : "bg-amber-100 text-amber-700"}`}>{badge}</span>
+        <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold ${active ? "bg-brand-600 text-white" : "bg-amber-100 text-amber-700"}`}>{badge}</span>
       )}
     </button>
   );
@@ -88,67 +86,76 @@ function AtRiskPanel() {
   students.forEach((row) => { counts[row.severity] = (counts[row.severity] || 0) + 1; });
 
   if (loading) return <Spinner label="Finding students at risk…" />;
-  if (error) return <EmptyState icon={AlertTriangle} title="Could not load at-risk students" hint={error} />;
+  if (error) return <InlineNotice tone="danger" title="Could not load at-risk students">{error}</InlineNotice>;
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       <div className="flex flex-wrap items-center gap-2">
         <FilterChip active={severity === ""} onClick={() => setSeverity("")}>All flagged ({students.length})</FilterChip>
         {["high", "medium", "low"].filter((key) => counts[key] > 0).map((key) => (
           <FilterChip key={key} active={severity === key} onClick={() => setSeverity(key)}>{SEVERITY[key].label} priority ({counts[key]})</FilterChip>
         ))}
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="meta">
         Students who are delayed, stalled, overdue or missing documents. Each row shows the one next step to take; open the student to see every flag.
       </p>
-      <Card className="overflow-hidden">
-        {shown.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="No students flagged" hint="Nobody needs a follow-up right now." />
-        ) : (
-          <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-3 py-3">Priority</th>
-                  <th className="px-3 py-3">Suggested next step</th>
-                  <th className="px-3 py-3">Owner</th>
-                  <th className="px-3 py-3"><span className="sr-only">Open</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((row) => {
-                  const sev = SEVERITY[row.severity] || SEVERITY.low;
-                  return (
-                    <tr key={row.student_id} className="border-b border-slate-50 align-top hover:bg-slate-50/60">
-                      <td className="px-5 py-3">
-                        <p className="font-semibold text-ink">{row.student_name}</p>
-                        <p className="text-xs text-slate-400">{row.program_code} · {row.stage}</p>
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${sev.badge}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${sev.dot}`} />{sev.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        <p className="font-semibold text-ink">{row.recommendation}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">Why: {row.trigger}{row.others > 0 ? ` · ${row.others} more flag${row.others === 1 ? "" : "s"}` : ""}</p>
-                      </td>
-                      <td className="px-3 py-3 text-slate-600">{row.owner}</td>
-                      <td className="px-3 py-3 text-right">
-                        <Link to={`/students/${row.student_id}`} className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">Open <ArrowRight className="h-3.5 w-3.5" /></Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      <DataTable
+        caption="Students flagged as at risk, with the suggested next step for each"
+        columns={AT_RISK_COLUMNS}
+        rows={shown}
+        rowKey="student_id"
+        minWidth="md"
+        pageSize={0}
+        empty={{ icon: CheckCircle2, title: "No students flagged", hint: "Nobody needs a follow-up right now." }}
+      />
     </div>
   );
 }
+
+// Priority chip tone: the server's severity words stand in for the status words.
+const SEVERITY_TONE = { high: "bad", medium: "warn", low: "good" };
+
+const AT_RISK_COLUMNS = [
+  {
+    key: "student_name",
+    header: "Student",
+    cell: (row) => (
+      <>
+        <p className="font-semibold text-ink">{row.student_name}</p>
+        <p className="meta">{row.program_code} · {row.stage}</p>
+      </>
+    ),
+  },
+  {
+    key: "severity",
+    header: "Priority",
+    cell: (row) => {
+      const sev = SEVERITY[row.severity] || SEVERITY.low;
+      return <StatusChip status={sev.label} tone={SEVERITY_TONE[row.severity] || "good"} />;
+    },
+  },
+  {
+    key: "recommendation",
+    header: "Suggested next step",
+    cell: (row) => (
+      <>
+        <p className="font-semibold text-ink">{row.recommendation}</p>
+        <p className="meta mt-0.5">Why: {row.trigger}{row.others > 0 ? ` · ${row.others} more flag${row.others === 1 ? "" : "s"}` : ""}</p>
+      </>
+    ),
+  },
+  { key: "owner", header: "Owner" },
+  {
+    key: "open",
+    header: <span className="sr-only">Open</span>,
+    align: "right",
+    cell: (row) => (
+      <Link to={`/students/${row.student_id}`} className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
+        Open <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
+    ),
+  },
+];
 
 function TasksPanel({ user }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -157,13 +164,46 @@ function TasksPanel({ user }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const { data, loading, error } = useApi(() => api.tasks({ owner, status, page, page_size: PAGE_SIZE }), [owner, status, page]);
-  const total = data?.total ?? (data?.items || []).length;
+  const items = data?.items || [];
+  const total = data?.total ?? items.length;
   const currentPage = data?.page || page;
   const pageSize = data?.page_size || PAGE_SIZE;
   const pages = data?.pages || Math.max(1, Math.ceil(total / pageSize));
-  const from = total ? (currentPage - 1) * pageSize + 1 : 0;
-  const to = Math.min(total, (currentPage - 1) * pageSize + (data?.items || []).length);
-  const filtered = (data?.items || []).filter((task) => `${task.title} ${task.student_name || ""} ${task.owner_role}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = items.filter((task) => `${task.title} ${task.student_name || ""} ${task.owner_role}`.toLowerCase().includes(query.toLowerCase()));
+  const canOpenStudent = CONFLICT_ROLES.includes(user?.role);
+
+  const columns = [
+    { key: "title", header: "Task", cell: (task) => <span className="font-semibold text-ink">{task.title}</span> },
+    { key: "owner_role", header: "Owner" },
+    {
+      key: "student_name",
+      header: "Student",
+      cell: (task) =>
+        !task.student_id ? null : canOpenStudent ? (
+          <Link to={`/students/${task.student_id}`} className="font-semibold text-brand-700 hover:underline">{task.student_name}</Link>
+        ) : (
+          <span className="font-semibold text-ink">{task.student_name}</span>
+        ),
+    },
+    {
+      key: "due_at",
+      header: "Due",
+      cell: (task) => (
+        <>
+          {formatDate(task.due_at)} <span className="text-slate-500">· {relativeDays(task.due_at)}</span>
+        </>
+      ),
+    },
+    { key: "status", header: "Status", cell: (task) => <StatusChip status={task.overdue ? "Overdue" : task.status} dot={false} /> },
+    {
+      key: "action",
+      header: "Action",
+      cell: (task) =>
+        task.action_url ? (
+          <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">{task.action_label || "Open"}</Link>
+        ) : null,
+    },
+  ];
 
   function updateFilter(next) {
     const merged = { owner, status, ...next };
@@ -177,8 +217,8 @@ function TasksPanel({ user }) {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="relative max-w-xl"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="field-input pl-10" placeholder="Search task, student, or owner…" aria-label="Search work queue" /></div>
+    <div className="page-stack">
+      <SearchInput value={query} onChange={setQuery} placeholder="Search task, student, or owner…" label="Search work queue" className="max-w-xl" />
 
       <div className="flex flex-wrap gap-2">
         <FilterChip active={owner === ""} onClick={() => updateFilter({ owner: "" })}>All owners</FilterChip>
@@ -188,65 +228,22 @@ function TasksPanel({ user }) {
         <FilterChip active={status === "Overdue"} onClick={() => updateFilter({ status: status === "Overdue" ? "" : "Overdue" })}>Overdue only</FilterChip>
       </div>
 
-      <Card className="overflow-hidden">
-        {loading ? (
-          <Spinner label="Loading tasks…" />
-        ) : error ? (
-          <EmptyState icon={AlertTriangle} title="Could not load tasks" hint={error} />
-        ) : filtered.length === 0 ? (
-          <EmptyState icon={ListTodo} title="No tasks match the selected filters" hint="Clear a filter or broaden the search." />
-        ) : (
-          <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="px-5 py-3">Task</th>
-                  <th className="px-3 py-3">Owner</th>
-                  <th className="px-3 py-3">Student</th>
-                  <th className="px-3 py-3">Due</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((task) => (
-                  <tr key={task.id} className="border-b border-slate-50 hover:bg-slate-50/60">
-                    <td className="px-5 py-3 font-semibold text-ink">{task.title}</td>
-                    <td className="px-3 py-3 text-slate-600">{task.owner_role}</td>
-                    <td className="px-3 py-3">
-                      {task.student_id && CONFLICT_ROLES.includes(user?.role) ? (
-                        <Link to={`/students/${task.student_id}`} className="font-semibold text-brand-700 hover:underline">{task.student_name}</Link>
-                      ) : task.student_id ? (
-                        <span className="font-semibold text-ink">{task.student_name}</span>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-slate-500">{formatDate(task.due_at)} <span className="text-slate-400">· {relativeDays(task.due_at)}</span></td>
-                    <td className="px-3 py-3"><StatusBadge value={task.overdue ? "Overdue" : task.status} dot={false} /></td>
-                    <td className="px-3 py-3">
-                      {task.action_url ? (
-                        <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">{task.action_label || "Open"}</Link>
-                      ) : (
-                        <span className="text-slate-300">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      {error ? (
+        <InlineNotice tone="danger" title="Could not load tasks">{error}</InlineNotice>
+      ) : (
+        <DataTable
+          caption="Open and recent tasks"
+          columns={columns}
+          rows={filtered}
+          rowKey="id"
+          loading={loading}
+          pageSize={0}
+          empty={{ icon: ListTodo, title: "No tasks match the selected filters", hint: "Clear a filter or broaden the search." }}
+        />
+      )}
 
       {!loading && !error && total > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-500">Showing <span className="font-semibold text-ink">{from}-{to}</span> of <span className="font-semibold text-ink">{total}</span></p>
-          <div className="flex gap-2">
-            <button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-            <button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-          </div>
-        </div>
+        <Pagination page={currentPage} pageCount={pages} total={total} pageSize={pageSize} shown={items.length} onPage={setPage} />
       )}
     </div>
   );
@@ -280,37 +277,47 @@ function ConflictsPanel({ state }) {
   }
 
   if (loading) return <Spinner label="Loading conflicts…" />;
-  if (error) return <EmptyState icon={AlertTriangle} title="Could not load conflicts" hint={error} />;
+  if (error) return <InlineNotice tone="danger" title="Could not load conflicts">{error}</InlineNotice>;
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Open conflicts" value={summary.open_total} tone="slate" />
-        <StatCard label="Auto-resolve on re-import" value={summary.auto_resolvable} tone="green" />
-        <StatCard label="Need coordinator action" value={summary.needs_action} tone="amber" />
+        <StatCard icon={Flag} label="Open conflicts" value={summary.open_total} tone="neutral" />
+        <StatCard icon={ShieldCheck} label="Auto-resolve on re-import" value={summary.auto_resolvable} tone="success" />
+        <StatCard icon={AlertTriangle} label="Need coordinator action" value={summary.needs_action} tone="warning" />
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">Source-correctable conflicts clear automatically after a corrected monitoring sheet is re-imported. The rest need coordinator review.</p>
-        <button type="button" onClick={refetch} className="btn-ghost cursor-pointer px-3 py-2"><RefreshCw className="h-4 w-4" /> Refresh</button>
+      <div className="flex items-center justify-between gap-3">
+        <p className="meta">Source-correctable conflicts clear automatically after a corrected monitoring sheet is re-imported. The rest need coordinator review.</p>
+        <Button variant="secondary" icon={RefreshCw} onClick={refetch} className="shrink-0">Refresh</Button>
       </div>
 
       {items.length === 0 ? (
-        <Card className="overflow-hidden"><EmptyState icon={CheckCircle2} title="No open conflicts" hint="Every flagged discrepancy has been resolved." /></Card>
+        <Card pad="none" className="overflow-hidden"><EmptyState icon={CheckCircle2} title="No open conflicts" hint="Every flagged discrepancy has been resolved." /></Card>
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
-            <Card key={item.id} className="p-4">
+            <Card key={item.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-ink">{item.category}</span>
                     {item.auto_resolvable ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700"><ShieldCheck className="h-3 w-3" /> Auto-resolves on re-import</span>
+                      <StatusChip
+                        status="Auto-resolves on re-import"
+                        tone="good"
+                        dot={false}
+                        label={<><ShieldCheck className="h-3 w-3" aria-hidden="true" /> Auto-resolves on re-import</>}
+                      />
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"><Flag className="h-3 w-3" /> Needs coordinator action</span>
+                      <StatusChip
+                        status="Needs coordinator action"
+                        tone="warn"
+                        dot={false}
+                        label={<><Flag className="h-3 w-3" aria-hidden="true" /> Needs coordinator action</>}
+                      />
                     )}
-                    {item.system_generated && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">System</span>}
+                    {item.system_generated && <StatusChip status="System" tone="muted" dot={false} />}
                   </div>
                   <p className="mt-1 text-sm font-medium text-slate-700">
                     {CONFLICT_ROLES.includes(user?.role) ? (
@@ -318,24 +325,34 @@ function ConflictsPanel({ state }) {
                     ) : (
                       <span>{item.student_name}</span>
                     )}
-                    <span className="text-slate-400"> · {item.student_number} · {item.program_code}</span>
+                    <span className="text-slate-500"> · {item.student_number} · {item.program_code}</span>
                   </p>
-                  <p className="mt-0.5 text-xs font-medium text-slate-500">On: {item.target_label || "Whole record"}</p>
+                  <p className="meta mt-0.5 font-medium">On: {item.target_label || "Whole record"}</p>
                   <p className="mt-1 text-sm text-slate-600">{item.note}</p>
-                  <p className="mt-1 text-xs text-slate-400">{item.source} · {item.created_by} · {formatDate(item.created_at)}</p>
+                  <p className="meta mt-1">{item.source} · {item.created_by} · {formatDate(item.created_at)}</p>
                 </div>
                 {canResolve && resolvingId !== item.id && (
-                  <button type="button" onClick={() => { setResolvingId(item.id); setNote(""); setActionError(""); }} className="btn-ghost cursor-pointer px-3 py-2 shrink-0"><CheckCircle2 className="h-4 w-4" /> Resolve</button>
+                  <Button variant="secondary" icon={CheckCircle2} className="shrink-0" onClick={() => { setResolvingId(item.id); setNote(""); setActionError(""); }}>
+                    Resolve
+                  </Button>
                 )}
               </div>
               {resolvingId === item.id && (
                 <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-                  <label className="field-label" htmlFor={`resolve-${item.id}`}>How was this resolved?</label>
-                  <textarea id={`resolve-${item.id}`} className="field-input min-h-24 resize-y" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Describe the corrected source, advising outcome, or verified resolution." />
-                  {actionError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">{actionError}</div>}
+                  <Field label="How was this resolved?">
+                    <Textarea
+                      className="min-h-24 resize-y"
+                      value={note}
+                      onChange={(event) => setNote(event.target.value)}
+                      placeholder="Describe the corrected source, advising outcome, or verified resolution."
+                    />
+                  </Field>
+                  {actionError && <InlineNotice tone="danger">{actionError}</InlineNotice>}
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={busy || !note.trim()} onClick={() => resolve(item)} className="btn-primary cursor-pointer"><CheckCircle2 className="h-4 w-4" /> {busy ? "Saving…" : "Resolve conflict"}</button>
-                    <button type="button" onClick={() => { setResolvingId(null); setNote(""); }} className="btn-ghost cursor-pointer">Cancel</button>
+                    <Button icon={CheckCircle2} loading={busy} disabled={!note.trim()} onClick={() => resolve(item)}>
+                      {busy ? "Saving…" : "Resolve conflict"}
+                    </Button>
+                    <Button variant="secondary" onClick={() => { setResolvingId(null); setNote(""); }}>Cancel</Button>
                   </div>
                 </div>
               )}
@@ -347,30 +364,11 @@ function ConflictsPanel({ state }) {
   );
 }
 
-function StatCard({ label, value, tone }) {
-  const tones = {
-    slate: "text-ink",
-    green: "text-green-700",
-    amber: "text-amber-700",
-  };
-  return (
-    <Card className="p-4">
-      <p className={`text-3xl font-bold ${tones[tone] || "text-ink"}`}>{value}</p>
-      <p className="mt-1 text-sm text-slate-500">{label}</p>
-    </Card>
-  );
-}
-
+// A toggle chip: pressed = the primary look, not pressed = the secondary look (the library Button, small size).
 function FilterChip({ active, onClick, children }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors duration-200 cursor-pointer ${
-        active ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-      }`}
-    >
+    <Button size="sm" variant={active ? "primary" : "secondary"} aria-pressed={active} onClick={onClick}>
       {children}
-    </button>
+    </Button>
   );
 }

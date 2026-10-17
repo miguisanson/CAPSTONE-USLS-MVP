@@ -24,52 +24,12 @@ import {
   Clock,
   ArrowRight,
   FileText,
-  X,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, SectionTitle, Spinner, StatusBadge, EmptyState } from "../components/ui";
+import { Button, Card, DataTable, EmptyState, Field, InlineNotice, Modal, PageHeader, SectionCard, Select, Spinner, StatCard, StatusChip } from "../components/ui/index.js";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import { CHART_COLORS, RISK_COLORS, SCHEDULE_COLORS, formatDate, relativeDays } from "../lib/format";
-
-function Kpi({ icon: Icon, label, value, sub, tone = "brand", to }) {
-  const tones = {
-    brand: "bg-brand-50 text-brand-700",
-    amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
-    red: "bg-red-50 text-red-700",
-  };
-  const content = (
-    <Card className="p-5">
-      <div className="flex items-start justify-between">
-        <span className={`grid h-11 w-11 place-items-center rounded-xl ${tones[tone]}`}>
-          <Icon className="h-6 w-6" strokeWidth={2} />
-        </span>
-      </div>
-      <p className="mt-4 font-display text-3xl font-semibold leading-none text-ink">{value}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-700">{label}</p>
-      {sub && <p className="text-xs text-slate-500">{sub}</p>}
-    </Card>
-  );
-  if (!to) return content;
-  return (
-    <Link to={to} className="block transition-colors hover:brightness-[0.99] cursor-pointer">
-      {content}
-    </Link>
-  );
-}
-
-function ChartCard({ title, subtitle, children, className = "" }) {
-  return (
-    <Card className={`p-5 ${className}`}>
-      <div className="mb-4">
-        <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
-      </div>
-      {children}
-    </Card>
-  );
-}
 
 const tooltipStyle = {
   borderRadius: 12,
@@ -80,55 +40,37 @@ const tooltipStyle = {
 
 const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
 
+const RISK_LEVELS = ["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"];
+const STANDINGS = ["Active", "On Leave", "AWOL", "Withdrawn"];
+
 function DashboardFilters({ filters, meta, onChange, onClear }) {
   const active = Object.values(filters).filter(Boolean).length;
+  const controls = [
+    { key: "program_id", label: "Program", all: "All programs", options: (meta?.programs || []).map((program) => ({ value: String(program.id), label: program.code })) },
+    { key: "stage", label: "Progress", all: "All stages", options: meta?.stages || [] },
+    { key: "risk", label: "Risk", all: "All risk levels", options: RISK_LEVELS },
+    { key: "standing", label: "Standing", all: "All standings", options: STANDINGS },
+    { key: "owner", label: "Owner", all: "All owners", options: OWNERS },
+  ];
   return (
-    <Card className="p-4">
+    <Card>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-        <FilterSelect label="Program" value={filters.program_id} onChange={(value) => onChange("program_id", value)}>
-          <option value="">All programs</option>
-          {(meta?.programs || []).map((program) => (
-            <option key={program.id} value={program.id}>{program.code}</option>
-          ))}
-        </FilterSelect>
-        <FilterSelect label="Progress" value={filters.stage} onChange={(value) => onChange("stage", value)}>
-          <option value="">All stages</option>
-          {(meta?.stages || []).map((stage) => <option key={stage} value={stage}>{stage}</option>)}
-        </FilterSelect>
-        <FilterSelect label="Risk" value={filters.risk} onChange={(value) => onChange("risk", value)}>
-          <option value="">All risk levels</option>
-          <option value="On Track">On Track</option>
-          <option value="At Risk of Delay">At Risk of Delay</option>
-          <option value="Delayed">Delayed</option>
-          <option value="Not Yet Assessed">Not Yet Assessed</option>
-          <option value="At Risk of Delay/Delayed">At Risk of Delay/Delayed</option>
-        </FilterSelect>
-        <FilterSelect label="Standing" value={filters.standing} onChange={(value) => onChange("standing", value)}>
-          <option value="">All standings</option>
-          {["Active", "On Leave", "AWOL", "Withdrawn"].map((standing) => <option key={standing} value={standing}>{standing}</option>)}
-        </FilterSelect>
-        <FilterSelect label="Owner" value={filters.owner} onChange={(value) => onChange("owner", value)}>
-          <option value="">All owners</option>
-          {OWNERS.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
-        </FilterSelect>
+        {controls.map((c) => (
+          <Field key={c.key} label={c.label}>
+            <Select placeholder={c.all} value={filters[c.key]} onChange={(e) => onChange(c.key, e.target.value)} options={c.options} />
+          </Field>
+        ))}
       </div>
       {active > 0 && (
-        <button type="button" onClick={onClear} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800">
+        <button
+          type="button"
+          onClick={onClear}
+          className="mt-3 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 max-sm:min-h-11"
+        >
           Clear dashboard filters
         </button>
       )}
     </Card>
-  );
-}
-
-function FilterSelect({ label, value, onChange, children }) {
-  return (
-    <label className="block">
-      <span className="field-label">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="field-input cursor-pointer">
-        {children}
-      </select>
-    </label>
   );
 }
 
@@ -145,7 +87,7 @@ export default function Dashboard() {
     }),
     [searchParams]
   );
-  const { data, loading, error } = useApi(
+  const { data, loading, error, refetch } = useApi(
     () => api.dashboard(filters),
     [filters.program_id, filters.stage, filters.risk, filters.standing, filters.owner]
   );
@@ -168,25 +110,30 @@ export default function Dashboard() {
   }
 
   if (loading) return <Spinner label="Loading dashboard…" />;
-  if (error) return <EmptyState icon={AlertTriangle} title="Could not load dashboard" hint={error} />;
+  if (error) {
+    return (
+      <InlineNotice tone="danger" title="Could not load dashboard">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span>{error}</span>
+          <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
+        </div>
+      </InlineNotice>
+    );
+  }
 
   const k = data.kpis;
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <div>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="font-display text-2xl font-semibold text-ink">Graduate School Overview</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Every figure below is computed live from recorded transactions — student handoffs, audits, gates, panels, schedules, and completion workflows.
-            </p>
-          </div>
-          <Link to="/reports" className="btn-ghost">
-            <FileText className="h-4 w-4" /> Reports
-          </Link>
-        </div>
-      </div>
+    <div className="page-stack animate-fade-up">
+      <PageHeader
+        title="Graduate School Overview"
+        description="Every figure below is computed live from recorded transactions — student handoffs, audits, gates, panels, schedules, and completion workflows."
+        actions={
+          <Button as={Link} to="/reports" variant="secondary" icon={FileText}>
+            Reports
+          </Button>
+        }
+      />
 
       <DashboardFilters
         filters={filters}
@@ -202,23 +149,23 @@ export default function Dashboard() {
 
       {/* Primary KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={Users} label="Students monitored" value={k.total_students} sub={`${k.active_students} active`} tone="brand" to="/students" />
-        <Kpi icon={AlertTriangle} label="At risk or delayed" value={k.at_risk} sub={`${k.high_risk} delayed`} tone="amber" to="/students?risk=At Risk of Delay/Delayed" />
-        <Kpi icon={ListTodo} label="Open tasks" value={k.pending_tasks} sub={`${k.overdue_tasks} overdue`} tone="red" to="/work-queue" />
-        <Kpi icon={CalendarCheck} label="Confirmed defenses" value={k.confirmed_schedules} sub={`${k.needs_availability} awaiting availability`} tone="blue" to="/reports" />
+        <StatCard icon={Users} label="Students monitored" value={k.total_students} sub={`${k.active_students} active`} tone="success" to="/students" />
+        <StatCard icon={AlertTriangle} label="At risk or delayed" value={k.at_risk} sub={`${k.high_risk} delayed`} tone="warning" to="/students?risk=At Risk of Delay/Delayed" />
+        <StatCard icon={ListTodo} label="Open tasks" value={k.pending_tasks} sub={`${k.overdue_tasks} overdue`} tone="danger" to="/work-queue" />
+        <StatCard icon={CalendarCheck} label="Confirmed defenses" value={k.confirmed_schedules} sub={`${k.needs_availability} awaiting availability`} tone="info" to="/reports" />
       </div>
 
       {/* Secondary strip */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <MiniStat icon={UserCheck} label="Active" value={k.active_students} to="/students?standing=Active" />
-        <MiniStat icon={CalendarOff} label="On leave" value={k.on_leave} to="/students?standing=On+Leave" />
-        <MiniStat icon={CheckCircle2} label="Completed" value={k.completed} to="/reports?workflow_type=graduation_candidates" />
-        <MiniStat icon={Clock} label="Overdue tasks" value={k.overdue_tasks} to="/work-queue?status=Overdue" />
+        <StatCard size="sm" tone="neutral" icon={UserCheck} label="Active" value={k.active_students} to="/students?standing=Active" />
+        <StatCard size="sm" tone="neutral" icon={CalendarOff} label="On leave" value={k.on_leave} to="/students?standing=On+Leave" />
+        <StatCard size="sm" tone="neutral" icon={CheckCircle2} label="Completed" value={k.completed} to="/reports?workflow_type=graduation_candidates" />
+        <StatCard size="sm" tone="neutral" icon={Clock} label="Overdue tasks" value={k.overdue_tasks} to="/work-queue?status=Overdue" />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ChartCard
+        <SectionCard
           title="Lifecycle stage distribution"
           subtitle="Where students currently sit in the graduate lifecycle"
           className="lg:col-span-2"
@@ -240,9 +187,9 @@ export default function Dashboard() {
             </BarChart>
           </ResponsiveContainer>
           <ChartDrilldownButtons items={data.stage_distribution.map((item) => ({ label: item.stage, count: item.count }))} onClick={(value) => openDetail("stage", value)} />
-        </ChartCard>
+        </SectionCard>
 
-        <ChartCard title="Risk level" subtitle="Computed from monitoring signals">
+        <SectionCard title="Risk level" subtitle="Computed from monitoring signals">
           <ResponsiveContainer width="100%" height={320}>
             <PieChart>
               <Pie
@@ -264,9 +211,9 @@ export default function Dashboard() {
             </PieChart>
           </ResponsiveContainer>
           <ChartDrilldownButtons items={data.risk_distribution.map((item) => ({ label: item.risk, count: item.count }))} onClick={(value) => openDetail("risk", value)} />
-        </ChartCard>
+        </SectionCard>
 
-        <ChartCard title="Students by college" subtitle="Program clusters under monitoring">
+        <SectionCard title="Students by college" subtitle="Program clusters under monitoring">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={data.college_distribution} margin={{ left: -16, right: 8 }}>
               <CartesianGrid vertical={false} stroke="#eef2f6" />
@@ -277,9 +224,9 @@ export default function Dashboard() {
             </BarChart>
           </ResponsiveContainer>
           <ChartDrilldownButtons items={data.college_distribution.map((item) => ({ label: item.college, count: item.count }))} onClick={(value) => openDetail("college", value)} />
-        </ChartCard>
+        </SectionCard>
 
-        <ChartCard title="Research gate position" subtitle="Active research cases by gate">
+        <SectionCard title="Research gate position" subtitle="Active research cases by gate">
           {data.gate_distribution.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -296,9 +243,9 @@ export default function Dashboard() {
             <EmptyState title="No research cases yet" />
           )}
           <ChartDrilldownButtons items={data.gate_distribution.map((item) => ({ label: item.gate, count: item.count }))} onClick={(value) => openDetail("gate", value)} />
-        </ChartCard>
+        </SectionCard>
 
-        <ChartCard title="Defense scheduling" subtitle="Outcome of scheduling requests">
+        <SectionCard title="Defense scheduling" subtitle="Outcome of scheduling requests">
           {data.schedule_distribution.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -315,11 +262,11 @@ export default function Dashboard() {
             <EmptyState title="No schedule requests yet" />
           )}
           <ChartDrilldownButtons items={data.schedule_distribution.map((item) => ({ label: item.status, count: item.count }))} onClick={(value) => openDetail("schedule", value)} />
-        </ChartCard>
+        </SectionCard>
       </div>
 
       {/* Open work queue by owner */}
-      <ChartCard title="Open work queue by owner" subtitle="Who currently owns the next action">
+      <SectionCard title="Open work queue by owner" subtitle="Who currently owns the next action">
         {data.tasks_by_owner.length ? (
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={data.tasks_by_owner} margin={{ left: -16, right: 8 }}>
@@ -334,12 +281,11 @@ export default function Dashboard() {
           <EmptyState title="No open tasks" />
         )}
         <ChartDrilldownButtons items={data.tasks_by_owner.map((item) => ({ label: item.owner, count: item.count }))} onClick={(value) => openDetail("owner", value)} />
-      </ChartCard>
+      </SectionCard>
 
       {/* Activity + tasks */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <SectionTitle title="Recent activity" subtitle="Latest recorded transactions" icon={Clock} />
+        <SectionCard title="Recent activity" subtitle="Latest recorded transactions" icon={Clock}>
           {data.recent_logs.length ? (
             <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={data.recent_logs.length}>
               <ul className="space-y-3">
@@ -348,37 +294,36 @@ export default function Dashboard() {
                     <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-ink">{log.result}</p>
-                      <p className="truncate text-xs text-slate-500">
+                      <p className="meta truncate">
                         {log.student_name || log.source_reference || "Workflow"} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
                       </p>
                     </div>
                   </li>
                 ))}
               </ul>
-              <Link to="/activity" className="btn-ghost mt-4 w-full">
+              <Button as={Link} to="/activity" variant="secondary" className="mt-4 w-full">
                 Open full activity log <ArrowRight className="h-4 w-4" />
-              </Link>
+              </Button>
             </HistoryDisclosure>
           ) : (
             <EmptyState title="No activity yet" hint="Complete a workflow to populate this feed." />
           )}
-        </Card>
+        </SectionCard>
 
-        <Card className="p-5">
-          <SectionTitle title="Open work queue" subtitle="Highest-priority pending tasks" icon={ListTodo} />
+        <SectionCard title="Open work queue" subtitle="Highest-priority pending tasks" icon={ListTodo}>
           {data.open_tasks.length ? (
             <ul className="divide-y divide-slate-100">
               {data.open_tasks.map((task) => (
                 <li key={task.id} className="flex items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink">{task.title}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="meta">
                       {task.owner_role} · {task.student_name || "—"}
                     </p>
                   </div>
                   <div className="text-right">
-                    <StatusBadge value={task.overdue ? "Overdue" : "Pending"} />
-                    <p className="mt-1 text-xs text-slate-400">{relativeDays(task.due_at)}</p>
+                    <StatusChip status={task.overdue ? "Overdue" : "Pending"} />
+                    <p className="meta mt-1">{relativeDays(task.due_at)}</p>
                   </div>
                 </li>
               ))}
@@ -386,60 +331,145 @@ export default function Dashboard() {
           ) : (
             <EmptyState title="No pending tasks" />
           )}
-          <Link to="/work-queue" className="btn-ghost mt-4 w-full">
+          <Button as={Link} to="/work-queue" variant="secondary" className="w-full">
             Open the work queue <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Card>
+          </Button>
+        </SectionCard>
       </div>
       {detail && <DashboardDetailModal detail={detail} loading={detailLoading} error={detailError} onClose={() => setDetail(null)} />}
     </div>
   );
 }
 
+// The drill-down dialog behind every chart category. Which table it shows depends on what was clicked.
 function DashboardDetailModal({ detail, loading, error, onClose }) {
+  const empty = !detail.rows?.length;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="dashboard-detail-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <Card className="max-h-[88vh] w-full max-w-5xl overflow-hidden">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
-          <div><h2 id="dashboard-detail-title" className="text-lg font-semibold text-ink">{detail.title}</h2>{detail.definition && <p className="mt-1 max-w-3xl text-sm text-slate-600">{detail.definition}</p>}</div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close dashboard details"><X className="h-5 w-5" /></button>
-        </div>
-        <div className="max-h-[70vh] overflow-auto p-5">
-          {loading ? <Spinner label="Loading filtered details…" /> : error ? <EmptyState icon={AlertTriangle} title="Could not load details" hint={error} /> : !detail.rows?.length ? <EmptyState title="No records in this category" hint="The dashboard category is valid, but no matching records are available under the current data." /> : detail.type === "schedule" ? <ScheduleDetailTable rows={detail.rows} /> : detail.type === "owner" ? <TaskDetailTable rows={detail.rows} /> : <StudentDetailTable rows={detail.rows} />}
-        </div>
-      </Card>
-    </div>
+    <Modal title={detail.title} subtitle={detail.definition} size="xl" onClose={onClose} closeLabel="Close dashboard details">
+      {loading ? (
+        <Spinner label="Loading filtered details…" />
+      ) : error ? (
+        <EmptyState icon={AlertTriangle} title="Could not load details" hint={error} />
+      ) : empty ? (
+        <EmptyState title="No records in this category" hint="The dashboard category is valid, but no matching records are available under the current data." />
+      ) : detail.type === "schedule" ? (
+        <ScheduleDetailTable rows={detail.rows} />
+      ) : detail.type === "owner" ? (
+        <TaskDetailList rows={detail.rows} />
+      ) : (
+        <StudentDetailTable rows={detail.rows} />
+      )}
+    </Modal>
   );
 }
 
 function ChartDrilldownButtons({ items, onClick }) {
-  return <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Chart categories">{items.map((item) => <button key={item.label} type="button" onClick={() => onClick(item.label)} aria-label={`Show ${item.label}: ${item.count} records`} className="cursor-pointer rounded-lg bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-brand-50 hover:text-brand-700">{item.label} · {item.count}</button>)}</div>;
+  return (
+    <div className="flex flex-wrap gap-1.5" aria-label="Chart categories">
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={() => onClick(item.label)}
+          aria-label={`Show ${item.label}: ${item.count} records`}
+          className="cursor-pointer rounded-lg bg-slate-50 px-2 py-1 text-2xs font-semibold text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-brand-50 hover:text-brand-700"
+        >
+          {item.label} · {item.count}
+        </button>
+      ))}
+    </div>
+  );
 }
 
+const recordLink = (to, text) => (
+  <Link to={to} className="font-semibold text-brand-700 hover:underline">{text}</Link>
+);
+
+const STUDENT_COLUMNS = [
+  {
+    key: "name",
+    header: "Student",
+    cell: (row) => (
+      <>
+        {recordLink(`/students/${row.id}`, row.name)}
+        <p className="meta">{row.student_number}</p>
+      </>
+    ),
+  },
+  { key: "program_code", header: "Program" },
+  {
+    key: "stage",
+    header: "Stage / status",
+    cell: (row) => (
+      <>
+        <p className="font-medium text-slate-700">{row.stage}</p>
+        <p className="meta">{row.status}</p>
+      </>
+    ),
+  },
+  { key: "risk", header: "Risk", cell: (row) => <StatusChip status={row.risk} dot={false} /> },
+  { key: "relevant_date", header: "Relevant date", cell: (row) => formatDate(row.relevant_date) },
+];
+
+const SCHEDULE_COLUMNS = [
+  {
+    key: "student",
+    header: "Student",
+    cell: (row) => (
+      <>
+        {recordLink(`/students/${row.student.id}`, row.student.name)}
+        <p className="meta">{row.student.student_number}</p>
+      </>
+    ),
+  },
+  { key: "defense_type", header: "Defense" },
+  {
+    key: "adviser",
+    header: "Adviser / panel",
+    cell: (row) => (
+      <>
+        {row.adviser || "—"}
+        <p className="meta">{row.panel?.join(", ") || "Panel pending"}</p>
+      </>
+    ),
+  },
+  { key: "status", header: "Status", cell: (row) => <StatusChip status={row.status} dot={false} /> },
+  {
+    key: "date",
+    header: "Date / venue",
+    cell: (row) => (
+      <>
+        {formatDate(row.date)}
+        <p className="meta">{row.venue || "Venue pending"}</p>
+      </>
+    ),
+  },
+  { key: "missing_action", header: "Action needed" },
+];
+
 function StudentDetailTable({ rows }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm"><thead><tr className="border-b border-slate-200 text-left text-xs font-bold uppercase tracking-wide text-slate-400"><th className="px-3 py-2">Student</th><th className="px-3 py-2">Program</th><th className="px-3 py-2">Stage / status</th><th className="px-3 py-2">Risk</th><th className="px-3 py-2">Relevant date</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-b border-slate-100"><td className="px-3 py-3"><Link to={`/students/${row.id}`} className="font-semibold text-brand-700 hover:underline">{row.name}</Link><p className="text-xs text-slate-400">{row.student_number}</p></td><td className="px-3 py-3 text-slate-600">{row.program_code}</td><td className="px-3 py-3"><p className="font-medium text-slate-700">{row.stage}</p><p className="text-xs text-slate-400">{row.status}</p></td><td className="px-3 py-3"><StatusBadge value={row.risk} dot={false} /></td><td className="px-3 py-3 text-slate-500">{formatDate(row.relevant_date)}</td></tr>)}</tbody></table></div>;
+  return <DataTable caption="Students in this category" columns={STUDENT_COLUMNS} rows={rows} minWidth="md" pageSize={0} />;
 }
 
 function ScheduleDetailTable({ rows }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-sm"><thead><tr className="border-b border-slate-200 text-left text-xs font-bold uppercase tracking-wide text-slate-400"><th className="px-3 py-2">Student</th><th className="px-3 py-2">Defense</th><th className="px-3 py-2">Adviser / panel</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Date / venue</th><th className="px-3 py-2">Action needed</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-b border-slate-100"><td className="px-3 py-3"><Link to={`/students/${row.student.id}`} className="font-semibold text-brand-700 hover:underline">{row.student.name}</Link><p className="text-xs text-slate-400">{row.student.student_number}</p></td><td className="px-3 py-3 text-slate-600">{row.defense_type}</td><td className="px-3 py-3 text-slate-600">{row.adviser || "—"}<p className="text-xs text-slate-400">{row.panel?.join(", ") || "Panel pending"}</p></td><td className="px-3 py-3"><StatusBadge value={row.status} dot={false} /></td><td className="px-3 py-3 text-slate-600">{formatDate(row.date)}<p className="text-xs text-slate-400">{row.venue || "Venue pending"}</p></td><td className="px-3 py-3 text-slate-600">{row.missing_action}</td></tr>)}</tbody></table></div>;
+  return <DataTable caption="Defense schedules in this category" columns={SCHEDULE_COLUMNS} rows={rows} minWidth="lg" pageSize={0} />;
 }
 
-function TaskDetailTable({ rows }) {
-  return <div className="space-y-2">{rows.map((row) => <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"><div><p className="font-semibold text-ink">{row.title}</p><p className="text-xs text-slate-500">{row.student_name} · {row.owner_role}</p></div><div className="text-right"><StatusBadge value={row.overdue ? "Overdue" : row.status} /><p className="mt-1 text-xs text-slate-400">{formatDate(row.due_at)}</p></div></div>)}</div>;
-}
-
-function MiniStat({ icon: Icon, label, value, to }) {
-  const content = (
-    <Card className="flex items-center gap-3 p-4">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500">
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="font-display text-xl font-semibold leading-none text-ink">{value}</p>
-        <p className="text-xs text-slate-500">{label}</p>
-      </div>
-    </Card>
+function TaskDetailList({ rows }) {
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+          <div>
+            <p className="font-semibold text-ink">{row.title}</p>
+            <p className="meta">{row.student_name} · {row.owner_role}</p>
+          </div>
+          <div className="text-right">
+            <StatusChip status={row.overdue ? "Overdue" : row.status} />
+            <p className="meta mt-1">{formatDate(row.due_at)}</p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
-  if (!to) return content;
-  return <Link to={to} className="block cursor-pointer">{content}</Link>;
 }
