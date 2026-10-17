@@ -6,9 +6,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { api } from "../../api";
-import { StatusBadge } from "../../components/ui";
+import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
-import { Field, Input, Select, Textarea } from "../../components/forms";
 import { useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
 
 export function ResearchRequestForm({ data, onSaved }) {
@@ -57,21 +56,21 @@ export function ResearchRequestForm({ data, onSaved }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-wide text-brand-600">Automatically detected stage</p><p className="mt-1 font-display text-xl font-semibold text-ink">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusBadge value={progress.status || "Pending"} dot={false} /></div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="text-[11px] font-bold uppercase text-slate-400">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow text-brand-700">Automatically detected stage</p><p className="section-title mt-1">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusChip status={progress.status || "Pending"} dot={false} /></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
       </div>
       <div className="grid gap-2 sm:grid-cols-4">
-        {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-300 bg-brand-50 text-brand-700" : stage.complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-400"}`}>{stage.name}</div>)}
+        {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-400 bg-brand-50 text-brand-800" : stage.complete ? "border-brand-200 bg-brand-50/60 text-brand-700" : "border-slate-200 text-slate-500"}`}>{stage.name}</div>)}
       </div>
       {progress.stage === "Title Defense" && (
         <Field label="Research title from uploaded Form 1" hint="This fills automatically after the Form 1 application PDF is uploaded below.">
           <Input value={form.research_title} onChange={set("research_title")} required placeholder="Upload Form 1 below to auto-fill" />
-          {prefillNote && <p className="mt-1 text-xs font-medium text-brand-700">{prefillNote}</p>}
+          {prefillNote && <p className="meta mt-1 font-medium text-brand-700">{prefillNote}</p>}
         </Field>
       )}
       <div>
         <p className="field-label">Files you upload</p>
-        <p className="mb-2 text-xs text-slate-500">Only these items require action from you for this milestone.</p>
+        <p className="meta mb-2">Only these items require action from you for this milestone.</p>
         <div className="space-y-2">
           {uploadRequirements.map((requirement) => (
             <ResearchEvidenceUpload
@@ -87,15 +86,15 @@ export function ResearchRequestForm({ data, onSaved }) {
       {managedRequirements.length > 0 && (
         <div>
           <p className="field-label">Completed by staff or the system</p>
-          <p className="mb-2 text-xs text-slate-500">These update automatically after review, panel matching, or scheduling.</p>
+          <p className="meta mb-2">These update automatically after review, panel matching, or scheduling.</p>
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             {managedRequirements.map((requirement) => (
               <div key={requirement.item_name} className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-3.5 py-3 last:border-b-0">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink">{requirement.label}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
+                  <p className="meta mt-0.5">{requirement.description}</p>
                 </div>
-                <StatusBadge value={requirement.status_label} dot={false} />
+                <StatusChip status={requirement.status_label} dot={false} />
               </div>
             ))}
           </div>
@@ -189,15 +188,15 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink">{requirement.label}</p>
-          <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
+          <p className="meta mt-0.5">{requirement.description}</p>
           <p className="mt-1 text-xs font-medium text-slate-600">{files.length} of {needed} file{needed > 1 ? "s" : ""} uploaded</p>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge value={requirement.status_label} dot={false} />
-          <label className={`btn-ghost ${titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-          {titlePackageLocked ? <Lock className="h-4 w-4" /> : <FileUp className="h-4 w-4" />} {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading..." : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
-          <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
-          </label>
+          <StatusChip status={requirement.status_label} dot={false} />
+          <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
+            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading..." : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
+            <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
+          </Button>
         </div>
       </div>
       {files.length > 0 && (
@@ -205,26 +204,33 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
           {files.map((file) => (
             <div key={file.id} className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="inline-flex overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
-                  <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50">
-                    {file.name}<Eye className="h-3.5 w-3.5" />
-                  </a>
+                <span className="inline-flex items-center gap-1.5">
+                  <Button as="a" variant="secondary" size="sm" href={file.url} target="_blank" rel="noreferrer">
+                    {file.name}<Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
                   {requirement.student_upload && (
-                    <button type="button" onClick={() => removeResearchFile(file)} disabled={titlePackageLocked || removingId === file.id} className="inline-flex cursor-pointer items-center border-l border-slate-200 px-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Remove ${file.name}`} title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Trash2}
+                      onClick={() => removeResearchFile(file)}
+                      disabled={titlePackageLocked || removingId === file.id}
+                      className="text-red-700 hover:bg-red-50"
+                      aria-label={`Remove ${file.name}`}
+                      title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}
+                    />
                   )}
                 </span>
                 {file.compliance_status && (
                   <div className="flex items-center gap-2">
-                    <StatusBadge value={file.compliance_status} dot={false} />
-                    {Number.isFinite(file.compliance_score) && <span className="text-xs font-semibold text-slate-500">{file.compliance_score}%</span>}
+                    <StatusChip status={file.compliance_status} dot={false} />
+                    {Number.isFinite(file.compliance_score) && <span className="meta font-semibold">{file.compliance_score}%</span>}
                   </div>
                 )}
                 {requirement.item_name === "Three concept papers" && (
-                  <button type="button" onClick={() => checkConceptPaper(file)} disabled={checkingId === file.id} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs">
+                  <Button variant="secondary" size="sm" onClick={() => checkConceptPaper(file)} loading={checkingId === file.id}>
                     {checkingId === file.id ? "Checking..." : file.compliance_status ? "Recheck" : "Check compliance"}
-                  </button>
+                  </Button>
                 )}
               </div>
               {file.compliance && <ConceptPaperCompliance compliance={file.compliance} />}
@@ -232,8 +238,8 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
           ))}
         </div>
       )}
-      {titlePackageItem && files.length > 0 && <p className={`mt-2 text-xs ${titlePackageLocked ? "font-semibold text-brand-700" : "text-slate-500"}`}>{titlePackageLocked ? "This title-defense package is read-only because a panel has already been matched." : "Removing Form 1 or any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete title-defense package must be endorsed again."}</p>}
-      {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
+      {titlePackageItem && files.length > 0 && <p className={`meta mt-2 ${titlePackageLocked ? "font-semibold text-brand-700" : ""}`}>{titlePackageLocked ? "This title-defense package is read-only because a panel has already been matched." : "Removing Form 1 or any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete title-defense package must be endorsed again."}</p>}
+      {error && <InlineNotice tone="danger" className="mt-2">{error}</InlineNotice>}
     </div>
   );
 }
@@ -253,7 +259,7 @@ export function ConceptPaperCompliance({ compliance }) {
               <div key={check.id} className="rounded-md border border-slate-100 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-slate-700">{check.label}</span>
-                  <StatusBadge value={check.status} dot={false} />
+                  <StatusChip status={check.status} dot={false} size="sm" />
                 </div>
                 {check.evidence && <p className="mt-1 text-slate-500">{check.evidence}</p>}
               </div>
@@ -262,7 +268,7 @@ export function ConceptPaperCompliance({ compliance }) {
         )}
         {citations.length > 0 && (
           <div>
-            <p className="font-bold uppercase tracking-wide text-slate-400">Sources</p>
+            <p className="eyebrow">Sources</p>
             <div className="mt-1 space-y-1">
               {citations.slice(0, 3).map((citation) => (
                 <p key={citation.id} className="rounded-md bg-slate-50 px-2 py-1.5 text-slate-500">
@@ -313,7 +319,7 @@ function RevisionSubmitForm({ followUp, onSaved }) {
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4" aria-label="Submit revised manuscript">
       <div>
-        <h3 className="text-sm font-semibold text-ink">Submit revised manuscript</h3>
+        <h3 className="card-title">Submit revised manuscript</h3>
         {followUp.label && <p className="mt-1 text-xs font-semibold text-amber-900">Defense outcome: {followUp.label}</p>}
         {followUp.summary && <p className="mt-1 text-xs leading-relaxed text-slate-600">{followUp.summary}</p>}
         {followUp.confirmed_by_role && (
@@ -364,10 +370,9 @@ export function ScheduleRequestForm({ data, onSaved }) {
     <div className="space-y-5">
       {followUp?.can_submit_revisions && <RevisionSubmitForm followUp={followUp} onSaved={onSaved} />}
       {liveSchedule && (
-        <div role="status" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-          <p className="font-semibold">A defense is already booked, so you cannot send another request.</p>
-          <p className="mt-1 text-xs">Your {liveSchedule.defense_type || "defense"} is {liveSchedule.status === "Needs Re-confirmation" ? "waiting for the Research Coordinator to confirm it again" : "scheduled"}. To change it, ask the Research Coordinator.</p>
-        </div>
+        <InlineNotice tone="info" title="A defense is already booked, so you cannot send another request.">
+          <p className="text-xs">Your {liveSchedule.defense_type || "defense"} is {liveSchedule.status === "Needs Re-confirmation" ? "waiting for the Research Coordinator to confirm it again" : "scheduled"}. To change it, ask the Research Coordinator.</p>
+        </InlineNotice>
       )}
       <form onSubmit={onSubmit} className="space-y-4">
         <fieldset disabled={Boolean(liveSchedule)} className="space-y-4 disabled:opacity-60">
