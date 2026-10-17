@@ -10,8 +10,7 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "../../api";
-import { Card, EmptyState, ErrorNote, SectionTitle, StatusBadge } from "../../components/ui";
-import { Field } from "../../components/forms";
+import { Button, Card, EmptyState, Field, InlineNotice, SectionTitle, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import { parseDay } from "../../components/calendar/CalendarView";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
@@ -50,7 +49,7 @@ export class StudentPortalSectionBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <Card className="p-6">
+        <Card pad="lg">
           <EmptyState
             icon={AlertTriangle}
             title="This page could not load"
@@ -106,11 +105,13 @@ export function StudentClarificationPanel({ slug, data, onSaved }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="flex items-center gap-2 text-sm font-semibold text-ink"><MessageSquare className="h-4 w-4 text-brand-700" /> Request discussion</p>
-          <p className="mt-1 text-xs text-slate-500">Messages and replies are shown chronologically. The newest post is highlighted in green.</p>
+          <p className="meta mt-1">Messages and replies are shown chronologically. The newest post is highlighted in green.</p>
         </div>
-        {latestReturn?.requires_document_resubmission && <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">New PDF required</span>}
+        {latestReturn?.requires_document_resubmission && <StatusChip status="New PDF required" tone="bad" dot={false} />}
       </div>
-      {latestReturn?.requires_document_resubmission && <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Step 1 has been reopened. Upload a replacement graduation application PDF before resubmitting.</p>}
+      {latestReturn?.requires_document_resubmission && (
+        <InlineNotice tone="warning" className="mb-3">Step 1 has been reopened. Upload a replacement graduation application PDF before resubmitting.</InlineNotice>
+      )}
       <WorkflowDiscussion
         messages={messages}
         title="Request discussion"
@@ -120,11 +121,12 @@ export function StudentClarificationPanel({ slug, data, onSaved }) {
       />
       {replyTarget && (
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-          <label className="block text-xs font-semibold text-slate-700" htmlFor={`${slug}-clarification-response`}>Reply to {replyTarget.sender_name || replyTarget.sender_role}</label>
-          <textarea id={`${slug}-clarification-response`} value={comment} onChange={(event) => setComment(event.target.value)} className="field-input mt-1 min-h-24 bg-white" placeholder="Explain what you updated or ask a follow-up question." />
-          <ErrorNote message={error} />
-          {notice && <p aria-live="polite" className="mt-2 text-sm font-semibold text-emerald-700">{notice}</p>}
-          <button type="button" disabled={busy || !comment.trim()} onClick={respond} className="btn-primary mt-3 cursor-pointer"><Send className="h-4 w-4" /> {busy ? "Sending…" : "Send reply"}</button>
+          <Field label={`Reply to ${replyTarget.sender_name || replyTarget.sender_role}`}>
+            <Textarea id={`${slug}-clarification-response`} value={comment} onChange={(event) => setComment(event.target.value)} className="min-h-24 bg-white" placeholder="Explain what you updated or ask a follow-up question." />
+          </Field>
+          {error && <InlineNotice tone="danger" className="mt-3">{error}</InlineNotice>}
+          {notice && <InlineNotice tone="success" className="mt-3">{notice}</InlineNotice>}
+          <Button icon={Send} loading={busy} disabled={!comment.trim()} onClick={respond} className="mt-3">{busy ? "Sending…" : "Send reply"}</Button>
         </div>
       )}
     </section>
@@ -154,6 +156,27 @@ export function useSubmitRequest(type, onSaved) {
   return { busy, error, message, submit };
 }
 
+/** One labelled value in a case card (put inside a `dl`). The label is an eyebrow, the value is body text. Nothing is drawn for an empty value. */
+export function Fact({ label, children }) {
+  if (children === null || children === undefined || children === "") return null;
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+      <dt className="eyebrow">{label}</dt>
+      <dd className="mt-0.5 text-sm font-semibold text-ink">{children}</dd>
+    </div>
+  );
+}
+
+// What the chip of a numbered stage card says and which colour it falls back to (the status map wins for the words it knows).
+const STAGE_CHIPS = {
+  active: { label: "Current stage", tone: "info" },
+  complete: { label: "Completed", tone: "good" },
+  pending: { label: "Pending review", tone: "warn" },
+  returned: { label: "Needs revision", tone: "warn" },
+  rejected: { label: "Rejected", tone: "bad" },
+  locked: { label: "Locked", tone: "muted" },
+};
+
 export function StageCard({ number, title, state = "locked", helper = "", children }) {
   const styles = {
     active: "border-brand-300 bg-white",
@@ -163,15 +186,15 @@ export function StageCard({ number, title, state = "locked", helper = "", childr
     rejected: "border-red-300 bg-red-50/70",
     locked: "border-slate-200 bg-slate-50/60",
   };
-  const labels = { active: "Current stage", complete: "Completed", pending: "Pending review", returned: "Needs revision", rejected: "Rejected", locked: "Locked" };
+  const chip = STAGE_CHIPS[state] || { label: state, tone: "muted" };
   return (
     <section className={`rounded-2xl border p-4 ${styles[state] || styles.locked}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${state === "active" ? "bg-brand-600 text-white" : ["returned", "rejected"].includes(state) ? "bg-red-100 text-red-700" : state === "complete" ? "bg-brand-100 text-brand-700" : "bg-slate-200 text-slate-500"}`}>{number}</span>
-          <div><h3 className="text-sm font-semibold text-ink">{title}</h3>{helper && <p className="mt-1 text-xs leading-relaxed text-slate-500">{helper}</p>}</div>
+          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-semibold ${state === "active" ? "bg-brand-600 text-white" : ["returned", "rejected"].includes(state) ? "bg-red-100 text-red-700" : state === "complete" ? "bg-brand-100 text-brand-700" : "bg-slate-200 text-slate-500"}`}>{number}</span>
+          <div><h3 className="card-title">{title}</h3>{helper && <p className="meta mt-1 leading-relaxed">{helper}</p>}</div>
         </div>
-        <StatusBadge value={labels[state] || state} dot={false} />
+        <StatusChip status={chip.label} tone={chip.tone} dot={false} />
       </div>
       {children && <div className="mt-4 border-t border-slate-200/80 pt-4">{children}</div>}
     </section>
@@ -179,15 +202,15 @@ export function StageCard({ number, title, state = "locked", helper = "", childr
 }
 
 export function SavedWorkflowFiles({ files = [], empty = "No files submitted yet." }) {
-  if (!files.length) return <p className="text-xs text-slate-500">{empty}</p>;
+  if (!files.length) return <p className="meta">{empty}</p>;
   return (
     <div>
-      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Already submitted</p>
+      <p className="eyebrow mb-2">Already submitted</p>
       <ul className="space-y-2">
         {files.map((file) => (
           <li key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-700">{file.name}</p><p className="text-xs text-slate-400">Uploaded by {file.uploaded_by || "Uploader not recorded"} · {formatDate(file.uploaded_at)}{file.stage ? ` · ${file.stage}` : ""}</p></div>
-            {file.file_exists !== false ? <a href={file.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5"><Eye className="h-3.5 w-3.5" /> View file</a> : <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">File unavailable</span>}
+            <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-700">{file.name}</p><p className="meta">Uploaded by {file.uploaded_by || "Uploader not recorded"} · {formatDate(file.uploaded_at)}{file.stage ? ` · ${file.stage}` : ""}</p></div>
+            {file.file_exists !== false ? <Button as="a" variant="secondary" size="sm" icon={Eye} href={file.url} target="_blank" rel="noreferrer">View file</Button> : <StatusChip status="File unavailable" tone="bad" dot={false} />}
           </li>
         ))}
       </ul>
@@ -222,7 +245,7 @@ export function RequestPdfUpload({ requestType, label, onUploaded, initialAttach
   }
 
   return (
-    <Field label={label} hint="PDF only, up to 25 MB. The file is stored with your request.">
+    <Field label={label} hint="PDF only, up to 25 MB. The file is stored with your request." error={error}>
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 hover:bg-slate-50">
         <span className="flex min-w-0 items-center gap-2">
           <FileUp className="h-4 w-4 shrink-0 text-brand-700" />
@@ -240,8 +263,7 @@ export function RequestPdfUpload({ requestType, label, onUploaded, initialAttach
         />
       </label>
       {attachment && attachment.file_exists !== false && <a href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View uploaded application</a>}
-      {attachment?.file_exists === false && <p className="mt-2 text-xs font-semibold text-red-600">The saved file is unavailable. Upload the PDF again before submitting.</p>}
-      {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
+      {attachment?.file_exists === false && <p className="mt-2 text-xs font-semibold text-red-700">The saved file is unavailable. Upload the PDF again before submitting.</p>}
     </Field>
   );
 }
@@ -249,24 +271,12 @@ export function RequestPdfUpload({ requestType, label, onUploaded, initialAttach
 export function SubmitState({ busy, error, message, label, disabled = false, disabledHint = "" }) {
   return (
     <div className="space-y-3">
-      <ErrorNote message={error} />
-      {message && (
-        <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
-          <CheckCircle2 className="h-5 w-5" /> {message}
-        </div>
-      )}
-      <button type="submit" disabled={busy || disabled} className="btn-primary w-full sm:w-auto">
-        {busy ? (
-          <>
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Submitting...
-          </>
-        ) : (
-          <>
-            <Send className="h-4 w-4" /> {label}
-          </>
-        )}
-      </button>
-      {disabledHint && <p className="text-xs font-medium text-slate-500">{disabledHint}</p>}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      {message && <InlineNotice tone="success" icon={CheckCircle2}>{message}</InlineNotice>}
+      <Button type="submit" icon={Send} loading={busy} disabled={disabled} className="w-full sm:w-auto">
+        {busy ? "Submitting..." : label}
+      </Button>
+      {disabledHint && <p className="meta font-medium">{disabledHint}</p>}
     </div>
   );
 }
@@ -314,7 +324,7 @@ const SCHEDULE_STATUS_NOTE = {
 // One card per defense schedule with the real facts (used on the dashboard and the Defense Schedule page).
 export function StudentSchedulePanel({ schedules = [], title = "Schedule requests" }) {
   return (
-    <Card className="p-6">
+    <Card pad="lg">
       <SectionTitle title={title} icon={CalendarClock} />
       {schedules.length ? (
         <ul className="space-y-3">
@@ -330,9 +340,9 @@ export function StudentSchedulePanel({ schedules = [], title = "Schedule request
                     <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"}</p>
                     <p className="text-sm text-slate-700">{fmtDay(schedule.preferred_date)}</p>
                   </div>
-                  <StatusBadge value={status} dot={false} />
+                  <StatusChip status={status} dot={false} />
                 </div>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="meta mt-1">
                   {timeRange(schedule.start_time, schedule.end_time)} (Philippine time) - {schedule.mode || "Mode not set"} - {schedule.venue || "Venue or link not set yet"}
                 </p>
                 {panel.length > 0 && (
