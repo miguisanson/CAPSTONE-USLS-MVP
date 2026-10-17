@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckSquare, Download, Eye, GraduationCap, Printer, Users } from "lucide-react";
 import { api } from "../../api";
-import { PageHeader, StatusBadge } from "../../components/ui";
+import { Button, Card, EmptyState, PageHeader, StatusChip } from "../../components/ui/index.js";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import { DeanFeedback, DeanGate, useDean } from "./DeanContext";
 import { casePath, useDeanFilters } from "./DeanShared";
@@ -13,6 +13,7 @@ import {
   DeanGraduationWorkspace,
   DeanListFilters,
   DeanWorkflowBoard,
+  STAGE_TONE,
 } from "./DeanParts";
 import {
   deanGraduationCurrentStage,
@@ -91,134 +92,138 @@ function DeanGraduationBatches() {
   return (
     <div>
       <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
-        {readyGraduation.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-            <span className="mr-auto text-sm font-semibold text-slate-700">{selectedGraduationIds.size} graduation candidate{selectedGraduationIds.size === 1 ? "" : "s"} selected</span>
-            <button type="button" onClick={() => setSelectedGraduationIds(new Set(readyGraduation.map((item) => item.student.id)))} className="btn-ghost cursor-pointer px-3 py-2">Select all ready</button>
-            {selectedGraduationIds.size > 0 && <button type="button" onClick={() => setSelectedGraduationIds(new Set())} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
-            <button type="button" disabled={!selectedGraduationIds.size} onClick={() => setBatchOpen(true)} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> Apply Dean group action</button>
+      {readyGraduation.length > 0 && (
+        <Card pad="sm" className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="mr-auto text-sm font-semibold text-slate-700">{selectedGraduationIds.size} graduation candidate{selectedGraduationIds.size === 1 ? "" : "s"} selected</span>
+          <Button variant="secondary" onClick={() => setSelectedGraduationIds(new Set(readyGraduation.map((item) => item.student.id)))}>Select all ready</Button>
+          {selectedGraduationIds.size > 0 && <Button variant="secondary" onClick={() => setSelectedGraduationIds(new Set())}>Clear selection</Button>}
+          <Button icon={CheckSquare} disabled={!selectedGraduationIds.size} onClick={() => setBatchOpen(true)}>Apply Dean group action</Button>
+        </Card>
+      )}
+      {selectedGraduation.length > 0 && (
+        <div className="mb-4 rounded-xl border border-brand-100 bg-brand-50/40 p-3">
+          <p className="eyebrow text-brand-700">Selected graduation candidates</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {selectedGraduation.map((item) => (
+              <span key={item.student.id} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-brand-100">
+                {item.student.name} · {item.student.student_number} · {graduationBatchLabel(item)}
+              </span>
+            ))}
           </div>
-        )}
-        {selectedGraduation.length > 0 && (
-          <div className="mb-4 rounded-xl border border-brand-100 bg-brand-50/40 p-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Selected graduation candidates</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {selectedGraduation.map((item) => (
-                <span key={item.student.id} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-brand-100">
-                  {item.student.name} · {item.student.student_number} · {graduationBatchLabel(item)}
-                </span>
-              ))}
+        </div>
+      )}
+      {readyGraduationBatches.length > 0 && (
+        <Card pad="none" className="mb-5 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="section-title">Ready graduation batches</h2>
+              <p className="meta">Select or process a whole batch while still seeing every student in it.</p>
             </div>
+            <StatusChip status={`${readyGraduationBatches.length} batch${readyGraduationBatches.length === 1 ? "" : "es"}`} tone="muted" dot={false} />
           </div>
-        )}
-        {readyGraduationBatches.length > 0 && (
-          <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-display text-lg font-semibold text-ink">Ready graduation batches</p>
-                <p className="text-xs text-slate-500">Select or process a whole batch while still seeing every student in it.</p>
-              </div>
-              <StatusBadge value={`${readyGraduationBatches.length} batch${readyGraduationBatches.length === 1 ? "" : "es"}`} dot={false} />
-            </div>
-            <div className="space-y-2">
-              {readyGraduationBatches.map((batch) => {
-                const currentStage = deanGraduationCurrentStage(batch);
-                const names = batch.rows.map((item) => item.student.name).slice(0, 4).join(", ");
-                const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
-                const expanded = expandedGraduationBatches.has(batch.label);
-                return (
-                  <div
-                    key={batch.label}
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("text/plain", `graduation-batch:${batch.label}`);
-                    }}
-                    className="cursor-grab rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 transition-colors hover:border-emerald-500 active:cursor-grabbing"
-                  >
-                    <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
-                        <p className="text-xs text-slate-500">{batch.rows.length} candidate{batch.rows.length === 1 ? "" : "s"}</p>
-                        <span className="mt-1 inline-flex rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>
-                      </div>
-                      <p className="truncate text-xs text-slate-600"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
-                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
-                        <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
-                        <button type="button" onClick={() => setStageBatch(batch)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${batch.label}`}><Eye className="h-4 w-4" /></button>
-                      </div>
-                      <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
-                        <button type="button" onClick={() => toggleGraduationBatchStudents(batch.label)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
-                        <button type="button" onClick={() => printGraduationBatch(batch)} className="btn-ghost cursor-pointer px-2.5 py-1"><Printer className="h-4 w-4" /> Print endorsement</button>
-                        <button type="button" onClick={() => setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id)))} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>
-                        <button type="button" onClick={() => { setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id))); setBatchOpen(true); }} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left"><CheckSquare className="h-4 w-4 shrink-0" /> Review endorsement list</button>
-                      </div>
+          <div className="space-y-2">
+            {readyGraduationBatches.map((batch) => {
+              const currentStage = deanGraduationCurrentStage(batch);
+              const names = batch.rows.map((item) => item.student.name).slice(0, 4).join(", ");
+              const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
+              const expanded = expandedGraduationBatches.has(batch.label);
+              return (
+                <div
+                  key={batch.label}
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", `graduation-batch:${batch.label}`);
+                  }}
+                  className="cursor-grab rounded-xl border border-brand-300 bg-brand-50 px-3 py-1.5 transition-colors hover:border-brand-500 active:cursor-grabbing"
+                >
+                  <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
+                      <p className="meta">{batch.rows.length} candidate{batch.rows.length === 1 ? "" : "s"}</p>
+                      <div className="mt-1"><StatusChip status="Ready" label="Ready for Dean review" size="sm" dot={false} /></div>
                     </div>
-                    {expanded && (
-                      <div className="mt-2 border-t border-slate-100 pt-2">
-                        <DeanGraduationBatchStudentList rows={batch.rows} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {boardWorkflowRows.length > 0 && (
-          <DeanWorkflowBoard rows={boardWorkflowRows} onOpen={(item) => navigate(casePath(item))} selectedIds={selectedGraduationIds} onToggle={toggleGraduation} />
-        )}
-        {approvedGraduationBatches.length > 0 && (
-          <div className="mb-5 rounded-xl border border-emerald-200 bg-white p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-display text-lg font-semibold text-ink">Approved graduation batches</p>
-                <p className="text-xs text-slate-500">Export the Dean-approved list, then email it to the Registrar and wait for acknowledgement.</p>
-              </div>
-              <StatusBadge value={`${approvedGraduation.length} approved`} dot={false} />
-            </div>
-            <div className="space-y-2">
-              {approvedGraduationBatches.map((batch) => {
-                const payload = graduationBatchExportPayload(batch);
-                const currentStage = deanGraduationCurrentStage(batch);
-                const names = batch.rows.map((item) => item.student.name).slice(0, 4).join(", ");
-                const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
-                const expanded = expandedGraduationBatches.has(batch.label);
-                const readyToSend = graduationBatchReadyToSend(batch, exportedGraduationBatches);
-                const exportBusy = busy === `export-${batch.label}`;
-                return (
-                  <div key={`approved-${batch.label}`} className="rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-1.5">
-                    <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(320px,1.25fr)] lg:items-center">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
-                        <p className="text-xs text-slate-500">{batch.rows.length} approved candidate{batch.rows.length === 1 ? "" : "s"}</p>
-                      </div>
-                      <p className="truncate text-xs text-slate-600"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
-                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
-                        <StatusBadge value={readyToSend ? "Exported" : `Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
-                        <button type="button" onClick={() => setStageBatch(batch)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${batch.label}`}><Eye className="h-4 w-4" /></button>
-                      </div>
-                      <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
-                        <button type="button" onClick={() => toggleGraduationBatchStudents(batch.label)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>
-                        <button type="button" disabled={exportBusy} onClick={() => exportApproved(payload)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700"><Download className="h-4 w-4 shrink-0" /> {exportBusy ? "Exporting..." : readyToSend ? "Export again" : "Export approved list"}</button>
-                      </div>
+                    <p className="meta truncate text-slate-600"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <p className="meta truncate font-semibold text-slate-700">{currentStage.label}</p>
+                      <StatusChip status={`Step ${currentStage.number}: ${currentStage.state}`} tone={STAGE_TONE[currentStage.state]} dot={false} />
+                      <Button variant="icon" icon={Eye} onClick={() => setStageBatch(batch)} aria-label={`View graduation stage check for ${batch.label}`} />
                     </div>
-                    {expanded && (
-                      <div className="mt-2 border-t border-emerald-100 pt-2">
-                        <DeanGraduationBatchStudentList rows={batch.rows} />
-                      </div>
-                    )}
+                    <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
+                      <Button variant="secondary" size="sm" icon={Users} onClick={() => toggleGraduationBatchStudents(batch.label)}>{expanded ? "Hide students" : "View students"}</Button>
+                      <Button variant="secondary" size="sm" icon={Printer} onClick={() => printGraduationBatch(batch)}>Print endorsement</Button>
+                      <Button variant="secondary" size="sm" onClick={() => setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id)))}>Select batch</Button>
+                      <Button size="sm" icon={CheckSquare} className="min-w-0 whitespace-normal text-left" onClick={() => { setSelectedGraduationIds(new Set(batch.rows.map((item) => item.student.id))); setBatchOpen(true); }}>Review endorsement list</Button>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                  {expanded && (
+                    <div className="mt-2 border-t border-slate-100 pt-2">
+                      <DeanGraduationBatchStudentList rows={batch.rows} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
+        </Card>
+      )}
+      {boardWorkflowRows.length > 0 && (
+        <DeanWorkflowBoard rows={boardWorkflowRows} onOpen={(item) => navigate(casePath(item))} selectedIds={selectedGraduationIds} onToggle={toggleGraduation} />
+      )}
+      {approvedGraduationBatches.length > 0 && (
+        <Card pad="none" className="mb-5 border-brand-200 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="section-title">Approved graduation batches</h2>
+              <p className="meta">Export the Dean-approved list, then email it to the Registrar and wait for acknowledgement.</p>
+            </div>
+            <StatusChip status={`${approvedGraduation.length} approved`} tone="muted" dot={false} />
+          </div>
+          <div className="space-y-2">
+            {approvedGraduationBatches.map((batch) => {
+              const payload = graduationBatchExportPayload(batch);
+              const currentStage = deanGraduationCurrentStage(batch);
+              const names = batch.rows.map((item) => item.student.name).slice(0, 4).join(", ");
+              const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
+              const expanded = expandedGraduationBatches.has(batch.label);
+              const readyToSend = graduationBatchReadyToSend(batch, exportedGraduationBatches);
+              const exportBusy = busy === `export-${batch.label}`;
+              return (
+                <div key={`approved-${batch.label}`} className="rounded-xl border border-brand-200 bg-brand-50/40 px-3 py-1.5">
+                  <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(320px,1.25fr)] lg:items-center">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
+                      <p className="meta">{batch.rows.length} approved candidate{batch.rows.length === 1 ? "" : "s"}</p>
+                    </div>
+                    <p className="meta truncate text-slate-600"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <p className="meta truncate font-semibold text-slate-700">{currentStage.label}</p>
+                      {readyToSend
+                        ? <StatusChip status="Exported - Ready to Send" label="Exported" dot={false} />
+                        : <StatusChip status={`Step ${currentStage.number}: ${currentStage.state}`} tone={STAGE_TONE[currentStage.state]} dot={false} />}
+                      <Button variant="icon" icon={Eye} onClick={() => setStageBatch(batch)} aria-label={`View graduation stage check for ${batch.label}`} />
+                    </div>
+                    <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
+                      <Button variant="secondary" size="sm" icon={Users} onClick={() => toggleGraduationBatchStudents(batch.label)}>{expanded ? "Hide students" : "View students"}</Button>
+                      <Button size="sm" icon={Download} loading={exportBusy} className="min-w-0 whitespace-normal text-left" onClick={() => exportApproved(payload)}>{exportBusy ? "Exporting..." : readyToSend ? "Export again" : "Export approved list"}</Button>
+                    </div>
+                  </div>
+                  {expanded && (
+                    <div className="mt-2 border-t border-brand-100 pt-2">
+                      <DeanGraduationBatchStudentList rows={batch.rows} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {!readyGraduationBatches.length && !approvedGraduationBatches.length && !boardWorkflowRows.length && (
-        <p className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">No graduation endorsement batches match these filters.</p>
+        <Card pad="none">
+          <EmptyState size="sm" title="No graduation endorsement batches match these filters." hint="Try a different search or filter." />
+        </Card>
       )}
       {batchOpen && selectedGraduation.length > 0 && <DeanGraduationBatchModal rows={selectedGraduation} onClose={() => setBatchOpen(false)} onSaved={batchSaved} />}
       {stageBatch && <DeanGraduationStageModal batch={stageBatch} onClose={() => setStageBatch(null)} />}
@@ -259,8 +264,8 @@ function DeanGraduationBody() {
         title="Graduation Endorsement"
         description="Review the endorsement lists prepared by Graduate School staff, approve or return them, then export the approved list for the Registrar."
         icon={GraduationCap}
-        badge={<StatusBadge value={`${counts.pendingGraduation} waiting`} dot={false} />}
-        actions={<Link to="/dean/approvals" className="btn-ghost"><ArrowLeft className="h-4 w-4" /> All approvals</Link>}
+        badge={<StatusChip status={`${counts.pendingGraduation} waiting`} tone="muted" dot={false} />}
+        actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>All approvals</Button>}
       />
       <DeanFeedback />
       <div role="tablist" aria-label="Graduation views" className="flex flex-wrap gap-2 border-b border-slate-200">
