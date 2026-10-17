@@ -16,28 +16,9 @@ export function Card({ children, className = "" }) {
   return <UiCard pad="none" className={className}>{children}</UiCard>;
 }
 
-export function Spinner({ label = "Loading…" }) {
-  return (
-    <div className="flex items-center justify-center gap-3 py-16 text-slate-500">
-      <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" />
-      <span className="text-sm font-medium">{label}</span>
-    </div>
-  );
-}
-
-export function EmptyState({ icon: Icon, title, hint }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      {Icon && (
-        <span className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-slate-400">
-          <Icon className="h-6 w-6" />
-        </span>
-      )}
-      <p className="font-semibold text-slate-700">{title}</p>
-      {hint && <p className="mt-1 text-sm text-slate-500 max-w-sm">{hint}</p>}
-    </div>
-  );
-}
+// P1d shims: Spinner, EmptyState and InlineNotice now live in ./ui/Feedback.jsx (InlineNotice info is blue; legacy
+// tones warn / error still work). Every existing import keeps working until the last packet.
+export { Spinner, EmptyState, InlineNotice } from "./ui/Feedback.jsx";
 
 export function ErrorNote({ message }) {
   if (!message) return null;
@@ -133,18 +114,5 @@ export function StatCard({ icon: Icon, label, value, sub, tone = "brand", to, ba
     <Link to={to} className="block h-full cursor-pointer rounded-2xl">
       {body}
     </Link>
-  );
-}
-
-export function InlineNotice({ tone = "info", children }) {
-  const tones = {
-    info: "border-brand-200 bg-brand-50 text-brand-800",
-    warn: "border-amber-200 bg-amber-50 text-amber-800",
-    error: "border-red-200 bg-red-50 text-red-700",
-  };
-  return (
-    <div role={tone === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${tones[tone] || tones.info}`}>
-      {children}
-    </div>
   );
 }
