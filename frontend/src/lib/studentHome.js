@@ -53,6 +53,17 @@ const time = (value) => {
   return Number.isNaN(t) ? 0 : t;
 };
 
+/** True for a task the student has to do; every other owner role is an office. */
+export const isOwnTask = (task) => task?.owner_role === "Student";
+/** The student's own tasks (what the "open tasks" key number counts). */
+export const studentTasks = (data) => (data.tasks || []).filter(isOwnTask);
+const sortedTasks = (tasks) =>
+  [...tasks].sort((a, b) => Number(Boolean(b.overdue)) - Number(Boolean(a.overdue)) || time(a.due_at) - time(b.due_at));
+const taskTarget = (task) => {
+  const view = VIEW_BY_TASK_URL[task.action_url];
+  return view ? { view } : { to: REQUEST_CENTER_PATH };
+};
+
 const isAwol = (student = {}) => student.standing === "AWOL" || student.enrollment_tag === "AWOL" || student.current_stage === "AWOL";
 const SEVERITY_TONE = { high: "danger", medium: "warning" };
 
@@ -64,8 +75,9 @@ function bannerTarget(data) {
 
 /**
  * The items of "Needs your action", most pressing first:
- * replies staff are waiting for, other unread messages, the leave / AWOL alert, open tasks, recommendations,
- * documents to upload, and subject-withdrawal windows closing within two weeks.
+ * replies staff are waiting for, other unread messages, the leave / AWOL alert, the student's own open tasks,
+ * recommendations, documents to upload, and subject-withdrawal windows closing within two weeks.
+ * Only things the STUDENT must do; tasks held by an office are in studentWaiting().
  * @param opts.now           the date to measure "within two weeks" from (tests)
  * @param opts.researchGates Set of document gates the Research page owns (left out of "documents to upload")
  * @returns [{ key, kind, title, detail, dueAt, tone, target, status? }]
@@ -118,19 +130,16 @@ export function studentActions(data, { now = new Date(), researchGates = new Set
     });
   }
 
-  // 4. tasks on the student's record: overdue first, then by date
-  const tasks = [...(data.tasks || [])].sort((a, b) => Number(Boolean(b.overdue)) - Number(Boolean(a.overdue)) || time(a.due_at) - time(b.due_at));
-  for (const task of tasks) {
-    const view = VIEW_BY_TASK_URL[task.action_url];
-    const mine = task.owner_role === "Student";
+  // 4. the student's own tasks: overdue first, then by date (tasks held by an office go to studentWaiting)
+  for (const task of sortedTasks(studentTasks(data))) {
     items.push({
       key: `task-${task.id}`,
       kind: "task",
       title: task.title,
-      detail: mine ? "Assigned to you." : `With the ${task.owner_role || "Graduate School"}.`,
+      detail: "Assigned to you.",
       dueAt: task.due_at,
-      tone: task.overdue ? "danger" : mine ? "warning" : "info",
-      target: view ? { view } : { to: REQUEST_CENTER_PATH },
+      tone: task.overdue ? "danger" : "warning",
+      target: taskTarget(task),
       status: task.overdue ? "Overdue" : task.status,
     });
   }
@@ -181,6 +190,24 @@ export function studentActions(data, { now = new Date(), researchGates = new Set
     });
   }
   return items;
+}
+
+/**
+ * "Waiting on the Graduate School": open tasks held by an office (staff, coordinators, dean, registrar). The student
+ * has nothing to do for them, so they never appear under "Needs your action".
+ * @returns [{ key, kind, title, detail, dueAt, tone, target, status }] - overdue first, then by date
+ */
+export function studentWaiting(data) {
+  return sortedTasks((data.tasks || []).filter((task) => !isOwnTask(task))).map((task) => ({
+    key: `waiting-${task.id}`,
+    kind: "waiting",
+    title: task.title,
+    detail: `With the ${task.owner_role || "Graduate School"}.`,
+    dueAt: task.due_at,
+    tone: "neutral",
+    target: taskTarget(task),
+    status: task.overdue ? "Overdue" : task.status,
+  }));
 }
 
 /**

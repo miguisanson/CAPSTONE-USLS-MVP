@@ -7,12 +7,14 @@
 // columns - the wide one holds the actions and the extra block, the narrow one (20rem) holds the key numbers and the
 // activity. Built only from the component library; nothing here knows about a role.
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight, CheckCircle2, ListChecks } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, Hourglass, ListChecks } from "lucide-react";
 import { Button, EmptyState, PageHeader, SectionCard, StatCard } from "./ui/index.js";
 import { toneOf } from "../lib/tone";
 
 /** The most recent-activity entries shown; the "View all" link leads to the rest. */
 export const MAX_ACTIVITY = 6;
+/** The rows shown in the "waiting on" group; its "View all" link leads to the rest. */
+export const MAX_WAITING = 3;
 
 /**
  * @param header         PageHeader props: { title, description, icon, badge, actions }
@@ -23,6 +25,9 @@ export const MAX_ACTIVITY = 6;
  * @param actionsTitle   heading of the list (default "Needs your action")
  * @param actionsSubtitle one short line under the heading
  * @param actionsEmpty   { title, hint } shown when `actions` is empty (default "Nothing is waiting on you")
+ * @param waiting        optional second group under the actions for things that wait on SOMEONE ELSE (AD7: an office
+ *                       holds the task, the viewer has nothing to do): { title, subtitle, items, all: { to, label } }.
+ *                       Same row shape as `actions`, at most MAX_WAITING rows, hidden when `items` is empty.
  * @param stats          3-4 StatCard prop objects ({ label, value, sub, to, icon, tone, badge })
  * @param activity       [{ key, title, detail, time, to, unread }] newest first; the first MAX_ACTIVITY are shown
  * @param activityTitle  heading (default "Recent activity")
@@ -36,6 +41,7 @@ export default function RoleHome({
   actionsTitle = "Needs your action",
   actionsSubtitle,
   actionsEmpty = {},
+  waiting,
   stats = [],
   activity = [],
   activityTitle = "Recent activity",
@@ -44,6 +50,7 @@ export default function RoleHome({
   extra = null,
 }) {
   const shownActivity = activity.slice(0, MAX_ACTIVITY);
+  const waitingItems = waiting?.items || [];
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader {...header} />
@@ -72,6 +79,31 @@ export default function RoleHome({
               />
             )}
           </SectionCard>
+          {waitingItems.length > 0 && (
+            <SectionCard
+              as="section"
+              title={waiting.title || "Waiting on others"}
+              subtitle={waiting.subtitle}
+              icon={Hourglass}
+              action={
+                waiting.all && (
+                  <Link
+                    to={waiting.all.to}
+                    className="inline-flex shrink-0 items-center text-sm font-semibold text-brand-700 hover:underline max-sm:min-h-11"
+                  >
+                    {waiting.all.label || "View all"}
+                  </Link>
+                )
+              }
+              className="order-1 lg:order-none"
+            >
+              <ul className="space-y-2">
+                {waitingItems.slice(0, MAX_WAITING).map((item) => (
+                  <ActionRow key={item.key ?? item.title} item={item} />
+                ))}
+              </ul>
+            </SectionCard>
+          )}
           {extra && <div className="order-3 space-y-5 lg:order-none">{extra}</div>}
         </div>
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">

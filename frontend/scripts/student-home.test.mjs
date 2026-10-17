@@ -2,7 +2,7 @@
 // and "Recent activity" list. Run: npm run test:student-home
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { studentActions, studentActivity } from "../src/lib/studentHome.js";
+import { isOwnTask, studentActions, studentActivity, studentTasks, studentWaiting } from "../src/lib/studentHome.js";
 
 const NOW = new Date("2026-10-17T09:00:00");
 const RESEARCH = new Set(["Form 1 - Title Defense", "Final Defense"]);
@@ -46,21 +46,41 @@ test("unread messages that are not replies become one 'unread messages' action",
   assert.match(studentActions(base({ workflow_messages: [msg(1)] }), opts)[0].title, /1 unread message$/);
 });
 
-test("tasks: overdue first, then by date; staff-owned tasks say who has them; the link follows the task's action_url", () => {
+test("tasks: only the student's own tasks are actions - overdue first, then by date; the link follows the task's action_url", () => {
   const data = base({
     tasks: [
       { id: 1, title: "Later task", owner_role: "Student", due_at: "2026-11-01", status: "Pending", overdue: false },
-      { id: 2, title: "Review automatic AWOL policy alert", owner_role: "Academic Coordinator", due_at: "2026-10-17", status: "Pending", overdue: false, action_url: "/workflow/awol" },
+      { id: 2, title: "Own AWOL form", owner_role: "Student", due_at: "2026-10-17", status: "Pending", overdue: false, action_url: "/workflow/awol" },
       { id: 3, title: "Late task", owner_role: "Student", due_at: "2026-10-01", status: "Pending", overdue: true },
+      { id: 4, title: "Review automatic AWOL policy alert", owner_role: "Academic Coordinator", due_at: "2026-10-17", status: "Pending", overdue: false, action_url: "/workflow/awol" },
     ],
   });
   const items = studentActions(data, opts);
-  assert.deepEqual(items.map((i) => i.title), ["Late task", "Review automatic AWOL policy alert", "Later task"]);
+  assert.deepEqual(items.map((i) => i.title), ["Late task", "Own AWOL form", "Later task"], "the coordinator's task is not an action for the student");
   assert.equal(items[0].tone, "danger");
-  assert.match(items[1].detail, /Academic Coordinator/);
+  assert.match(items[1].detail, /Assigned to you/);
   assert.deepEqual(items[1].target, { view: "awol" });
   assert.deepEqual(items[0].target, { to: "/student/requests" }, "a task with no page of its own goes to the Request Center");
   assert.equal(items[2].dueAt, "2026-11-01");
+  assert.equal(studentTasks(data).length, 3, "the open-tasks key number counts only the student's own tasks");
+  assert.equal(isOwnTask({ owner_role: "Student" }), true);
+  assert.equal(isOwnTask({ owner_role: "Dean" }), false);
+  assert.equal(isOwnTask({}), false);
+});
+
+test("waiting on the Graduate School: tasks held by any office, neutral, overdue first, with who holds them", () => {
+  const task = (id, owner_role, extra = {}) => ({ id, title: `T${id}`, owner_role, due_at: `2026-10-2${id}`, status: "Pending", overdue: false, ...extra });
+  const data = base({
+    tasks: [task(1, "Student"), task(2, "Graduate School Staff"), task(3, "Academic Coordinator", { action_url: "/workflow/awol" }), task(4, "Dean", { overdue: true }), task(5, "Research Coordinator"), task(6, "Registrar")],
+  });
+  const waiting = studentWaiting(data);
+  assert.deepEqual(waiting.map((i) => i.title), ["T4", "T2", "T3", "T5", "T6"]);
+  assert.ok(waiting.every((i) => i.tone === "neutral" && i.kind === "waiting"));
+  assert.match(waiting[0].detail, /With the Dean/);
+  assert.equal(waiting[0].status, "Overdue");
+  assert.deepEqual(waiting[2].target, { view: "awol" });
+  assert.deepEqual(waiting[1].target, { to: "/student/requests" });
+  assert.deepEqual(studentWaiting(base()), []);
 });
 
 test("the leave / AWOL banner is an action only when it is a warning or an alert", () => {

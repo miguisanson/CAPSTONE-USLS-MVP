@@ -4,7 +4,7 @@ import { SectionCard, Stepper, StatusChip } from "../../components/ui/index.js";
 import RoleHome from "../../components/RoleHome.jsx";
 import { formatDate, relativeDays } from "../../lib/format";
 import { stageSteps } from "../../lib/stages.js";
-import { VIEW_LABELS, studentActions, studentActivity } from "../../lib/studentHome.js";
+import { VIEW_LABELS, studentActions, studentActivity, studentTasks, studentWaiting } from "../../lib/studentHome.js";
 import { useStudentPortal } from "./StudentPortalContext";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
 import { leaveRequestStatus } from "./LeaveCaseCards";
@@ -127,10 +127,11 @@ export default function StudentOverview() {
   const { student, course_audit: audit, research_case: researchCase } = data;
   const messages = data.workflow_messages || [];
   const unreadCount = messages.filter((message) => message.is_unread).length;
-  const tasks = data.tasks || [];
+  const tasks = studentTasks(data); // only the student's own tasks; office-held ones are listed under 'waiting'
   const firstName = student.first_name || student.name.split(" ")[0];
 
   const actions = studentActions(data, { researchGates: RESEARCH_GATE_KEYS }).map(toActionRow);
+  const waiting = studentWaiting(data).map(toActionRow);
   const activity = studentActivity(data).map((entry) => ({
     key: entry.key,
     title: entry.title,
@@ -150,10 +151,16 @@ export default function StudentOverview() {
       }}
       actions={actions}
       actionsSubtitle="What is waiting on you now, most pressing first"
+      waiting={{
+        title: "Waiting on the Graduate School",
+        subtitle: "Offices are working on these. Nothing to do on your side unless they ask.",
+        items: waiting,
+        all: { to: "/student/requests", label: "View all" },
+      }}
       stats={[
         { key: "coursework", label: "Coursework", value: `${audit.completion_rate}%`, sub: `${audit.completed.length} completed, ${audit.missing_count} missing`, to: "/student/progress" },
         { key: "research", label: "Research", badge: true, value: researchCase?.status || "Not started", sub: researchCase?.current_gate_label || "Open the Research page to begin", tone: "info", to: "/student/research" },
-        { key: "tasks", label: "Open tasks", value: tasks.length, sub: `${tasks.filter((task) => task.overdue).length} overdue`, tone: tasks.length ? "warning" : "neutral" },
+        { key: "tasks", label: "Your open tasks", value: tasks.length, sub: `${tasks.filter((task) => task.overdue).length} overdue`, tone: tasks.length ? "warning" : "neutral" },
         { key: "messages", label: "Unread messages", value: unreadCount, sub: "Replies on your requests", tone: unreadCount ? "danger" : "neutral", to: "/student/messages" },
       ]}
       activity={activity}

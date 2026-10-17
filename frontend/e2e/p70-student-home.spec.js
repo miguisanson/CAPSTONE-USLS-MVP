@@ -1,9 +1,10 @@
 // Packet P7.0 (owner decision IM19, one action-first home layout for every role): pins what the STUDENT home shows.
 // Written BEFORE the change and red on the old home. Through the real UI, as three demo students (read-only: nothing is
 // clicked except navigation links, no data changes):
-//   - Maya Torres (AWOL, one open task, one recommendation): the first section of the page is "Needs your action" and it
-//     lists the waiting task with a working link to the student page where it is handled;
-//   - Roberto Aquino (nothing waiting): the same section says "Nothing is waiting on you" and holds no list;
+//   - Maya Torres (AWOL, one open task held by the Academic Coordinator, one recommendation): the first section of
+//     the page is "Needs your action" (the AWOL banner, with a working link) and holds only what SHE must do; the
+//     coordinator's alert sits in the second section, "Waiting on the Graduate School" (AD7); "Your open tasks" counts 0;
+//   - Roberto Aquino (nothing waiting): the same section says "Nothing is waiting on you" and holds no list and there is no empty second group;
 //   - Miguel Yu (any stage on the lifecycle path): each key number is shown ONCE (coursework %, research status, open tasks, unread
 //     messages), the lifecycle Stepper marks his current stage, "On track" appears at most once, and the blocks that
 //     left the home are still one click away: Defense Schedule, Request Center, Leave of Absence, Research Adviser;
@@ -45,13 +46,33 @@ const main = (page) => page.locator("main");
 const sectionOf = (page, name) => main(page).locator("section", { has: page.getByRole("heading", { name, exact: true }) });
 
 test.describe("student home, action first (IM19)", () => {
-  test("Maya: the first section is 'Needs your action' and lists the waiting task with a working link", async ({ page, context }) => {
+  test("Maya: 'Needs your action' holds what she must do; the coordinator's alert waits under 'Waiting on the Graduate School'", async ({ page, context }) => {
     await openHome(page, context, MAYA);
-    await expect(main(page).locator("h2").first(), "the first section of the page").toHaveText("Needs your action");
-    const section = sectionOf(page, "Needs your action");
-    await expect(section.getByText("Review automatic AWOL policy alert")).toBeVisible();
-    const link = section.locator('a[href$="/student/requests/awol-return"]').first();
-    await expect(link, "a link from the waiting task to the page where it is handled").toBeVisible();
+    const headings = main(page).locator("h2");
+    await expect(headings.nth(0), "the first section of the page").toHaveText("Needs your action");
+    await expect(headings.nth(1), "the second section, right under it").toHaveText("Waiting on the Graduate School");
+
+    // the AWOL banner is hers to act on: it is in "Needs your action" with a working link
+    const mine = sectionOf(page, "Needs your action");
+    await expect(mine.getByText("Your record is marked AWOL")).toBeVisible();
+    // the coordinator's alert is NOT hers to act on
+    await expect(mine.getByText("Review automatic AWOL policy alert"), "an office's task is not a student action").toHaveCount(0);
+    await expect(mine.getByText(/With the Academic Coordinator/), "no office-held row under Needs your action").toHaveCount(0);
+
+    const waiting = sectionOf(page, "Waiting on the Graduate School");
+    await expect(waiting.getByText("Review automatic AWOL policy alert")).toBeVisible();
+    await expect(waiting.getByText(/With the Academic Coordinator/)).toBeVisible();
+    await expect(waiting.getByText("Your record is marked AWOL"), "the banner is not duplicated here").toHaveCount(0);
+    await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/student/requests");
+
+    // the key number counts only her own tasks: the coordinator's alert is not one of them
+    const card = main(page).locator('[data-slot="label"]', { hasText: /^Your open tasks$/i }).locator("xpath=..");
+    await expect(card.locator('[data-slot="value"]')).toHaveText("0");
+
+    // both rows lead to the student page where the case is handled
+    const link = mine.locator('a[href$="/student/requests/awol-return"]').first();
+    await expect(link, "a link from the banner to the page where it is handled").toBeVisible();
+    await expect(waiting.locator('a[href$="/student/requests/awol-return"]').first()).toBeVisible();
     await link.click();
     await expect(page).toHaveURL(/\/student\/requests\/awol-return$/);
     await expect(page.locator("main h1")).toBeVisible();
@@ -63,6 +84,7 @@ test.describe("student home, action first (IM19)", () => {
     const section = sectionOf(page, "Needs your action");
     await expect(section.getByText("Nothing is waiting on you")).toBeVisible();
     await expect(section.locator("li")).toHaveCount(0);
+    await expect(main(page).getByRole("heading", { name: "Waiting on the Graduate School", exact: true }), "no empty second group").toHaveCount(0);
     await expect(main(page).getByRole("heading", { name: "Recent activity", exact: true })).toBeVisible();
     expect(await main(page).getByText(/on track/i).count(), "'On track' appears at most once").toBeLessThanOrEqual(1);
   });
@@ -85,7 +107,7 @@ test.describe("student home, action first (IM19)", () => {
 
     // exactly four key numbers, each named once
     const labels = (await m.locator('[data-slot="label"]').allTextContents()).map((t) => t.trim().toLowerCase());
-    expect([...labels].sort(), "the key-number labels").toEqual(["coursework", "open tasks", "research", "unread messages"]);
+    expect([...labels].sort(), "the key-number labels").toEqual(["coursework", "research", "unread messages", "your open tasks"]);
 
     // the Stepper marks the student's current stage
     const current = m.locator('ol [aria-current="step"]');
