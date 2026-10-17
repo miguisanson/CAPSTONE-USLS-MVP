@@ -20,6 +20,9 @@ Your decisions: `DECISIONS.md`. How unattended work runs: `IMPROVE.md`.
 
 ## Ready for your review
 
+- **Design system, foundations** (merges 2e8cefc, ab32a7d, edc050c) - shared sizes/spacing, one status-colour map, shared buttons/fields/cards, one dialog that fits every screen, and `npm run check:ui`, which blocks new one-off sizes, tables and dialogs. Visible: status chips use one colour per meaning ("Submitted" blue, "Returned" amber, "Completed" green), info notes are blue, buttons and inputs are bigger on phones, the white strip above open dialogs is gone. Agent decisions AD1-AD4 in `DECISIONS.md`.
+- **Section J bugs fixed:** J1 (dropped-subject dialog fits a laptop screen), J4 (no error banner after signing Form 1), J8 ("Mark reviewed" window title).
+
 - **Unused files moved to `archive/`** (merge 55c142b) — nothing visible changes; see `archive/README.md`.
 - **SQLite only** (merge 4a996ba) — MySQL removed; an outdated database now stops the app with "Run `npm run seed`". See the `.env` step under "Waiting on you".
 - **Automatic walkthroughs** (merge ada73ad) — `npm run e2e` logs in as all 7 roles, opens all 116 pages, and saves 348 screenshots (laptop, desktop, phone) to `frontend/e2e-artifacts/screens/`. Its first run found 9 problems (I-031…I-039 in `ISSUES.md`), mostly pages that run off the screen on a phone; fixes are in progress.
