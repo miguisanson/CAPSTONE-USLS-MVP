@@ -30,7 +30,7 @@ import {
   Scale,
 } from "lucide-react";
 import { useAuth } from "../auth";
-import { api } from "../api";
+import { Button, Drawer } from "./ui/index.js";
 import { PORTAL_NAV, PORTAL_FOOTERS, findNavItem, usePortalNav } from "./portalNav";
 import NotificationBell from "./NotificationBell";
 
@@ -123,7 +123,7 @@ function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {
       <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
       <span className="min-w-0 flex-1">{label}</span>
       {badge > 0 && (
-        <span className="ml-auto inline-flex min-w-[1.4rem] items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-800" aria-label={`${badge} waiting`}>
+        <span className="ml-auto inline-flex min-w-[1.4rem] items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold text-amber-800" aria-label={`${badge} waiting`}>
           {badge}
         </span>
       )}
@@ -131,7 +131,7 @@ function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {
   );
 }
 
-function SidebarContent({ onNavigate, user }) {
+function SidebarContent({ onNavigate, onClose, user }) {
   const { counts, flags } = usePortalNav();
   const portalGroups = PORTAL_NAV[user?.role];
   const allowedPaths = ROLE_PATHS[user?.role];
@@ -150,16 +150,17 @@ function SidebarContent({ onNavigate, user }) {
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white shadow-sm">
           <GraduationCap className="h-6 w-6" />
         </span>
-        <div className="leading-tight">
-          <p className="font-display text-[15px] font-semibold text-ink">USLS Graduate School</p>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">Lifecycle Monitoring</p>
+        <div className="min-w-0 leading-tight">
+          <p className="card-title">USLS Graduate School</p>
+          <p className="text-2xs font-semibold uppercase tracking-wide text-brand-600">Lifecycle Monitoring</p>
         </div>
+        {onClose && <Button variant="icon" icon={X} aria-label="Close menu" onClick={onClose} className="ml-auto" />}
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
         {groups.map((group) => (
           <div key={group.label}>
-            <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{group.label}</p>
+            <p className="eyebrow px-3 pb-2">{group.label}</p>
             <div className="space-y-1">
               {group.items.map((item) => (
                 <NavItem key={item.to} {...item} onClick={onNavigate} />
@@ -170,8 +171,8 @@ function SidebarContent({ onNavigate, user }) {
       </nav>
 
       <div className="border-t border-slate-200 px-5 py-4">
-        <p className="mb-1 text-xs font-bold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
-        <p className="text-[11px] leading-relaxed text-slate-400">
+        <p className="mb-1 text-xs font-semibold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
+        <p className="micro leading-relaxed">
           {PORTAL_FOOTERS[user?.role] || "Figures are computed live from recorded transactions."}
         </p>
       </div>
@@ -186,6 +187,16 @@ export default function Layout({ children }) {
   const portalGroups = PORTAL_NAV[user?.role];
   const current = portalGroups ? findNavItem(portalGroups, location.pathname) : null;
   const pageTitle = current?.item.label || null;
+
+  // The menu is a small-screen control: if the window grows to desktop width while it is open, close it
+  // (the old drawer was lg:hidden).
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const wide = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => wide.matches && setMobileOpen(false);
+    wide.addEventListener("change", onChange);
+    return () => wide.removeEventListener("change", onChange);
+  }, [mobileOpen]);
 
   // Keep the browser tab title in step with the page (helps history and tabs).
   useEffect(() => {
@@ -204,7 +215,7 @@ export default function Layout({ children }) {
     <div className="min-h-screen lg:flex">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-brand-700 focus:shadow-lift"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-toast focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-brand-700 focus:shadow-lift"
       >
         Skip to main content
       </a>
@@ -215,56 +226,31 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      {/* Mobile drawer */}
+      {/* Mobile menu: the library Drawer (focus moves in and is trapped, Escape and the backdrop close it, focus returns to the menu button) */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-ink/40" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-72 bg-white shadow-lift animate-fade-up">
-            <button
-              type="button"
-              aria-label="Close menu"
-              onClick={() => setMobileOpen(false)}
-              className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
-          </aside>
-        </div>
+        <Drawer side="left" label="Menu" width="w-80 max-w-[85vw]" onClose={() => setMobileOpen(false)}>
+          <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} onClose={() => setMobileOpen(false)} />
+        </Drawer>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur lg:px-6 2xl:px-8">
-          <button
-            type="button"
-            aria-label="Open menu"
-            onClick={() => setMobileOpen(true)}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer lg:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+        <header className="sticky top-0 z-header flex items-center gap-3 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur lg:px-6 2xl:px-8">
+          <Button variant="icon" icon={Menu} aria-label="Open menu" onClick={() => setMobileOpen(true)} className="lg:hidden" />
           <Breadcrumb path={location.pathname} current={current} role={user?.role} />
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
             <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-block xl:max-w-[24rem]" title={`${user?.full_name || "Graduate School Staff"} · ${user?.program || ROLE_LABELS[user?.role] || "Staff"}`}>
               {user?.full_name || "Graduate School Staff"} · {user?.program || ROLE_LABELS[user?.role] || "Staff"}
             </span>
             <NotificationBell />
-            <button
-              type="button"
-              onClick={logout}
-              className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
-              aria-label="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white" aria-hidden="true">
+            <Button variant="icon" icon={LogOut} aria-label="Sign out" onClick={logout} />
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-sm font-semibold text-white" aria-hidden="true">
               {initials}
             </span>
           </div>
         </header>
 
-        <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[90rem] flex-1 px-4 py-6 focus:outline-none lg:px-6 lg:py-7 2xl:px-8 2xl:py-8">{children}</main>
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-page flex-1 px-4 py-6 focus:outline-none lg:px-6 lg:py-7 2xl:px-8 2xl:py-8">{children}</main>
       </div>
     </div>
   );
@@ -283,9 +269,9 @@ function Breadcrumb({ path, current, role }) {
   if (current) {
     return (
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
-        <span className="hidden font-semibold text-slate-400 sm:inline">{ROLE_LABELS[role]} Portal</span>
+        <span className="hidden font-semibold text-slate-500 sm:inline">{ROLE_LABELS[role]} Portal</span>
         <ChevronRight className="hidden h-4 w-4 text-slate-300 sm:block" />
-        <span className="hidden font-semibold text-slate-400 md:inline">{current.group.label}</span>
+        <span className="hidden font-semibold text-slate-500 md:inline">{current.group.label}</span>
         <ChevronRight className="hidden h-4 w-4 text-slate-300 md:block" />
         <span className="truncate font-semibold text-ink" aria-current="page">{current.item.label}</span>
       </nav>
@@ -300,7 +286,7 @@ function Breadcrumb({ path, current, role }) {
     : parts.length === 0 ? "Dashboard" : BREADCRUMB_LABELS[parts[0]] || parts[0].replace(/-/g, " ");
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-sm">
-      <span className="font-semibold text-slate-400">Platform</span>
+      <span className="font-semibold text-slate-500">Platform</span>
       <ChevronRight className="h-4 w-4 text-slate-300" />
       <span className="font-semibold capitalize text-ink">{label}</span>
     </div>

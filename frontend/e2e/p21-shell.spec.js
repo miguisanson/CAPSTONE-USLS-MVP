@@ -151,6 +151,7 @@ const SHOTS = join(ARTIFACTS_DIR, "p21");
 async function shot(page, name) {
   mkdirSync(SHOTS, { recursive: true });
   await page.mouse.move(0, 0); // park the mouse so no hover colour is captured
+  await page.waitForTimeout(500); // let the 250 ms fade-up of the panel finish
   await page.screenshot({ path: join(SHOTS, `${name}.png`) });
 }
 
