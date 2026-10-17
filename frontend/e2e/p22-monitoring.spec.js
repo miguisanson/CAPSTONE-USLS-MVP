@@ -22,15 +22,25 @@ import { AUTH_DIR, SCREENS_DIR } from "./support/paths.mjs";
 const SHOTS = join(SCREENS_DIR, "..", "p22");
 const authFile = (key) => join(AUTH_DIR, `${key}.json`);
 
-async function shotBothWidths(page, name) {
+async function shotBothWidths(page, name, { fullPage = false } = {}) {
   mkdirSync(SHOTS, { recursive: true });
   await page.mouse.move(0, 0);
-  await page.screenshot({ path: join(SHOTS, `${name}-1366.png`) });
+  await page.waitForTimeout(600); // let a dialog finish its fade-in before the picture
+  await page.screenshot({ path: join(SHOTS, `${name}-1366.png`), fullPage });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: join(SHOTS, `${name}-390.png`) });
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: join(SHOTS, `${name}-390.png`), fullPage });
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.waitForTimeout(300);
+}
+
+/** Console errors and uncaught page errors: none are allowed while these screens are used. */
+function watchErrors(page) {
+  const problems = [];
+  // A Windows socket-buffer failure is the test machine, not the app (I-041; same rule as support/checker.js).
+  page.on("console", (message) => { if (message.type() === "error" && !/ERR_NO_BUFFER_SPACE/.test(message.text())) problems.push(`console: ${message.text()}`); });
+  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
+  return problems;
 }
 
 test.describe("P2.2 Monitoring Sheet dialogs", () => {
@@ -38,6 +48,7 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
 
   test("add student, record panel, reasons and provenance", async ({ page }) => {
     test.setTimeout(240_000);
+    const problems = watchErrors(page);
     const writes = [];
     page.on("request", (request) => {
       if (request.method() !== "GET" && request.url().includes("/api/monitoring/")) writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
@@ -227,10 +238,13 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
     }
     expect(found, "an imported subject row on one of the first students").toBeTruthy();
     expect(writes.filter((w) => w.startsWith("PATCH")), "the imported value was not saved").toEqual([]);
+    expect(problems, "console / page errors").toEqual([]);
   });
 });
 
-async function calendarTour(page, { first, name }) {
+async function calendarTour(page, { url, first, name }) {
+  const problems = watchErrors(page);
+  await page.goto(url);
   const views = page.getByRole("group", { name: "Calendar view" });
   await expect(views).toBeVisible({ timeout: 30_000 });
   const pressed = (label) => views.getByRole("button", { name: label, exact: true });
@@ -244,7 +258,7 @@ async function calendarTour(page, { first, name }) {
   await expect(pressed("Week")).toHaveAttribute("aria-pressed", "false");
   for (const day of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) await expect(page.getByText(day, { exact: true }).first()).toBeVisible();
   const monthTitle = (await title.textContent()) || "";
-  await shotBothWidths(page, `${name}-month`);
+  await shotBothWidths(page, `${name}-month`, { fullPage: true });
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(title).not.toHaveText(monthTitle);
   await page.getByRole("button", { name: "Previous", exact: true }).click();
@@ -257,7 +271,7 @@ async function calendarTour(page, { first, name }) {
   await expect(page.getByText("07:00", { exact: true })).toBeVisible();
   const weekTitle = (await title.textContent()) || "";
   expect(weekTitle).toContain("–");
-  await shotBothWidths(page, `${name}-week`);
+  await shotBothWidths(page, `${name}-week`, { fullPage: true });
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(title).not.toHaveText(weekTitle);
   await page.getByRole("button", { name: "Today", exact: true }).click();
@@ -267,7 +281,8 @@ async function calendarTour(page, { first, name }) {
   await expect(pressed("Agenda")).toHaveAttribute("aria-pressed", "true");
   await expect(title).toContainText("From ");
   await expect(page.getByText(/Nothing on the calendar in this period\.|Your role|on the panel|Defense/).first()).toBeVisible();
-  await shotBothWidths(page, `${name}-agenda`);
+  await shotBothWidths(page, `${name}-agenda`, { fullPage: true });
+  expect(problems, "console / page errors").toEqual([]);
 }
 
 test.describe("P2.2 calendar views", () => {
@@ -275,16 +290,14 @@ test.describe("P2.2 calendar views", () => {
     test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
     test("month, week and agenda", async ({ page }) => {
       test.setTimeout(120_000);
-      await page.goto("/workflow/defense-scheduling?view=calendar");
-      await calendarTour(page, { first: "Month", name: "p22-calendar-staff" });
+      await calendarTour(page, { url: "/workflow/defense-scheduling?view=calendar", first: "Month", name: "p22-calendar-staff" });
     });
   });
   test.describe("faculty", () => {
     test.use({ storageState: authFile("faculty"), viewport: { width: 1366, height: 768 } });
     test("week first, then month and agenda", async ({ page }) => {
       test.setTimeout(120_000);
-      await page.goto("/faculty-portal/calendar");
-      await calendarTour(page, { first: "Week", name: "p22-calendar-faculty" });
+      await calendarTour(page, { url: "/faculty-portal/calendar", first: "Week", name: "p22-calendar-faculty" });
     });
   });
 });
