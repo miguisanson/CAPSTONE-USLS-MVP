@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { CalendarClock } from "lucide-react";
-import { InlineNotice } from "../../components/ui";
-import { Field, Select, Textarea } from "../../components/forms";
+import { Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import { ProcessCaseList } from "./ProcessCaseCard";
 import { useSubmitRequest, StageCard, SavedWorkflowFiles, SubmitState } from "./shared";
@@ -35,7 +34,7 @@ function withCurrentValue(options, value) {
 
 function SuccessNote({ message }) {
   if (!message) return null;
-  return <InlineNotice>{message}</InlineNotice>;
+  return <InlineNotice tone="success">{message}</InlineNotice>;
 }
 
 export function LoaRequestForm({ data, onSaved }) {
@@ -146,7 +145,7 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label={title}>
-      <h3 className="text-base font-semibold text-ink">{title}</h3>
+      <h3 className="card-title">{title}</h3>
       <p className="mt-1 text-sm text-slate-600">
         {editable
           ? "Change what the comment above asks for, then send your request again."
@@ -178,16 +177,11 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
           </Field>
         </div>
 
-        {filingFail && (
-          <div role="alert" className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
-            {startOption.filing_detail}
-          </div>
-        )}
+        {filingFail && <InlineNotice tone="danger">{startOption.filing_detail}</InlineNotice>}
         {filingWarning && (
-          <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <p className="font-bold">Please read before you send this request</p>
-            <p className="mt-1">{startOption.filing_detail}</p>
-          </div>
+          <InlineNotice tone="warning" title="Please read before you send this request">
+            {startOption.filing_detail}
+          </InlineNotice>
         )}
 
         <Field label="Reason" required>
@@ -301,7 +295,7 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label={title}>
-      <h3 className="text-base font-semibold text-ink">{title}</h3>
+      <h3 className="card-title">{title}</h3>
       <p className="mt-1 text-sm text-slate-600">
         {editable
           ? "Change what the comment above asks for, then send your request again."
@@ -310,10 +304,9 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
 
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
         {can.linked_case_id ? (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            <p className="font-semibold">You are ending your leave: {can.leave_period || "your leave of absence"}.</p>
-            {can.leave_end && <p className="mt-0.5">It runs until {formatDate(can.leave_end)}.</p>}
-          </div>
+          <InlineNotice tone="info" title={`You are ending your leave: ${can.leave_period || "your leave of absence"}.`}>
+            {can.leave_end && `It runs until ${formatDate(can.leave_end)}.`}
+          </InlineNotice>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Your leave started in" required>
@@ -386,22 +379,22 @@ export function AwolReturnRequestForm({ data, onSaved }) {
     <div className="space-y-4">
       <ProcessCaseList cases={data.standalone_cases?.awol || []} />
       {(student.standing === "AWOL" || student.enrollment_tag === "AWOL") && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+        <InlineNotice tone="danger">
           Your record was automatically flagged AWOL from an official standing or full-semester withdrawal without approved LOA. Registration privileges remain restricted until your return request is reviewed.
-        </div>
+        </InlineNotice>
       )}
       {student.enrollment_tag === "Residency" && (
-        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+        <InlineNotice tone="info">
           You are enrolled in residency without subjects for an approved academic purpose. Check the workflow status for the recorded semester and purpose.
-        </div>
+        </InlineNotice>
       )}
       {locked ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Your return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</div>
+        <InlineNotice tone="warning">Your return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</InlineNotice>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+          <InlineNotice tone="info">
             The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete the form below; no file needs to be uploaded.
-          </div>
+          </InlineNotice>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Intended return semester" required><Select value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} required /></Field>
             <Field label="Last enrolled semester"><Select value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="Select semester" options={allSemesters} /></Field>
@@ -446,54 +439,48 @@ export function WithdrawalRequestForm({ data, onSaved }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <ProcessCaseList cases={data.standalone_cases?.withdrawal || []} />
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        <p className="font-semibold">When you can withdraw a subject</p>
-        <p className="mt-1 text-xs leading-relaxed text-amber-900">{(selectedSubject || activeSubjects[0])?.withdrawal_window?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of the term's total is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
-      </div>
+      <InlineNotice tone="warning" title="When you can withdraw a subject">
+        <p className="text-xs leading-relaxed">{(selectedSubject || activeSubjects[0])?.withdrawal_window?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of the term's total is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
+      </InlineNotice>
       <StageCard number={1} title={applicationEditable ? "Send your withdrawal request" : "Your withdrawal request"} state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}>
         {applicationEditable ? (
           <div className="space-y-4">
             <Field label="Enrolled subject" required>
-              <select className="field-input cursor-pointer" value={form.subject_enrollment_id} onChange={set("subject_enrollment_id")} required>
-                <option value="">Choose an eligible enrolled subject</option>
-                {activeSubjects.map((item) => (
-                  <option key={item.id} value={item.id} disabled={!item.withdrawal_eligible}>
-                    {item.course_code} — {item.course_title} · {item.term_label}
-                    {item.withdrawal_eligible ? ` · ELIGIBLE UNTIL ${item.withdrawal_window?.deadline || "semester deadline"}` : " · WITHDRAWAL WINDOW CLOSED"}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={form.subject_enrollment_id}
+                onChange={set("subject_enrollment_id")}
+                placeholder="Choose an eligible enrolled subject"
+                options={activeSubjects.map((item) => ({
+                  value: item.id,
+                  disabled: !item.withdrawal_eligible,
+                  label: `${item.course_code} — ${item.course_title} · ${item.term_label}${item.withdrawal_eligible ? ` · ELIGIBLE UNTIL ${item.withdrawal_window?.deadline || "semester deadline"}` : " · WITHDRAWAL WINDOW CLOSED"}`,
+                }))}
+                required
+              />
               {selectedSubject?.withdrawal_window && (
-                <div
+                <InlineNotice
+                  tone={selectedSubject.withdrawal_eligible ? "success" : "danger"}
                   role="status"
-                  className={`mt-3 flex items-start gap-3 rounded-xl border px-4 py-4 ${
-                    selectedSubject.withdrawal_eligible
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-950"
-                      : "border-red-300 bg-red-50 text-red-950"
-                  }`}
+                  icon={CalendarClock}
+                  className="mt-3"
                 >
-                  <CalendarClock className={`mt-0.5 h-5 w-5 shrink-0 ${selectedSubject.withdrawal_eligible ? "text-emerald-700" : "text-red-700"}`} aria-hidden="true" />
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider">
-                      {selectedSubject.withdrawal_eligible ? "Withdrawal deadline" : "Withdrawal availability"}
-                    </p>
-                    <p className="mt-1 text-lg font-extrabold leading-tight">
-                      {selectedSubject.withdrawal_eligible
-                        ? `Eligible until ${formatDate(selectedSubject.withdrawal_window.deadline)}`
-                        : "Withdrawal window closed"}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold opacity-80">
-                      {selectedSubject.withdrawal_window.status}
-                      {selectedSubject.withdrawal_window.term_start_date
-                        ? ` · Classes begin ${formatDate(selectedSubject.withdrawal_window.term_start_date)}`
-                        : ""}
-                    </p>
-                    {selectedSubject.withdrawal_window.fee_consequence && <p className="mt-2 text-xs font-semibold">Fee: {selectedSubject.withdrawal_window.fee_consequence}</p>}
-                    {selectedSubject.withdrawal_window.rule_source && <p className="mt-1 text-[11px] opacity-80">Rule: {selectedSubject.withdrawal_window.rule_source}</p>}
-                  </div>
-                </div>
+                  <p className="eyebrow text-current">{selectedSubject.withdrawal_eligible ? "Withdrawal deadline" : "Withdrawal availability"}</p>
+                  <p className="mt-1 font-display text-lg font-semibold leading-tight">
+                    {selectedSubject.withdrawal_eligible
+                      ? `Eligible until ${formatDate(selectedSubject.withdrawal_window.deadline)}`
+                      : "Withdrawal window closed"}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold opacity-80">
+                    {selectedSubject.withdrawal_window.status}
+                    {selectedSubject.withdrawal_window.term_start_date
+                      ? ` · Classes begin ${formatDate(selectedSubject.withdrawal_window.term_start_date)}`
+                      : ""}
+                  </p>
+                  {selectedSubject.withdrawal_window.fee_consequence && <p className="mt-2 text-xs font-semibold">Fee: {selectedSubject.withdrawal_window.fee_consequence}</p>}
+                  {selectedSubject.withdrawal_window.rule_source && <p className="micro mt-1 text-current opacity-80">Rule: {selectedSubject.withdrawal_window.rule_source}</p>}
+                </InlineNotice>
               )}
-              {!eligibleSubjects.length && <div className="mt-2"><InlineNotice>No active subject is currently inside the withdrawal window (until the end of the second week of classes). Contact Graduate School staff if the recorded semester dates are incorrect.</InlineNotice></div>}
+              {!eligibleSubjects.length && <InlineNotice tone="info" className="mt-2">No active subject is currently inside the withdrawal window (until the end of the second week of classes). Contact Graduate School staff if the recorded semester dates are incorrect.</InlineNotice>}
             </Field>
             <Field label="Reason for withdrawing from this subject" required>
               <Textarea value={form.reason} onChange={set("reason")} required />
@@ -511,15 +498,12 @@ export function WithdrawalRequestForm({ data, onSaved }) {
           <div className="space-y-3">
             <p className="text-sm font-semibold text-ink">{existing?.subject?.course_code || "Subject pending"} — {existing?.subject?.course_title || "Selected subject"}</p>
             <p className="text-sm text-slate-600">{existing?.effective_term || existing?.subject?.term_label || "Semester pending"} · submitted {formatDate(existing?.created_at)}</p>
-            <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-emerald-950">
-              <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" aria-hidden="true" />
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider">Eligibility recorded at submission</p>
-                <p className="mt-1 text-base font-extrabold">Eligible until {formatDate(existing?.withdrawal_window?.deadline)}</p>
-                <p className="mt-1 text-xs font-semibold text-emerald-800">{existing?.withdrawal_window?.status || "Eligibility recorded"}</p>
-                {existing?.withdrawal_window?.fee_consequence && <p className="mt-1 text-xs text-emerald-900">Fee: {existing.withdrawal_window.fee_consequence}</p>}
-              </div>
-            </div>
+            <InlineNotice tone="success" role="status" icon={CalendarClock}>
+              <p className="eyebrow text-current">Eligibility recorded at submission</p>
+              <p className="card-title mt-1 text-current">Eligible until {formatDate(existing?.withdrawal_window?.deadline)}</p>
+              <p className="mt-1 text-xs font-semibold">{existing?.withdrawal_window?.status || "Eligibility recorded"}</p>
+              {existing?.withdrawal_window?.fee_consequence && <p className="mt-1 text-xs font-normal">Fee: {existing.withdrawal_window.fee_consequence}</p>}
+            </InlineNotice>
             <p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>
           </div>
         )}
