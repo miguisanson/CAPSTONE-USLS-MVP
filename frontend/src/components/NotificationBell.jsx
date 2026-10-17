@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, CheckCheck } from "lucide-react";
 import { api } from "../api";
+import { Button } from "./ui/index.js";
 
 // In-app notification bell for the top bar of the shared shell (every role). Opening the bell asks
 // the server for the person's notifications; the server also creates any reminder that is due, so
@@ -81,23 +82,23 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={wrapper}>
-      <button
-        type="button"
+      <Button
+        variant="icon"
+        icon={Bell}
         onClick={() => { setOpen((value) => !value); if (!open) load(); }}
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="true"
-        className="relative grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+        className="relative"
       >
-        <Bell className="h-4 w-4" />
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 grid min-w-[1.1rem] place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[1.1rem] text-white" aria-hidden="true">
+          <span className="absolute -right-1 -top-1 grid min-w-[1.1rem] place-items-center rounded-full bg-red-600 px-1 text-2xs font-semibold leading-[1.1rem] text-white" aria-hidden="true">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
-      </button>
+      </Button>
       {open && (
-        <div role="region" aria-label="Notifications" className="absolute right-0 z-50 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift">
+        <div role="region" aria-label="Notifications" className="absolute right-0 z-header mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <p className="font-display text-sm font-semibold text-ink">Notifications</p>
             <button type="button" onClick={readAll} disabled={!unread} className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline disabled:cursor-default disabled:text-slate-300 disabled:no-underline">
@@ -111,11 +112,11 @@ export default function NotificationBell() {
               <li key={item.id}>
                 <button type="button" onClick={() => openItem(item)} className={`block w-full cursor-pointer px-4 py-3 text-left hover:bg-slate-50 ${item.read_at ? "" : "bg-brand-50/40"}`}>
                   <span className="flex items-start justify-between gap-2">
-                    <span className={`text-sm leading-snug ${item.read_at ? "font-semibold text-slate-700" : "font-bold text-ink"}`}>{item.title}</span>
+                    <span className={`text-sm leading-snug ${item.read_at ? "font-medium text-slate-700" : "font-semibold text-ink"}`}>{item.title}</span>
                     {!item.read_at && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-600" aria-label="Unread" />}
                   </span>
                   {item.body && <span className="mt-0.5 line-clamp-3 block text-xs text-slate-500">{item.body}</span>}
-                  <span className="mt-1 block text-[11px] font-semibold text-slate-400">{when(item.created_at)}</span>
+                  <span className="micro mt-1 block font-semibold">{when(item.created_at)}</span>
                 </button>
               </li>
             ))}

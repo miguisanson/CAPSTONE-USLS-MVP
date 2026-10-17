@@ -17,7 +17,7 @@ function RoleNavItem({ item, active, onChange, mobile = false }) {
       }`}
     >
       {item.number != null && (
-        <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${selected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+        <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-2xs font-semibold ${selected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
           {item.number}
         </span>
       )}
@@ -37,12 +37,12 @@ export default function RoleSidebar({ roleLabel, groups, items = [], active, onC
         <div className="sticky top-0 flex h-screen flex-col">
           <div className="flex items-center gap-3 px-5 py-5">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white shadow-sm"><GraduationCap className="h-6 w-6" /></span>
-            <div className="leading-tight"><p className="font-display text-[15px] font-semibold text-ink">USLS Graduate School</p><p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">{roleLabel}</p></div>
+            <div className="leading-tight"><p className="card-title">USLS Graduate School</p><p className="text-2xs font-semibold uppercase tracking-wide text-brand-600">{roleLabel}</p></div>
           </div>
           <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6" aria-label={`${roleLabel} navigation`}>
             {navigationGroups.map((group) => (
               <section key={group.label} aria-labelledby={`${roleLabel}-${group.label}`.replace(/[^a-zA-Z0-9_-]+/g, "-").toLowerCase()}>
-                <p id={`${roleLabel}-${group.label}`.replace(/[^a-zA-Z0-9_-]+/g, "-").toLowerCase()} className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{group.label}</p>
+                <p id={`${roleLabel}-${group.label}`.replace(/[^a-zA-Z0-9_-]+/g, "-").toLowerCase()} className="eyebrow px-3 pb-2">{group.label}</p>
                 <div className="space-y-1">
                   {group.items.map((item) => <RoleNavItem key={item.id} item={item} active={active} onChange={onChange} />)}
                 </div>
@@ -50,13 +50,13 @@ export default function RoleSidebar({ roleLabel, groups, items = [], active, onC
             ))}
           </nav>
           {footer && <div className="border-t border-slate-200 px-3 py-3">{footer}</div>}
-          <p className="border-t border-slate-200 px-5 py-4 text-[11px] leading-relaxed text-slate-400">Only transactions assigned to this role are shown.</p>
+          <p className="micro border-t border-slate-200 px-5 py-4 leading-relaxed">Only transactions assigned to this role are shown.</p>
         </div>
       </aside>
       <nav className="flex gap-4 overflow-x-auto border-b border-slate-200 bg-white px-4 py-3 lg:hidden" aria-label={`${roleLabel} navigation`}>
         {navigationGroups.map((group) => (
           <div key={group.label} className="flex shrink-0 items-center gap-2" role="group" aria-label={group.label}>
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">{group.label}</span>
+            <span className="shrink-0 text-2xs font-semibold uppercase tracking-wider text-slate-500">{group.label}</span>
             {group.items.map((item) => <RoleNavItem key={item.id} item={item} active={active} onChange={onChange} mobile />)}
           </div>
         ))}
