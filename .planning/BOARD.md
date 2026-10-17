@@ -21,6 +21,7 @@ Your decisions: `DECISIONS.md`. How unattended work runs: `IMPROVE.md`.
 ## Ready for your review
 
 - **Design system, foundations** (merges 2e8cefc, ab32a7d, edc050c) - shared sizes/spacing, one status-colour map, shared buttons/fields/cards, one dialog that fits every screen, and `npm run check:ui`, which blocks new one-off sizes, tables and dialogs. Visible: status chips use one colour per meaning ("Submitted" blue, "Returned" amber, "Completed" green), info notes are blue, buttons and inputs are bigger on phones, the white strip above open dialogs is gone. Agent decisions AD1-AD4 in `DECISIONS.md`.
+- **First pages on the new design system:** Students, Dashboard and Work Queue (merge e5931af) - same data and actions; one header style, one table style with paging, dialogs that fit. Before/after screenshots: `E:\Temp\claude\p61-before` and `p61-after`.
 - **Section J bugs fixed:** J1 (dropped-subject dialog fits a laptop screen), J4 (no error banner after signing Form 1), J8 ("Mark reviewed" window title).
 
 - **Unused files moved to `archive/`** (merge 55c142b) — nothing visible changes; see `archive/README.md`.
