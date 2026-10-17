@@ -65,9 +65,9 @@ export default function ExportFollowUpModal({
         aria-modal="true"
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-description`}
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
       >
-        <header className="flex items-start gap-3 border-b border-slate-200 px-5 py-4">
+        <header className="flex shrink-0 items-start gap-3 border-b border-slate-200 px-5 py-4">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700">
             <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
           </span>
@@ -87,7 +87,7 @@ export default function ExportFollowUpModal({
           </button>
         </header>
 
-        <div className="space-y-4 px-5 py-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
             <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Exported file</p>
             <p className="mt-1 break-all text-sm font-semibold text-emerald-950">{filename}</p>
@@ -119,7 +119,7 @@ export default function ExportFollowUpModal({
           </ol>
         </div>
 
-        <footer className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-4">
+        <footer className="flex shrink-0 justify-end border-t border-slate-200 bg-slate-50 px-5 py-4">
           <button
             ref={closeButtonRef}
             type="button"

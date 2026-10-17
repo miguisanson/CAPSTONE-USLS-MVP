@@ -878,9 +878,9 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
         aria-modal="true"
         aria-labelledby="subject-status-dialog-title"
         aria-describedby="subject-status-dialog-description"
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift animate-fade-up"
+        className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift animate-fade-up"
       >
-        <header className="flex items-start gap-3 border-b border-slate-200 px-5 py-4">
+        <header className="flex shrink-0 items-start gap-3 border-b border-slate-200 px-5 py-4">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
             <ClipboardCheck className="h-5 w-5" />
           </span>
@@ -903,7 +903,7 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
           </button>
         </header>
 
-        <div className="space-y-4 px-5 py-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{edit.courseTitle}</p>
@@ -974,7 +974,7 @@ function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
           </p>
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+        <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
           <button type="button" onClick={onClose} disabled={busy} className="btn-ghost cursor-pointer">
             Cancel
           </button>
