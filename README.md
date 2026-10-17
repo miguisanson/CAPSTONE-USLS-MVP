@@ -120,9 +120,10 @@ virtual environment.
 npm run dev
 ```
 
-The seed and maintenance steps (empty database seeding, demo accounts, curriculum sync) run
-automatically when the app starts, however it is started (`npm run dev`, `python app.py`,
-`flask --app app run`, or a WSGI server), and are safe to repeat. They are skipped under the test
+A normal start never changes data. The one exception is a brand-new, empty database file: the
+first start builds the same demo data as `npm run seed` (below), however the app is started
+(`npm run dev`, `python app.py`, `flask --app app run`, or a WSGI server). On a database that
+already has data, starting the app writes nothing. The first-start build is skipped under the test
 runner, for `python app.py --seed`, and when `USLS_SKIP_STARTUP_TASKS=1` is set.
 
 Then open <http://localhost:5000>. Press `Ctrl+C` in the terminal to stop the server.
@@ -163,7 +164,7 @@ FLASK_PORT=5001 npm run dev:web
 | `npm run dev` | Start the app (Flask serves the API + built UI on port 5000) |
 | `npm start` | Same as `npm run dev` |
 | `npm run build` | Rebuild the frontend after changing UI code |
-| `npm run seed` | Reset/reseed the demo database (~350 students) |
+| `npm run seed` | Reset the demo database to the shared demo data and print its fingerprint |
 | `npm run dev:web` | Vite dev server on :5173 with hot reload (run `npm run dev` in a second terminal for the API) |
 
 > If you change anything under `frontend/src`, run `npm run build` (or use `npm run dev:web`) to see it.
@@ -185,7 +186,6 @@ local demo flow keeps working; set `DEMO_MODE=0` (in `.env` or the environment) 
 | Demo endpoints (`/api/auth/demo-accounts`, `/api/auth/demo-students`, demo reset) | available | `404` |
 | Passwords sent to the browser | only inside the expanded panel | never |
 | Demo persona repair at sign-in | yes | no |
-| Fabricated panel-matching availability seeded at start-up | yes | no |
 | `SECRET_KEY` not set | uses a public default | uses a random per-process key (set `SECRET_KEY` so sessions survive a restart) |
 
 Nothing is ever pre-filled: the presenter either types the password or presses **Fill form** /
@@ -208,7 +208,6 @@ Set these in the environment or in `.env` (the app never needs `.env` to start).
 | `SECRET_KEY` | public demo value in demo mode | signs the session cookie |
 | `SESSION_COOKIE_SECURE` | `0` | `1` when served over HTTPS |
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCKOUT_SECONDS` | `5`, `300` | sign-in lockout |
-| `DEMO_SEED_COUNT` | `350` | synthetic students when seeding |
 | `GOOGLE_API_KEY` (or `GOOGLE_AI_STUDIO_API_KEY`) | none, optional | Gemini key for the Policy Assistant |
 | `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL` | `gemini-2.5-flash`, `gemini-embedding-2` | Gemini models |
 | `RAG_PREWARM` | `1` | pre-build the document index at start-up (only when a Gemini key is set) |
@@ -246,13 +245,26 @@ The app uses a local SQLite file (`usls_gs_demo.sqlite3`) so it runs with no dat
 setup. It is SQLite only: the tables are created from the data models, and the app never patches
 an existing database. If you pull a newer version of the app and your database file was built by
 an older one, the app refuses to start and tells you to rebuild it. Reseed anytime (this resets
-the demo data and creates about 350 synthetic students plus related records):
+the demo data and builds 148 students, 12 faculty and the related records, imported from the
+sheets in `Documents/`):
 
 ```cmd
 npm run seed
 ```
 
-Change `DEMO_SEED_COUNT` in `.env` to seed 200-500 records.
+The seed is the only thing that writes demo data, and it gives the same data on every machine:
+the dates are counted from the day the seed runs, and the build does not depend on your `.env`
+(it always builds the full demo, including the fabricated panel-matching availability and the
+upcoming defenses). When it finishes it prints a line like
+
+```text
+Demo data fingerprint: 7c27df51af33...
+```
+
+Compare that line with a teammate's: if the two match, you hold the same data. (The fingerprint
+ignores the time of day inside timestamps and the salted password hashes, so two seeds run on the
+same day always agree. To see which tables differ between two database files run
+`.venv\Scripts\python.exe scripts/db_fingerprint.py your-file.sqlite3 --tables`.)
 
 ## Google Calendar availability
 

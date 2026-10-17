@@ -1338,32 +1338,6 @@ class PrivateFeedTests(CalendarDataBase):
 # Existing data and demo data
 # ---------------------------------------------------------------------------
 class ExistingDataTests(CalendarBase):
-    def test_the_old_automatic_default_hours_no_longer_count_as_entered(self):
-        """Faculty created before this change all got Monday-Friday 8-17 automatically."""
-        with app.app_context():
-            faculty = Faculty(name="Old Default Person", college="GS", role="Faculty", specialization="x",
-                              email="old.default@example.test", active=True)
-            db.session.add(faculty)
-            db.session.flush()
-            for weekday in range(5):
-                db.session.add(app_module.FacultyWorkingHour(
-                    faculty_id=faculty.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0), enabled=True))
-            entered = Faculty(name="Entered Person", college="GS", role="Faculty", specialization="x",
-                              email="entered.person@example.test", active=True, availability_updated_at=datetime.now())
-            db.session.add(entered)
-            db.session.flush()
-            for weekday in range(5):
-                db.session.add(app_module.FacultyWorkingHour(
-                    faculty_id=entered.id, weekday=weekday, start_time=time(8, 0), end_time=time(17, 0), enabled=True))
-            db.session.commit()
-            self.assertTrue(app_module.faculty_availability_entered(faculty))  # before the migration
-            flagged = app_module.label_system_default_working_hours()
-            db.session.expire_all()
-            self.assertGreaterEqual(flagged, 1)  # the fixture faculty look exactly like the old defaults too
-            self.assertFalse(app_module.faculty_availability_entered(db.session.get(Faculty, faculty.id)))
-            self.assertTrue(app_module.faculty_availability_entered(db.session.get(Faculty, entered.id)))
-            self.assertEqual(app_module.label_system_default_working_hours(), 0)
-
     def test_the_demo_panel_gets_labelled_demo_hours_and_nobody_else_does(self):
         with app.app_context():
             demo = Faculty(name="Dr. Liwayway Bautista", college="GS", role="Faculty", specialization="Learning analytics",

@@ -14,6 +14,7 @@ The real-database guard is the existing pattern: create a temp SQLite file and s
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from datetime import date, datetime, timedelta
 
@@ -38,15 +39,13 @@ from app import (  # noqa: E402
     add_log,
     add_task,
     app,
+    build_demo_database,
     canonical_owner_role,
-    close_tasks_of_finished_workflows,
     db,
     ensure_demo_accounts,
     generate_password_hash,
     graduation_eligibility,
     link_faculty_accounts,
-    normalize_owner_role_vocabulary,
-    run_data_normalisation,
     seed_database,
 )
 import app as app_module  # noqa: E402
@@ -535,18 +534,6 @@ class TaskClosingTests(CrossCutBase):
             self.assertEqual(self._titles("practicum"), ["Complete practicum hours and prepare certificates"])
 
 
-    def test_startup_cleanup_closes_tasks_of_workflows_that_already_finished(self):
-        with app.app_context():
-            db.session.add(WithdrawalApplication(student_id=self.student_id, status="Exported - Ready to Send",
-                                                 dean_decision="Approved"))
-            add_task(self.student_id, "Tag approved subject withdrawal and export the Registrar update", "Graduate School Staff", 3)
-            add_task(self.student_id, "Check graduation coursework completion", "Academic Coordinator", 3)
-            db.session.commit()
-            self.assertEqual(close_tasks_of_finished_workflows(), 1)
-            self.assertEqual(self._titles(), ["Check graduation coursework completion"])
-            self.assertEqual(close_tasks_of_finished_workflows(), 0)
-
-
 class OwnerVocabularyTests(CrossCutBase):
     """H03: one spelling for each owner role, on every screen."""
 
@@ -562,18 +549,6 @@ class OwnerVocabularyTests(CrossCutBase):
             self.assertEqual(canonical_owner_role("Graduate School Staff · Grace"), "Graduate School Staff")
             add_log("withdrawal", self.student_id, "Student", "src", "Result", "GS Staff", "notes")
             db.session.commit()
-            self.assertEqual(TransactionLog.query.one().next_owner, "Graduate School Staff")
-
-    def test_migration_rewrites_legacy_rows_and_is_safe_to_repeat(self):
-        with app.app_context():
-            db.session.add(Task(student_id=self.student_id, title="Legacy", owner_role="GS Staff",
-                                due_at=date.today(), status="Pending", priority=1))
-            db.session.add(TransactionLog(transaction_slug="awol", student_id=self.student_id, actor_role="Student",
-                                          result="x", next_owner="GS Staff"))
-            db.session.commit()
-            self.assertEqual(normalize_owner_role_vocabulary(), 2)
-            self.assertEqual(normalize_owner_role_vocabulary(), 0)
-            self.assertEqual(Task.query.one().owner_role, "Graduate School Staff")
             self.assertEqual(TransactionLog.query.one().next_owner, "Graduate School Staff")
 
     def test_every_screen_counts_the_same_staff_tasks(self):
@@ -711,19 +686,26 @@ class SeededConsistencyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         app.config.update(TESTING=True)
+        # The build registers the draft Operations Manual in the policy library; keep that copy and
+        # its search index in a scratch folder so no other test module (or the repo) sees it.
+        cls.scratch = tempfile.mkdtemp(prefix="crosscut-policy-")
+        cls.patches = [
+            patch("app.POLICY_DOCUMENT_UPLOAD_ROOT", Path(cls.scratch) / "policy_documents"),
+            patch("app.RAG_INDEX_DIR", Path(cls.scratch) / "rag-index"),
+        ]
+        for started in cls.patches:
+            started.start()
         with app.app_context():
             db.drop_all()
             db.create_all()
-            seed_database(60)
-            ensure_demo_accounts()
-            link_faculty_accounts()
-            run_data_normalisation()
-            db.session.commit()
+            build_demo_database()
             cls.staff_id = UserAccount.query.filter_by(role="staff", active=True).first().id
             cls.total_students = Student.query.count()
 
     @classmethod
     def tearDownClass(cls):
+        for started in cls.patches:
+            started.stop()
         with app.app_context():
             db.session.remove()
 
@@ -836,7 +818,7 @@ class FirstStartTests(unittest.TestCase):
         with app.app_context():
             db.drop_all()
             db.create_all()
-            seed_database(60)
+            seed_database()
             ensure_demo_accounts()
             link_faculty_accounts()
             db.session.commit()
