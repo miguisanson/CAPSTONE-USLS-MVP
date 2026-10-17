@@ -5,7 +5,6 @@ import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Card, EmptyState, Spinner } from "../../components/ui";
 import { PortalNavProvider } from "../../components/portalNav";
-import { DeanDecisionModal } from "./DeanParts";
 
 // Approval "processes" as the Dean sees them. Several workflow types share a
 // page (LOA, readmission and AWOL returns are all standing changes).
@@ -45,7 +44,6 @@ export function DeanProvider({ children }) {
   const [visibility, setVisibility] = useState({});
   const [msg, setMsg] = useState("");
   const [actErr, setActErr] = useState("");
-  const [pendingDecision, setPendingDecision] = useState(null);
   const keepFeedbackOnce = useRef(false);
 
   // Banners belong to the page where the action happened; clear them when the
@@ -118,31 +116,23 @@ export function DeanProvider({ children }) {
     }
   }
 
-  function requestWorkflowDecision(item, decision) {
+  // Called by the case page's DecisionPanel once the Dean has typed the comment (return and deny need one) and
+  // confirmed in the window titled after the button. `comment` is the trimmed text of the comment box.
+  async function requestWorkflowDecision(item, decision, comment = "") {
     const key = `${item.type}-${item.id}`;
     const selectedTemplate = template[key] || "";
-    const customNote = note[key] || "";
-    const combinedNote = [selectedTemplate !== "Other / Custom comment" ? selectedTemplate : "", customNote].filter(Boolean).join(" · ");
+    const combinedNote = [selectedTemplate !== "Other / Custom comment" ? selectedTemplate : "", comment].filter(Boolean).join(" · ");
     if (["return", "deny"].includes(decision) && !combinedNote.trim()) {
       setActErr("Choose a reason or enter a comment before returning or denying the request.");
       return;
     }
-    setActErr("");
-    setPendingDecision({ item, decision, note: combinedNote });
-  }
-
-  async function confirmWorkflowDecision() {
-    if (!pendingDecision) return;
-    const { item, decision, note: decisionNote } = pendingDecision;
-    const key = `${item.type}-${item.id}`;
     setBusy(key);
     setMsg("");
     setActErr("");
     try {
-      const res = await api.decideWorkflowApproval(item.type, item.id, { decision, note: decisionNote });
+      const res = await api.decideWorkflowApproval(item.type, item.id, { decision, note: combinedNote });
       setMsg(res.message);
       await refetch();
-      setPendingDecision(null);
       // After deciding from a case page, go back to that process's list.
       if (location.pathname.startsWith("/dean/case/")) {
         keepFeedbackOnce.current = true;
@@ -198,14 +188,6 @@ export function DeanProvider({ children }) {
     <PortalNavProvider counts={counts} flags={null}>
       <DeanContext.Provider value={value}>
         {children}
-        {pendingDecision && (
-          <DeanDecisionModal
-            pending={pendingDecision}
-            busy={busy === `${pendingDecision.item.type}-${pendingDecision.item.id}`}
-            onClose={() => setPendingDecision(null)}
-            onConfirm={confirmWorkflowDecision}
-          />
-        )}
       </DeanContext.Provider>
     </PortalNavProvider>
   );
