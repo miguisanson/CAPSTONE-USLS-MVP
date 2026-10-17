@@ -270,9 +270,9 @@ function Breadcrumb({ path, current, role }) {
     return (
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
         <span className="hidden font-semibold text-slate-500 sm:inline">{ROLE_LABELS[role]} Portal</span>
-        <ChevronRight className="hidden h-4 w-4 text-slate-300 sm:block" />
+        <ChevronRight className="hidden h-4 w-4 shrink-0 text-slate-300 sm:block" />
         <span className="hidden font-semibold text-slate-500 md:inline">{current.group.label}</span>
-        <ChevronRight className="hidden h-4 w-4 text-slate-300 md:block" />
+        <ChevronRight className="hidden h-4 w-4 shrink-0 text-slate-300 md:block" />
         <span className="truncate font-semibold text-ink" aria-current="page">{current.item.label}</span>
       </nav>
     );
@@ -287,7 +287,7 @@ function Breadcrumb({ path, current, role }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-sm">
       <span className="font-semibold text-slate-500">Platform</span>
-      <ChevronRight className="h-4 w-4 text-slate-300" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
       <span className="font-semibold capitalize text-ink">{label}</span>
     </div>
   );
