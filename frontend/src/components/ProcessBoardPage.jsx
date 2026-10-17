@@ -18,6 +18,7 @@ import {
   actionsIntoColumn,
   batchActionsOf,
   checkMoveFor,
+  lockReasonFor,
   commonBatchActions,
   matchesFilters,
   plural,
@@ -273,6 +274,8 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
 
   const checkMove = useCallback((item, column) => checkMoveFor(item, column, vocabulary), [vocabulary]);
 
+  const lockReason = useCallback((item) => lockReasonFor(item, vocabulary), [vocabulary]);
+
   const onMove = useCallback(
     async (item, toColumn) => {
       const action = actionsIntoColumn(item, toColumn)[0];
@@ -487,6 +490,7 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
               getColumnKey={getColumnKey}
               renderCard={renderCard}
               canDrag={(item) => (item.actions || NO_ACTIONS).length > 0}
+              lockReason={lockReason}
               checkMove={checkMove}
               onMove={onMove}
               renderColumnHeader={renderColumnHeader}
