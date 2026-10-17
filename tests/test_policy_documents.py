@@ -22,9 +22,11 @@ import app as appmod  # noqa: E402
 
 app = appmod.app
 db = appmod.db
-REAL_UPLOAD_ROOT = Path(appmod.POLICY_DOCUMENT_UPLOAD_ROOT)
-REAL_UPLOAD_LISTING = sorted(p.name for p in REAL_UPLOAD_ROOT.glob("*")) if REAL_UPLOAD_ROOT.exists() else []
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# The repository's own seed folder. (Not appmod.POLICY_DOCUMENT_UPLOAD_ROOT: under a test run that is a shared temp
+# folder, which every module that builds the demo database legitimately fills with the Operations Manual draft.)
+REAL_UPLOAD_ROOT = REPO_ROOT / "uploads" / "policy_documents"
+REAL_UPLOAD_LISTING = sorted(p.name for p in REAL_UPLOAD_ROOT.glob("*")) if REAL_UPLOAD_ROOT.exists() else []
 DRAFT_WARNING = "Draft — pending Graduate School validation"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _TEST_ROOT = tempfile.mkdtemp(prefix="policy-tests-")
