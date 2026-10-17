@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Move, X } from "lucide-react";
+import { Move } from "lucide-react";
+import { InlineNotice } from "./ui/index.js";
 
 /**
  * A staged board with real drag and drop (native HTML5, no dependency).
@@ -136,20 +137,9 @@ export default function StageBoard({
     <div>
       <div aria-live="polite" className="mb-3 min-h-[1px]">
         {notice && (
-          <div
-            role={notice.tone === "error" ? "alert" : "status"}
-            className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
-              notice.tone === "error"
-                ? "border-red-200 bg-red-50 text-red-700"
-                : "border-brand-200 bg-brand-50 text-brand-800"
-            }`}
-          >
-            {notice.tone === "error" ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
-            <span className="flex-1">{notice.text}</span>
-            <button type="button" onClick={() => setNotice(null)} className="cursor-pointer rounded p-0.5 hover:bg-black/5" aria-label="Dismiss message">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <InlineNotice tone={notice.tone === "error" ? "danger" : "success"} icon onDismiss={() => setNotice(null)}>
+            {notice.text}
+          </InlineNotice>
         )}
       </div>
       <div
@@ -173,7 +163,7 @@ export default function StageBoard({
                 onDrop={readOnly ? undefined : (event) => onDrop(event, column)}
                 className={`${columnClassName} flex shrink-0 flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors ${
                   allowedHere
-                    ? "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-200"
+                    ? "border-brand-400 bg-brand-50/60 ring-2 ring-brand-200"
                     : refusedHere
                       ? "border-dashed border-red-300 bg-red-50/40"
                       : "border-slate-200"
@@ -184,16 +174,16 @@ export default function StageBoard({
                 ) : (
                   <header className="mb-3">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{columnItems.length}</span>
+                      <h3 className="section-title">{column.label}</h3>
+                      <span className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{columnItems.length}</span>
                     </div>
-                    {column.description && <p className="mt-1 text-xs leading-relaxed text-slate-500">{column.description}</p>}
+                    {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
                   </header>
                 )}
                 {refusedHere && (
-                  <p role="status" className="mb-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs font-semibold text-red-700">
+                  <InlineNotice tone="danger" role="status" className="mb-2 px-2.5 py-2 text-xs">
                     {hoverVerdict.reason || "That move is not allowed."}
-                  </p>
+                  </InlineNotice>
                 )}
                 <div className="flex-1 space-y-3">
                   {columnItems.length ? (
@@ -226,7 +216,7 @@ export default function StageBoard({
                       );
                     })
                   ) : (
-                    <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-400">{column.empty || emptyText}</p>
+                    <p className="meta rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center">{column.empty || emptyText}</p>
                   )}
                 </div>
                 {renderColumnFooter ? renderColumnFooter(column, columnItems) : null}
@@ -271,7 +261,7 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, disabled }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11"
       >
         <Move className="h-3.5 w-3.5" /> Move to…
       </button>
@@ -279,7 +269,7 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, disabled }) {
         <ul
           id={menuId}
           role="menu"
-          className="absolute right-0 top-full z-30 mt-1 w-72 max-w-[85vw] rounded-xl border border-slate-200 bg-white p-1 shadow-xl"
+          className="absolute right-0 top-full z-header mt-1 w-72 max-w-[85vw] rounded-xl border border-slate-200 bg-white p-1 shadow-lift"
         >
           {columns
             .filter((column) => column.key !== fromKey)
@@ -296,11 +286,11 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, disabled }) {
                       onPick(column.key);
                     }}
                     className={`flex w-full cursor-pointer flex-col rounded-lg px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                      check.allowed ? "text-ink hover:bg-brand-50" : "text-slate-400 hover:bg-slate-50"
+                      check.allowed ? "text-ink hover:bg-brand-50" : "text-slate-500 hover:bg-slate-50"
                     }`}
                   >
                     <span className="font-semibold">{column.label}</span>
-                    {!check.allowed && check.reason && <span className="text-xs font-normal text-red-600">{check.reason}</span>}
+                    {!check.allowed && check.reason && <span className="text-xs font-normal text-red-700">{check.reason}</span>}
                   </button>
                 </li>
               );

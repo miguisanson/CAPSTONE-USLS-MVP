@@ -142,7 +142,12 @@ test.describe("P2.3 shared process components", () => {
       expect(titles[0]).toMatch(/Academically Eligible/);
       await expect(board.getByText("Bianca Santos", { exact: true })).toBeVisible();
 
-      await page.getByRole("button", { name: "View student", exact: true }).first().click();
+      // Bianca's own card (other specs move other students into this column, so "the first one" is not safe)
+      await board
+        .getByText("Bianca Santos", { exact: true })
+        .locator("xpath=ancestor::div[.//button[normalize-space()='View student']][1]")
+        .getByRole("button", { name: "View student", exact: true })
+        .click();
       const dialog = page.getByRole("dialog");
       await expect(dialog.getByRole("heading", { name: "Bianca Santos" })).toBeVisible();
       const toggle = dialog.getByRole("button", { name: /stage history/ });

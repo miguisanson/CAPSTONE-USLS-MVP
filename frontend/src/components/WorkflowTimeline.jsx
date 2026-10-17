@@ -1,4 +1,5 @@
 import HistoryDisclosure from "./HistoryDisclosure";
+import { Stepper } from "./ui/index.js";
 
 const WITHDRAWAL_STEPS = [
   "Student sends a subject withdrawal request",
@@ -70,33 +71,13 @@ export function graduationTimelineSteps(status, eligibility = {}) {
   return numberedStates(GRADUATION_STEPS, activeIndex, [6]);
 }
 
+// The step builders above stay as they were; this only draws their result. The list is behind "View stage history":
+// long step names read best one per line, so it is a vertical Stepper.
 export default function WorkflowTimeline({ steps = [], title = "Workflow timeline" }) {
   return (
     <HistoryDisclosure label="View stage history" hideLabel="Hide stage history" count={steps.length}>
       <section aria-label={title}>
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
-        <ol className="grid gap-2 sm:grid-cols-2">
-          {steps.map((step, index) => {
-            const state = step.state || "upcoming";
-            return (
-              <li
-                key={`${index}-${step.label}`}
-                aria-current={state === "current" ? "step" : undefined}
-                className={`rounded-xl border px-3 py-2 text-xs font-semibold leading-relaxed ${
-                  state === "current"
-                    ? "border-brand-600 bg-brand-600 text-white"
-                    : state === "complete"
-                      ? "border-brand-200 bg-brand-50 text-brand-800"
-                      : "border-slate-200 bg-white text-slate-500"
-                }`}
-              >
-                <span className={`font-bold ${state === "upcoming" ? "text-slate-400" : "text-current"}`}>Step {index + 1}:</span>{" "}
-                {step.label}
-                {step.optional && <span className="ml-1 font-medium opacity-75">(if needed)</span>}
-              </li>
-            );
-          })}
-        </ol>
+        <Stepper steps={steps} title={title} orientation="vertical" compact />
       </section>
     </HistoryDisclosure>
   );
