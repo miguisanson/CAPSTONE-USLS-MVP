@@ -13,7 +13,7 @@ export default defineConfig({
   timeout: 15 * 60 * 1000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
-  workers: Number(process.env.E2E_WORKERS || 4),
+  workers: Number(process.env.E2E_WORKERS || 3), // 4 made Windows run out of socket buffers (I-041)
   retries: 0,
   forbidOnly: false,
   reporter: [["list"], ["html", { open: "never", outputFolder: join(ARTIFACTS_DIR, "report") }]],

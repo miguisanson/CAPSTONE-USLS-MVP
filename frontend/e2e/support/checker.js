@@ -27,10 +27,20 @@ export const slugify = (href) =>
   (href || "").replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "home";
 
 /** Watches a page and attributes events to whatever `tracker.where` currently names. */
+// Windows can run out of socket buffers when several browsers load pages at once (I-041). That is the test
+// machine, not the app: such a failure is logged as a note and not counted as a problem.
+const MACHINE_NETWORK_ERROR = /ERR_NO_BUFFER_SPACE/;
+
 export function attachWatchers(page, tracker) {
   const add = (problem) => tracker.problems.push({ ...tracker.where, problem });
+  const machineHiccup = (text) => {
+    if (!MACHINE_NETWORK_ERROR.test(text || "")) return false;
+    console.warn(`[e2e] ignored a machine network error (I-041) on ${tracker.where?.page || "?"}: ${String(text).slice(0, 160)}`);
+    return true;
+  };
   page.on("console", (message) => {
     if (message.type() !== "error") return;
+    if (machineHiccup(message.text())) return;
     const loc = message.location();
     const at = loc?.url ? ` (${loc.url.replace(/^https?:\/\/[^/]+/, "")}${loc.lineNumber ? `:${loc.lineNumber}` : ""})` : "";
     add(`console error: ${message.text().slice(0, 300)}${at}`);
@@ -48,6 +58,7 @@ export function attachWatchers(page, tracker) {
   });
   page.on("requestfailed", (request) => {
     const url = new URL(request.url());
+    if (machineHiccup(request.failure()?.errorText)) return;
     if (url.pathname.startsWith("/api/")) add(`API request failed: ${request.method()} ${url.pathname} (${request.failure()?.errorText})`);
   });
 }
