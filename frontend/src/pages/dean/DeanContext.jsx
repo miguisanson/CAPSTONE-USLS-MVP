@@ -5,22 +5,10 @@ import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Card, EmptyState, InlineNotice, Spinner } from "../../components/ui/index.js";
 import { PortalNavProvider } from "../../components/portalNav";
+import { DEAN_PROCESSES, processOfType } from "../../lib/deanHome.js";
 
-// Approval "processes" as the Dean sees them. Several workflow types share a
-// page (LOA, readmission and AWOL returns are all standing changes).
-export const DEAN_PROCESSES = {
-  "course-adjustments": { label: "Course Adjustments", types: [] },
-  "leave-of-absence": { label: "Leave of Absence", types: ["leave-of-absence"] },
-  readmission: { label: "Readmission", types: ["readmission"] },
-  awol: { label: "AWOL & Residency", types: ["awol-return"] },
-  withdrawal: { label: "Withdrawal Requests", types: ["withdrawal"] },
-  practicum: { label: "Practicum Reports", types: ["practicum"] },
-  graduation: { label: "Graduation Endorsement", types: ["graduation"] },
-};
-
-export function processOfType(type) {
-  return Object.keys(DEAN_PROCESSES).find((key) => DEAN_PROCESSES[key].types.includes(type)) || null;
-}
+// Approval "processes" as the Dean sees them: the table lives in lib/deanHome.js (the Dean home's unit test imports it).
+export { DEAN_PROCESSES, processOfType };
 
 const DeanContext = createContext(null);
 

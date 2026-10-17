@@ -14,6 +14,8 @@
     "test:stages": "node --test scripts/stages.test.mjs",
     "test:student-home": "node --test scripts/student-home.test.mjs",
     "test:staff-home": "node --test scripts/staff-home.test.mjs",
+    "test:dean-home": "node --test scripts/dean-home.test.mjs",
+    "test:faculty-home": "node --test scripts/faculty-home.test.mjs",
     "e2e": "npm run check:ui && node scripts/e2e.mjs --build",
     "e2e:negative": "vite build && node scripts/e2e.mjs --negative",
     "e2e:install": "node scripts/e2e.mjs install chromium"
