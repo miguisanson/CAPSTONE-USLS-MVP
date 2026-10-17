@@ -30,6 +30,14 @@ task) picks it up.
    decisions are `.planning/DECISIONS.md` (IM1–IM15); the owner reads
    `.planning/BOARD.md` — keep it current with STATE.md. For an unattended
    run the same command runs `.planning/IMPROVE.md`.
+   **Consistency is the owner's top concern (IM24).** Every session runs the
+   consistency sweep in `.planning/IMPROVE.md` (bug hunt, method 0): compare
+   pages of the same kind (boards, role homes, forms, list pages, detail pages,
+   dialogs, reports) feature by feature and file every unexplained difference as
+   a `consistency:` row in `.planning/ISSUES.md` — e.g. Leave/Readmission cards
+   could be dragged while some AWOL cards could not, with no reason shown
+   (I-049). Fix by making the pages behave alike or by showing the policy
+   reason on the page, never by special-casing one page.
    For what the app must *do*: `DEFENSE_REVISIONS.md` (the panel's required
    revisions from the 2026-08-07 defense) is worked **first**, top to bottom. After it is fully closed,
    `CHECKLIST_PHASE_PLAN.md` (numbered, phase-gated, items 1–92) and

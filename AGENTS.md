@@ -224,7 +224,10 @@ parallel, each in its own worktree, branched from `v5.2-migui_again`.
   values from the policy text or the owner, not the code's own output; list
   removed or changed assertions by name; open every changed screenshot at
   1366/1920/390 px; reach the feature through the real UI; grep siblings of the
-  changed pattern; no stray `console.log`/`print`, no secrets, nothing outside
+  changed pattern; **check the same-kind pages too (IM24): a change to one board, form,
+  list, home or dialog is applied to, or checked against, every page of that kind, and any
+  difference without a visible policy reason is a finding (example: AWOL cards that could
+  not move without saying why, I-049)**; no stray `console.log`/`print`, no secrets, nothing outside
   the packet's file list. Fix small findings in the same session.
 - **Unused files and folders are moved to `archive/`, not deleted** (owner,
   IM12), each listed in `archive/README.md` with where it came from and the

@@ -15,10 +15,11 @@ work (IM11); every commit can be reverted on its own.
 1. **Red gate**: a failing unittest, a failing Playwright walkthrough, or a frontend build error.
 2. **`ISSUES.md` rows** with status `open` or `confirmed`, highest severity first
    (this includes `DEFENSE_REVISIONS.md` section J, copied in as I-rows).
-3. **The current `ROADMAP.md` phase** (foundations → walkthroughs → section J → backend split
+3. **Consistency findings** (`consistency:` rows from the sweep below; IM24).
+4. **The current `ROADMAP.md` phase** (foundations → walkthroughs → section J → backend split
    → design system → performance/cleanup, IM8).
-4. **Cheap ideas** from `IDEAS.md` (IM13 definition), only when 1–3 are empty.
-5. **Bug-hunt findings with evidence** (below).
+5. **Cheap ideas** from `IDEAS.md` (IM13 definition), only when 1–3 are empty.
+6. **Bug-hunt findings with evidence** (below).
 
 Not inputs: "could be better" with no evidence, new features that are not cheap (they go to
 `IDEAS.md`), anything in `Documents/CAPSTONE_ONLY/CAPRIT2 OLD/`, stakeholder-blocked items.
@@ -80,6 +81,23 @@ One pass after every 3 merged commits. **At most 5 findings filed per pass.** An
 is a correct result. Three empty passes in a row with an empty queue: stop and report.
 
 Methods:
+0. **Consistency sweep (owner decision IM24 — do this every pass, it is the owner's top concern).**
+   Pages of the same kind must look and behave the same. Group the app's pages by kind and compare them
+   feature by feature, through the real UI, for every role that sees them:
+   - process/workflow boards (Leave of Absence, Readmission, AWOL & Residency, Withdrawal, the WorkflowPage
+     boards such as Graduation, Practicum, Research Gate);
+   - role homes (student, staff, coordinators, dean, faculty — all on `RoleHome`);
+   - request/submission forms; list pages with tables; record/detail pages; decision dialogs; history panels;
+     report pages; the assistant pages.
+   For each group, check: same layout and component library pieces; same controls (view toggle, filters, search,
+   batch actions, export, drag / "Move to…"); same states (loading, empty, error, locked); same wording for the
+   same thing; same sizes at 1366/1920/390. **Any difference with no visible policy reason is a finding.**
+   Worked example (I-049, 2026-10-17): Leave of Absence and Readmission cards could be dragged but some AWOL &
+   Residency cards could not, and nothing on the card said why (they were waiting on the student). The fix is
+   never "make AWOL different" — it is "make every board show why a card is locked". A difference that policy
+   requires stays, but it must be visible on the page.
+   Write each finding as an ISSUES.md row tagged `consistency:` with both pages named, and keep
+   `.planning/phases/05-design-system/board-parity.md` (and a parity table per page group) current.
 1. Run the Playwright walkthroughs for every role; any console error, failed request, page
    wider than the viewport, or text overflow is a finding.
 2. Open the screenshot set at all three widths; compare pages that should look alike.
