@@ -73,7 +73,7 @@ async function formPage(browser, mutate, { failPath, failMessage = "Spec: the se
   const close = context.close.bind(context);
   context.close = async () => {
     for (const open of context.pages()) await open.waitForLoadState("networkidle").catch(() => {});
-    await context.unrouteAll({ behavior: "wait" });
+    await context.unrouteAll({ behavior: "ignoreErrors" });
     await close();
   };
   return { context, page, writes, info };
