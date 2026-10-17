@@ -205,3 +205,80 @@ test.describe("I-004 Form 1 endorsement", () => {
     await expect(page.getByRole("button", { name: /Miguel Yu.*Endorsed/s }).first()).toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------
+// I-008 (J8): the Dean's "Mark reviewed" window must not be titled "Approve current stage"
+// ---------------------------------------------------------------------------------------------------------
+test.describe("I-008 Practicum: Dean marks a report reviewed", () => {
+  test.use({ storageState: authFile("dean"), viewport: { width: 1366, height: 768 } });
+
+  test("the confirmation window is titled after the Mark reviewed button", async ({ page, playwright }) => {
+    mkdirSync(SHOTS, { recursive: true });
+
+    // Setup: take Paolo Ramirez (MSGC) from a fresh practicum to "Report Sent to Dean".
+    await resetDemoStudent(playwright, "practicum-paolo");
+    const paolo = await apiAs(playwright, "practicum.paolo@usls.edu.ph");
+    const me = await okJson(await paolo.get("/api/auth/me"), "me");
+    const studentId = me.user.student_id;
+    expect(studentId, "Paolo's student id").toBeTruthy();
+    const attach = async (file) =>
+      (
+        await okJson(
+          await paolo.post("/api/student-portal/request-attachments/upload", { multipart: { request_type: "practicum", file } }),
+          `upload ${file.name}`,
+        )
+      );
+    const attachmentId = (body) => body.attachment?.id ?? body.id ?? body.item?.id;
+
+    const moa = attachmentId(await attach(pdfFile("Paolo_Ramirez_Signed_MOA.pdf", ["Memorandum of Agreement - Practicum"])));
+    expect(moa, "MOA attachment id").toBeTruthy();
+    await okJson(
+      await paolo.post("/api/student-portal/requests/practicum", {
+        data: { attachment_id: moa, practicum_site: "Guidance and Counseling Partner Center", supervisor_name: "Ms. Angela Cruz", remarks: "MOA for review." },
+      }),
+      "student submits MOA",
+    );
+    const staff = await apiAs(playwright, "staff@usls.edu.ph");
+    const coordinator = await apiAs(playwright, "academic@usls.edu.ph");
+    const step = async (ctx, status, extra = {}) =>
+      okJson(await ctx.post("/api/transactions/practicum", { data: { student_id: studentId, status, ...extra } }), `practicum -> ${status}`);
+    await step(staff, "MOA Under Review");
+    await step(coordinator, "Practicum In Progress");
+    const certificate = attachmentId(
+      await attach(pdfFile("Paolo_Ramirez_Practicum_Certificates.pdf", ["Practicum Hours Certificates", "200 of 200 hours completed"])),
+    );
+    await okJson(
+      await paolo.post("/api/student-portal/requests/practicum", {
+        data: { certificate_attachment_id: certificate, completed_hours: 200, remarks: "All 200 hours." },
+      }),
+      "student submits completion documents",
+    );
+    await step(staff, "Documents Under Review");
+    await step(coordinator, "Completed");
+    await step(coordinator, "Report Sent to Dean");
+    await Promise.all([paolo, staff, coordinator].map((ctx) => ctx.dispose()));
+
+    // The screen under test, as the Dean.
+    await page.goto("/dean/approvals/practicum");
+    const row = page.getByRole("row").filter({ hasText: "Paolo Ramirez" });
+    await expect(row.first()).toBeVisible();
+    await row.first().getByRole("link", { name: "Review" }).click();
+    await page.getByLabel(/Review comment/i).first().fill("Practicum completed: 200 of 200 hours documented. Reviewed.");
+    const button = page.getByRole("button", { name: "Mark reviewed" });
+    await button.scrollIntoViewIfNeeded();
+    const buttonLabel = (await button.innerText()).trim();
+    expect(buttonLabel).toBe("Mark reviewed");
+    await button.click();
+
+    const dialog = page.getByRole("dialog").last();
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: join(SHOTS, "i-008-dean-mark-reviewed-window-1366.png") });
+    // The window is named after the button the Dean clicked, and its confirm button says the same.
+    await expect(dialog.getByRole("heading").first()).toContainText(buttonLabel);
+    await expect(dialog.getByText("Approve current stage")).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: buttonLabel })).toBeVisible();
+    await dialog.getByRole("button", { name: buttonLabel }).click();
+    await expect(dialog).toBeHidden();
+  });
+});
