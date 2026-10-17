@@ -9995,7 +9995,7 @@ def _gemini_generate(prompt: str) -> str:
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     if not api_key:
         raise RuntimeError("Google AI Studio is not configured.")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").removeprefix("models/")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-flash-latest").removeprefix("models/")
     if not re.fullmatch(r"[A-Za-z0-9._-]+", model_name):
         raise RuntimeError("The configured Gemini model name is invalid.")
     endpoint = (

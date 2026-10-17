@@ -209,7 +209,7 @@ Set these in the environment or in `.env` (the app never needs `.env` to start).
 | `SESSION_COOKIE_SECURE` | `0` | `1` when served over HTTPS |
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCKOUT_SECONDS` | `5`, `300` | sign-in lockout |
 | `GOOGLE_API_KEY` (or `GOOGLE_AI_STUDIO_API_KEY`) | none, optional | Gemini key for the Policy Assistant |
-| `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL` | `gemini-2.5-flash`, `gemini-embedding-2` | Gemini models |
+| `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL` | `gemini-flash-latest`, `gemini-embedding-2` | Gemini models (`gemini-2.5-flash` is closed to new keys since 2026) |
 | `RAG_PREWARM` | `1` | pre-build the document index at start-up (only when a Gemini key is set) |
 | `TESSERACT_CMD` | on `PATH` | OCR for scanned PDFs |
 
