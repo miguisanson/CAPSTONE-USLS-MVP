@@ -15,7 +15,7 @@ export const SIGNIN_DIR = join(ARTIFACTS_DIR, ".signin");
 export const AUTH_DIR = join(ARTIFACTS_DIR, ".auth");
 export const STATE_FILE = join(ARTIFACTS_DIR, ".runtime", "state.json");
 
-export const PORT = 5055;
+export const PORT = Number(process.env.E2E_PORT) || 5055; // E2E_PORT lets two worktrees run the suite side by side
 export const BASE_URL = `http://127.0.0.1:${PORT}`;
 export const DEFAULT_BROWSERS_PATH = "E:/DevCache/ms-playwright";
 
