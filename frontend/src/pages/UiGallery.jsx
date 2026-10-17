@@ -10,6 +10,7 @@ import UiGalleryP1b from "./UiGalleryP1b.jsx";
 import ModalSection from "./UiGalleryModal.jsx"; // P1c
 import UiGalleryP1e from "./UiGalleryP1e.jsx"; // P1e
 import UiGalleryP1d from "./UiGalleryP1d.jsx";
+import UiGalleryP1f from "./UiGalleryP1f.jsx"; // P1f
 
 const Z_SCALE = [
   ["z-header", "30", "sticky top bar"],
@@ -128,6 +129,7 @@ export default function UiGallery() {
           <ModalSection />
           <UiGalleryP1e />
           <UiGalleryP1d />
+          <UiGalleryP1f />
 
           <Block id="components" title="Components">
             <p className="text-sm text-slate-600" data-gallery="exports">
