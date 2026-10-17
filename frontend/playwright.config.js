@@ -42,7 +42,7 @@ export default defineConfig({
     // `node scripts/e2e.mjs --build`, which `npm run e2e` uses). Not in the negative control.
     ...(negative
       ? []
-      : [{ name: "ui-gallery", testMatch: /ui-gallery\.spec\.js$/, dependencies: ["setup"] }]),
+      : [{ name: "ui-gallery", testMatch: /ui-gallery[\w-]*\.spec\.js$/, dependencies: ["setup"] }]),
   ],
   globalTeardown: "./e2e/support/teardown.mjs",
   webServer: {

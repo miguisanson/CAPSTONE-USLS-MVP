@@ -80,4 +80,4 @@ for (const viewport of VIEWPORTS) {
 }
 
 // Owed by later packets (see UI-SPEC section 8). Listed here so the gallery spec shows what it will have to cover.
-test.fixme("gallery shows StatusChip, Card, Field (P1b), Modal and Drawer (P1c), DataTable and Feedback (P1d), PageHeader, StatCard and Stepper (P1e), DecisionPanel and HistoryPanel (P1f) with a long-text and an empty case", async () => {});
+test.fixme("gallery shows Modal and Drawer (P1c), DataTable and Feedback (P1d), PageHeader, StatCard and Stepper (P1e), DecisionPanel and HistoryPanel (P1f) with a long-text and an empty case", async () => {});
