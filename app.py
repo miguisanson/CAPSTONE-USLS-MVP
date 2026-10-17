@@ -14828,7 +14828,6 @@ def register_routes(app: Flask) -> None:
             })
         adviser_inbox, adviser_consents = faculty_adviser_inbox(faculty)
         open_invitations = faculty_open_invitations(faculty)
-        db.session.commit()
         return jsonify({
             "faculty": faculty_profile_dict(faculty, include_calendar_events=True),
             "panels": panels,
@@ -19536,8 +19535,6 @@ def register_routes(app: Flask) -> None:
         _account, faculty = signed_in_faculty()
         if not faculty:
             return jsonify(NO_FACULTY_RECORD[0]), NO_FACULTY_RECORD[1]
-        ensure_invitations_for_faculty(faculty)
-        db.session.commit()
         rows = PanelInvitation.query.filter_by(faculty_id=faculty.id).order_by(PanelInvitation.invited_at.desc(), PanelInvitation.id.desc()).all()
         items = []
         for row in rows:
@@ -19629,10 +19626,6 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "research_coordinator", "academic_coordinator")
     def panel_invitation_list():
         student_id = request.args.get("student_id", type=int)
-        student = db.session.get(Student, student_id) if student_id else None
-        if student:
-            sync_panel_invitations(student, current_panel_gate(student), notify=False)
-            db.session.commit()
         query = PanelInvitation.query
         if student_id:
             query = query.filter_by(student_id=student_id)
@@ -23730,8 +23723,6 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 for item in AvailabilityRequest.query.filter_by(student_id=selected_student.id)
                 .order_by(AvailabilityRequest.created_at.desc(), AvailabilityRequest.id.desc()).limit(30).all()
             ]
-            if progress["gate"] in RESEARCH_GATE_DEFENSE_TYPES:
-                sync_panel_invitations(selected_student, progress["gate"], notify=False)
             context["panel_invitations"] = [
                 panel_invitation_dict(item)
                 for item in PanelInvitation.query.filter_by(student_id=selected_student.id, gate=progress["gate"]).all()
@@ -26759,6 +26750,8 @@ def carry_panel_forward(student: Student, gate: str) -> int:
             panel_role=assignment.panel_role, score=assignment.score,
             eligibility_note="Carried over from the proposal defense panel (same panel at the final defense)",
         ))
+    db.session.flush()
+    sync_panel_invitations(student, RESEARCH_GATE_FINAL, notify=False)  # the new seats get their invitations now
     return len(proposal_panel)
 
 
@@ -28283,15 +28276,18 @@ def sync_panel_invitations(student: Student, gate: str, notify: bool = True) -> 
     return created
 
 
-def ensure_invitations_for_faculty(faculty: Faculty) -> None:
-    """Create the invitations a faculty member should have for seats on a student's current panel."""
-    for assignment in PanelAssignment.query.filter_by(faculty_id=faculty.id).all():
-        student = assignment.student
-        if not student:
-            continue
+def sync_all_panel_invitations() -> int:
+    """Give every seat on a student's current panel its invitation (the demo build calls this once).
+
+    A page view never creates invitations: they are made when the seat is made. This covers seats
+    that the demo seeders place directly.
+    """
+    created = 0
+    for student in Student.query.filter(Student.id.in_(db.session.query(PanelAssignment.student_id))).order_by(Student.id).all():
         gate = current_panel_gate(student)
-        if assignment.gate == gate:
-            sync_panel_invitations(student, gate, notify=False)
+        if gate in RESEARCH_GATE_DEFENSE_TYPES:
+            created += sync_panel_invitations(student, gate, notify=False)
+    return created
 
 
 # ---- notifications about schedule changes -----------------------------------------------------
@@ -28554,8 +28550,10 @@ def faculty_adviser_inbox(faculty: Faculty) -> tuple[list[AdviserAppointment], l
 
 
 def faculty_open_invitations(faculty: Faculty) -> list[PanelInvitation]:
-    """Invitations on a student's current panel that this faculty member has not answered yet."""
-    ensure_invitations_for_faculty(faculty)
+    """Invitations on a student's current panel that this faculty member has not answered yet.
+
+    Read only: invitations are created when the seat is made (sync_panel_invitations), never here.
+    """
     rows = []
     for row in PanelInvitation.query.filter_by(faculty_id=faculty.id, status="Invited").all():
         student = row.student
@@ -36789,6 +36787,7 @@ def build_demo_database() -> dict:
         # 4. The policy library and the future defenses that fill the calendars.
         ensure_operations_manual_policy_document()  # the draft manual is searchable as a Draft
         ensure_upcoming_defense_demo()
+        sync_all_panel_invitations()  # seats the seeders placed directly get their invitations (no page view makes them)
         db.session.commit()
         # 5. Last syncs, once everything above exists.
         sync_result = sync_all_curricula()

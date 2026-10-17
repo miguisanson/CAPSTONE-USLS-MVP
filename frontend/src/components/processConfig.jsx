@@ -54,6 +54,7 @@ export const GUIDES = {
 //   { slug, role, isStaff, cases, data, reload(), openDetail(item), banner(tone, text), signal, clearSignal }
 // and fill three fixed places on the page: next to the summary line (HeaderActions), just above
 // the board (AboveBoard) and just below it (BelowBoard).
+// Opening the screen writes nothing (I-039): the dates are moved along at start-up, at sign-in and by this button.
 function LeaveHeaderActions({ ctx }) {
   const [syncing, setSyncing] = useState(false);
   if (!ctx.isStaff) return null;
@@ -110,18 +111,6 @@ function AwolHeaderActions({ ctx }) {
   );
 }
 
-// When the screen opens, let the server update any leave dates once, and load again only if
-// something changed.
-async function leaveAfterOpen({ isStaff, reload }) {
-  if (!isStaff) return;
-  try {
-    const result = await api.syncLeaveCases();
-    if (syncSummary(result).changed) await reload();
-  } catch {
-    // The dates are only a convenience here; the board still works without them.
-  }
-}
-
 export const PROCESS_CONFIG = {
   "leave-of-absence": {
     title: "Leave of Absence",
@@ -133,7 +122,6 @@ export const PROCESS_CONFIG = {
     emptyTitle: "No leave requests yet",
     emptyHint: "Requests appear here as soon as a student files one.",
     nameBatches: true,
-    afterOpen: leaveAfterOpen,
     HeaderActions: LeaveHeaderActions,
     AboveBoard: LeaveAboveBoard,
     BelowBoard: LeaveBelowBoard,
@@ -148,7 +136,6 @@ export const PROCESS_CONFIG = {
     emptyTitle: "No readmission requests yet",
     emptyHint: "Requests appear here as soon as a student files one.",
     nameBatches: true,
-    afterOpen: leaveAfterOpen,
     HeaderActions: LeaveHeaderActions,
     BelowBoard: LeaveBelowBoard,
   },

@@ -34,6 +34,7 @@ from app import (  # noqa: E402
     ResearchEvidenceFile,
     ScheduleRequest,
     Student,
+    sync_panel_invitations,
     Task,
     TransactionLog,
     UserAccount,
@@ -239,6 +240,8 @@ class ResearchCoreBase(unittest.TestCase):
             db.session.add(row)
             rows.append(row)
         db.session.flush()
+        # Seats get their invitations when they are made (a page view no longer creates them: I-038).
+        sync_panel_invitations(db.session.get(Student, student_id), gate, notify=False)
         return rows
 
     def schedule(self, student_id, defense_type, status="Scheduled", day=None, start=time(9, 0), end=time(11, 0), names=None):
