@@ -30,8 +30,8 @@ from app import (  # noqa: E402
     db,
     demo_mode_enabled,
     generate_password_hash,
+    build_demo_database,
     resolve_secret_key,
-    run_startup_tasks,
     should_run_startup_tasks,
 )
 
@@ -528,18 +528,19 @@ class StartupTests(HealthTestBase):
         with app.app_context():
             self.assertEqual(Student.query.count(), 2)
 
-    def test_startup_tasks_are_idempotent_and_create_the_demo_accounts(self):
-        # Startup also registers the draft Operations Manual in the policy library; keep that
+    def test_the_build_creates_the_demo_accounts_and_is_repeatable(self):
+        # The build also registers the draft Operations Manual in the policy library; keep that
         # copy (and the search index) in a scratch folder so no other test module sees it.
         scratch = Path(tempfile.mkdtemp(prefix="health-policy-"))
         with patch("app.POLICY_DOCUMENT_UPLOAD_ROOT", scratch / "policy_documents"), patch("app.RAG_INDEX_DIR", scratch / "rag-index"):
             with app.app_context():
-                run_startup_tasks(seed_count=0)
-                first = UserAccount.query.count()
+                build_demo_database()  # resets the database first: the two setUp students are gone
+                first_accounts, first_students = UserAccount.query.count(), Student.query.count()
                 self.assertIsNotNone(UserAccount.query.filter_by(email="staff@usls.edu.ph").first())
-                run_startup_tasks(seed_count=0)
-                self.assertEqual(UserAccount.query.count(), first)
-                self.assertEqual(Student.query.filter_by(student_number="GS-HLT-A").count(), 1)
+                self.assertEqual(Student.query.filter_by(student_number="GS-HLT-A").count(), 0)
+                build_demo_database()
+                self.assertEqual(UserAccount.query.count(), first_accounts)
+                self.assertEqual(Student.query.count(), first_students)
                 from app import PolicyDocument
                 self.assertEqual(PolicyDocument.query.filter_by(category="Operations Manual", status="draft").count(), 1)
 

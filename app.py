@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import random
 import re
@@ -5176,40 +5177,6 @@ def recompute_risk(student: Student) -> None:
     student.risk_level = student_priority(student)["level"]
 
 
-def normalize_owner_role_vocabulary() -> int:
-    """Rewrite the old "GS Staff" owner spelling to the one canonical label on existing rows.
-
-    Guarded and idempotent: only touches rows that still carry a legacy spelling and tolerates a
-    database where the tables do not exist yet.
-    """
-    tables = set(inspect(db.engine).get_table_names())
-    changed = 0
-    for table, column in (("task", "owner_role"), ("transaction_log", "next_owner")):
-        if table not in tables:
-            continue
-        for legacy in LEGACY_STAFF_OWNER_SPELLINGS:
-            result = db.session.execute(
-                text(f"UPDATE {table} SET {column} = :new WHERE {column} = :old"),
-                {"new": STAFF_OWNER, "old": legacy},
-            )
-            changed += result.rowcount or 0
-    if changed:
-        db.session.commit()
-    return changed
-
-
-def normalize_stage_vocabulary() -> int:
-    """Move students left in the retired stage "Research" to the real stage "Writing"."""
-    if "student" not in set(inspect(db.engine).get_table_names()):
-        return 0
-    result = db.session.execute(
-        text("UPDATE student SET current_stage = 'Writing' WHERE current_stage = 'Research'")
-    )
-    if result.rowcount:
-        db.session.commit()
-    return result.rowcount or 0
-
-
 def ensure_delay_status_consistency() -> int:
     changed = 0
     for student in Student.query.all():
@@ -9800,8 +9767,9 @@ def _policy_version_note(source) -> tuple[str, str | None]:
     return note, None
 
 
-def _write_policy_file(file_bytes: bytes, original_name: str) -> tuple[str, Path]:
-    stored_name = f"{uuid4().hex[:10]}-{original_name}"
+def _write_policy_file(file_bytes: bytes, original_name: str, stored_prefix: str | None = None) -> tuple[str, Path]:
+    # Uploads get a random prefix so two files never collide; the seeded manual passes a fixed one.
+    stored_name = f"{stored_prefix or uuid4().hex[:10]}-{original_name}"
     target = POLICY_DOCUMENT_UPLOAD_ROOT / stored_name
     POLICY_DOCUMENT_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     target.write_bytes(file_bytes)
@@ -9815,13 +9783,14 @@ def _policy_ocr_note(file_bytes: bytes) -> str:
 
 def create_policy_document(
     file_bytes: bytes, filename: str, account: UserAccount, values: dict, note: str = "",
+    stored_prefix: str | None = None,
 ) -> PolicyDocument:
     """Validate, store, and register a new policy document (version 1). Raises ValueError."""
     original_name, suffix = _policy_upload_names(filename)
     if suffix not in POLICY_DOCUMENT_TYPES:
         raise ValueError("Only PDF and DOCX policy documents can be uploaded.")
     page_count, chunk_count, mime_type = _inspect_policy_document(file_bytes, suffix)
-    stored_name, target = _write_policy_file(file_bytes, original_name)
+    stored_name, target = _write_policy_file(file_bytes, original_name, stored_prefix)
     document = PolicyDocument(
         title=values["title"],
         description=values.get("description", ""),
@@ -9906,7 +9875,11 @@ def ensure_operations_manual_policy_document() -> int:
     )
     if owner is None:
         return 0
-    create_policy_document(file_bytes, path.name, owner, dict(OPERATIONS_MANUAL_VALUES), OPERATIONS_MANUAL_SEED_NOTE)
+    # A file name taken from the content, so every machine seeds the same row (R-001).
+    create_policy_document(
+        file_bytes, path.name, owner, dict(OPERATIONS_MANUAL_VALUES), OPERATIONS_MANUAL_SEED_NOTE,
+        stored_prefix=hashlib.sha256(file_bytes).hexdigest()[:10],
+    )
     return 1
 
 
@@ -24134,33 +24107,6 @@ event.listen(Session, "after_commit", _forget_fresh_tasks)
 event.listen(Session, "after_soft_rollback", _forget_fresh_tasks)
 
 
-def close_tasks_of_finished_workflows() -> int:
-    """Startup clean-up: close open tasks left behind by workflows that already finished.
-
-    Older databases kept such tasks forever, which inflated "open" and "overdue" counts.
-    Only the student's latest case is looked at, so a newer active request keeps its tasks.
-    """
-    closed = 0
-    for slug, finder, final_statuses in (
-        ("withdrawal", latest_withdrawal_application, WORKFLOW_FINAL_STATUSES["withdrawal"]),
-        ("practicum", latest_practicum_record, WORKFLOW_FINAL_STATUSES["practicum"]),
-    ):
-        markers = WORKFLOW_TASK_MARKERS[slug]
-        open_by_student: dict[int, list[Task]] = {}
-        for task in Task.query.filter(Task.status.in_(["Pending", "Overdue"])).all():
-            if any(marker in task.title.lower() for marker in markers):
-                open_by_student.setdefault(task.student_id, []).append(task)
-        for student_id, tasks in open_by_student.items():
-            record = finder(student_id)
-            if record and record.status in final_statuses:
-                for task in tasks:
-                    task.status = "Done"
-                    closed += 1
-    if closed:
-        db.session.commit()
-    return closed
-
-
 def add_task(student_id: int, title: str, owner: str, days: int, priority: int = 20, status: str = "Pending") -> None:
     # Tasks make workflow follow-ups visible in the Work Queue.
     task = Task(
@@ -33693,24 +33639,6 @@ def reset_database() -> None:
     db.create_all()
 
 
-def label_system_default_working_hours() -> int:
-    """Flag the old automatic Monday-Friday 08:00-17:00 rows (never entered by anyone) as system defaults."""
-    flagged = 0
-    for faculty in Faculty.query.filter(Faculty.availability_updated_at.is_(None)).all():
-        rows = list(faculty.working_hours)
-        if len(rows) != 5 or any(row.source for row in rows):
-            continue
-        if sorted(row.weekday for row in rows) != [0, 1, 2, 3, 4]:
-            continue
-        if any(not row.enabled or row.start_time != time(8, 0) or row.end_time != time(17, 0) for row in rows):
-            continue
-        for row in rows:
-            row.source = SYSTEM_DEFAULT_HOURS_SOURCE
-        flagged += 1
-    db.session.commit()
-    return flagged
-
-
 def ensure_course_year_consistency() -> int:
     """Derive stored YR from AY Entry and the active academic semester."""
     changed = 0
@@ -33913,50 +33841,6 @@ def backfill_workflow_activity() -> None:
     db.session.commit()
 
 
-def backfill_withdrawal_subjects() -> None:
-    """Fill the subject/Registrar fields on existing withdrawal cases."""
-    db.session.execute(text(
-        "UPDATE withdrawal_application SET withdrawal_scope = 'Subject' "
-        "WHERE withdrawal_scope IS NULL OR withdrawal_scope = ''"
-    ))
-    for application in WithdrawalApplication.query.filter(
-        WithdrawalApplication.subject_enrollment_id.is_(None)
-    ).all():
-        enrollment = (
-            SubjectEnrollment.query.filter_by(student_id=application.student_id)
-            .filter(SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES))
-            .order_by(SubjectEnrollment.updated_at.desc(), SubjectEnrollment.id.desc())
-            .first()
-        )
-        if not enrollment and application.status == "Withdrawn Confirmed":
-            enrollment = (
-                SubjectEnrollment.query.filter_by(student_id=application.student_id)
-                .order_by(SubjectEnrollment.updated_at.desc(), SubjectEnrollment.id.desc())
-                .first()
-            )
-        if enrollment:
-            application.subject_enrollment_id = enrollment.id
-            application.effective_term = enrollment.term.label if enrollment.term else application.effective_term
-    db.session.commit()
-
-
-def backfill_panel_assignment_gates() -> None:
-    """Give every panel assignment without a gate the gate its student's research case is at."""
-    assignments = PanelAssignment.query.filter(
-        (PanelAssignment.gate.is_(None)) | (PanelAssignment.gate == "")
-    ).all()
-    if assignments:
-        case_by_student = {
-            case.student_id: case.current_gate
-            for case in ResearchCase.query.filter(
-                ResearchCase.student_id.in_({item.student_id for item in assignments})
-            ).all()
-        }
-        for assignment in assignments:
-            assignment.gate = case_by_student.get(assignment.student_id) or "Form 1 - Title Defense"
-        db.session.commit()
-
-
 def backfill_subject_enrollments() -> int:
     """Backfill the enrollment ledger from course records."""
     changed = 0
@@ -34048,16 +33932,6 @@ def migrate_research_vocabulary() -> None:
         ).first()
         if not newer:
             schedule.status = "Scheduled"
-    db.session.commit()
-
-
-def ensure_active_planning_term() -> None:
-    """Mark the current term as the planning term when no term is marked yet."""
-    active_count = db.session.execute(text("SELECT COUNT(*) FROM academic_term WHERE is_active_planning_term = 1")).scalar() or 0
-    if active_count == 0:
-        current = get_active_term()  # date-aware current/next semester, not the far-future latest
-        if current:
-            db.session.execute(text("UPDATE academic_term SET is_active_planning_term = 1 WHERE id = :term_id"), {"term_id": current.id})
     db.session.commit()
 
 
@@ -35480,7 +35354,7 @@ def seed_maed_personas() -> None:
     adopt_legacy_leave_logs()
 
 
-def seed_database(count: int = 350) -> None:
+def seed_database() -> None:
     # Deterministic seed data keeps demos repeatable while still showing varied
     # stages, risks, documents, panels, schedules, and activity history.
     reset_database()
@@ -36246,7 +36120,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
         active_term = get_active_term()
         if current_course_codes and active_term and not has_leave_case:
             academic_year, semester = split_academic_term_label(active_term.label)
-            for course_code in current_course_codes:
+            for course_code in sorted(current_course_codes):
                 course = Course.query.filter_by(program_id=program.id, code=course_code).first()
                 if not course:
                     continue
@@ -36657,34 +36531,6 @@ def ensure_miguel_yu_research_demo_unlock() -> int:
     return changed
 
 
-def seed_simulation_demo() -> None:
-    """Remove the retired MAEDS "simulation cohort" program if it lingers from an
-    older seed. The simulation fixtures (MAEDS, Student A/B/C, duplicate sim
-    faculty) are no longer used. Idempotent and safe to run on every startup."""
-    program = Program.query.filter_by(code="MAEDS").first()
-    if not program:
-        return
-    student_ids = [s.id for s in Student.query.filter_by(program_id=program.id).all()]
-    if student_ids:
-        CourseRecord.query.filter(CourseRecord.student_id.in_(student_ids)).delete(synchronize_session=False)
-        PanelAssignment.query.filter(PanelAssignment.student_id.in_(student_ids)).delete(synchronize_session=False)
-        ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(student_ids)).delete(synchronize_session=False)
-        ResearchCase.query.filter(ResearchCase.student_id.in_(student_ids)).delete(synchronize_session=False)
-        DocumentCheck.query.filter(DocumentCheck.student_id.in_(student_ids)).delete(synchronize_session=False)
-        TermEnrollment.query.filter(TermEnrollment.student_id.in_(student_ids)).delete(synchronize_session=False)
-        Task.query.filter(Task.student_id.in_(student_ids)).delete(synchronize_session=False)
-        TransactionLog.query.filter(TransactionLog.student_id.in_(student_ids)).delete(synchronize_session=False)
-        UserAccount.query.filter(UserAccount.student_id.in_(student_ids)).delete(synchronize_session=False)
-        Student.query.filter(Student.id.in_(student_ids)).delete(synchronize_session=False)
-    CourseRecord.query.filter(
-        CourseRecord.course_id.in_([c.id for c in Course.query.filter_by(program_id=program.id).all()])
-    ).delete(synchronize_session=False)
-    CurriculumOffering.query.filter_by(program_id=program.id).delete(synchronize_session=False)
-    Course.query.filter_by(program_id=program.id).delete(synchronize_session=False)
-    db.session.delete(program)
-    db.session.commit()
-
-
 def ensure_demo_request_submission_logs() -> int:
     created = 0
     demo_attachments = StudentRequestAttachment.query.filter(
@@ -36869,49 +36715,14 @@ def check_database_matches_models(allow_outdated: bool = False) -> bool:
     return True
 
 
-def run_data_normalisation() -> None:
-    """Data normalisation and backfills that run on every start (no schema changes).
-
-    Order matters: later steps read what earlier ones fill in.
-    """
-    backfill_panel_assignment_gates()
-    backfill_withdrawal_subjects()
-    backfill_workflow_activity()
-    backfill_subject_enrollments()
-    migrate_research_vocabulary()
-    ensure_active_planning_term()
-    link_faculty_accounts()
-    label_system_default_working_hours()
-    migrate_adviser_appointments()
-    normalize_owner_role_vocabulary()
-    normalize_stage_vocabulary()
-    close_tasks_of_finished_workflows()
-    ensure_authoritative_curricula()
-    ensure_practicum_program_policy()
-    ensure_course_year_consistency()
-    ensure_delay_status_consistency()
-    ensure_business_rules()
-    # Demo data for Panel Matching must never block startup.
-    try:
-        ensure_panel_matching_demo_data()
-        db.session.commit()
-    except Exception as exc:  # noqa: BLE001
-        db.session.rollback()
-        print(f"Panel Matching demo data was not seeded: {exc}")
-
-
-with app.app_context():
-    if check_database_matches_models(allow_outdated="--seed" in sys.argv):
-        run_data_normalisation()
-
-
 def should_run_startup_tasks(argv=None, environ=None, main_name="unset") -> bool:
-    """Should importing the app run the seed/maintenance steps?
+    """Should importing the app build the demo database when it finds an empty one?
 
     Yes for every way of serving it (``python app.py``, ``flask run``, gunicorn).
     No under a test runner (tests build their own data and must stay fast), for
     ``python app.py --seed`` (which does its own reset), or when
     USLS_SKIP_STARTUP_TASKS=1 (maintenance scripts that only import models).
+    A database that already holds the demo data is never touched, whatever the answer.
     """
     argv = sys.argv if argv is None else argv
     environ = os.environ if environ is None else environ
@@ -36929,64 +36740,97 @@ def should_run_startup_tasks(argv=None, environ=None, main_name="unset") -> bool
     return True
 
 
-def run_startup_tasks(seed_count: int | None = None) -> dict:
-    """Idempotent seed and maintenance steps that must run however the app starts.
+@contextlib.contextmanager
+def _demo_build_environment():
+    """Make the build give the same data on every machine whatever the local .env says.
 
-    Call inside an app context. Safe to repeat: it seeds only an empty database,
-    creates missing accounts, and re-syncs derived data without changing content.
+    DEMO_MODE=0 and PANEL_MATCHING_DEMO_SEED=0 switch parts of the demo data off; the build
+    exists to produce the whole demo dataset, so it runs with both on and puts them back.
     """
-    if seed_count is None:
-        seed_count = int(os.getenv("DEMO_SEED_COUNT", "350"))
-    db.create_all()
-    if Student.query.count() == 0 and seed_count > 0:
-        seed_database(seed_count)
-    ensure_business_rules()
-    adopt_legacy_leave_logs(commit=True)  # before the demo baseline, which reads leave cases
-    ensure_demo_accounts()
+    forced = {"DEMO_MODE": "1", "PANEL_MATCHING_DEMO_SEED": "1"}
+    saved = {key: os.environ.get(key) for key in forced}
+    os.environ.update(forced)
     try:
+        yield
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def build_demo_database() -> dict:
+    """Reset the database and build the one complete demo dataset (owner decisions IM2, IM4, IM16).
+
+    The only place demo data is written. ``python app.py --seed`` (``npm run seed``) calls it, and
+    so does the first start on an empty database; a start on a database that already holds data
+    changes nothing. Call inside an app context. The steps run in a fixed order because later
+    steps read what earlier ones wrote; nothing here depends on the machine, the clock's time of
+    day, or set/dict ordering, and every date is relative to the day it runs.
+    Returns the curriculum sync result of the last sync step.
+    """
+    with _demo_build_environment():
+        # 1. Reset and import: programs, terms, faculty and student rosters, personas, panel data
+        #    (seed_database resets the database first).
+        seed_database()
+        # 2. Accounts, and the links between people and their subjects.
+        ensure_demo_accounts()
+        link_faculty_accounts()
+        backfill_workflow_activity()
+        backfill_subject_enrollments()
+        db.session.commit()
+        # 3. Derived data that reads what step 2 filled in.
+        migrate_research_vocabulary()  # a defense that has a verdict is Held/Deferred, not Scheduled
+        migrate_adviser_appointments()  # one appointment per adviser assignment
+        ensure_course_year_consistency()
+        ensure_delay_status_consistency()
+        # 4. The policy library and the future defenses that fill the calendars.
         ensure_operations_manual_policy_document()  # the draft manual is searchable as a Draft
-    except Exception as exc:  # noqa: BLE001 - the library must never block startup
-        db.session.rollback()
-        print(f"The Operations Manual draft was not added to the policy library: {exc}")
-    if demo_mode_enabled():
-        ensure_panel_matching_demo_data()  # fabricated availability windows: demo data only
-        try:
-            ensure_upcoming_defense_demo()  # future defenses so the calendars are not empty
-            db.session.commit()
-        except Exception as exc:  # noqa: BLE001 - demo data must never block startup
-            db.session.rollback()
-            print(f"The upcoming-defense demo data was not seeded: {exc}")
-    seed_simulation_demo()  # remove any lingering MAEDS cohort from older databases
-    link_faculty_accounts()
-    backfill_workflow_activity()
-    sync_result = sync_all_curricula()
-    backfill_subject_enrollments()
-    sync_automatic_awol_statuses(commit=False)
-    db.session.commit()
-    sync_leave_cases(commit=True)  # old log-only leave history becomes cases; dates move cases along
-    return sync_result
+        ensure_upcoming_defense_demo()
+        db.session.commit()
+        # 5. Last syncs, once everything above exists.
+        sync_result = sync_all_curricula()
+        sync_automatic_awol_statuses(commit=False)
+        db.session.commit()
+        sync_leave_cases(commit=True)  # dates move leave cases along
+        return sync_result
 
 
-if should_run_startup_tasks():
-    with app.app_context():
-        _startup_sync = run_startup_tasks()
-        if _startup_sync["created"]:
-            print(f"Added {_startup_sync['created']} missing curriculum row(s) for {_startup_sync['students']} student(s).")
+def database_has_demo_data() -> bool:
+    """True when the database already holds students (the demo data, or anything else)."""
+    return Student.query.count() > 0
+
+
+def _load_fingerprint_module():
+    """scripts/db_fingerprint.py is stdlib-only; load it by path (scripts/ is not a package)."""
+    import importlib.util
+
+    path = Path(__file__).resolve().parent / "scripts" / "db_fingerprint.py"
+    spec = importlib.util.spec_from_file_location("db_fingerprint", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+with app.app_context():
+    # The one start-time rule: create the tables of an empty database and, only then, build the
+    # demo data. A database that already holds data is not written to at all.
+    if check_database_matches_models(allow_outdated="--seed" in sys.argv):
+        if should_run_startup_tasks() and not database_has_demo_data():
+            build_demo_database()
+            print("Built the demo database (it was empty).")
 
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        seed_count = int(os.getenv("DEMO_SEED_COUNT", "350"))
-        if "--seed" in sys.argv:
-            seed_database(seed_count)
-            ensure_demo_accounts()
-            link_faculty_accounts()
-            backfill_workflow_activity()
-            backfill_subject_enrollments()
-            db.session.commit()
+    if "--seed" in sys.argv:
+        with app.app_context():
+            build_demo_database()
             print(f"Seeded {Student.query.count()} student(s) and {Faculty.query.count()} faculty from imported source sheets.")
-            raise SystemExit(0)
+            fingerprint = _load_fingerprint_module().database_fingerprint(db.engine.url.database)
+            print(f"Demo data fingerprint: {fingerprint}")
+            print("Compare this with a teammate's to check you have the same data.")
+        raise SystemExit(0)
 
     port = int(os.getenv("FLASK_PORT", "5000"))
     if (

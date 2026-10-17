@@ -311,12 +311,12 @@ def run_suite(workdir: Path):
 
 
 def collect_seed():
-    """Seed a temporary database exactly as a first start does and measure the demonstration dataset, the
+    """Build a temporary demo database exactly as `npm run seed` does and measure the demonstration dataset, the
     report counts and the KPI measurements (never touches a real database: DATABASE_URL is a temp file)."""
     import app as A
 
     with A.app.app_context():
-        A.run_startup_tasks()
+        A.build_demo_database()
         client = A.app.test_client()
         login = client.post("/api/auth/login", json={"email": "admin@usls.edu.ph", "password": "DemoPass123!"})
         out = {
