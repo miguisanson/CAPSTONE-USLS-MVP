@@ -32,7 +32,7 @@ Your decisions: `DECISIONS.md`. How unattended work runs: `IMPROVE.md`.
 
 ## Waiting on you (whenever convenient)
 
-- **One small step on your PC (not a decision):** your `.env` file has a `DATABASE_URL=mysql…` line. Once the SQLite-only change lands, the app will refuse to start with it. Delete that line (or put `#` in front of it), then run `npm run seed`. I never open `.env`, so you have to do this one yourself. Teammates do the same.
+- **One small step on your PC (2 minutes):** in the project folder run `npm run setup:env` - it removes the old MySQL line from `.env` and adds an empty `GOOGLE_API_KEY=` line. Get a free key at https://aistudio.google.com/apikey and paste it after the `=`. Then run `npm run seed`. Teammates do the same (the key is optional for them).
 
 - **Pick ideas** from `IDEAS.md` (X-06…X-11). My pick: X-06 "Needs my action" page and X-07 reminders.
 - **Tell your teammates** once Phase 1 lands: pull `v5.2-migui_again`, delete their old
