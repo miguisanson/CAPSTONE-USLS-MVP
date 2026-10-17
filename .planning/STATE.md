@@ -1,5 +1,34 @@
 # State
 
+## HANDOVER FOR THE NEXT SESSION / ACCOUNT (kept current; read this first)
+
+The owner's plan for this account ends **2026-10-17 17:00 +08**. A new session (any account) starts with
+`/continue_CAPSTONE-USLS-MVP` and continues from here. Never ask the owner for decisions during unattended runs
+(IM18): take the recommended option and log it as an `AD#` row in `DECISIONS.md`.
+
+1. `git switch v5.2-migui_again && git pull`. `git worktree list`: any `pkt/*` branch with commits ahead of
+   `v5.2-migui_again` is finished helper work - review it (AGENTS.md reviewer rules), merge one at a time, re-run
+   the gate. A worktree with uncommitted changes is half-done work - read its diff and finish or discard it.
+   Helper worktrees live in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<name>`.
+2. Gates: Python `.venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"` (~28 min, run in the
+   background); frontend `npm run e2e` (~6 min; the only known failure is I-036, academic-coordinator 403) and
+   `npm run e2e:negative` (must FAIL). When helpers run e2e at the same time, give each its own
+   `E2E_PORT=<51xx>` and `USLS_E2E_TMP=E:\Temp\claude\e2e-<name>`. `cd frontend && npm run check:ui` must
+   never rise (`--update` after a packet lowers it; resolve baseline merge conflicts by taking either side and
+   running `--update`).
+3. Order of the remaining work (ROADMAP.md): (a) finish Phase 5 page migrations - the remaining rows of
+   `.planning/phases/05-design-system/05-UI-SPEC.md` section 8 (each packet pins behaviour first with
+   `frontend/e2e/p<NN>-<name>.spec.js`, which the `pages` Playwright project picks up without a config edit),
+   then P8 close-out (`check:ui --strict` = all zeros; allow-list `lib/print.js`, AD3); (b) Phase 3 backend
+   section J bugs I-002, I-003, I-005, I-006, I-007, I-009..I-013 plus I-036 and I-043 - **only one packet at a
+   time may edit app.py**; (c) Phase 4 split of app.py (order in `codebase/ARCHITECTURE.md`); (d) Phase 6.
+4. Max 3 Sonnet implementer subagents at once (IM10). Copy the brief style of earlier packets (git log of
+   merged `pkt/*` branches shows what each did).
+5. After every merge: update this file's Current Position, `BOARD.md`, `ISSUES.md`, `REGRESSION.md`; commit and
+   push `v5.2-migui_again`. Never merge into `v5.1-migui_clean` (owner only).
+6. The hourly scheduled task "Keep CAPSTONE improvement mode running" restarts the run if
+   `.planning/.run-heartbeat` is older than 45 min; keep the heartbeat fresh while working.
+
 ## Current Position (2026-10-17 — improvement mode set up)
 
 - **Branch:** `v5.2-migui_again` (new, from `v5.1-migui_clean` at e6460e0; not pushed).
