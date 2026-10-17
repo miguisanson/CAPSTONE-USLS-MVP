@@ -7,6 +7,7 @@ import * as UI from "../components/ui/index.js";
 import { TONES, TONE_NAMES } from "../lib/tone";
 import UiGalleryP1b from "./UiGalleryP1b.jsx";
 import ModalSection from "./UiGalleryModal.jsx"; // P1c
+import UiGalleryP1d from "./UiGalleryP1d.jsx";
 
 const Z_SCALE = [
   ["z-header", "30", "sticky top bar"],
@@ -123,6 +124,7 @@ export default function UiGallery() {
 
           <UiGalleryP1b />
           <ModalSection />
+          <UiGalleryP1d />
 
           <Block id="components" title="Components">
             <p className="text-sm text-slate-600" data-gallery="exports">

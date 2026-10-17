@@ -166,6 +166,27 @@ export function formatDateTime(value) {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+/** One CSV field: arrays join with "; ", everything is quoted, quotes doubled. A text that starts like a spreadsheet
+ *  formula (= @, or + - followed by a letter) gets a leading apostrophe so Excel shows it instead of running it. */
+export function csvCell(value) {
+  let text = Array.isArray(value) ? value.join("; ") : String(value ?? "");
+  if (/^(=|@|[+-][^\d.\s])/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+/** Saves a Blob (or text) as a download named `filename`. */
+export function downloadBlob(blob, filename) {
+  const file = blob instanceof Blob ? blob : new Blob([blob], { type: "text/plain" });
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 export function relativeDays(value) {
   if (!value) return "";
   const d = new Date(value);

@@ -277,7 +277,7 @@ for (const viewport of VIEWPORTS) {
       const spinner = one("spinner");
       await expect(spinner).toBeVisible();
       await expect(spinner).toContainText("Loading");
-      expect(await spinner.getAttribute("role")).toBe("status");
+      await expect(spinner.getByRole("status")).toBeVisible();
       await expect(one("spinner-sm")).toBeVisible();
       await expect(one("spinner-custom")).toContainText("Checking the roster");
 
@@ -291,8 +291,9 @@ for (const viewport of VIEWPORTS) {
       await expect(empty.getByText("Requests will appear here once a student submits one.")).toBeVisible();
       await expect(empty.getByRole("button", { name: "Refresh" })).toBeVisible();
       await expect(one("empty-state-sm")).toBeVisible();
-      const mdHeight = (await empty.boundingBox()).height;
-      const smHeight = (await one("empty-state-sm").boundingBox()).height;
+      // the two samples sit in one grid row (equal boxes), so measure the EmptyState itself, the first child
+      const mdHeight = (await empty.locator(":scope > div").boundingBox()).height;
+      const smHeight = (await one("empty-state-sm").locator(":scope > div").boundingBox()).height;
       expect(smHeight, "size sm is tighter than md").toBeLessThan(mdHeight);
 
       const search = one("search").getByRole("searchbox", { name: "Search the roster" });
