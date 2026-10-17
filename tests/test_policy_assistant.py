@@ -10,10 +10,13 @@
 
 No test touches the network: ``app._gemini_generate`` is mocked and ``app.urlopen`` always fails.
 """
+import json
 import os
+import re
 import tempfile
 import unittest
 from datetime import date, timedelta
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 
@@ -62,6 +65,35 @@ def fail_http(*_args, **_kwargs):
 
 def no_network(*_args, **_kwargs):
     raise URLError("no network in tests")
+
+
+class FakeResponse:
+    """What ``urlopen`` returns: a context manager whose body is JSON."""
+
+    def __init__(self, payload):
+        self.body = json.dumps(payload).encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def gemini_payload(text, finish="STOP"):
+    return {"candidates": [{"content": {"parts": [{"text": text}]}, "finishReason": finish}]}
+
+
+def http_429(retry_after=None):
+    headers = {"Retry-After": str(retry_after)} if retry_after is not None else {}
+    return HTTPError("https://generativelanguage.googleapis.com", 429, "Too Many Requests", headers, None)
+
+
+def sent_body(call):
+    return json.loads(call.args[0].data.decode("utf-8"))
 
 
 class AssistantBase(unittest.TestCase):
@@ -242,6 +274,169 @@ class HonestAnswerTests(AssistantBase):
         with self.with_key(), self.keyword_only(), patch.object(appmod, "_gemini_generate", generate):
             payload = self.ask("dean@usls.edu.ph", "How many units is the thesis defense fee waiver worth?")
         self.assertNotCovered(payload)
+
+
+class GeminiRequestTests(AssistantBase):
+    """The Gemini call itself: no thinking tokens eating the answer, no half sentences, one retry on a 429."""
+
+    def generate(self, side_effect):
+        urlopen = MagicMock(side_effect=side_effect)
+        sleeper = MagicMock()
+        with self.with_key(), patch.object(appmod, "urlopen", urlopen), patch.object(appmod, "_gemini_sleep", sleeper):
+            try:
+                result = appmod._gemini_generate("Question: test")
+            except RuntimeError as exc:
+                result = exc
+        return result, urlopen, sleeper
+
+    def test_the_request_switches_thinking_off_and_leaves_room_for_the_answer(self):
+        result, urlopen, _ = self.generate([FakeResponse(gemini_payload("Seven years. Done."))])
+        self.assertEqual(result, "Seven years. Done.")
+        config = sent_body(urlopen.call_args)["generationConfig"]
+        self.assertEqual(config["thinkingConfig"], {"thinkingBudget": 0})
+        self.assertGreaterEqual(config["maxOutputTokens"], 1000)
+
+    def test_an_answer_cut_off_by_the_token_limit_is_retried_with_a_larger_budget(self):
+        cut = gemini_payload("A master's student has at most seven years, including any leave of", "MAX_TOKENS")
+        full = gemini_payload("A master's student has at most seven years, including any leave of absence.")
+        result, urlopen, _ = self.generate([FakeResponse(cut), FakeResponse(full)])
+        self.assertEqual(result, "A master's student has at most seven years, including any leave of absence.")
+        first, second = (sent_body(call)["generationConfig"]["maxOutputTokens"] for call in urlopen.call_args_list)
+        self.assertGreater(second, first)
+
+    def test_an_answer_still_cut_off_after_the_retry_is_trimmed_to_its_last_whole_sentence(self):
+        cut = gemini_payload("Seven years is the limit. Leave of absence counts toward it. The panel, however, has", "MAX_TOKENS")
+        result, urlopen, _ = self.generate([FakeResponse(cut), FakeResponse(cut)])
+        self.assertEqual(urlopen.call_count, 2)
+        self.assertEqual(result, "Seven years is the limit. Leave of absence counts toward it.")
+
+    def test_an_answer_with_no_whole_sentence_to_keep_is_an_error_not_a_fragment(self):
+        cut = gemini_payload("A defense panel consists of a chair and members who serve as content specialists, method", "MAX_TOKENS")
+        result, _, _ = self.generate([FakeResponse(cut), FakeResponse(cut)])
+        self.assertIsInstance(result, RuntimeError)
+
+    def test_a_429_is_retried_once_after_a_short_wait_and_the_answer_is_used(self):
+        result, urlopen, sleeper = self.generate([http_429(), FakeResponse(gemini_payload("Seven years."))])
+        self.assertEqual(result, "Seven years.")
+        self.assertEqual(urlopen.call_count, 2)
+        waited = sleeper.call_args.args[0]
+        self.assertTrue(0 < waited <= 3, waited)
+
+    def test_the_retry_after_header_is_respected_but_never_beyond_three_seconds(self):
+        _, _, sleeper = self.generate([http_429(2), FakeResponse(gemini_payload("Ok."))])
+        self.assertEqual(sleeper.call_args.args[0], 2)
+        _, _, sleeper = self.generate([http_429(40), FakeResponse(gemini_payload("Ok."))])
+        self.assertEqual(sleeper.call_args.args[0], 3)
+
+    def test_two_429s_in_a_row_raise_so_the_caller_can_fall_back(self):
+        result, urlopen, _ = self.generate([http_429(), http_429()])
+        self.assertIsInstance(result, RuntimeError)
+        self.assertIn("429", str(result))
+        self.assertEqual(urlopen.call_count, 2)
+
+    def test_embeddings_also_retry_a_429_once(self):
+        vector = {"embeddings": [{"values": [1.0, 0.0]}]}
+        urlopen = MagicMock(side_effect=[http_429(), FakeResponse(vector)])
+        with self.with_key(), patch.object(appmod, "urlopen", urlopen), patch.object(appmod, "_gemini_sleep", MagicMock()):
+            vectors = appmod._gemini_embed_texts(["one passage"], "query")
+        self.assertEqual(vectors, [[1.0, 0.0]])
+        self.assertEqual(urlopen.call_count, 2)
+
+
+class RateLimitFallbackTests(AssistantBase):
+    """Found by the live run: strong retrieval, Gemini rate-limited, and the reader got "not covered"."""
+
+    QUESTION = "What does a student need before sitting for the comprehensive exam, and what if they fail it?"
+
+    def test_a_429_twice_gives_the_offline_answer_with_sources_not_the_refusal(self):
+        for email in ("dean@usls.edu.ph", STUDENT_A_EMAIL):
+            with self.subTest(user=email.split("@")[0]):
+                urlopen = MagicMock(side_effect=http_429())
+                with self.with_key(), self.keyword_only(), patch.object(appmod, "urlopen", urlopen), patch.object(
+                    appmod, "_gemini_sleep", MagicMock(),
+                ):
+                    payload = self.ask(email, self.QUESTION)
+                self.assertFalse(payload["not_covered"], payload["answer"])
+                self.assertTrue(payload["offline"], payload["mode"])
+                self.assertTrue(payload["sources"])
+                self.assertNotIn("don't cover this", payload["answer"])
+
+    def test_a_429_then_success_uses_the_gemini_answer(self):
+        urlopen = MagicMock(side_effect=[http_429(), FakeResponse(gemini_payload(COVERED_ANSWER))])
+        with self.with_key(), self.keyword_only(), patch.object(appmod, "urlopen", urlopen), patch.object(
+            appmod, "_gemini_sleep", MagicMock(),
+        ):
+            payload = self.ask("dean@usls.edu.ph", COVERED_QUESTION)
+        self.assertEqual(payload["mode"], "document-rag")
+        self.assertIn(COVERED_ANSWER, payload["answer"])
+        self.assertFalse(payload["offline"])
+
+    def test_a_half_sentence_from_gemini_never_reaches_the_reader(self):
+        cut = gemini_payload("A defense panel consists of a panel chair and members who serve as content specialists, method", "MAX_TOKENS")
+        urlopen = MagicMock(side_effect=lambda *_a, **_k: FakeResponse(cut))
+        with self.with_key(), self.keyword_only(), patch.object(appmod, "urlopen", urlopen):
+            payload = self.ask("dean@usls.edu.ph", "Who sits on a defense panel and how many members does it need?")
+        self.assertNotIn("content specialists, method", payload["answer"])
+        self.assertTrue(payload["offline"])
+        self.assertFalse(payload["not_covered"])
+
+    def test_failed_embeddings_do_not_make_retrieval_weaker_than_keyword_only(self):
+        offline = [chunk["id"] for chunk in appmod.search_policy_passages(self.QUESTION, 4)]
+        chunks = appmod._load_rag_document_index()
+        with self.with_key(), self.keyword_only():
+            found = [chunk["id"] for chunk in appmod._retrieve_rag_document_chunks(self.QUESTION, chunks, 4)]
+        self.assertEqual(found, offline)
+
+
+class StrengthBarTests(AssistantBase):
+    LOA_QUESTION = "My job is getting heavy this semester. Can a student take a leave of absence and for how long?"
+    NOT_COVERED = [
+        "What time does the campus gym open on weekends?",
+        "Can you recommend a good restaurant near the campus for a farewell dinner?",
+    ]
+
+    def test_filler_words_do_not_hide_a_question_the_handbook_covers(self):
+        generate = MagicMock(return_value="A leave of absence may be approved. (Graduate School Handbook 2022-2023, p. 53)")
+        with self.with_key(), self.keyword_only(), patch.object(appmod, "_gemini_generate", generate):
+            payload = self.ask("dean@usls.edu.ph", self.LOA_QUESTION)
+        generate.assert_called_once()
+        self.assertFalse(payload["not_covered"], payload["answer"])
+        self.assertTrue(payload["sources"])
+
+    def test_the_same_question_without_a_key_gets_an_offline_answer(self):
+        payload = self.ask("dean@usls.edu.ph", self.LOA_QUESTION)
+        self.assertFalse(payload["not_covered"], payload["answer"])
+        self.assertTrue(payload["sources"])
+
+    def test_off_topic_questions_stay_not_covered_with_and_without_a_key(self):
+        for question in self.NOT_COVERED:
+            with self.subTest(question=question, key=False):
+                payload = self.ask("dean@usls.edu.ph", question)
+                self.assertTrue(payload["not_covered"], payload["answer"])
+            with self.subTest(question=question, key=True):
+                generate = MagicMock(return_value="never")
+                with self.with_key(), self.keyword_only(), patch.object(appmod, "_gemini_generate", generate):
+                    payload = self.ask("dean@usls.edu.ph", question)
+                generate.assert_not_called()
+                self.assertTrue(payload["not_covered"], payload["answer"])
+
+
+class EvalScriptIsolationTests(unittest.TestCase):
+    """The live-check script builds a demo database; it must never write into the real uploads or RAG index."""
+
+    def test_the_eval_script_points_every_writable_folder_at_its_own_work_folder_before_importing_app(self):
+        source = (Path(__file__).resolve().parents[1] / "scripts" / "assistant_eval.py").read_text(encoding="utf-8")
+        import_at = source.index("import app as appmod")
+        for variable in ("USLS_UPLOAD_DIR", "POLICY_DOCUMENT_UPLOAD_DIR", "RAG_INDEX_DIR", "DATABASE_URL"):
+            with self.subTest(variable=variable):
+                assignment = re.search(rf'os\.environ\["{variable}"\]\s*=', source)
+                self.assertIsNotNone(assignment, f"{variable} must be set outright (not setdefault)")
+                self.assertLess(assignment.start(), import_at)
+
+    def test_the_eval_script_checks_the_real_policy_folder_is_untouched_when_it_finishes(self):
+        source = (Path(__file__).resolve().parents[1] / "scripts" / "assistant_eval.py").read_text(encoding="utf-8")
+        self.assertIn("real_policy_listing", source)
+        self.assertIn("wrote into the real", source)
 
 
 class PersonalAnswerTests(AssistantBase):

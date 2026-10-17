@@ -24,7 +24,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import quote_plus, urlencode
-from time import monotonic as _monotonic
+from time import monotonic as _monotonic, sleep as _sleep
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -9987,8 +9987,65 @@ ASSISTANT_STUDENT_SUGGESTIONS = [
 ]
 
 
+class GeminiHTTPError(RuntimeError):
+    """A Gemini call that came back with an HTTP error status."""
+
+    def __init__(self, message: str, code: int):
+        super().__init__(message)
+        self.code = code
+
+
+def _gemini_sleep(seconds: float) -> None:
+    _sleep(seconds)
+
+
+def _gemini_retry_wait(exc: HTTPError) -> float:
+    """How long to wait before the one retry after a 429: Retry-After when given, never more than 3 seconds."""
+    try:
+        wait = float((getattr(exc, "headers", None) or {}).get("Retry-After") or 1.0)
+    except (TypeError, ValueError):
+        wait = 1.0
+    return min(3.0, max(0.2, wait))
+
+
+def _gemini_open_json(request_item: Request, timeout: float, label: str) -> dict:
+    """One Gemini request; a rate limit (HTTP 429) is retried once after a short wait, any other failure raises."""
+    for attempt in (0, 1):
+        try:
+            with urlopen(request_item, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            if exc.code == 429 and attempt == 0:
+                _gemini_sleep(_gemini_retry_wait(exc))
+                continue
+            raise GeminiHTTPError(f"{label} returned HTTP {exc.code}.", exc.code) from exc
+        except (URLError, TimeoutError) as exc:
+            raise RuntimeError(f"{label} did not respond before the timeout.") from exc
+    raise RuntimeError(f"{label} did not answer.")  # pragma: no cover - the loop always returns or raises
+
+
+_SENTENCE_END = re.compile(r"[.!?][\"')\]]*(?=\s|$)")
+_NOT_A_SENTENCE_END = re.compile(r"(?:\b(?:p|pp|no|nos|sec|dr|mr|ms|mrs|vs|fig|art)|\be\.g|\bi\.e)\.$", re.IGNORECASE)
+
+
+def _trim_to_last_sentence(text: str) -> str:
+    """Keep a cut-off answer only up to its last complete sentence; empty when none is complete."""
+    text = (text or "").strip()
+    end = 0
+    for match in _SENTENCE_END.finditer(text):
+        if not _NOT_A_SENTENCE_END.search(text[:match.end()]):
+            end = match.end()
+    return text[:end].strip()
+
+
 def _gemini_generate(prompt: str) -> str:
-    """Make one bounded, stateless Gemini request without a heavyweight SDK."""
+    """Make one bounded, stateless Gemini request without a heavyweight SDK.
+
+    Thinking is switched off (thinking tokens count against the output budget and cut answers off mid-sentence).
+    An answer that still hits the token limit is retried once with twice the room; if it is still cut off, only its
+    last complete sentence is kept, and with none the call fails so the caller falls back. A half sentence is
+    never returned.
+    """
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     if not api_key:
         raise RuntimeError("Google AI Studio is not configured.")
@@ -9999,34 +10056,43 @@ def _gemini_generate(prompt: str) -> str:
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model_name}:generateContent"
     )
-    body = json.dumps({
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "500")),
-        },
-    }).encode("utf-8")
-    request_item = Request(
-        endpoint,
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-        },
-        method="POST",
-    )
     timeout = max(3.0, float(os.getenv("RAG_REQUEST_TIMEOUT_SECONDS", "18")))
-    try:
-        with urlopen(request_item, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        raise RuntimeError(f"Gemini returned HTTP {exc.code}.") from exc
-    except (URLError, TimeoutError) as exc:
-        raise RuntimeError("Gemini did not respond before the timeout.") from exc
-    candidates = payload.get("candidates") or []
-    if not candidates:
-        raise RuntimeError("Gemini returned no answer.")
-    parts = ((candidates[0].get("content") or {}).get("parts") or [])
-    answer = "".join(str(part.get("text") or "") for part in parts).strip()
+    budget = max(256, int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "1024")))
+    thinking: dict | None = {"thinkingBudget": max(0, int(os.getenv("RAG_THINKING_BUDGET", "0")))}
+    answer, cut_off, grown = "", False, False
+    for _attempt in range(3):
+        config: dict = {"maxOutputTokens": budget}
+        if thinking is not None:
+            config["thinkingConfig"] = thinking
+        body = json.dumps({
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": config,
+        }).encode("utf-8")
+        request_item = Request(
+            endpoint,
+            data=body,
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+            method="POST",
+        )
+        try:
+            payload = _gemini_open_json(request_item, timeout, "Gemini")
+        except GeminiHTTPError as exc:
+            if exc.code == 400 and thinking is not None:
+                thinking = None  # a model that does not accept a thinking budget: ask again without one
+                continue
+            raise
+        candidates = payload.get("candidates") or []
+        if not candidates:
+            raise RuntimeError("Gemini returned no answer.")
+        parts = ((candidates[0].get("content") or {}).get("parts") or [])
+        answer = "".join(str(part.get("text") or "") for part in parts if not part.get("thought")).strip()
+        cut_off = candidates[0].get("finishReason") == "MAX_TOKENS"
+        if cut_off and not grown:
+            budget, grown = budget * 2, True
+            continue
+        break
+    if cut_off:
+        answer = _trim_to_last_sentence(answer)
     if not answer:
         raise RuntimeError("Gemini returned an empty answer.")
     return answer
@@ -10087,13 +10153,7 @@ def _gemini_embed_texts(texts: list[str], purpose: str, timeout: float | None = 
             },
             method="POST",
         )
-        try:
-            with urlopen(request_item, timeout=timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            raise RuntimeError(f"Gemini embeddings returned HTTP {exc.code}.") from exc
-        except (URLError, TimeoutError) as exc:
-            raise RuntimeError("Gemini embeddings did not respond before the timeout.") from exc
+        payload = _gemini_open_json(request_item, timeout, "Gemini embeddings")
         embeddings = payload.get("embeddings") or []
         if len(embeddings) != len(batch):
             raise RuntimeError("Gemini embeddings returned an incomplete batch.")
@@ -10430,7 +10490,10 @@ def _retrieve_rag_document_chunks(
         # Keep policy guidance available during an embedding outage. Generation
         # still receives retrieved source text and remains citation-grounded.
         pass
-    return [{**item, "_retrieval": "lexical-fallback"} for item in _prag.search(question, chunks, limit)]
+    # Embeddings are down: retrieval is exactly the keyword search the offline answer uses, never weaker.
+    found = search_policy_passages(question, limit, chunks)
+    found.sort(key=lambda item: (item.get("status") or "active") != "active")  # in force before draft (stable)
+    return [{**item, "_retrieval": "lexical-fallback"} for item in found]
 
 
 def prewarm_keyword_index() -> None:
@@ -11172,9 +11235,9 @@ def _local_answer_location(chunk: dict) -> str:
     return source[len(title):].lstrip(", ") if source.startswith(title) else source
 
 
-def search_policy_passages(question: str, limit: int = 3) -> list[dict]:
+def search_policy_passages(question: str, limit: int = 3, document_chunks: list[dict] | None = None) -> list[dict]:
     """Best passages for a question with no AI key: BM25 + the older lexical score, reranked on sentences."""
-    document_chunks = _load_rag_document_index()
+    document_chunks = document_chunks if document_chunks is not None else _load_rag_document_index()
     legacy = _retrieve_rag_document_chunks_lexically(question, document_chunks, 20)
     return _prag.search(
         question, document_chunks, limit, extra_rank=[chunk["id"] for chunk in legacy],

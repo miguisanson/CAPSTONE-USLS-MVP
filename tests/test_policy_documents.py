@@ -22,9 +22,11 @@ import app as appmod  # noqa: E402
 
 app = appmod.app
 db = appmod.db
-REAL_UPLOAD_ROOT = Path(appmod.POLICY_DOCUMENT_UPLOAD_ROOT)
-REAL_UPLOAD_LISTING = sorted(p.name for p in REAL_UPLOAD_ROOT.glob("*")) if REAL_UPLOAD_ROOT.exists() else []
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# The repository's own seed folder. (Not appmod.POLICY_DOCUMENT_UPLOAD_ROOT: under a test run that is a shared temp
+# folder, which every module that builds the demo database legitimately fills with the Operations Manual draft.)
+REAL_UPLOAD_ROOT = REPO_ROOT / "uploads" / "policy_documents"
+REAL_UPLOAD_LISTING = sorted(p.name for p in REAL_UPLOAD_ROOT.glob("*")) if REAL_UPLOAD_ROOT.exists() else []
 DRAFT_WARNING = "Draft — pending Graduate School validation"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _TEST_ROOT = tempfile.mkdtemp(prefix="policy-tests-")
@@ -209,8 +211,33 @@ class BuiltInLibraryTests(PolicyTestBase):
         self.assertTrue(any("Research-Protocol" in name for name in names), names)
         self.assertFalse(any(name.lower().endswith(".xlsx") for name in names), names)
 
+    @staticmethod
+    def committed_seed_copies() -> Path:
+        """A temp folder holding only the seed files that are committed in uploads/policy_documents.
+
+        What else a developer's own uploads folder holds (the Operations Manual draft that the seed or a
+        first start puts there, staff uploads) is not part of the committed library and must not decide this test.
+        """
+        import shutil
+        import subprocess
+        source = REPO_ROOT / "uploads" / "policy_documents"
+        listed = subprocess.run(
+            ["git", "ls-files", "--", "uploads/policy_documents"], cwd=REPO_ROOT, capture_output=True, text=True,
+        )
+        names = [Path(line).name for line in listed.stdout.splitlines() if line.strip()] if listed.returncode == 0 else []
+        if not names:  # no git here: the committed seed copies are the Handbook and the Research Protocol
+            names = [p.name for p in source.glob("*") if "HANDBOOK" in p.name.upper() or "RESEARCH-PROTOCOL" in p.name.upper()]
+        folder = Path(tempfile.mkdtemp(dir=_TEST_ROOT)) / "policy_documents"
+        folder.mkdir()
+        for name in names:
+            if (source / name).is_file():
+                shutil.copy2(source / name, folder / name)
+        return folder
+
     def test_committed_seed_copies_are_not_indexed_twice(self):
-        with patch.object(appmod, "POLICY_DOCUMENT_UPLOAD_ROOT", REAL_UPLOAD_ROOT):
+        seed_copies = self.committed_seed_copies()
+        self.assertTrue(any(seed_copies.iterdir()), "the committed seed copies are missing")
+        with patch.object(appmod, "POLICY_DOCUMENT_UPLOAD_ROOT", seed_copies):
             appmod._reset_rag_indexes()
             files = appmod._rag_document_files()
             chunks = appmod._load_rag_document_index()

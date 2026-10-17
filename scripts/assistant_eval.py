@@ -24,6 +24,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Windows consoles default to a legacy code page and turn "§" and "—" into mojibake.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+# What the repository's own policy folder holds now; the run must leave it exactly so (listing names only).
+REAL_POLICY_FOLDER = ROOT / "uploads" / "policy_documents"
+
+
+def real_policy_listing() -> list[str]:
+    return sorted(item.name for item in REAL_POLICY_FOLDER.glob("*")) if REAL_POLICY_FOLDER.exists() else []
+
+
+REAL_POLICY_BEFORE = real_policy_listing()
+
+# Everything the run writes (database, uploads, policy documents, RAG index) goes into this one temp folder.
 WORK = Path(tempfile.mkdtemp(prefix="assistant-eval-"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(WORK / 'eval.sqlite3').as_posix()}"
 os.environ["USLS_UPLOAD_DIR"] = str(WORK / "uploads")
@@ -120,6 +138,10 @@ def main() -> int:
                 print("   sources: none")
         print("\n" + "=" * 100)
         print(f"Gemini wrote {used} of {len(QUESTIONS)} answers.")
+    changed = set(real_policy_listing()) ^ set(REAL_POLICY_BEFORE)
+    if changed:
+        print(f"ERROR: the run wrote into the real {REAL_POLICY_FOLDER}: {sorted(changed)}")
+        return 1
     return 0
 
 

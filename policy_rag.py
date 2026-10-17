@@ -845,7 +845,9 @@ def search(
     ]
 
 
-MIN_COVERAGE = 0.5
+# Filler words in a chatty question ("my job is getting heavy this semester") lower the share of its words a
+# passage can cover; 0.45 keeps those answerable while off-topic questions (gym hours 0.41, restaurant 0.29) stay below it.
+MIN_COVERAGE = 0.45
 
 
 # --------------------------------------------------------------------------- answering
