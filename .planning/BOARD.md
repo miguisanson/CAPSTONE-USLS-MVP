@@ -20,6 +20,9 @@ Your decisions: `DECISIONS.md`. How unattended work runs: `IMPROVE.md`.
 
 ## Ready for your review
 
+- **New home pages (IM19):** student home (merge edfea70) and staff home (merge 2f416f7) now share one layout - "Needs your action" first, then "Waiting on the Graduate School / on others", 3-4 key numbers, recent activity. The student home went from ~2,400 px of repeated cards to ~1,050 px; staff charts moved to **Reports > Analytics** (4 readable charts, click a bar to see the students). Dean and faculty homes are being rebuilt the same way now.
+- **Gemini works with your key** (default model switched to `gemini-flash-latest`; Google closed `gemini-2.5-flash` to new keys). The grounded assistant rebuild is in progress.
+
 - **Same data on every machine** (merge a9d0367) - `npm run seed` now builds the whole demo (148 students) the same way everywhere and prints a *Demo data fingerprint*; two teammates who see the same fingerprint have the same data. Starting the app never changes the data any more. To move a teammate over: pull `v5.2-migui_again`, remove the `DATABASE_URL=mysql...` line from `.env`, run `npm run seed`, compare fingerprints.
 
 - **Design system, foundations** (merges 2e8cefc, ab32a7d, edc050c) - shared sizes/spacing, one status-colour map, shared buttons/fields/cards, one dialog that fits every screen, and `npm run check:ui`, which blocks new one-off sizes, tables and dialogs. Visible: status chips use one colour per meaning ("Submitted" blue, "Returned" amber, "Completed" green), info notes are blue, buttons and inputs are bigger on phones, the white strip above open dialogs is gone. Agent decisions AD1-AD4 in `DECISIONS.md`.
