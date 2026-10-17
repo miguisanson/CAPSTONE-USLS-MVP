@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Inbox } from "lucide-react";
-import { EmptyState, StatusBadge } from "../../components/ui";
+import { Button, DataTable, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import { deanDateMatches, deanItemDate, graduationBatchLabel, sortDeanItems } from "./deanHelpers";
 import { DEAN_PROCESSES } from "./DeanContext";
@@ -51,59 +51,79 @@ export function useDeanFilters(items) {
   return { filters, setFilters, programs, statuses, matches, apply };
 }
 
+// How long a case has waited: grey until a week, amber from 8 days, red from 15 (the status chip's own tones).
 export function AgeBadge({ value }) {
   const days = daysSince(value);
   if (days === null) return null;
-  const tone = days >= 15 ? "bg-red-50 text-red-700 ring-red-200" : days >= 8 ? "bg-amber-50 text-amber-700 ring-amber-200" : "bg-slate-100 text-slate-600 ring-slate-200";
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${tone}`}>{ageLabel(value)}</span>;
+  return <StatusChip label={ageLabel(value)} tone={days >= 15 ? "bad" : days >= 8 ? "warn" : "muted"} size="sm" dot={false} />;
 }
 
 export function casePath(item) {
   return `/dean/case/${item.type}/${item.id}`;
 }
 
-// Compact table of workflow cases; each row opens the case detail page.
+// Compact table of workflow cases; the row (and its Review button) opens the case detail page.
 export function CaseTable({ items, emptyTitle = "Nothing to review here", emptyHint = "Submitted items for this process will appear here.", showProcess = false }) {
-  if (!items.length) {
-    return <EmptyState icon={Inbox} title={emptyTitle} hint={emptyHint} />;
-  }
+  const columns = [
+    {
+      key: "student",
+      header: "Student",
+      sortValue: (item) => item.student?.name || item.title,
+      cell: (item) => (
+        <>
+          <span className="block">{item.student?.name || item.title}</span>
+          <span className="meta inline-block font-normal">{item.student?.student_number} · {item.student?.program_code}</span>
+        </>
+      ),
+    },
+    {
+      key: "request",
+      header: "Request",
+      sortValue: (item) => item.title,
+      cell: (item) => (
+        <>
+          <p className="font-medium text-slate-700">{item.title}</p>
+          <p className="meta">{showProcess ? `${processLabel(item.type)} · ` : ""}{item.subtitle}</p>
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (item) => item.workflow_status || item.status,
+      cell: (item) => <StatusChip status={item.workflow_status || item.status} dot={false} />,
+    },
+    {
+      key: "waiting",
+      header: "Waiting",
+      sortValue: (item) => item.submitted_at || deanItemDate(item),
+      cell: (item) => (
+        <div className="space-y-1">
+          <p className="meta">{formatDate(item.submitted_at || deanItemDate(item))}</p>
+          <AgeBadge value={item.submitted_at || deanItemDate(item)} />
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">Actions</span>,
+      align: "right",
+      cell: (item) => (
+        <Button as={Link} to={casePath(item)} variant="secondary" size="sm" icon={Eye} aria-label={`Review ${item.title}`}>
+          Review
+        </Button>
+      ),
+    },
+  ];
   return (
-    <div className="relative overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-            <th className="px-3 py-2">Student</th>
-            <th className="px-3 py-2">Request</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Waiting</th>
-            <th className="px-3 py-2"><span className="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={`${item.type}-${item.id}`} className="border-b border-slate-50 last:border-0">
-              <td className="px-3 py-3">
-                <p className="font-semibold text-ink">{item.student?.name || item.title}</p>
-                <p className="text-xs text-slate-400">{item.student?.student_number} · {item.student?.program_code}</p>
-              </td>
-              <td className="px-3 py-3 text-slate-600">
-                <p className="font-medium text-slate-700">{item.title}</p>
-                <p className="text-xs text-slate-400">{showProcess ? `${processLabel(item.type)} · ` : ""}{item.subtitle}</p>
-              </td>
-              <td className="px-3 py-3"><StatusBadge value={item.workflow_status || item.status} dot={false} /></td>
-              <td className="px-3 py-3">
-                <p className="text-xs text-slate-500">{formatDate(item.submitted_at || deanItemDate(item))}</p>
-                <AgeBadge value={item.submitted_at || deanItemDate(item)} />
-              </td>
-              <td className="px-3 py-3 text-right">
-                <Link to={casePath(item)} className="btn-ghost px-3 py-1.5 text-xs" aria-label={`Review ${item.title}`}>
-                  <Eye className="h-3.5 w-3.5" /> Review
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      caption="Workflow cases waiting for the Dean"
+      columns={columns}
+      rows={items}
+      rowKey={(item) => `${item.type}-${item.id}`}
+      rowHref={casePath}
+      pageSize={25}
+      empty={{ icon: Inbox, title: emptyTitle, hint: emptyHint }}
+    />
   );
 }

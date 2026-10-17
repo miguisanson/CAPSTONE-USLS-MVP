@@ -38,10 +38,11 @@ export default defineConfig({
     ...(negative
       ? []
       : [{ name: "section-j", testMatch: /section-j\.spec\.js$/, dependencies: ["setup"] }]),
-    // P6.1 page behaviour pin (Students, Dashboard, Work Queue as staff). Read-only. Not in the negative control.
+    // Page-migration packets (Phase 5): e2e/p<NN>-<name>.spec.js pin page behaviour. Some change data
+    // (each uses its own demo students). Not in the negative control. New packets add a spec file only.
     ...(negative
       ? []
-      : [{ name: "p61-pages", testMatch: /p61-pages\.spec\.js$/, dependencies: ["setup"] }]),
+      : [{ name: "pages", testMatch: /(^|[\/])p\d+-[\w-]+\.spec\.js$/, dependencies: ["setup"] }]),
     // Phase 5 component gallery at /__ui (ui-gallery.spec.js plus one ui-gallery-<packet>.spec.js per packet). Read-only. Needs the e2e build (VITE_UI_GALLERY=1, set by
     // `node scripts/e2e.mjs --build`, which `npm run e2e` uses). Not in the negative control.
     ...(negative
