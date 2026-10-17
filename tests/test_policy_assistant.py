@@ -12,9 +12,11 @@ No test touches the network: ``app._gemini_generate`` is mocked and ``app.urlope
 """
 import json
 import os
+import re
 import tempfile
 import unittest
 from datetime import date, timedelta
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 
@@ -417,6 +419,24 @@ class StrengthBarTests(AssistantBase):
                     payload = self.ask("dean@usls.edu.ph", question)
                 generate.assert_not_called()
                 self.assertTrue(payload["not_covered"], payload["answer"])
+
+
+class EvalScriptIsolationTests(unittest.TestCase):
+    """The live-check script builds a demo database; it must never write into the real uploads or RAG index."""
+
+    def test_the_eval_script_points_every_writable_folder_at_its_own_work_folder_before_importing_app(self):
+        source = (Path(__file__).resolve().parents[1] / "scripts" / "assistant_eval.py").read_text(encoding="utf-8")
+        import_at = source.index("import app as appmod")
+        for variable in ("USLS_UPLOAD_DIR", "POLICY_DOCUMENT_UPLOAD_DIR", "RAG_INDEX_DIR", "DATABASE_URL"):
+            with self.subTest(variable=variable):
+                assignment = re.search(rf'os\.environ\["{variable}"\]\s*=', source)
+                self.assertIsNotNone(assignment, f"{variable} must be set outright (not setdefault)")
+                self.assertLess(assignment.start(), import_at)
+
+    def test_the_eval_script_checks_the_real_policy_folder_is_untouched_when_it_finishes(self):
+        source = (Path(__file__).resolve().parents[1] / "scripts" / "assistant_eval.py").read_text(encoding="utf-8")
+        self.assertIn("real_policy_listing", source)
+        self.assertIn("wrote into the real", source)
 
 
 class PersonalAnswerTests(AssistantBase):
