@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, Search, SlidersHorizontal } from "lucide-react";
+import { Activity, AlertTriangle, SlidersHorizontal } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, Spinner, StatusBadge, EmptyState } from "../components/ui";
+import { Card, EmptyState, PageHeader, SearchInput, Select, Spinner } from "../components/ui/index.js";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import { formatDate } from "../lib/format";
 
@@ -44,25 +44,54 @@ export default function ActivityLog() {
       && (!filters.owner || log.next_owner === filters.owner);
   }), [items, filters]);
 
-  return (
-    <div className="space-y-5 animate-fade-up">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Activity Log</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          An append-style trail of recorded transactions — the audit basis for accountability and monitoring.
-        </p>
-      </div>
+  const hasFilters = Object.values(filters).some(Boolean);
+  const setFilter = (key) => (value) => setFilters((current) => ({ ...current, [key]: value }));
 
-      <Card className="p-3">
+  return (
+    <div className="page-stack animate-fade-up">
+      <PageHeader
+        title="Activity Log"
+        description="An append-style trail of recorded transactions — the audit basis for accountability and monitoring."
+      />
+
+      <Card pad="sm">
         <div className="grid gap-3 sm:grid-cols-3">
-          <label className="relative block"><span className="sr-only">Search activity</span><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} className="field-input pl-10" placeholder="Search activity or student…" aria-label="Search activity" /></label>
-          <select value={filters.workflow} onChange={(event) => setFilters((current) => ({ ...current, workflow: event.target.value }))} className="field-input cursor-pointer" aria-label="Filter activity by workflow"><option value="">All workflows</option>{workflows.map((workflow) => <option key={workflow} value={workflow}>{workflowLabel(workflow)}</option>)}</select>
-          <select value={filters.owner} onChange={(event) => setFilters((current) => ({ ...current, owner: event.target.value }))} className="field-input cursor-pointer" aria-label="Filter activity by next owner"><option value="">All next owners</option>{owners.map((owner) => <option key={owner}>{owner}</option>)}</select>
+          <SearchInput
+            value={filters.query}
+            onChange={setFilter("query")}
+            placeholder="Search activity or student…"
+            label="Search activity"
+          />
+          <Select
+            aria-label="Filter activity by workflow"
+            placeholder="All workflows"
+            value={filters.workflow}
+            onChange={(event) => setFilter("workflow")(event.target.value)}
+            options={workflows.map((workflow) => ({ value: workflow, label: workflowLabel(workflow) }))}
+          />
+          <Select
+            aria-label="Filter activity by next owner"
+            placeholder="All next owners"
+            value={filters.owner}
+            onChange={(event) => setFilter("owner")(event.target.value)}
+            options={owners}
+          />
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>Showing {filtered.length} of {items.length} activities</span>{Object.values(filters).some(Boolean) && <button type="button" onClick={() => setFilters({ query: "", workflow: "", owner: "" })} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear filters</button>}</div>
+        <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
+          <span>Showing {filtered.length} of {items.length} activities</span>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => setFilters({ query: "", workflow: "", owner: "" })}
+              className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800 max-sm:min-h-11"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" /> Clear filters
+            </button>
+          )}
+        </div>
       </Card>
 
-      <Card className="p-6">
+      <Card pad="lg">
         {loading ? (
           <Spinner label="Loading activity…" />
         ) : error ? (
@@ -76,13 +105,13 @@ export default function ActivityLog() {
                 <li key={log.id} className="relative">
                   <span className="absolute -left-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-white bg-brand-500" />
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-600">
                       {workflowLabel(log.transaction_slug)}
                     </span>
-                    <span className="text-xs text-slate-400">{formatDate(log.created_at, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className="meta">{formatDate(log.created_at, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
                   <p className="mt-1 text-sm font-semibold text-ink">{log.result}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="meta">
                     {log.actor_role}
                     {log.student_id && (
                       <>
@@ -96,7 +125,7 @@ export default function ActivityLog() {
                     {" · next owner: "}
                     {log.next_owner || "—"}
                   </p>
-                  {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
+                  {log.notes && <p className="meta mt-1 leading-relaxed">{log.notes}</p>}
                 </li>
               ))}
             </ol>
