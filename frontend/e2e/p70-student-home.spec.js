@@ -4,7 +4,7 @@
 //   - Maya Torres (AWOL, one open task, one recommendation): the first section of the page is "Needs your action" and it
 //     lists the waiting task with a working link to the student page where it is handled;
 //   - Roberto Aquino (nothing waiting): the same section says "Nothing is waiting on you" and holds no list;
-//   - Miguel Yu (Final Defense): each key number is shown ONCE (coursework %, research status, open tasks, unread
+//   - Miguel Yu (any stage on the lifecycle path): each key number is shown ONCE (coursework %, research status, open tasks, unread
 //     messages), the lifecycle Stepper marks his current stage, "On track" appears at most once, and the blocks that
 //     left the home are still one click away: Defense Schedule, Request Center, Leave of Absence, Research Adviser;
 //   - at 390 px nothing overflows sideways and the page is one column; at 1366 px the actions take the wide column.
@@ -70,6 +70,9 @@ test.describe("student home, action first (IM19)", () => {
   test("Miguel: every key number once, the Stepper marks the stage, 'On track' at most once, moved blocks stay reachable", async ({ page, context }) => {
     await openHome(page, context, MIGUEL);
     const m = main(page);
+    // other specs move Miguel through the lifecycle (section-j resets him), so read his stage instead of assuming it
+    const portal = await (await context.request.get("/api/student-portal/context")).json();
+    const stage = portal.student.current_stage;
 
     // coursework % shown once, research status shown once
     await expect(m.getByText(/^\d+%$/), "coursework percentage appears once").toHaveCount(1);
@@ -87,7 +90,7 @@ test.describe("student home, action first (IM19)", () => {
     // the Stepper marks the student's current stage
     const current = m.locator('ol [aria-current="step"]');
     await expect(current).toHaveCount(1);
-    await expect(current).toContainText("Final Defense");
+    await expect(current).toContainText(stage);
 
     // blocks that left the home are one click away
     for (const [name, path] of [
