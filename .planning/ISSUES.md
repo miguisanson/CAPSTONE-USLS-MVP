@@ -36,7 +36,7 @@ hunt — becomes one row here. Rules adapted from DD-Project-GameMaker.
 | I-010 | BUG | P1 | Graduation: after the Dean's CSV export the batch stays "Dean Approved" instead of "Exported - Ready to Send". (J10) | walkthrough cases | open |
 | I-011 | BUG | P2 | After a monitoring-sheet import the Onboarding report panel still says "No import batches yet". (J11) | walkthrough cases | open |
 | I-012 | BUG | P1 | Residency can be recorded when the checker says "Needs Human Review". (J12) | walkthrough cases | open |
-| I-013 | BUG | P3 | Policy Assistant still returns loosely related passages for some questions the library does not cover. (J13) | walkthrough cases | open |
+| I-013 | BUG | P3 | Policy Assistant still returns loosely related passages for some questions the library does not cover. (J13) | walkthrough cases | fixed on pkt/assistant (offline gate + weak-retrieval refusal); live Gemini check pending |
 | I-014 | FEATURE | P2 | Walkthrough cases 9 and 18 not fully re-captured on the final build. (J14) — superseded by the Playwright walkthroughs (IM7) once they exist | `scripts/docs/walkthrough/` | open |
 | I-015 | BUG | P1 | "multiple people are struggling with having mismatch data" (owner, 2026-10-17). audit: `npm run seed` and a plain start build different data (panel assignments 45 vs 71, adviser assignments 28 vs 31); the app also changes data on every normal start. | `research/DATABASE-FOR-TEAM.md`, `codebase/STACK.md` | fixed-on-v5.2 (pkt/seed: one build, fingerprint de2824de… on two hash seeds) |
 | I-016 | UI | P2 | "a lot of inconsistencies, different UI sizes" (owner, 2026-10-17) | `codebase/CONCERNS.md` (UI inventory) | confirmed |

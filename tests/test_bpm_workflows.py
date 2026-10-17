@@ -1750,7 +1750,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
                 "app.call_document_rag"
-            ) as document_rag:
+            ) as document_rag, patch(
+                "app._gemini_generate", side_effect=RuntimeError("no network in tests")
+            ):
                 fast = client.post(
                     "/api/student-portal/assistant",
                     json={
