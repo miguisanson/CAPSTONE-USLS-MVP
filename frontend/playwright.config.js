@@ -42,6 +42,10 @@ export default defineConfig({
     ...(negative
       ? []
       : [{ name: "p61-pages", testMatch: /p61-pages\.spec\.js$/, dependencies: ["setup"] }]),
+    // P2.1 app shell behaviour pin (sidebar links per role, mobile menu, notification bell, sign out). Read-only. Not in the negative control.
+    ...(negative
+      ? []
+      : [{ name: "p21-shell", testMatch: /p21-shell\.spec\.js$/, dependencies: ["setup"] }]),
     // Phase 5 component gallery at /__ui (ui-gallery.spec.js plus one ui-gallery-<packet>.spec.js per packet). Read-only. Needs the e2e build (VITE_UI_GALLERY=1, set by
     // `node scripts/e2e.mjs --build`, which `npm run e2e` uses). Not in the negative control.
     ...(negative
