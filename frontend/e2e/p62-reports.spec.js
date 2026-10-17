@@ -32,7 +32,7 @@ function apiGet(page, pathname, ok = () => true) {
     .waitForResponse((r) => {
       const u = new URL(r.url());
       return r.request().method() === "GET" && u.pathname === pathname && ok(u.searchParams);
-    })
+    }, { timeout: 60_000 }) // the full run keeps the one dev server busy; 20 s flaked once
     .then(async (r) => ({ params: new URL(r.url()).searchParams, json: await r.json() }));
 }
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);

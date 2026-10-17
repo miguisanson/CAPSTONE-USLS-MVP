@@ -3,7 +3,8 @@ import { useSearchParams, Link } from "react-router-dom";
 import { AlertTriangle, Download, FileText, GraduationCap, ListTodo, ClipboardCheck, Briefcase, LogOut, Activity, FlaskConical, RefreshCw, Printer, CheckSquare, Square, BarChart3, Clock, Users, CalendarClock, TrendingDown, Gauge, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from "../components/ui";
+import { Button, Card, DataTable, EmptyState, Field, InlineNotice, Input, PageHeader, SectionCard, Select, Spinner, StatCard, StatusChip } from "../components/ui/index.js";
+import { csvCell, downloadBlob } from "../lib/format";
 import { printDataTable } from "../lib/print";
 
 const REPORT_TABS = [
@@ -34,6 +35,9 @@ const ANALYTICS_TABS = [
 
 const ANALYTICS_IDS = new Set(ANALYTICS_TABS.map((tab) => tab.id));
 const PAGED_TABS = new Set(REPORT_TABS.filter((tab) => !["summary", "daily_changes"].includes(tab.id)).map((tab) => tab.id));
+const RISK_OPTIONS = ["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"];
+const STANDING_OPTIONS = ["Active", "On Leave", "AWOL", "Withdrawn"];
+const WORKFLOW_OPTIONS = REPORT_TABS.filter((tab) => tab.id !== "summary").map((tab) => ({ value: tab.id, label: tab.label }));
 
 export default function Reports() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -112,60 +116,36 @@ export default function Reports() {
   const analyticsReport = analyticsWanted ? analytics?.[active] : null;
 
   return (
-    <div className="space-y-5 animate-fade-up">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Reports</h1>
-          <p className="mt-1 text-sm text-slate-500">Filterable monitoring reports generated from student records, tasks, and workflow cases.</p>
-        </div>
-        <Link to="/" className="btn-ghost">Back to dashboard</Link>
-      </div>
+    <div className="page-stack animate-fade-up">
+      <PageHeader
+        title="Reports"
+        description="Filterable monitoring reports generated from student records, tasks, and workflow cases."
+        actions={<Button as={Link} to="/" variant="secondary">Back to dashboard</Button>}
+      />
 
       <ReportFilters data={data} filters={filters} updateFilter={updateFilter} clear={() => setSearchParams({}, { replace: true })} />
 
       <div className="flex flex-wrap gap-2">
         {REPORT_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const selected = activeTab.id === tab.id;
           const count = (tab.id === "summary" || tab.id === "daily_changes") ? null : data?.[tab.id]?.count || 0;
           return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => chooseTab(tab.id)}
-              className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
-                selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-brand-50"
-              }`}
-            >
-              <Icon className="h-4 w-4" /> {tab.label}{count !== null ? ` · ${count}` : ""}
-            </button>
+            <TabButton key={tab.id} tab={tab} selected={activeTab.id === tab.id} count={count} onClick={() => chooseTab(tab.id)} />
           );
         })}
       </div>
 
       <div>
-        <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          Analytics &amp; decision support
-        </p>
+        <p className="eyebrow px-1 pb-2">Analytics &amp; decision support</p>
         <div className="flex flex-wrap gap-2">
-          {ANALYTICS_TABS.map((tab) => {
-            const Icon = tab.icon;
-            const selected = activeTab.id === tab.id;
-            const count = analytics?.[tab.id]?.count;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => chooseTab(tab.id)}
-                className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
-                  selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-brand-50"
-                }`}
-              >
-                <Icon className="h-4 w-4" /> {tab.label}
-                {count !== undefined ? ` · ${count}` : ""}
-              </button>
-            );
-          })}
+          {ANALYTICS_TABS.map((tab) => (
+            <TabButton
+              key={tab.id}
+              tab={tab}
+              selected={activeTab.id === tab.id}
+              count={analytics?.[tab.id]?.count ?? null}
+              onClick={() => chooseTab(tab.id)}
+            />
+          ))}
         </div>
       </div>
 
@@ -181,80 +161,73 @@ export default function Reports() {
           error={analyticsError}
         />
       ) : (
-        <Card className="p-5">
-          <SectionTitle
-            title={activeTab.label}
-            icon={activeTab.icon}
-            action={active !== "summary" && rows.length ? <button type="button" onClick={() => exportCsv(active, rows)} className="btn-ghost"><Download className="h-4 w-4" /> Export CSV</button> : null}
-          />
-          {active === "summary" ? <SummaryReport summary={data.summary} /> : <ReportTable type={active} rows={rows} />}
-          {tabData && tabData.count > 0 && (
-            <ReportPager data={tabData} busy={loading} onPage={(next) => setPage(next)} />
+        <SectionCard
+          title={activeTab.label}
+          icon={activeTab.icon}
+          action={active !== "summary" && rows.length ? <Button variant="secondary" icon={Download} onClick={() => exportCsv(active, rows)}>Export CSV</Button> : null}
+        >
+          {active === "summary" ? (
+            <SummaryReport summary={data.summary} />
+          ) : (
+            <ReportTable
+              type={active}
+              rows={rows}
+              pagination={tabData && tabData.count > 0 ? {
+                page: tabData.page || 1,
+                pageCount: tabData.pages || Math.max(1, Math.ceil(tabData.count / (tabData.page_size || Math.max(1, rows.length)))),
+                total: tabData.count,
+                pageSize: tabData.page_size || Math.max(1, rows.length),
+                onPage: setPage,
+              } : undefined}
+            />
           )}
-        </Card>
+        </SectionCard>
       )}
     </div>
   );
 }
 
-function ReportPager({ data, busy, onPage }) {
-  const pageSize = data.page_size || rowsPerPageFallback(data);
-  const current = data.page || 1;
-  const pages = data.pages || Math.max(1, Math.ceil(data.count / pageSize));
-  const from = (current - 1) * pageSize + 1;
-  const to = Math.min(data.count, (current - 1) * pageSize + (data.rows || []).length);
+// One report / analytics switch: pressed = the primary look, not pressed = the secondary look.
+function TabButton({ tab, selected, count, onClick }) {
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm text-slate-500">Showing <span className="font-semibold text-ink">{from}-{to}</span> of <span className="font-semibold text-ink">{data.count}</span></p>
-      <div className="flex gap-2">
-        <button type="button" disabled={busy || current <= 1} onClick={() => onPage(current - 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-        <button type="button" disabled={busy || current >= pages} onClick={() => onPage(current + 1)} className="btn-ghost cursor-pointer px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-      </div>
-    </div>
+    <Button size="sm" variant={selected ? "primary" : "secondary"} icon={tab.icon} aria-pressed={selected} onClick={onClick}>
+      {tab.label}{count !== null && count !== undefined ? ` · ${count}` : ""}
+    </Button>
   );
-}
-
-function rowsPerPageFallback(data) {
-  return Math.max(1, (data.rows || []).length);
 }
 
 function ReportFilters({ data, filters, updateFilter, clear }) {
   const active = Object.values(filters).filter(Boolean).length;
   return (
-    <Card className="p-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-        <Select label="Program" value={filters.program_id} onChange={(value) => updateFilter("program_id", value)}>
-          <option value="">All programs</option>
-          {(data?.programs || []).map((program) => <option key={program.id} value={program.id}>{program.code}</option>)}
-        </Select>
-        <Select label="Progress" value={filters.stage} onChange={(value) => updateFilter("stage", value)}>
-          <option value="">All progress</option>
-          {(data?.stages || []).map((stage) => <option key={stage} value={stage}>{stage}</option>)}
-        </Select>
-        <Select label="Risk" value={filters.risk} onChange={(value) => updateFilter("risk", value)}>
-          <option value="">All risk</option>
-          {["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"].map((risk) => <option key={risk} value={risk}>{risk}</option>)}
-        </Select>
-        <Select label="Standing" value={filters.standing} onChange={(value) => updateFilter("standing", value)}>
-          <option value="">All standings</option>
-          {["Active", "On Leave", "AWOL", "Withdrawn"].map((standing) => <option key={standing} value={standing}>{standing}</option>)}
-        </Select>
-        <Select label="Workflow" value={filters.workflow_type} onChange={(value) => updateFilter("workflow_type", value)}>
-          <option value="">All workflows</option>
-          {REPORT_TABS.filter((tab) => tab.id !== "summary").map((tab) => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
-        </Select>
+    <Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <Field label="Program">
+          <Select
+            placeholder="All programs"
+            value={filters.program_id}
+            onChange={(e) => updateFilter("program_id", e.target.value)}
+            options={(data?.programs || []).map((program) => ({ value: String(program.id), label: program.code }))}
+          />
+        </Field>
+        <Field label="Progress">
+          <Select placeholder="All progress" value={filters.stage} onChange={(e) => updateFilter("stage", e.target.value)} options={data?.stages || []} />
+        </Field>
+        <Field label="Risk">
+          <Select placeholder="All risk" value={filters.risk} onChange={(e) => updateFilter("risk", e.target.value)} options={RISK_OPTIONS} />
+        </Field>
+        <Field label="Standing">
+          <Select placeholder="All standings" value={filters.standing} onChange={(e) => updateFilter("standing", e.target.value)} options={STANDING_OPTIONS} />
+        </Field>
+        <Field label="Workflow">
+          <Select placeholder="All workflows" value={filters.workflow_type} onChange={(e) => updateFilter("workflow_type", e.target.value)} options={WORKFLOW_OPTIONS} />
+        </Field>
       </div>
-      {active > 0 && <button type="button" onClick={clear} className="mt-3 text-xs font-semibold text-brand-700">Clear report filters</button>}
+      {active > 0 && (
+        <button type="button" onClick={clear} className="mt-3 cursor-pointer text-xs font-semibold text-brand-700 hover:text-brand-800 max-sm:min-h-11">
+          Clear report filters
+        </button>
+      )}
     </Card>
-  );
-}
-
-function Select({ label, value, onChange, children }) {
-  return (
-    <label>
-      <span className="field-label">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="field-input cursor-pointer">{children}</select>
-    </label>
   );
 }
 
@@ -272,10 +245,7 @@ function SummaryReport({ summary }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {cards.map(([label, value]) => (
-        <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-          <p className="font-display text-2xl font-semibold text-ink">{value}</p>
-          <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
-        </div>
+        <StatCard key={label} tone="neutral" label={label} value={value} />
       ))}
     </div>
   );
@@ -286,73 +256,57 @@ function AnalyticsPanel({ tab, report, kpis, studentCount, loading, error }) {
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load analytics" hint={error} />;
   const rows = report?.rows || [];
   const columns = report?.columns || [];
+  const tableColumns = columns.map((col) => ({
+    key: col.key,
+    header: col.label,
+    cell: (row) => formatAnalyticsCell(row[col.key]),
+  }));
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       {kpis?.length ? <KpiStrip kpis={kpis} /> : null}
-      <Card className="p-5">
-        <SectionTitle
-          title={tab.label}
-          icon={tab.icon}
-          action={rows.length ? (
-            <button type="button" onClick={() => exportAnalyticsCsv(tab.id, columns, rows)} className="btn-ghost">
-              <Download className="h-4 w-4" /> Export CSV
-            </button>
-          ) : null}
-        />
-        <p className="-mt-1 mb-3 text-xs text-slate-500">
+      <SectionCard
+        title={tab.label}
+        icon={tab.icon}
+        action={rows.length ? <Button variant="secondary" icon={Download} onClick={() => exportAnalyticsCsv(tab.id, columns, rows)}>Export CSV</Button> : null}
+      >
+        <p className="meta -mt-2">
           Computed from recorded event history for {studentCount ?? 0} student(s) matching the filters.
         </p>
         {report?.totals ? <TotalsRow totals={report.totals} /> : null}
-        {rows.length ? (
-          <div className="overflow-x-auto rounded-xl border border-slate-100">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  {columns.map((col) => <th key={col.key} className="px-4 py-2.5">{col.label}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => (
-                  <tr key={index} className="border-b border-slate-50 align-top">
-                    {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-2.5 text-slate-600">
-                        {formatAnalyticsCell(row[col.key])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState icon={FileText} title="Nothing to report" hint="No records match the current filters." />
-        )}
-      </Card>
+        <DataTable
+          caption={tab.label}
+          columns={tableColumns}
+          rows={rows}
+          rowKey={(row, index) => index}
+          minWidth="md"
+          pageSize={0}
+          empty={{ icon: FileText, title: "Nothing to report", hint: "No records match the current filters." }}
+        />
+      </SectionCard>
     </div>
   );
 }
 
 function KpiStrip({ kpis }) {
   return (
-    <Card className="p-5">
-      <SectionTitle title="Module KPI measurements" icon={Gauge} />
+    <SectionCard title="Module KPI measurements" icon={Gauge}>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {kpis.map((kpi) => {
-          const tone = kpi.met === null ? "text-slate-500" : kpi.met ? "text-emerald-600" : "text-amber-600";
+          const tone = kpi.met === null ? "text-slate-500" : kpi.met ? "text-brand-700" : "text-amber-700";
           return (
             <div key={kpi.kpi} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{kpi.module}</p>
+              <p className="eyebrow">{kpi.module}</p>
               <p className="mt-1 text-sm font-semibold text-ink">{kpi.kpi}</p>
-              <p className={`mt-2 font-display text-2xl font-semibold ${tone}`}>
+              <p className={`page-title mt-2 ${tone}`}>
                 {kpi.value}{kpi.unit}
               </p>
-              <p className="text-xs text-slate-500">Target {kpi.target}</p>
-              <p className="mt-1 text-xs text-slate-400">{kpi.basis}</p>
+              <p className="meta">Target {kpi.target}</p>
+              <p className="meta mt-1">{kpi.basis}</p>
             </div>
           );
         })}
       </div>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -360,7 +314,7 @@ function TotalsRow({ totals }) {
   const entries = Object.entries(totals || {});
   if (!entries.length) return null;
   return (
-    <div className="mb-3 flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2">
       {entries.map(([key, value]) => (
         <span key={key} className="rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700">
           {key.replace(/_/g, " ")}: {formatAnalyticsCell(value)}
@@ -376,160 +330,172 @@ function formatAnalyticsCell(value) {
   return String(value);
 }
 
+function downloadCsv(filename, lines) {
+  downloadBlob(new Blob([lines.join("\n")], { type: "text/csv" }), filename);
+}
+
 function exportAnalyticsCsv(type, columns, rows) {
-  const headers = columns.map((col) => col.label);
-  const lines = [headers.map(csvCell).join(",")];
+  const lines = [columns.map((col) => csvCell(col.label)).join(",")];
   rows.forEach((row) => {
     lines.push(columns.map((col) => csvCell(row[col.key])).join(","));
   });
-  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${type}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadCsv(`${type}.csv`, lines);
 }
 
-function ReportTable({ type, rows }) {
-  if (!rows.length) return <EmptyState icon={FileText} title="No rows match the filters" />;
-  if (type === "graduation_candidates") return <GraduationTable rows={rows} />;
-  if (type === "missing_requirements") return <MissingTable rows={rows} />;
-  if (type === "practicum_monitoring") return <PracticumTable rows={rows} />;
-  if (type === "withdrawal_requests") return <WithdrawalTable rows={rows} />;
-  if (type === "loa_readmission") return <LoaTable rows={rows} />;
-  if (type === "at_risk") return <RiskTable rows={rows} />;
-  if (type === "open_overdue_tasks") return <TaskTable rows={rows} />;
-  if (type === "research_completion") return <ResearchTable rows={rows} />;
-  return null;
-}
-
-function BaseTable({ headers, rows, render }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-slate-100">
-      <table className="w-full min-w-[760px] text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-            {headers.map((header) => <th key={header} className="px-4 py-2.5">{header}</th>)}
-          </tr>
-        </thead>
-        <tbody>{rows.map(render)}</tbody>
-      </table>
-    </div>
-  );
-}
-
+// The student a row belongs to: name links to the record, number and program underneath.
 function StudentCell({ student }) {
   return (
-    <td className="px-4 py-2.5">
+    <>
       <Link to={`/students/${student.id}`} className="font-semibold text-brand-700 hover:underline">{student.name}</Link>
-      <p className="text-xs text-slate-400">{student.student_number} · {student.program_code}</p>
-    </td>
+      <p className="meta">{student.student_number} · {student.program_code}</p>
+    </>
   );
 }
 
-function GraduationTable({ rows }) {
-  return <BaseTable headers={["Student", "Window", "Coursework", "Research", "Practicum", "Status"]} rows={rows} render={(row) => (
-    <tr key={row.id} className="border-b border-slate-50">
-      <StudentCell student={row.student} />
-      <td className="px-4 py-2.5 text-slate-600">{row.review_window}</td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.coursework_status} dot={false} /></td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.research_status} dot={false} /></td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.practicum_status} dot={false} /></td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.endorsement_status} dot={false} /></td>
-    </tr>
-  )} />;
-}
+const studentColumn = { key: "student", header: "Student", cell: (row) => <StudentCell student={row.student} /> };
+const chipColumn = (key, header, value) => ({ key, header, cell: (row) => <StatusChip status={value(row)} dot={false} /> });
 
-function MissingTable({ rows }) {
-  return <BaseTable headers={["Student", "Coursework", "Research", "Practicum", "Next owner"]} rows={rows} render={(row) => (
-    <tr key={row.student.id} className="border-b border-slate-50 align-top">
-      <StudentCell student={row.student} />
-      <td className="px-4 py-2.5 text-slate-600">{row.coursework.length ? row.coursework.join("; ") : "None"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.research.length ? row.research.join("; ") : "None"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.practicum || "None"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.next_owner}</td>
-    </tr>
-  )} />;
-}
+// One entry per report: the columns, how a row is keyed, and the screen-reader caption.
+const REPORT_TABLES = {
+  graduation_candidates: {
+    caption: "Graduation candidates",
+    rowKey: (row) => row.id,
+    columns: [
+      studentColumn,
+      { key: "window", header: "Window", cell: (row) => row.review_window },
+      chipColumn("coursework", "Coursework", (row) => row.coursework_status),
+      chipColumn("research", "Research", (row) => row.research_status),
+      chipColumn("practicum", "Practicum", (row) => row.practicum_status),
+      chipColumn("status", "Status", (row) => row.endorsement_status),
+    ],
+  },
+  missing_requirements: {
+    caption: "Students with missing requirements",
+    rowKey: (row) => row.student.id,
+    columns: [
+      studentColumn,
+      { key: "coursework", header: "Coursework", cell: (row) => (row.coursework.length ? row.coursework.join("; ") : "None") },
+      { key: "research", header: "Research", cell: (row) => (row.research.length ? row.research.join("; ") : "None") },
+      { key: "practicum", header: "Practicum", cell: (row) => row.practicum || "None" },
+      { key: "owner", header: "Next owner", cell: (row) => row.next_owner },
+    ],
+  },
+  practicum_monitoring: {
+    caption: "Practicum monitoring",
+    rowKey: (row) => row.id,
+    columns: [
+      studentColumn,
+      { key: "site", header: "Site", cell: (row) => row.practicum_site || "—" },
+      { key: "hours", header: "Hours", cell: (row) => `${row.completed_hours}/${row.required_hours}` },
+      chipColumn("documents", "Documents", (row) => row.document_status),
+      { key: "certificates", header: "Certificates", cell: (row) => row.certificate_count },
+      chipColumn("status", "Status", (row) => row.status),
+    ],
+  },
+  withdrawal_requests: {
+    caption: "Withdrawal requests",
+    rowKey: (row) => row.id,
+    columns: [
+      studentColumn,
+      {
+        key: "subject",
+        header: "Subject / semester",
+        cell: (row) => (
+          <>
+            <span className="font-semibold text-ink">{row.subject?.course_code || "—"}</span>
+            <span className="meta block">{row.effective_term || "—"}</span>
+          </>
+        ),
+      },
+      {
+        key: "window",
+        header: "Window",
+        cell: (row) => (
+          <span className="meta">
+            {row.withdrawal_window?.status || "—"}
+            <span className="block">Deadline: {row.withdrawal_window?.deadline || "—"}</span>
+            <span className="block">Fee: {row.withdrawal_window?.fee_percent != null ? `${row.withdrawal_window.fee_percent}% of term` : "—"}</span>
+          </span>
+        ),
+      },
+      chipColumn("dean", "Dean", (row) => row.dean_decision),
+      chipColumn("registrar", "Sent to Registrar", (row) => row.registrar_status),
+      { key: "record", header: "Academic record", cell: (row) => <span className="meta font-semibold text-brand-700">{row.academic_record_effect || "—"}</span> },
+      chipColumn("status", "Status", (row) => row.status),
+    ],
+  },
+  loa_readmission: {
+    caption: "Leave of absence and readmission requests",
+    rowKey: (row) => row.id,
+    columns: [
+      studentColumn,
+      { key: "request", header: "Request", cell: (row) => row.kind_label },
+      chipColumn("status", "Status", (row) => row.status_label || row.status),
+      { key: "period", header: "Period / return semester", cell: (row) => row.period_text || "—" },
+      { key: "owner", header: "Next owner", cell: (row) => row.owner || "—" },
+      { key: "registrar", header: "Registrar list", cell: (row) => (row.registrar_status && row.registrar_status !== "Not Ready" ? row.registrar_status : "—") },
+    ],
+  },
+  at_risk: {
+    caption: "At-risk students",
+    rowKey: (row) => row.student.id,
+    columns: [
+      studentColumn,
+      chipColumn("risk", "Risk", (row) => row.student.risk_level),
+      { key: "recommendation", header: "Recommendation", cell: (row) => row.top_recommendation?.recommendation || "No recommendation" },
+      { key: "owner", header: "Owner", cell: (row) => row.top_recommendation?.owner || "—" },
+    ],
+  },
+  open_overdue_tasks: {
+    caption: "Open and overdue tasks",
+    rowKey: (row) => row.id,
+    columns: [
+      { key: "task", header: "Task", cell: (row) => <span className="font-semibold text-ink">{row.title}</span> },
+      { key: "student", header: "Student", cell: (row) => row.student_name || "—" },
+      { key: "owner", header: "Owner", cell: (row) => row.owner_role },
+      { key: "due", header: "Due", cell: (row) => row.due_at },
+      chipColumn("status", "Status", (row) => (row.overdue ? "Overdue" : row.status)),
+    ],
+  },
+  research_completion: {
+    caption: "Research completion",
+    rowKey: (row) => row.case.id,
+    columns: [
+      studentColumn,
+      { key: "case", header: "Case", cell: (row) => row.case.title },
+      { key: "gate", header: "Gate", cell: (row) => row.case.current_gate_label },
+      chipColumn("status", "Status", (row) => row.case.status),
+    ],
+  },
+};
 
-function PracticumTable({ rows }) {
-  return <BaseTable headers={["Student", "Site", "Hours", "Documents", "Certificates", "Status"]} rows={rows} render={(row) => (
-    <tr key={row.id} className="border-b border-slate-50">
-      <StudentCell student={row.student} />
-      <td className="px-4 py-2.5 text-slate-600">{row.practicum_site || "—"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.completed_hours}/{row.required_hours}</td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.document_status} dot={false} /></td>
-      <td className="px-4 py-2.5 text-slate-600">{row.certificate_count}</td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.status} dot={false} /></td>
-    </tr>
-  )} />;
-}
-
-function WithdrawalTable({ rows }) {
-  return <BaseTable headers={["Student", "Subject / semester", "Window", "Dean", "Sent to Registrar", "Academic record", "Status"]} rows={rows} render={(row) => (
-    <tr key={row.id} className="border-b border-slate-50">
-      <StudentCell student={row.student} />
-      <td className="px-4 py-2.5 text-slate-600"><span className="font-semibold text-ink">{row.subject?.course_code || "—"}</span><span className="block text-xs">{row.effective_term || "—"}</span></td>
-      <td className="px-4 py-2.5 text-xs text-slate-600">{row.withdrawal_window?.status || "—"}<span className="block">Deadline: {row.withdrawal_window?.deadline || "—"}</span><span className="block">Fee: {row.withdrawal_window?.fee_percent != null ? `${row.withdrawal_window.fee_percent}% of term` : "—"}</span></td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.dean_decision} dot={false} /></td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.registrar_status} dot={false} /></td>
-      <td className="px-4 py-2.5 text-xs font-semibold text-emerald-700">{row.academic_record_effect || "—"}</td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.status} dot={false} /></td>
-    </tr>
-  )} />;
-}
-
-function LoaTable({ rows }) {
-  return <BaseTable headers={["Student", "Request", "Status", "Period / return semester", "Next owner", "Registrar list"]} rows={rows} render={(row) => (
-    <tr key={row.id} className="border-b border-slate-50">
-      <StudentCell student={row.student} />
-      <td className="px-4 py-2.5 text-slate-600">{row.kind_label}</td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.status_label || row.status} dot={false} /></td>
-      <td className="px-4 py-2.5 text-slate-600">{row.period_text || "—"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.owner || "—"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.registrar_status && row.registrar_status !== "Not Ready" ? row.registrar_status : "—"}</td>
-    </tr>
-  )} />;
-}
-
-function RiskTable({ rows }) {
-  return <BaseTable headers={["Student", "Risk", "Recommendation", "Owner"]} rows={rows} render={(row) => (
-    <tr key={row.student.id} className="border-b border-slate-50">
-      <StudentCell student={row.student} />
-      <td className="px-4 py-2.5"><StatusBadge value={row.student.risk_level} dot={false} /></td>
-      <td className="px-4 py-2.5 text-slate-600">{row.top_recommendation?.recommendation || "No recommendation"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.top_recommendation?.owner || "—"}</td>
-    </tr>
-  )} />;
-}
-
-function TaskTable({ rows }) {
-  return <BaseTable headers={["Task", "Student", "Owner", "Due", "Status"]} rows={rows} render={(row) => (
-    <tr key={row.id} className="border-b border-slate-50">
-      <td className="px-4 py-2.5 font-semibold text-ink">{row.title}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.student_name || "—"}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.owner_role}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.due_at}</td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.overdue ? "Overdue" : row.status} dot={false} /></td>
-    </tr>
-  )} />;
-}
-
-function ResearchTable({ rows }) {
-  return <BaseTable headers={["Student", "Case", "Gate", "Status"]} rows={rows} render={(row) => (
-    <tr key={row.case.id} className="border-b border-slate-50">
-      <StudentCell student={row.student} />
-      <td className="px-4 py-2.5 text-slate-600">{row.case.title}</td>
-      <td className="px-4 py-2.5 text-slate-600">{row.case.current_gate_label}</td>
-      <td className="px-4 py-2.5"><StatusBadge value={row.case.status} dot={false} /></td>
-    </tr>
-  )} />;
+function ReportTable({ type, rows, pagination }) {
+  const table = REPORT_TABLES[type];
+  if (!table) return null;
+  return (
+    <DataTable
+      caption={table.caption}
+      columns={table.columns}
+      rows={rows}
+      rowKey={table.rowKey}
+      minWidth="md"
+      pageSize={0}
+      pagination={pagination}
+      empty={{ icon: FileText, title: "No rows match the filters" }}
+    />
+  );
 }
 
 function todayISO() {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function changeText(item) {
+  if (item.previous_status && item.new_status && item.previous_status !== item.new_status) {
+    return `${item.detail} (${item.previous_status} → ${item.new_status})`;
+  }
+  return item.detail;
 }
 
 function DailyChangesReport() {
@@ -581,13 +547,6 @@ function DailyChangesReport() {
   const items = data?.items || [];
   const summary = data?.summary || { total: 0, reflected: 0, pending: 0 };
 
-  function changeText(item) {
-    if (item.previous_status && item.new_status && item.previous_status !== item.new_status) {
-      return `${item.detail} (${item.previous_status} → ${item.new_status})`;
-    }
-    return item.detail;
-  }
-
   function exportChangesCsv() {
     const headers = ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Sent to Registrar"];
     const lines = [headers.join(",")];
@@ -597,13 +556,7 @@ function DailyChangesReport() {
         item.program_code, changeText(item), item.actor, item.reflected_in_aims ? "Yes" : "No",
       ].map(csvCell).join(","));
     });
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `daily-changes-${date}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`daily-changes-${date}.csv`, lines);
   }
 
   function printChanges() {
@@ -619,77 +572,83 @@ function DailyChangesReport() {
     });
   }
 
-  return (
-    <Card className="p-5">
-      <SectionTitle
-        title="Daily changes"
-        subtitle="Every change made in this system on the selected date. Export or print the list for the Registrar, then mark each change as sent."
-        icon={RefreshCw}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="field-input max-w-44" aria-label="Change report date" />
-            <button type="button" onClick={exportChangesCsv} disabled={!items.length} className="btn-ghost cursor-pointer"><Download className="h-4 w-4" /> CSV</button>
-            <button type="button" onClick={printChanges} disabled={!items.length} className="btn-ghost cursor-pointer"><Printer className="h-4 w-4" /> Print</button>
-          </div>
-        }
-      />
+  const columns = [
+    {
+      key: "time",
+      header: "Time",
+      cell: (item) => <span className="whitespace-nowrap text-slate-500">{item.time ? new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</span>,
+    },
+    { key: "type", header: "Change type", cell: (item) => <StatusChip status={item.change_type} dot={false} /> },
+    {
+      key: "student",
+      header: "Student",
+      cell: (item) => (
+        <>
+          <Link to={`/students/${item.student_id}`} className="font-semibold text-brand-700 hover:underline">{item.student_name}</Link>
+          <p className="meta">{item.student_number} · {item.program_code}</p>
+        </>
+      ),
+    },
+    { key: "change", header: "Change", cell: (item) => changeText(item) },
+    { key: "by", header: "By", cell: (item) => <span className="text-slate-500">{item.actor}</span> },
+    {
+      key: "sent",
+      header: "Sent to Registrar",
+      align: "right",
+      cell: (item) => (
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={item.reflected_in_aims ? CheckSquare : Square}
+          disabled={busyId === item.id}
+          onClick={() => toggleReflected(item)}
+          className={`whitespace-nowrap ${item.reflected_in_aims ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100" : ""}`}
+        >
+          {item.reflected_in_aims ? "Sent" : "Mark as sent"}
+        </Button>
+      ),
+    },
+  ];
 
-      <div className="mt-3 grid grid-cols-3 gap-3">
-        <MiniStat label="Changes today" value={summary.total} />
-        <MiniStat label="Sent to Registrar" value={summary.reflected} tone="green" />
-        <MiniStat label="Not yet sent" value={summary.pending} tone="amber" />
+  return (
+    <SectionCard
+      title="Daily changes"
+      subtitle="Every change made in this system on the selected date. Export or print the list for the Registrar, then mark each change as sent."
+      icon={RefreshCw}
+      action={
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="max-w-44" aria-label="Change report date" />
+          <Button variant="secondary" icon={Download} onClick={exportChangesCsv} disabled={!items.length}>CSV</Button>
+          <Button variant="secondary" icon={Printer} onClick={printChanges} disabled={!items.length}>Print</Button>
+        </div>
+      }
+    >
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard tone="neutral" label="Changes today" value={summary.total} />
+        <StatCard tone="success" label="Sent to Registrar" value={summary.reflected} />
+        <StatCard tone="warning" label="Not yet sent" value={summary.pending} />
       </div>
 
-      {error && <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">{error}</div>}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
 
       {loading ? (
-        <div className="mt-4"><Spinner label="Loading changes…" /></div>
-      ) : items.length === 0 ? (
-        <div className="mt-4"><EmptyState icon={FileText} title="No changes on this date" hint="Pick another date, or make changes in Enrollment, Withdrawal, or the standing-change workflows." /></div>
+        <Spinner label="Loading changes…" />
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                <th className="px-4 py-2.5">Time</th>
-                <th className="px-4 py-2.5">Change type</th>
-                <th className="px-4 py-2.5">Student</th>
-                <th className="px-4 py-2.5">Change</th>
-                <th className="px-4 py-2.5">By</th>
-                <th className="px-4 py-2.5 text-right">Sent to Registrar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-slate-50 align-top">
-                  <td className="px-4 py-2.5 text-slate-500">{item.time ? new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                  <td className="px-4 py-2.5"><StatusBadge value={item.change_type} dot={false} /></td>
-                  <td className="px-4 py-2.5"><Link to={`/students/${item.student_id}`} className="font-semibold text-brand-700 hover:underline">{item.student_name}</Link><p className="text-xs text-slate-400">{item.student_number} · {item.program_code}</p></td>
-                  <td className="px-4 py-2.5 text-slate-600">{changeText(item)}</td>
-                  <td className="px-4 py-2.5 text-slate-500">{item.actor}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button type="button" onClick={() => toggleReflected(item)} disabled={busyId === item.id} className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors ${item.reflected_in_aims ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
-                      {item.reflected_in_aims ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                      {item.reflected_in_aims ? "Sent" : "Mark as sent"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          caption="Changes recorded on the selected date"
+          columns={columns}
+          rows={items}
+          rowKey="id"
+          minWidth="md"
+          pageSize={0}
+          empty={{
+            icon: FileText,
+            title: "No changes on this date",
+            hint: "Pick another date, or make changes in Enrollment, Withdrawal, or the standing-change workflows.",
+          }}
+        />
       )}
-    </Card>
-  );
-}
-
-function MiniStat({ label, value, tone }) {
-  const tones = { green: "text-green-700", amber: "text-amber-700" };
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-      <p className={`font-display text-2xl font-semibold ${tones[tone] || "text-ink"}`}>{value}</p>
-      <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
-    </div>
+    </SectionCard>
   );
 }
 
@@ -700,18 +659,7 @@ function exportCsv(type, rows) {
   flattened.forEach((row) => {
     lines.push(headers.map((header) => csvCell(row[header])).join(","));
   });
-  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${type}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function csvCell(value) {
-  const text = Array.isArray(value) ? value.join("; ") : String(value ?? "");
-  return `"${text.replace(/"/g, '""')}"`;
+  downloadCsv(`${type}.csv`, lines);
 }
 
 function flattenRow(type, row) {
