@@ -61,6 +61,12 @@ async function putBatchInFrontOfTheDean(playwright) {
   }
 }
 
+/** Full-page screenshot once the page's own fade-in has finished (otherwise the shot is half transparent). */
+async function shot(page, name) {
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: join(SHOTS, name), fullPage: true });
+}
+
 /** No sideways page scroll (IM15). */
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
@@ -112,12 +118,12 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(page.getByText("Onboarding report & Dean approval")).toBeVisible();
     await expect(page.getByText("Coursework status report to the Dean")).toBeVisible();
     await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "gate-reports-1366.png"), fullPage: true });
+    await shot(page, "gate-reports-1366.png");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Admission & Coursework Reports" })).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
-    await page.screenshot({ path: join(SHOTS, "gate-reports-390.png"), fullPage: true });
+    await shot(page, "gate-reports-390.png");
   });
 
   test("Reports & Analytics: tiles, the Decisions by process table, Pending load by program", async ({ page }) => {
@@ -165,14 +171,14 @@ test.describe("P3.3 Dean reports and graduation", () => {
     const maed = main.getByRole("listitem").filter({ hasText: /^MAED\s*\d+$/ });
     await expect(maed).toHaveCount(1);
     expect(await numberIn(maed), "MAED pending").toBeGreaterThanOrEqual(1);
-    await page.screenshot({ path: join(SHOTS, "analytics-1366.png"), fullPage: true });
+    await shot(page, "analytics-1366.png");
 
     // 390: the page never scrolls sideways (the table scrolls inside its own box).
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Reports & Analytics" })).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
-    await page.screenshot({ path: join(SHOTS, "analytics-390.png"), fullPage: true });
+    await shot(page, "analytics-390.png");
   });
 
   test("Graduation Endorsement: header, tabs, the roster", async ({ page }) => {
@@ -187,7 +193,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(tabs.getByRole("tab", { name: "Endorsement batches" })).toHaveAttribute("aria-selected", "false");
     await expect(page.getByText("Graduation endorsement candidates")).toBeVisible();
     await expect(page.getByText("Isabel Flores").first()).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "graduation-roster-1366.png"), fullPage: true });
+    await shot(page, "graduation-roster-1366.png");
   });
 
   test("Endorsement batches: the ready batch, selection, View students, board, filter", async ({ page }) => {
@@ -222,7 +228,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(main.getByText("Selected graduation candidates").first()).toBeVisible();
     await expect(main.getByText(`Isabel Flores · 2260007 · ${BATCH}`)).toBeVisible();
     await expect(main.getByRole("checkbox", { name: "Select Isabel Flores for Dean group action" })).toBeChecked();
-    await page.screenshot({ path: join(SHOTS, "batches-selected-1366.png"), fullPage: true });
+    await shot(page, "batches-selected-1366.png");
     await main.getByRole("button", { name: "Clear selection" }).click();
     await expect(main.getByText("0 graduation candidates selected")).toBeVisible();
     await expect(main.getByRole("checkbox", { name: "Select Isabel Flores for Dean group action" })).not.toBeChecked();
@@ -239,7 +245,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
       await expect(batch.getByText(label), label).toBeVisible();
     }
     await expect(batch).toContainText("2260007 · MAED");
-    await page.screenshot({ path: join(SHOTS, "batches-ready-1366.png"), fullPage: true });
+    await shot(page, "batches-ready-1366.png");
     await batch.getByRole("button", { name: "Hide students" }).click();
     await expect(batch.getByText("Thesis / research completed")).toHaveCount(0);
 
@@ -256,7 +262,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await page.reload();
     await expect(main.getByText("Ready graduation batches")).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
-    await page.screenshot({ path: join(SHOTS, "batches-ready-390.png"), fullPage: true });
+    await shot(page, "batches-ready-390.png");
   });
 
   test("the stage check of the ready batch: which steps are complete, current, pending", async ({ page }) => {
@@ -267,7 +273,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
       ["Complete", "Complete", "Complete", "Complete", "Current", "Pending"],
       { number: 5, label: "Dean reviews endorsement list", state: "Current" },
     );
-    await page.screenshot({ path: join(SHOTS, "stage-check-ready-1366.png"), fullPage: true });
+    await shot(page, "stage-check-ready-1366.png");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
@@ -279,7 +285,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
       { number: 5, label: "Dean reviews endorsement list", state: "Current" },
     );
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
-    await page.screenshot({ path: join(SHOTS, "stage-check-ready-390.png"), fullPage: true });
+    await shot(page, "stage-check-ready-390.png");
     await page.keyboard.press("Escape");
   });
 
@@ -309,7 +315,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(batch).toContainText("Step 6: Complete");
     await expect(batch.getByRole("button", { name: "View students" })).toBeVisible();
     await expect(batch.getByRole("button", { name: "Export approved list" })).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "batches-approved-1366.png"), fullPage: true });
+    await shot(page, "batches-approved-1366.png");
 
     // Its stage check: every step complete.
     await batch.getByRole("button", { name: `View graduation stage check for ${BATCH}` }).click();
@@ -318,7 +324,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
       ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete"],
       { number: 6, label: "Export endorsed list", state: "Complete" },
     );
-    await page.screenshot({ path: join(SHOTS, "stage-check-approved-1366.png"), fullPage: true });
+    await shot(page, "stage-check-approved-1366.png");
     await page.keyboard.press("Escape");
 
     // Export: a CSV is downloaded, the follow-up window names it, and the button becomes "Export again".
@@ -328,7 +334,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(followUp.getByRole("heading").first()).toHaveText("Graduation CSV export complete");
     await expect(followUp).toContainText(download.suggestedFilename());
     await expect(followUp).toContainText("Email the endorsed graduation list to the Registrar");
-    await page.screenshot({ path: join(SHOTS, "export-follow-up-1366.png"), fullPage: true });
+    await shot(page, "export-follow-up-1366.png");
     await followUp.getByRole("button", { name: "Got it" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("status").filter({ hasText: `${BATCH} exported as ${download.suggestedFilename()}` })).toBeVisible();
@@ -339,7 +345,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await page.reload();
     await expect(main.getByText("Approved graduation batches")).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
-    await page.screenshot({ path: join(SHOTS, "batches-approved-390.png"), fullPage: true });
+    await shot(page, "batches-approved-390.png");
   });
 
   test("Decision History and the analytics table pick up the approval", async ({ page }) => {
@@ -366,7 +372,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await filter.selectOption({ label: "Graduation Endorsement" });
     await expect(main.getByText("1 entry", { exact: true })).toBeVisible();
     await expect(link).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "history-filtered-1366.png"), fullPage: true });
+    await shot(page, "history-filtered-1366.png");
     for (const label of ["Leave of Absence", "Readmission", "AWOL & Residency", "Withdrawal Requests", "Practicum Reports", "Course Adjustments"]) {
       await filter.selectOption({ label });
       await expect(link, `${label} hides the graduation entry`).toHaveCount(0);
@@ -377,13 +383,13 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await filter.selectOption({ label: "All processes" });
     await expect(link).toBeVisible();
 
-    await page.screenshot({ path: join(SHOTS, "history-1366.png"), fullPage: true });
+    await shot(page, "history-1366.png");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Decision History" })).toBeVisible();
     await expect(link).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
-    await page.screenshot({ path: join(SHOTS, "history-390.png"), fullPage: true });
+    await shot(page, "history-390.png");
     await page.setViewportSize({ width: 1366, height: 768 });
 
     // The analytics table now counts the approved batch under Approved / completed.

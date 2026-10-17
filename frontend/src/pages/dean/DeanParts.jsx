@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, DecisionPanel, EmptyState, HistoryPanel, Modal, SearchInput, Spinner, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DecisionPanel, EmptyState, HistoryPanel, Modal, SearchInput, Spinner, Stepper, StatusChip } from "../../components/ui/index.js";
 import { toneOf } from "../../lib/tone";
 import { formatDate } from "../../lib/format";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../../components/WorkflowTimeline";
@@ -97,11 +97,26 @@ export function DeanGraduationWorkspace() {
 }
 
 // The tint a stage-check chip takes from the stage's state (the words "Step 3: Current" are not in the status map).
-const STAGE_TONE = { Complete: "good", Current: "info", "Needs action": "bad", Pending: "muted" };
+// "Needs action" is amber: a person must act, nothing has been denied (UI-SPEC section 3, warning).
+export const STAGE_TONE = { Complete: "success", Current: "info", "Needs action": "warning", Pending: "neutral" };
+
+// The Stepper state of each stage-check state; "Needs action" is a stage the Dean sent back for revision.
+const STAGE_STEP_STATE = { Complete: "complete", Current: "current", "Needs action": "returned", Pending: "upcoming" };
 
 export function DeanGraduationStageModal({ batch, onClose }) {
   const stages = deanGraduationStageChecks(batch);
   const currentStage = deanGraduationCurrentStage(batch);
+  const steps = stages.map((stage) => ({
+    key: stage.label,
+    label: stage.label,
+    state: STAGE_STEP_STATE[stage.state] || "upcoming",
+    hint: (
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <StatusChip status={stage.state} tone={STAGE_TONE[stage.state]} size="sm" dot={false} />
+        <span>{stage.detail}</span>
+      </span>
+    ),
+  }));
   return (
     <Modal
       size="xl"
@@ -117,20 +132,7 @@ export function DeanGraduationStageModal({ batch, onClose }) {
           </div>
           <StatusChip status={`Step ${currentStage.number}: ${currentStage.state}`} tone={STAGE_TONE[currentStage.state]} dot={false} />
         </div>
-        <ol className="mt-3 grid w-full grid-cols-1 gap-2 2xl:grid-cols-2">
-          {stages.map((stage) => (
-            <li key={stage.label} className="flex w-full max-w-none gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold ${stage.state === "Complete" ? "bg-brand-600 text-white" : stage.state === "Current" ? "bg-amber-100 text-amber-800" : stage.state === "Needs action" ? "bg-red-100 text-red-700" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>{stage.number}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-800">{stage.label}</p>
-                  <StatusChip status={stage.state} tone={STAGE_TONE[stage.state]} dot={false} />
-                </div>
-                <p className="meta mt-1">{stage.detail}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <Stepper className="mt-3" orientation="vertical" role="group" aria-label="Graduation stage check steps" steps={steps} />
       </div>
     </Modal>
   );
