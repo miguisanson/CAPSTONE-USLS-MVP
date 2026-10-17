@@ -9968,23 +9968,20 @@ def policy_test_question_payload(question: str) -> dict:
 
 
 ASSISTANT_STAFF_SUGGESTIONS = [
+    "What is waiting on me?",
     "Which students need attention right now?",
     "What does a student need for proposal defense readiness?",
     "Explain the LOA and residency rule.",
-    "What evidence is required for completion?",
-    "How is a defense panel composed?",
 ]
 ASSISTANT_POLICY_SUGGESTIONS = [
+    "What is waiting on me?",
     "Explain the LOA and residency rule.",
     "What is the maximum residence period for a master's program?",
-    "What does a student need for proposal defense readiness?",
     "How is a defense panel composed?",
-    "What is the withdrawal policy for a subject?",
 ]
 ASSISTANT_STUDENT_SUGGESTIONS = [
-    "What should I do next based on my record?",
-    "Which subjects am I currently enrolled in?",
-    "Explain the incomplete-grade re-enrollment rule.",
+    "What is my next step?",
+    "What am I missing?",
     "What do I need before a research defense?",
     "Explain the leave, AWOL, and residency rules for students.",
 ]
@@ -10421,7 +10418,11 @@ def _retrieve_rag_document_chunks(
             top = []
             for chunk_id in sorted(fused, key=lambda key: (-fused[key], key))[:limit]:
                 if chunk_id in vector_ranked:
-                    top.append({**vector_ranked[chunk_id], "_rrf": round(fused[chunk_id], 5)})
+                    keyword = keyword_ranked.get(chunk_id) or {}
+                    top.append({
+                        **vector_ranked[chunk_id], "_rrf": round(fused[chunk_id], 5),
+                        "_relevant": bool(keyword.get("_relevant")), "_coverage": keyword.get("_coverage"),
+                    })
                 else:
                     top.append({**keyword_ranked[chunk_id], "_retrieval": "bm25-boost", "_rrf": round(fused[chunk_id], 5)})
             return top
@@ -10456,23 +10457,6 @@ def prewarm_document_rag() -> None:
         )
     except Exception as exc:  # noqa: BLE001
         print(f"Policy Assistant document index prewarm skipped: {exc}")
-
-
-def _case_context_for_rag(student: Student | None, payload: dict | None, snippets: list[dict]) -> str:
-    context = []
-    if student and payload:
-        context.append("Student context: " + _status_sentence(student, payload["indicators"]))
-        if payload["recommendations"]:
-            context.append(
-                "Open recommendations: "
-                + "; ".join(f"{r['recommendation']} ({r['owner']})" for r in payload["recommendations"][:3])
-            )
-    if snippets:
-        context.append(
-            "Known policy snippets: "
-            + " ".join(f"{s['title']}: {s['text']}" for s in snippets)
-        )
-    return "\n".join(context)
 
 
 def _policy_citation(chunk: dict) -> dict:
@@ -10514,12 +10498,339 @@ def _finalize_document_answer(answer: str, chunks: list[dict]) -> str:
     return answer
 
 
-def call_document_rag(question: str, snippets: list[dict], payload: dict | None, student: Student | None) -> tuple[str, list[dict]]:
+# ---------------------------------------------------------------------------
+# Policy Assistant: personal questions (owner decision IM21)
+# "What is my next step?" is answered from the SIGNED-IN user's own record, never from anyone else's:
+# a student's stage, open tasks, missing items and leave state; a staff member's or coordinator's or
+# dean's queue; a faculty member's panel invitations. Gemini writes the answer from that record alone;
+# without a key, or when Gemini fails, the same record is turned into a plain offline answer.
+# ---------------------------------------------------------------------------
+_PERSONAL_QUESTION_PATTERNS = [
+    re.compile(pattern) for pattern in (
+        r"\bmy (?:next steps?|status|record|progress|standing|queue|tasks?|to-?do|deadlines?|requirements?|"
+        r"documents?|case|cases|stage|work|workload|pending)\b",
+        r"\bwhat (?:should|must|do|can|shall) i (?:do|work on|focus on)(?: (?:next|now|first|today|this week))?\s*[?.!]*$",
+        r"\bwhat (?:am i|i am|do i) (?:still )?(?:missing|lacking)\b",
+        r"\bwhat do i (?:still )?(?:need|have) to do\b",
+        r"\bwhat(?:'s| is) (?:still )?(?:missing|pending|outstanding|waiting|due|left)\b.{0,15}\b(?:for|on|from) me\b",
+        r"\bwhat(?:'s| is) (?:waiting|pending|due)\b.{0,12}\bme\b",
+        r"\bwhat(?:'s| is) next for me\b",
+        r"\bwhere am i\b",
+    )
+]
+
+
+def assistant_asks_personal(question: str) -> bool:
+    """True for questions about the asker's own status, tasks or next step."""
+    lowered = " ".join((question or "").lower().replace("’", "'").split())
+    return any(pattern.search(lowered) for pattern in _PERSONAL_QUESTION_PATTERNS)
+
+
+def _plain_date(value) -> str:
+    return value.strftime("%b %d, %Y").replace(" 0", " ") if value else "no date"
+
+
+def student_assistant_record(student: Student) -> dict:
+    """Facts from ONE student's own record that the assistant may use. Read-only; no names or numbers."""
+    today = date.today()
+    case = ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
+    indicators = student_indicators(student)
+    audit = compute_course_audit(student)
+    missing_documents: list[str] = []
+    if case and case.current_gate in RESEARCH_MILESTONES:
+        milestone = research_milestone_payload(student, case.current_gate)
+        missing_documents = [
+            item["label"] for item in milestone["requirements"]
+            if item["student_upload"] and item["status"] == "Missing"
+        ]
+    open_tasks = (
+        Task.query.filter(Task.student_id == student.id, Task.status.in_(["Pending", "Overdue"]))
+        .order_by(Task.due_at.asc(), Task.id.asc()).limit(8).all()
+    )
+    tasks = [
+        {
+            "title": task.title, "owner": normalize_owner_label(task.owner_role), "due": task.due_at,
+            "overdue": task.due_at < today,
+        }
+        for task in open_tasks
+    ]
+    standing_note = None
+    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        awol = latest_awol_case(student.id)
+        standing_note = (
+            "Your record is marked AWOL, so you cannot enroll until a return request is approved."
+            + (f" Your return request is at the stage: {awol.status}." if awol and awol.status else "")
+        )
+    elif student.standing == "On Leave" or student.enrollment_tag == "LOA" or student.current_stage == "LOA":
+        leave = active_leave_case(student.id)
+        end = leave_end_date(leave) if leave else None
+        standing_note = "You are on an approved leave of absence" + (
+            f" that ends {_plain_date(end)}." if end else "."
+        ) + " A readmission request is needed to come back."
+    elif student.standing == "Withdrawn" or student.current_stage == "Withdrawal In Progress":
+        standing_note = (
+            "Your record shows: " + ("withdrawn." if student.standing == "Withdrawn" else "withdrawal in progress.")
+        )
+    defense = (
+        ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.preferred_date >= today,
+            ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+        ).order_by(ScheduleRequest.preferred_date.asc()).first()
+    )
+    recommendations = [
+        {"text": item["recommendation"], "owner": item["owner"]}
+        for item in student_portal_recommendations(student)[:3]
+    ]
+    missing_subjects = [row["course"].code for row in (audit["incomplete"] + audit["missing"])]
+    return {
+        "stage": student_portal_stage(student, case),
+        "program": student.program.code if student.program else "",
+        "standing": student.standing,
+        "progress_status": student_priority(student)["level"],
+        "completion_rate": audit["completion_rate"],
+        "missing_subject_count": audit["missing_count"],
+        "missing_subjects": missing_subjects[:6],
+        "research_gate": case.current_gate if case else None,
+        "research_status": case.status if case else None,
+        "missing_documents": missing_documents,
+        "tasks": tasks,
+        "standing_note": standing_note,
+        "defense": (
+            {"type": defense.defense_type or "Defense", "date": defense.preferred_date, "status": defense.status}
+            if defense else None
+        ),
+        "recommendations": recommendations,
+        "next_owner": indicators.get("next_owner"),
+    }
+
+
+def _record_task_line(task: dict) -> str:
+    state = "overdue since" if task["overdue"] else "due"
+    return f"{task['title']} (owner: {task['owner']}, {state} {_plain_date(task['due'])})"
+
+
+def student_record_text(record: dict) -> str:
+    """The record as short plain lines for the Gemini prompt (no name, no student number)."""
+    lines = [
+        f"Stage: {record['stage']} ({record['program']}); standing {record['standing']}; "
+        f"progress status {record['progress_status']}.",
+        f"Coursework: {record['completion_rate']}% of required subjects completed; "
+        f"{record['missing_subject_count']} required subject(s) not yet completed"
+        + (f" (for example {', '.join(record['missing_subjects'])})." if record["missing_subjects"] else "."),
+    ]
+    if record["research_gate"]:
+        lines.append(f"Research step: {record['research_gate']}, status {record['research_status']}.")
+    if record["missing_documents"]:
+        lines.append("Missing documents you must upload: " + "; ".join(record["missing_documents"]) + ".")
+    if record["tasks"]:
+        lines.append("Open tasks: " + " | ".join(_record_task_line(task) for task in record["tasks"]))
+    else:
+        lines.append("Open tasks: none.")
+    if record["standing_note"]:
+        lines.append(record["standing_note"])
+    if record["defense"]:
+        d = record["defense"]
+        lines.append(f"Upcoming defense: {d['type']} on {_plain_date(d['date'])} ({d['status']}).")
+    if record["recommendations"]:
+        lines.append(
+            "Recommended next steps: "
+            + "; ".join(f"{item['text']} ({item['owner']})" for item in record["recommendations"])
+        )
+    return "\n".join(lines)
+
+
+def student_record_answer(record: dict) -> str:
+    """The offline answer to a personal question: the student's own record in plain words."""
+    parts = [
+        f"From your own record: you are at the {record['stage']} stage ({record['program']}), "
+        f"standing {record['standing']}, progress status {record['progress_status']}."
+    ]
+    if record["standing_note"]:
+        parts.append(record["standing_note"])
+    if record["tasks"]:
+        first = record["tasks"][0]
+        parts.append(
+            f"Your next step: {first['title']} - {'overdue since' if first['overdue'] else 'due'} {_plain_date(first['due'])}."
+        )
+        if len(record["tasks"]) > 1:
+            parts.append("Also open: " + "; ".join(_record_task_line(task) for task in record["tasks"][1:4]) + ".")
+    elif record["recommendations"]:
+        parts.append(f"Your next step: {record['recommendations'][0]['text']}")
+    else:
+        parts.append("You have no open tasks, and nothing in your record needs your action right now.")
+    if record["missing_documents"]:
+        parts.append("Still missing: " + "; ".join(record["missing_documents"]) + ".")
+    if record["missing_subject_count"]:
+        parts.append(f"Coursework: {record['missing_subject_count']} required subject(s) are not yet completed.")
+    if record["defense"]:
+        d = record["defense"]
+        parts.append(f"Upcoming: {d['type']} on {_plain_date(d['date'])}.")
+    return " ".join(parts)
+
+
+def account_assistant_queue(account: UserAccount) -> dict:
+    """What is waiting on the signed-in staff member, coordinator, dean or faculty member."""
+    role = account.role
+    today = date.today()
+    items: list[dict] = []
+    extras: list[str] = []
+    if role == "faculty":
+        invitations = (
+            PanelInvitation.query.filter_by(faculty_id=account.faculty_id, status="Invited")
+            .order_by(PanelInvitation.invited_at.asc()).limit(8).all()
+        ) if account.faculty_id else []
+        for invitation in invitations:
+            student_name = invitation.student.name if invitation.student else "a student"
+            items.append({
+                "title": (
+                    f"Answer the panel invitation for {student_name} "
+                    f"({invitation.gate}, {invitation.panel_role or 'panel member'})"
+                ),
+                "due": None, "overdue": False, "owner": ROLE_LABELS["faculty"],
+            })
+        total, overdue = len(items), 0
+        label = ROLE_LABELS["faculty"]
+    else:
+        owner = STAFF_OWNER if role in {"staff", "admin"} else ROLE_LABELS.get(role, STAFF_OWNER)
+        label = ROLE_LABELS.get(role, owner)
+        query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]), owner_task_clause(owner))
+        total = query.count()
+        overdue = query.filter(Task.due_at < today).count()
+        for task in query.order_by(Task.due_at.asc(), Task.id.asc()).limit(8).all():
+            student_name = task.student.name if task.student else ""
+            items.append({
+                "title": task.title + (f" - {student_name}" if student_name else ""),
+                "due": task.due_at, "overdue": task.due_at < today, "owner": owner,
+            })
+        if role == "dean":
+            review = LeaveCase.query.filter(LeaveCase.status == "Dean Review").count()
+            plans = CourseOfferingPlan.query.filter_by(status="Submitted").count()
+            if review:
+                extras.append(f"{review} leave or readmission request(s) are waiting for your decision.")
+            if plans:
+                extras.append(f"{plans} course offering plan(s) are waiting for your approval.")
+    return {"role_label": label, "items": items, "total": total, "overdue": overdue, "extras": extras}
+
+
+def queue_text(queue: dict) -> str:
+    waiting = queue["total"] + len(queue["extras"])
+    lines = [f"Role: {queue['role_label']}. Items waiting on you: {waiting}"
+             + (f" ({queue['overdue']} overdue)." if queue["overdue"] else ".")]
+    for item in queue["items"]:
+        lines.append("- " + item["title"] + (
+            f" ({'overdue since' if item['overdue'] else 'due'} {_plain_date(item['due'])})" if item["due"] else ""
+        ))
+    lines.extend("- " + extra for extra in queue["extras"])
+    return "\n".join(lines)
+
+
+def queue_answer(queue: dict) -> str:
+    if not queue["items"] and not queue["extras"]:
+        return (
+            f"Nothing is waiting on you right now as {queue['role_label']}. "
+            "Your home page lists new items as they arrive, and you can ask me any Graduate School policy question."
+        )
+    parts = [
+        f"{queue['total'] + len(queue['extras'])} item(s) are waiting on you as {queue['role_label']}"
+        + (f", {queue['overdue']} overdue." if queue["overdue"] else ".")
+    ]
+    if queue["items"]:
+        parts.append(f"Your next step: {queue['items'][0]['title']}.")
+        if len(queue["items"]) > 1:
+            parts.append("Next in line: " + "; ".join(item["title"] for item in queue["items"][1:4]) + ".")
+    parts.extend(queue["extras"])
+    return " ".join(parts)
+
+
+def call_personal_gemini(question: str, record_text: str, subject: str) -> str:
+    """One Gemini call that may use ONLY the signed-in user's own record."""
+    prompt = (
+        f"You are the USLS Graduate School assistant answering a personal question for the signed-in {subject}. "
+        "Answer using ONLY YOUR RECORD below; never use outside knowledge, never guess, and never mention anyone "
+        "else's record. Say plainly what the record shows (stage, open tasks, missing items, leave state, deadlines) "
+        "and put the single most useful next step first. Do not invent approvals, dates, decisions or records; if the "
+        "record does not answer the question, say so. Use at most 120 words, plain language, no tables.\n\n"
+        f"YOUR RECORD\n{record_text}\n\nQuestion: {question}"
+    )
+    return _gemini_generate(prompt)
+
+
+def personal_answer(question: str, subject: str, record_text: str, offline_answer: str, has_data: bool) -> tuple[str, str]:
+    """(answer, mode): Gemini from the record when it can, else the offline record answer.
+
+    The mode is ``record-ai`` when Gemini wrote it, ``record-offline`` otherwise. With nothing in the record
+    to explain, Gemini is not called.
+    """
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    if api_key and has_data:
+        try:
+            return call_personal_gemini(question, record_text, subject).strip(), "record-ai"
+        except Exception:  # noqa: BLE001 - a Gemini error or timeout falls back to the offline answer
+            pass
+    return offline_answer, "record-offline"
+
+
+# What the last retrieval looked like (for the evaluation script and for debugging), per thread.
+_ASSISTANT_TRACE = threading.local()
+
+
+def _assistant_trace(**values) -> None:
+    if getattr(_ASSISTANT_TRACE, "data", None) is None:
+        _ASSISTANT_TRACE.data = {}
+    _ASSISTANT_TRACE.data.update(values)
+
+
+def _assistant_trace_reset() -> None:
+    _ASSISTANT_TRACE.data = {}
+
+
+def _retrieval_strength(chunks: list[dict]) -> dict:
+    """Is what retrieval found good enough to show a model (or a reader) as an answer?
+
+    Strong means the keyword search judged a passage relevant (it covers at least half of the question's
+    words, rare words weighing more, and most of the question's words occur somewhere in the library), or the
+    embedding puts a passage at cosine similarity >= RAG_MIN_SIMILARITY (default 0.60) to the question.
+    """
+    minimum = float(os.getenv("RAG_MIN_SIMILARITY", "0.60"))
+    keyword_ok = any(chunk.get("_relevant") for chunk in chunks)
+    similarities = [chunk.get("_score") or 0.0 for chunk in chunks if chunk.get("_retrieval") == "vector"]
+    best_similarity = max(similarities) if similarities else None
+    vector_ok = best_similarity is not None and best_similarity >= minimum
+    coverages = [chunk.get("_coverage") or 0.0 for chunk in chunks]
+    return {
+        "strong": bool(keyword_ok or vector_ok),
+        "keyword_relevant": bool(keyword_ok),
+        "best_coverage": max(coverages) if coverages else 0.0,
+        "best_similarity": round(best_similarity, 4) if best_similarity is not None else None,
+        "min_similarity": minimum,
+    }
+
+
+def _model_says_not_covered(generated: str) -> bool:
+    lowered = (generated or "").strip().lower().replace("’", "'")
+    return lowered.startswith("i could not find this in the handbook") or (
+        len(lowered) < 300 and "don't cover this" in lowered
+    )
+
+
+def call_document_rag(
+    question: str, snippets: list[dict], payload: dict | None, student: Student | None,
+) -> tuple[str, list[dict]]:
+    """Gemini answers from the retrieved policy excerpts alone and cites them.
+
+    Weak retrieval never reaches the model: PolicyAnswerNotFound is raised, and so it is when the model itself
+    says the excerpts do not answer the question. The prompt holds the excerpts and the question, nothing else
+    (no student record, no curated snippets).
+    """
     document_chunks = _load_rag_document_index()
-    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks, max(5, int(os.getenv("RAG_TOP_K", "3"))))
+    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks, max(4, int(os.getenv("RAG_TOP_K", "3"))))
     if not retrieved_chunks:
         raise PolicyPassageNotFound("No matching policy passage was found.")
-    case_context = _case_context_for_rag(student, payload, snippets)
+    strength = _retrieval_strength(retrieved_chunks)
+    _assistant_trace(retrieval=strength)
+    if not strength["strong"]:
+        raise PolicyAnswerNotFound("The retrieved passages are too weak to answer this question.")
     prompt = (
         "You are the USLS Graduate School policy assistant. Answer using ONLY the numbered excerpts below "
         "(handbook, research protocol, memos, manuals); never use outside knowledge and never guess. "
@@ -10529,12 +10840,9 @@ def call_document_rag(question: str, snippets: list[dict], payload: dict | None,
         "If an excerpt is marked DRAFT, say the rule is a draft pending Graduate School validation. "
         "If the excerpts do not contain the answer, reply exactly: "
         f"\"{_prag.NOT_FOUND_ANSWER}\" and add nothing else. "
-        "If student context is provided, use it only for that student's live status and do not invent approvals, "
-        "decisions, or missing records. Use at most 120 words and do not paste long passages.\n\n"
+        "Use at most 120 words and do not paste long passages.\n\n"
+        "Retrieved document excerpts:\n"
     )
-    if case_context:
-        prompt += case_context + "\n\n"
-    prompt += "Retrieved document excerpts:\n"
     prompt += "\n\n".join(
         f"[{number}. {chunk['source']}"
         + (" — DRAFT, pending Graduate School validation" if (chunk.get("status") or "active") == "draft" else "")
@@ -10543,9 +10851,9 @@ def call_document_rag(question: str, snippets: list[dict], payload: dict | None,
         for number, chunk in enumerate(retrieved_chunks, start=1)
     )
     prompt += f"\n\nQuestion: {question}"
-    generated = _gemini_generate(prompt)
-    if (generated or "").strip().lower().startswith("i could not find this in the handbook"):
-        return _prag.NOT_FOUND_ANSWER, []  # the model found nothing in the passages: show no unrelated sources
+    generated = (_gemini_generate(prompt) or "").strip()
+    if _model_says_not_covered(generated):
+        raise PolicyAnswerNotFound("The model found no answer in the passages.")
     response = _finalize_document_answer(generated, retrieved_chunks)
     return response, [_policy_citation(chunk) for chunk in retrieved_chunks]
 
@@ -10881,6 +11189,7 @@ def call_local_document_rag(question: str) -> tuple[str, list[dict]]:
     """
     document_chunks = _load_rag_document_index()
     passages = search_policy_passages(question, max(3, int(os.getenv("RAG_TOP_K", "3"))))
+    _assistant_trace(retrieval=_retrieval_strength(passages))
     composed = _prag.compose_answer(
         question, passages, document_chunks, max(400, int(os.getenv("LOCAL_RAG_MAX_ANSWER_CHARS", "900"))),
     )
@@ -11246,6 +11555,12 @@ def _database_report_for_intent(intent: str, student: Student | None, payload: d
     return None
 
 
+# Answers produced without Gemini because there was no key, or Gemini failed: the UI labels them "Offline answer".
+ASSISTANT_OFFLINE_MODES = {
+    "document-rag-local", "policy-retrieval", "offline-fallback", "record-offline", "student-policy-fallback",
+}
+
+
 def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
     sources = {
         "database-rules": (
@@ -11269,8 +11584,16 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
             "Found by keyword search in the Handbook, Research Protocol and uploaded policies and quoted from them. No AI service was used; add a Gemini key for fuller, reworded answers.", False,
         ),
         "policy-not-found": (
-            "Not found in the documents",
+            "Not covered by the documents",
             "The Handbook, Research Protocol and uploaded policies were searched and none of them answers this question.", False,
+        ),
+        "record-ai": (
+            "Your record · written by Gemini",
+            "Gemini wrote this from the signed-in user's own record only; no other person's record was used.", True,
+        ),
+        "record-offline": (
+            "Your record · offline answer",
+            "Built from the signed-in user's own record without an AI service.", False,
         ),
         "role-guarded": (
             "Policy library · Role limits",
@@ -11296,7 +11619,11 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
     note = None
     if not ai_configured and mode in {"document-rag-local", "policy-not-found", "student-document-rag-local"}:
         note = "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers."
-    return {"label": label, "detail": detail, "ai_used": ai_used, "ai_configured": ai_configured, "note": note}
+    offline = mode in ASSISTANT_OFFLINE_MODES
+    return {
+        "label": label, "detail": detail, "ai_used": ai_used, "ai_configured": ai_configured, "note": note,
+        "offline": offline, "badge": "Offline answer" if offline else None,
+    }
 
 
 def _attention_report(portfolio: dict, display_limit: int = 5) -> dict:
@@ -11448,16 +11775,6 @@ def local_grounded_answer(
     return " ".join(out).strip()
 
 
-def call_google_ai_studio(question: str, snippets: list[dict], payload: dict | None, api_key: str) -> str:
-    """Real provider integration point (Google AI Studio / Gemini).
-
-    Intentionally a thin stub: in the demo no key is set, so this is never called.
-    When GOOGLE_AI_STUDIO_API_KEY is provided, build the grounded prompt from
-    `snippets` + `payload` and POST to the AI Studio endpoint here, then return the text.
-    """
-    raise NotImplementedError("Google AI Studio not connected in this build.")
-
-
 def assistant_validation_message(question: str) -> str | None:
     normalized = (question or "").strip()
     if len(normalized) > ASSISTANT_MAX_QUESTION_LENGTH:
@@ -11560,6 +11877,19 @@ def assistant_requires_document_rag(
     return _policy_library_has_relevant_passage(question)
 
 
+def finish_assistant_payload(payload: dict) -> dict:
+    """Add the fields the Assistant screens rely on to every reply, whichever path produced it."""
+    source = payload.get("source") or {}
+    payload["sources"] = payload.get("citations") or []
+    payload["not_covered"] = payload.get("mode") in {"policy-not-found", "student-document-not-found"}
+    payload["offline"] = bool(source.get("offline"))
+    payload.setdefault("personal", False)
+    retrieval = (getattr(_ASSISTANT_TRACE, "data", None) or {}).get("retrieval")
+    if retrieval:
+        payload["retrieval"] = retrieval
+    return payload
+
+
 def student_requires_document_rag(
     question: str,
     student: Student,
@@ -11652,19 +11982,45 @@ def assistant_role_guarded_response(role: str) -> dict:
     }
 
 
-def generate_answer(question: str, student_id: int | None = None, policy_only: bool = False, role: str = "") -> dict:
+def personal_queue_response(question: str, account: UserAccount) -> dict:
+    """A personal question from staff, a coordinator, the dean or faculty: answered from what waits on them."""
+    queue = account_assistant_queue(account)
+    has_data = bool(queue["items"] or queue["extras"])
+    answer, mode = personal_answer(
+        question, ROLE_LABELS.get(account.role, "user").lower(), queue_text(queue), queue_answer(queue), has_data,
+    )
+    source = _assistant_source(mode)
+    if not has_data:  # nothing to explain, so this is not a fallback
+        source.update({"offline": False, "badge": None})
+    return {
+        "answer": answer, "structured": None, "mode": mode, "source": source, "citations": [],
+        "grounded": None, "recommendations": [], "student": None, "personal": True, "scope": "own-queue",
+        "read_only": True,
+    }
+
+
+def generate_answer(
+    question: str, student_id: int | None = None, policy_only: bool = False, role: str = "",
+    account: UserAccount | None = None,
+) -> dict:
     # Policy-only callers (Dean, coordinators, faculty) never get student data.
     student = Student.query.get(student_id) if student_id and not policy_only else None
     payload = student_recommendations(student) if student else None
     validation_message = assistant_validation_message(question)
     if validation_message:
         return assistant_validation_response(validation_message, student, payload)
+    if account is not None and assistant_asks_personal(question):
+        # "What is my next step?" is about the person asking, not about a policy or a chosen student.
+        return personal_queue_response(question, account)
     # The assistant is advisory only: it retrieves policy passages and explains
     # backend-computed facts. It never changes records or approves decisions.
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     intent = _assistant_intent(question)
     intent_ai_used = False
-    if intent == "unknown" and not assistant_requires_document_rag(question, student, [], intent) and api_key:
+    if (
+        intent == "unknown" and not policy_only
+        and not assistant_requires_document_rag(question, student, [], intent) and api_key
+    ):
         classified_intent = _classify_assistant_intent_with_gemini(question, bool(student))
         if classified_intent and classified_intent != "unknown":
             intent = classified_intent
@@ -11682,7 +12038,11 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
     rag_citations = []
     attention_portfolio = portfolio_recommendations() if intent == "student_attention" else None
     database_report = _database_report_for_intent(intent, student, payload)
-    if assistant_requires_document_rag(question, student, snippets, intent):
+    # With a key the embedding can find a passage for wording the keyword search misses, so every question that is
+    # not about a record goes to the document search first; weak retrieval then answers "not covered" itself.
+    if assistant_requires_document_rag(question, student, snippets, intent) or (
+        api_key and intent not in database_intents
+    ):
         try:
             if not api_key:
                 raise RuntimeError("Gemini is not configured.")
@@ -11696,6 +12056,9 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
                 mode = "document-rag"
                 if not student:
                     _rag_cache_set(cache_key, (answer, rag_citations))
+        except PolicyAnswerNotFound:
+            # Retrieval was weak, or Gemini said the excerpts do not answer: say so, show no passages.
+            answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "policy-not-found"
         except Exception:
             try:
                 answer, rag_citations = call_local_document_rag(question)
@@ -11718,6 +12081,8 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
         answer = local_grounded_answer(
             question, student, payload, snippets, attention_portfolio, database_report
         )
+        if answer == _prag.NOT_FOUND_ANSWER:
+            mode = "policy-not-found"
 
     policy_citations = [{"id": s["id"], "title": s["title"], "source": s["source"], "text": s["text"]} for s in snippets]
     structured = None
@@ -11731,7 +12096,7 @@ def generate_answer(question: str, student_id: int | None = None, policy_only: b
         "mode": mode,
         "source": _assistant_source(mode, intent_ai_used),
         "citations": rag_citations or (
-            policy_citations if mode != "database-rules" else []
+            policy_citations if mode not in {"database-rules", "policy-not-found"} else []
         ),
         "grounded": payload["indicators"] if payload else None,
         "recommendations": payload["recommendations"] if payload else [],
@@ -11797,9 +12162,18 @@ def generate_student_answer(question: str, student: Student) -> dict:
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     mode = "student-fast"
     rag_citations = []
+    personal = False
     if _student_asks_current_enrollment(question):
         answer = _student_enrollment_answer(student)
         mode = "student-records"
+    elif assistant_asks_personal(question):
+        # "What is my next step?" - from this student's own record only, written by Gemini when it can be.
+        record = student_assistant_record(student)
+        answer, record_mode = personal_answer(
+            question, "student", student_record_text(record), student_record_answer(record), True,
+        )
+        mode = "student-record-ai" if record_mode == "record-ai" else "student-fast"
+        personal = True
     elif student_requires_document_rag(question, student, snippets):
         try:
             if not api_key:
@@ -11811,6 +12185,8 @@ def generate_student_answer(question: str, student: Student) -> dict:
                 student,
             )
             mode = "student-document-rag"
+        except PolicyAnswerNotFound:
+            answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "student-document-not-found"
         except Exception:
             try:
                 answer, rag_citations = call_local_document_rag(question)
@@ -11829,7 +12205,10 @@ def generate_student_answer(question: str, student: Student) -> dict:
             "student-document-rag": "document-rag",
             "student-document-rag-local": "document-rag-local",
             "student-document-not-found": "policy-not-found",
+            "student-record-ai": "record-ai",
+            "student-fast": "record-offline",
         }.get(mode, mode)),
+        "personal": personal,
         "citations": rag_citations or (
             [
                 {"id": item["id"], "title": item["title"], "source": item["source"], "text": item["text"]}
@@ -17946,15 +18325,20 @@ def register_routes(app: Flask) -> None:
             student_id = int(student_id) if student_id else None
         except (TypeError, ValueError):
             student_id = None
+        _assistant_trace_reset()
         try:
             if account.role == "student":
-                return jsonify(generate_student_answer(question, Student.query.get_or_404(account.student_id)))
+                return jsonify(finish_assistant_payload(
+                    generate_student_answer(question, Student.query.get_or_404(account.student_id))
+                ))
             if account.role in {"staff", "admin"}:
-                return jsonify(generate_answer(question, student_id))
-            return jsonify(generate_answer(question, None, policy_only=True, role=account.role))
+                return jsonify(finish_assistant_payload(generate_answer(question, student_id, account=account)))
+            return jsonify(finish_assistant_payload(
+                generate_answer(question, None, policy_only=True, role=account.role, account=account)
+            ))
         except Exception:
             app.logger.exception("Policy Assistant could not complete a read-only request.")
-            return jsonify({
+            return jsonify(finish_assistant_payload({
                 "answer": (
                     "I could not safely complete that request right now. No records were changed. "
                     "Please try a more specific question or try again in a moment."
@@ -17964,7 +18348,7 @@ def register_routes(app: Flask) -> None:
                 "grounded": None,
                 "recommendations": [],
                 "student": None,
-            })
+            }))
 
     # Starter questions for the Assistant UI.
     @app.route("/api/assistant/suggestions")
@@ -17988,7 +18372,8 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Ask a question to get started."}), 400
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        return jsonify(generate_student_answer(question, student))
+        _assistant_trace_reset()
+        return jsonify(finish_assistant_payload(generate_student_answer(question, student)))
 
     @app.route("/api/student-portal/assistant/suggestions")
     @require_api_login("student")

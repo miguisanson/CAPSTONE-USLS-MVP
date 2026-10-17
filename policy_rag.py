@@ -851,8 +851,7 @@ MIN_COVERAGE = 0.5
 # --------------------------------------------------------------------------- answering
 NOT_FOUND_ANSWER = (
     "I could not find this in the Handbook, the Research Protocol or the uploaded policies. "
-    "Try asking with the name of the rule, stage or form (for example leave of absence, comprehensive exam, "
-    "title defense or Form 1), or ask the Graduate School office."
+    "The USLS policy documents in the library don't cover this. Ask the Graduate School office."
 )
 
 
