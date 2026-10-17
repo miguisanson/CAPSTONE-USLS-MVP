@@ -371,9 +371,13 @@ class PanelMatchingTests(unittest.TestCase):
                 self.assertTrue(profile["ready"], profile.get("blocked_reason"))
 
     def test_seeder_is_registered_with_the_other_startup_seeders(self):
+        # Demo data is written only by build_demo_database(), which runs seed_database() first.
         source = Path(app_module.__file__).read_text(encoding="utf-8")
-        startup = source.split("app = create_app()", 1)[1].split('if __name__ == "__main__":', 1)[0]
-        self.assertIn("ensure_panel_matching_demo_data()", startup)
+        after_app = source.split("app = create_app()", 1)[1]
+        build = after_app.split("def build_demo_database()", 1)[1].split("def database_has_demo_data()", 1)[0]
+        self.assertIn("seed_database()", build)
+        seeding = source.split("def seed_database()", 1)[1].split("\n\ndef ", 1)[0]
+        self.assertIn("ensure_panel_matching_demo_data()", seeding)
 
     # --------------------------------------------------------------------- D6
     def test_method_is_labelled_honestly_and_gemini_falls_back_to_tfidf(self):
