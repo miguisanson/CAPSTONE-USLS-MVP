@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { AlertTriangle, Download, FileText, GraduationCap, ListTodo, ClipboardCheck, Briefcase, LogOut, Activity, FlaskConical, RefreshCw, Printer, CheckSquare, Square, BarChart3, Clock, Users, CalendarClock, TrendingDown, Gauge, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Download, PieChart, FileText, GraduationCap, ListTodo, ClipboardCheck, Briefcase, LogOut, Activity, FlaskConical, RefreshCw, Printer, CheckSquare, Square, BarChart3, Clock, Users, CalendarClock, TrendingDown, Gauge, ShieldCheck } from "lucide-react";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { useApi } from "../hooks";
 import { Button, Card, DataTable, EmptyState, Field, InlineNotice, Input, PageHeader, SectionCard, Select, Spinner, StatCard, StatusChip } from "../components/ui/index.js";
 import { csvCell, downloadBlob } from "../lib/format";
 import { printDataTable } from "../lib/print";
+import AnalyticsSection from "./reports/AnalyticsSection.jsx";
 
 const REPORT_TABS = [
   { id: "summary", label: "Dashboard summary", icon: FileText },
@@ -33,6 +35,11 @@ const ANALYTICS_TABS = [
   { id: "followup_closure", label: "Follow-up closure", icon: Gauge },
 ];
 
+// The charts that used to fill the staff home (IM20). They use the dashboard API, which is the Graduate School's
+// (staff and administrator), so the tab is offered only to them. It is not in the Workflow filter: it is not a report.
+const CHARTS_TAB = { id: "analytics", label: "Analytics", icon: PieChart };
+const CHARTS_ROLES = new Set(["staff", "admin"]);
+
 const ANALYTICS_IDS = new Set(ANALYTICS_TABS.map((tab) => tab.id));
 const PAGED_TABS = new Set(REPORT_TABS.filter((tab) => !["summary", "daily_changes"].includes(tab.id)).map((tab) => tab.id));
 const RISK_OPTIONS = ["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"];
@@ -40,8 +47,13 @@ const STANDING_OPTIONS = ["Active", "On Leave", "AWOL", "Withdrawn"];
 const WORKFLOW_OPTIONS = REPORT_TABS.filter((tab) => tab.id !== "summary").map((tab) => ({ value: tab.id, label: tab.label }));
 
 export default function Reports() {
+  const { user } = useAuth();
+  const canSeeCharts = CHARTS_ROLES.has(user?.role);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [active, setActive] = useState(searchParams.get("workflow_type") || "summary");
+  const [active, setActive] = useState(() => {
+    const wanted = searchParams.get("workflow_type") || "summary";
+    return wanted === CHARTS_TAB.id && !canSeeCharts ? "summary" : wanted;
+  });
   const filters = useMemo(
     () => ({
       program_id: searchParams.get("program_id") || "",
@@ -108,6 +120,7 @@ export default function Reports() {
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load reports" hint={error} />;
 
   const activeTab =
+    (active === CHARTS_TAB.id && CHARTS_TAB) ||
     REPORT_TABS.find((tab) => tab.id === active) ||
     ANALYTICS_TABS.find((tab) => tab.id === active) ||
     REPORT_TABS[0];
@@ -137,6 +150,7 @@ export default function Reports() {
       <div>
         <p className="eyebrow px-1 pb-2">Analytics &amp; decision support</p>
         <div className="flex flex-wrap gap-2">
+          {canSeeCharts && <TabButton tab={CHARTS_TAB} selected={active === CHARTS_TAB.id} count={null} onClick={() => chooseTab(CHARTS_TAB.id)} />}
           {ANALYTICS_TABS.map((tab) => (
             <TabButton
               key={tab.id}
@@ -149,7 +163,9 @@ export default function Reports() {
         </div>
       </div>
 
-      {active === "daily_changes" ? (
+      {active === CHARTS_TAB.id ? (
+        <AnalyticsSection filters={filters} />
+      ) : active === "daily_changes" ? (
         <DailyChangesReport />
       ) : analyticsWanted ? (
         <AnalyticsPanel
