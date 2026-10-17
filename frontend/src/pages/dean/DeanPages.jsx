@@ -10,13 +10,15 @@ import {
   RotateCcw,
   SearchX,
 } from "lucide-react";
-import { Button, Card, DataTable, EmptyState, HistoryPanel, InlineNotice, Input, PageHeader, SectionCard, StatCard, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DataTable, EmptyState, HistoryPanel, Input, PageHeader, SectionCard, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
-import { toneOf } from "../../lib/tone";
+import { useAuth } from "../../auth";
+import RoleHome from "../../components/RoleHome.jsx";
+import { deanActions, deanActivity, deanStats, wordDays } from "../../lib/deanHome.js";
+import { firstNameOf } from "../../lib/staffHome.js";
 import { DEAN_PROCESSES, DeanFeedback, DeanGate, processOfType, useDean } from "./DeanContext";
-import { AgeBadge, CaseTable, casePath, daysSince, processLabel, useDeanFilters } from "./DeanShared";
+import { AgeBadge, CaseTable, casePath, processLabel, useDeanFilters } from "./DeanShared";
 import { DeanListFilters, DeanWorkflowBoard, WorkflowApprovalCard } from "./DeanParts";
-import { deanItemDate } from "./deanHelpers";
 import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
@@ -43,36 +45,8 @@ function CountChip({ count }) {
 const VIEW_ALL_LINK = "text-xs font-semibold text-brand-700 hover:underline";
 
 // ---------------------------------------------------------------- Dashboard
-function AgingPanel({ pending }) {
-  const buckets = [
-    { label: "0-2 days", test: (days) => days <= 2, tone: toneOf("success").dot },
-    { label: "3-7 days", test: (days) => days >= 3 && days <= 7, tone: toneOf("info").dot },
-    { label: "8-14 days", test: (days) => days >= 8 && days <= 14, tone: toneOf("warning").dot },
-    { label: "15+ days", test: (days) => days >= 15, tone: toneOf("danger").dot },
-  ].map((bucket) => ({ ...bucket, count: pending.filter((item) => {
-    const days = daysSince(item.submitted_at || deanItemDate(item));
-    return days !== null && bucket.test(days);
-  }).length }));
-  const max = Math.max(1, ...buckets.map((bucket) => bucket.count));
-  return (
-    <SectionCard pad="lg" title="How long items have waited" subtitle="Pending decisions grouped by age" icon={Clock}>
-      <ul className="space-y-3">
-        {buckets.map((bucket) => (
-          <li key={bucket.label}>
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-600">{bucket.label}</span>
-              <span className="font-semibold text-ink">{bucket.count}</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div className={`h-full rounded-full ${bucket.tone}`} style={{ width: `${(bucket.count / max) * 100}%` }} />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </SectionCard>
-  );
-}
-
+// IM19: the Dean home is action first (RoleHome) - the decisions waiting on the Dean, oldest first; four key numbers;
+// the recent decisions. The per-process breakdown and the full table are the Approvals Queue (lib/deanHome.js).
 export function DeanDashboard() {
   return (
     <DeanGate>
@@ -81,72 +55,54 @@ export function DeanDashboard() {
   );
 }
 
+function waitText(row) {
+  if (row.days === null) return undefined;
+  return row.days === 0 ? "Filed today" : `Waiting ${wordDays(row.days)} · filed ${formatDate(row.filedAt)}`;
+}
+
 function DeanDashboardBody() {
+  const { user } = useAuth();
   const { counts, workflowPending, workflowRecent, pendingPlans, recentPlans } = useDean();
-  const oldest = [...workflowPending, ...pendingPlans]
-    .map((item) => daysSince(item.submitted_at || deanItemDate(item)))
-    .filter((days) => days !== null)
-    .sort((left, right) => right - left)[0];
-  const queue = [...workflowPending]
-    .sort((left, right) => new Date(left.submitted_at || 0) - new Date(right.submitted_at || 0))
-    .slice(0, 8);
-  const recent = [...workflowRecent].slice(0, 5);
+  const now = new Date();
+  const waiting = { pending: workflowPending, plans: pendingPlans, adviserCount: counts.pendingAdviser, now };
+  const actions = deanActions(waiting);
+  const stats = deanStats({ ...waiting, recent: workflowRecent, recentPlans });
+  const activity = deanActivity({ recent: workflowRecent, recentPlans }).map((entry) => ({
+    key: entry.key,
+    title: entry.title,
+    detail: entry.detail,
+    time: formatDate(entry.at),
+    to: entry.to,
+  }));
   return (
-    <div className="space-y-5 animate-fade-up">
-      <PageHeader
-        title="Dean Dashboard"
-        description="Decisions waiting on you, by process, and how long they have waited."
-        icon={Gavel}
-        actions={<Button as={Link} to="/dean/approvals" icon={Inbox}>Open approvals queue</Button>}
-      />
+    <div className="space-y-5">
       <DeanFeedback />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Inbox} label="Decisions waiting" value={counts.pendingTotal} sub={oldest !== undefined ? `Oldest waiting ${oldest} day${oldest === 1 ? "" : "s"}` : "Nothing is waiting"} tone={counts.pendingTotal ? "warning" : "success"} to="/dean/approvals" />
-        {PROCESS_ORDER.slice(0, 3).map((key) => (
-          <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="info" to={`/dean/approvals/${key}`} />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {PROCESS_ORDER.slice(3).map((key) => (
-          <StatCard key={key} label={DEAN_PROCESSES[key].label} value={counts[PROCESS_COUNT_KEY[key]]} sub="waiting for your decision" tone="info" to={`/dean/approvals/${key}`} />
-        ))}
-        <StatCard icon={CheckCircle2} label="Recently decided" value={workflowRecent.length + recentPlans.length} sub="See Decision History" tone="neutral" to="/dean/activity" />
-      </div>
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <SectionCard
-          pad="lg"
-          className="lg:col-span-8"
-          title="Waiting longest"
-          subtitle="Oldest pending workflow decisions first"
-          icon={Inbox}
-          action={<Link to="/dean/approvals" className={VIEW_ALL_LINK}>View all</Link>}
-        >
-          <CaseTable items={queue} showProcess emptyTitle="No workflow decisions are waiting" emptyHint="New requests routed to the Dean will appear here." />
-          {pendingPlans.length > 0 && (
-            <InlineNotice tone="warning">
-              {pendingPlans.length} course offering plan{pendingPlans.length === 1 ? " is" : "s are"} also waiting.{" "}
-              <Link to="/dean/approvals/course-adjustments" className="underline">Review course adjustments</Link>
-            </InlineNotice>
-          )}
-        </SectionCard>
-        <div className="space-y-5 lg:col-span-4">
-          <AgingPanel pending={[...workflowPending, ...pendingPlans]} />
-          <SectionCard pad="lg" title="Recent decisions" icon={CheckCircle2} action={<Link to="/dean/activity" className={VIEW_ALL_LINK}>History</Link>}>
-            {recent.length ? (
-              <ul className="divide-y divide-slate-100">
-                {recent.map((item) => (
-                  <li key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <span className="min-w-0 truncate text-slate-700">{item.title}</span>
-                    <StatusChip status={item.status} dot={false} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState title="No decisions yet" />
-            )}
-          </SectionCard>
-        </div>
-      </div>
+      <RoleHome
+        header={{
+          title: `Welcome, ${firstNameOf(user?.full_name) || "Dean"}`,
+          description: "Dean · the decisions waiting on you",
+          icon: Gavel,
+          actions: <Button as={Link} to="/dean/approvals" icon={Inbox}>Open approvals queue</Button>,
+        }}
+        actions={actions.items.map((row) => ({
+          key: row.key,
+          title: row.title,
+          detail: row.detail,
+          meta: waitText(row),
+          tone: row.tone,
+          chip: row.status ? <StatusChip status={row.status} dot={false} size="sm" /> : undefined,
+          to: row.target.to,
+          linkLabel: row.target.label,
+        }))}
+        actionsSubtitle="Oldest first. Open a case to read the files and history, then decide."
+        actionsEmpty={{ title: "Nothing is waiting for your decision", hint: "Requests routed to the Dean will appear here." }}
+        actionsAll={actions.rows > actions.items.length ? { to: "/dean/approvals", label: `View all ${actions.total}` } : undefined}
+        stats={stats}
+        activityTitle="Recent decisions"
+        activity={activity}
+        activityAll={{ to: "/dean/activity", label: "View all" }}
+        activityEmpty={{ title: "No decisions yet", hint: "Decisions you make will be listed here." }}
+      />
     </div>
   );
 }

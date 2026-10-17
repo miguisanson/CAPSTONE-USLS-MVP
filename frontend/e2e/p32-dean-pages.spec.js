@@ -1,8 +1,8 @@
 // Packet P3.2 (Phase 5 design system, dean stream): pins what the Dean's pages DO that the sweep only photographs, so the
 // restyle of DeanPages.jsx, DeanLeaveParts.jsx and DeanContext.jsx onto the component library cannot change it.
 // Written against the old code; it must pass on both. Through the real UI, as the Dean:
-//   - the dashboard: the stat tiles go where they went, "Waiting longest" lists the cases with a Review link, the aging
-//     panel counts them, the course-plan notice links to the plan page, Recent decisions has its History link;
+//   - the dashboard: the key numbers go where they went, "Needs your action" lists the cases with a Review link and the
+//     course plan with a link to the plan page, Recent decisions has its View all link (reshaped in P7.2, see below);
 //   - the approvals queue: every process section with its count, the search / program / status / date filters and
 //     "Clear filters", the course-plan row and the Adviser Designation section;
 //   - the course-adjustments page: the plan card with its subject table, "Return for revision" without a note shows the
@@ -120,57 +120,46 @@ test.describe("P3.2 Dean pages", () => {
     ids = await putWorkInFrontOfTheDean(playwright);
   });
 
-  test("dashboard: tiles and their links, Waiting longest, aging, plan notice, recent decisions", async ({ page }) => {
+  // P7.2 (IM19): the Dean home became action first (see e2e/p72-dean-faculty-home.spec.js). What changed in this test, and
+  // why, is listed in the commit message of the packet. Everything that still exists is pinned here as before.
+  test("dashboard: key numbers and their links, the waiting decisions with a Review link each, the plan row, recent decisions", async ({ page }) => {
     await page.goto("/dean");
-    await expect(page.getByRole("heading", { level: 1, name: "Dean Dashboard" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
     await expect(page.getByRole("main").getByRole("link", { name: /Open approvals queue/ })).toHaveAttribute("href", "/dean/approvals");
 
-    // The headline tile: how many decisions wait and how long the oldest has.
+    // The headline number: how many decisions wait and how long the oldest has.
     const waiting = page.getByRole("main").getByRole("link", { name: /Decisions waiting/ });
     await expect(waiting).toHaveAttribute("href", "/dean/approvals");
-    await expect(waiting).toContainText(/Oldest waiting \d+ days?/);
     const total = Number((await waiting.innerText()).match(/Decisions waiting\s+(\d+)/i)?.[1]);
     expect(total, "Maureen, Daniel, Gabriel and the plan are waiting").toBeGreaterThanOrEqual(4);
+    await expect(page.getByRole("main").getByRole("link", { name: /Oldest wait/ })).toContainText(/(Today|\d+ days?)/);
+    await expect(page.getByRole("main").getByRole("link", { name: /Waiting over 7 days/ })).toHaveAttribute("href", "/dean/approvals");
+    await expect(page.getByRole("main").getByRole("link", { name: /Decided this week/ })).toHaveAttribute("href", "/dean/activity");
 
-    // One tile per process, each opening that process; and the Recently decided tile opens the history.
-    for (const key of ["course-adjustments", "leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"]) {
-      await expect(page.getByRole("main").locator(`a[href="/dean/approvals/${key}"]`).first(), `tile for ${key}`).toBeVisible();
+    // Needs your action: the oldest decisions first, each with a Review link to its case.
+    const mine = page.locator("main section", { has: page.getByRole("heading", { name: "Needs your action", exact: true }) });
+    await expect(mine).toBeVisible();
+    for (const [name, type] of [["Maureen Castillo", "leave-of-absence"], ["Daniel Fernandez", "leave-of-absence"], ["Gabriel Domingo", "readmission"]]) {
+      const row = mine.getByRole("listitem").filter({ hasText: name }).first();
+      await expect(row, `${name} in Needs your action`).toBeVisible();
+      await expect(row.getByRole("link", { name: "Review" })).toHaveAttribute("href", new RegExp(`^/dean/case/${type}/\d+$`));
     }
-    await expect(page.getByRole("main").locator('a[href="/dean/approvals/leave-of-absence"]').first()).toContainText("waiting for your decision");
-    await expect(page.getByRole("main").getByRole("link", { name: /Recently decided/ })).toHaveAttribute("href", "/dean/activity");
+    await expect(mine.getByRole("listitem").filter({ hasText: "Maureen Castillo" }).first()).toContainText("Leave of Absence");
 
-    // Waiting longest: the oldest workflow decisions, each with a Review link.
-    await expect(page.getByRole("heading", { name: "Waiting longest" })).toBeVisible();
-    await expect(page.getByText("Oldest pending workflow decisions first")).toBeVisible();
-    for (const name of ["Maureen Castillo", "Daniel Fernandez", "Gabriel Domingo"]) {
-      const row = caseRow(page, name).first();
-      await expect(row, `${name} in Waiting longest`).toBeVisible();
-      await expect(row.getByRole("link", { name: /^Review / })).toBeVisible();
-    }
-    await expect(caseRow(page, "Maureen Castillo").first()).toContainText("Leave of Absence");
-    await expect(page.getByRole("link", { name: "View all", exact: true })).toHaveAttribute("href", "/dean/approvals");
+    // The course offering plan is a row of its own and opens the plan page.
+    const planRow = mine.getByRole("listitem").filter({ hasText: /Course offerings/ }).first();
+    await expect(planRow).toBeVisible();
+    await expect(planRow.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/dean/approvals/course-adjustments");
 
-    // The course-plan notice and its link.
-    await expect(page.getByText(/course offering plans? (is|are) also waiting/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "Review course adjustments" })).toHaveAttribute("href", "/dean/approvals/course-adjustments");
-
-    // Aging: four buckets; the cases just filed are in the first one.
-    await expect(page.getByRole("heading", { name: "How long items have waited" })).toBeVisible();
-    for (const bucket of ["0-2 days", "3-7 days", "8-14 days", "15+ days"]) {
-      await expect(page.getByRole("listitem").filter({ hasText: bucket }), bucket).toHaveCount(1);
-    }
-    const fresh = Number((await page.getByRole("listitem").filter({ hasText: "0-2 days" }).innerText()).match(/(\d+)\s*$/)?.[1]);
-    expect(fresh, "0-2 days bucket counts the new cases").toBeGreaterThanOrEqual(4);
-    await expect(page.getByRole("listitem").filter({ hasText: "15+ days" })).toContainText("0");
-
-    // Recent decisions and its History link.
-    await expect(page.getByRole("heading", { name: "Recent decisions" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "History", exact: true })).toHaveAttribute("href", "/dean/activity");
+    // Recent decisions and its View all link.
+    const recent = page.locator("main section", { has: page.getByRole("heading", { name: "Recent decisions", exact: true }) });
+    await expect(recent).toBeVisible();
+    await expect(recent.getByRole("link", { name: "View all", exact: true })).toHaveAttribute("href", "/dean/activity");
 
     await page.screenshot({ path: join(SHOTS, "dashboard-1366.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(page.getByRole("heading", { level: 1, name: "Dean Dashboard" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
     await page.screenshot({ path: join(SHOTS, "dashboard-390.png"), fullPage: true });
   });

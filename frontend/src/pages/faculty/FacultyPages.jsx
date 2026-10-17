@@ -6,14 +6,17 @@ import {
   CalendarDays,
   Clock3,
   Download,
-  FileCheck,
   FileSignature,
   FileText,
   LayoutDashboard,
   Scale,
   Users,
 } from "lucide-react";
-import { Card, EmptyState, PageHeader, SectionTitle, StatCard, StatusBadge } from "../../components/ui";
+import { Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui";
+import { StatusChip } from "../../components/ui/index.js";
+import RoleHome, { MAX_WAITING } from "../../components/RoleHome.jsx";
+import { facultyActions, facultyStats, facultyUpcoming, facultyWaiting } from "../../lib/facultyHome.js";
+import { firstNameOf } from "../../lib/staffHome.js";
 import { formatDate } from "../../lib/format";
 import FacultyResearchWorkspace from "../../components/FacultyResearchWorkspace";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
@@ -50,110 +53,50 @@ function defenseTime(defense) {
 export function FacultyDashboard() {
   const { data } = useFaculty();
   const { faculty } = data;
-  const panels = data.panels || [];
-  const advisees = data.advisees || [];
-  const pendingSignatures = advisees.reduce((sum, row) => sum + (row.pending_count || 0), 0);
-  const verdictsDue = panels.filter((panel) => panel.can_submit_verdict);
-  // The server already keeps only future defenses that are still booked.
-  const upcoming = (data.upcoming_defenses || []).slice(0, 5);
-  const availabilityMissing = faculty?.availability_entered === false;
-  const pendingInvitations = data.counts?.pending_invitations || 0;
-  const pendingAdviserRequests = data.counts?.pending_adviser_requests || 0;
-  const hasAction = pendingSignatures > 0 || verdictsDue.length > 0 || availabilityMissing || pendingInvitations > 0 || pendingAdviserRequests > 0;
+  const actions = facultyActions(data);
+  const waiting = facultyWaiting(data);
+  const stats = facultyStats(data);
+  const upcoming = facultyUpcoming(data).map((entry) => ({
+    key: entry.key,
+    title: entry.title,
+    detail: entry.detail,
+    time: `${formatDay(entry.date)} · ${formatTimeRange(entry.start, entry.end)}`,
+    to: entry.to,
+  }));
+  const toRow = (row) => ({
+    key: row.key,
+    title: row.title,
+    detail: row.detail,
+    tone: row.tone,
+    to: row.target.to,
+    linkLabel: row.target.label,
+  });
   return (
-    <div className="space-y-5 animate-fade-up">
-      <PageHeader
-        title={`Welcome, ${faculty?.name || "Faculty"}`}
-        description={faculty?.specialization || "Your advisees, panel assignments and defense schedule."}
-        icon={LayoutDashboard}
-        badge={<StatusBadge value={faculty?.college || "College"} dot={false} />}
-      />
+    <div className="space-y-5">
       <CalendarNotice />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Users} label="Advisees" value={advisees.length} sub="students you advise" to="/faculty-portal/advisees" />
-        <StatCard icon={FileSignature} label="Signatures needed" value={pendingSignatures} sub="advisee papers to review" tone={pendingSignatures ? "amber" : "slate"} to="/faculty-portal/signatures" />
-        <StatCard icon={FileText} label="Panel assignments" value={panels.length} sub="committees you sit on" tone="blue" to="/faculty-portal/panels" />
-        <StatCard icon={Scale} label="Verdicts due" value={verdictsDue.length} sub="as panel chair or lead" tone={verdictsDue.length ? "red" : "slate"} to="/faculty-portal/verdicts" />
-      </div>
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <div className="space-y-5 lg:col-span-8">
-          <Card className="p-6">
-            <SectionTitle
-              title="Upcoming defenses"
-              subtitle="Scheduled defenses for panels you sit on"
-              icon={CalendarClock}
-              action={<Link to="/faculty-portal/defenses" className="text-xs font-semibold text-brand-700 hover:underline">View schedule</Link>}
-            />
-            {upcoming.length ? (
-              <ul className="space-y-2.5">
-                {upcoming.map((item) => (
-                  <li key={item.defense.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 p-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">{item.student.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {formatDay(item.defense.preferred_date)} · {formatTimeRange(item.defense.start_time, item.defense.end_time)} Philippine time
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {item.defense.defense_type}
-                        {item.defense.venue ? ` · ${item.defense.venue}` : item.defense.mode ? ` · ${item.defense.mode}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusBadge value={item.my_role} dot={false} />
-                      <StatusBadge value={item.defense.display_status || item.defense.status} dot={false} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState icon={CalendarClock} title="No defenses scheduled" hint="Defenses appear here once the Research Coordinator schedules a panel you sit on." />
-            )}
-          </Card>
-          <Card className="p-6">
-            <SectionTitle title="What needs your action" icon={FileCheck} />
-            {hasAction ? (
-              <ul className="space-y-2.5">
-                {availabilityMissing && (
-                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <p className="flex items-start gap-2 text-sm font-semibold text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> You have not entered your availability yet. Staff cannot book defenses with you until you do.</p>
-                    <Link to="/faculty-portal/availability" className="btn-primary px-3 py-1.5 text-xs">Enter your availability</Link>
-                  </li>
-                )}
-                {pendingInvitations > 0 && (
-                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-blue-900">{pendingInvitations} panel invitation{pendingInvitations === 1 ? "" : "s"} waiting for your answer.</p>
-                    <Link to="/faculty-portal/invitations" className="btn-primary px-3 py-1.5 text-xs">Answer invitations</Link>
-                  </li>
-                )}
-                {pendingAdviserRequests > 0 && (
-                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-blue-900">{pendingAdviserRequests} adviser request{pendingAdviserRequests === 1 ? "" : "s"} waiting for your answer.</p>
-                    <Link to="/faculty-portal/advisees" className="btn-primary px-3 py-1.5 text-xs">Open requests</Link>
-                  </li>
-                )}
-                {pendingSignatures > 0 && (
-                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-amber-900">{pendingSignatures} advisee document{pendingSignatures === 1 ? "" : "s"} waiting for your signature.</p>
-                    <Link to="/faculty-portal/signatures" className="btn-primary px-3 py-1.5 text-xs">Review and sign</Link>
-                  </li>
-                )}
-                {verdictsDue.length > 0 && (
-                  <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-amber-900">{verdictsDue.length} defense verdict{verdictsDue.length === 1 ? "" : "s"} to submit.</p>
-                    <Link to="/faculty-portal/verdicts" className="btn-primary px-3 py-1.5 text-xs">Submit verdicts</Link>
-                  </li>
-                )}
-              </ul>
-            ) : (
-              <EmptyState icon={FileCheck} title="You are all caught up" hint="No signatures, verdicts, invitations or adviser requests are waiting on you." />
-            )}
-          </Card>
-        </div>
-        <div className="space-y-5 lg:col-span-4">
-          <FacultyCalendarConnection calendar={faculty?.calendar} />
-          <StatCard icon={Clock3} label="Availability windows" value={(data.availability || []).length} sub="upcoming profile windows" tone="slate" to="/faculty-portal/availability" />
-        </div>
-      </div>
+      <RoleHome
+        header={{
+          title: `Welcome, ${firstNameOf(faculty?.name) || "Faculty"}`,
+          description: faculty?.specialization || "Your advisees, panel assignments and defense schedule.",
+          icon: LayoutDashboard,
+          badge: <StatusChip label={faculty?.college || "College"} tone="muted" dot={false} />,
+        }}
+        actions={actions.items.map(toRow)}
+        actionsSubtitle="Invitations, signatures, verdicts and requests that wait for you"
+        actionsEmpty={{ title: "Nothing is waiting on you", hint: "No signatures, verdicts, invitations or adviser requests need you right now." }}
+        waiting={{
+          title: "Waiting on others",
+          subtitle: "The student or the Research Coordinator holds these. Nothing to do until they act.",
+          items: waiting.items.map(toRow),
+          all: waiting.total > MAX_WAITING ? { to: "/faculty-portal/advisees", label: "View all" } : undefined,
+        }}
+        stats={stats}
+        extra={<FacultyCalendarConnection calendar={faculty?.calendar} />}
+        activityTitle="Upcoming defenses"
+        activity={upcoming}
+        activityAll={{ to: "/faculty-portal/defenses", label: "View schedule" }}
+        activityEmpty={{ title: "No defenses scheduled", hint: "Defenses appear here once the Research Coordinator schedules a panel you sit on." }}
+      />
     </div>
   );
 }
