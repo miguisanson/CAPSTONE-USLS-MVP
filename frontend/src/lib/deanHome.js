@@ -4,6 +4,7 @@
 //
 // A decision's `target` is { to, label }: `to` is an app path, `label` names the page for the link button.
 // Dates stay raw (ISO strings); the page formats them.
+import { PAGE } from "./labels.js";
 
 /** The most "Needs your action" rows shown; the Approvals Queue holds the rest. */
 export const MAX_ACTIONS = 8;
@@ -15,13 +16,13 @@ const DAY = 86400000;
 // Approval "processes" as the Dean sees them. Several workflow types share a page (LOA, readmission and AWOL returns
 // are all standing changes).
 export const DEAN_PROCESSES = {
-  "course-adjustments": { label: "Course Adjustments", types: [] },
-  "leave-of-absence": { label: "Leave of Absence", types: ["leave-of-absence"] },
-  readmission: { label: "Readmission", types: ["readmission"] },
-  awol: { label: "AWOL & Residency", types: ["awol-return"] },
-  withdrawal: { label: "Withdrawal Requests", types: ["withdrawal"] },
-  practicum: { label: "Practicum Reports", types: ["practicum"] },
-  graduation: { label: "Graduation Endorsement", types: ["graduation"] },
+  "course-adjustments": { label: PAGE.courseAdjustments, types: [] },
+  "leave-of-absence": { label: PAGE.leaveOfAbsence, types: ["leave-of-absence"] },
+  readmission: { label: PAGE.readmission, types: ["readmission"] },
+  awol: { label: PAGE.awolResidency, types: ["awol-return"] },
+  withdrawal: { label: PAGE.subjectWithdrawal, types: ["withdrawal"] },
+  practicum: { label: PAGE.practicumReports, types: ["practicum"] },
+  graduation: { label: PAGE.graduationEndorsement, types: ["graduation"] },
 };
 
 export function processOfType(type) {
@@ -165,7 +166,7 @@ export function deanStats({ pending = [], plans = [], adviserCount = 0, recent =
       key: "decided",
       label: "Decided this week",
       value: decided,
-      sub: "See Decision History",
+      sub: `See ${PAGE.activityLog}`,
       tone: "neutral",
       to: HISTORY_PATH,
     },

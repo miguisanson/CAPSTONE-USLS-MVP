@@ -8,16 +8,17 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
+import { PAGE } from "../../lib/labels.js";
 
 export const REQUEST_GROUPS = [
   {
     title: "Research & Defense",
     description: "Upload your milestone files, submit them for review, then request scheduling after a panel is assigned.",
     items: [
-      { id: "research", label: "Research Submission", icon: FileCheck },
+      { id: "research", label: PAGE.researchProgress, icon: FileCheck },
       {
         id: "schedule",
-        label: "Defense Schedule",
+        label: PAGE.defenseSchedule,
         icon: CalendarCheck,
         lockedWhen: (data) => !data.research_case || !data.panel?.length,
         lockedReason: "Available after research staff opens your research case and completes panel matching.",
@@ -28,10 +29,10 @@ export const REQUEST_GROUPS = [
     title: "Leave & Return",
     description: "Submit a standalone standing-change or subject-withdrawal request.",
     items: [
-      { id: "loa", label: "Leave of Absence", icon: CalendarOff },
+      { id: "loa", label: PAGE.leaveOfAbsence, icon: CalendarOff },
       {
         id: "readmission",
-        label: "Readmission",
+        label: PAGE.readmission,
         icon: UserCheck,
         lockedWhen: (data) => {
           const overview = data.leave_overview;
@@ -45,12 +46,12 @@ export const REQUEST_GROUPS = [
       },
       {
         id: "awol",
-        label: "Return from AWOL",
+        label: PAGE.returnFromAwol,
         icon: UserX,
         lockedWhen: (data) => data.student.enrollment_tag !== "AWOL" && data.student.standing !== "AWOL",
         lockedReason: "Available only while your student record is marked AWOL.",
       },
-      { id: "withdrawal", label: "Subject Withdrawal", icon: LogOut },
+      { id: "withdrawal", label: PAGE.subjectWithdrawal, icon: LogOut },
     ],
   },
   {
@@ -59,12 +60,12 @@ export const REQUEST_GROUPS = [
     items: [
       {
         id: "practicum",
-        label: "Practicum",
+        label: PAGE.practicum,
         icon: Briefcase,
         lockedWhen: (data) => !data.student.program_has_practicum,
         lockedReason: "Practicum is available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students.",
       },
-      { id: "graduation", label: "Graduation Endorsement", icon: GraduationCap },
+      { id: "graduation", label: PAGE.graduationEndorsement, icon: GraduationCap },
     ],
   },
 ];

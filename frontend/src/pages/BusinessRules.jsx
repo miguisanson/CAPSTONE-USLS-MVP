@@ -8,6 +8,7 @@ import {
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import { RuleBadges, formatRuleValue } from "../components/PolicyRules";
 import { formatDate } from "../lib/format";
+import { PAGE } from "../lib/labels.js";
 
 const FILTERS = [
   { id: "all", label: "All rules" },
@@ -77,7 +78,7 @@ export default function BusinessRules() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         icon={Scale}
-        title="Business rules"
+        title={PAGE.businessRules}
         description={`The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy (upload it under Policy Documents). ${editNote}`}
       />
 

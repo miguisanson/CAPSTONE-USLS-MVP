@@ -29,7 +29,7 @@ const PROCESS_LABELS = {
   "leave-of-absence": "Leave of Absence",
   readmission: "Readmission",
   awol: "AWOL & Residency",
-  withdrawal: "Withdrawal Requests",
+  withdrawal: "Subject Withdrawal", // one name per page (pkt/vocab, lib/labels.js)
   practicum: "Practicum Reports",
   graduation: "Graduation Endorsement",
 };
@@ -146,7 +146,7 @@ test.describe("P7.9 Dean pages", () => {
     await expect(statValue(page, "Decided this week"), "Reports & Analytics counts the same two").toHaveText("2");
     const cellOf = (process, column) => main(page).getByRole("row").filter({ has: page.getByRole("link", { name: process, exact: true }) }).getByRole("cell").nth(column);
     await expect(cellOf("Leave of Absence", 2), "a scheduled leave is an approved decision").toHaveText("1");
-    await expect(cellOf("Withdrawal Requests", 4), "a denial is a denial").toHaveText("1");
+    await expect(cellOf("Subject Withdrawal", 4), "a denial is a denial").toHaveText("1");
     await expect(statValue(page, "Approval share")).toHaveText("50%");
   });
 

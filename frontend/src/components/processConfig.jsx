@@ -7,6 +7,7 @@ import { syncSummary } from "../pages/leave/leaveHelpers";
 import ResidencyDialog from "../pages/process/ResidencyDialog";
 import AwolRegistrar from "../pages/process/AwolRegistrar";
 import WithdrawalExport from "../pages/process/WithdrawalExport";
+import { PAGE } from "../lib/labels.js";
 
 // What makes each standalone process different. Everything else (header, rules panel,
 // toolbar, board, case window, batch bar) is the same component: ProcessBoardPage.
@@ -113,7 +114,7 @@ function AwolHeaderActions({ ctx }) {
 
 export const PROCESS_CONFIG = {
   "leave-of-absence": {
-    title: "Leave of Absence",
+    title: PAGE.leaveOfAbsence,
     icon: CalendarOff,
     rulesProcess: "loa",
     description: "Record an LOA application and route the Dean decision. Time on leave still counts toward the maximum residence.",
@@ -127,7 +128,7 @@ export const PROCESS_CONFIG = {
     BelowBoard: LeaveBelowBoard,
   },
   readmission: {
-    title: "Readmission",
+    title: PAGE.readmission,
     icon: UserCheck,
     rulesProcess: "readmission",
     description: "Record a return request after LOA, route the Dean decision, and reactivate approved students.",
@@ -140,7 +141,7 @@ export const PROCESS_CONFIG = {
     BelowBoard: LeaveBelowBoard,
   },
   awol: {
-    title: "AWOL & Residency",
+    title: PAGE.awolResidency,
     icon: UserX,
     rulesProcess: "awol_residency",
     description: "Automatically flag policy-backed AWOL cases, review structured return declarations, and record valid residency enrollment without subjects.",
@@ -152,7 +153,7 @@ export const PROCESS_CONFIG = {
     BelowBoard: AwolRegistrar,
   },
   withdrawal: {
-    title: "Withdrawal Requests",
+    title: PAGE.subjectWithdrawal,
     icon: LogOut,
     rulesProcess: "withdrawal",
     description: "Withdraw a student from one subject until the end of the second week of classes, without changing program standing.",

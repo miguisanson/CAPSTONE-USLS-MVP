@@ -8,13 +8,14 @@ import { MyCoursesPanel } from "./MyCourses";
 import { StudentPolicyAssistant } from "./StudentAssistant";
 import { StudentInbox } from "./StudentInbox";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
+import { PAGE } from "../../lib/labels.js";
 
 export function StudentEnrollmentPage() {
   const { data, refetch } = useStudentPortal();
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Enrollment"
+        title={PAGE.enrollment}
         description="Choose the published subjects you are taking this semester. Subjects already on your record stay locked."
         icon={BookPlus}
         actions={<Link to="/student/progress" className="btn-ghost">View my progress</Link>}
@@ -30,7 +31,7 @@ export function StudentMessagesPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Messages"
+        title={PAGE.messages}
         description="Clarification requests, staff replies and questions about your active requests."
         icon={Mail}
       />
@@ -45,7 +46,7 @@ export function StudentDocumentsPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Documents"
+        title={PAGE.documents}
         description="Admission and general records, and the files you have submitted. Research milestone files are managed on the Research page."
         icon={FileUp}
         actions={<Link to="/student/research" className="btn-ghost">Research uploads</Link>}
@@ -66,7 +67,7 @@ export function StudentActivityPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Activity History"
+        title={PAGE.activityLog}
         description="Every submission, decision and hand-off on your record, with who owns the next step."
         icon={History}
       />
@@ -79,7 +80,7 @@ export function StudentAssistantPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Policy Assistant"
+        title={PAGE.assistant}
         description="Ask about the Graduate School manual, procedures, or your own academic record."
         icon={Bot}
       />
@@ -103,7 +104,7 @@ export function StudentProfilePage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="My Profile"
+        title={PAGE.myProfile}
         description="Your identity and enrollment details as recorded by the Graduate School. Contact the office to correct anything here."
         icon={UserRound}
       />

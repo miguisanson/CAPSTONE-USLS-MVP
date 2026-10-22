@@ -3,7 +3,7 @@
 //   - Dean: the first section is "Needs your action" and lists the decisions waiting on the Dean, oldest first, each
 //     with a link that opens its case (a leave request is put in front of the Dean first, through each role's own
 //     API login, like p31-dean.spec.js); four key numbers, each named once (no wall of per-process tiles - the
-//     per-process breakdown is the Approvals Queue); "Recent decisions" links to Decision History; the "Open approvals
+//     per-process breakdown is the Approvals Queue); "Recent decisions" links to the Activity Log; the "Open approvals
 //     queue" button stays; with nothing waiting the section says so; nothing overflows at 390;
 //   - Faculty (the seeded adviser the sweep uses): the first section is "Needs your action" and holds only what this
 //     member must do, every row with a working link; four key numbers read from the portal context, each named once;
@@ -152,7 +152,7 @@ test.describe("Dean home", () => {
     await expect(page.getByText("This page is not available yet")).toHaveCount(0);
   });
 
-  test("four key numbers, each named once; no wall of per-process tiles; the queue and Decision History stay one click away", async ({ page }) => {
+  test("four key numbers, each named once; no wall of per-process tiles; the queue and the Activity Log stay one click away", async ({ page }) => {
     const loaded = await openHome(page);
     await expect(main(page).locator("h2").first()).toHaveText("Needs your action");
     const waiting = waitingOf(loaded);

@@ -23,6 +23,7 @@ import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import AdviserAppointments from "../AdviserAppointments";
+import { PAGE } from "../../lib/labels.js";
 
 const PROCESS_ORDER = ["course-adjustments", "leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"];
 // The four standalone processes are one page template (the same board staff use).
@@ -154,7 +155,7 @@ function DeanQueueBody() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Approvals Queue"
+        title={PAGE.approvalsQueue}
         description="Everything waiting on the Dean, grouped by process. Open a case to review the files, history and messages before you decide."
         icon={Inbox}
         badge={<StatusChip status={`${counts.pendingTotal} waiting`} tone="muted" dot={false} />}

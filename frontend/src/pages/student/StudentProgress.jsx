@@ -4,6 +4,7 @@ import { BookOpenCheck, ListChecks } from "lucide-react";
 import { Card, EmptyState, PageHeader, ProgressBar, SectionTitle, StatusBadge } from "../../components/ui";
 import { useStudentPortal } from "./StudentPortalContext";
 import { ProgressPanel, WorkflowStatusPanel } from "./Panels";
+import { PAGE } from "../../lib/labels.js";
 
 // Read-only view of the student's curriculum and subject statuses, grouped by
 // category. Official grades and statuses stay in their source systems.
@@ -93,7 +94,7 @@ export default function StudentProgress() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="My Progress"
+        title={PAGE.myProgress}
         description="Your lifecycle stage, requirement status, and curriculum, read from the monitoring record."
         icon={ListChecks}
       />

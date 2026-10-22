@@ -16,6 +16,7 @@ import { api } from "../api";
 import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import SubjectNeedsReport from "../components/SubjectNeedsReport";
+import { PAGE } from "../lib/labels.js";
 
 const STEPS = ["Draft", "Submitted", "Approved", "Published"];
 export default function CourseAdjustments({ embedded = false }) {
@@ -195,7 +196,7 @@ export default function CourseAdjustments({ embedded = false }) {
             <ClipboardList className="h-6 w-6" />
           </span>
           <div className="flex-1">
-            <h1 className="font-display text-2xl font-semibold text-ink">Course Adjustments</h1>
+            <h1 className="font-display text-2xl font-semibold text-ink">{PAGE.courseAdjustments}</h1>
             <p className="mt-1 text-sm text-slate-600">
               Use live demand as guidance, manually add any curriculum subject, and publish the approved list as the official semester offerings.
             </p>

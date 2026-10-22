@@ -25,6 +25,7 @@ import HistoryDisclosure from "../components/HistoryDisclosure";
 import PolicyRules from "../components/PolicyRules";
 import { StudyPlanPanel } from "../components/ProcessGates";
 import { formatDate } from "../lib/format";
+import { PAGE } from "../lib/labels.js";
 
 // Conflicts that come from a business rule (add/change window, academic load): the
 // coordinator decides each one; they are never resolved automatically.
@@ -289,7 +290,7 @@ export default function Enrollment() {
     <div className="space-y-5 animate-fade-up">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Enrollment</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">{PAGE.enrollment}</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
             Assign official semester offerings to an individual student. Confirming runs all checks and synchronizes the class list, monitoring sheet, student profile, and portal in one action.
           </p>

@@ -102,7 +102,7 @@ test.describe("Faculty profiles (GS staff)", () => {
     const business = all.filter((item) => item.college === "Business").length;
 
     await page.goto("/faculty");
-    await expect(page.getByRole("heading", { level: 1, name: "Faculty Profiles" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Faculty" })).toBeVisible();
     await expect(page.getByText(/Search the faculty directory, then open a profile/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Add faculty" })).toBeVisible();
 
@@ -163,7 +163,7 @@ test.describe("Faculty profiles (GS staff)", () => {
     expect(await noOverflow(page), "no sideways scroll at 1366").toBe(true);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(page.getByRole("heading", { level: 1, name: "Faculty Profiles" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Faculty" })).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
   });
 

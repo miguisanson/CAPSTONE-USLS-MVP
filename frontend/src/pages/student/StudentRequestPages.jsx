@@ -35,52 +35,53 @@ import { AwolReturnRequestForm, LoaRequestForm, ReadmissionRequestForm, Withdraw
 import { GraduationRequestForm, PracticumRequestForm } from "./CompletionForms";
 import { REQUEST_GROUPS, STUDENT_REQUEST_PATHS, findRequestItem, lockedReasonFor } from "./requestMeta";
 import { leaveRequestStatus } from "./LeaveCaseCards";
+import { PAGE } from "../../lib/labels.js";
 
 const REQUEST_PAGES = {
   research: {
-    title: "Research",
+    title: PAGE.researchProgress,
     description: "Upload your milestone files, submit them for review, and follow your title, proposal and final defense requirements.",
     icon: FileCheck,
     render: (data, onSaved) => <ResearchRequestForm data={data} onSaved={onSaved} />,
   },
   schedule: {
-    title: "Defense Schedule",
+    title: PAGE.defenseSchedule,
     description: "Request a defense date once your panel is matched. The Research Coordinator confirms a time shared by your adviser and panel.",
     icon: CalendarCheck,
     render: (data, onSaved) => <ScheduleRequestForm data={data} onSaved={onSaved} />,
   },
   loa: {
-    title: "Leave of Absence",
+    title: PAGE.leaveOfAbsence,
     description: "Ask for a leave of absence, or for more time on a leave you are already on. Graduate School staff check your request, then the Dean decides.",
     icon: CalendarOff,
     render: (data, onSaved) => <LoaRequestForm data={data} semesters={data.future_semesters || []} onSaved={onSaved} />,
   },
   readmission: {
-    title: "Readmission",
+    title: PAGE.readmission,
     description: "Ask to come back to your studies when your leave of absence is ending. Staff check your request, then the Dean decides.",
     icon: UserCheck,
     render: (data, onSaved) => <ReadmissionRequestForm data={data} onSaved={onSaved} />,
   },
   awol: {
-    title: "Return from AWOL",
+    title: PAGE.returnFromAwol,
     description: "Submit a written intention to resume enrollment when your record is marked AWOL.",
     icon: UserX,
     render: (data, onSaved) => <AwolReturnRequestForm data={data} onSaved={onSaved} />,
   },
   withdrawal: {
-    title: "Subject Withdrawal",
+    title: PAGE.subjectWithdrawal,
     description: "Withdraw from one enrolled subject until the end of the second week of classes (fees apply). It never changes your program standing.",
     icon: LogOut,
     render: (data, onSaved) => <WithdrawalRequestForm data={data} onSaved={onSaved} />,
   },
   practicum: {
-    title: "Practicum",
+    title: PAGE.practicum,
     description: "Submit your MOA and completion evidence for the practicum requirement (Psychology and MSGC programs).",
     icon: Briefcase,
     render: (data, onSaved) => <PracticumRequestForm data={data} onSaved={onSaved} />,
   },
   graduation: {
-    title: "Graduation Endorsement",
+    title: PAGE.graduationEndorsement,
     description: "Apply for the Graduate School graduation endorsement once coursework, research and any practicum are complete.",
     icon: GraduationCap,
     render: (data, onSaved) => <GraduationRequestForm data={data} onSaved={onSaved} />,
@@ -142,7 +143,7 @@ export function StudentRequestPage({ id, aside = null }) {
       {aside}
       <Card className="p-4 sm:p-6">
         {messageSlug && <StudentClarificationPanel slug={messageSlug} data={data} onSaved={refetch} />}
-        {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} className="mb-4" defaultOpen={id === "withdrawal"} />}
+        {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} className="mb-4" />}
         {locked ? (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
@@ -211,7 +212,7 @@ export function StudentRequestCenter() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Request Center"
+        title={PAGE.requestCenter}
         description="Every request you can file, with its current status. Choose the one that matches your situation."
         icon={Send}
       />
