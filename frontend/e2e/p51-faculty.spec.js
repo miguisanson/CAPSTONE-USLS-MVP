@@ -147,9 +147,10 @@ test.describe("Dashboard", () => {
       expect(await dialog.evaluate((el) => el.contains(document.activeElement)), `Shift+Tab ${i + 1} left the dialog`).toBe(true);
     }
 
-    // Escape closes it.
+    // Escape closes it and the focus goes back to the button that opened it (added in P5.2: the old dialog lost it).
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
+    await expect(connect).toBeFocused();
     await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
 
     // A click on the backdrop closes it.
