@@ -7,7 +7,9 @@
 ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
   - `be2` / `pkt/be2` — the only app.py editor: I-055 demo reset needs login, I-056 soft per-IP login throttle, I-057 per-install secret key, I-058 admin acts as staff in workflow steps, I-036 AC defense-scheduling 403, I-073 withdrawal task link (new `tests/test_v53_backend.py`, port 5301).
-  - `fac` / `pkt/fac` — Phase 5 P5.1+P5.2 faculty pages (spec `e2e/p51-faculty.spec.js`, port 5302).
+  - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
+  - `board` / `pkt/board` — StageBoard columns fit at 1366 + scroll cue (I-067), one EmptyState for columns (I-088) (spec `e2e/p74-board-fit.spec.js`, port 5305).
+  - Fixed on the branch: I-096 e2e harness now keyless (the main checkout's .env key broke p80).
   - `mon` / `pkt/mon` — Phase 5 P6.4 MonitoringGrid/EnrollmentClassList/AdviserRecordCard (spec `e2e/p64-monitoring-pages.spec.js`, port 5303).
   - MERGED `pkt/wf` (P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/`); e2e after it -> `E:/Temp/claude/gate53/e2e_after_wf.txt`.
   - `wf2` / `pkt/wf2` — dead code in workflow/ + restyle P7.5 of shared/WorkflowPage/HandoffImport/CourseAudit/ResearchGate/PanelMatching (spec `e2e/p75-workflow-pages.spec.js`, port 5304).
