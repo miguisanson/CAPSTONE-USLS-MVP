@@ -321,15 +321,27 @@ def demo_password_hint() -> str:
 
 
 def resolve_secret_key(environ=None) -> str:
-    """SECRET_KEY from the environment; otherwise a public default in demo mode
-    only. With DEMO_MODE off a missing key becomes a random per-process key, so
-    a session cookie can never be forged with a value published in the source."""
+    """SECRET_KEY from the environment; otherwise, in demo mode, a random key made once and
+    kept in ``instance/secret_key`` (gitignored; SECRET_KEY_FILE moves it), so sessions
+    survive a restart but the key is never a value published in the source. With DEMO_MODE
+    off, or if the file cannot be written, a missing key becomes a random per-process key."""
     environ = os.environ if environ is None else environ
     configured = environ.get("SECRET_KEY")
     if configured:
         return configured
     if str(environ.get("DEMO_MODE", "1")).strip().lower() not in {"0", "false", "no", "off"}:
-        return "demo-only-secret"
+        key_file = Path(environ.get("SECRET_KEY_FILE") or Path(__file__).resolve().parent / "instance" / "secret_key")
+        try:
+            if key_file.is_file():
+                saved = key_file.read_text(encoding="utf-8").strip()
+                if len(saved) >= 32:
+                    return saved
+            key_file.parent.mkdir(parents=True, exist_ok=True)
+            generated = os.urandom(32).hex()
+            key_file.write_text(generated, encoding="utf-8")
+            return generated
+        except OSError:
+            pass
     return os.urandom(32).hex()
 
 

@@ -357,9 +357,13 @@ class LoginHardeningTests(HealthTestBase):
         _, response = self.login("staff@usls.edu.ph")
         self.assertIn("no-store", response.headers.get("Cache-Control", ""))
 
-    def test_secret_key_is_never_the_public_default_outside_demo_mode(self):
+    def test_secret_key_is_never_the_public_default(self):
         self.assertEqual(resolve_secret_key({"SECRET_KEY": "from-env"}), "from-env")
-        self.assertEqual(resolve_secret_key({"DEMO_MODE": "1"}), "demo-only-secret")
+        # I-057: demo mode no longer uses a public fixed string; it reuses a generated key file.
+        with tempfile.TemporaryDirectory() as folder:
+            demo = {"DEMO_MODE": "1", "SECRET_KEY_FILE": str(Path(folder) / "secret_key")}
+            self.assertNotEqual(resolve_secret_key(demo), "demo-only-secret")
+            self.assertEqual(resolve_secret_key(demo), resolve_secret_key(demo))
         first = resolve_secret_key({"DEMO_MODE": "0"})
         second = resolve_secret_key({"DEMO_MODE": "0"})
         self.assertNotEqual(first, "demo-only-secret")
