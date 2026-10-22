@@ -315,6 +315,30 @@ export default function StageBoard({
   );
 }
 
+// The line every board carries above its filters: how many cards are in each column ("1 submitted, 2 on leave") and how
+// a card is moved. Process boards, Practicum and Graduation all use it, so the boards read alike (IM24).
+export function boardSummaryLine(columns, totals, noun) {
+  const parts = columns.filter((column) => (totals[column.key] || 0) > 0).map((column) => `${totals[column.key]} ${column.label.toLowerCase()}`);
+  return parts.length ? parts.join(", ") : `No ${noun} yet`;
+}
+
+export function BoardSummary({ line, windowName = "request window", actions = null }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3" data-testid="board-summary">
+      <div className="min-w-0">
+        <p data-summary-line className="text-base font-semibold text-ink" aria-live="polite">
+          {line}
+        </p>
+        <p className="mt-1 max-w-3xl text-sm text-slate-500">
+          Dragging a card to another column does the same as the buttons in its {windowName}. On a keyboard or phone, use
+          &quot;Move to...&quot; on the card.
+        </p>
+      </div>
+      {actions}
+    </div>
+  );
+}
+
 // "Scroll board left/right": a real button, so a keyboard, a screen reader and a phone can reach stages that are out of sight.
 function ScrollButton({ direction, disabled, onClick }) {
   const Icon = direction === "left" ? ChevronLeft : ChevronRight;

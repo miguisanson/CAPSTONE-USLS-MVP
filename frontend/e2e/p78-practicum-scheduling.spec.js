@@ -159,7 +159,9 @@ test.describe("Practicum (staff)", () => {
     await expect(card).toContainText("Community Counselling Center");
     await expect(card).toContainText("0/200 hrs");
     await expect(card).toContainText("Next: Graduate School Staff");
-    await expect(card.getByRole("button", { name: /Message/ })).toBeVisible();
+    // CHANGED BY conC (I-126): a card has one button, "View details", like the process boards; Message / Return is in the case window.
+    await expect(card.getByRole("button", { name: "View details for Andrea Villanueva" })).toHaveText("View details");
+    await expect(card.getByRole("button", { name: /Message/ })).toHaveCount(0);
     await shotsAt(page, "practicum-card");
 
     await main(page).getByRole("button", { name: "Table" }).click();
@@ -359,10 +361,13 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
     await expect(guide).toContainText("MOA status, practicum site, required/completed hours");
     await page.keyboard.press("Escape");
 
+    // CHANGED BY conC (I-123): the same text sits in the guide window on a page that used to have a side rail.
     await page.goto("/workflow/research-gate?student_id=146");
-    const rail = main(page).locator(".card").filter({ has: page.getByRole("heading", { level: 2, name: "How this works" }) });
-    await expect(rail).toContainText("Used by");
-    await expect(rail).toContainText("What it records");
+    await main(page).getByRole("button", { name: "How this works" }).click();
+    const railGuide = page.getByRole("dialog");
+    await expect(railGuide.getByText("Used by", { exact: true })).toBeVisible();
+    await expect(railGuide.getByText("What it records", { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
   });
 
   test("header buttons exist on the pages that have no side guide", async ({ page }) => {

@@ -17,7 +17,7 @@ import { InlineNotice, SectionTitle } from "../../components/ui/index.js";
 import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
-import StageBoard from "../../components/StageBoard";
+import StageBoard, { BoardSummary, boardSummaryLine } from "../../components/StageBoard";
 import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { GraduationBatchModal } from "./GraduationBatchModal";
 import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, sortSelectedWorkflowRows } from "./graduationShared";
@@ -106,9 +106,13 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, det
 }
 
 // "View details" on a batch card: the stage check and, below it, every student of the batch.
-function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent }) {
+// The batch's step (and the Dean's Export) are buttons in this window, not on the card, like the process boards.
+function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, exporting = false }) {
   const currentStage = graduationBatchCurrentStage(group);
   const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
+  const stageSelection = graduationStageSelection(group.rows, accountRole);
+  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
+  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
   return (
     <WorkflowCaseModal
       id={modalId}
@@ -116,6 +120,15 @@ function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStuden
       subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
       onClose={onClose}
       size="wide"
+      footer={canExport ? (
+        <Button icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>
+          {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
+        </Button>
+      ) : stageSelection.action ? (
+        <Button icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
+      ) : (
+        <span className="meta self-center font-semibold">No {WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.</span>
+      )}
     >
       <div className="space-y-5">
         <GraduationBatchStageCheck group={group} />
@@ -233,7 +246,7 @@ function graduationBoardLockReason(item, accountRole) {
     return "Only Graduate School Staff create a graduation batch.";
   }
   const group = item.group;
-  if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Use Export on the batch card." : "Waiting for: Dean (export)";
+  if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Open View details to export the list." : "Waiting for: Dean (export)";
   const owners = (group.nextOwners || []).filter(Boolean);
   return owners.length ? `Waiting for: ${owners.join(", ")}` : "No step is open right now";
 }
@@ -249,13 +262,13 @@ function graduationBoardCheckMove(item, toColumn, accountRole) {
   const group = item.group;
   const selection = graduationStageSelection(group.rows, accountRole);
   if (!selection.action) {
-    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: "Export is a button on the batch card." };
+    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: "Export is a button in the batch View details window." };
     return { allowed: false, reason: `No step is due on this batch for your role; waiting for: ${group.nextOwners.join(", ")}.` };
   }
   const actionLabel = graduationBatchActionLabel(selection.action);
   const destinationStatus = GRADUATION_STEP_DESTINATION_STATUS[selection.action.id];
   const destination = destinationStatus ? GRADUATION_ALL_BOARD_COLUMNS.find((column) => column.kind === "batch" && column.statuses.includes(destinationStatus)) : null;
-  if (!destination) return { allowed: false, reason: `This step does not move the batch to another column. Use the button on the card: ${actionLabel}.` };
+  if (!destination) return { allowed: false, reason: `This step does not move the batch to another column. Open View details to: ${actionLabel}.` };
   if (toColumn.key === destination.key) return { allowed: true };
   return { allowed: false, reason: `Move this batch one step at a time, to '${destination.label}': ${actionLabel}.` };
 }
@@ -291,8 +304,14 @@ function GraduationNote({ icon: Icon = MessageSquare, children }) {
   );
 }
 
-const viewButtonClass = "btn-ghost mt-3 w-full cursor-pointer px-2 py-1.5";
-const stepButtonClass = "btn-primary mt-2 w-full cursor-pointer whitespace-normal px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50";
+// The one button on a card, the same as the process boards' card: "View details", full width.
+function ViewDetailsButton({ onClick, label }) {
+  return (
+    <Button variant="secondary" size="sm" icon={Eye} onClick={onClick} className="mt-3 w-full" aria-label={`View details for ${label}`}>
+      View details
+    </Button>
+  );
+}
 
 function GraduationStudentCard({ row, stage, canSelect, selected, onToggleStudent, onOpenStudent }) {
   const applicationFile = row.endorsement?.request_attachment;
@@ -327,21 +346,17 @@ function GraduationStudentCard({ row, stage, canSelect, selected, onToggleStuden
         </>
       )}
     >
-      <button type="button" onClick={() => onOpenStudent(row.student.id)} className={viewButtonClass} aria-label={`View details for ${row.student.name}`}>
-        <Eye className="h-3.5 w-3.5" /> View details
-      </button>
+      <ViewDetailsButton onClick={() => onOpenStudent(row.student.id)} label={row.student.name} />
     </GraduationCard>
   );
 }
 
-function GraduationBatchCard({ group, accountRole, selectedIds, onToggleBatch, onProcessBatch, onViewBatch, onExportBatch, exporting = false }) {
+function GraduationBatchCard({ group, selectedIds, onToggleBatch, onViewBatch }) {
   const selectionState = graduationBatchSelectionState(group, selectedIds);
-  const stageSelection = graduationStageSelection(group.rows, accountRole);
   const currentStage = graduationBatchCurrentStage(group);
   const names = group.rows.map((row) => row.student.name).slice(0, 3).join(", ");
   const hiddenCount = group.rows.length - Math.min(group.rows.length, 3);
   const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
-  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
   const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
   const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   const programs = uniqueValues(group.rows.map((row) => row.student.program_code)).join(", ");
@@ -370,18 +385,7 @@ function GraduationBatchCard({ group, accountRole, selectedIds, onToggleBatch, o
         </>
       )}
     >
-      <button type="button" onClick={() => onViewBatch(group)} className={viewButtonClass} aria-label={`View details for ${group.label}`}>
-        <Eye className="h-3.5 w-3.5" /> View details
-      </button>
-      {canExport ? (
-        <button type="button" disabled={exporting} onClick={() => onExportBatch(group)} className={stepButtonClass}>
-          <Download className="h-3.5 w-3.5 shrink-0" /> {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
-        </button>
-      ) : stageSelection.action ? (
-        <button type="button" onClick={() => onProcessBatch(group)} className={stepButtonClass}>
-          <CheckSquare className="h-3.5 w-3.5 shrink-0" /> {graduationBatchActionLabel(stageSelection.action)}
-        </button>
-      ) : null}
+      <ViewDetailsButton onClick={() => onViewBatch(group)} label={group.label} />
     </GraduationCard>
   );
 }
@@ -469,6 +473,16 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     ],
     [awaitingApplicationRows, readyForBatchRows, visibleBatchGroups],
   );
+  // The line above the filters: how many cards sit in each column, over every candidate (the filters narrow the board only).
+  const summaryLine = useMemo(() => {
+    const totals = {};
+    const bump = (key) => { if (key) totals[key] = (totals[key] || 0) + 1; };
+    rows.forEach((row) => {
+      if (row.eligibility?.eligible && !row.endorsement?.batch_name) bump(row.has_submitted_documents ? "stage-2" : "stage-1");
+    });
+    graduationBatchGroups(rows.filter((row) => Boolean(row.endorsement?.batch_name))).forEach((group) => bump(graduationBoardColumnKey({ kind: "batch", group })));
+    return boardSummaryLine(GRADUATION_ALL_BOARD_COLUMNS, totals, "candidates");
+  }, [rows]);
   // The table lists the same students as the board, one row each, with the batch under the stage.
   const columnLabelByKey = useMemo(() => Object.fromEntries(GRADUATION_ALL_BOARD_COLUMNS.map((column) => [column.key, column.label])), []);
   const tableRows = useMemo(
@@ -566,13 +580,9 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     return (
       <GraduationBatchCard
         group={item.group}
-        accountRole={accountRole}
         selectedIds={selectedIds}
         onToggleBatch={canTickBatches ? toggleBatchGroup : null}
-        onProcessBatch={processBatchGroup}
         onViewBatch={(group) => setStageGroupId(group.id)}
-        onExportBatch={accountRole === "dean" ? exportApprovedBatch : null}
-        exporting={exportingBatchId === item.group.id}
       />
     );
   }
@@ -685,6 +695,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       {exportError && <InlineNotice tone="danger">{exportError}</InlineNotice>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+      <BoardSummary line={summaryLine} windowName="details window" />
       <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
         <RosterFilters
           filters={filters}
@@ -735,7 +746,18 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       ) : (
         <EmptyState title="No candidates match these filters" hint="Clear a filter to see more." />
       )}
-      {stageGroup && <GraduationBatchDetailsModal group={stageGroup} accountRole={accountRole} onClose={() => setStageGroupId(null)} onOpenStudent={openCase} onMessageStudent={setMessageRow} />}
+      {stageGroup && (
+        <GraduationBatchDetailsModal
+          group={stageGroup}
+          accountRole={accountRole}
+          onClose={() => setStageGroupId(null)}
+          onOpenStudent={openCase}
+          onMessageStudent={setMessageRow}
+          onProcessBatch={(group) => { setStageGroupId(null); processBatchGroup(group); }}
+          onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApprovedBatch(group); } : null}
+          exporting={exportingBatchId === stageGroup.id}
+        />
+      )}
       {selectedRow && (
         <WorkflowCaseModal
           id={`graduation-case-${selectedRow.student.id}`}

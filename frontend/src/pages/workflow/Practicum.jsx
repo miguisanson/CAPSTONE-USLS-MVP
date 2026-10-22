@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, Eye, MessageSquare } from "lucide-react";
 import { Button, DataTable, EmptyState, Field, InlineNotice, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import WorkflowTimeline from "../../components/WorkflowTimeline";
-import StageBoard from "../../components/StageBoard";
+import StageBoard, { BoardSummary, boardSummaryLine } from "../../components/StageBoard";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { formatDate } from "../../lib/format";
@@ -67,14 +67,14 @@ function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfi
 }
 
 const PRACTICUM_BOARD_COLUMNS = [
-  { label: "Awaiting Submission", statuses: ["Not Submitted"] },
-  { label: "Submitted", statuses: ["MOA Submitted", "MOA Received"] },
-  { label: "Eligibility Review", statuses: ["MOA Under Review"] },
-  { label: "Documents Review", statuses: ["Documents Submitted", "Documents Under Review"] },
-  { label: "In Progress", statuses: ["Practicum In Progress", "Hours Incomplete", "Additional Certificates Requested"] },
-  { label: "Completion Review", statuses: ["Completed"] },
-  { label: "Completed", statuses: ["Report Sent to Dean", "Dean Reviewed"] },
-  { label: "Returned", statuses: ["Returned for Clarification", "Not Accepted - New Organization Required"] },
+  { label: "Awaiting Submission", description: "Waiting for the student's MOA.", statuses: ["Not Submitted"] },
+  { label: "Submitted", description: "Staff receive the MOA and forward it.", statuses: ["MOA Submitted", "MOA Received"] },
+  { label: "Eligibility Review", description: "The Academic Coordinator checks the MOA.", statuses: ["MOA Under Review"] },
+  { label: "Documents Review", description: "Certificates and hours are being checked.", statuses: ["Documents Submitted", "Documents Under Review"] },
+  { label: "In Progress", description: "The student is completing the hours.", statuses: ["Practicum In Progress", "Hours Incomplete", "Additional Certificates Requested"] },
+  { label: "Completion Review", description: "Hours verified. The report goes to the Dean.", statuses: ["Completed"] },
+  { label: "Completed", description: "The Dean has the report or has reviewed it.", statuses: ["Report Sent to Dean", "Dean Reviewed"] },
+  { label: "Returned", description: "Sent back to the student to correct.", statuses: ["Returned for Clarification", "Not Accepted - New Organization Required"] },
 ];
 
 // The same columns for the shared StageBoard (each needs a key).
@@ -87,7 +87,7 @@ function practicumReadyForDeanReview(row) {
   return row.record?.status === "Report Sent to Dean";
 }
 
-function PracticumBoardCard({ row, onOpen, onMessage }) {
+function PracticumBoardCard({ row, onOpen }) {
   const record = row.record;
   const readyForDean = practicumReadyForDeanReview(row);
   const ready = Boolean(row.has_submitted_documents) || readyForDean;
@@ -109,10 +109,7 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
         </div>
       )}
       <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || (record ? "Awaiting review" : "Student")}</p>
-      <div className="mt-3 flex gap-2">
-        <Button variant="secondary" size="sm" icon={Eye} onClick={onOpen} className="flex-1" aria-label={`View details for ${row.student.name}`}>View</Button>
-        {record && <Button variant="secondary" size="sm" icon={MessageSquare} onClick={onMessage} className="flex-1" aria-label={`Message about ${row.student.name}`}>Message</Button>}
-      </div>
+      <Button variant="secondary" size="sm" icon={Eye} onClick={onOpen} className="mt-3 w-full" aria-label={`View details for ${row.student.name}`}>View details</Button>
     </article>
   );
 }
@@ -201,10 +198,21 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
     setSelectedStudentId(studentId);
   }
 
+  // How many cards sit in each column, over every eligible student (the filters below narrow the board, not this line).
+  const summaryLine = useMemo(() => {
+    const totals = {};
+    rows.forEach((row) => {
+      const key = practicumBoardColumnKey(row);
+      totals[key] = (totals[key] || 0) + 1;
+    });
+    return boardSummaryLine(PRACTICUM_STAGE_COLUMNS, totals, "practicum students");
+  }, [rows]);
+
   return (
     <div className="page-stack">
       {messageNotice && <InlineNotice tone="success" onDismiss={() => setMessageNotice("")}>{messageNotice}</InlineNotice>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+      <BoardSummary line={summaryLine} windowName="case window" />
       <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
         <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
       </BoardFilterRow>
@@ -217,7 +225,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
           items={filteredRows}
           getItemId={practicumBoardItemId}
           getColumnKey={practicumBoardColumnKey}
-          renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
+          renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} />}
           canDrag={(row) => Boolean(practicumMoveFor(row))}
           lockReason={practicumLockReason}
           checkMove={practicumCheckMove}

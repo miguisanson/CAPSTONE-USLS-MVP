@@ -5,7 +5,7 @@ import { useAuth } from "../auth";
 import { formatDateTime } from "../lib/format";
 import { Button, EmptyState, InlineNotice, Modal, PageHeader, Spinner } from "./ui/index.js";
 import PolicyRules from "./PolicyRules";
-import StageBoard from "./StageBoard";
+import StageBoard, { BoardSummary, boardSummaryLine } from "./StageBoard";
 import { GUIDES, PROCESS_CONFIG } from "./processConfig";
 import ActionDialog from "../pages/leave/ActionDialog";
 import BatchBar, { BatchResult } from "../pages/leave/BatchBar";
@@ -237,12 +237,7 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
   );
   const groupActions = useMemo(() => commonBatchActions(selectedItems), [selectedItems]);
 
-  const summaryLine = useMemo(() => {
-    const parts = columns
-      .filter((column) => (totals[column.key] || 0) > 0)
-      .map((column) => `${totals[column.key]} ${column.label.toLowerCase()}`);
-    return parts.length ? parts.join(", ") : `No ${config.noun} yet`;
-  }, [columns, totals, config.noun]);
+  const summaryLine = useMemo(() => boardSummaryLine(columns, totals, config.noun), [columns, totals, config.noun]);
 
   // ---- the one guarded step behind every button, menu choice and drop ----------------
   const submitTransition = useCallback(
@@ -424,18 +419,10 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
 
       <PolicyRules process={config.rulesProcess} />
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-base font-semibold text-ink" aria-live="polite">
-            {summaryLine}
-          </p>
-          <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use
-            &quot;Move to...&quot; on the card.
-          </p>
-        </div>
-        {HeaderActions && <div className="flex flex-wrap gap-2"><HeaderActions ctx={ctx} /></div>}
-      </div>
+      <BoardSummary
+        line={summaryLine}
+        actions={HeaderActions ? <div className="flex flex-wrap gap-2"><HeaderActions ctx={ctx} /></div> : null}
+      />
 
       {state.error && <InlineNotice tone="danger">{state.error}</InlineNotice>}
       {banner && (
