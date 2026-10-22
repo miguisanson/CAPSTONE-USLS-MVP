@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
-import {
-  ClipboardCheck,
-  Printer,
-  Lock,
-} from "lucide-react";
+import { ClipboardCheck, Lock, Printer } from "lucide-react";
 import { api } from "../../api";
-import { SectionTitle, StatusBadge, EmptyState } from "../../components/ui";
+import { Button, DataTable, Field, InlineNotice, SectionTitle, Select, StatusChip } from "../../components/ui/index.js";
 import { printDataTable } from "../../lib/print";
+
+const ROSTER_COLUMNS = [
+  {
+    key: "student",
+    header: "Student",
+    cell: (student) => (
+      <>
+        <p className="font-semibold text-ink">{student.name}</p>
+        <p className="meta">{student.student_number}</p>
+      </>
+    ),
+  },
+  { key: "status", header: "Status", cell: (student) => <StatusChip status={student.status} dot={false} /> },
+  { key: "remarks", header: "Remarks", cell: (student) => <span className="text-slate-500">{student.remarks || "—"}</span> },
+];
 
 export function FacultyClasses({ subjects, terms }) {
   const activeTerm = terms.find((term) => term.is_active_planning_term) || terms[0];
@@ -35,17 +46,43 @@ export function FacultyClasses({ subjects, terms }) {
     });
   }
 
-  return <div>
-    <SectionTitle title="Assigned class rosters" subtitle="Review assigned subjects and students." icon={ClipboardCheck} />
-    <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-      <p>Grades and subject outcomes are encoded and maintained in their authorized source systems. The Monitoring Sheet is a synchronized, read-only view.</p>
+  const termOptions = terms.map((item) => ({ value: item.label, label: item.label }));
+  const subjectOptions = subjects.map((item) => ({ value: item.id, label: `${item.code} — ${item.title}` }));
+  const students = roster?.students || [];
+
+  return (
+    <div>
+      <SectionTitle title="Assigned class rosters" subtitle="Review assigned subjects and students." icon={ClipboardCheck} />
+      <div className="space-y-4">
+        <InlineNotice tone="neutral" icon={Lock}>
+          <span className="font-normal">
+            Grades and subject outcomes are encoded and maintained in their authorized source systems. The Monitoring Sheet is a synchronized, read-only view.
+          </span>
+        </InlineNotice>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Semester">
+            <Select placeholder="" options={termOptions} value={term} onChange={(e) => setTerm(e.target.value)} />
+          </Field>
+          <Field label="Subject">
+            <Select placeholder="" options={subjectOptions} value={courseId} onChange={(e) => setCourseId(e.target.value)} />
+          </Field>
+        </div>
+        <DataTable
+          caption="Students in the selected class"
+          columns={ROSTER_COLUMNS}
+          rows={students}
+          rowKey="student_id"
+          pageSize={0}
+          minWidth="md"
+          empty={{ icon: ClipboardCheck, title: "No students in this class", hint: "The Academic Coordinator must add students through Enrollment first." }}
+        />
+        {students.length > 0 && (
+          <div>
+            <Button variant="secondary" icon={Printer} onClick={printRoster}>Print roster</Button>
+          </div>
+        )}
+        {notice && <InlineNotice tone="danger">{notice}</InlineNotice>}
+      </div>
     </div>
-    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      <label><span className="field-label">Semester</span><select className="field-input cursor-pointer" value={term} onChange={(e) => setTerm(e.target.value)}>{terms.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}</select></label>
-      <label><span className="field-label">Subject</span><select className="field-input cursor-pointer" value={courseId} onChange={(e) => setCourseId(e.target.value)}>{subjects.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select></label>
-    </div>
-    {roster?.students?.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400"><th className="py-2">Student</th><th>Status</th><th>Remarks</th></tr></thead><tbody>{roster.students.map((student) => <tr key={student.student_id} className="border-b border-slate-100"><td className="py-3 pr-3"><p className="font-semibold text-ink">{student.name}</p><p className="text-xs text-slate-500">{student.student_number}</p></td><td className="pr-3"><StatusBadge value={student.status} dot={false} /></td><td className="text-slate-500">{student.remarks || "—"}</td></tr>)}</tbody></table><div className="mt-4"><button type="button" onClick={printRoster} className="btn-ghost cursor-pointer"><Printer className="h-4 w-4" /> Print roster</button></div></div> : <EmptyState icon={ClipboardCheck} title="No students in this class" hint="The Academic Coordinator must add students through Enrollment first." />}
-    {notice && <p className="mt-3 text-sm font-semibold text-red-700" role="alert">{notice}</p>}
-  </div>;
+  );
 }

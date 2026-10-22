@@ -3,13 +3,15 @@ import { Link } from "react-router-dom";
 import { Handshake, UserCheck, UserRoundCog, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, ErrorNote, InlineNotice, SectionTitle, Spinner, StatusBadge } from "../../components/ui";
-import { Field, Textarea } from "../../components/forms";
+import { Button, Card, DataTable, Field, InlineNotice, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDay, useFaculty } from "./FacultyContext";
 
 const MIN_REASON = 3;
-const DANGER_BTN =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 cursor-pointer disabled:opacity-60";
+
+// An error line from a message string; nothing when there is no message.
+function ErrorLine({ message }) {
+  return message ? <InlineNotice tone="danger">{message}</InlineNotice> : null;
+}
 
 // Segmented "n of max" meter. Turns amber when the limit is reached.
 function AdviseeMeter({ meter }) {
@@ -18,9 +20,9 @@ function AdviseeMeter({ meter }) {
   const pending = meter?.pending || 0;
   const full = active >= max;
   return (
-    <Card className="p-6">
-      <SectionTitle title="Advisees" subtitle="You can advise at most " icon={Users} />
-      <div className="-mt-3 space-y-2">
+    <Card>
+      <SectionTitle title="Advisees" subtitle={`You can advise at most ${max} students.`} icon={Users} />
+      <div className="space-y-2">
         <p className={`text-sm font-semibold ${full ? "text-amber-800" : "text-ink"}`}>
           {active} of {max} advisees{pending > 0 ? ` · ${pending} pending` : ""}
         </p>
@@ -31,9 +33,9 @@ function AdviseeMeter({ meter }) {
           })}
         </div>
         {full ? (
-          <p className="text-xs font-semibold text-amber-800">You are at the limit. The Dean can appoint a sixth adviser only as a recorded exception.</p>
+          <p className="meta font-semibold text-amber-800">You are at the limit. The Dean can appoint a sixth adviser only as a recorded exception.</p>
         ) : (
-          <p className="text-xs text-slate-500">{max - active} place{max - active === 1 ? "" : "s"} left.</p>
+          <p className="meta">{max - active} place{max - active === 1 ? "" : "s"} left.</p>
         )}
       </div>
     </Card>
@@ -57,10 +59,10 @@ function ReasonBox({ label, confirmLabel, busy, onCancel, onSubmit }) {
       <Field label={label} required>
         <Textarea value={reason} rows={2} maxLength={500} onChange={(event) => setReason(event.target.value)} />
       </Field>
-      <ErrorNote message={error} />
+      <ErrorLine message={error} />
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className={DANGER_BTN} disabled={busy}>{busy ? "Sending..." : confirmLabel}</button>
-        <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>Cancel</button>
+        <Button type="submit" variant="danger" disabled={busy}>{busy ? "Sending..." : confirmLabel}</Button>
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
       </div>
     </form>
   );
@@ -84,17 +86,17 @@ function RequestCard({ children, yesLabel, noLabel, reasonLabel, noConfirmLabel,
     }
   };
   return (
-    <li className="space-y-3 rounded-2xl border border-slate-100 p-4">
+    <li className="space-y-3 rounded-xl border border-slate-200 p-4">
       {children}
       {asking ? (
         <ReasonBox label={reasonLabel} confirmLabel={noConfirmLabel} busy={busy} onCancel={() => { setAsking(false); setError(""); }} onSubmit={(reason) => run(() => onNo(reason))} />
       ) : (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-primary" disabled={busy} onClick={() => run(onYes)}>{busy ? "Saving..." : yesLabel}</button>
-          <button type="button" className="btn-ghost" disabled={busy} onClick={() => { setAsking(true); setError(""); }}>{noLabel}</button>
+          <Button disabled={busy} onClick={() => run(onYes)}>{busy ? "Saving..." : yesLabel}</Button>
+          <Button variant="secondary" disabled={busy} onClick={() => { setAsking(true); setError(""); }}>{noLabel}</Button>
         </div>
       )}
-      <ErrorNote message={error} />
+      <ErrorLine message={error} />
     </li>
   );
 }
@@ -104,9 +106,9 @@ function StudentLine({ item }) {
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-ink">{item.student_name}</p>
-        <p className="text-xs text-slate-500">{[item.program_code, item.student_number].filter(Boolean).join(" · ") || "Program not set"}</p>
+        <p className="meta">{[item.program_code, item.student_number].filter(Boolean).join(" · ") || "Program not set"}</p>
       </div>
-      <StatusBadge value={item.kind === "Change" ? "Change of adviser" : "New appointment"} dot={false} />
+      <StatusChip status={item.kind === "Change" ? "Change of adviser" : "New appointment"} dot={false} />
     </div>
   );
 }
@@ -116,10 +118,45 @@ function Detail({ label, children }) {
   return <p className="text-sm text-slate-600"><span className="font-semibold text-ink">{label}:</span> {children}</p>;
 }
 
-function contractBadge(contract) {
-  const status = contract?.status || "Not applicable";
-  return status;
-}
+const contractStatus = (contract) => contract?.status || "Not applicable";
+
+const ADVISEE_COLUMNS = [
+  {
+    key: "student",
+    header: "Student",
+    cell: (row) => (
+      <>
+        <p className="font-semibold text-ink">{row.student_name}</p>
+        <p className="meta">{row.student_number}</p>
+      </>
+    ),
+    sortable: true,
+    sortValue: (row) => row.student_name,
+  },
+  { key: "program", header: "Program", cell: (row) => row.program_code, sortable: true, sortValue: (row) => row.program_code },
+  { key: "stage", header: "Stage", cell: (row) => row.stage || "Not set", sortable: true, sortValue: (row) => row.stage },
+  { key: "appointed", header: "Appointed", cell: (row) => (row.appointed_on ? formatDay(row.appointed_on) : "Not set"), sortable: true, sortValue: (row) => row.appointed_on },
+  {
+    key: "contract",
+    header: "Contract (Forms 3.2 / 3.3)",
+    cell: (row) => {
+      const overdue = row.contract?.status === "Overdue";
+      const showDue = row.contract?.due_on && row.contract.status !== "Received" && row.contract.status !== "Not applicable";
+      return (
+        <>
+          <StatusChip status={contractStatus(row.contract)} dot={false} />
+          {showDue && (
+            <span className={`meta mt-1 block ${overdue ? "font-semibold text-red-700" : ""}`}>
+              {overdue ? "Overdue since" : "Due"} {formatDay(row.contract.due_on)}
+            </span>
+          )}
+        </>
+      );
+    },
+    sortable: true,
+    sortValue: (row) => contractStatus(row.contract),
+  },
+];
 
 export function FacultyAdviserPanel() {
   const { refetch: refetchPortal } = useFaculty();
@@ -130,8 +167,8 @@ export function FacultyAdviserPanel() {
     await refetchPortal();
   };
 
-  if (loading && !data) return <Card className="p-6"><Spinner label="Loading adviser requests..." /></Card>;
-  if (!data) return <ErrorNote message={error || "Could not load your adviser requests."} />;
+  if (loading && !data) return <Card><Spinner label="Loading adviser requests..." /></Card>;
+  if (!data) return <ErrorLine message={error || "Could not load your adviser requests."} />;
 
   const inbox = data.inbox || [];
   const consents = data.consents || [];
@@ -139,11 +176,11 @@ export function FacultyAdviserPanel() {
 
   return (
     <div className="space-y-5">
-      <ErrorNote message={error} />
+      <ErrorLine message={error} />
       <AdviseeMeter meter={data.meter} />
 
       {inbox.length > 0 && (
-        <Card className="p-6">
+        <Card>
           <SectionTitle title="Research adviser requests" subtitle="A student asks you to be their research adviser. Please accept or decline." icon={UserCheck} />
           <ul className="space-y-3">
             {inbox.map((item) => (
@@ -162,7 +199,7 @@ export function FacultyAdviserPanel() {
                 <Detail label="Dean's note">{item.decision_note}</Detail>
                 <Detail label="Form 3.1 issued">{item.form31_issued_on ? formatDay(item.form31_issued_on) : ""}</Detail>
                 {item.warnings?.length > 0 && (
-                  <InlineNotice tone="warn">{item.warnings.join(" ")}</InlineNotice>
+                  <InlineNotice tone="warning">{item.warnings.join(" ")}</InlineNotice>
                 )}
               </RequestCard>
             ))}
@@ -171,7 +208,7 @@ export function FacultyAdviserPanel() {
       )}
 
       {consents.length > 0 && (
-        <Card className="p-6">
+        <Card>
           <SectionTitle title="Change of adviser: your agreement needed" subtitle="One of your advisees asks to move to a new adviser." icon={UserRoundCog} />
           <ul className="space-y-3">
             {consents.map((item) => (
@@ -197,48 +234,21 @@ export function FacultyAdviserPanel() {
         <InlineNotice>No adviser requests are waiting for you.</InlineNotice>
       )}
 
-      <Card className="p-6">
+      <Card>
         <SectionTitle
           title="Your advisees"
           subtitle="Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1."
           icon={Handshake}
-          action={<Link to="/faculty-portal/signatures" className="text-xs font-semibold text-brand-700 hover:underline">Signatures</Link>}
+          action={<Button as={Link} variant="secondary" size="sm" to="/faculty-portal/signatures">Signatures</Button>}
         />
         {advisees.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="px-3 py-2">Student</th>
-                  <th className="px-3 py-2">Program</th>
-                  <th className="px-3 py-2">Stage</th>
-                  <th className="px-3 py-2">Appointed</th>
-                  <th className="px-3 py-2">Contract (Forms 3.2 / 3.3)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {advisees.map((row) => {
-                  const overdue = row.contract?.status === "Overdue";
-                  return (
-                    <tr key={row.id} className="border-b border-slate-50 last:border-0">
-                      <td className="px-3 py-3"><p className="font-semibold text-ink">{row.student_name}</p><p className="text-xs text-slate-400">{row.student_number}</p></td>
-                      <td className="px-3 py-3 text-slate-600">{row.program_code}</td>
-                      <td className="px-3 py-3 text-slate-600">{row.stage || "Not set"}</td>
-                      <td className="px-3 py-3 text-slate-600">{row.appointed_on ? formatDay(row.appointed_on) : "Not set"}</td>
-                      <td className="px-3 py-3">
-                        <StatusBadge value={contractBadge(row.contract)} dot={false} className={overdue ? "!bg-red-50 !text-red-700 !ring-red-200" : ""} />
-                        {row.contract?.due_on && row.contract.status !== "Received" && row.contract.status !== "Not applicable" && (
-                          <span className={`mt-1 block text-xs ${overdue ? "font-semibold text-red-700" : "text-slate-500"}`}>
-                            {overdue ? "Overdue since" : "Due"} {formatDay(row.contract.due_on)}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            caption="Your appointed advisees and the state of their adviser contract"
+            columns={ADVISEE_COLUMNS}
+            rows={advisees}
+            pageSize={0}
+            minWidth="md"
+          />
         ) : (
           <p className="text-sm text-slate-500">No appointed advisees yet. Students appear here once you accept their request.</p>
         )}
