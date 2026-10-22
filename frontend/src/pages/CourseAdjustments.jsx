@@ -1,25 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  CheckCircle2,
-  Circle,
-  ClipboardList,
-  Eye,
-  Send,
-  Settings2,
-  Users,
-} from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Circle, ClipboardList, Eye, Send, Settings2, Users, X } from "lucide-react";
 import { api } from "../api";
-import { Card, EmptyState, Spinner, StatusBadge } from "../components/ui";
+import {
+  Button,
+  Card,
+  DataTable,
+  Drawer,
+  EmptyState,
+  Field,
+  InlineNotice,
+  Input,
+  Select,
+  SectionCard,
+  Spinner,
+  StatCard,
+  StatusChip,
+  Stepper,
+} from "../components/ui/index.js";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import SubjectNeedsReport from "../components/SubjectNeedsReport";
-import { PAGE } from "../lib/labels.js";
 
 const STEPS = ["Draft", "Submitted", "Approved", "Published"];
-export default function CourseAdjustments({ embedded = false }) {
+
+// The page's title, tabs and rules block belong to CoursePlanning; this is the "Demand & adjustments" screen.
+export default function CourseAdjustments() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
   const selectedTermId = searchParams.get("term_id") || "";
@@ -35,6 +40,7 @@ export default function CourseAdjustments({ embedded = false }) {
   const [autosave, setAutosave] = useState("idle");
   const [subjectNeedsReport, setSubjectNeedsReport] = useState(null);
   const [selectedFaculty, setSelectedFaculty] = useState(null);
+  const [detailId, setDetailId] = useState(null);
   const dirtyRef = useRef(false);
 
   function load(pid, tid) {
@@ -188,258 +194,332 @@ export default function CourseAdjustments({ embedded = false }) {
 
   const offeredCount = useMemo(() => Object.values(sel).filter((s) => s.offer).length, [sel]);
 
-  return (
-    <div className={`space-y-5 ${embedded ? "" : "animate-fade-up"}`}>
-      {!embedded && <Card className="p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white">
-            <ClipboardList className="h-6 w-6" />
-          </span>
-          <div className="flex-1">
-            <h1 className="font-display text-2xl font-semibold text-ink">{PAGE.courseAdjustments}</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Use live demand as guidance, manually add any curriculum subject, and publish the approved list as the official semester offerings.
-            </p>
-            <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
-              <p>
-                <span className="font-bold uppercase tracking-wide text-slate-400">Who uses it · </span>
-                Academic Coordinator / GS Staff
-              </p>
-              <p>
-                <span className="font-bold uppercase tracking-wide text-slate-400">Data captured · </span>
-                Live demand, sections, editable faculty recommendations, offering status, Dean approval state.
-              </p>
-            </div>
-          </div>
-        </div>
-      </Card>}
+  // I-069: a suggestion is only worth printing on a row when it tells subjects apart. When every subject has the same
+  // suggested faculty member it is said once above the table instead of on every row.
+  const demandRows = data?.demand || [];
+  const suggestionNames = [...new Set(demandRows.map((row) => row.faculty_candidates?.[0]?.name).filter(Boolean))];
+  const sameSuggestion = suggestionNames.length === 1 ? suggestionNames[0] : "";
+  const showRowSuggestions = suggestionNames.length > 1;
+  const detailRow = demandRows.find((row) => row.course.id === detailId) || null;
 
+  const facultyProfiles = data?.faculty_profiles || [];
+  const openProfile = (facultyId) => setSelectedFaculty(facultyProfiles.find((faculty) => faculty.id === Number(facultyId)) || null);
+
+  const columns = [
+    {
+      key: "subject",
+      header: "Subject",
+      cell: (row) => (
+        <div className="min-w-0 max-w-[16rem]" title={subjectTitle(row)}>
+          <p className="truncate font-semibold text-ink">{row.course.code}</p>
+          {row.course.title && row.course.title !== row.course.code && <p className="meta truncate">{row.course.title}</p>}
+        </div>
+      ),
+    },
+    {
+      key: "demand",
+      header: "Demand",
+      cell: (row) => (
+        <div className="min-w-44">
+          <div className="flex items-center gap-3">
+            <span className="h-2 w-24 shrink-0 overflow-hidden rounded-full bg-slate-100">
+              <span className={`block h-full rounded-full ${demandBarClass(row.demand_status)}`} style={{ width: `${demandWidth(row)}%` }} />
+            </span>
+            <span className="font-semibold text-ink">{row.demand_count}</span>
+          </div>
+          <p className="meta mt-0.5">
+            {row.demand_count === 1 ? "student affected" : "students affected"}
+            {row.delayed_count ? ` · ${row.delayed_count} delayed if withheld` : ""}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "decision",
+      header: "Decision",
+      cell: (row) => {
+        const s = sel[row.course.id] || defaultSelection(row);
+        return (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="icon"
+              icon={s.offer ? Check : Circle}
+              onClick={() => toggleOffer(row)}
+              disabled={!canEdit}
+              aria-pressed={s.offer}
+              aria-label={`${s.offer ? "Hold" : "Offer"} ${row.course.code}`}
+              title={s.offer ? "Offered - click to hold" : "Not offered - click to offer"}
+              className={s.offer ? "!border-brand-200 !bg-brand-50 !text-brand-700" : ""}
+            />
+            <StatusChip status={s.status || "No decision"} dot={false} />
+          </div>
+        );
+      },
+    },
+    {
+      key: "sections",
+      header: "Sections",
+      cell: (row) => {
+        const s = sel[row.course.id] || defaultSelection(row);
+        return (
+          <div className="w-20">
+            <Input
+              type="number"
+              min="0"
+              value={s.sections}
+              onChange={(e) => updateSections(row, e.target.value)}
+              disabled={!canEdit}
+              className="px-2 disabled:cursor-not-allowed disabled:bg-slate-100"
+              aria-label={`Sections for ${row.course.code}`}
+            />
+          </div>
+        );
+      },
+    },
+    {
+      key: "faculty",
+      header: "Faculty",
+      cell: (row) => {
+        const s = sel[row.course.id] || defaultSelection(row);
+        const suggested = row.faculty_candidates?.[0];
+        return (
+          <div className="min-w-52">
+            <Select
+              value={s.facultyId}
+              onChange={(event) => updateFaculty(row, event.target.value)}
+              disabled={!canEdit || !s.offer}
+              className="min-w-0 disabled:cursor-not-allowed disabled:bg-slate-100"
+              aria-label={`Faculty assignment for ${row.course.code}`}
+              placeholder="Unassigned"
+              options={facultyProfiles.map((faculty) => {
+                const candidate = (row.faculty_candidates || []).find((item) => item.id === faculty.id);
+                return {
+                  value: faculty.id,
+                  label: `${faculty.name}${candidate?.preferred ? " · preferred" : ""} · ${candidate ? `${candidate.projected_load}/24u` : faculty.specialization}`,
+                };
+              })}
+            />
+            {((showRowSuggestions && suggested) || s.facultyId) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                {showRowSuggestions && suggested && (
+                  <span className="min-w-0 truncate text-brand-700" title="Recommended from preferences, availability, specialization and teaching load. You can change it.">Suggested: {suggested.name}</span>
+                )}
+                {s.facultyId && (
+                  <button type="button" onClick={() => openProfile(s.facultyId)} className="inline-flex cursor-pointer items-center gap-1 font-semibold text-slate-600 hover:text-brand-700 max-sm:min-h-11">
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" /> View profile
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "details",
+      header: <span className="sr-only">Details</span>,
+      align: "right",
+      cell: (row) => (
+        <Button variant="secondary" size="sm" onClick={() => setDetailId(row.course.id)} aria-label={`Details for ${row.course.code}`}>
+          Details
+        </Button>
+      ),
+    },
+  ];
+
+  const planSteps = STEPS.map((label, i) => ({
+    label,
+    state: status === "Returned" && i === 0 ? "returned" : i < stepIndex ? "complete" : i === stepIndex ? "current" : "upcoming",
+  }));
+
+  return (
+    <div className="page-stack">
       {loading ? (
         <Spinner label="Loading course adjustments..." />
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Could not load course adjustments" hint={error} />
       ) : (
         <>
-          <Card className="p-4">
-            {embedded && (
-              <div className="mb-4">
-                <h2 className="font-display text-xl font-semibold text-ink">Adjustments and subject demand</h2>
-                <p className="mt-1 text-sm text-slate-600">Demand is recalculated automatically from the current student records. The coordinator remains responsible for every offering and faculty decision.</p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <SectionCard
+            title="Adjustments and subject demand"
+            subtitle="Demand is recalculated automatically from the current student records. The coordinator remains responsible for every offering and faculty decision."
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Program">
-                <select value={programId} onChange={(e) => updateFilters({ program_id: e.target.value })} className="field-input cursor-pointer" aria-label="Program">
-                  {(data?.programs || []).map((p) => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
-                </select>
+                <Select
+                  value={programId}
+                  onChange={(e) => updateFilters({ program_id: e.target.value })}
+                  aria-label="Program"
+                  placeholder={null}
+                  options={(data?.programs || []).map((p) => ({ value: p.id, label: `${p.code} - ${p.name}` }))}
+                />
               </Field>
               <Field label="Academic year and semester">
-                <select value={termId} onChange={(e) => updateFilters({ term_id: e.target.value })} className="field-input cursor-pointer" aria-label="Academic year and semester">
-                  {(data?.terms || []).map((term) => <option key={term.id} value={term.id}>{formatTermLabel(term.label)}{term.relative_label ? ` (${term.relative_label})` : ""}</option>)}
-                </select>
+                <Select
+                  value={termId}
+                  onChange={(e) => updateFilters({ term_id: e.target.value })}
+                  aria-label="Academic year and semester"
+                  placeholder={null}
+                  options={(data?.terms || []).map((term) => ({ value: term.id, label: `${formatTermLabel(term.label)}${term.relative_label ? ` (${term.relative_label})` : ""}` }))}
+                />
               </Field>
             </div>
-            <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
-              <p className="text-sm font-semibold text-brand-900">Subject needs are calculated automatically</p>
-              <p className="mt-1 text-xs leading-relaxed text-brand-800">
-                Counts below update with the selected program and semester. They support the decision; they do not publish an offering or assign a faculty member by themselves.
-              </p>
-            </div>
-          </Card>
+            <InlineNotice tone="info" title="Subject needs are calculated automatically">
+              Counts below update with the selected program and semester. They support the decision; they do not publish an offering or assign a faculty member by themselves.
+            </InlineNotice>
+          </SectionCard>
 
-          <Card className="p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              {STEPS.map((step, i) => {
-                const done = stepIndex > i;
-                const current = stepIndex === i;
-                return (
-                  <div key={step} className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${current ? "bg-brand-600 text-white" : done ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-400"}`}>
-                      {done ? <Check className="h-3.5 w-3.5" /> : <span className={`grid h-4 w-4 place-items-center rounded-full text-[10px] ${current ? "bg-white/20" : "bg-white"}`}>{i + 1}</span>}
-                      {step}
-                    </span>
-                    {i < STEPS.length - 1 && <span className="text-slate-300">-</span>}
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mb-4 text-sm text-slate-600">{planStatusNote(data.latest_plan)}</p>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50/70 p-4">
+          <Card className="space-y-4">
+            <Stepper steps={planSteps} title="Offering plan progress" />
+            <p className="text-sm text-slate-600">{planStatusNote(data.latest_plan)}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-4">
               <p className="text-sm text-slate-600">
                 Demand numbers are guidance. Every curriculum subject remains available for a manual offering decision.
               </p>
               <div className="flex flex-wrap gap-2">
-                <ActionButton busy={busy === "draft"} onClick={() => planAction("draft")} icon={Settings2} disabled={!canEdit} primary={canEdit}>
+                <Button variant="secondary" loading={busy === "draft"} onClick={() => planAction("draft")} icon={Settings2} disabled={!canEdit}>
                   {status === "Draft" || status === "Returned" ? "Update draft" : "Save draft"} ({offeredCount} offered)
-                </ActionButton>
-                <ActionButton busy={busy === "submit"} onClick={() => planAction("submit")} icon={Send} disabled={!canEdit} primary={canEdit}>
+                </Button>
+                <Button variant={canEdit ? "primary" : "secondary"} loading={busy === "submit"} onClick={() => planAction("submit")} icon={Send} disabled={!canEdit}>
                   Submit for approval
-                </ActionButton>
-                <ActionButton busy={busy === "publish"} onClick={() => planAction("publish")} icon={CheckCircle2} disabled={!canManage || status !== "Approved"} primary={canManage && status === "Approved"}>
+                </Button>
+                <Button variant={canManage && status === "Approved" ? "primary" : "secondary"} loading={busy === "publish"} onClick={() => planAction("publish")} icon={CheckCircle2} disabled={!canManage || status !== "Approved"}>
                   Publish
-                </ActionButton>
+                </Button>
                 {canManage && (status === "Submitted" || status === "Approved" || status === "Published") && (
-                  <ActionButton busy={busy === "reopen"} onClick={() => planAction("reopen")} icon={Settings2} disabled={false} primary={false}>
+                  <Button variant="secondary" loading={busy === "reopen"} onClick={() => planAction("reopen")} icon={Settings2}>
                     Start new draft
-                  </ActionButton>
+                  </Button>
                 )}
               </div>
             </div>
             {!canManage && (
-              <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+              <InlineNotice tone="neutral">
                 Graduate School Staff have read-only access. An Academic Coordinator can change, submit, and publish the offering plan.
-              </p>
+              </InlineNotice>
             )}
-            {message && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">{message}</p>}
-            {autosave !== "idle" && <p className="mt-3 text-xs font-semibold text-slate-500">{autosave === "pending" ? "Draft changes pending..." : autosave === "saving" ? "Saving..." : "Saved"}</p>}
+            {message && <InlineNotice tone="success" onDismiss={() => setMessage("")}>{message}</InlineNotice>}
+            {autosave !== "idle" && <p className="meta font-semibold" role="status">{autosave === "pending" ? "Draft changes pending..." : autosave === "saving" ? "Saving..." : "Saved"}</p>}
             {data.latest_plan && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <div className="meta flex flex-wrap items-center justify-between gap-2">
                 <span>{data.latest_plan.program_code} - {data.latest_plan.term_label} - {data.latest_plan.offerings.length} offering row(s)</span>
-                <StatusBadge value={data.latest_plan.status} dot={false} />
+                <StatusChip status={data.latest_plan.status} dot={false} />
               </div>
             )}
           </Card>
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Metric icon={ClipboardList} label="Curriculum subjects" value={data.summary.curriculum_subjects ?? data.demand.length} tone="brand" />
-            <Metric icon={Users} label="Affected students" value={data.summary.affected_students ?? 0} tone="blue" />
-            <Metric icon={AlertTriangle} label="Delayed if withheld" value={data.summary.students_delayed_if_not_offered ?? 0} tone="amber" />
-            <Metric icon={Settings2} label="Selected to offer" value={offeredCount} tone="brand" />
+            <StatCard icon={ClipboardList} label="Curriculum subjects" value={data.summary.curriculum_subjects ?? data.demand.length} tone="success" />
+            <StatCard icon={Users} label="Affected students" value={data.summary.affected_students ?? 0} tone="info" />
+            <StatCard icon={AlertTriangle} label="Delayed if withheld" value={data.summary.students_delayed_if_not_offered ?? 0} tone="warning" />
+            <StatCard icon={Settings2} label="Selected to offer" value={offeredCount} tone="success" />
           </div>
 
           {subjectNeedsReport && (
             <SubjectNeedsReport report={subjectNeedsReport} termLabel={subjectNeedsReport.term?.label ? formatTermLabel(subjectNeedsReport.term.label) : ""} />
           )}
 
-          <Card className="overflow-hidden">
-            <div className="border-b border-slate-100 px-5 py-3">
-              <h2 className="text-lg font-semibold text-ink">Course offering decisions</h2>
-              <p className="text-sm text-slate-500">
-                One affected student is sufficient demand. Each row names every student who would be affected and whether withholding the subject would delay progress.
+          <Card className="space-y-4">
+            <div>
+              <h2 className="section-title">Course offering decisions</h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                One affected student is sufficient demand. Open Details on a row to see every student who would be affected and whether withholding the subject would delay progress.
               </p>
             </div>
-            {data.demand.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="No curriculum subjects found" hint="This program has no curriculum subjects yet. Import the program's monitoring sheet in Student Handoff first." />
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {data.demand.map((row) => {
-                  const s = sel[row.course.id] || defaultSelection(row);
-                  const affected = row.affected_students || [];
-                  return (
-                    <li key={row.course.id} className="px-5 py-4">
-                      <div className="grid grid-cols-1 gap-x-6 gap-y-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <p className="min-w-0 truncate font-semibold text-ink" title={row.course.title && row.course.title !== row.course.code ? `${row.course.code} · ${row.course.title}` : row.course.code}>
-                              {row.course.code}
-                              {row.course.title && row.course.title !== row.course.code && <span className="font-normal text-slate-600"> · {row.course.title}</span>}
-                            </p>
-                            <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                              row.selection_source === "Demand" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"
-                            }`}>
-                              {row.selection_source || (row.demand_count > 0 ? "Demand" : "Manual")}
-                            </span>
-                            <OfferingStatusBadge status={s.status} />
-                          </div>
-                          <div className="mt-2 flex min-w-0 items-center gap-3">
-                            <span className="h-2 w-full max-w-[14rem] overflow-hidden rounded-full bg-slate-100">
-                              <span className={`block h-full rounded-full ${demandBarClass(row.demand_status)}`} style={{ width: `${demandWidth(row)}%` }} />
-                            </span>
-                            <span className="shrink-0 text-sm font-bold text-slate-700">{row.demand_count}</span>
-                            <span className="truncate text-xs text-slate-500">
-                              {row.demand_count === 1 ? "student affected" : "students affected"}
-                              {row.delayed_count ? ` · ${row.delayed_count} delayed if withheld` : ""}
-                            </span>
-                          </div>
-                          {affected.length > 0 && (
-                            <details className="group mt-2">
-                              <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800">
-                                <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-                                <span className="group-open:hidden">Show the {affected.length} affected student{affected.length === 1 ? "" : "s"}</span>
-                                <span className="hidden group-open:inline">Hide affected students</span>
-                              </summary>
-                              <ul className="mt-2 grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto pr-1 md:grid-cols-2">
-                                {affected.map((student) => (
-                                  <li key={student.id} className={`min-w-0 rounded-lg border px-2.5 py-1.5 text-xs ${student.will_be_delayed ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
-                                    <p className="truncate font-semibold text-ink" title={`${student.name} (${student.student_number})`}>{student.name} <span className="font-normal text-slate-500">({student.student_number})</span></p>
-                                    <p className={`truncate ${student.will_be_delayed ? "text-amber-800" : "text-slate-600"}`}>{student.impact_basis} · {student.will_be_delayed ? "delayed if not offered" : "no confirmed delay"}</p>
-                                  </li>
-                                ))}
-                              </ul>
-                            </details>
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-end gap-3">
-                            <label className="block">
-                              <span className="field-label">Sections</span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={s.sections}
-                                onChange={(e) => updateSections(row, e.target.value)}
-                                disabled={!canEdit}
-                                className="field-input w-full px-2 py-1 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                aria-label={`Sections for ${row.course.code}`}
-                              />
-                            </label>
-                            <label className="block min-w-0">
-                              <span className="field-label">Faculty</span>
-                              <select
-                                value={s.facultyId}
-                                onChange={(event) => updateFaculty(row, event.target.value)}
-                                disabled={!canEdit || !s.offer}
-                                className="field-input w-full min-w-0 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100"
-                                aria-label={`Faculty assignment for ${row.course.code}`}
-                              >
-                                <option value="">Unassigned</option>
-                                {(data.faculty_profiles || []).map((faculty) => {
-                                  const candidate = (row.faculty_candidates || []).find((item) => item.id === faculty.id);
-                                  return <option key={faculty.id} value={faculty.id}>
-                                    {faculty.name}{candidate?.preferred ? " · preferred" : ""} · {candidate ? `${candidate.projected_load}/24u` : faculty.specialization}
-                                  </option>;
-                                })}
-                              </select>
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => toggleOffer(row)}
-                              disabled={!canEdit}
-                              className={`inline-grid h-10 w-10 place-items-center rounded-full border transition-colors ${s.offer ? "border-brand-200 bg-brand-50 text-brand-600" : "border-slate-200 bg-white text-slate-400"} disabled:cursor-not-allowed disabled:opacity-40`}
-                              aria-label={`${s.offer ? "Hold" : "Offer"} ${row.course.code}`}
-                              title={s.offer ? "Offered - click to hold" : "Not offered - click to offer"}
-                            >
-                              {s.offer ? <Check className="h-5 w-5" strokeWidth={3} /> : <Circle className="h-5 w-5" />}
-                            </button>
-                          </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                            {row.faculty_candidates?.[0] && (
-                              <span className="min-w-0 truncate text-brand-700" title="Recommended from preferences, availability, specialization and teaching load. You can change it.">Suggested: {row.faculty_candidates[0].name}</span>
-                            )}
-                            {s.facultyId && (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedFaculty((data.faculty_profiles || []).find((faculty) => faculty.id === Number(s.facultyId)) || null)}
-                                className="inline-flex cursor-pointer items-center gap-1 font-semibold text-slate-600 hover:text-brand-700"
-                              >
-                                <Eye className="h-3.5 w-3.5" /> View profile
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+            {sameSuggestion && (
+              <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span className="font-semibold text-brand-700">{sameSuggestion}</span> is the same suggested faculty member for every subject (from preferences, availability, specialization and teaching load), so it is not repeated on each row. Choose the faculty member for each subject below.
+              </p>
             )}
+            <DataTable
+              caption="Course offering decisions: one row per curriculum subject with demand, decision, sections and faculty"
+              columns={columns}
+              rows={demandRows}
+              rowKey={(row) => row.course.id}
+              minWidth="lg"
+              pageSize={0}
+              empty={{
+                icon: CheckCircle2,
+                title: "No curriculum subjects found",
+                hint: "This program has no curriculum subjects yet. Import the program's monitoring sheet in Student Handoff first.",
+              }}
+            />
           </Card>
         </>
+      )}
+      {detailRow && (
+        <DetailsDrawer
+          row={detailRow}
+          selection={sel[detailRow.course.id] || defaultSelection(detailRow)}
+          onClose={() => setDetailId(null)}
+        />
       )}
       {selectedFaculty && <FacultyAssignmentProfile faculty={selectedFaculty} onClose={() => setSelectedFaculty(null)} />}
     </div>
   );
+}
+
+/** Everything about one subject that does not fit a table row: who is affected, and who could teach it. */
+function DetailsDrawer({ row, selection, onClose }) {
+  const affected = row.affected_students || [];
+  const candidates = (row.faculty_candidates || []).slice(0, 3);
+  return (
+    <Drawer side="right" label={`${row.course.code} details`} onClose={onClose}>
+      <div className="flex items-start gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
+        <div className="min-w-0 flex-1">
+          <h2 className="section-title break-words">{row.course.code}</h2>
+          {row.course.title && row.course.title !== row.course.code && <p className="mt-0.5 text-sm text-slate-500">{row.course.title}</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <StatusChip status={selection.status || "No decision"} dot={false} />
+            <span className="meta">{row.selection_source || (row.demand_count > 0 ? "Demand" : "Manual")}</span>
+          </div>
+        </div>
+        <Button variant="icon" icon={X} onClick={onClose} aria-label="Close details" />
+      </div>
+      <div className="space-y-5 px-4 py-4 sm:px-6">
+        <section aria-labelledby="detail-affected">
+          <h3 id="detail-affected" className="card-title">
+            {affected.length === 1 ? "1 student affected" : `${affected.length} students affected`}
+            {row.delayed_count ? <span className="meta ml-2 font-normal">{row.delayed_count} delayed if withheld</span> : null}
+          </h3>
+          {affected.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No student needs this subject right now. It stays available for a manual offering decision.</p>
+          ) : (
+            <ul className="mt-2 grid grid-cols-1 gap-1.5">
+              {affected.map((student) => (
+                <li key={student.id} className={`min-w-0 rounded-lg border px-3 py-2 text-xs ${student.will_be_delayed ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                  <p className="truncate font-semibold text-ink" title={`${student.name} (${student.student_number})`}>{student.name} <span className="font-normal text-slate-500">({student.student_number})</span></p>
+                  <p className={`truncate ${student.will_be_delayed ? "text-amber-800" : "text-slate-600"}`}>{student.impact_basis} · {student.will_be_delayed ? "delayed if not offered" : "no confirmed delay"}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section aria-labelledby="detail-faculty">
+          <h3 id="detail-faculty" className="card-title">Who could teach it</h3>
+          {candidates.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No faculty member has the availability and teaching load for this subject yet.</p>
+          ) : (
+            <>
+              <ul className="mt-2 space-y-1.5">
+                {candidates.map((candidate) => (
+                  <li key={candidate.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <span className="min-w-0 truncate font-semibold text-ink">{candidate.name}{candidate.preferred ? <span className="meta ml-2 font-normal">preferred</span> : null}</span>
+                    <span className="meta shrink-0">{candidate.projected_load}/24u</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="meta mt-2">Recommended from preferences, availability, specialization and teaching load. The coordinator can choose anyone.</p>
+            </>
+          )}
+        </section>
+      </div>
+    </Drawer>
+  );
+}
+
+function subjectTitle(row) {
+  return row.course.title && row.course.title !== row.course.code ? `${row.course.code} · ${row.course.title}` : row.course.code;
 }
 
 function seedSelections(rows = []) {
@@ -495,56 +575,4 @@ function demandBarClass(status) {
 function demandWidth(row) {
   if (!row.demand_count) return 4;
   return Math.max(8, Math.min(100, (row.demand_count / 15) * 100));
-}
-
-function OfferingStatusBadge({ status }) {
-  const label = status || "No decision";
-  const styles = {
-    Offered: "bg-brand-50 text-brand-700 ring-brand-200",
-    "Not Offered": "bg-slate-100 text-slate-700 ring-slate-200",
-    Suggested: "bg-amber-50 text-amber-700 ring-amber-200",
-    "No decision": "bg-slate-100 text-slate-500 ring-slate-200",
-  };
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${styles[label] || styles["No decision"]}`}>{label}</span>;
-}
-
-function ActionButton({ busy, onClick, icon: Icon, children, primary = false, disabled = false }) {
-  return (
-    <button type="button" onClick={onClick} disabled={busy || disabled} className={primary ? "btn-primary" : "btn-ghost"}>
-      {busy ? (
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" />
-      ) : (
-        <Icon className="h-4 w-4" />
-      )}
-      {children}
-    </button>
-  );
-}
-
-function Metric({ icon: Icon, label, value, tone }) {
-  const tones = {
-    brand: "bg-brand-50 text-brand-700",
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-  };
-  return (
-    <Card className="flex items-center gap-3 p-4">
-      <span className={`grid h-10 w-10 place-items-center rounded-xl ${tones[tone] || tones.brand}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="font-display text-2xl font-semibold leading-none text-ink">{value}</p>
-        <p className="text-xs text-slate-500">{label}</p>
-      </div>
-    </Card>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="field-label">{label}</span>
-      {children}
-    </label>
-  );
 }
