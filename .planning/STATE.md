@@ -20,7 +20,7 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/wf2` (P7.5 restyle of six workflow files, dead code out).
   - MERGED `pkt/grad` (I-065, I-051). New: I-105 (batch 'Next: Dean' wrong), I-106, I-107.
   - MERGED `pkt/wf4` (I-063, I-089, I-102).
-  - `dean` / `pkt/dean` — Dean numbers agree (I-074), Dean copy + collapsed empty queues (I-084), Dean graduation wrapper/drag (I-106 part) (port 5309).
+  - MERGED `pkt/dean` (I-074, I-084, I-106 part). Follow-up I-111.
   - After `pkt/vocab` merges (it owns Layout.jsx): sidebar nav clipped by the footer (I-103, P2) + course-audit nav entry (I-101).
   - Fable review DONE -> `.planning/research/FULL-REVIEW-2026-10-22.md`; findings F-01..F-41 filed as I-055..I-095 (I-0xx = F-xx + 54). Worktree `review` can be removed (rmdir junction first).
 - **Wave plan from the review (backend lane is serial, one app.py packet at a time):**
