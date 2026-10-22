@@ -13,6 +13,7 @@ import { PAGE } from "../lib/labels.js";
 // toolbar, board, case window, batch bar) is the same component: ProcessBoardPage.
 // A process only supplies: its words, its guide, and the few extras that only it has.
 // Its stages, cards and steps come from the server (standalone_process.py / leave_workflow.py).
+// `description` is written for Graduate School staff; `deanDescription` is the Dean's own line for the same board.
 
 export const PROCESS_SLUGS = ["leave-of-absence", "readmission", "awol", "withdrawal"];
 
@@ -118,6 +119,7 @@ export const PROCESS_CONFIG = {
     icon: CalendarOff,
     rulesProcess: "loa",
     description: "Record an LOA application and route the Dean decision. Time on leave still counts toward the maximum residence.",
+    deanDescription: "Leave of absence requests that Graduate School staff forwarded for your decision. Approve, return or deny each one.",
     noun: "requests",
     boardLabel: "Leave of absence board",
     emptyTitle: "No leave requests yet",
@@ -132,6 +134,7 @@ export const PROCESS_CONFIG = {
     icon: UserCheck,
     rulesProcess: "readmission",
     description: "Record a return request after LOA, route the Dean decision, and reactivate approved students.",
+    deanDescription: "Requests to return from a leave that Graduate School staff forwarded for your decision. Approve, return or deny each one.",
     noun: "requests",
     boardLabel: "Readmission board",
     emptyTitle: "No readmission requests yet",
@@ -145,6 +148,7 @@ export const PROCESS_CONFIG = {
     icon: UserX,
     rulesProcess: "awol_residency",
     description: "Automatically flag policy-backed AWOL cases, review structured return declarations, and record valid residency enrollment without subjects.",
+    deanDescription: "AWOL return declarations that Graduate School staff forwarded for your decision, and the residency records on file.",
     noun: "cases",
     boardLabel: "AWOL and residency board",
     emptyTitle: "No AWOL or residency cases yet",
@@ -157,6 +161,7 @@ export const PROCESS_CONFIG = {
     icon: LogOut,
     rulesProcess: "withdrawal",
     description: "Withdraw a student from one subject until the end of the second week of classes, without changing program standing.",
+    deanDescription: "Requests to withdraw from one subject that Graduate School staff forwarded for your decision. Approve, return or deny each one.",
     noun: "requests",
     boardLabel: "Subject withdrawal board",
     emptyTitle: "No withdrawal requests yet",

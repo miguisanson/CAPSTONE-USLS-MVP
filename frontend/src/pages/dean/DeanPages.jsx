@@ -1,4 +1,4 @@
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -10,7 +10,7 @@ import {
   RotateCcw,
   SearchX,
 } from "lucide-react";
-import { Button, Card, DataTable, EmptyState, HistoryPanel, Input, PageHeader, SectionCard, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DataTable, DecisionPanel, EmptyState, PageHeader, SectionCard, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import { useAuth } from "../../auth";
 import RoleHome from "../../components/RoleHome.jsx";
@@ -18,10 +18,9 @@ import { deanActions, deanActivity, deanStats, wordDays } from "../../lib/deanHo
 import { firstNameOf } from "../../lib/staffHome.js";
 import { DEAN_PROCESSES, DeanFeedback, DeanGate, processOfType, useDean } from "./DeanContext";
 import { AgeBadge, CaseTable, casePath, processLabel, useDeanFilters } from "./DeanShared";
-import { DeanListFilters, DeanWorkflowBoard, WorkflowApprovalCard } from "./DeanParts";
-import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
+import { DeanListFilters, WorkflowApprovalCard } from "./DeanParts";
+import { DeanPracticumBoard } from "./DeanPracticumBoard";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
-import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import AdviserAppointments from "../AdviserAppointments";
 import { PAGE } from "../../lib/labels.js";
 
@@ -214,6 +213,19 @@ const PLAN_COLUMNS = [
   { key: "decision", header: "Decision", sortValue: (o) => o.status, cell: (o) => <StatusChip status={o.status} dot={false} /> },
 ];
 
+// The words of the confirmation window for a plan decision: named after the button, says where the plan goes.
+function planConfirm(plan, label, outcome, comment) {
+  return {
+    title: `Confirm: ${label}`,
+    confirmLabel: label,
+    message: [
+      `Course offerings · ${plan.program_code} · ${plan.term_label}`,
+      `Plan movement: Submitted → ${outcome}`,
+      comment.trim() ? `Recorded note: ${comment.trim()}` : "No optional note was entered.",
+    ].join("\n\n"),
+  };
+}
+
 function PlanCards() {
   const { pendingPlans, recentPlans, note, setNote, busy, decidePlan } = useDean();
   return (
@@ -226,6 +238,7 @@ function PlanCards() {
         <div className="space-y-4">
           {pendingPlans.map((plan) => {
             const offered = plan.offerings.filter((o) => o.status === "Offered" || o.status === "Suggested");
+            const comment = note[plan.id] || "";
             return (
               <SectionCard
                 key={plan.id}
@@ -241,16 +254,21 @@ function PlanCards() {
                   pageSize={0}
                   empty={{ icon: Inbox, title: "No subjects in this plan" }}
                 />
-                <Input
-                  value={note[plan.id] || ""}
-                  onChange={(e) => setNote((n) => ({ ...n, [plan.id]: e.target.value }))}
-                  placeholder="Optional note to the Graduate School…"
-                  aria-label={`Optional decision note for ${plan.program_code} ${plan.term_label}`}
+                {/* The same decision panel as every other Dean decision: a return needs a note, both ask first. */}
+                <DecisionPanel
+                  variant="plain"
+                  busy={busy === plan.id}
+                  onDecide={(decision, text) => decidePlan(plan, decision, text)}
+                  comment={comment}
+                  onCommentChange={(value) => setNote((current) => ({ ...current, [plan.id]: value }))}
+                  commentLabel="Note to the Academic Coordinator"
+                  commentPlaceholder="Optional when approving. Say what to revise when returning. It is saved with your name, role, date and time."
+                  commentRequiredMessage="Enter a comment explaining what to revise before returning the plan."
+                  actions={[
+                    { key: "approve", label: "Approve", tone: "approve", icon: CheckCircle2, confirm: planConfirm(plan, "Approve", "Approved", comment) },
+                    { key: "return", label: "Return for revision", tone: "return", icon: RotateCcw, confirm: planConfirm(plan, "Return for revision", "Returned for revision", comment) },
+                  ]}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <Button icon={CheckCircle2} disabled={busy === plan.id} onClick={() => decidePlan(plan, "approve")}>Approve</Button>
-                  <Button variant="secondary" icon={RotateCcw} disabled={busy === plan.id} onClick={() => decidePlan(plan, "return")}>Return for revision</Button>
-                </div>
               </SectionCard>
             );
           })}
@@ -276,12 +294,7 @@ function PlanCards() {
   );
 }
 
-const PROCESS_COPY = {
-  "course-adjustments": "Course offering plans submitted by the Academic Coordinator. Approve them or return them for revision.",
-
-  practicum: "Practicum completion reports sent to the Dean for final review.",
-  graduation: "Graduation endorsement lists prepared by Graduate School staff.",
-};
+const COURSE_ADJUSTMENTS_COPY = "Course offering plans submitted by the Academic Coordinator. Approve them or return them for revision.";
 
 export function DeanProcessPage() {
   const { process } = useParams();
@@ -289,7 +302,7 @@ export function DeanProcessPage() {
   if (!DEAN_PROCESSES[process]) return <Navigate to="/dean/approvals" replace />;
   return (
     <DeanGate>
-      {STANDALONE_PROCESSES.includes(process) ? <DeanStandaloneBody slug={process} /> : <DeanProcessBody process={process} />}
+      {STANDALONE_PROCESSES.includes(process) ? <DeanStandaloneBody slug={process} /> : process === "practicum" ? <DeanPracticumBoard /> : <DeanPlansBody />}
     </DeanGate>
   );
 }
@@ -299,77 +312,32 @@ export function DeanProcessPage() {
 // deny) on the cards that are waiting for a decision, so dragging a card or using its buttons
 // decides it through the same guarded call.
 function DeanStandaloneBody({ slug }) {
-  const { refetch } = useDean();
+  const { refetch, counts } = useDean();
+  // The "N waiting" chip beside the title is on every Dean board (finding 10).
+  const waiting = <StatusChip status={`${counts[PROCESS_COUNT_KEY[slug]]} waiting`} tone="muted" dot={false} />;
   return (
     <div className="space-y-5">
       <DeanFeedback />
-      <ProcessBoardPage key={slug} slug={slug} onChanged={refetch} />
+      <ProcessBoardPage key={slug} slug={slug} onChanged={refetch} headerBadge={waiting} />
     </div>
   );
 }
 
-// One line in a recent / overview list. Leave and readmission cases open into the same
-// summary the Dean saw when deciding, read-only.
-function DecidedRow({ item }) {
-  const leaveCase = isLeaveCaseItem(item) ? item.case : null;
-  return (
-    <li className="py-2 text-sm">
-      <div className="flex items-center justify-between gap-3">
-        <Link to={casePath(item)} className="min-w-0 truncate text-slate-700 hover:text-brand-700 hover:underline">{item.title}</Link>
-        {leaveCase ? leaveCaseStatusBadge(leaveCase) : <StatusChip status={item.status} dot={false} />}
-      </div>
-      {leaveCase?.status === "Denied" && <p className="meta mt-1 font-semibold text-red-700">Follow-up owner: {leaveCase.owner || "Graduate School staff"}</p>}
-      {leaveCase && (
-        <HistoryPanel className="mt-2" label="View details" hideLabel="Hide details">
-          <LeaveCaseSummary item={item} />
-        </HistoryPanel>
-      )}
-    </li>
-  );
-}
-
-function DeanProcessBody({ process }) {
-  const navigate = useNavigate();
-  const { workflowPending, workflowRecent, workflowOverview, counts } = useDean();
-  const types = DEAN_PROCESSES[process].types;
-  const pending = workflowPending.filter((item) => types.includes(item.type));
-  const overview = workflowOverview.filter((item) => types.includes(item.type));
-  const recent = workflowRecent.filter((item) => types.includes(item.type));
-  const { filters, setFilters, programs, statuses, apply } = useDeanFilters(process === "course-adjustments" ? [] : overview);
-  const visiblePending = apply(pending);
-  const boardRows = apply(overview);
-  const visibleRecent = apply(recent);
+// Course Adjustments: the course offering plans the Academic Coordinator submitted. The plan card decides with the
+// same DecisionPanel as every other Dean decision.
+function DeanPlansBody() {
+  const { counts } = useDean();
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title={DEAN_PROCESSES[process].label}
-        description={PROCESS_COPY[process]}
+        title={DEAN_PROCESSES["course-adjustments"].label}
+        description={COURSE_ADJUSTMENTS_COPY}
         icon={Gavel}
-        badge={<StatusChip status={`${counts[PROCESS_COUNT_KEY[process]]} waiting`} tone="muted" dot={false} />}
+        badge={<StatusChip status={`${counts[PROCESS_COUNT_KEY["course-adjustments"]]} waiting`} tone="muted" dot={false} />}
         actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>All approvals</Button>}
       />
       <DeanFeedback />
-      {process === "course-adjustments" ? (
-        <PlanCards />
-      ) : (
-        <>
-          <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
-          {boardRows.length > 0 && (
-            <DeanWorkflowBoard rows={boardRows} onOpen={(item) => navigate(casePath(item))} selectedIds={new Set()} onToggle={() => {}} />
-          )}
-          <SectionCard title="Waiting for your decision" subtitle="Open a case to review it and decide" icon={Inbox}>
-            <CaseTable items={visiblePending} emptyTitle="Nothing to review in this section" emptyHint="Submitted items for this role will appear here." />
-          </SectionCard>
-          {visibleRecent.length > 0 && (
-            <Card>
-              <p className="eyebrow mb-3 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Recent workflow decisions</p>
-              <ul className="divide-y divide-slate-100">
-                {visibleRecent.map((item) => <DecidedRow key={`${item.type}-${item.id}`} item={item} />)}
-              </ul>
-            </Card>
-          )}
-        </>
-      )}
+      <PlanCards />
     </div>
   );
 }
