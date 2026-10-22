@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { useAuth } from "./auth";
 import Layout from "./components/Layout";
-import { Card, EmptyState, Spinner } from "./components/ui";
+import { Card, EmptyState, Spinner } from "./components/ui/index.js";
 import Dashboard from "./pages/Dashboard";
 import Reports from "./pages/Reports";
 import Students from "./pages/Students";

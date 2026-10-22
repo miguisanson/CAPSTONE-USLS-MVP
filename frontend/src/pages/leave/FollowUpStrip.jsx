@@ -37,7 +37,7 @@ export default function FollowUpStrip({ cases, onOpen, onRunAction }) {
                       {item.overdue_days > 0 && (
                         <StatusChip label={`Overdue ${plural(item.overdue_days, "day")}`} tone="bad" size="sm" dot={false} />
                       )}
-                      {item.awol_proposed && <StatusChip label="AWOL proposed" tone="warn" size="sm" dot={false} />}
+                      {item.awol_proposed && <StatusChip label="AWOL proposed" tone="warning" size="sm" dot={false} />}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">

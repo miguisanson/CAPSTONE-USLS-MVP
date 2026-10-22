@@ -84,7 +84,7 @@ export async function inspectPage(page) {
       const s = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none";
     };
-    // components/ui.jsx ErrorNote = red bordered box; role=alert is the accessible error region.
+    // InlineNotice tone="danger" = red bordered box; role=alert is the accessible error region.
     const seen = new Set();
     for (const el of document.querySelectorAll(".border-red-200.bg-red-50, [role='alert']")) {
       if (!visible(el)) continue;

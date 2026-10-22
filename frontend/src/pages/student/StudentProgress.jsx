@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { BookOpenCheck, ListChecks } from "lucide-react";
 import { Button, DataTable, EmptyState, PageHeader, SectionCard, StatCard, StatusChip } from "../../components/ui/index.js";
-import { ProgressBar } from "../../components/ui";
+import { ProgressBar } from "../../components/ui/ProgressBar.jsx";
 import { useStudentPortal } from "./StudentPortalContext";
 import { ProgressPanel, WorkflowStatusPanel } from "./Panels";
 import { PAGE } from "../../lib/labels.js";

@@ -471,7 +471,7 @@ function ExpertiseEditor({ faculty, onChanged }) {
                   <StatusChip status={item.kind_label} tone="good" size="sm" dot={false} />
                   {item.year && <span className="micro">{item.year}</span>}
                   {item.source === "demo seed"
-                    ? <StatusChip status="Demo data" tone="warn" size="sm" dot={false} />
+                    ? <StatusChip status="Demo data" tone="warning" size="sm" dot={false} />
                     : <StatusChip status="Manual entry" tone="muted" size="sm" dot={false} />}
                 </div>
                 <p className="mt-1 text-sm leading-relaxed text-slate-700">{item.text}</p>

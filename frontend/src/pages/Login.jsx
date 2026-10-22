@@ -433,7 +433,7 @@ function DemoStudentGroup({ className = "", open, onToggle, title, description, 
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={contentId}
-        className={`flex w-full cursor-pointer items-center justify-between gap-3 bg-slate-50 px-3.5 py-3 text-left transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${open ? "border-b border-slate-100" : ""}`}
+        className={`flex w-full cursor-pointer items-center justify-between gap-3 bg-slate-50 px-3.5 py-3 text-left transition-colors hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 focus-visible:ring-0 focus-visible:ring-offset-0 ${open ? "border-b border-slate-100" : ""}`}
       >
         <span className="min-w-0">
           <span className="flex items-center gap-2 text-sm font-semibold text-ink">

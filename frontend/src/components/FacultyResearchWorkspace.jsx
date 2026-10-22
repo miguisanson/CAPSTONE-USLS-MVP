@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, FileSignature, Gavel, Users } from "lucide-react";
 import { api } from "../api";
-import { Card, EmptyState, SectionTitle, StatusBadge } from "./ui";
+import { Card, EmptyState, SectionTitle, StatusChip } from "./ui/index.js";
 import { formatDate } from "../lib/format";
 import SignaturePad from "./SignaturePad";
 
@@ -71,18 +71,18 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
 
   return <>
     {notice && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-4 w-4" />{notice}</div>}
-    {showSignatures && <Card className="p-6">
+    {showSignatures && <Card pad="none" className="p-6">
       <SectionTitle title="Adviser paper signatures" subtitle="Review and sign the exact manuscript version uploaded by your assigned advisees" icon={FileSignature} />
       {!papers.length ? <EmptyState icon={FileSignature} title="No adviser documents yet" hint="Proposal manuscripts, proposal/final endorsements, and final manuscripts appear here after an assigned advisee uploads them." /> : <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]">
-        <div className="space-y-2">{papers.map((paper) => <button key={paper.id} type="button" disabled={Boolean(paper.approval)} onClick={() => setSelectedPaper(paper)} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedPaper?.id === paper.id ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-white hover:bg-slate-50"} disabled:cursor-default`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{paper.student.name}</p><p className="text-xs text-slate-500">{paper.document_type} · {paper.gate}</p></div><StatusBadge value={paper.approval?.status || "Needs signature"} dot={false} /></div><p className="mt-2 text-sm text-slate-700">{paper.name}</p><div className="mt-2 flex flex-wrap items-center gap-3"><a href={paper.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><Eye className="h-3.5 w-3.5" />Open document</a><span className="text-xs text-slate-400">Uploaded {formatDate(paper.uploaded_at)}</span></div>{paper.approval && <p className="mt-2 text-xs font-semibold text-emerald-700">Signed by {paper.approval.adviser_name} · {new Date(paper.approval.signed_at).toLocaleString()}</p>}</button>)}</div>
+        <div className="space-y-2">{papers.map((paper) => <button key={paper.id} type="button" disabled={Boolean(paper.approval)} onClick={() => setSelectedPaper(paper)} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedPaper?.id === paper.id ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-white hover:bg-slate-50"} disabled:cursor-default`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{paper.student.name}</p><p className="text-xs text-slate-500">{paper.document_type} · {paper.gate}</p></div><StatusChip status={paper.approval?.status || "Needs signature"} dot={false} /></div><p className="mt-2 text-sm text-slate-700">{paper.name}</p><div className="mt-2 flex flex-wrap items-center gap-3"><a href={paper.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><Eye className="h-3.5 w-3.5" />Open document</a><span className="text-xs text-slate-400">Uploaded {formatDate(paper.uploaded_at)}</span></div>{paper.approval && <p className="mt-2 text-xs font-semibold text-emerald-700">Signed by {paper.approval.adviser_name} · {new Date(paper.approval.signed_at).toLocaleString()}</p>}</button>)}</div>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">{selectedPaper ? <><p className="text-sm font-semibold text-ink">Sign {selectedPaper.name}</p><p className="mb-3 mt-1 text-xs text-slate-500">Student: {selectedPaper.student.name}. Review the file before signing this exact version.</p><SignaturePad resetKey={selectedPaper.id} onChange={setSignature} ariaLabel="Faculty adviser signature canvas" /><button type="button" onClick={signPaper} disabled={busy || !signature} className="btn-primary mt-4 w-full cursor-pointer"><FileSignature className="h-4 w-4" />{busy ? "Saving signature..." : "Sign this document"}</button></> : <EmptyState icon={FileSignature} title="Choose a pending document" hint="Select an unsigned document to review and sign it." />}</div>
       </div>}
     </Card>}
 
-    {showSignatures && revisionReviews.length > 0 && <Card className="p-6">
+    {showSignatures && revisionReviews.length > 0 && <Card pad="none" className="p-6">
       <SectionTitle title="Revisions to confirm" subtitle="After a pass with minor revisions the student submits the revised manuscript; you confirm it and the stage completes" icon={CheckCircle2} />
       <div className="mt-4 space-y-3">{revisionReviews.map((verdict) => <div key={verdict.id} className="rounded-xl border border-slate-200 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{verdict.student.name}</p><p className="text-xs text-slate-500">{verdict.defense_type} · {verdict.label}</p></div><StatusBadge value={verdict.revision_status || "Awaiting revisions"} dot={false} /></div>
+        <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{verdict.student.name}</p><p className="text-xs text-slate-500">{verdict.defense_type} · {verdict.label}</p></div><StatusChip status={verdict.revision_status || "Awaiting revisions"} dot={false} /></div>
         {verdict.remarks && <p className="mt-2 text-sm text-slate-700">Panel remarks: {verdict.remarks}</p>}
         {verdict.revision_note && <p className="mt-2 text-sm text-slate-700">Student note: {verdict.revision_note}</p>}
         {verdict.revision_status === "Revisions submitted"
@@ -91,7 +91,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
       </div>)}</div>
     </Card>}
 
-    {showPanels && <Card className="p-6">
+    {showPanels && <Card pad="none" className="p-6">
       <SectionTitle title="Panel papers and defense verdicts" subtitle="Documents and verdict actions are limited to your assigned panel records" icon={Users} />
       {!panelRows.length ? <EmptyState icon={Users} title={view === "verdicts" ? "No scheduled defenses" : "No panel assignments"} hint={view === "verdicts" ? "Verdict forms appear here once a defense is scheduled for a panel you chair." : "Assigned student papers and chair actions will appear here."} /> : <div className="mt-4 space-y-4">{panelRows.map((panel) => {
         const scheduleId = panel.defense?.id;
@@ -101,10 +101,10 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
         const verdict = panel.defense?.verdict;
         const correction = corrections[verdict?.id] || {};
         return <article key={`${panel.student.id}-${panel.gate}-${panel.panel_role}`} className="rounded-xl border border-slate-200 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{panel.student.name}</p><p className="text-xs text-slate-500">{panel.student.program_code} · {panel.gate}</p></div><StatusBadge value={panel.panel_role} dot={false} /></div>
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{panel.student.name}</p><p className="text-xs text-slate-500">{panel.student.program_code} · {panel.gate}</p></div><StatusChip status={panel.panel_role} dot={false} /></div>
           <p className="mt-2 flex items-start gap-1.5 text-sm text-slate-600"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" />{panel.research_title || "Research title pending"}</p>
           <div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Current-stage papers</p>{panel.documents?.length ? <div className="mt-2 flex flex-wrap gap-2">{panel.documents.map((document) => <a key={document.id} href={document.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-2 text-xs"><Eye className="h-3.5 w-3.5" />{document.document_type}: {document.name}</a>)}</div> : <p className="mt-1 text-xs text-slate-500">No uploaded papers for this assigned stage.</p>}</div>
-          {panel.defense && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-brand-800"><CalendarClock className="h-4 w-4" /><span className="font-semibold">{panel.defense.defense_type} · {formatDate(panel.defense.preferred_date)} {panel.defense.start_time || ""}</span><StatusBadge value={panel.defense.display_status || panel.defense.status} dot={false} /></div>}
+          {panel.defense && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-brand-800"><CalendarClock className="h-4 w-4" /><span className="font-semibold">{panel.defense.defense_type} · {formatDate(panel.defense.preferred_date)} {panel.defense.start_time || ""}</span><StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} /></div>}
           {verdict && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p className="text-sm font-semibold text-emerald-800">Verdict: {verdict.label || verdict.result}{verdict.selected_title ? ` · ${verdict.selected_title}` : ""}</p>
             <p className="mt-1 text-xs text-emerald-700">Submitted by {verdict.chair_name} · {new Date(verdict.submitted_at).toLocaleString()}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}</p>

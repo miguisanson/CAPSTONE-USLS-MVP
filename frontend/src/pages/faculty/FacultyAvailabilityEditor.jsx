@@ -4,7 +4,7 @@ import { CalendarDays, CalendarOff, CalendarPlus, Clock3, Inbox, Trash2 } from "
 import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionTitle, Spinner, StatusChip } from "../../components/ui/index.js";
-import { RadioRow } from "../../components/forms";
+import { RadioRow } from "../../components/ui/RadioRow.jsx";
 import { useConfirm } from "../../components/confirm";
 import { formatDateTime } from "../../lib/format";
 import { isoDay } from "../../components/calendar/CalendarView";
@@ -370,7 +370,7 @@ export default function FacultyAvailabilityEditor() {
           {data.updated_at ? `Last updated ${formatDateTime(data.updated_at)}.` : "Availability entered."}{data.google_connected ? " Google Calendar connected." : ""}
         </InlineNotice>
       ) : (
-        <InlineNotice tone="warn">
+        <InlineNotice tone="warning">
           You have not entered any availability. The Graduate School cannot check your time, so it will ask you first.
         </InlineNotice>
       )}

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { formatDate } from "../../lib/format";
-import { SectionTitle, ErrorNote } from "../../components/ui";
+import { InlineNotice, SectionTitle } from "../../components/ui/index.js";
 import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
@@ -683,7 +683,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     <div className="space-y-4">
       <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`} icon={GraduationCap} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
-      {exportError && <div role="alert"><ErrorNote message={exportError} /></div>}
+      {exportError && <InlineNotice tone="danger">{exportError}</InlineNotice>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
         <RosterFilters

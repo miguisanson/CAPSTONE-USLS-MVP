@@ -1,5 +1,5 @@
 import { CheckCircle2, Eye } from "lucide-react";
-import { StatusBadge } from "../../components/ui";
+import { StatusChip } from "../../components/ui/index.js";
 import { uniqueValues } from "./shared";
 
 export const GRADUATION_STAGE_ACTIONS = {
@@ -323,7 +323,7 @@ export function GraduationBatchStageCheck({ group, compact = false, onViewStage 
             <p className="mt-1 truncate text-sm font-semibold text-ink">Step {currentStage.number}: {currentStage.label}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StatusBadge value={`${completed}/${stages.length}`} dot={false} />
+            <StatusChip status={`${completed}/${stages.length}`} dot={false} />
             {onViewStage && <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>}
           </div>
         </div>
@@ -340,7 +340,7 @@ export function GraduationBatchStageCheck({ group, compact = false, onViewStage 
           <p className="text-sm font-semibold text-ink">Graduation stage check for {group.label}</p>
           <p className="text-xs text-slate-500">Follow where this batch is in the graduation endorsement process.</p>
         </div>
-        <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
+        <StatusChip status={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
       </div>
       <ol className="mt-3 grid w-full grid-cols-1 gap-2 2xl:grid-cols-2">
         {stages.map((stage) => (
@@ -349,7 +349,7 @@ export function GraduationBatchStageCheck({ group, compact = false, onViewStage 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-slate-800">{stage.label}</p>
-                <StatusBadge value={stage.state} dot={false} />
+                <StatusChip status={stage.state} dot={false} />
               </div>
               <p className="mt-1 text-xs text-slate-500">{stage.detail}</p>
             </div>
@@ -397,7 +397,7 @@ export function GraduationCompletedCourseworkView({ row, id }) {
             {completedUnits > 0 ? ` · ${completedUnits} units` : ""}
           </p>
         </div>
-        <StatusBadge value={row.eligibility?.coursework_status || "Needs verification"} dot={false} />
+        <StatusChip status={row.eligibility?.coursework_status || "Needs verification"} dot={false} />
       </div>
       {completedCourses.length > 0 ? (
         <ul className="mt-3 grid gap-2 md:grid-cols-2">
@@ -409,7 +409,7 @@ export function GraduationCompletedCourseworkView({ row, id }) {
               </div>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-700">{course.title}</p>
               {(course.category || course.term_label) && (
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-2xs text-slate-500">
                   {[course.category, course.term_label].filter(Boolean).join(" · ")}
                 </p>
               )}
@@ -449,14 +449,14 @@ export function GraduationResearchRequirementsView({ row, id }) {
             {progress.completed_stage_count ?? 0}/{progress.stage_count ?? stages.length} research stages complete
           </p>
         </div>
-        <StatusBadge value={row.eligibility?.research_status || "Needs verification"} dot={false} />
+        <StatusChip status={row.eligibility?.research_status || "Needs verification"} dot={false} />
       </div>
       <div className="mt-3 grid gap-2 lg:grid-cols-2">
         {stages.map((stage) => (
           <div key={stage.gate} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-ink">{stage.name}</p>
-              <StatusBadge value={stage.complete ? "Complete" : "Incomplete"} dot={false} />
+              <StatusChip status={stage.complete ? "Complete" : "Incomplete"} dot={false} />
             </div>
             <p className="mt-1 text-xs text-slate-600">{researchStageDetailLine(stage)}</p>
           </div>
@@ -465,7 +465,7 @@ export function GraduationResearchRequirementsView({ row, id }) {
           <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-ink">Completion Evidence</p>
-              <StatusBadge value={completion.status || (completion.complete ? "Complete" : "Incomplete")} dot={false} />
+              <StatusChip status={completion.status || (completion.complete ? "Complete" : "Incomplete")} dot={false} />
             </div>
             <p className="mt-1 text-xs text-slate-600">Requirements {completion.requirements_complete ?? 0}/{completion.requirements_total ?? 0}</p>
           </div>
@@ -485,7 +485,7 @@ export function GraduationPracticumCompletionView({ row, id }) {
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Practicum completion details</p>
             <p className="mt-1 text-sm text-slate-700">This student’s program does not require practicum.</p>
           </div>
-          <StatusBadge value="Not Required" dot={false} />
+          <StatusChip status="Not Required" dot={false} />
         </div>
       </section>
     );
@@ -498,7 +498,7 @@ export function GraduationPracticumCompletionView({ row, id }) {
             <p className="text-xs font-bold uppercase tracking-wide text-red-700">Practicum completion details</p>
             <p className="mt-1 text-sm text-red-800">No practicum record is on file for this required program.</p>
           </div>
-          <StatusBadge value={details.status || "Missing"} dot={false} />
+          <StatusChip status={details.status || "Missing"} dot={false} />
         </div>
       </section>
     );
@@ -520,12 +520,12 @@ export function GraduationPracticumCompletionView({ row, id }) {
           <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Practicum completion details</p>
           <p className="mt-0.5 text-xs text-slate-600">Hours, placement, documents, and final review status</p>
         </div>
-        <StatusBadge value={details.status || "Needs verification"} dot={false} />
+        <StatusChip status={details.status || "Needs verification"} dot={false} />
       </div>
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">
         {detailItems.map(([label, value]) => (
           <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-            <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+            <dt className="text-2xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
             <dd className="mt-1 text-sm font-semibold text-slate-800">{value}</dd>
           </div>
         ))}

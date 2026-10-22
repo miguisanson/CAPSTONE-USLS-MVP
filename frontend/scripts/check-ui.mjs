@@ -42,15 +42,28 @@ export function isExcluded(path) {
 
 const matches = (text, re) => text.match(re) || [];
 
+/**
+ * The allow-list entry for one file and metric: `{ metric: { "path": ["hit", ...] } }` or, with a reason,
+ * `{ metric: { "path": { "hits": ["hit", ...], "reason": "why" } } }`. Returns the set of matched strings that do not count.
+ */
+function allowedHits(allow, metric, path) {
+  const entry = allow?.[metric]?.[path];
+  if (!entry) return new Set();
+  return new Set(Array.isArray(entry) ? entry : entry.hits || []);
+}
+
 /** Per-file counts for one file (not excluded). `allow` is { metric: { "pages/Login.jsx": ["text-3xl"] } }. */
 function countFile({ path, text }, allow) {
   const out = Object.fromEntries(METRICS.map((m) => [m, 0]));
-  out.arbitraryText = matches(text, ARBITRARY_TEXT).length;
-  const allowed = new Set(allow?.offScaleText?.[path] || []);
-  out.offScaleText = matches(text, OFF_SCALE_TEXT).filter((hit) => !allowed.has(hit)).length;
-  out.rawTable = matches(text, RAW_TABLE).length;
-  out.rawH1 = matches(text, RAW_H1).length;
-  out.localStatusStyle = matches(text, LOCAL_STATUS).length;
+  const counted = (metric, re) => {
+    const allowed = allowedHits(allow, metric, path);
+    return matches(text, re).filter((hit) => !allowed.has(hit)).length;
+  };
+  out.arbitraryText = counted("arbitraryText", ARBITRARY_TEXT);
+  out.offScaleText = counted("offScaleText", OFF_SCALE_TEXT);
+  out.rawTable = counted("rawTable", RAW_TABLE);
+  out.rawH1 = counted("rawH1", RAW_H1);
+  out.localStatusStyle = counted("localStatusStyle", LOCAL_STATUS);
   out.rawModal = matches(text, STRING_LITERAL).filter((s) => HAS_FIXED.test(s) && HAS_INSET_0.test(s)).length;
   return out;
 }

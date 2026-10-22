@@ -163,7 +163,7 @@ export default function StudentPicker({ value, onChange, selectedLabel, meta }) 
                 }}
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-brand-50 cursor-pointer"
               >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-2xs font-bold text-slate-600">
                   {initials(s.name)}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -171,7 +171,7 @@ export default function StudentPicker({ value, onChange, selectedLabel, meta }) 
                   <p className="truncate text-xs text-slate-400">
                     {s.student_number} · {s.program_code} · {s.research_stage || s.current_stage}
                   </p>
-                  <p className={`mt-0.5 truncate text-[11px] font-semibold ${/complete|ready/i.test(s.readiness_status || "") ? "text-emerald-600" : "text-amber-600"}`}>
+                  <p className={`mt-0.5 truncate text-2xs font-semibold ${/complete|ready/i.test(s.readiness_status || "") ? "text-emerald-600" : "text-amber-600"}`}>
                     {s.readiness_status || "Readiness not recorded"}
                   </p>
                 </div>

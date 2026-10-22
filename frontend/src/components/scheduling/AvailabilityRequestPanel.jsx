@@ -68,7 +68,7 @@ export default function AvailabilityRequestPanel({ context, studentId, refetch }
           <p id="panel-availability-request" className="text-sm font-semibold text-ink">Availability of the panel</p>
           <p className="meta">Nobody is assumed to be free. People who have not entered availability are not checked.</p>
         </div>
-        {missing.length > 0 && <StatusChip status={`${missing.length} not entered`} tone="warn" dot={false} />}
+        {missing.length > 0 && <StatusChip status={`${missing.length} not entered`} tone="warning" dot={false} />}
       </div>
       <ul className="grid gap-2 sm:grid-cols-2">
         {participants.map((participant) => {
