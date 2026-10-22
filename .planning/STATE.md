@@ -10,7 +10,7 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
   - MERGED `pkt/board` (I-067, I-088). Follow-up: Practicum `w-[300px]` and Graduation `w-[380px]` column overrides (workflow packet).
   - `vocab` / `pkt/vocab` — one name table `lib/labels.js`, breadcrumb rule Portal > Page (I-077, I-078), rules collapsed (I-076), Activity Log open (I-080) (spec `e2e/p76-vocabulary.spec.js`, port 5306).
-  - Full Python gate on 00eda43 running in worktree `wt/gate` -> `E:/Temp/claude/gate53/gate_00eda43.txt` (remove that worktree after).
+  - Full Python gate on 00eda43 (after wf, be, fac, mon merges + source-test path fix): **643 tests OK** (38 min). Worktree `wt/gate` is kept for the next gate run (`git -C ../CAPSTONE-USLS-MVP-wt/gate checkout --detach <sha>`).
   - Fixed on the branch: I-096 e2e harness now keyless (the main checkout's .env key broke p80).
   - MERGED `pkt/mon` (P6.4 Monitoring Sheet / class list / adviser record).
   - MERGED `pkt/fac2` (I-079, I-090, I-085, I-099, I-100). Its worktree `wt/fac2` may still have a helper process; remove it later (rmdir junction first).
