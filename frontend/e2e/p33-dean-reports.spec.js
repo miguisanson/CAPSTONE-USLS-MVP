@@ -208,7 +208,9 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(main.getByText("Ready graduation batches")).toBeVisible();
     await expect(main.getByText("Select or process a whole batch while still seeing every student in it.")).toBeVisible();
     await expect(main.getByText("1 batch", { exact: true })).toBeVisible();
-    const batch = main.locator("div[draggable=true]").filter({ hasText: BATCH }).filter({ hasText: "Ready for Dean review" });
+    // The batches are a list, not draggable cards: there is no board to drop them on (I-106).
+    await expect(main.locator("[draggable=true]"), "no draggable batch card on this tab").toHaveCount(0);
+    const batch = main.getByRole("listitem").filter({ hasText: BATCH }).filter({ hasText: "Ready for Dean review" });
     await expect(batch).toHaveCount(1);
     await expect(batch).toContainText("1 candidate");
     await expect(batch).toContainText("Students: Isabel Flores");
