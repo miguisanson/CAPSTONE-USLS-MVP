@@ -15,7 +15,9 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/mon` (P6.4 Monitoring Sheet / class list / adviser record).
   - `fac2` / `pkt/fac2` — faculty follow-ups I-079 one advisees table, I-090 verdicts grouping, I-085 Google card, I-099 Received chip (port 5302).
   - MERGED `pkt/wf` (P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/`); e2e after it -> `E:/Temp/claude/gate53/e2e_after_wf.txt`.
-  - `wf2` / `pkt/wf2` — dead code in workflow/ + restyle P7.5 of shared/WorkflowPage/HandoffImport/CourseAudit/ResearchGate/PanelMatching (spec `e2e/p75-workflow-pages.spec.js`, port 5304).
+  - MERGED `pkt/wf2` (P7.5 restyle of six workflow files, dead code out).
+  - `grad` / `pkt/grad` — Graduation onto the shared board + Board/Table toggle (I-065, I-051) (spec `e2e/p77-graduation-board.spec.js`, port 5307).
+  - NEXT frontend packet (wf4): Practicum + DefenseScheduling + AvailabilityWorkspace restyle, Practicum width/banner (I-089), header boilerplate 'WHO USES IT / DATA CAPTURED' -> PageHeader everywhere (I-063), MiniBox/RosterFilters/Detail/Pill leftovers (I-102), course-audit nav (I-101).
   - Fable review DONE -> `.planning/research/FULL-REVIEW-2026-10-22.md`; findings F-01..F-41 filed as I-055..I-095 (I-0xx = F-xx + 54). Worktree `review` can be removed (rmdir junction first).
 - **Wave plan from the review (backend lane is serial, one app.py packet at a time):**
   - be3 seed data: I-060 (F-06 advisers <=5, adviser never on panel), I-061 (F-07 stage vs units, titles, departments), I-062 (F-08 one case in every Dean queue), I-070 (F-16 dates spread over past weeks, R-001 stays green), I-094 (F-40), I-095 (F-41).
