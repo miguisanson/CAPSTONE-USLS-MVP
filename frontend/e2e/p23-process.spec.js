@@ -248,7 +248,9 @@ test.describe("P2.3 shared process components", () => {
       await page.route("**/api/enrollment/curriculum-tag/*", (route) =>
         route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "No curriculum is on file for this student." }) }),
       );
-      await page.locator('select[aria-label="Student"]').selectOption({ index: 1 });
+      // I-082 (P8.3): the study-plan panel no longer has a picker of its own; it follows the Student picker at the top
+      // of the Enrollment page (the third filter, after Program and Academic semester).
+      await page.locator("select.field-input").nth(2).selectOption({ index: 1 });
       await expect(page.getByText("No curriculum is on file for this student.")).toBeVisible();
       await page.screenshot({ path: join(SHOTS, "study-plan-banner-1366.png"), fullPage: true });
     });
