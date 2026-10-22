@@ -30,7 +30,7 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from flask import Flask, Response, has_app_context, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event, func, inspect, or_, text
+from sqlalchemy import event, func, inspect, or_, text, true
 from sqlalchemy import event as _sa_event
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import get_history as _sa_get_history
@@ -12782,9 +12782,19 @@ def register_routes(app: Flask) -> None:
 
     # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def dashboard():
-        return jsonify(dashboard_stats(request.args))
+        """Staff see the whole school. A coordinator sees the same cards for their own caseload: the students
+        who have open work owned by their role, and only that work in the action list and the owner chart."""
+        account = current_account()
+        owner = ROLE_LABELS[account.role] if account.role in COORDINATOR_ROLES else None
+        filters = request.args
+        if owner:
+            filters = MultiDict(request.args)
+            filters["owner"] = owner
+        payload = dashboard_stats(filters, locked_owner=owner)
+        payload["viewer"] = {"role": account.role, "owner": owner}
+        return jsonify(payload)
 
     @app.route("/api/dashboard/drilldown")
     @require_api_login("staff")
@@ -20758,7 +20768,10 @@ def filtered_students_query(filters):
     return query
 
 
-def dashboard_stats(filters=None) -> dict:
+COORDINATOR_ROLES = ("academic_coordinator", "research_coordinator")
+
+
+def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     # The dashboard intentionally uses live SQL aggregates instead of cached
     # values so every completed workflow is visible immediately during the demo.
     filters = filters or {}
@@ -20848,6 +20861,7 @@ def dashboard_stats(filters=None) -> dict:
         db.session.query(Task.owner_role, func.count(Task.id))
         .filter(Task.student_id.in_(student_ids) if not empty else False)
         .filter(Task.status.in_(["Pending", "Overdue"]))
+        .filter(owner_task_clause(locked_owner) if locked_owner else true())
         .group_by(Task.owner_role)
         .order_by(func.count(Task.id).desc())
         .all()

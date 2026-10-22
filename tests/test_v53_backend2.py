@@ -370,13 +370,20 @@ class V53Backend2Tests(unittest.TestCase):
     # ------------------------------------------------------------------ I-066 (F-12)
     def test_each_coordinator_gets_a_dashboard_holding_only_their_own_work(self):
         labels = {"academic@usls.edu.ph": "Academic Coordinator", "research@usls.edu.ph": "Research Coordinator"}
+        with app.app_context():
+            from app import Task
+            student_id = Student.query.order_by(Student.id).first().id
+            for label in labels.values():  # the seed gives the Research Coordinator no open work, so plant one each
+                db.session.add(Task(student_id=student_id, title=f"Own work of the {label}", owner_role=label,
+                                    due_at=date.today() + timedelta(days=3), status="Pending", priority=99))
+            db.session.commit()
         for email, label in labels.items():
             client = sign_in(email)
             response = client.get("/api/dashboard")
             self.assertEqual(response.status_code, 200, (email, response.get_json()))
             payload = response.get_json()
             tasks = payload["open_tasks"]
-            self.assertTrue(tasks, email)
+            self.assertIn(f"Own work of the {label}", [task["title"] for task in tasks], email)
             self.assertEqual({task["owner_role"] for task in tasks}, {label}, email)
             self.assertEqual([row["owner"] for row in payload["tasks_by_owner"]], [label], email)
             own = client.get("/api/tasks", query_string={"owner": label, "page_size": 200}).get_json()
