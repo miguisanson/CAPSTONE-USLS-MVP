@@ -4974,7 +4974,9 @@ def require_api_login(*roles):
 def require_workflow_actor(*roles) -> UserAccount:
     """Enforce the configured owner for a workflow transition."""
     account = current_account()
-    if not account or account.role not in roles:
+    # Admin acts as Graduate School staff (the same mapping as leave_workflow.role_key).
+    acting_role = "staff" if account and account.role == "admin" else (account.role if account else None)
+    if not account or acting_role not in roles:
         expected = " or ".join(ROLE_LABELS[role] for role in roles)
         raise ValueError(f"This step must be completed by {expected}.")
     return account
