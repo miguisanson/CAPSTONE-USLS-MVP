@@ -194,7 +194,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
         <div className="flex items-center gap-2">
           <StatusChip status={requirement.status_label} dot={false} />
           <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
-            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading..." : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
+            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
             <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
           </Button>
         </div>
@@ -342,7 +342,7 @@ function RevisionSubmitForm({ followUp, onSaved }) {
           <input type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
         </label>
       </Field>
-      <SubmitState busy={busy} error={error} message={message} label="Send revisions" disabled={!verdictId} />
+      <SubmitState busy={busy} error={error} message={message} label="Submit revisions" disabled={!verdictId} />
     </form>
   );
 }

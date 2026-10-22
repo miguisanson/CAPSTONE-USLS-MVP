@@ -88,6 +88,13 @@ export function lockedReasonFor(item, data) {
   return item.lockedReasonFrom?.(data) || item.lockedReason;
 }
 
+// One word for "nothing has been filed yet" on every student request page (the server says "Not Submitted" for a
+// practicum or graduation record, and "No request" was written by hand elsewhere).
+export const NOT_SUBMITTED = "Not submitted";
+export function requestStateLabel(status) {
+  return !status || /^(no request|not submitted)$/i.test(String(status).trim()) ? NOT_SUBMITTED : status;
+}
+
 export const REQUEST_ITEMS = REQUEST_GROUPS.flatMap((group) => group.items);
 export function findRequestItem(id) {
   return REQUEST_ITEMS.find((item) => item.id === id) || null;

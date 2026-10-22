@@ -11,23 +11,28 @@ import { PAGE } from "../lib/labels.js";
 
 // Staff and admin can focus the chat on a student record; every other signed-in
 // role (Dean, coordinators, faculty) asks policy questions and questions about their own queue.
-export default function Assistant({ policyOnly: policyOnlyProp = false }) {
+// The student portal uses this same page (`student`): it asks the student endpoints, about the student's own record.
+export default function Assistant({ policyOnly: policyOnlyProp = false, student = false }) {
   const { user } = useAuth();
-  const policyOnly = policyOnlyProp || !["staff", "admin"].includes(user?.role);
+  const policyOnly = student || policyOnlyProp || !["staff", "admin"].includes(user?.role);
   const [searchParams] = useSearchParams();
   const initialStudentId = searchParams.get("student_id");
   const initialQuestion = searchParams.get("q") || "";
   const { data: meta } = useApi(() => (policyOnly ? Promise.resolve(null) : api.meta()), [policyOnly]);
-  const { data: suggData } = useApi(() => api.assistantSuggestions(), []);
+  const { data: suggData } = useApi(() => (student ? api.studentAssistantSuggestions() : api.assistantSuggestions()), [student]);
   const [studentId, setStudentId] = useState(initialStudentId ? Number(initialStudentId) : null);
   const [studentLabel, setStudentLabel] = useState(searchParams.get("student_label") || "");
 
-  const scope = policyOnly
+  const scope = student
+    ? "Policy documents and your own record only"
+    : policyOnly
     ? "Policy documents and your own queue"
     : studentId
       ? `Focused on ${studentLabel.split(" - ")[1] || "a student"}`
       : "General · policy documents and all students";
-  const greeting = policyOnly
+  const greeting = student
+    ? "Hi! I'm the Policy Assistant. I answer from the Graduate School policy documents and the record connected to your account, and show the document, page and section behind every policy answer. Ask about a procedure, a form or a deadline, or what your next step is."
+    : policyOnly
     ? "Hi! I'm the Policy Assistant. I answer from the Graduate School policy documents and show the document, page and section behind every answer. Ask what is waiting on you, or any question about policy, forms, procedures or deadlines."
     : "Hi! I'm the Policy Assistant. Ask about a student's status, what is waiting on you, or Graduate School policy. I answer from live records and the policy documents, and I say so when the documents do not cover a question.";
 
@@ -42,7 +47,7 @@ export default function Assistant({ policyOnly: policyOnlyProp = false }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <AssistantChat
-            ask={(question) => api.assistant(question, policyOnly ? null : studentId)}
+            ask={(question) => (student ? api.studentAssistant(question) : api.assistant(question, policyOnly ? null : studentId))}
             greeting={greeting}
             suggestions={suggData?.items || []}
             scope={scope}
@@ -73,6 +78,12 @@ export default function Assistant({ policyOnly: policyOnlyProp = false }) {
               <li>If the documents do not cover a question, it says so instead of guessing.</li>
               <li>Questions like &ldquo;what is my next step?&rdquo; use only your own record or queue.</li>
               <li>An &ldquo;Offline answer&rdquo; label means Gemini was not used and the answer is a keyword match.</li>
+              {student && (
+                <li>
+                  Private and read-only: the assistant uses the record connected to your signed-in account. It cannot see other students
+                  or change grades, enrollment, requests or official records.
+                </li>
+              )}
             </ul>
           </SectionCard>
         </div>

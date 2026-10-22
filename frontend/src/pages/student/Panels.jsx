@@ -13,6 +13,7 @@ import {
 import { api } from "../../api";
 import { Button, Card, EmptyState, HistoryPanel, InlineNotice, SectionTitle, StatusChip, Stepper } from "../../components/ui/index.js";
 import { ProgressBar } from "../../components/ui/ProgressBar.jsx";
+import { NOT_SUBMITTED, requestStateLabel } from "./requestMeta";
 import { stageSteps } from "../../lib/stages";
 import { RESEARCH_GATE_KEYS } from "./shared";
 import { PAGE } from "../../lib/labels.js";
@@ -69,7 +70,7 @@ export function WorkflowStatusPanel({ data }) {
   rows.push({
     label: "Withdrawal",
     icon: LogOut,
-    status: data.withdrawal_application?.status || "No request",
+    status: data.withdrawal_application?.status || NOT_SUBMITTED,
     detail: data.withdrawal_application
       ? `Dean: ${data.withdrawal_application.dean_decision} · requirements: ${data.withdrawal_application.requirement_status}`
       : "No withdrawal request is active.",
@@ -105,7 +106,7 @@ export function WorkflowStatusPanel({ data }) {
                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
                   <Icon className="h-4 w-4 text-brand-700" /> {row.label}
                 </span>
-                <StatusChip status={row.status} dot={false} />
+                <StatusChip status={requestStateLabel(row.status)} dot={false} />
               </div>
               <p className="meta leading-relaxed">{row.detail}</p>
             </div>

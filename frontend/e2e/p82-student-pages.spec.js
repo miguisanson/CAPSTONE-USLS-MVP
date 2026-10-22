@@ -637,7 +637,7 @@ test.describe("P82 changes: the Defense Schedule page", () => {
     try {
       await open(s.page, "/student/defense-schedule");
       await expect(chip(s.page)).not.toContainText("Finished");
-      await expect(chip(s.page)).toContainText("No request");
+      await expect(chip(s.page)).toContainText("Not submitted");
       await expect(main(s.page).getByRole("button", { name: "Submit schedule request" })).toBeVisible();
       // the list below still shows the finished defense as Finished
       await expect(cardOf(s.page, "Schedule requests")).toContainText("Finished");
@@ -846,9 +846,9 @@ test.describe("P82 changes: request forms show an error summary on submit", () =
     try {
       await page.goto("/student/requests/withdrawal");
       await expect(ctl(page, "Reason for withdrawing from this subject")).not.toHaveAttribute("required", /.*/);
-      await expectSummaryOnSubmit(page, writes, "Send withdrawal request", [["Reason for withdrawing from this subject", "Explain why you are withdrawing from this subject."]], { prefix: "requests/withdrawal" });
+      await expectSummaryOnSubmit(page, writes, "Submit withdrawal request", [["Reason for withdrawing from this subject", "Explain why you are withdrawing from this subject."]], { prefix: "requests/withdrawal" });
       await ctl(page, "Reason for withdrawing from this subject").fill("Spec: schedule clash.");
-      await submitButton(page, "Send withdrawal request").click();
+      await submitButton(page, "Submit withdrawal request").click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/withdrawal").body).toMatchObject({ reason: "Spec: schedule clash.", subject_enrollment_id: 901 });
     } finally {

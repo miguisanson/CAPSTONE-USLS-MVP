@@ -374,7 +374,7 @@ test.describe("conD: student pages that are alike behave alike", () => {
     }
     // the leave pages without their leave information
     for (const path of [PAGES.loa.path, PAGES.readmission.path]) {
-      const { context, page } = await ctxFor(browser, STUDENT, { mutate: (d) => { d.leave_overview = null; } });
+      const { context, page } = await ctxFor(browser, STUDENT, { mutate: (d) => { d.leave_overview = null; d.student.standing = "On Leave"; } });
       try {
         await page.goto(path);
         await failing(page, "Could not load your leave information");

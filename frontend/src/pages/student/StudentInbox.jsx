@@ -171,7 +171,7 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
                 <Textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Write your question about this request." />
               </Field>
               <Button type="submit" icon={Send} loading={questionBusy} disabled={!question.trim()}>
-                {questionBusy ? "Sending..." : "Send question"}
+                {questionBusy ? "Sending…" : "Send question"}
               </Button>
             </div>
           </div>
@@ -221,7 +221,7 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
                         <label className="meta font-semibold text-slate-600" htmlFor={`student-inbox-reply-${key}`}>Reply to {message.sender_name || message.sender_role || "staff"}</label>
                         <Textarea id={`student-inbox-reply-${key}`} value={drafts[key] || ""} onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-24" placeholder="Explain what you updated or ask a follow-up question." />
                         <Button icon={Send} loading={busyId === key} disabled={!(drafts[key] || "").trim()} onClick={() => sendReply(message, key)} className="mt-3">
-                          {busyId === key ? "Sending..." : "Send reply"}
+                          {busyId === key ? "Sending…" : "Send reply"}
                         </Button>
                       </div>
                     ) : null}

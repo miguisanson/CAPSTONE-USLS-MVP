@@ -6,7 +6,7 @@ import { useApi } from "../../hooks";
 import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionCard, Spinner, StatusChip } from "../../components/ui/index.js";
 import CalendarView, { CalendarLegend } from "../../components/calendar/CalendarView";
 import CalendarFeedCard from "../../components/calendar/CalendarFeedCard";
-import { daysPhrase, fmtDay } from "./shared";
+import { LoadError, daysPhrase, fmtDay } from "./shared";
 import { PAGE } from "../../lib/labels.js";
 
 const timeOf = (value) => (value ? String(value).slice(11, 16) : "");
@@ -187,7 +187,7 @@ function SelectedCard({ selected, onClose }) {
 }
 
 export default function StudentCalendarPage() {
-  const { data, loading, error } = useApi(() => api.studentResearchCalendar(), []);
+  const { data, loading, error, refetch } = useApi(() => api.studentResearchCalendar(), []);
   const [anchor, setAnchor] = useState(() => new Date());
   const [view, setView] = useState("agenda");
   const [selected, setSelected] = useState(null);
@@ -199,8 +199,8 @@ export default function StudentCalendarPage() {
         description="Your defense date, the deadlines that lead to it, and a link to put them in your own calendar. All times are Philippine time."
         icon={CalendarDays}
       />
-      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-      {loading && !data && <Card pad="lg"><Spinner label="Loading your calendar..." /></Card>}
+      {error && <LoadError title="Could not load your calendar" onRetry={refetch}>{error}</LoadError>}
+      {loading && !data && <Card pad="lg"><Spinner label="Loading your calendar…" /></Card>}
       {data && (
         <>
           <AdviserLine adviser={data.adviser} />

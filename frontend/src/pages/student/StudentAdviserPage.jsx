@@ -4,7 +4,7 @@ import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionCard, Select, Spinner, StatusChip, Stepper, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
-import { daysPhrase, fmtDay } from "./shared";
+import { LoadError, daysPhrase, fmtDay } from "./shared";
 import { PAGE } from "../../lib/labels.js";
 
 // Small local hook: run one API action, show its error, refetch the page after success.
@@ -121,7 +121,7 @@ function ChangeForm({ tracker, onChanged }) {
         <Textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={600} required />
       </Field>
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-      <Button type="submit" loading={busy} disabled={!valid}>{busy ? "Sending..." : "Send change request"}</Button>
+      <Button type="submit" loading={busy} disabled={!valid}>{busy ? "Sending…" : "Send change request"}</Button>
     </form>
   );
 }
@@ -244,7 +244,7 @@ function ApplyForm({ tracker, onChanged }) {
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
         </Field>
         {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-        <Button type="submit" loading={busy} disabled={!facultyId}>{busy ? "Sending..." : "Send Form 3 application"}</Button>
+        <Button type="submit" loading={busy} disabled={!facultyId}>{busy ? "Sending…" : "Send Form 3 application"}</Button>
       </form>
     </SectionCard>
   );
@@ -287,7 +287,7 @@ export default function StudentAdviserPage() {
         description="You nominate an adviser on Form 3. The Academic Coordinator notes it, the Dean decides, and the adviser accepts. Then you email Forms 3.2 and 3.3 to the Research Coordinator within a few days."
       />
       {loading && !tracker && <Card pad="lg"><Spinner /></Card>}
-      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      {error && <LoadError title="Could not load your adviser" onRetry={refetch}>{error}</LoadError>}
       {tracker && (
         <>
           {tracker.current && <CurrentCard tracker={tracker} onChanged={refetch} />}

@@ -1,11 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
-import { BookPlus, Bot, FileUp, History, Mail, UserRound } from "lucide-react";
+import { BookPlus, FileUp, History, Mail, UserRound } from "lucide-react";
 import { Button, Card, EmptyState, PageHeader, SectionCard, StatusChip } from "../../components/ui/index.js";
 import { useStudentPortal } from "./StudentPortalContext";
 import { RESEARCH_GATE_KEYS } from "./shared";
 import { ActivityPanel, AdministrativeDocumentsPanel } from "./Panels";
 import { MyCoursesPanel } from "./MyCourses";
-import { StudentPolicyAssistant } from "./StudentAssistant";
+import Assistant from "../Assistant";
 import { StudentInbox } from "./StudentInbox";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
 import { PAGE } from "../../lib/labels.js";
@@ -77,16 +77,7 @@ export function StudentActivityPage() {
 }
 
 export function StudentAssistantPage() {
-  return (
-    <div className="page-stack animate-fade-up">
-      <PageHeader
-        title={PAGE.assistant}
-        description="Ask about the Graduate School manual, procedures, or your own academic record."
-        icon={Bot}
-      />
-      <StudentPolicyAssistant />
-    </div>
-  );
+  return <Assistant student />;
 }
 
 function ProfileRow({ label, children }) {

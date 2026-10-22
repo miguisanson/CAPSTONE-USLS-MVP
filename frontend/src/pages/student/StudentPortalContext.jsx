@@ -1,11 +1,10 @@
 import { createContext, useContext, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, EmptyState, Spinner } from "../../components/ui/index.js";
+import { Card, Spinner } from "../../components/ui/index.js";
 import { PortalNavProvider } from "../../components/portalNav";
-import { StudentPortalSectionBoundary } from "./shared";
+import { LoadError, StudentPortalSectionBoundary } from "./shared";
 
 const StudentPortalContext = createContext(null);
 
@@ -35,21 +34,17 @@ export function useStudentPortal() {
 // Wraps every student route: shared loading / error states plus an error
 // boundary so one broken page never takes the whole portal down.
 export function StudentGate({ children }) {
-  const { data, loading, error } = useStudentPortal();
+  const { data, loading, error, refetch } = useStudentPortal();
   const location = useLocation();
   if (loading && !data) {
     return (
       <Card pad="lg">
-        <Spinner label="Loading student portal..." />
+        <Spinner label="Loading student portal…" />
       </Card>
     );
   }
   if (error && !data) {
-    return (
-      <Card pad="lg">
-        <EmptyState icon={AlertTriangle} title="Could not load your student portal" hint={error} />
-      </Card>
-    );
+    return <LoadError title="Could not load your student portal" onRetry={refetch}>{error}</LoadError>;
   }
   if (!data?.student) return null;
   return <StudentPortalSectionBoundary view={location.pathname}>{children}</StudentPortalSectionBoundary>;
