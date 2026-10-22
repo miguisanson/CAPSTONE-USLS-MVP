@@ -8,9 +8,11 @@ ode_modules` so the main node_modules is not deleted):**
   - `be` / `pkt/be` — backend P1 bugs I-010, I-012, I-005, I-002 (test commit then fix commit each; new `tests/test_section_j_backend.py`). The only app.py editor.
   - `fac` / `pkt/fac` — Phase 5 P5.1+P5.2 faculty pages (spec `e2e/p51-faculty.spec.js`, port 5302).
   - `mon` / `pkt/mon` — Phase 5 P6.4 MonitoringGrid/EnrollmentClassList/AdviserRecordCard (spec `e2e/p64-monitoring-pages.spec.js`, port 5303).
-  - `wf` / `pkt/wf` — Phase 5 P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/` (port 5304).
+  - MERGED `pkt/wf` (P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/`); e2e after it -> `E:/Temp/claude/gate53/e2e_after_wf.txt`.
+  - `wf2` / `pkt/wf2` — dead code in workflow/ + restyle P7.5 of shared/WorkflowPage/HandoffImport/CourseAudit/ResearchGate/PanelMatching (spec `e2e/p75-workflow-pages.spec.js`, port 5304).
   - `review` (detached, read-only) — one-time Fable full review -> `E:/Temp/claude/review53/FULL-REVIEW.md` (port 5310).
   - web UX research (Sonnet, read-only) -> `E:/Temp/claude/review53/UX-RESEARCH.md`.
+- UX research saved: `.planning/research/UX-RESEARCH-2026-10-22.md` (top 15 checks at the end).
 - **Baseline gate** on v5.3 start: running -> `E:/Temp/claude/gate53/baseline.txt`.
 - **Next:** review + merge each packet one at a time (gate after each), file the Fable findings into ISSUES.md and plan the next waves from them.
 
