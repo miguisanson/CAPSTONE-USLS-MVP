@@ -38,6 +38,7 @@ from app import (  # noqa: E402
     graduation_candidate_payload,
     graduation_eligibility,
     required_documents_for_gate,
+    seed_database,
 )
 
 
@@ -215,6 +216,45 @@ class SectionJBackendTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200, (query, response.get_json()))
             numbers = [item["student_number"] for item in response.get_json()["items"]]
             self.assertIn("GS-2026-TEST", numbers, query)
+
+
+    # ------------------------------------------------------------------ I-002 (J2)
+    def test_demo_reset_leaves_single_student_enrollment_working(self):
+        """J2: after the enrollment demo reset, enrolling one seeded student in an offered subject succeeds."""
+        with app.app_context():
+            seed_database()
+            student = Student.query.filter_by(student_number="GS-2026-ENR-01").one()
+            student_id = student.id
+            term = AcademicTerm.query.filter_by(label="AY 2026-2027 2nd Semester").one()
+            term_id = term.id
+            course = Course.query.filter_by(program_id=student.program_id, code="MAED-MAJ2").one()
+            course_id = course.id
+            staff_id = UserAccount.query.filter_by(email="staff@usls.edu.ph").one().id
+            if not CurriculumOffering.query.filter_by(
+                program_id=student.program_id, academic_year="2026-2027", semester="2nd Semester", course_id=course_id,
+            ).first():
+                db.session.add(CurriculumOffering(
+                    program_id=student.program_id, academic_year="2026-2027", semester="2nd Semester",
+                    course_id=course_id, added_by="Test",
+                ))
+            db.session.commit()
+
+        reset = app.test_client().post("/api/auth/demo-students/enrollment-clarissa/reset", json={})
+        self.assertEqual(reset.status_code, 200, reset.get_json())
+
+        staff = self._role_client(staff_id, "staff")
+        saved = staff.post("/api/enrollment", json={
+            "student_id": student_id,
+            "term_id": term_id,
+            "course_ids": [course_id],
+            "resolutions": {},
+            "source_reference": "Section J regression",
+            "confirmed": True,
+        })
+        self.assertEqual(saved.status_code, 200, saved.get_json())
+        with app.app_context():
+            row = SubjectEnrollment.query.filter_by(student_id=student_id, course_id=course_id, term_id=term_id).one()
+            self.assertIn(row.status, {"Enrolled", "Current"})
 
 
 if __name__ == "__main__":
