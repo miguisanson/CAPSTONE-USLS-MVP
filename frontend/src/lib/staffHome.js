@@ -57,14 +57,41 @@ const TITLE_TARGETS = [
 // The Students page is for Graduate School staff, the administrator and the Academic Coordinator.
 const CAN_OPEN_STUDENTS = new Set(["staff", "admin", "academic_coordinator"]);
 
+// I-109: the pages a coordinator can open (the same lists as the sidebar in components/Layout.jsx and the server's
+// ROLE_TRANSACTION_ACCESS). Staff and the administrator open everything, so they have no entry. A task's link must
+// never lead a role to a page it cannot open.
+const COORDINATOR_PAGES = Object.freeze({
+  academic_coordinator: new Set([
+    "/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment",
+    "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum",
+    "/workflow/graduation", "/workflow/awol", "/work-queue",
+  ]),
+  research_coordinator: new Set([
+    "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation",
+    "/monitoring-sheet", "/work-queue",
+  ]),
+});
+const canOpen = (to, role) => {
+  const pages = COORDINATOR_PAGES[role];
+  if (!pages) return true;
+  const path = String(to).split(/[?#]/)[0];
+  return pages.has(path) || (path.startsWith("/students/") && pages.has("/students"));
+};
+
 /**
  * Where "Open" leads for one of the viewer's own tasks: the task's own action_url, else the workflow page its title
- * names, else the student's record (when the role has a Students page), else the work queue.
+ * names - either only if the role can open it - else the student's record (when the role has a Students page), else
+ * the work queue.
  * @returns { to, label }
  */
 export function taskTarget(task, role) {
-  if (task.action_url) return { to: task.action_url, label: task.action_label || "Open" };
-  for (const [pattern, to, label] of TITLE_TARGETS) if (pattern.test(task.title || "")) return { to, label };
+  if (task.action_url && canOpen(task.action_url, role)) return { to: task.action_url, label: task.action_label || "Open" };
+  for (const [pattern, to, label] of TITLE_TARGETS) {
+    if (pattern.test(task.title || "")) {
+      if (canOpen(to, role)) return { to, label };
+      break; // the page the title names is not this role's: fall through to the record or the queue
+    }
+  }
   if (task.student_id && CAN_OPEN_STUDENTS.has(role)) return { to: `/students/${task.student_id}`, label: "Student record" };
   return { to: "/work-queue", label: "Work Queue" };
 }
@@ -105,29 +132,54 @@ export function officeActions(tasks, role, { now = new Date(), limit = MAX_ACTIO
   };
 }
 
+const pluralWord = (word) => (/s$/i.test(word) ? word : /[^aeiou]y$/i.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`);
+/** "Review automatic AWOL policy alert" x 3 -> "3 automatic AWOL policy alerts"; any other title -> "Title (3)". */
+function groupTitle(title, count) {
+  const rest = String(title).trim().replace(/^review\s+/i, "");
+  if (rest === String(title).trim()) return `${rest} (${count})`;
+  const words = rest.split(/\s+/);
+  words[words.length - 1] = pluralWord(words[words.length - 1]);
+  return `${count} ${words.join(" ")}`;
+}
+const MAX_NAMES = 3;
+const namesOf = (tasks) => {
+  const names = [...new Set(tasks.map((task) => task.student_name).filter(Boolean))];
+  return names.length > MAX_NAMES ? `${names.slice(0, MAX_NAMES).join(", ")} and ${names.length - MAX_NAMES} more` : names.join(", ");
+};
+
 /**
  * "Waiting on others": open tasks the viewer's office does not hold (another office, or the student). The viewer has
  * nothing to do for them, so they never appear under "Needs your action". Each row opens that owner's work queue.
- * @returns { items (all, overdue first), total }
+ * I-083: tasks with the same title held by the same owner (the system's automatic alerts) are ONE row with a count.
+ * @returns { items (overdue first), total (the tasks, not the rows) }
  */
 export function officeWaiting(tasks, role) {
   const office = officeOf(role);
   const held = sortTasks((tasks || []).filter((task) => ownerLabel(task.owner_role) !== office));
-  const items = held.map((task) => {
+  const groups = new Map(); // insertion order = the most urgent task of each group first
+  for (const task of held) {
+    const key = `${ownerLabel(task.owner_role)}|${String(task.title || "").trim().toLowerCase()}`;
+    groups.set(key, [...(groups.get(key) || []), task]);
+  }
+  const items = [...groups.values()].map((group) => {
+    const task = group[0]; // the most urgent of the group
     const owner = ownerLabel(task.owner_role) || "another office";
+    const overdue = group.some(isOverdue);
+    const many = group.length > 1;
     return {
-      key: `waiting-${task.id}`,
+      key: many ? `waiting-group-${task.id}` : `waiting-${task.id}`,
       kind: "waiting",
-      title: task.title,
-      detail: [`With the ${owner}.`, task.student_name].filter(Boolean).join(" "),
+      title: many ? groupTitle(task.title, group.length) : task.title,
+      detail: [`With the ${owner}.`, many ? namesOf(group) : task.student_name].filter(Boolean).join(" "),
       dueAt: task.due_at,
-      overdue: isOverdue(task),
+      overdue,
       tone: "neutral",
-      status: isOverdue(task) ? "Overdue" : task.status || "Pending",
+      status: overdue ? "Overdue" : task.status || "Pending",
       target: { to: workQueuePath(owner), label: "Work Queue" },
+      ...(many ? { count: group.length } : {}),
     };
   });
-  return { items, total: items.length };
+  return { items, total: held.length };
 }
 
 /**
