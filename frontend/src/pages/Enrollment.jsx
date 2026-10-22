@@ -376,6 +376,7 @@ export default function Enrollment() {
     {
       key: "demand",
       header: "Demand",
+      className: "whitespace-nowrap",
       cell: (course) => `${course.demand_count} student${course.demand_count === 1 ? "" : "s"}`,
     },
     {
