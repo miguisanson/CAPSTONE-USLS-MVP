@@ -14,12 +14,13 @@ const cx = (...parts) => parts.filter(Boolean).join(" ").replace(/\s+/g, " ").tr
  * @param title   what is missing, e.g. "No requests to show"
  * @param hint    one short sentence on what to do or when items will appear
  * @param action  a node (usually a Button) shown under the hint
- * @param size    "md" (default, a page or card) | "sm" (inside a table or a small panel)
+ * @param size    "md" (default, a page or card) | "sm" (inside a table, a board column or a small panel)
+ * Other props (data-testid, id) go to the outer element.
  */
-export function EmptyState({ icon: Icon, title, hint, action, size = "md", className = "" }) {
+export function EmptyState({ icon: Icon, title, hint, action, size = "md", className = "", ...rest }) {
   const small = size === "sm";
   return (
-    <div className={cx("flex flex-col items-center justify-center text-center", small ? "py-6" : "py-12", className)}>
+    <div className={cx("flex flex-col items-center justify-center text-center", small ? "py-6" : "py-12", className)} {...rest}>
       {Icon && (
         <span className={cx("grid place-items-center rounded-2xl bg-slate-100 text-slate-400", small ? "mb-2 h-10 w-10" : "mb-3 h-12 w-12")}>
           <Icon className={small ? "h-5 w-5" : "h-6 w-6"} aria-hidden="true" />

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Lock, Move } from "lucide-react";
-import { InlineNotice } from "./ui/index.js";
+import { ChevronLeft, ChevronRight, Inbox, Lock, Move } from "lucide-react";
+import { EmptyState, InlineNotice } from "./ui/index.js";
 
 /**
  * A staged board with real drag and drop (native HTML5, no dependency).
@@ -29,8 +29,11 @@ import { InlineNotice } from "./ui/index.js";
  *                  throw an Error (its message is shown) to refuse
  *   renderColumnHeader  (column, items) => node, to replace the default header
  *   renderColumnFooter  (column, items) => node
- *   emptyText      text for an empty column
- *   columnClassName  classes for each column (width etc.)
+ *   emptyText      text for an empty column (shown with the shared EmptyState)
+ *   columnClassName  classes for each column (width etc.); the default is a narrow column so more stages fit
+ *
+ * When the stages are wider than the screen the board says so: a line above it ("3 more stages to the right"),
+ * "Scroll board left/right" buttons (keyboard reachable) and a soft fade at the cut edge. Column titles wrap, never cut.
  *   ariaLabel      label for the scrolling region
  *   readOnly       turns drag and the menu off
  */
@@ -48,7 +51,7 @@ export default function StageBoard({
   renderColumnHeader,
   renderColumnFooter,
   emptyText = "Nothing here",
-  columnClassName = "w-[290px]",
+  columnClassName = "w-[248px]",
   ariaLabel = "Stage board",
   readOnly = false,
 }) {
@@ -57,6 +60,8 @@ export default function StageBoard({
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState(null); // { tone, text }
   const noticeTimer = useRef(null);
+  const regionRef = useRef(null);
+  const [hidden, setHidden] = useState({ left: 0, right: 0 }); // stages not fully in view on each side
 
   const columnByKey = useMemo(() => Object.fromEntries(columns.map((column) => [column.key, column])), [columns]);
   const itemById = useMemo(() => new Map(items.map((item) => [String(getItemId(item)), item])), [items, getItemId]);
@@ -67,6 +72,46 @@ export default function StageBoard({
     noticeTimer.current = window.setTimeout(() => setNotice(null), tone === "error" ? 9000 : 6000);
   }, []);
   useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
+
+  // Count the stages that are cut off (or out of sight) on each side of the scrolling box.
+  const measureHidden = useCallback(() => {
+    const region = regionRef.current;
+    if (!region) return;
+    const view = region.getBoundingClientRect();
+    let left = 0;
+    let right = 0;
+    region.querySelectorAll(":scope > div > section").forEach((section) => {
+      const box = section.getBoundingClientRect();
+      if (box.left < view.left - 1) left += 1;
+      else if (box.right > view.right + 1) right += 1;
+    });
+    setHidden((old) => (old.left === left && old.right === right ? old : { left, right }));
+  }, []);
+
+  useEffect(() => {
+    const region = regionRef.current;
+    if (!region) return undefined;
+    measureHidden();
+    region.addEventListener("scroll", measureHidden, { passive: true });
+    window.addEventListener("resize", measureHidden);
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(measureHidden) : null;
+    if (observer) {
+      observer.observe(region);
+      if (region.firstElementChild) observer.observe(region.firstElementChild);
+    }
+    return () => {
+      region.removeEventListener("scroll", measureHidden);
+      window.removeEventListener("resize", measureHidden);
+      if (observer) observer.disconnect();
+    };
+  }, [measureHidden, columns.length]);
+
+  const scrollBoard = useCallback((direction) => {
+    const region = regionRef.current;
+    if (!region) return;
+    const smooth = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    region.scrollBy({ left: direction * Math.max(200, region.clientWidth * 0.8), behavior: smooth ? "smooth" : "auto" });
+  }, []);
 
   const verdict = useCallback(
     (item, toKey) => {
@@ -152,13 +197,28 @@ export default function StageBoard({
           </InlineNotice>
         )}
       </div>
+      {(hidden.left > 0 || hidden.right > 0) && (
+        <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+          <p data-testid="board-scroll-hint" className="meta font-medium text-slate-600">
+            {hidden.right > 0
+              ? `${hidden.right} more ${hidden.right === 1 ? "stage" : "stages"} to the right →${
+                  hidden.left > 0 ? ` · ${hidden.left} to the left` : ""
+                }`
+              : `← ${hidden.left} ${hidden.left === 1 ? "stage" : "stages"} to the left`}
+          </p>
+          <ScrollButton direction="left" disabled={hidden.left === 0} onClick={() => scrollBoard(-1)} />
+          <ScrollButton direction="right" disabled={hidden.right === 0} onClick={() => scrollBoard(1)} />
+        </div>
+      )}
+      <div className="relative">
       <div
+        ref={regionRef}
         className="relative max-w-full overflow-x-auto rounded-xl pb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         role="region"
         aria-label={ariaLabel}
         tabIndex={0}
       >
-        <div className="flex w-max gap-4">
+        <div className="flex w-max gap-3">
           {columns.map((column) => {
             const columnItems = items.filter((item) => getColumnKey(item) === column.key);
             const isHover = hoverColumn === column.key && Boolean(draggedItem);
@@ -184,7 +244,7 @@ export default function StageBoard({
                 ) : (
                   <header className="mb-3">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="section-title">{column.label}</h3>
+                      <h3 className="section-title min-w-0 break-words">{column.label}</h3>
                       <span className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{columnItems.length}</span>
                     </div>
                     {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
@@ -229,7 +289,13 @@ export default function StageBoard({
                       );
                     })
                   ) : (
-                    <p className="meta rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center">{column.empty || emptyText}</p>
+                    <div data-testid="board-empty">
+                      {column.empty ? (
+                        <EmptyState size="sm" icon={Inbox} title="Nothing here" hint={column.empty} className="px-1" />
+                      ) : (
+                        <EmptyState size="sm" icon={Inbox} title={emptyText} className="px-1" />
+                      )}
+                    </div>
                   )}
                 </div>
                 {renderColumnFooter ? renderColumnFooter(column, columnItems) : null}
@@ -238,7 +304,30 @@ export default function StageBoard({
           })}
         </div>
       </div>
+      {hidden.right > 0 && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-xl bg-gradient-to-l from-canvas to-transparent" />
+      )}
+      {hidden.left > 0 && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-xl bg-gradient-to-r from-canvas to-transparent" />
+      )}
+      </div>
     </div>
+  );
+}
+
+// "Scroll board left/right": a real button, so a keyboard, a screen reader and a phone can reach stages that are out of sight.
+function ScrollButton({ direction, disabled, onClick }) {
+  const Icon = direction === "left" ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={`Scroll board ${direction}`}
+      className="inline-grid h-9 w-9 cursor-pointer place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors duration-200 hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-40 max-sm:h-11 max-sm:w-11"
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </button>
   );
 }
 

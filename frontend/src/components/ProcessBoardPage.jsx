@@ -496,7 +496,6 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
               renderColumnHeader={renderColumnHeader}
               renderColumnFooter={renderColumnFooter}
               emptyText={`No ${config.noun} here`}
-              columnClassName="w-[300px]"
               ariaLabel={config.boardLabel}
             />
           ) : filtered.length ? (
