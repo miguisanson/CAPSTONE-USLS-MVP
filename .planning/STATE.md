@@ -8,7 +8,9 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
   - MERGED `pkt/be2` (I-055..I-058, I-036, I-073; R-012).
   - `seed2` / `pkt/seed2` — the only app.py editor: seed quality I-060 advisers<=limit and never on own panel, I-062 Dean queues seeded, I-061 stage vs units/titles/departments, I-070 dates spread, I-094, I-095 (new `tests/test_seed_quality.py`, port 5311).
-  - `shell` / `pkt/shell` — sidebar clipped (I-103), course-audit nav (I-101), titles (I-112; one app.py string) (spec p81, port 5312).
+  - MERGED `pkt/shell` (I-103, I-101, I-112); RoleSidebar.jsx deleted (unused).
+  - `enr` / `pkt/enr` — Enrollment P6.7/P6.8 + one student picker (I-082) + jargon widget out (I-081 part) (spec p83, port 5315).
+  - Gate on 176b0cf running in `wt/gate`: python -> `E:/Temp/claude/gate53/gate_176b0cf.txt`, e2e (port 5330) -> `e2e_176b0cf.txt`. LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
   - `bpol` / `pkt/bpol` — flaky p74 (I-110), filter bar placeholder/390 (I-108, I-106), staff graduation wrapper + ProcessGates role copy (I-111) (port 5313).
   - `stu` / `pkt/stu` — student P4.3/P4.4 + I-087, I-086, form error summaries (spec p82, port 5314).
   - MERGED `pkt/vocab` (I-076..I-078, I-080). Folder `wt/vocab` is deregistered but a locked file kept it on disk - delete it after a reboot. Follow-up I-112.
