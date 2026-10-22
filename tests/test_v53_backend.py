@@ -193,6 +193,13 @@ class V53BackendTests(unittest.TestCase):
             allowed = ROLE_TRANSACTION_ACCESS[role]
             self.assertEqual([slug for slug in slugs if slug not in allowed], [], role)
 
+    # ------------------------------------------------------------------ I-073 (F-19)
+    def test_withdrawal_review_task_links_to_the_withdrawal_screen(self):
+        with app.app_context():
+            task = Task.query.filter_by(title="Review student withdrawal request").first()
+            self.assertIsNotNone(task)
+            self.assertEqual(task_dict(task)["action_url"], "/workflow/withdrawal")
+
 
 if __name__ == "__main__":
     unittest.main()
