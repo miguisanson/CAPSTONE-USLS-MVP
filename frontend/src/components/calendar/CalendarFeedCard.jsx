@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Rss, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { api } from "../../api";
-import { Card, ErrorNote, SectionTitle } from "../ui";
+import { Button, Card, InlineNotice, SectionTitle } from "../ui/index.js";
 import { useConfirm } from "../confirm";
 
 // "Subscribe in Google Calendar / Outlook / Apple Calendar": a private link that works without
@@ -65,34 +65,34 @@ export default function CalendarFeedCard() {
   }
 
   return (
-    <Card className="p-5">
+    <Card>
       <SectionTitle title="Subscribe to this calendar" subtitle="Defenses and deadlines in your own calendar app" icon={Rss} />
-      <ErrorNote message={error} />
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {feed === undefined ? (
-        <p className="text-sm text-slate-500">Loading...</p>
+        <p className="text-sm text-slate-500" role="status">Loading...</p>
       ) : feed ? (
         <div className="space-y-3">
           <div>
             <label htmlFor="calendar-feed-url" className="field-label">Your private link</label>
             <div className="flex gap-2">
               <input id="calendar-feed-url" readOnly className="field-input font-mono text-xs" value={feed.absolute_url} onFocus={(e) => e.target.select()} />
-              <button type="button" className="btn-ghost shrink-0 px-3" onClick={copy} aria-label="Copy link"><Copy className="h-4 w-4" /></button>
+              <Button variant="icon" icon={Copy} onClick={copy} aria-label="Copy link" />
             </div>
-            {copied && <p className="mt-1 text-xs font-semibold text-emerald-700" role="status">Copied.</p>}
+            {copied && <p className="mt-1 text-xs font-semibold text-brand-700" role="status">Copied.</p>}
           </div>
           <p className="text-xs leading-relaxed text-slate-500">
             In Google Calendar choose "Other calendars" then "From URL" and paste the link. Anyone with the link can see your calendar, so do not share it.
             {feed.last_used_at ? ` Last read ${new Date(feed.last_used_at).toLocaleString()}.` : " Not read yet."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn-ghost px-3 py-1.5 text-xs" disabled={busy} onClick={regenerate}><RefreshCw className="h-3.5 w-3.5" />New link</button>
-            <button type="button" className="btn-ghost px-3 py-1.5 text-xs text-red-700" disabled={busy} onClick={revoke}><Trash2 className="h-3.5 w-3.5" />Turn off</button>
+            <Button variant="secondary" size="sm" icon={RefreshCw} disabled={busy} onClick={regenerate}>New link</Button>
+            <Button variant="secondary" size="sm" icon={Trash2} className="text-red-700" disabled={busy} onClick={revoke}>Turn off</Button>
           </div>
         </div>
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-slate-600">Get a private link that keeps your phone or Google Calendar up to date with your defenses and deadlines.</p>
-          <button type="button" className="btn-primary text-xs" disabled={busy} onClick={regenerate}>{busy ? "Creating..." : "Create my private link"}</button>
+          <Button size="sm" loading={busy} onClick={regenerate}>{busy ? "Creating..." : "Create my private link"}</Button>
         </div>
       )}
     </Card>

@@ -1,6 +1,6 @@
 import { CornerDownRight, MessageSquare, Reply } from "lucide-react";
 import { formatDateTime } from "../lib/format";
-import { StatusBadge } from "./ui";
+import { Button, EmptyState, StatusChip } from "./ui/index.js";
 
 function messageTime(message) {
   const timestamp = new Date(message.created_at || 0).getTime();
@@ -75,14 +75,14 @@ export default function WorkflowDiscussion({
   return (
     <div className={embedded ? "" : "rounded-xl border border-slate-200 bg-white p-4"}>
       {showHeader && <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-          <MessageSquare className="h-4 w-4" /> {title}
+        <p className="eyebrow flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" aria-hidden="true" /> {title}
         </p>
-        <StatusBadge value={`${messages.length} message${messages.length === 1 ? "" : "s"}`} dot={false} />
+        <StatusChip status={`${messages.length} message${messages.length === 1 ? "" : "s"}`} tone="muted" dot={false} />
       </div>}
 
       {!thread.length ? (
-        <p className={`${showHeader ? "mt-3" : ""} rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500`}>{emptyText}</p>
+        <EmptyState size="sm" title={emptyText} className={`${showHeader ? "mt-3" : ""} rounded-xl bg-slate-50`} />
       ) : (
         <ol className={`${showHeader ? "mt-3" : ""} space-y-3`} aria-label={title}>
           {thread.map(({ message, depth, parent }, index) => {
@@ -101,37 +101,35 @@ export default function WorkflowDiscussion({
                 aria-label={depth > 0 ? `Reply level ${depth}` : "Discussion post"}
               >
                 {depth > 0 && <span aria-hidden="true" className="absolute -left-0.5 top-5 h-px w-3 bg-slate-200" />}
-                <article className={`rounded-xl border p-3 text-sm shadow-sm ${isHighlighted ? "border-emerald-300 bg-emerald-50" : latestOnlyHighlight ? "border-slate-200 bg-white" : depth > 0 ? "border-slate-200 bg-slate-50/80" : "border-slate-200 bg-white"}`}>
+                <article className={`rounded-xl border p-3 text-sm ${isHighlighted ? "border-brand-300 bg-brand-50" : latestOnlyHighlight ? "border-slate-200 bg-white" : depth > 0 ? "border-slate-200 bg-slate-50/80" : "border-slate-200 bg-white"}`}>
                   {parent && (
-                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-brand-700">
-                      <CornerDownRight className="h-3.5 w-3.5 shrink-0" />
+                    <p className="meta mb-2 flex items-center gap-1.5 font-semibold text-brand-700">
+                      <CornerDownRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       Replying to {senderLabel(parent)}
                     </p>
                   )}
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex min-w-0 items-start gap-2.5">
-                      <span aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${depth > 0 ? "bg-slate-200 text-slate-700" : "bg-brand-100 text-brand-800"}`}>
+                      <span aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${depth > 0 ? "bg-slate-200 text-slate-700" : "bg-brand-100 text-brand-800"}`}>
                         {senderInitial(message)}
                       </span>
                       <div className="min-w-0">
                         <p className="font-semibold leading-relaxed text-ink">
-                          {senderIdentity(message)} <span className="mx-1 text-slate-400">→</span> {message.recipient_role || "Recipient not recorded"}
+                          {senderIdentity(message)} <span className="mx-1 text-slate-500" aria-hidden="true">→</span> {message.recipient_role || "Recipient not recorded"}
                         </p>
                       </div>
                     </div>
                     <span className="flex flex-wrap gap-1.5">
-                      {latestOnlyHighlight && isLatest && <StatusBadge value="Latest" dot={false} />}
-                      {message.visibility && <StatusBadge value={message.visibility === "internal" ? "Internal" : "Student visible"} dot={false} />}
-                      <StatusBadge value={message.status || "Message"} dot={false} />
+                      {latestOnlyHighlight && isLatest && <StatusChip status="Latest" tone="success" dot={false} />}
+                      {message.visibility && <StatusChip status={message.visibility === "internal" ? "Internal" : "Student visible"} tone="muted" dot={false} />}
+                      <StatusChip status={message.status || "Message"} tone="muted" dot={false} />
                     </span>
                   </div>
                   {message.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{message.comment}</p>}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 pt-2.5">
-                    <time className="text-xs font-medium text-slate-500" dateTime={message.created_at || undefined}>{formatDateTime(message.created_at)}</time>
+                    <time className="meta font-medium" dateTime={message.created_at || undefined}>{formatDateTime(message.created_at)}</time>
                     {replyAllowed && (
-                      <button type="button" onClick={() => onReply(message)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors duration-200 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2">
-                        <Reply className="h-3.5 w-3.5" /> Reply
-                      </button>
+                      <Button variant="secondary" size="sm" icon={Reply} onClick={() => onReply(message)}>Reply</Button>
                     )}
                   </div>
                   {renderMessageFooter?.(message, key)}

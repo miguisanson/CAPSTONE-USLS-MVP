@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import { api } from "../../api";
+import { InlineNotice } from "../ui/index.js";
 import { longDate } from "./dates";
 
 // Live conflict check for a chosen slot. Waits ~400 ms after the last change, ignores
@@ -57,37 +58,30 @@ export default function SlotCheck({ check, className = "" }) {
   const { result, error, waiting, hard, soft } = check;
   return (
     <div className={`space-y-2 ${className}`} aria-live="polite">
-      {waiting && !result && <p className="text-xs text-slate-500">Checking this slot against the panel and the room...</p>}
-      {error && (
-        <p className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" /> {error}
-        </p>
-      )}
+      {waiting && !result && <p className="meta">Checking this slot against the panel and the room...</p>}
+      {error && <InlineNotice tone="neutral" icon={Info} className="text-xs">{error}</InlineNotice>}
       {result && hard.length > 0 && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <p className="flex items-center gap-2 font-semibold"><XCircle className="h-4 w-4" /> Cannot be booked</p>
+        <InlineNotice tone="danger" icon={XCircle} title="Cannot be booked" className="px-4">
           <ul className="mt-1.5 list-disc space-y-1 pl-6 text-xs">
             {hard.map((item) => <li key={item}>{item}</li>)}
           </ul>
-        </div>
+        </InlineNotice>
       )}
       {result && soft.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" /> Needs a reason</p>
+        <InlineNotice tone="warning" icon={AlertTriangle} title="Needs a reason" className="px-4">
           <ul className="mt-1.5 list-disc space-y-1 pl-6 text-xs">
             {soft.map((item) => <li key={item}>{item}</li>)}
           </ul>
           <p className="mt-1.5 text-xs">To book anyway, tick the override box below and write why.</p>
-        </div>
+        </InlineNotice>
       )}
       {result && hard.length === 0 && soft.length === 0 && (
-        <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-          <CheckCircle2 className="h-4 w-4" /> No conflicts found
-          <span className="text-xs font-normal">({result.matched_count} of {result.participant_count} checked)</span>
-        </p>
+        <InlineNotice tone="success" icon={CheckCircle2} className="px-4">
+          No conflicts found <span className="text-xs font-normal">({result.matched_count} of {result.participant_count} checked)</span>
+        </InlineNotice>
       )}
       {result?.earliest_date && (
-        <p className="text-xs text-slate-500">
+        <p className="meta">
           Earliest allowed date: {longDate(result.earliest_date)}{result.lead_days ? ` (${result.lead_days}-day lead time)` : ""}.
           {" "}Times are Philippine time.
         </p>

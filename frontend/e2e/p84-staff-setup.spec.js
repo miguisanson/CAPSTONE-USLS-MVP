@@ -464,7 +464,7 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     expect(box.height / data.demand.length, `average row height ${Math.round(box.height / data.demand.length)} px`).toBeLessThan(96);
     // the stacked cards of the old page are gone
     await expect(main(page).getByText(/^Show the \d+ affected students?$/)).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(4000);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(4300); // was 4,790 px before P6.5; real subject titles add lines (I-117 merges the two subject lists)
     for (const view of VIEWS.slice(1)) {
       await page.setViewportSize(view);
       expect(await noOverflow(page), `sideways scroll at ${view.width}`).toBe(true);

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ChevronDown, Scale } from "lucide-react";
+import { ChevronDown, Scale } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
+import { StatusChip } from "./ui/index.js";
 
 // "14 days", "Yes", "1.75 grade" — one place so the page and the workflow
 // screens always show a rule value the same way.
@@ -17,15 +18,11 @@ export function RuleBadges({ rule }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       {rule.enforced ? (
-        <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700 ring-1 ring-inset ring-brand-200">Enforced by the system</span>
+        <StatusChip status="Enforced by the system" tone="good" size="sm" dot={false} />
       ) : (
-        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-inset ring-slate-200">Documented only</span>
+        <StatusChip status="Documented only" tone="muted" size="sm" dot={false} />
       )}
-      {rule.status === "needs_review" && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 ring-1 ring-inset ring-amber-200">
-          <AlertTriangle className="h-3 w-3" aria-hidden="true" /> Needs review
-        </span>
-      )}
+      {rule.status === "needs_review" && <StatusChip status="Needs review" size="sm" dot={false} />}
     </span>
   );
 }
@@ -52,15 +49,15 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
         className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
       >
         <span className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-100 text-brand-700"><Scale className="h-4 w-4" aria-hidden="true" /></span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700"><Scale className="h-4 w-4" aria-hidden="true" /></span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-ink">{title}</span>
-            <span className="block truncate text-xs text-slate-500">
+            <span className="meta block truncate">
               {items.length} rule{items.length === 1 ? "" : "s"} from the Graduate School policies{needsReview ? ` · ${needsReview} need${needsReview === 1 ? "s" : ""} review` : ""}
             </span>
           </span>
         </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
         <div className="space-y-3 border-t border-brand-100 px-4 pb-4 pt-3">
@@ -68,16 +65,16 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
             <div key={rule.key} className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="min-w-0 flex-1 text-sm font-semibold text-ink">{rule.title}</p>
-                <span className="shrink-0 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-bold text-white">{formatRuleValue(rule)}</span>
+                <span className="shrink-0 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white">{formatRuleValue(rule)}</span>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">{rule.description}</p>
-              <p className="mt-1.5 text-xs font-semibold text-brand-800">Source: {rule.citation}{rule.source_section ? ` (${rule.source_section})` : ""}</p>
+              <p className="meta mt-1 leading-relaxed text-slate-600">{rule.description}</p>
+              <p className="meta mt-1.5 font-semibold text-brand-800">Source: {rule.citation}{rule.source_section ? ` (${rule.source_section})` : ""}</p>
               <div className="mt-1.5"><RuleBadges rule={rule} /></div>
-              {!rule.enforced && rule.not_enforced_reason && <p className="mt-1 text-[11px] text-slate-500">{rule.not_enforced_reason}</p>}
+              {!rule.enforced && rule.not_enforced_reason && <p className="micro mt-1">{rule.not_enforced_reason}</p>}
             </div>
           ))}
           {canOpenPage && (
-            <p className="text-right text-xs"><Link to="/business-rules" className="font-semibold text-brand-700 underline-offset-2 hover:underline">See every business rule and its history</Link></p>
+            <p className="meta text-right"><Link to="/business-rules" className="font-semibold text-brand-700 underline-offset-2 hover:underline">See every business rule and its history</Link></p>
           )}
         </div>
       )}
