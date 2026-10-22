@@ -382,7 +382,7 @@ test.describe("Enrollment Class List (GS staff)", () => {
     await sidebarLink(page, "Enrollment Class List").click();
     await expect(page).toHaveURL(/\/enrollment-class-list$/);
     await expect(heading1(page, "Enrollment Class List")).toBeVisible();
-    await expect(page.getByText("Enrollment record", { exact: true })).toBeVisible();
+    // (P6.4: the small "Enrollment record" line above the title is gone; PageHeader has no eyebrow.)
     await expect(page.getByText("Read-only class rosters synchronized automatically with confirmed Enrollment records.")).toBeVisible();
     await expect(page.getByText("Read-only roster.")).toBeVisible();
     await expect(page.getByText(/Confirm or change enrollment in the Enrollment workspace; this list updates automatically/)).toBeVisible();
@@ -427,17 +427,20 @@ test.describe("Enrollment Class List (GS staff)", () => {
     // CSV of the single class first
     const [single] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);
     expect(single.suggestedFilename()).toBe(`class-list-${(await okJson(await page.request.get("/api/monitoring/class-list"), "cl")).selected_offering.course_code}.csv`);
-    const singleText = readFileSync(await single.path(), "utf8").split("\n");
+    const singleRaw = readFileSync(await single.path(), "utf8");
+    expect(singleRaw.charCodeAt(0), "byte-order mark (P6.4)").toBe(0xfeff);
+    const singleText = singleRaw.slice(1).split("\r\n");
     expect(singleText[0]).toBe('"Subject","Faculty","Student","IDNO","Program","Status","Enrolled at","Source"');
-    expect(singleText.join("\n")).toContain('"Mendoza, Bianca","2560052","DBA","Enrolled"');
+    expect(singleText.join("\r\n")).toContain('"Mendoza, Bianca","2560052","DBA","Enrolled"');
 
     await page.getByLabel("Class list view", { exact: true }).selectOption("all");
     await expect(page.getByText("All class lists", { exact: true }).filter({ visible: true }).first()).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: `${data.program.code} · ${data.term.label}` })).toBeVisible();
     await expect(page.getByText("Every offered class is expanded below for one-page review.")).toBeVisible();
-    await expect(page.getByText(`${data.summary.offered_classes} classes`, { exact: true })).toBeVisible();
-    await expect(page.getByText(`${data.summary.class_list_entries} roster entries`, { exact: true })).toBeVisible();
-    await expect(page.getByText(`${data.summary.unique_students} students`, { exact: true })).toBeVisible();
+    const n = (value, one, many) => `${value} ${value === 1 ? one : many}`;
+    await expect(page.getByText(n(data.summary.offered_classes, "class", "classes"), { exact: true })).toBeVisible();
+    await expect(page.getByText(n(data.summary.class_list_entries, "roster entry", "roster entries"), { exact: true })).toBeVisible();
+    await expect(page.getByText(n(data.summary.unique_students, "student", "students"), { exact: true })).toBeVisible(); // P6.4: "1 student", not "1 students"
     await expect(page.locator("main table")).toHaveCount(data.class_lists.length);
     for (const list of data.class_lists) {
       await expect(page.getByRole("heading", { level: 3, name: `${list.offering.course_code} — ${list.offering.course_title}` })).toBeVisible();
