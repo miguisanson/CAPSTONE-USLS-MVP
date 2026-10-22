@@ -639,7 +639,10 @@ class QueueAndRiskTests(CrossCutBase):
             db.session.add(Task(student_id=self.student_id, title="Late thing", owner_role="Graduate School Staff",
                                 due_at=date.today() - timedelta(days=9), status="Pending", priority=10))
             db.session.commit()
-            app_module._RISK_REFRESH_STATE["at"] -= 10_000  # the refresh window has passed
+            # A page view only reads (I-071): the stored level changes when the refresh runs, not when the
+            # dashboard is opened. The staff dashboard's Refresh button posts to this endpoint.
+            self.assertEqual(staff.get("/api/dashboard").get_json()["kpis"]["at_risk"], 0)
+            self.assertEqual(staff.post("/api/maintenance/refresh", json={}).status_code, 200)
             kpis = staff.get("/api/dashboard").get_json()["kpis"]
             self.assertEqual(kpis["at_risk"], 1)
             # The student page, the students list and the dashboard agree on the same student.

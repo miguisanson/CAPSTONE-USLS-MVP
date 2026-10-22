@@ -720,7 +720,7 @@ class BusinessRulesTests(unittest.TestCase):
         terms = self._loa_terms()
         with app.app_context():
             student = db.session.get(Student, self.student_id)
-            from app import add_log
+            from app import add_log, adopt_legacy_leave_logs
             add_log(
                 "leave-of-absence", student.id, "Dean", "Test", "LOA approved by Dean", "Student",
                 f"Requested semester period: {terms[0]} to {terms[1]}.",
@@ -729,6 +729,8 @@ class BusinessRulesTests(unittest.TestCase):
                 "leave-of-absence", student.id, "Dean", "Test", "LOA approved by Dean", "Student",
                 f"Requested semester period: {terms[2]} to {terms[3]}.",
             )
+            db.session.commit()
+            adopt_legacy_leave_logs()  # old log-only leaves become cases by the explicit sweep, not on a read (I-071)
             db.session.commit()
             request = {"reason_category": "Medical / health", "reason_remarks": "Renewal",
                        "application_reference": "Portal form", "effective_start": terms[4], "effective_end": terms[4]}
