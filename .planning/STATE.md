@@ -1,25 +1,27 @@
 # State
 
-## HANDOFF AT USAGE LIMIT (2026-10-22 evening) — do this first
+## PAUSED BY THE OWNER (2026-10-22 night) — read this first
 
-Branch `v5.3-migui_test` is pushed and green at the last merge (python gate 661 OK on e7be427; later merges were
-frontend-only, each checked with targeted e2e). Three helpers were still running when the limit hit; their work is
-on branches, NOT merged:
-1. MERGED `pkt/be4` (96ded3d; R-014; full gate on it: **680 OK**), `pkt/wire` (bell refresh, staff Refresh
-   data, coordinator homes), `pkt/conA` (Dean consistency). In flight: `pkt/rep` (wt/rep, port 5335, the only app.py
-   editor: Reports rebuild IM20 = five real reports + short analytics, I-068), `pkt/conD` (wt/conD, port 5336: student
-   consistency I-128 part), `pkt/conE` (wt/conE, port 5337: faculty/Layout nits, I-129, AD9 in standalone_process.py), `pkt/iso` (e2e order class).
-   MERGED since: `pkt/conC`, `pkt/conD` (+ I-131 sign-out race fix). `pkt/a11y2` (wt/a11y2, port 5338): I-120 a11y follow-ups + p89 scans every sidebar page. Next: packet B (list toolbars/Activity Log I-124/I-125 - after pkt/rep), I-120 a11y.
-2. MERGED `pkt/p8` (a14d173): Phase 5 DONE - check:ui --strict all zeros, shims deleted, AGENTS.md gate updated.
-3. `pkt/iso` (wt/iso) - e2e order-independence class fix (I-100/I-113/I-121): DATA-OWNERSHIP.md + guard.
-In flight since: `pkt/conA` (wt/conA, port 5332: Dean Practicum board, Dean Course Adjustments DecisionPanel, Dean board copy - I-122, I-127) and `pkt/conC` (wt/conC, port 5333: guide/activity in one place, Practicum/Graduation summary + 'View details' - I-123, I-126). Remaining consistency packets B (list toolbars/Activity Log, I-124/I-125), D (student pages, I-128 part), E (faculty/Layout nits).
-Then: consistency findings I-122..I-128 (`research/CONSISTENCY-2026-10-22.md` ends with a 5-packet split A-E;
-packets touching FacultyPages/DeanReportPages/Layout must not run together); I-120 a11y follow-ups; Reports rebuild
-IM20 (I-068, needs app.py) + coordinator home frontend on be4's API; I-119 server strings; I-105 batch 'Next: Dean'.
-Worktree junction rule: `cmd //c rmdir <wt>rontend
-ode_modules` BEFORE `git worktree remove`.
-Leftover locked folders to delete after a reboot: wt/vocab, wt/enr, wt/seed2, wt/ca, wt/leave, wt/p24, wt/p65, wt/p66,
-wt/lists, wt/stu, wt/a11y (deregistered already).
+Owner: "put a pause on things and wrap up". All helpers were stopped. `v5.3-migui_test` is pushed; last full Python
+gate 680 OK (after pkt/be4), every later merge checked with targeted e2e + strict design check (all zeros).
+
+Finished but NOT merged (each on its own branch + worktree in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<name>`;
+review per AGENTS.md, merge one at a time, gate after each):
+1. `pkt/rep` (5 commits) - Reports rebuild IM20: five real reports (at-risk, cohorts, overdue, defenses, graduation)
+   with xlsx/pdf export + a short Analytics tab (I-068, I-014-class). Its full Python gate was still running when
+   stopped - re-run the gate and `p93-reports.spec.js` + p62 + p33 before merging. Only app.py editor.
+2. `pkt/conE` (4 commits) - AD9 (staff locked on Dean Review withdrawals, test first), consistency findings 11/15,
+   I-129 coordinator home (own-process waiting items, concept papers open Research Gate). Its combined e2e re-run
+   was cut off - re-run p95 + the combined run before merging.
+3. `pkt/iso` (2 commits) - e2e data-ownership map + guard + collisions fixed (I-100/I-113/I-121 class); run A of
+   three passed, reversed/1-worker runs not done.
+4. `pkt/a11y2` (0 commits; WIP stashed in wt/a11y2: `git -C ../CAPSTONE-USLS-MVP-wt/a11y2 stash list`) - I-120
+   a11y follow-ups barely started; redo from the brief in this file's history if the stash is unclear.
+Then remaining: consistency packet B (list toolbars / Activity Log I-124/I-125, after pkt/rep), I-120 rest
+(faculty signatures nested buttons), I-119 server strings, I-105, I-107, I-114/I-115, Phase 4 app.py split, Phase 6.
+Junction rule: `cmd //c rmdir <wt>rontend
+ode_modules` BEFORE `git worktree remove`. Locked leftover folders in
+the -wt directory (already deregistered) can be deleted after a reboot.
 
 ## CURRENT RUN (2026-10-22, v5.3) — read this first
 
