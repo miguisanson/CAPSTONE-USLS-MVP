@@ -8,7 +8,9 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
   - `be2` / `pkt/be2` — the only app.py editor: I-055 demo reset needs login, I-056 soft per-IP login throttle, I-057 per-install secret key, I-058 admin acts as staff in workflow steps, I-036 AC defense-scheduling 403, I-073 withdrawal task link (new `tests/test_v53_backend.py`, port 5301).
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
-  - `board` / `pkt/board` — StageBoard columns fit at 1366 + scroll cue (I-067), one EmptyState for columns (I-088) (spec `e2e/p74-board-fit.spec.js`, port 5305).
+  - MERGED `pkt/board` (I-067, I-088). Follow-up: Practicum `w-[300px]` and Graduation `w-[380px]` column overrides (workflow packet).
+  - `vocab` / `pkt/vocab` — one name table `lib/labels.js`, breadcrumb rule Portal > Page (I-077, I-078), rules collapsed (I-076), Activity Log open (I-080) (spec `e2e/p76-vocabulary.spec.js`, port 5306).
+  - Full Python gate on 00eda43 running in worktree `wt/gate` -> `E:/Temp/claude/gate53/gate_00eda43.txt` (remove that worktree after).
   - Fixed on the branch: I-096 e2e harness now keyless (the main checkout's .env key broke p80).
   - MERGED `pkt/mon` (P6.4 Monitoring Sheet / class list / adviser record).
   - `fac2` / `pkt/fac2` — faculty follow-ups I-079 one advisees table, I-090 verdicts grouping, I-085 Google card, I-099 Received chip (port 5302).
