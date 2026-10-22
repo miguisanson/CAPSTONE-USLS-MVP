@@ -3,7 +3,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
-import { useSubmitRequest, StageCard, SavedWorkflowFiles, RequestPdfUpload, SubmitState } from "./shared";
+import { ErrorSummary, useFormErrors, useSubmitRequest, StageCard, SavedWorkflowFiles, RequestPdfUpload, SubmitState } from "./shared";
 
 export function PracticumRequestForm({ data, onSaved }) {
   const existing = data.practicum_record;
@@ -33,6 +33,7 @@ export function PracticumRequestForm({ data, onSaved }) {
     remarks: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("practicum", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   useEffect(() => {
@@ -49,6 +50,19 @@ export function PracticumRequestForm({ data, onSaved }) {
 
   function onSubmit(e) {
     e.preventDefault();
+    const found = [];
+    if (moaEditable) {
+      if (!form.practicum_site.trim()) found.push({ id: "practicum-site", message: "Enter the practicum site or company." });
+      if (!form.attachment_id) found.push({ id: "practicum-moa", message: "Upload the signed MOA as a PDF." });
+    } else if (completionEditable) {
+      if (String(form.completed_hours).trim() === "" || Number(form.completed_hours) < 0) found.push({ id: "practicum-hours", message: "Enter the hours you have completed, as a number from 0 up." });
+      if (!form.certificate_attachment_id) found.push({ id: "practicum-certificates", message: additionalCompletionPdfRequired ? "Upload the new certificates or hours proof as a PDF." : "Upload the completion certificates as a PDF." });
+    }
+    if (found.length) {
+      fail(found);
+      return;
+    }
+    clear();
     submit({
       student_id: data.student.id,
       ...form,
@@ -56,7 +70,8 @@ export function PracticumRequestForm({ data, onSaved }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <ErrorSummary errors={errors} />
       <InlineNotice tone="info" icon={Briefcase} title="Psychology and MSGC students only">
         <p className="text-xs leading-relaxed">
           {scope.description || "Practicum is restricted to Psychology programs and the Master of Science in Guidance and Counseling (MSGC)."} Your program, {data.student.program_code} — {data.student.program_name}, is within this scope.
@@ -85,11 +100,11 @@ export function PracticumRequestForm({ data, onSaved }) {
       </StageCard>
 
       <StageCard number={2} title="MOA Submission" state={moaEditable ? (returned ? "returned" : "active") : moaPending ? "pending" : existing?.moa_attachment ? "complete" : "locked"} helper={!eligibilityReady ? "Available after the eligibility requirements in Step 1 are verified." : moaEditable ? "What you need to submit now: practicum site details and the signed MOA PDF." : moaPending ? "Your MOA is saved and waiting for staff / Academic Coordinator review." : "Completed MOA information is read-only while you continue to the next stage."}>
-        {moaEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Practicum site / company" required><Input value={form.practicum_site} onChange={set("practicum_site")} required /></Field><Field label="Supervisor name"><Input value={form.supervisor_name} onChange={set("supervisor_name")} /></Field></div><RequestPdfUpload requestType="practicum" label="Practicum MOA PDF" initialAttachment={existing?.moa_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message for the staff reviewing this submission." /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the practicum MOA before submitting." : ""} label={returned ? "Resubmit MOA stage" : "Submit MOA stage"} /></div> : <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><div><p className="eyebrow">Practicum site</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.practicum_site || "Not provided"}</p></div><div><p className="eyebrow">Supervisor</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.supervisor_name || "Not provided"}</p></div></div>{existing?.moa_attachment && <SavedWorkflowFiles files={[existing.moa_attachment]} />}</div>}
+        {moaEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Practicum site / company" required error={messageFor("practicum-site")}><Input id="practicum-site" value={form.practicum_site} onChange={set("practicum_site")} /></Field><Field label="Supervisor name"><Input value={form.supervisor_name} onChange={set("supervisor_name")} /></Field></div><RequestPdfUpload id="practicum-moa" invalid={messageFor("practicum-moa")} requestType="practicum" label="Practicum MOA PDF" initialAttachment={existing?.moa_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message for the staff reviewing this submission." /></Field><SubmitState busy={busy} error={error} message={message} label={returned ? "Resubmit MOA stage" : "Submit MOA stage"} /></div> : <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><div><p className="eyebrow">Practicum site</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.practicum_site || "Not provided"}</p></div><div><p className="eyebrow">Supervisor</p><p className="mt-1 text-sm font-semibold text-ink">{existing?.supervisor_name || "Not provided"}</p></div></div>{existing?.moa_attachment && <SavedWorkflowFiles files={[existing.moa_attachment]} />}</div>}
       </StageCard>
 
       <StageCard number={3} title="Practicum Document Submission" state={completionEditable ? (returned ? "returned" : "active") : documentsPending ? "pending" : completionPreviouslySubmitted ? "complete" : "locked"} helper={completionEditable ? (additionalCompletionPdfRequired ? "What you need to submit now: upload a new PDF for the requested additional certificates. Earlier uploaded PDFs stay in the file history." : "What you need to submit now: completed hours and one PDF containing the required completion documents.") : documentsPending ? "Your completion documents are saved and under review." : newOrganizationRequired || moaPending ? "A replacement or pending MOA must be approved before completion documents can be submitted again." : "Available after the MOA is approved and the practicum is marked in progress."}>
-        {completionEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Required hours"><Input type="number" value={form.required_hours} readOnly aria-readonly="true" /></Field><Field label="Completed hours" required><Input type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} required /></Field></div><InlineNotice tone="success" title="Certificates are counted automatically"><p className="text-xs">The system currently detects {existing?.certificate_count || 0} submitted certificate file{existing?.certificate_count === 1 ? "" : "s"}. Uploading an additional file updates this count.</p></InlineNotice><RequestPdfUpload requestType="practicum" label={additionalCompletionPdfRequired ? "New additional certificates / hours proof PDF" : "Completion certificates / forms / hours proof PDF"} initialAttachment={additionalCompletionPdfRequired ? null : existing?.certificate_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />{additionalCompletionPdfRequired && existing?.completion_attachments?.length > 0 && <SavedWorkflowFiles files={existing.completion_attachments} empty="No previous practicum files submitted yet." />}<Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add any context the reviewer should see with these files." /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.certificate_attachment_id} disabledHint={!form.certificate_attachment_id ? "Upload the requested additional PDF before submitting." : ""} label={returned ? "Resubmit completion stage" : "Submit completion stage"} /></div> : existing?.certificate_attachment ? <div className="space-y-3"><p className="text-sm text-slate-600">{existing.completed_hours}/{existing.required_hours} hours · {existing.certificate_count} submitted certificate file{existing.certificate_count === 1 ? "" : "s"}</p><SavedWorkflowFiles files={existing.completion_attachments?.length ? existing.completion_attachments : [existing.certificate_attachment]} /></div> : null}
+        {completionEditable ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Required hours"><Input type="number" value={form.required_hours} readOnly aria-readonly="true" /></Field><Field label="Completed hours" required error={messageFor("practicum-hours")}><Input id="practicum-hours" type="number" min="0" value={form.completed_hours} onChange={set("completed_hours")} /></Field></div><InlineNotice tone="success" title="Certificates are counted automatically"><p className="text-xs">The system currently detects {existing?.certificate_count || 0} submitted certificate file{existing?.certificate_count === 1 ? "" : "s"}. Uploading an additional file updates this count.</p></InlineNotice><RequestPdfUpload id="practicum-certificates" invalid={messageFor("practicum-certificates")} requestType="practicum" label={additionalCompletionPdfRequired ? "New additional certificates / hours proof PDF" : "Completion certificates / forms / hours proof PDF"} initialAttachment={additionalCompletionPdfRequired ? null : existing?.certificate_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, certificate_attachment_id: attachment?.id || null }))} />{additionalCompletionPdfRequired && existing?.completion_attachments?.length > 0 && <SavedWorkflowFiles files={existing.completion_attachments} empty="No previous practicum files submitted yet." />}<Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add any context the reviewer should see with these files." /></Field><SubmitState busy={busy} error={error} message={message} label={returned ? "Resubmit completion stage" : "Submit completion stage"} /></div> : existing?.certificate_attachment ? <div className="space-y-3"><p className="text-sm text-slate-600">{existing.completed_hours}/{existing.required_hours} hours · {existing.certificate_count} submitted certificate file{existing.certificate_count === 1 ? "" : "s"}</p><SavedWorkflowFiles files={existing.completion_attachments?.length ? existing.completion_attachments : [existing.certificate_attachment]} /></div> : null}
       </StageCard>
 
       <StageCard number={4} title="Review / Approval" state={reviewComplete ? "complete" : documentsPending ? "pending" : "locked"} helper={documentsPending ? "Graduate School staff and the Academic Coordinator are checking the submitted hours and documents." : reviewComplete ? "The completion evidence was accepted." : "Available after Step 3 is submitted."} />
@@ -116,6 +131,7 @@ export function GraduationRequestForm({ data, onSaved }) {
     remarks: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("graduation", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const eligibility = data.graduation_eligibility || {};
   const status = existing?.endorsement_status || "Not Submitted";
@@ -131,16 +147,25 @@ export function GraduationRequestForm({ data, onSaved }) {
 
   function onSubmit(e) {
     e.preventDefault();
+    const found = [];
+    if (!form.review_window) found.push({ id: "graduation-year", message: "Choose the school year you are graduating in." });
+    if (!form.attachment_id) found.push({ id: "graduation-pdf", message: "Upload your signed graduation application as a PDF." });
+    if (found.length) {
+      fail(found);
+      return;
+    }
+    clear();
     submit({ student_id: data.student.id, ...form });
   }
 
   useEffect(() => setForm({ attachment_id: existing?.request_attachment?.id || null, review_window: defaultReviewWindow, remarks: "" }), [data.student.id, existing?.id, existing?.updated_at, defaultReviewWindow]);
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <ErrorSummary errors={errors} />
       <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current graduation stage</p><p className="meta mt-1">Your application stays visible while each reviewing office completes its part.</p></div><StatusChip status={status} dot={false} /></div></div>
       <StageCard number={1} title="Application / Review Window" state={!eligibilityReady && !existing ? "locked" : applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={!eligibilityReady && !existing ? "This step opens only after coursework, research, completion documents, and any required practicum are complete." : applicationEditable ? "What you need to submit now: the review window and signed graduation application / review-window PDF." : "Your submitted application is saved and read-only during review."}>
-        {applicationEditable ? <div className="space-y-4"><Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} is open. Other school years are shown in gray and cannot be selected.`} required><Select value={form.review_window} onChange={set("review_window")} options={reviewWindowOptions} placeholder="" required /></Field><RequestPdfUpload requestType="graduation" label="Signed graduation application / review-window PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message to the staff reviewing your graduation submission." /></Field><SubmitState busy={busy} error={error} message={message} disabled={!form.attachment_id} disabledHint={!form.attachment_id ? "Upload the signed graduation application PDF before submitting Step 1." : ""} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : existing ? <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing.review_window}</p><SavedWorkflowFiles files={existing.attachments || []} /></div> : <InlineNotice tone="neutral">Complete the requirements listed in Step 3 before submitting a graduation application.</InlineNotice>}
+        {applicationEditable ? <div className="space-y-4"><Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} is open. Other school years are shown in gray and cannot be selected.`} required error={messageFor("graduation-year")}><Select id="graduation-year" value={form.review_window} onChange={set("review_window")} options={reviewWindowOptions} placeholder="" /></Field><RequestPdfUpload id="graduation-pdf" invalid={messageFor("graduation-pdf")} requestType="graduation" label="Signed graduation application / review-window PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message to the staff reviewing your graduation submission." /></Field><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : existing ? <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing.review_window}</p><SavedWorkflowFiles files={existing.attachments || []} /></div> : <InlineNotice tone="neutral">Complete the requirements listed in Step 3 before submitting a graduation application.</InlineNotice>}
       </StageCard>
       {applicationEditable && existing?.attachments?.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">

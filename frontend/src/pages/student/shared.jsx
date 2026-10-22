@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from "react";
+import { Component, useEffect, useId, useState } from "react";
 import {
   AlertTriangle,
   CalendarClock,
@@ -133,6 +133,70 @@ export function StudentClarificationPanel({ slug, data, onSaved }) {
   );
 }
 
+// ---- validate on submit: one error summary at the top of the form (UX research, forms, section 3) ----
+//
+// A form checks its answers when Submit is pressed (never while typing, and Submit is not switched off for a missing
+// answer). What is wrong comes back as a list of { id, message }; `id` is the DOM id of the control to fix. The summary
+// repeats each message as a link to its control, the same words show under the field (`<Field error=...>`), the page title
+// starts with "Error: ", and every answer stays in the form.
+
+/** @returns { errors, fail(list), clear(), messageFor(id) } */
+export function useFormErrors() {
+  const [errors, setErrors] = useState([]);
+  const failing = errors.length > 0;
+  useEffect(() => {
+    if (!failing) return undefined;
+    const previous = document.title;
+    document.title = `Error: ${previous}`;
+    return () => {
+      document.title = previous;
+    };
+  }, [failing]);
+  return {
+    errors,
+    fail: (list) => setErrors(list),
+    clear: () => setErrors([]),
+    messageFor: (id) => errors.find((item) => item.id === id)?.message,
+  };
+}
+
+/** Moves the focus to the control with this id (a link in the summary does it) and brings it into view. */
+export function focusField(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  el.scrollIntoView?.({ block: "center" });
+}
+
+/** "There is a problem" box: gets the focus whenever a new list of problems arrives; one link per problem. */
+export function ErrorSummary({ errors }) {
+  const id = useId();
+  useEffect(() => {
+    if (errors.length) document.getElementById(id)?.focus();
+  }, [errors, id]);
+  if (!errors.length) return null;
+  return (
+    <InlineNotice id={id} tabIndex={-1} tone="danger" title="There is a problem" className="scroll-mt-24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300">
+      <ul className="mt-1 list-disc space-y-1 pl-5">
+        {errors.map((item) => (
+          <li key={item.id}>
+            <a
+              href={`#${item.id}`}
+              onClick={(event) => {
+                event.preventDefault();
+                focusField(item.id);
+              }}
+              className="cursor-pointer font-semibold underline"
+            >
+              {item.message}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </InlineNotice>
+  );
+}
+
 export function useSubmitRequest(type, onSaved) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -218,7 +282,8 @@ export function SavedWorkflowFiles({ files = [], empty = "No files submitted yet
   );
 }
 
-export function RequestPdfUpload({ requestType, label, onUploaded, initialAttachment = null }) {
+// `id` is the id of the file input (a summary link focuses it); `invalid` is the message shown when nothing was uploaded.
+export function RequestPdfUpload({ requestType, label, onUploaded, initialAttachment = null, id, invalid }) {
   const [attachment, setAttachment] = useState(initialAttachment);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -245,8 +310,8 @@ export function RequestPdfUpload({ requestType, label, onUploaded, initialAttach
   }
 
   return (
-    <Field label={label} hint="PDF only, up to 25 MB. The file is stored with your request." error={error}>
-      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 hover:bg-slate-50">
+    <Field label={label} hint="PDF only, up to 25 MB. The file is stored with your request." error={error || invalid}>
+      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 focus-within:ring-2 focus-within:ring-brand-500 hover:bg-slate-50">
         <span className="flex min-w-0 items-center gap-2">
           <FileUp className="h-4 w-4 shrink-0 text-brand-700" />
           <span className="truncate">{attachment?.name || (busy ? "Uploading..." : "Choose PDF file")}</span>
@@ -255,9 +320,10 @@ export function RequestPdfUpload({ requestType, label, onUploaded, initialAttach
           Browse
         </span>
         <input
+          id={id}
           type="file"
           accept="application/pdf,.pdf"
-          className="hidden"
+          className="sr-only"
           disabled={busy}
           onChange={(e) => upload(e.target.files?.[0])}
         />

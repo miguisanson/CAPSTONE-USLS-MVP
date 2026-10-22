@@ -368,21 +368,33 @@ test.describe("P82 student pages (pinned)", () => {
   });
 
   test("Research Progress and Defense Schedule: the adviser-and-panel card, the schedule list", async ({ browser }) => {
-    const { page, portal, finish } = await studentPage(browser);
+    const schedules = [
+      { id: 9301, defense_type: "Proposal Defense", preferred_date: "2026-08-08", status: "Held", display_status: "Finished", is_active: false, start_time: "09:00", end_time: "10:30", mode: "In person", venue: "Spec Room", panelists: [], attention: [] },
+      { id: 9302, defense_type: "Title Defense", preferred_date: "2026-06-09", status: "Held", display_status: "Finished", is_active: false, start_time: "09:00", end_time: "10:30", mode: "In person", venue: "Spec Room", panelists: [], attention: [] },
+    ];
+    const { page, finish } = await studentPage(browser, {
+      mutate: (d) => {
+        d.research_case = { ...(d.research_case || {}), id: 1, status: "Pending Staff Action", adviser_name: "Dr. Spec Adviser" };
+        d.student.adviser_name = "Dr. Spec Adviser";
+        d.panel = [{ id: 1, faculty_name: "Dr. Panel One", panel_role: "Panel Chair", specialization: "Spec" }];
+        d.schedules = schedules;
+        d.defense_follow_up = null;
+      },
+    });
     try {
-      const data = await portal();
       await open(page, "/student/research");
       const card = cardOf(page, "Adviser and panel");
       await expect(card).toContainText("Assigned after Panel Matching; scheduling opens once a panel is in place");
-      await expect(card).toContainText(`Adviser: ${data.student.adviser_name || data.research_case?.adviser_name || "Not assigned"}`);
-      for (const member of data.panel || []) await expect(card).toContainText(member.panel_role);
+      await expect(card).toContainText("Adviser: Dr. Spec Adviser");
+      await expect(card).toContainText("Dr. Panel One");
+      await expect(card).toContainText("Panel Chair");
       await expect(card.getByRole("link", { name: "Defense schedule" }), "the research page links to the schedule page").toHaveAttribute("href", "/student/defense-schedule");
 
       await open(page, "/student/defense-schedule", "defense");
       await expect(h2s(page).filter({ hasText: /^(Adviser and panel|Schedule requests)$/ })).toHaveText(["Adviser and panel", "Schedule requests"]);
       const list = cardOf(page, "Schedule requests");
-      await expect(list.locator("ul.space-y-3 > li")).toHaveCount((data.schedules || []).length || 1);
-      for (const schedule of data.schedules || []) await expect(list).toContainText(schedule.defense_type);
+      await expect(list.locator("ul.space-y-3 > li")).toHaveCount(2);
+      for (const schedule of schedules) await expect(list).toContainText(schedule.defense_type);
       await expect(main(page).getByRole("link", { name: "All requests" })).toHaveAttribute("href", "/student/requests");
     } finally {
       await finish();
@@ -559,7 +571,11 @@ const FINISHED_PROPOSAL = {
 const LIVE_FINAL = { id: 9202, defense_type: "Final Defense", preferred_date: "2027-03-01", status: "Scheduled", display_status: "Scheduled", is_active: true, start_time: "09:00", end_time: "10:30", mode: "In person", venue: "Spec Room", panelists: [], attention: [] };
 const DEFERRED_FINAL = { id: 9203, defense_type: "Final Defense", preferred_date: "2026-09-01", status: "Deferred", display_status: "Deferred", is_active: false, start_time: null, end_time: null, mode: null, venue: null, panelists: [], attention: [] };
 
+// A research case, a matched panel and these schedules: the Defense Schedule page shows its form (it is locked without a panel).
 const atStage = (stage, schedules) => (d) => {
+  d.research_case = { ...(d.research_case || {}), id: 1, status: "Pending Staff Action" };
+  d.panel = [{ id: 1, faculty_name: "Dr. Panel One", panel_role: "Panel Chair", specialization: "Spec" }];
+  d.defense_follow_up = null;
   d.student.current_stage = stage;
   d.research_progress = { ...(d.research_progress || {}), stage };
   d.schedules = schedules;
