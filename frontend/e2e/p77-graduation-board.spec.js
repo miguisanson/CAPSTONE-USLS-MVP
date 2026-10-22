@@ -215,7 +215,7 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await dialog.getByRole("button", { name: "Close details" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    // Isabel's batch: View details shows the stage check and the students; the card has the step button and "Move to...".
+    // Isabel's batch: View details shows the stage check and the students; the step is in this window and the card has "Move to...".
     const batch = cardsOf(column(board, "Batch created")).filter({ hasText: BATCH });
     await expect(batch).toHaveCount(1);
     await expect(batch.getByText("Next: Graduate School Staff")).toBeVisible();
@@ -224,9 +224,9 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await expect(dialog.getByRole("heading").first()).toHaveText(`Graduation stage check for ${BATCH}`);
     await expect(dialog.getByText("Isabel Flores")).toBeVisible();
     await expect(dialog.getByRole("button", { name: /Message \/ Return/ })).toBeVisible();
-    await dialog.getByRole("button", { name: "Close details" }).first().click();
-
-    await batch.getByRole("button", { name: "Forward to Academic Coordinator" }).click();
+    // CHANGED BY conC (I-126): the step is a button in this window, not on the card (the card has "View details" only).
+    await expect(batch.getByRole("button", { name: "Forward to Academic Coordinator" })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Forward to Academic Coordinator" }).click();
     dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading").first()).toContainText("Forward to Academic Coordinator");
     await dialog.getByRole("button", { name: "Close details" }).click();
@@ -268,7 +268,10 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await expect(batch).toHaveCount(1);
     await expect(batch).toHaveAttribute("draggable", "true");
     await expect(batch.getByText("Next: Dean")).toBeVisible();
-    await batch.getByRole("button", { name: "Approve endorsement list" }).click();
+    // CHANGED BY conC (I-126): the Dean's step is a button in the batch window, not on the card.
+    await expect(batch.getByRole("button", { name: "Approve endorsement list" })).toHaveCount(0);
+    await batch.getByRole("button", { name: `View details for ${BATCH}` }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Approve endorsement list" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByLabel("Dean decision")).toBeVisible();
     await expect(dialog.getByRole("option", { name: "Return endorsement list for revision" })).toHaveCount(1);
@@ -284,8 +287,12 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     const approved = column(board, "Approved, ready to export");
     const batch = cardsOf(approved).filter({ hasText: BATCH });
     await expect(batch).toHaveCount(1);
-    await expect(batch.getByRole("button", { name: "Export approved list" })).toBeVisible();
-    await expect(batch.getByText("Use Export on the batch card.", { exact: true })).toBeVisible();
+    // CHANGED BY conC (I-126): Export is in the batch window; the card says where ("Open View details to export the list.").
+    await expect(batch.getByRole("button", { name: "Export approved list" })).toHaveCount(0);
+    await expect(batch.getByText("Open View details to export the list.", { exact: true })).toBeVisible();
+    await batch.getByRole("button", { name: `View details for ${BATCH}` }).click();
+    await expect(page.getByRole("dialog").getByRole("button", { name: "Export approved list", exact: true })).toBeVisible();
+    await page.getByRole("dialog").getByRole("button", { name: "Close details" }).first().click();
     await expect(batch.getByText("Exported - Ready to Send")).toHaveCount(0);
 
     await page.unroute(/\/api\/transactions\/graduation\/context/);
@@ -293,7 +300,8 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await page.reload();
     const exported = cardsOf(column(page.getByRole("region", { name: BOARD }), "Approved, ready to export")).filter({ hasText: BATCH });
     await expect(exported.getByText("Exported - Ready to Send")).toBeVisible();
-    await expect(exported.getByRole("button", { name: "Export approved list again" })).toBeVisible();
+    await exported.getByRole("button", { name: `View details for ${BATCH}` }).click();
+    await expect(page.getByRole("dialog").getByRole("button", { name: "Export approved list again" })).toBeVisible();
   });
 });
 

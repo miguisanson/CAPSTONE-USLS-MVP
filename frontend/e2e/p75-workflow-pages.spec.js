@@ -137,8 +137,11 @@ test.describe("Student Handoff (staff)", () => {
     await expect(main(page).getByText("0 backups")).toBeVisible();
     await expect(main(page).getByText("No monitoring-sheet backups yet.")).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: /Onboarding report/ })).toBeVisible();
-    await expect(main(page).getByRole("heading", { level: 2, name: "How this works" })).toBeVisible();
-    await expect(main(page).getByRole("heading", { level: 2, name: "Recent in this workflow" })).toBeVisible();
+    // CHANGED BY conC (I-123): the guide and the activity are the two header buttons, not cards in a side rail.
+    await expect(main(page).getByRole("button", { name: "How this works", exact: true })).toBeVisible();
+    await expect(main(page).getByRole("button", { name: "View recent activity", exact: true })).toBeVisible();
+    await expect(main(page).getByRole("heading", { level: 2, name: "How this works" })).toHaveCount(0);
+    await expect(main(page).getByRole("heading", { level: 2, name: "Recent in this workflow" })).toHaveCount(0);
     await shotsAt(page, "handoff");
   });
 

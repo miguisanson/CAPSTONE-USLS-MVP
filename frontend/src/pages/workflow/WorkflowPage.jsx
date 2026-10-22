@@ -10,7 +10,6 @@ import {
   GraduationCap,
   CheckCircle2,
   Info,
-  Sparkles,
   AlertTriangle,
   CalendarDays,
   UserRoundCheck,
@@ -19,7 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EmptyState, HistoryPanel, InlineNotice, PageHeader, SectionTitle, Spinner } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionTitle, Spinner } from "../../components/ui/index.js";
 import StudentPicker from "../../components/StudentPicker";
 import { useAuth } from "../../auth";
 import { OnboardingGatePanel } from "../../components/ProcessGates";
@@ -102,8 +101,6 @@ function SubviewTabs({ tabs, active, onChange }) {
   );
 }
 
-const OVERVIEW_WORKFLOWS = new Set(["practicum", "graduation"]);
-
 // Leave of Absence, Readmission, AWOL & Residency and Withdrawal are one page template
 // (ProcessBoardPage) with a different process. Every other workflow keeps its own screen.
 export default function WorkflowPage() {
@@ -155,14 +152,8 @@ function SingleWorkflowPage() {
   const tx = context?.transaction || meta?.transactions?.find((t) => t.slug === slug);
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
-  const overviewWorkflow = OVERVIEW_WORKFLOWS.has(slug);
   const subviewTabs = SUBVIEW_TABS[slug] || null;
   const subview = subviewTabs && subviewTabs.some((tab) => tab.key && tab.key === searchParams.get("view")) ? searchParams.get("view") : "";
-  const hideSideRail = overviewWorkflow || slug === "course-audit" || Boolean(subview);
-  // Pages without the side guide carry "How this works" and "View recent activity" in the header instead.
-  const hasGuideButtons = overviewWorkflow || slug === "course-audit";
-  // Panel Matching holds a wide ranked table: the notes move under it so the table gets the full page width.
-  const railBelow = slug === "panel-matching";
 
   function changeSubview(key) {
     const next = new URLSearchParams(searchParams);
@@ -236,12 +227,12 @@ function SingleWorkflowPage() {
           title={tx.title}
           description={tx.short}
           icon={Icon}
-          actions={hasGuideButtons ? (
+          actions={(
             <>
               <Button variant="secondary" icon={HelpCircle} onClick={() => setSupportModal("guide")}>How this works</Button>
               <Button variant="secondary" icon={History} onClick={() => setSupportModal("activity")}>View recent activity</Button>
             </>
-          ) : null}
+          )}
         />
         {slug === "practicum" && (
           <p className="meta flex items-center gap-1.5">
@@ -258,100 +249,66 @@ function SingleWorkflowPage() {
       {slug !== "defense-scheduling" && result && <InlineNotice tone="success" icon={CheckCircle2}>{result.message}</InlineNotice>}
       {slug !== "defense-scheduling" && submitError && <InlineNotice tone="danger">{submitError}</InlineNotice>}
 
-      <div className={hideSideRail || railBelow ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
-        <div className={hideSideRail || railBelow ? "page-stack" : "page-stack lg:col-span-2"}>
-          {subview === "adviser" && <AdviserAppointments role={user?.role} embedded />}
-          {subview === "calendar" && (
-            <CalendarPage scope="staff" embedded title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in the Scheduling tab." />
-          )}
-          {!subview && needsStudent && (
-            <Card pad="lg">
-              <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
-              <StudentPicker
-                value={studentId}
-                selectedLabel={studentLabel}
-                meta={meta}
-                onChange={(id, label) => {
-                  setStudentId(id);
-                  setStudentLabel(label || "");
-                  setResult(null);
-                  if (!id) {
-                    window.localStorage.removeItem("workflowStudentId");
-                    const next = new URLSearchParams(searchParams);
-                    next.delete("student_id");
-                    setSearchParams(next, { replace: true });
-                  }
-                }}
-              />
-            </Card>
-          )}
-
-          {subview ? null : needsStudent && !studentId ? (
-            <Card pad="lg">
-              <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
-            </Card>
-          ) : loading && !context ? (
-            <Card pad="lg">
-              <Spinner label="Loading workflow data…" />
-            </Card>
-          ) : error && !context ? (
-            <Card pad="lg">
-              <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
-            </Card>
-          ) : slug === "research-gate" ? (
-            <ResearchGateForm {...formProps} />
-          ) : slug === "practicum" ? (
-            <PracticumRoster {...formProps} />
-          ) : slug === "defense-scheduling" ? (
-            <DefenseSchedulingForm {...formProps} />
-          ) : slug === "graduation" ? (
-            <GraduationRoster {...formProps} />
-          ) : (
-            <Card pad="lg">
-              {slug === "student-handoff" && <HandoffPanel {...formProps} />}
-              {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
-              {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
-            </Card>
-          )}
-
-          {/* BPMN 1 Admission: the onboarding report and the Dean's approval
-              gate that turns an import batch into a recorded admission completion. */}
-          {!subview && slug === "student-handoff" ? (
-            <div><OnboardingGatePanel role={user?.role} /></div>
-          ) : null}
-        </div>
-
-        {/* Side rail */}
-        {!hideSideRail && (
-          <div className={railBelow ? "grid grid-cols-1 gap-5 md:grid-cols-2" : "page-stack"}>
-            <Card pad="lg">
-              <SectionTitle title="How this works" icon={Sparkles} />
-              <p className="text-sm leading-relaxed text-slate-600">{workflowGuidance(slug)}</p>
-              <dl className="mt-4 space-y-3 border-t border-slate-100 pt-4">
-                <div><dt className="eyebrow">Used by</dt><dd className="mt-1 text-sm text-slate-600">{tx.actor}</dd></div>
-                <div><dt className="eyebrow">What it records</dt><dd className="mt-1 text-sm text-slate-600">{tx.data}</dd></div>
-              </dl>
-            </Card>
-            <Card pad="lg">
-              <SectionTitle title="Recent in this workflow" icon={Info} />
-              {context?.recent_logs?.length ? (
-                <HistoryPanel
-                  label="View logs"
-                  hideLabel="Hide logs"
-                  entries={context.recent_logs.map((log) => ({
-                    id: log.id,
-                    title: log.result,
-                    at: log.created_at,
-                    actor: log.student_name || log.source_reference || "Workflow",
-                    note: log.notes,
-                  }))}
-                />
-              ) : (
-                <EmptyState title="No recent actions" size="sm" />
-              )}
-            </Card>
-          </div>
+      <div className="page-stack">
+        {subview === "adviser" && <AdviserAppointments role={user?.role} embedded />}
+        {subview === "calendar" && (
+          <CalendarPage scope="staff" embedded title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in the Scheduling tab." />
         )}
+        {!subview && needsStudent && (
+          <Card pad="lg">
+            <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
+            <StudentPicker
+              value={studentId}
+              selectedLabel={studentLabel}
+              meta={meta}
+              onChange={(id, label) => {
+                setStudentId(id);
+                setStudentLabel(label || "");
+                setResult(null);
+                if (!id) {
+                  window.localStorage.removeItem("workflowStudentId");
+                  const next = new URLSearchParams(searchParams);
+                  next.delete("student_id");
+                  setSearchParams(next, { replace: true });
+                }
+              }}
+            />
+          </Card>
+        )}
+
+        {subview ? null : needsStudent && !studentId ? (
+          <Card pad="lg">
+            <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
+          </Card>
+        ) : loading && !context ? (
+          <Card pad="lg">
+            <Spinner label="Loading workflow data…" />
+          </Card>
+        ) : error && !context ? (
+          <Card pad="lg">
+            <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
+          </Card>
+        ) : slug === "research-gate" ? (
+          <ResearchGateForm {...formProps} />
+        ) : slug === "practicum" ? (
+          <PracticumRoster {...formProps} />
+        ) : slug === "defense-scheduling" ? (
+          <DefenseSchedulingForm {...formProps} />
+        ) : slug === "graduation" ? (
+          <GraduationRoster {...formProps} />
+        ) : (
+          <Card pad="lg">
+            {slug === "student-handoff" && <HandoffPanel {...formProps} />}
+            {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
+            {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
+          </Card>
+        )}
+
+        {/* BPMN 1 Admission: the onboarding report and the Dean's approval
+            gate that turns an import batch into a recorded admission completion. */}
+        {!subview && slug === "student-handoff" ? (
+          <div><OnboardingGatePanel role={user?.role} /></div>
+        ) : null}
       </div>
       {supportModal && (
         <WorkflowSupportModal
