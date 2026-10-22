@@ -19,7 +19,7 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/p65` (P6.5, I-069, I-081 part). I-115 filed.
   - MERGED `pkt/p24` (P2.4). New: I-117, I-118.
   - `ca` / `pkt/ca` — I-117 one subject table on Course Adjustments (port 5324).
-  - `a11y` / `pkt/a11y` — axe-core check p89 + library/layout/token fixes (I-092) (port 5325). Dev dep @axe-core/playwright 4.13.0 added.
+  - MERGED `pkt/a11y` (p89 axe check, contrast tokens, table scroll regions). Follow-up I-120.
   - NEXT: P8 close-out after p66 merges (StudentPicker, graduationShared, MonitoringGrid allow-list I-097, ui.jsx/forms.jsx shims, print.js AD3, --strict); Reports rebuild IM20 (app.py after be4); coordinator home frontend (after be4's API); ModalShell adapter out of ProcessBoardPage (I-118). NEXT after a slot frees: P6.6 StudentDetail/Assistant/ChangePassword/Login; then P8 close-out; Reports rebuild IM20 (needs app.py after seed2).
   - MERGED `pkt/stu` (P4.3/P4.4, I-087, I-086, error summaries).
   - MERGED `pkt/leave` (P5.3-P5.5).
