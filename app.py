@@ -29329,8 +29329,13 @@ def handle_awol(data: MultiDict) -> int:
         if reason not in RESIDENCY_REASONS:
             raise ValueError("Choose a handbook-supported residency reason.")
         review = awol_policy_review(student, {"workflow_action": "record_residency", "residency_reason": reason})
-        if review["recommendation"] != "Eligible for Residency" and not staff_notes:
-            raise ValueError("This residency case needs human review. Enter staff notes explaining the verified exception or use LOA.")
+        if review["recommendation"] != "Eligible for Residency":
+            # The handbook (Residency Enrollment, p. 51) allows residency only for its listed purposes;
+            # it has no staff override, so a note cannot turn "Needs Human Review" into a recorded residency.
+            raise ValueError(
+                "The residency policy checker says this case needs human review, so residency cannot be recorded. "
+                "Fix the record the checker flagged (or choose the matching purpose), or use leave of absence instead."
+            )
         term = AcademicTerm.query.get(safe_int(data.get("term_id"))) if data.get("term_id") else get_active_term()
         if not term:
             raise ValueError("No active semester is available for residency enrollment.")
