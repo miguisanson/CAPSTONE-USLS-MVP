@@ -5247,6 +5247,23 @@ RISK_REFRESH_SECONDS = max(int(os.getenv("USLS_RISK_REFRESH_SECONDS", "60") or 6
 _RISK_REFRESH_STATE: dict = {"at": None, "day": None}
 
 
+def run_maintenance_sweeps() -> dict:
+    """Every sweep that depends on the clock or on data entered elsewhere. Writes; the caller commits.
+
+    The seed runs it once, and ``POST /api/maintenance/refresh`` runs it on request. A page view never does.
+    """
+    awol = sync_automatic_awol_statuses(commit=False)
+    leave = sync_leave_cases(commit=False)
+    risk = refresh_risk_levels(force=True)
+    reviews = ensure_onboarding_reviews()
+    advisers = migrate_adviser_appointments()
+    reminders = generate_reminders()
+    return {
+        "awol_cases_checked": awol, "leave": leave, "risk_levels_changed": risk,
+        "onboarding_reviews_made": reviews, "adviser_appointments_made": advisers, "reminders_made": reminders,
+    }
+
+
 def refresh_risk_levels(force: bool = False) -> int:
     """Bring every student's stored risk level up to date; returns how many changed."""
     import time as _time
@@ -5875,7 +5892,6 @@ def active_leave_case(student_id: int) -> LeaveCase | None:
 
 def leave_approved_semesters(student: Student, exclude_case_id: int | None = None) -> int:
     """Semesters of leave already approved (extensions are part of their leave)."""
-    adopt_legacy_leave_logs(student.id)
     total = 0
     for case in LeaveCase.query.filter(
         LeaveCase.student_id == student.id,
@@ -7543,7 +7559,6 @@ def leave_vocabulary() -> dict:
 
 def leave_student_overview(student: Student) -> dict:
     """What the student's pages need: their cases and what they may file now."""
-    adopt_legacy_leave_logs(student.id, commit=True)
     cases = leave_family_cases(student.id)
     active = active_leave_case(student.id)
     today = date.today()
@@ -7632,7 +7647,6 @@ def leave_student_overview(student: Student) -> dict:
 
 def submitted_request_students(request_type: str) -> list[dict]:
     """One row per leave or readmission case (newest change first), for staff rosters."""
-    adopt_legacy_leave_logs(commit=True)
     rows: list[dict] = []
     kinds = KINDS_FOR_SLUG[request_type]
     for case in (
@@ -12771,25 +12785,31 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "term": term_dict(term)})
 
+    # The date-driven sweeps used to run inside page views (dashboard, reports, leave board, bell). A page
+    # view now only reads (I-071); everything that moves with the clock runs here, on request, and once at
+    # seed time. The staff dashboard's "Refresh" button calls it.
+    @app.route("/api/maintenance/refresh", methods=["POST"])
+    @require_api_login("staff")
+    def maintenance_refresh():
+        summary = run_maintenance_sweeps()
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Dates, risk levels and reminders are up to date.", **summary})
+
     # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
     @require_api_login("staff")
     def dashboard():
-        sync_automatic_awol_statuses(commit=True)
-        refresh_risk_levels()
         return jsonify(dashboard_stats(request.args))
 
     @app.route("/api/dashboard/drilldown")
     @require_api_login("staff")
     def dashboard_drilldown():
-        refresh_risk_levels()
         return jsonify(dashboard_drilldown_payload(request.args))
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def students_list():
-        refresh_risk_levels()
         query = Student.query.join(Program)
         q = request.args.get("q", "").strip()
         if q:
@@ -13017,7 +13037,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/student-portal/context")
     @require_api_login("student")
     def student_portal_context():
-        sync_automatic_awol_statuses(commit=True)
         account = current_account()
         student_id = account.student_id if account else None
         if not student_id:
@@ -14072,7 +14091,6 @@ def register_routes(app: Flask) -> None:
         if slug not in LEAVE_SLUGS:
             return jsonify({"error": "This standing-change report is not supported."}), 404
         student = Student.query.get_or_404(student_id)
-        adopt_legacy_leave_logs(student.id)
         case = (
             LeaveCase.query.filter(
                 LeaveCase.student_id == student.id,
@@ -14555,7 +14573,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports")
     @require_api_login("staff", "academic_coordinator")
     def reports():
-        refresh_risk_levels()
         return jsonify(reports_payload(request.args))
 
     # Analytics is computed on demand rather than folded into /api/reports so
@@ -14563,17 +14580,12 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports/analytics")
     @require_api_login("staff", "academic_coordinator")
     def reports_analytics():
-        refresh_risk_levels()
         return jsonify(analytics_payload(request.args))
 
     # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
     @app.route("/api/onboarding/reviews")
     @require_api_login("staff", "academic_coordinator", "dean")
     def onboarding_reviews():
-        uploads = MonitoringSheetUpload.query.order_by(MonitoringSheetUpload.uploaded_at.desc()).limit(12).all()
-        for upload in uploads:
-            build_onboarding_review(upload)
-        db.session.commit()
         rows = (
             OnboardingReview.query.order_by(OnboardingReview.created_at.desc()).limit(12).all()
         )
@@ -18009,7 +18021,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/monitoring/grid")
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def monitoring_grid():
-        sync_automatic_awol_statuses(commit=True)
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
         if not program:
@@ -18568,8 +18579,6 @@ def register_routes(app: Flask) -> None:
         slug = (request.args.get("slug") or SLUG_LOA).strip()
         if slug not in LEAVE_SLUGS:
             return jsonify({"error": "Choose leave-of-absence or readmission."}), 400
-        adopt_legacy_leave_logs()
-        db.session.commit()
         cases = (
             LeaveCase.query.filter(LeaveCase.kind.in_(KINDS_FOR_SLUG[slug]))
             .order_by(LeaveCase.updated_at.desc(), LeaveCase.id.desc())
@@ -18972,6 +18981,7 @@ def register_routes(app: Flask) -> None:
                 ],
             }
             upload.result_json = json.dumps(stored_result, ensure_ascii=False)
+            build_onboarding_review(upload)
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
@@ -19228,6 +19238,7 @@ def register_routes(app: Flask) -> None:
                 "outcomes": outcomes,
             }
             correction_upload.result_json = json.dumps(correction_result, ensure_ascii=False)
+            build_onboarding_review(correction_upload)
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
@@ -19612,9 +19623,7 @@ def register_routes(app: Flask) -> None:
         _account, student = signed_in_student()
         if not student:
             return jsonify({"error": "This account is not linked to a student record."}), 400
-        payload = adviser_tracker_payload(student)
-        db.session.commit()
-        return jsonify(payload)
+        return jsonify(adviser_tracker_payload(student))
 
     @app.route("/api/student-portal/adviser/apply", methods=["POST"])
     @require_api_login("student")
@@ -20194,16 +20203,16 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/notifications")
     @require_api_login()
     def notifications_list():
+        return jsonify(notification_list_payload(current_account()))
+
+    @app.route("/api/notifications/refresh", methods=["POST"])
+    @require_api_login()
+    def notifications_refresh():
+        """Make the reminders that are due for this person (a read never does), then return their list."""
         account = current_account()
         generate_reminders(account=account)
         db.session.commit()
-        limit = min(max(request.args.get("limit", default=50, type=int), 1), 200)
-        query = Notification.query.filter_by(account_id=account.id)
-        if request.args.get("unread") in {"1", "true"}:
-            query = query.filter(Notification.read_at.is_(None))
-        rows = query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit).all()
-        unread = Notification.query.filter_by(account_id=account.id, read_at=None).count()
-        return jsonify({"items": [notification_dict(row) for row in rows], "unread_count": unread})
+        return jsonify(notification_list_payload(account))
 
     @app.route("/api/notifications/<int:notification_id>/read", methods=["POST"])
     @require_api_login()
@@ -22495,7 +22504,6 @@ def workflow_approvals_payload() -> dict:
             query = query.order_by(LeaveCase.forwarded_at.asc(), LeaveCase.id.asc())
         return query.limit(limit).all()
 
-    adopt_legacy_leave_logs(commit=True)
     standing_pending = {slug: standing_cases(slug, ("Dean Review",)) for slug in LEAVE_SLUGS}
     decided_statuses = ("Leave Scheduled", "On Leave", "Return Due", "Approved", "Denied", "Closed", "Expired", "Returned")
     standing_recent = {slug: standing_cases(slug, decided_statuses, 12, recent=True) for slug in LEAVE_SLUGS}
@@ -22646,14 +22654,17 @@ def onboarding_checklist_state(upload: MonitoringSheetUpload) -> list[dict]:
 
 
 def onboarding_review_dict(item: OnboardingReview) -> dict:
-    checklist = json.loads(item.checklist_json) if item.checklist_json else []
+    # The checklist and counts are worked out from the import every time, so a page view never has to
+    # write them back (a stored copy would go stale as soon as a validation issue is resolved).
+    live = onboarding_review_figures(item.upload) if item.upload else None
+    checklist = live["checklist"] if live else (json.loads(item.checklist_json) if item.checklist_json else [])
     return {
         "id": item.id,
         "upload_id": item.upload_id,
         "program_code": item.program_code,
-        "student_count": item.student_count,
-        "new_student_count": item.new_student_count,
-        "unresolved_issue_count": item.unresolved_issue_count,
+        "student_count": live["student_count"] if live else item.student_count,
+        "new_student_count": live["new_student_count"] if live else item.new_student_count,
+        "unresolved_issue_count": live["unresolved_issue_count"] if live else item.unresolved_issue_count,
         "checklist": checklist,
         "checklist_complete": all(c.get("passed") for c in checklist) if checklist else False,
         "status": item.status,
@@ -22666,22 +22677,43 @@ def onboarding_review_dict(item: OnboardingReview) -> dict:
     }
 
 
+def onboarding_review_figures(upload: MonitoringSheetUpload) -> dict:
+    """The counts and checklist of one import, read from the data (no writes)."""
+    students = Student.query.filter_by(monitoring_upload_id=upload.id).all()
+    return {
+        "checklist": onboarding_checklist_state(upload),
+        "student_count": len(students),
+        "new_student_count": sum(1 for s in students if s.monitoring_new_student),
+        "unresolved_issue_count": MonitoringValidationIssue.query.filter(
+            MonitoringValidationIssue.upload_id == upload.id,
+            MonitoringValidationIssue.status != "Resolved",
+        ).count(),
+    }
+
+
 def build_onboarding_review(upload: MonitoringSheetUpload) -> OnboardingReview:
+    """Make (or bring up to date) the Dean-gate row of one import. A write: imports and the refresh call it."""
     review = OnboardingReview.query.filter_by(upload_id=upload.id).first()
     if review is None:
         review = OnboardingReview(upload_id=upload.id)
         db.session.add(review)
-    students = Student.query.filter_by(monitoring_upload_id=upload.id).all()
-    checklist = onboarding_checklist_state(upload)
+    figures = onboarding_review_figures(upload)
     review.program_code = upload.program_code
-    review.student_count = len(students)
-    review.new_student_count = sum(1 for s in students if s.monitoring_new_student)
-    review.unresolved_issue_count = MonitoringValidationIssue.query.filter(
-        MonitoringValidationIssue.upload_id == upload.id,
-        MonitoringValidationIssue.status != "Resolved",
-    ).count()
-    review.checklist_json = json.dumps(checklist)
+    review.student_count = figures["student_count"]
+    review.new_student_count = figures["new_student_count"]
+    review.unresolved_issue_count = figures["unresolved_issue_count"]
+    review.checklist_json = json.dumps(figures["checklist"])
     return review
+
+
+def ensure_onboarding_reviews(limit: int = 12) -> int:
+    """Give each recent import its onboarding row. Returns how many were made."""
+    made = 0
+    for upload in MonitoringSheetUpload.query.order_by(MonitoringSheetUpload.uploaded_at.desc()).limit(limit).all():
+        if OnboardingReview.query.filter_by(upload_id=upload.id).first() is None:
+            made += 1
+        build_onboarding_review(upload)
+    return made
 
 
 # ---------------------------------------------------------------------------
@@ -23867,7 +23899,6 @@ def reports_payload(filters=None) -> dict:
     ]
     missing_section = section("missing_requirements", len(missing_all), missing_rows)
 
-    adopt_legacy_leave_logs(commit=True)
     leave_query = LeaveCase.query.order_by(LeaveCase.updated_at.desc(), LeaveCase.id.desc())
     leave_query = leave_query.filter(LeaveCase.student_id.in_(student_ids)) if not empty else leave_query.filter(False)
     loa_readmission_rows = []
@@ -24103,7 +24134,6 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         context["graduation_review_windows"] = graduation_school_year_options()
         context["graduation_default_review_window"] = default_graduation_school_year()
     elif slug == "awol":
-        sync_automatic_awol_statuses(commit=True)
         context["roster"] = awol_residency_roster_payload()
         context["residency_reasons"] = RESIDENCY_REASONS
         context["policy_citations"] = AWOL_RESIDENCY_CITATIONS
@@ -28310,8 +28340,8 @@ def adviser_candidate_list() -> list[dict]:
 
 
 def adviser_tracker_payload(student: Student) -> dict:
-    """Everything the student's 'My research adviser' page shows."""
-    migrate_student_adviser(student)
+    """Everything the student's 'My research adviser' page shows. It only reads: the appointment record is
+    made when the adviser is recorded (import, designation, application) or by the seed."""
     rows = AdviserAppointment.query.filter_by(student_id=student.id).order_by(AdviserAppointment.id.desc()).all()
     active = student_active_appointments(student.id)
     open_row = next((row for row in rows if row.status in ADVISER_OPEN_STATUSES), None)
@@ -29130,6 +29160,16 @@ def generate_reminders(account: UserAccount | None = None, today: date | None = 
                 link="/student/calendar", related_type=item["kind"], dedupe_key=f"deadline_soon:{item['id']}", due_on=parse_date(item["date"]),
             )
     return created
+
+
+def notification_list_payload(account: UserAccount) -> dict:
+    limit = min(max(request.args.get("limit", default=50, type=int), 1), 200)
+    query = Notification.query.filter_by(account_id=account.id)
+    if request.args.get("unread") in {"1", "true"}:
+        query = query.filter(Notification.read_at.is_(None))
+    rows = query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit).all()
+    unread = Notification.query.filter_by(account_id=account.id, read_at=None).count()
+    return {"items": [notification_dict(row) for row in rows], "unread_count": unread}
 
 
 def notification_dict(row: Notification) -> dict:
@@ -37945,6 +37985,9 @@ def build_demo_database() -> dict:
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         sync_leave_cases(commit=True)  # dates move leave cases along
+        ensure_onboarding_reviews()
+        generate_reminders()  # the reminders that are due today (a page view no longer makes them)
+        db.session.commit()
         spread_seed_history()  # last, so nothing is stamped after it: history over the previous weeks
         return sync_result
 
