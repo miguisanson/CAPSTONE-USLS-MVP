@@ -287,3 +287,109 @@ test.describe("Defense scheduling and the Research Gate header (research coordin
     await shotsAt(page, "research-gate-header");
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// I-063: the lifecycle workflow pages open with the shared PageHeader, not a white card with "WHO USES IT / DATA CAPTURED".
+// I-089: Practicum's scope is a one-line note, its columns are as wide as the other boards', a card with no date says nothing.
+// Written after the pins above and red on the old code.
+// ---------------------------------------------------------------------------------------------------------------
+const LIFECYCLE_PAGES = [
+  ["student-handoff", "Student Handoff"],
+  ["course-audit", "Course Audit"],
+  ["research-gate", "Research Gate Readiness"],
+  ["panel-matching", "Panel Matching"],
+  ["defense-scheduling", "Defense Scheduling"],
+  ["practicum", "Practicum"],
+  ["graduation", "Graduation"],
+];
+
+test.describe("Lifecycle workflow pages open with the shared header (I-063)", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  for (const [slug, title] of LIFECYCLE_PAGES) {
+    test(`${slug}: PageHeader title, no who-uses/data-captured boilerplate, header not boxed in a card`, async ({ page }) => {
+      await page.goto(`/workflow/${slug}`);
+      const heading = main(page).getByRole("heading", { level: 1, name: title });
+      await expect(heading).toBeVisible();
+      await expect(main(page).locator("h1")).toHaveCount(1);
+      await page.waitForLoadState("networkidle");
+      await expect(main(page).getByText(/who uses it/i)).toHaveCount(0);
+      await expect(main(page).getByText(/data captured/i)).toHaveCount(0);
+      // PageHeader renders a bare <header>; the old block was a .card around it.
+      const boxed = await heading.evaluate((node) => Boolean(node.closest("header")?.closest(".card")));
+      expect(boxed, "the header sits inside a card").toBe(false);
+      const headerBox = await heading.evaluate((node) => {
+        const header = node.closest("header");
+        return header ? header.getBoundingClientRect().height : 0;
+      });
+      expect(headerBox, "there is a header element").toBeGreaterThan(0);
+    });
+  }
+
+  test("the who-uses / data-captured text is kept in the How this works guide", async ({ page }) => {
+    await page.goto("/workflow/practicum");
+    await main(page).getByRole("button", { name: "How this works" }).click();
+    const guide = page.getByRole("dialog");
+    await expect(guide.getByText("Used by", { exact: true })).toBeVisible();
+    await expect(guide).toContainText("Student / GS Staff / Academic Coordinator / Dean");
+    await expect(guide.getByText("What it records", { exact: true })).toBeVisible();
+    await expect(guide).toContainText("MOA status, practicum site, required/completed hours");
+    await page.keyboard.press("Escape");
+
+    await page.goto("/workflow/research-gate?student_id=146");
+    const rail = main(page).locator(".card").filter({ has: page.getByRole("heading", { level: 2, name: "How this works" }) });
+    await expect(rail).toContainText("Used by");
+    await expect(rail).toContainText("What it records");
+  });
+
+  test("header buttons exist on the pages that have no side guide", async ({ page }) => {
+    for (const slug of ["practicum", "graduation", "course-audit"]) {
+      await page.goto(`/workflow/${slug}`);
+      await expect(main(page).getByRole("button", { name: "How this works" }), slug).toBeVisible();
+      await expect(main(page).getByRole("button", { name: "View recent activity" }), slug).toBeVisible();
+    }
+  });
+});
+
+test.describe("Practicum board matches the other boards (I-089)", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  test("scope is a one-line note under the header, not a green banner", async ({ page }) => {
+    await page.goto("/workflow/practicum");
+    await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
+    await expect(main(page).getByText("Program scope:")).toHaveCount(0);
+    const note = main(page).getByText(/Practicum applies to Psychology and MSGC students only/);
+    await expect(note).toBeVisible();
+    const box = await note.boundingBox();
+    expect(box.height, "the note is one line").toBeLessThan(28);
+    const banner = await note.evaluate((node) => getComputedStyle(node.closest("div,p")).backgroundColor);
+    expect(banner, "no green banner behind the note").not.toMatch(/rgb\((2[0-4]\d|[0-9]{1,2}), 2[0-5]\d, /);
+  });
+
+  test("columns are as wide as on the Withdrawal board", async ({ page }) => {
+    const widthOf = async (slug, label) => {
+      await page.goto(`/workflow/${slug}`);
+      const board = page.getByRole("region", { name: label });
+      await expect(board).toBeVisible();
+      return board.locator(":scope section[aria-label]").first().evaluate((node) => Math.round(node.getBoundingClientRect().width));
+    };
+    const practicum = await widthOf("practicum", "Practicum workflow board");
+    const withdrawal = await widthOf("withdrawal", "Subject withdrawal board");
+    expect(practicum).toBe(withdrawal);
+  });
+
+  test("a card with no date does not say Updated", async ({ page }) => {
+    await page.goto("/workflow/practicum");
+    const board = main(page).getByRole("region", { name: "Practicum workflow board" });
+    await expect(board.getByText("Andrea Villanueva", { exact: true })).toBeVisible();
+    await expect(board.getByText(/Updated\s*[—-]/)).toHaveCount(0);
+    await expect(board.getByText(/Updated/)).toHaveCount(0);
+  });
+
+  test("a card with a date still shows it", async ({ page }) => {
+    await withOneCase(page);
+    await page.goto("/workflow/practicum");
+    const card = main(page).getByRole("region", { name: "Practicum workflow board" }).getByRole("article").filter({ hasText: "Andrea Villanueva" });
+    await expect(card).toContainText(/Updated .*2026/);
+  });
+});
