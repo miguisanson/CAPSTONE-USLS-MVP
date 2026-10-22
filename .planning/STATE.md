@@ -1,5 +1,25 @@
 # State
 
+## HANDOFF AT USAGE LIMIT (2026-10-22 evening) — do this first
+
+Branch `v5.3-migui_test` is pushed and green at the last merge (python gate 661 OK on e7be427; later merges were
+frontend-only, each checked with targeted e2e). Three helpers were still running when the limit hit; their work is
+on branches, NOT merged:
+1. `pkt/be4` (wt/be4) - notifications on decisions (I-059), GETs/login stop writing (I-071, I-072), coordinator
+   dashboard API (I-066), N+1 /api/students (I-093), daily-changes student_id (I-047). Review its commits
+   (`git log v5.3-migui_test..pkt/be4`), run tests/test_v53_backend2.py + test_reads_do_not_write.py, merge, then the
+   full gate in wt/gate. If it has uncommitted changes, finish or discard them.
+2. `pkt/p8` (wt/p8) - Phase 5 close-out: last check:ui hits, shims removed, `check:ui --strict` in npm run e2e,
+   ModalShell out (I-118). After merging, change the AGENTS.md gate line it reports.
+3. `pkt/iso` (wt/iso) - e2e order-independence class fix (I-100/I-113/I-121): DATA-OWNERSHIP.md + guard.
+Then: consistency findings I-122..I-128 (`research/CONSISTENCY-2026-10-22.md` ends with a 5-packet split A-E;
+packets touching FacultyPages/DeanReportPages/Layout must not run together); I-120 a11y follow-ups; Reports rebuild
+IM20 (I-068, needs app.py) + coordinator home frontend on be4's API; I-119 server strings; I-105 batch 'Next: Dean'.
+Worktree junction rule: `cmd //c rmdir <wt>rontend
+ode_modules` BEFORE `git worktree remove`.
+Leftover locked folders to delete after a reboot: wt/vocab, wt/enr, wt/seed2, wt/ca, wt/leave, wt/p24, wt/p65, wt/p66,
+wt/lists, wt/stu, wt/a11y (deregistered already).
+
 ## CURRENT RUN (2026-10-22, v5.3) — read this first
 
 - **Branch:** `v5.3-migui_test` (from `v5.2-migui_again` @ c426b6f, pushed). Owner decisions IM25-IM27 (4 helpers, agent decides everything, bolder improvements allowed).
