@@ -9,7 +9,8 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be2` (I-055..I-058, I-036, I-073; R-012).
   - `seed2` / `pkt/seed2` — the only app.py editor: seed quality I-060 advisers<=limit and never on own panel, I-062 Dean queues seeded, I-061 stage vs units/titles/departments, I-070 dates spread, I-094, I-095 (new `tests/test_seed_quality.py`, port 5311).
   - MERGED `pkt/shell` (I-103, I-101, I-112); RoleSidebar.jsx deleted (unused).
-  - MERGED `pkt/enr` (P6.7/P6.8, I-082, I-081 part).
+  - MERGED `pkt/enr` (P6.7/P6.8, I-082, I-081 part). Folder wt/enr locked by a helper process; delete later.
+  - `lists` / `pkt/lists` — I-075 compre column, I-083 grouped alerts, I-098 program selects, I-104 faculty table at 390, I-109 AC task links (spec p85, port 5317).
   - Gate on 176b0cf: python **652 OK**; e2e 315/318 (3 p78 order failures, fixed by pkt/bpol). LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
   - MERGED `pkt/bpol` (I-110, I-108, I-106, I-111, I-113).
   - `p65` / `pkt/p65` — P6.5 staff setup pages + Course Adjustments decision table (I-069) + policy placeholder (I-081 part) (spec p84, port 5316).
