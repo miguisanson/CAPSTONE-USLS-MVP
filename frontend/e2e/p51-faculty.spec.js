@@ -314,6 +314,9 @@ test.describe("My Advisees", () => {
   test("consent: Agree to release sends consent yes", async ({ page }) => {
     const state = { inbox: [], consents: [{ id: 910, kind: "Change", student_name: "Release Student", program_code: "MAED", student_number: "MK-020", faculty_name: "Dr. New Adviser", reason: "Wants a new adviser." }], advisees: [], meter: { max: 5, active: 0, pending: 0 } };
     const calls = [];
+    const portal = await (await page.request.get("/api/faculty-portal/context")).json();
+    portal.advisees = []; // the one advisee table joins both sources, so "no advisees" needs both empty
+    await mockJson(page, "**/api/faculty-portal/context", () => portal);
     await mockJson(page, "**/api/faculty-portal/adviser-requests", () => state);
     await mockPost(page, "**/api/faculty-portal/adviser-requests/*/consent", calls, () => { state.consents = []; });
     await openFromSidebar(page, "My Advisees", "My Advisees");

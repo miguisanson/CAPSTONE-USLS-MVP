@@ -112,19 +112,6 @@ const nameCell = (name, sub) => (
   </>
 );
 
-const ADVISEE_COLUMNS = [
-  { key: "student", header: "Student", cell: (row) => nameCell(row.student.name, row.student.student_number), sortable: true, sortValue: (row) => row.student.name },
-  { key: "program", header: "Program", cell: (row) => row.student.program_code, sortable: true, sortValue: (row) => row.student.program_code },
-  { key: "stage", header: "Stage", cell: (row) => <StatusChip status={row.student.current_stage} dot={false} />, sortable: true, sortValue: (row) => row.student.current_stage },
-  { key: "documents", header: "Documents", cell: (row) => row.documents.length, sortable: true, sortValue: (row) => row.documents.length },
-  {
-    key: "pending",
-    header: "Needs signature",
-    cell: (row) => (row.pending_count ? <StatusChip status="Pending" label={`${row.pending_count} pending`} dot={false} /> : <span className="meta">None</span>),
-    sortable: true, sortValue: (row) => row.pending_count || 0,
-  },
-];
-
 export function FacultyAdviseesPage() {
   const { data } = useFaculty();
   const advisees = data.advisees || [];
@@ -136,16 +123,7 @@ export function FacultyAdviseesPage() {
         icon={Users}
         actions={<Button as={Link} variant="secondary" icon={FileSignature} to="/faculty-portal/signatures">Signatures</Button>}
       />
-      <FacultyAdviserPanel />
-      <DataTable
-        caption="Advisees and the research documents that need your signature"
-        columns={ADVISEE_COLUMNS}
-        rows={advisees}
-        rowKey={(row) => row.student.id}
-        pageSize={0}
-        minWidth="md"
-        empty={{ icon: Users, title: "No advisees yet", hint: "Students appear here once they are assigned to you as their adviser." }}
-      />
+      <FacultyAdviserPanel portalAdvisees={advisees} />
     </div>
   );
 }
