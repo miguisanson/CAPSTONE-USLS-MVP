@@ -5,7 +5,7 @@
 Branch `v5.3-migui_test` is pushed and green at the last merge (python gate 661 OK on e7be427; later merges were
 frontend-only, each checked with targeted e2e). Three helpers were still running when the limit hit; their work is
 on branches, NOT merged:
-1. MERGED `pkt/be4` (96ded3d; R-014; full gate on it -> `gate53/gate_be4.txt`), `pkt/wire` (bell refresh, staff Refresh
+1. MERGED `pkt/be4` (96ded3d; R-014; full gate on it: **680 OK**), `pkt/wire` (bell refresh, staff Refresh
    data, coordinator homes), `pkt/conA` (Dean consistency). In flight: `pkt/rep` (wt/rep, port 5335, the only app.py
    editor: Reports rebuild IM20 = five real reports + short analytics, I-068), `pkt/conD` (wt/conD, port 5336: student
    consistency I-128 part), `pkt/conC` (workflow consistency), `pkt/iso` (e2e order class). Next: packet B (list
