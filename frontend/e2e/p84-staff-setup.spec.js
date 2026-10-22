@@ -445,7 +445,7 @@ test.describe("P6.5: one header style on the five pages (review F-09)", () => {
 test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-15)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
-  test("one table: subject, demand, decision, sections, faculty; one row per subject, none taller than 72 px on average", async ({ page }) => {
+  test("one table: subject, demand, decision, sections, faculty; one row per subject, none taller than 96 px on average (two-line subject titles; the old stacked cards were ~250 px)", async ({ page }) => {
     test.setTimeout(120_000);
     const data = await openCourseAdjustments(page);
     const table = main(page).getByRole("table", { name: "Course offering decisions" });
@@ -461,7 +461,7 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
       await expect(line.locator(`button[aria-label="Offer ${row.course.code}"], button[aria-label="Hold ${row.course.code}"]`)).toHaveCount(1);
     }
     const box = await table.locator("tbody").boundingBox();
-    expect(box.height / data.demand.length, `average row height ${Math.round(box.height / data.demand.length)} px`).toBeLessThan(72);
+    expect(box.height / data.demand.length, `average row height ${Math.round(box.height / data.demand.length)} px`).toBeLessThan(96);
     // the stacked cards of the old page are gone
     await expect(main(page).getByText(/^Show the \d+ affected students?$/)).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(4000);
