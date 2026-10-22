@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
-import { StatusBadge } from "../../components/ui";
+import { Button, DataTable, StatusChip } from "../../components/ui/index.js";
 import { plural } from "../leave/leaveHelpers";
 
 const REPORT_STATUSES = [
@@ -10,6 +10,37 @@ const REPORT_STATUSES = [
   "Re-enrollment Completed",
   "Residency",
   "Residency Completed",
+];
+
+const COLUMNS = [
+  {
+    key: "student",
+    header: "Student",
+    cell: (item) => (
+      <>
+        <p className="font-semibold text-ink">{item.student.name}</p>
+        <p className="meta">{item.student.student_number} · {item.student.program_code}</p>
+      </>
+    ),
+  },
+  { key: "kind", header: "Type", cell: (item) => item.kind_label },
+  { key: "status", header: "Status", cell: (item) => <StatusChip status={item.status_label} dot={false} /> },
+  {
+    key: "report",
+    header: <span className="sr-only">Report</span>,
+    align: "right",
+    cell: (item) => (
+      <Button
+        as="a"
+        href={`/api/${item.kind === "RESIDENCY" ? "residency" : "awol"}/${item.record_id}/registrar-report`}
+        variant="secondary"
+        size="sm"
+        icon={Download}
+      >
+        Download report
+      </Button>
+    ),
+  },
 ];
 
 /**
@@ -27,7 +58,7 @@ export default function AwolRegistrar({ ctx }) {
           <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 id="registrar-heading" className="text-base font-semibold text-ink">Registrar list</h3>
+          <h3 id="registrar-heading" className="card-title">Registrar list</h3>
           <p className="mt-0.5 text-sm text-slate-600">
             Approved returns and residency semesters go to the Registrar. The portal does not send any email: download the report and
             email it through the official channel. Enrollment itself stays a separate Academic Coordinator step.
@@ -36,39 +67,8 @@ export default function AwolRegistrar({ ctx }) {
             <p className="mt-3 text-sm text-slate-500">Nothing to send to the Registrar yet. Approved returns and recorded residency appear here.</p>
           ) : (
             <>
-              <p className="mt-3 text-xs text-slate-500">{plural(rows.length, "report")} available.</p>
-              <div className="relative mt-2 overflow-x-auto rounded-xl border border-slate-200">
-                <table className="w-full min-w-[36rem] text-left text-sm">
-                  <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th scope="col" className="px-3 py-2.5">Student</th>
-                      <th scope="col" className="px-3 py-2.5">Type</th>
-                      <th scope="col" className="px-3 py-2.5">Status</th>
-                      <th scope="col" className="px-3 py-2.5"><span className="sr-only">Report</span></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {rows.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-3 py-3 align-top">
-                          <p className="font-semibold text-ink">{item.student.name}</p>
-                          <p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p>
-                        </td>
-                        <td className="px-3 py-3 align-top text-slate-700">{item.kind_label}</td>
-                        <td className="px-3 py-3 align-top"><StatusBadge value={item.status_label} dot={false} /></td>
-                        <td className="px-3 py-3 align-top text-right">
-                          <a
-                            href={`/api/${item.kind === "RESIDENCY" ? "residency" : "awol"}/${item.record_id}/registrar-report`}
-                            className="btn-ghost px-3 py-1.5"
-                          >
-                            <Download className="h-3.5 w-3.5" /> Download report
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <p className="meta mt-3">{plural(rows.length, "report")} available.</p>
+              <DataTable className="mt-2" caption="Reports for the Registrar" columns={COLUMNS} rows={rows} minWidth="sm" pageSize={0} />
             </>
           )}
         </div>

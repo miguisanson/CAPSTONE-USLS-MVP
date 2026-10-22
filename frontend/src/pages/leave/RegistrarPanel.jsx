@@ -3,11 +3,8 @@ import { Download, FileSpreadsheet, MailCheck, Send } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { formatDate, formatDateTime } from "../../lib/format";
-import { EmptyState, ErrorNote, Spinner } from "../../components/ui";
+import { Button, DataTable, EmptyState, HistoryPanel, InlineNotice, Spinner, StatusChip } from "../../components/ui/index.js";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
-import { LeaveStatusBadge } from "../../components/leaveStatus";
-import { Banner } from "./leaveUi";
 import { plural, whenText } from "./leaveHelpers";
 
 const HANDOFF_TONE = {
@@ -19,35 +16,26 @@ const HANDOFF_TONE = {
 
 const EXPORTABLE = ["Pending Handoff", "Exported - Ready to Send"];
 
+const HISTORY_COLUMNS = [
+  { key: "file_name", header: "File", cell: (row) => <span className="font-medium text-ink">{row.file_name}</span> },
+  { key: "case_count", header: "Requests" },
+  { key: "exported_by", header: "Downloaded by" },
+  { key: "exported_at", header: "When", cell: (row) => <span className="text-slate-500">{formatDateTime(row.exported_at)}</span> },
+];
+
 function ExportHistory({ slug }) {
   const { data, loading, error } = useApi(() => api.leaveExportLog(slug), [slug]);
   if (loading) return <Spinner label="Loading export history..." />;
-  if (error) return <ErrorNote message={error} />;
-  const items = data?.items || [];
-  if (!items.length) return <EmptyState title="No lists downloaded yet" hint="Each download is recorded here." />;
+  if (error) return <InlineNotice tone="danger">{error}</InlineNotice>;
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200">
-      <table className="w-full min-w-[32rem] text-left text-sm">
-        <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
-          <tr>
-            <th scope="col" className="px-3 py-2">File</th>
-            <th scope="col" className="px-3 py-2">Requests</th>
-            <th scope="col" className="px-3 py-2">Downloaded by</th>
-            <th scope="col" className="px-3 py-2">When</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
-          {items.map((row) => (
-            <tr key={row.id}>
-              <td className="px-3 py-2 font-medium text-ink">{row.file_name}</td>
-              <td className="px-3 py-2 text-slate-700">{row.case_count}</td>
-              <td className="px-3 py-2 text-slate-700">{row.exported_by || "-"}</td>
-              <td className="px-3 py-2 text-slate-500">{formatDateTime(row.exported_at)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      caption="Registrar lists downloaded"
+      columns={HISTORY_COLUMNS}
+      rows={data?.items || []}
+      minWidth="sm"
+      pageSize={0}
+      empty={{ title: "No lists downloaded yet", hint: "Each download is recorded here." }}
+    />
   );
 }
 
@@ -124,6 +112,50 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
     }
   }
 
+  const columns = [
+    {
+      key: "select",
+      width: "2.5rem",
+      header: (
+        <input
+          type="checkbox"
+          checked={allSelected}
+          onChange={toggleAll}
+          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          aria-label="Tick every request in the Registrar list"
+        />
+      ),
+      cell: (item) => (
+        <input
+          type="checkbox"
+          checked={selected.has(item.id)}
+          onChange={() => toggle(item)}
+          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          aria-label={`Tick ${item.student.name}`}
+        />
+      ),
+    },
+    {
+      key: "student",
+      header: "Student",
+      cell: (item) => (
+        <>
+          <p className="font-semibold text-ink">{item.student.name}</p>
+          <p className="meta">
+            {item.student.student_number} · {item.student.program_code}
+          </p>
+        </>
+      ),
+    },
+    { key: "period", header: readmission ? "Return semester" : "Leave period", cell: (item) => whenText(item) },
+    { key: "decided", header: "Dean decision", cell: (item) => formatDate(item.decided_at) },
+    {
+      key: "handoff",
+      header: "Handoff",
+      cell: (item) => <StatusChip status={item.registrar.status} tone={HANDOFF_TONE[item.registrar.status] || "muted"} dot={false} />,
+    },
+  ];
+
   return (
     <section aria-labelledby="registrar-heading" className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-start gap-3">
@@ -131,7 +163,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
           <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <h3 id="registrar-heading" className="text-base font-semibold text-ink">Registrar list</h3>
+          <h3 id="registrar-heading" className="card-title">Registrar list</h3>
           <p className="mt-0.5 text-sm text-slate-600">
             Dean-approved requests that go to the Registrar. The portal does not send any email: download the list, email it yourself,
             then mark it as sent. Mark it as acknowledged when the Registrar confirms.
@@ -141,7 +173,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
 
       <div className="mt-4 space-y-3">
         {message && (
-          <Banner tone={message.tone} onDismiss={() => setMessage(null)}>
+          <InlineNotice tone={message.tone} icon onDismiss={() => setMessage(null)}>
             <p>{message.text}</p>
             {message.skipped?.length > 0 && (
               <div className="mt-2 font-normal">
@@ -155,7 +187,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
                 </ul>
               </div>
             )}
-          </Banner>
+          </InlineNotice>
         )}
 
         {rows.length === 0 ? (
@@ -166,78 +198,32 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => download("xlsx")} disabled={Boolean(busy)} className="btn-primary px-4 py-2">
-                <Download className="h-4 w-4" /> {busy === "xlsx" ? "Preparing..." : "Download list (Excel)"}
-              </button>
-              <button type="button" onClick={() => download("csv")} disabled={Boolean(busy)} className="btn-ghost px-4 py-2">
-                <Download className="h-4 w-4" /> {busy === "csv" ? "Preparing..." : "Download list (CSV)"}
-              </button>
-              <button type="button" onClick={() => advance("Sent to Registrar")} disabled={Boolean(busy) || !selectedRows.length} className="btn-ghost px-4 py-2">
-                <Send className="h-4 w-4" /> Mark as sent
-              </button>
-              <button type="button" onClick={() => advance("Acknowledged")} disabled={Boolean(busy) || !selectedRows.length} className="btn-ghost px-4 py-2">
-                <MailCheck className="h-4 w-4" /> Mark as acknowledged
-              </button>
+              <Button icon={Download} loading={busy === "xlsx"} onClick={() => download("xlsx")} disabled={Boolean(busy)}>
+                {busy === "xlsx" ? "Preparing..." : "Download list (Excel)"}
+              </Button>
+              <Button variant="secondary" icon={Download} loading={busy === "csv"} onClick={() => download("csv")} disabled={Boolean(busy)}>
+                {busy === "csv" ? "Preparing..." : "Download list (CSV)"}
+              </Button>
+              <Button variant="secondary" icon={Send} onClick={() => advance("Sent to Registrar")} disabled={Boolean(busy) || !selectedRows.length}>
+                Mark as sent
+              </Button>
+              <Button variant="secondary" icon={MailCheck} onClick={() => advance("Acknowledged")} disabled={Boolean(busy) || !selectedRows.length}>
+                Mark as acknowledged
+              </Button>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="meta">
               {selectedRows.length
                 ? `${plural(selectedRows.length, "request")} ticked.`
                 : "Nothing ticked: a download includes every request still waiting to go out."}
             </p>
 
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[44rem] text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th scope="col" className="w-10 px-3 py-2.5">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleAll}
-                        className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                        aria-label="Tick every request in the Registrar list"
-                      />
-                    </th>
-                    <th scope="col" className="px-3 py-2.5">Student</th>
-                    <th scope="col" className="px-3 py-2.5">{readmission ? "Return semester" : "Leave period"}</th>
-                    <th scope="col" className="px-3 py-2.5">Dean decision</th>
-                    <th scope="col" className="px-3 py-2.5">Handoff</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {rows.map((item) => (
-                    <tr key={item.id} className={selected.has(item.id) ? "bg-brand-50/40" : ""}>
-                      <td className="px-3 py-3 align-top">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(item.id)}
-                          onChange={() => toggle(item)}
-                          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                          aria-label={`Tick ${item.student.name}`}
-                        />
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <p className="font-semibold text-ink">{item.student.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {item.student.student_number} · {item.student.program_code}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3 align-top text-slate-700">{whenText(item)}</td>
-                      <td className="px-3 py-3 align-top text-slate-700">{formatDate(item.decided_at)}</td>
-                      <td className="px-3 py-3 align-top">
-                        <LeaveStatusBadge label={item.registrar.status} tone={HANDOFF_TONE[item.registrar.status] || "muted"} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable caption="Dean-approved requests for the Registrar" columns={columns} rows={rows} minWidth="md" pageSize={0} />
           </>
         )}
 
-        <HistoryDisclosure label="Export history" hideLabel="Hide export history">
+        <HistoryPanel label="Export history" hideLabel="Hide export history">
           <ExportHistory key={historyKey} slug={slug} />
-        </HistoryDisclosure>
+        </HistoryPanel>
       </div>
 
       {followUp && (

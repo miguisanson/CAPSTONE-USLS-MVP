@@ -1,4 +1,5 @@
-import { Columns3, List, Search, SlidersHorizontal } from "lucide-react";
+import { Columns3, List, SlidersHorizontal } from "lucide-react";
+import { Button, SearchInput, Select } from "../../components/ui/index.js";
 import { EMPTY_FILTERS } from "./leaveHelpers";
 
 export function ViewToggle({ value, onChange }) {
@@ -37,62 +38,34 @@ export function BoardFilterRow({ children, toggle }) {
 
 export default function LeaveFilters({ filters, setFilters, programs, statusOptions, reasons = [], kindOptions, count, total, noun = "requests" }) {
   const active = Object.values(filters).filter(Boolean).length;
-  const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  const set = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
+  const update = (key) => (event) => set(key, event.target.value);
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="relative block">
-          <span className="sr-only">Search</span>
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={filters.query}
-            onChange={update("query")}
-            className="field-input pl-10"
-            placeholder="Search students"
-            aria-label="Search requests by name, student number or program"
-          />
-        </label>
-        <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter by program">
-          <option value="">All programs</option>
-          {programs.map((program) => (
-            <option key={program} value={program}>{program}</option>
-          ))}
-        </select>
-        <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter by status">
-          <option value="">All statuses</option>
-          {statusOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+        <SearchInput
+          value={filters.query}
+          onChange={(value) => set("query", value)}
+          placeholder="Search students"
+          label="Search requests by name, student number or program"
+        />
+        <Select value={filters.program} onChange={update("program")} options={programs} placeholder="All programs" aria-label="Filter by program" />
+        <Select value={filters.status} onChange={update("status")} options={statusOptions} placeholder="All statuses" aria-label="Filter by status" />
         {reasons.length > 0 && (
-          <select value={filters.reason} onChange={update("reason")} className="field-input cursor-pointer" aria-label="Filter by reason">
-            <option value="">All reasons</option>
-            {reasons.map((reason) => (
-              <option key={reason} value={reason}>{reason}</option>
-            ))}
-          </select>
+          <Select value={filters.reason} onChange={update("reason")} options={reasons} placeholder="All reasons" aria-label="Filter by reason" />
         )}
         {kindOptions.length > 1 && (
-          <select value={filters.kind} onChange={update("kind")} className="field-input cursor-pointer" aria-label="Filter by type of request">
-            <option value="">All types</option>
-            {kindOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
+          <Select value={filters.kind} onChange={update("kind")} options={kindOptions} placeholder="All types" aria-label="Filter by type of request" />
         )}
       </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
         <span>
           Showing {count} of {total} {noun}
         </span>
         {active > 0 && (
-          <button
-            type="button"
-            onClick={() => setFilters(EMPTY_FILTERS)}
-            className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}
-          </button>
+          <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={() => setFilters(EMPTY_FILTERS)}>
+            Clear {active} filter{active === 1 ? "" : "s"}
+          </Button>
         )}
       </div>
     </div>

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { ErrorNote, Spinner } from "../../components/ui";
+import { Button, InlineNotice, Modal, Spinner } from "../../components/ui/index.js";
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
-import ModalShell from "./ModalShell";
 import { ActionButton } from "./leaveUi";
 import CaseConversation from "./CaseConversation";
 import { CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, FollowUpBlock, PolicyCheck, StudentSummary } from "./CaseSections";
@@ -34,9 +33,8 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
   const actions = detail?.actions || [];
 
   return (
-    <ModalShell
-      id={`${slug}-case-${caseId}`}
-      size="wide"
+    <Modal
+      size="lg"
       title={detail ? detail.student.name : "Request details"}
       subtitle={detail ? `${detail.kind_label} · ${detail.student.student_number} · ${detail.student.program_code}` : "Loading the request..."}
       badge={detail ? leaveCaseStatusBadge(detail) : null}
@@ -44,31 +42,27 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
       closeLabel="Close request details"
       footer={
         <>
-          <button type="button" onClick={onClose} className="btn-ghost px-4 py-2">
-            Close details
-          </button>
-          <div className="flex flex-wrap justify-end gap-2">
-            {detail && actions.length === 0 && (
-              <p className="self-center text-sm text-slate-500">
-                {detail.owner === "Dean"
-                  ? "Waiting for the Dean."
-                  : detail.owner === "Student"
-                    ? "Waiting for the student."
-                    : "No step is open right now."}
-              </p>
-            )}
-            {actions.map((action) => (
-              <ActionButton key={action.action} action={action} onClick={() => onAction(detail, action)} />
-            ))}
-          </div>
+          <Button variant="secondary" onClick={onClose}>Close details</Button>
+          {detail && actions.length === 0 && (
+            <p className="self-center text-sm text-slate-500">
+              {detail.owner === "Dean"
+                ? "Waiting for the Dean."
+                : detail.owner === "Student"
+                  ? "Waiting for the student."
+                  : "No step is open right now."}
+            </p>
+          )}
+          {actions.map((action) => (
+            <ActionButton key={action.action} action={action} onClick={() => onAction(detail, action)} />
+          ))}
         </>
       }
     >
-      {error && !detail && <ErrorNote message={error} />}
+      {error && !detail && <InlineNotice tone="danger">{error}</InlineNotice>}
       {!detail && !error && <Spinner label="Loading the request..." />}
       {detail && (
         <div className="space-y-4">
-          {error && <ErrorNote message={error} />}
+          {error && <InlineNotice tone="danger">{error}</InlineNotice>}
           <LeaveTimeline steps={detail.timeline} />
           <CaseSummary item={detail} />
           <PolicyCheck detail={detail} />
@@ -83,6 +77,6 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
           <CaseHistory detail={detail} vocabulary={vocabulary} />
         </div>
       )}
-    </ModalShell>
+    </Modal>
   );
 }

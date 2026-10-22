@@ -1,15 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
-import { Field, Input, Textarea } from "../../components/forms";
-import { Banner } from "./leaveUi";
+import { Button, Field, InlineNotice, Input, Textarea } from "../../components/ui/index.js";
 import { defaultBatchName, plural } from "./leaveHelpers";
 
-const BUTTON_STYLES = {
-  primary: "btn-primary",
-  danger: "btn bg-red-600 text-white hover:bg-red-700",
-  warn: "btn bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-300 hover:bg-amber-200",
-  secondary: "btn-ghost",
-};
+// The server's tone for a step -> a Button look ("warn" is the secondary look, like every return button in the app).
+const VARIANT = { primary: "primary", danger: "danger", warn: "secondary", secondary: "secondary" };
 
 /**
  * The group step, the same in all four processes: tick cards, then apply one step to all of
@@ -54,10 +49,12 @@ export default function BatchBar({ selectedItems, slug, actions, nameBatches = f
 
   if (!actions.length) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900">
-        <p>The {plural(selectedItems.length, "ticked request")} do not share a group step. Tick requests in the same column.</p>
-        <button type="button" onClick={onClear} className="btn-ghost px-4 py-2">Clear selection</button>
-      </div>
+      <InlineNotice tone="warning">
+        <div className="flex flex-wrap items-center justify-between gap-3 font-normal">
+          <p>The {plural(selectedItems.length, "ticked request")} do not share a group step. Tick requests in the same column.</p>
+          <Button variant="secondary" onClick={onClear}>Clear selection</Button>
+        </div>
+      </InlineNotice>
     );
   }
 
@@ -87,23 +84,23 @@ export default function BatchBar({ selectedItems, slug, actions, nameBatches = f
         )}
         <div className="flex flex-wrap items-center gap-2 pb-0.5">
           {actions.map((action) => (
-            <button
+            <Button
               key={action.action}
-              type="button"
+              variant={VARIANT[action.tone] || "primary"}
+              icon={action.action === "forward" ? Send : undefined}
+              loading={busy === action.action}
               disabled={Boolean(busy)}
               onClick={() => run(action)}
-              className={`${BUTTON_STYLES[action.tone] || BUTTON_STYLES.primary} px-4 py-2.5`}
             >
-              {action.action === "forward" && <Send className="h-4 w-4" />}
-              {busy === action.action ? "Working..." : `${action.label} (${selectedItems.length})`}
-            </button>
+              {`${action.label} (${selectedItems.length})`}
+            </Button>
           ))}
-          <button type="button" onClick={onClear} disabled={Boolean(busy)} className="btn-ghost px-4 py-2.5">
+          <Button variant="secondary" onClick={onClear} disabled={Boolean(busy)}>
             Clear selection
-          </button>
+          </Button>
         </div>
       </div>
-      {error && <p role="alert" className="mt-2 text-sm font-semibold text-red-700">{error}</p>}
+      {error && <InlineNotice tone="danger" className="mt-2">{error}</InlineNotice>}
     </div>
   );
 }
@@ -112,7 +109,7 @@ export function BatchResult({ result, onDismiss }) {
   if (!result) return null;
   const skipped = result.skipped || [];
   return (
-    <Banner tone={result.updated?.length ? "success" : "error"} onDismiss={onDismiss}>
+    <InlineNotice tone={result.updated?.length ? "success" : "danger"} icon onDismiss={onDismiss}>
       <p>{result.message}</p>
       {skipped.length > 0 && (
         <div className="mt-2 font-normal">
@@ -126,6 +123,6 @@ export function BatchResult({ result, onDismiss }) {
           </ul>
         </div>
       )}
-    </Banner>
+    </InlineNotice>
   );
 }

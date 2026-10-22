@@ -1,14 +1,14 @@
 import { CheckCircle2, Circle, Download, FileCheck, FileSpreadsheet, Eye, GraduationCap, History, ListChecks, ShieldCheck, Users } from "lucide-react";
 import { formatDate, formatDateTime } from "../../lib/format";
-import { EmptyState, ProgressBar, StatusBadge } from "../../components/ui";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
+import { ProgressBar } from "../../components/ui";
+import { Button, HistoryPanel, StatusChip } from "../../components/ui/index.js";
 import { Block } from "./leaveUi";
 import { plural, whenDates, whenText } from "./leaveHelpers";
 
 function Row({ label, children, full = false }) {
   return (
     <div className={full ? "sm:col-span-2" : ""}>
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="eyebrow">{label}</dt>
       <dd className="mt-0.5 whitespace-pre-wrap text-sm text-ink">{children}</dd>
     </div>
   );
@@ -68,7 +68,7 @@ export function CaseSummary({ item }) {
         )}
         <Row label="Stage and tag before leaving">{before || "-"}</Row>
         <Row label="Eligibility result">
-          {item.eligibility_result ? <StatusBadge value={item.eligibility_result} dot={false} /> : "Not set yet"}
+          {item.eligibility_result ? <StatusChip status={item.eligibility_result} dot={false} /> : "Not set yet"}
         </Row>
         <Row label="Filed">{formatDate(item.submitted_at)}</Row>
         <Row label="Sent to the Dean">{formatDate(item.forwarded_at)}</Row>
@@ -88,9 +88,9 @@ export function PolicyCheck({ detail }) {
   return (
     <Block title="Policy check" icon={ShieldCheck} hint="Advice for staff - the Dean decides.">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge value={review.recommendation} dot={false} />
+        <StatusChip status={review.recommendation} dot={false} />
         {review.suggested_dean_action && (
-          <span className="text-xs text-slate-500">Suggested for the Dean: {review.suggested_dean_action}</span>
+          <span className="meta">Suggested for the Dean: {review.suggested_dean_action}</span>
         )}
       </div>
       {review.summary && <p className="mt-2 text-sm text-slate-700">{review.summary}</p>}
@@ -101,7 +101,7 @@ export function PolicyCheck({ detail }) {
               <p className="text-sm font-semibold text-ink">{check.label}</p>
               {check.detail && <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{check.detail}</p>}
             </div>
-            <StatusBadge value={check.status} dot={false} />
+            <StatusChip status={check.status} dot={false} />
           </li>
         ))}
       </ul>
@@ -213,9 +213,9 @@ export function FollowUpBlock({ detail }) {
       {(followUp.links || []).length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {followUp.links.map((link) => (
-            <a key={link.url} href={link.url} className="btn-ghost px-3 py-1.5">
-              <Download className="h-3.5 w-3.5" /> {link.label}
-            </a>
+            <Button key={link.url} as="a" href={link.url} variant="secondary" size="sm" icon={Download}>
+              {link.label}
+            </Button>
           ))}
         </div>
       ) : (
@@ -241,11 +241,11 @@ export function FileList({ files = [] }) {
                 </p>
               </div>
               {file.file_exists !== false ? (
-                <a href={file.url} target="_blank" rel="noreferrer" className="btn-ghost px-3 py-1.5">
-                  <Eye className="h-3.5 w-3.5" /> View file
-                </a>
+                <Button as="a" href={file.url} target="_blank" rel="noreferrer" variant="secondary" size="sm" icon={Eye}>
+                  View file
+                </Button>
               ) : (
-                <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">File unavailable</span>
+                <StatusChip tone="danger" label="File unavailable" dot={false} />
               )}
             </li>
           ))}
@@ -263,57 +263,40 @@ function eventWord(event, vocabulary) {
 }
 
 export function CaseHistory({ detail, vocabulary }) {
-  const events = detail.events || [];
-  const logs = detail.history || [];
+  const events = (detail.events || []).map((event) => ({
+    id: event.id,
+    title: eventWord(event, vocabulary),
+    at: event.created_at,
+    actor: event.actor_name || "Someone",
+    actorRole: event.actor_role,
+    from: event.from_status,
+    to: event.to_status,
+    note: event.comment,
+  }));
+  const logs = (detail.history || []).map((log) => ({
+    id: log.id,
+    title: log.result,
+    at: log.created_at,
+    actor: log.actor_role,
+    from: log.previous_status,
+    to: log.new_status,
+    note: log.notes,
+  }));
   return (
     <Block title="History" icon={History}>
       <div className="space-y-3">
-        <HistoryDisclosure label="Who did what" hideLabel="Hide who did what" count={events.length}>
-          {!events.length ? (
-            <EmptyState title="No steps recorded yet" />
-          ) : (
-            <ol className="space-y-2">
-              {events.map((event) => (
-                <li key={event.id} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="font-semibold text-ink">{eventWord(event, vocabulary)}</p>
-                    <time className="text-xs text-slate-400" dateTime={event.created_at || undefined}>{formatDateTime(event.created_at)}</time>
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {event.actor_name || "Someone"}
-                    {event.actor_role ? ` (${event.actor_role})` : ""}
-                    {event.from_status || event.to_status ? ` · ${event.from_status || "-"} to ${event.to_status || "-"}` : ""}
-                  </p>
-                  {event.comment && <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{event.comment}</p>}
-                </li>
-              ))}
-            </ol>
-          )}
-        </HistoryDisclosure>
-        <HistoryDisclosure label="Activity log" hideLabel="Hide activity log" count={logs.length}>
-          {!logs.length ? (
-            <EmptyState title="No activity yet" hint="Filings, messages and decisions will appear here." />
-          ) : (
-            <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
-              {logs.map((log) => (
-                <li key={log.id} className="relative rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-                  <span className="absolute -left-[27px] top-4 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-ink">{log.result}</p>
-                    <time className="text-xs text-slate-400" dateTime={log.created_at || undefined}>{formatDateTime(log.created_at)}</time>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{log.actor_role}</p>
-                  {(log.previous_status || log.new_status) && (
-                    <p className="mt-2 text-xs font-semibold text-slate-600">
-                      {log.previous_status || "-"} <span className="mx-1 text-slate-300">to</span> {log.new_status || "-"}
-                    </p>
-                  )}
-                  {log.notes && <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-500">{log.notes}</p>}
-                </li>
-              ))}
-            </ol>
-          )}
-        </HistoryDisclosure>
+        <HistoryPanel
+          label="Who did what"
+          hideLabel="Hide who did what"
+          entries={events}
+          emptyText="No steps recorded yet"
+        />
+        <HistoryPanel
+          label="Activity log"
+          hideLabel="Hide activity log"
+          entries={logs}
+          emptyText="No activity yet. Filings, messages and decisions will appear here."
+        />
       </div>
     </Block>
   );

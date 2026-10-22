@@ -105,7 +105,7 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
       await expect(page.getByRole("region", { name: region }), slug).toBeVisible();
       await expect(page.getByRole("button", { name: "How this works" }), `${slug}: guide`).toBeVisible();
       await expect(page.getByRole("button", { name: "View recent activity" }), `${slug}: activity`).toBeVisible();
-      await expect(page.getByRole("textbox", { name: /Search requests by name/ }), `${slug}: search`).toBeVisible();
+      await expect(page.getByRole("searchbox", { name: /Search requests by name/ }), `${slug}: search`).toBeVisible();
       await expect(page.getByRole("combobox", { name: "Filter by program" }), `${slug}: program`).toBeVisible();
       await expect(page.getByRole("combobox", { name: "Filter by status" }), `${slug}: status`).toBeVisible();
       const toggle = page.getByRole("group", { name: "Choose how to show the requests" });
