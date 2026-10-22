@@ -220,6 +220,39 @@ test.describe("P7.9 Dean pages", () => {
     await page.unroute(/\/api\/onboarding\/reviews$/);
   });
 
+  test("I-111: the Dean's report panels ask the server once each, empty or not, and speak to the Dean", async ({ page }) => {
+    const hits = { coursework: 0, onboarding: 0 };
+    const answer = (key, items) => (route) => {
+      hits[key] += 1;
+      return route.fulfill({ json: { items } });
+    };
+    // empty: the Dean's own words, one request each
+    await page.route(/\/api\/coursework\/reports$/, answer("coursework", []));
+    await page.route(/\/api\/onboarding\/reviews$/, answer("onboarding", []));
+    await page.goto("/dean/gate-reports");
+    await expect(main(page).getByText("No coursework reports have been sent to you yet.")).toBeVisible();
+    await expect(main(page).getByText("No onboarding reports have been sent to you yet.")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect(hits, "empty: one request per panel").toEqual({ coursework: 1, onboarding: 1 });
+    await page.unroute(/\/api\/coursework\/reports$/);
+    await page.unroute(/\/api\/onboarding\/reviews$/);
+
+    // not empty: still one request per panel (the page used to ask first, then the panel asked again)
+    hits.coursework = 0;
+    hits.onboarding = 0;
+    await page.route(/\/api\/coursework\/reports$/, answer("coursework", [
+      { id: 1, term_label: "Term 1", program: null, status: "Dean Review", students_reviewed: 3, completion_issue_count: 1, missing_subject_count: 2 },
+    ]));
+    await page.route(/\/api\/onboarding\/reviews$/, answer("onboarding", [
+      { id: 1, program_code: "MAED", student_count: 2, new_student_count: 1, source_file: "batch.xlsx", status: "Dean Review", checklist: [], checklist_complete: true },
+    ]));
+    await page.goto("/dean/gate-reports");
+    await expect(main(page).getByText("Term 1", { exact: false })).toBeVisible();
+    await expect(main(page).getByText("batch.xlsx")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect(hits, "with reports: one request per panel").toEqual({ coursework: 1, onboarding: 1 });
+  });
+
   test("I-106: the Dean's graduation board is as wide as the Dean's Leave of Absence board", async ({ page }) => {
     // Same kind of page, same board: the Leave of Absence board sits straight on the page; the graduation roster was
     // wrapped in one more padded card, so its columns were ~50 px narrower.

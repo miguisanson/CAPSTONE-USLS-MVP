@@ -151,6 +151,25 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
     });
   }
 
+  test("I-111: every board is the same width (no extra card around the Graduation board)", async ({ page }) => {
+    const widths = {};
+    for (const [slug, region] of [
+      ["leave-of-absence", "Leave of absence board"],
+      ["readmission", "Readmission board"],
+      ["awol", "AWOL and residency board"],
+      ["withdrawal", "Subject withdrawal board"],
+      ["practicum", "Practicum workflow board"],
+      ["graduation", "Graduation workflow Kanban board"],
+    ]) {
+      await page.goto(`/workflow/${slug}`);
+      const board = page.getByRole("region", { name: region });
+      await expect(board).toBeVisible();
+      widths[slug] = Math.round((await board.boundingBox()).width);
+    }
+    const all = Object.values(widths);
+    expect(Math.max(...all) - Math.min(...all), `board widths differ: ${JSON.stringify(widths)}`).toBeLessThanOrEqual(8);
+  });
+
   test.describe("at 390 px", () => {
     test.use({ viewport: { width: 390, height: 844 } });
     for (const [slug, region] of [

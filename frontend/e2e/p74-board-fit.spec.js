@@ -49,6 +49,59 @@ async function measure(board) {
   });
 }
 
+/**
+ * I-108 / I-106: the filter bar above a board. `row` is the line that holds the filter box and the Board/Table toggle.
+ * Returns the width of each control in it, whether the toggle sits on its own line, and whether the search
+ * placeholder fits its field (measured with the field's own font; a placeholder is not in the DOM to measure).
+ */
+async function measureFilterBar(page) {
+  const toggle = page.getByRole("group", { name: "Choose how to show the requests" });
+  await expect(toggle).toBeVisible();
+  return toggle.evaluate((group) => {
+    const row = group.parentElement;
+    const box = [...row.children].find((child) => child !== group);
+    const boxRect = box.getBoundingClientRect();
+    const groupRect = group.getBoundingClientRect();
+    const controls = [...box.querySelectorAll("input, select")].map((el) => ({ name: el.getAttribute("aria-label") || el.placeholder, width: el.getBoundingClientRect().width }));
+    const search = box.querySelector('input[placeholder^="Search"]');
+    let placeholderFits = null;
+    if (search) {
+      const style = getComputedStyle(search);
+      const context = document.createElement("canvas").getContext("2d");
+      context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const room = search.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      placeholderFits = { text: search.placeholder, need: Math.ceil(context.measureText(search.placeholder).width), room: Math.floor(room) };
+    }
+    return {
+      boxWidth: boxRect.width,
+      toggleWidth: groupRect.width,
+      toggleOnOwnRow: groupRect.top >= boxRect.bottom - 1,
+      toggleBesideBox: groupRect.left >= boxRect.right - 1,
+      controls,
+      placeholderFits,
+    };
+  });
+}
+
+/**
+ * Wait until the board has stopped moving. The scroll buttons use smooth scrolling (an animation of several frames), and the
+ * board's "stages out of sight" count, which switches a button on or off, is updated from the scroll events a frame later.
+ * Reading the buttons while the board is still moving is a race (I-110): the test saw the right button enabled, then the board
+ * landed on the last stage, the button switched off, and the click waited 20 s for a button that was never going to be enabled again.
+ */
+async function settled(board) {
+  let last = -1;
+  let still = 0;
+  await expect
+    .poll(async () => {
+      const now = (await measure(board)).scrollLeft;
+      still = now === last ? still + 1 : 0;
+      last = now;
+      return still;
+    }, { message: "the board stopped scrolling", intervals: [100], timeout: 10_000 })
+    .toBeGreaterThanOrEqual(3);
+}
+
 const noPageOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
 test.describe("P7.4 boards show every stage or say that more exist", () => {
@@ -90,16 +143,23 @@ test.describe("P7.4 boards show every stage or say that more exist", () => {
       await right.focus();
       await page.keyboard.press("Enter");
       await expect.poll(async () => (await measure(board)).scrollLeft, "the board scrolled right").toBeGreaterThan(100);
+      await settled(board);
       await expect(left).toBeEnabled();
       // Scroll to the end: the right button switches off and the cue talks about the stages on the left.
-      for (let i = 0; i < 8 && (await right.isEnabled()); i++) {
+      // The loop asks the board where it is (not the button, which follows the board a frame later) and clicks only a button
+      // that must still be on; every click is followed by a wait until the board has landed.
+      for (let i = 0; i < 8; i++) {
+        const { scrollLeft, maxScroll } = await measure(board);
+        if (scrollLeft >= maxScroll - 1) break;
+        await expect(right).toBeEnabled();
         await right.click();
-        await page.waitForTimeout(450);
+        await settled(board);
       }
       await expect(right).toBeDisabled();
       await expect(page.getByTestId("board-scroll-hint")).toHaveText(/to the left/);
+      const atEnd = (await measure(board)).scrollLeft;
       await left.click();
-      await expect.poll(async () => (await measure(board)).scrollLeft).toBeLessThan((await measure(board)).maxScroll);
+      await expect.poll(async () => (await measure(board)).scrollLeft, "the left button moved the board back").toBeLessThan(atEnd);
     });
 
     test(`${slug}: an empty column uses the shared EmptyState, not a dashed box`, async ({ page }) => {
@@ -131,8 +191,32 @@ test.describe("P7.4 boards show every stage or say that more exist", () => {
   });
 });
 
+test.describe("P7.4 filter bar (I-108)", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+  for (const [slug, label] of BOARDS) {
+    test(`${slug}: the search placeholder is not cut off at 1366`, async ({ page }) => {
+      await page.goto(`/workflow/${slug}`);
+      await expect(page.getByRole("region", { name: label })).toBeVisible();
+      const bar = await measureFilterBar(page);
+      expect(bar.placeholderFits, `${slug}: a search field in the filter bar`).not.toBeNull();
+      expect(bar.placeholderFits.need, `"${bar.placeholderFits.text}" needs ${bar.placeholderFits.need}px, the field has ${bar.placeholderFits.room}px`).toBeLessThanOrEqual(bar.placeholderFits.room);
+    });
+  }
+});
+
 test.describe("P7.4 phone width", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 390, height: 844 } });
+
+  for (const [slug, label] of BOARDS) {
+    test(`${slug}: the filter bar and the Board/Table toggle wrap the same way at 390 (I-106)`, async ({ page }) => {
+      await page.goto(`/workflow/${slug}`);
+      await expect(page.getByRole("region", { name: label })).toBeVisible();
+      const bar = await measureFilterBar(page);
+      expect(bar.boxWidth, `${slug}: the filter box is not a sliver`).toBeGreaterThanOrEqual(160);
+      for (const control of bar.controls) expect(control.width, `${slug}: "${control.name}" is at least 160px wide`).toBeGreaterThanOrEqual(160);
+      expect(bar.toggleOnOwnRow, `${slug}: the Board/Table toggle is on its own row on a phone`).toBe(true);
+    });
+  }
 
   for (const [slug, label] of BOARDS) {
     test(`${slug}: the board scrolls inside itself, the page does not`, async ({ page }) => {

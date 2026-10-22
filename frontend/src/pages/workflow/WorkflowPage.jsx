@@ -304,12 +304,13 @@ function SingleWorkflowPage() {
             <PracticumRoster {...formProps} />
           ) : slug === "defense-scheduling" ? (
             <DefenseSchedulingForm {...formProps} />
+          ) : slug === "graduation" ? (
+            <GraduationRoster {...formProps} />
           ) : (
             <Card pad="lg">
               {slug === "student-handoff" && <HandoffPanel {...formProps} />}
               {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
-              {slug === "graduation" && <GraduationRoster {...formProps} />}
             </Card>
           )}
 

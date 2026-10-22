@@ -56,7 +56,11 @@ export function OnboardingGatePanel({ role }) {
       <p className="text-sm text-slate-500">Each import batch is checked, reported to the Dean, and only then recorded as an admission completion. The checklist is derived from the import — it is not ticked by hand.</p>
       <Notice msg={msg} />
       {!items.length ? (
-        <EmptyState icon={FileSpreadsheet} title="No import batches yet" hint="Import a monitoring sheet to open an onboarding report." />
+        role === "dean" ? (
+          <EmptyState icon={FileSpreadsheet} title="No onboarding reports have been sent to you yet." hint="When Graduate School staff report an import batch, it appears here for your approval." />
+        ) : (
+          <EmptyState icon={FileSpreadsheet} title="No import batches yet" hint="Import a monitoring sheet to open an onboarding report." />
+        )
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
@@ -357,7 +361,11 @@ export function CourseworkReportPanel({ role }) {
       <p className="text-sm text-slate-500">Completion issues and missing subjects for the active term, compiled for the Dean's review.</p>
       <Notice msg={msg} />
       {!items.length ? (
-        <EmptyState icon={FileSpreadsheet} title="No coursework reports yet" hint="Generate one to send to the Dean." />
+        role === "dean" ? (
+          <EmptyState icon={FileSpreadsheet} title="No coursework reports have been sent to you yet." hint="When Graduate School staff send a coursework status report, it appears here for your review." />
+        ) : (
+          <EmptyState icon={FileSpreadsheet} title="No coursework reports yet" hint="Generate one to send to the Dean." />
+        )
       ) : (
         <div className="space-y-3">
           {items.slice(0, 5).map((item) => (
