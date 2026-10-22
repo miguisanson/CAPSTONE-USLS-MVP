@@ -5,7 +5,7 @@
 //   - the four staff process boards (Leave of Absence, Readmission, AWOL & Residency, Withdrawal): the page title, the board
 //     region, every stage column in order with its count equal to the cards in it, and the seeded cards in their columns;
 //     the Table view shows each case's status chip;
-//   - the Graduation board (StageBoard with its own column headers) and, inside a graduation case window, the stage
+//   - the Graduation board (StageBoard with the shared column header) and, inside a graduation case window, the stage
 //     timeline behind "View stage history": nine steps in order, the first one current;
 //   - a student's request pages (Leave of Absence, Return from AWOL): the "Where this request is" list with each step's
 //     label, which one is current, which are done;
@@ -139,15 +139,11 @@ test.describe("P2.3 shared process components", () => {
       await expect(board).toBeVisible();
       const titles = await board.locator("section").evaluateAll((sections) => sections.map((s) => s.getAttribute("aria-label")));
       expect(titles.length).toBeGreaterThanOrEqual(3);
-      expect(titles[0]).toMatch(/Academically Eligible/);
+      expect(titles[0]).toMatch(/Academically eligible/);
       await expect(board.getByText("Bianca Santos", { exact: true })).toBeVisible();
 
       // Bianca's own card (other specs move other students into this column, so "the first one" is not safe)
-      await board
-        .getByText("Bianca Santos", { exact: true })
-        .locator("xpath=ancestor::div[.//button[normalize-space()='View student']][1]")
-        .getByRole("button", { name: "View student", exact: true })
-        .click();
+      await board.getByRole("button", { name: "View details for Bianca Santos", exact: true }).click();
       const dialog = page.getByRole("dialog");
       await expect(dialog.getByRole("heading", { name: "Bianca Santos" })).toBeVisible();
       const toggle = dialog.getByRole("button", { name: /stage history/ });

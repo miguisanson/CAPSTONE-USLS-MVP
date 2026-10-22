@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   FileCheck,
   FileText,
-  Users,
   Briefcase,
   GraduationCap,
   ArrowUpRight,
@@ -13,14 +12,16 @@ import {
   BookOpenCheck,
 } from "lucide-react";
 import { api } from "../../api";
-import { SectionTitle, StatusBadge, ErrorNote } from "../../components/ui";
-import { Field, Input, Textarea, Select } from "../../components/forms";
+import { formatDate } from "../../lib/format";
+import { SectionTitle, ErrorNote } from "../../components/ui";
+import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import StageBoard from "../../components/StageBoard";
+import { ViewToggle } from "../leave/LeaveFilters";
 import { GraduationBatchModal } from "./GraduationBatchModal";
 import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, sortSelectedWorkflowRows } from "./graduationShared";
-import { CaseMessageHistory, DemoResetButton, DemoResetFeedback, Detail, MiniBox, RosterFilters, SubmitButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, WorkflowSubmitFeedback, uniqueValues, useDemoCaseReset } from "./shared";
+import { CaseMessageHistory, DemoResetButton, DemoResetFeedback, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, WorkflowSubmitFeedback, uniqueValues, useDemoCaseReset } from "./shared";
 
 function graduationBatchSelectionState(group, selectedIds) {
   const selectedCount = group.rows.filter((row) => selectedIds.has(row.student.id)).length;
@@ -31,72 +32,16 @@ function graduationBatchSelectionState(group, selectedIds) {
   };
 }
 
-function GraduationBatchStageModal({ group, onClose }) {
-  const currentStage = graduationBatchCurrentStage(group);
-  const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
-  return (
-    <WorkflowCaseModal
-      id={modalId}
-      title={`Graduation stage check for ${group.label}`}
-      subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
-      onClose={onClose}
-      size="wide"
-    >
-      <GraduationBatchStageCheck group={group} />
-    </WorkflowCaseModal>
-  );
+// Which completion details a role may open for each student of a batch.
+function graduationBatchDetailMode(group, accountRole) {
+  if (accountRole === "academic_coordinator" && group.boardStatus === "Coursework Review") return "coursework";
+  if (group.boardStatus === "Research Review") return "research-practicum";
+  if (["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision", "Ready for Dean Review", "Dean Approved"].includes(group.boardStatus)) return "all-completion";
+  return "";
 }
 
-const GRADUATION_BOARD_COLUMNS = [
-  {
-    label: "3 · Graduation Batch Created",
-    description: "Application-submitted candidates are now grouped and ready for GS Staff to forward for coursework review.",
-    statuses: ["For Review"],
-    empty: "No newly created batches are waiting for GS Staff routing.",
-  },
-  {
-    label: "4 · Academic Coordinator Coursework Review",
-    description: "The Academic Coordinator verifies completed curriculum requirements for each candidate in the batch.",
-    statuses: ["Coursework Review"],
-    empty: "No batches are waiting for coursework review.",
-  },
-  {
-    label: "5 · Research and Practicum Validation",
-    description: "The Research Coordinator validates research, defense, completion evidence, and required practicum completion.",
-    statuses: ["Research Review"],
-    empty: "No batches are waiting for research and practicum validation.",
-  },
-  {
-    label: "6 · Endorsement Preparation or Revision",
-    description: "Validated batches return to GS Staff for endorsement preparation or Dean-requested revision.",
-    statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"],
-    empty: "No batches are waiting for endorsement preparation or revision.",
-  },
-  {
-    label: "7 · Dean Review",
-    description: "Prepared endorsement batches await the Dean's approval or return decision.",
-    statuses: ["Ready for Dean Review"],
-    empty: "No batches are waiting for Dean review.",
-  },
-  {
-    label: "8 · Dean Approved and Ready for Export",
-    description: "Only approved and currently eligible candidates are available for CSV export and manual Registrar email.",
-    statuses: ["Dean Approved"],
-    empty: "No Dean-approved graduation batches are ready for export.",
-  },
-  {
-    label: "Exception Queue",
-    description: "Candidates whose revalidation found missing requirements remain visible for correction and student notification.",
-    statuses: ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete", "Not Eligible", "Returned for Clarification"],
-    empty: "No graduation exceptions currently require correction.",
-  },
-];
-
-function graduationReadyForDeanReview(group) {
-  return group.boardStatus === "Ready for Dean Review";
-}
-
-function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, detailMode = "", compact = false }) {
+// The students of one batch, with the buttons that open a student's case, the discussion, and the completion details.
+function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, detailMode = "" }) {
   const [expandedDetailKeys, setExpandedDetailKeys] = useState(() => new Set());
   const showCourseworkAction = ["coursework", "all-completion"].includes(detailMode);
   const showResearchPracticumActions = ["research-practicum", "all-completion"].includes(detailMode);
@@ -117,207 +62,133 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, det
         const courseworkPanelId = `graduation-card-coursework-${row.student.id}`;
         const researchPanelId = `graduation-card-research-${row.student.id}`;
         const practicumPanelId = `graduation-card-practicum-${row.student.id}`;
-        const readyToDrag = Boolean(row.has_submitted_documents);
         return (
-          <li
-            key={row.student.id}
-            className={`rounded-lg px-3 py-2 ring-1 ${readyToDrag ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-slate-200"}`}
-          >
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
-              <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+          <li key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
+                <p className="meta">{row.student.student_number} · {row.student.program_code}</p>
+              </div>
+              <span className="flex flex-wrap items-center gap-1.5">
+                <StatusChip status={graduationRowStatus(row)} dot={false} />
+                {!row.has_submitted_documents && <StatusChip label="Waiting for documents" tone="neutral" size="sm" dot={false} />}
+              </span>
             </div>
-            <span className="flex flex-wrap items-center gap-1.5"><StatusBadge value={graduationRowStatus(row)} dot={false} />{!row.has_submitted_documents && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Waiting for documents</span>}</span>
-          </div>
-          <GraduationRequirementBoxes row={row} />
-          {row.messages?.length > 0 && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> {row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</p>}
-          {(onOpenStudent || onMessageStudent) && (
+            <GraduationRequirementBoxes row={row} />
+            {row.messages?.length > 0 && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> {row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</p>}
             <div className="mt-2 flex flex-wrap gap-2">
-              {onOpenStudent && <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2 py-1 text-xs"><Eye className="h-3.5 w-3.5" /> View</button>}
+              <Button variant="secondary" size="sm" icon={Eye} onClick={() => onOpenStudent(row.student.id)}>View</Button>
               {showCourseworkAction && (
-                <button
-                  type="button"
-                  onClick={() => toggleDetail(row.student.id, "coursework")}
-                  className="btn-ghost cursor-pointer px-2 py-1 text-xs transition-colors"
-                  aria-expanded={courseworkOpen}
-                  aria-controls={courseworkPanelId}
-                >
-                  <BookOpenCheck className="h-3.5 w-3.5" />
+                <Button variant="secondary" size="sm" icon={BookOpenCheck} onClick={() => toggleDetail(row.student.id, "coursework")} aria-expanded={courseworkOpen} aria-controls={courseworkPanelId}>
                   {courseworkOpen ? "Hide coursework completed" : "View coursework completed"}
-                </button>
+                </Button>
               )}
               {showResearchPracticumActions && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => toggleDetail(row.student.id, "research")}
-                    className="btn-ghost cursor-pointer px-2 py-1 text-xs transition-colors"
-                    aria-expanded={researchOpen}
-                    aria-controls={researchPanelId}
-                  >
-                    <FileCheck className="h-3.5 w-3.5" />
+                  <Button variant="secondary" size="sm" icon={FileCheck} onClick={() => toggleDetail(row.student.id, "research")} aria-expanded={researchOpen} aria-controls={researchPanelId}>
                     {researchOpen ? "Hide research completion details" : "View research completion details"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleDetail(row.student.id, "practicum")}
-                    className="btn-ghost cursor-pointer px-2 py-1 text-xs transition-colors"
-                    aria-expanded={practicumOpen}
-                    aria-controls={practicumPanelId}
-                  >
-                    <Briefcase className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="secondary" size="sm" icon={Briefcase} onClick={() => toggleDetail(row.student.id, "practicum")} aria-expanded={practicumOpen} aria-controls={practicumPanelId}>
                     {practicumOpen ? "Hide practicum completion details" : "View practicum completion details"}
-                  </button>
+                  </Button>
                 </>
               )}
-              {row.endorsement && onMessageStudent && <button type="button" onClick={() => onMessageStudent(row)} className="btn cursor-pointer border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700 hover:border-red-300 hover:bg-red-100"><MessageSquare className="h-3.5 w-3.5" /> Message / Return</button>}
+              {row.endorsement && <Button variant="danger" size="sm" icon={MessageSquare} onClick={() => onMessageStudent(row)}>Message / Return</Button>}
             </div>
-          )}
-          {showCourseworkAction && courseworkOpen && <GraduationCompletedCourseworkView id={courseworkPanelId} row={row} />}
-          {showResearchPracticumActions && researchOpen && <GraduationResearchRequirementsView id={researchPanelId} row={row} />}
-          {showResearchPracticumActions && practicumOpen && <GraduationPracticumCompletionView id={practicumPanelId} row={row} />}
-        </li>
+            {showCourseworkAction && courseworkOpen && <GraduationCompletedCourseworkView id={courseworkPanelId} row={row} />}
+            {showResearchPracticumActions && researchOpen && <GraduationResearchRequirementsView id={researchPanelId} row={row} />}
+            {showResearchPracticumActions && practicumOpen && <GraduationPracticumCompletionView id={practicumPanelId} row={row} />}
+          </li>
         );
       })}
     </ul>
   );
 }
 
-function GraduationBatchRow({
-  group,
-  accountRole,
-  selectedIds = new Set(),
-  expanded = false,
-  selectedTone = false,
-  onToggleBatch,
-  onToggleExpanded,
-  onSelectBatch,
-  onProcessBatch,
-  onOpenStudent,
-  onMessageStudent,
-  onViewStage,
-  onExportBatch,
-  exporting = false,
-}) {
-  const selectionState = graduationBatchSelectionState(group, selectedIds);
-  const stageSelection = graduationStageSelection(group.rows, accountRole);
-  const actionLabel = graduationBatchActionLabel(stageSelection.action);
-  const visibleRows = expanded ? group.rows : [];
-  const hiddenCount = group.rows.length - Math.min(group.rows.length, 4);
-  const selectionLabel = selectionState.partiallySelected ? `${selectionState.selectedCount}/${group.rows.length} selected` : selectionState.allSelected ? "Batch selected" : "Select batch";
+// "View details" on a batch card: the stage check and, below it, every student of the batch.
+function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent }) {
   const currentStage = graduationBatchCurrentStage(group);
-  const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
-  const canExpandStudents = Boolean(onToggleExpanded && onOpenStudent && onMessageStudent);
-  const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
-  const readyForDean = graduationReadyForDeanReview(group);
-  const readyToDrag = applicationComplete || readyForDean;
-  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
-  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
-  const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
+  const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
   return (
-    <article
-      className={`rounded-xl border px-3 py-1.5 transition-colors ${readyToDrag ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : selectedTone ? "border-brand-200 bg-brand-50/50" : "border-slate-200 bg-white"}`}
+    <WorkflowCaseModal
+      id={modalId}
+      title={`Graduation stage check for ${group.label}`}
+      subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
+      onClose={onClose}
+      size="wide"
     >
-      <div className="space-y-3">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-start gap-2">
-            {onToggleBatch && (
-              <input
-                type="checkbox"
-                checked={selectionState.allSelected}
-                aria-checked={selectionState.partiallySelected ? "mixed" : selectionState.allSelected}
-                onChange={() => onToggleBatch(group)}
-                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                aria-label={`Select ${group.label}`}
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink">{group.label}</p>
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                <span>{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"}</span>
-                <span>·</span>
-                <span>{selectionLabel}</span>
-                <StatusBadge value={group.boardStatus === "Dean Approved" && alreadyExported ? "Exported - Ready to Send" : group.boardStatus} dot={false} />
-                {readyForDean && <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>}
-                {!applicationComplete && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Application document issue</span>}
-                {messageCount > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"><MessageSquare className="mr-1 inline h-3 w-3" />{messageCount} message{messageCount === 1 ? "" : "s"}</span>}
-              </div>
-            </div>
+      <div className="space-y-5">
+        <GraduationBatchStageCheck group={group} />
+        <div>
+          <h3 className="section-title">Students in this batch</h3>
+          <div className="mt-3">
+            <GraduationBatchStudentList
+              rows={group.rows}
+              onOpenStudent={onOpenStudent}
+              onMessageStudent={onMessageStudent}
+              detailMode={graduationBatchDetailMode(group, accountRole)}
+            />
           </div>
         </div>
-        <div className="min-w-0 border-t border-slate-200/70 pt-2 text-xs text-slate-600">
-          <p className="truncate"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
-          <p className="mt-0.5 truncate"><span className="font-semibold text-slate-700">Next:</span> {group.nextOwners.join(", ")}</p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
-          <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
-          <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>
-        </div>
-        <div className="flex min-w-0 flex-wrap justify-start gap-1.5 border-t border-slate-200/70 pt-2">
-          {canExpandStudents && <button type="button" onClick={() => onToggleExpanded(group.id)} className="btn-ghost cursor-pointer px-2.5 py-1"><Users className="h-4 w-4" /> {expanded ? "Hide students" : "View students"}</button>}
-          {onSelectBatch && <button type="button" onClick={() => onSelectBatch(group)} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>}
-          {canExport ? (
-            <button type="button" disabled={exporting} onClick={() => onExportBatch(group)} className="btn min-w-0 cursor-pointer whitespace-normal bg-emerald-600 px-2.5 py-1 text-left text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"><Download className="h-4 w-4 shrink-0" /> {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}</button>
-          ) : (
-            <button type="button" disabled={!stageSelection.action} onClick={() => onProcessBatch(group)} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4 shrink-0" /> {actionLabel}</button>
-          )}
-        </div>
       </div>
-      {canExpandStudents && expanded && (
-        <div className="mt-2 border-t border-slate-100 pt-2">
-          <GraduationBatchStudentList
-            rows={visibleRows}
-            onOpenStudent={onOpenStudent}
-            onMessageStudent={onMessageStudent}
-            detailMode={
-              accountRole === "academic_coordinator" && group.boardStatus === "Coursework Review"
-                ? "coursework"
-                : group.boardStatus === "Research Review"
-                  ? "research-practicum"
-                  : [
-                    "Eligibility Confirmed",
-                    "Endorsement Prepared",
-                    "Returned for Revision",
-                    "Ready for Dean Review",
-                    "Dean Approved",
-                  ].includes(group.boardStatus)
-                    ? "all-completion"
-                    : ""
-            }
-            compact
-          />
-        </div>
-      )}
-    </article>
+    </WorkflowCaseModal>
   );
 }
 
-// The Graduation staged board. The two candidate stages and the eight batch columns are
-// one StageBoard, so a card can be dragged (or moved with its "Move to..." menu). A move
-// never changes data here: it opens the same confirmation dialog the card buttons open,
-// which posts to the guarded endpoint, and the server checks every rule again.
+// The Graduation staged board, the same shape as the process boards (Leave of Absence...): stage name, a count and one
+// short line in each column header, default column width. Two candidate stages come first, then one column per batch step.
 const GRADUATION_STAGE_COLUMNS = [
   {
     key: "stage-1",
     kind: "stage",
-    stageNumber: 1,
     selectable: false,
-    label: "1 · Academically Eligible — Awaiting Student Application",
-    title: "Academically Eligible — Awaiting Student Application",
-    description: "These students completed all required academic, research, and practicum stages. They are visible to staff, but cannot be selected for a graduation batch until they submit the signed application / review-window PDF in the student portal.",
-    empty: "No academically eligible students are currently waiting for a graduation application.",
+    label: "Academically eligible",
+    description: "Waiting for the student's signed application.",
   },
   {
     key: "stage-2",
     kind: "stage",
-    stageNumber: 2,
     selectable: true,
-    label: "2 · Application Submitted — Ready for Batch Creation",
-    title: "Application Submitted — Ready for Batch Creation",
-    description: "The required student application / review-window PDF is on file. GS Staff may select individual students, all visible students, a program, or a completed-course cohort before creating the batch. Other staff accounts see this stage as read-only.",
-    empty: "No submitted graduation applications are waiting for batch creation.",
+    label: "Application submitted",
+    description: "Staff can now create a graduation batch.",
+  },
+];
+
+const GRADUATION_BOARD_COLUMNS = [
+  {
+    label: "Batch created",
+    description: "Staff forward it for coursework review.",
+    statuses: ["For Review"],
+  },
+  {
+    label: "Coursework review",
+    description: "The Academic Coordinator checks coursework.",
+    statuses: ["Coursework Review"],
+  },
+  {
+    label: "Research and practicum check",
+    description: "The Research Coordinator checks the evidence.",
+    statuses: ["Research Review"],
+  },
+  {
+    label: "Endorsement prep or revision",
+    description: "Staff prepare the list or revise it.",
+    statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"],
+  },
+  {
+    label: "Dean review",
+    description: "The Dean approves or returns the list.",
+    statuses: ["Ready for Dean Review"],
+  },
+  {
+    label: "Approved, ready to export",
+    description: "The Dean exports the approved list.",
+    statuses: ["Dean Approved"],
+  },
+  {
+    label: "Exceptions",
+    description: "Missing requirements to correct.",
+    statuses: ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete", "Not Eligible", "Returned for Clarification"],
   },
 ];
 
@@ -335,6 +206,10 @@ const GRADUATION_STEP_DESTINATION_STATUS = {
   send_to_dean: "Ready for Dean Review",
   approve: "Dean Approved",
 };
+
+function graduationReadyForDeanReview(group) {
+  return group.boardStatus === "Ready for Dean Review";
+}
 
 function graduationBoardItemId(item) {
   return item.kind === "student" ? `student:${item.row.student.id}` : `batch:${item.group.id}`;
@@ -369,7 +244,7 @@ function graduationBoardCheckMove(item, toColumn, accountRole) {
     if (toColumn.kind === "batch" && toColumn.statuses.includes("For Review")) {
       return accountRole === "staff" ? { allowed: true } : { allowed: false, reason: "Only Graduate School Staff create a graduation batch." };
     }
-    return { allowed: false, reason: "A submitted application moves to 'Graduation Batch Created' when staff create the batch." };
+    return { allowed: false, reason: "A submitted application moves to 'Batch created' when staff create the batch." };
   }
   const group = item.group;
   const selection = graduationStageSelection(group.rows, accountRole);
@@ -385,83 +260,141 @@ function graduationBoardCheckMove(item, toColumn, accountRole) {
   return { allowed: false, reason: `Move this batch one step at a time, to '${destination.label}': ${actionLabel}.` };
 }
 
-function GraduationBoardColumnHeader({ column, items, accountRole, selectedIds, onSelectAll, onClearSelection, onCreateBatch }) {
-  if (column.kind === "batch") {
-    return (
-      <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-slate-800">{column.label}</h3>
-          <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-500">{column.description}</p>
-        </div>
-        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{items.length}</span>
-      </header>
-    );
-  }
-  const rows = items.map((item) => item.row);
-  const canCreateBatch = column.selectable && accountRole === "staff";
-  const selectedCount = rows.filter((row) => selectedIds.has(row.student.id)).length;
-  const titleId = `graduation-candidate-stage-${column.stageNumber}`;
+// One card, the same skeleton as the process boards' CaseCard: name, number line, 1-2 detail lines, "Next:", one status chip.
+function GraduationCard({ selected = false, checkbox = null, title, subtitle, lines = [], next, chip, notes = null, children }) {
   return (
-    <div className="mb-4 space-y-3">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${column.selectable ? "bg-emerald-600 text-white" : "bg-slate-700 text-white"}`}>{column.stageNumber}</span>
-        <div>
-          <p id={titleId} className="font-display text-lg font-semibold text-ink">{column.title}</p>
-          <p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-600">{column.description}</p>
+    <article className={`rounded-xl border bg-white p-3 shadow-sm transition-colors ${selected ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200 hover:border-slate-300"}`}>
+      <div className="flex items-start gap-2.5">
+        {checkbox}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink">{title}</p>
+          <p className="truncate text-xs text-slate-500">{subtitle}</p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge value={`${rows.length} student${rows.length === 1 ? "" : "s"}`} dot={false} />
-        {canCreateBatch && rows.length > 0 && <button type="button" onClick={onSelectAll} className="btn-ghost cursor-pointer px-3 py-2">Select all visible</button>}
-        {canCreateBatch && selectedCount > 0 && <button type="button" onClick={onClearSelection} className="btn-ghost cursor-pointer px-3 py-2">Clear selection</button>}
-        {canCreateBatch && <button type="button" disabled={!selectedCount} onClick={onCreateBatch} className="btn-primary cursor-pointer px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4" /> Create graduation batch</button>}
-      </div>
-    </div>
+      {lines.map((line, index) => (
+        <p key={index} className={index === 0 ? "mt-2.5 text-xs font-medium text-slate-700" : "mt-0.5 text-xs text-slate-500"}>{line}</p>
+      ))}
+      <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {next}</p>
+      <div className="mt-2">{chip}</div>
+      {notes}
+      {children}
+    </article>
   );
 }
 
-function GraduationStudentCard({ row, selectable, canSelect, selected, onToggleStudent, onOpenStudent }) {
-  const completedCourses = row.eligibility?.completed_courses || [];
-  const applicationFile = row.endorsement?.request_attachment;
+function GraduationNote({ icon: Icon = MessageSquare, children }) {
   return (
-    <div className={`rounded-xl border p-3 ${selectable ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50/60"}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-2.5">
-          {canSelect && <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
-            <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
-          </div>
-        </div>
-        <span className="flex flex-wrap items-center justify-end gap-1.5">
-          <StatusBadge value={row.application_status} dot={false} />
+    <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-amber-800">
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+const viewButtonClass = "btn-ghost mt-3 w-full cursor-pointer px-2 py-1.5";
+const stepButtonClass = "btn-primary mt-2 w-full cursor-pointer whitespace-normal px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50";
+
+function GraduationStudentCard({ row, stage, canSelect, selected, onToggleStudent, onOpenStudent }) {
+  const applicationFile = row.endorsement?.request_attachment;
+  const awaiting = stage === "stage-1";
+  const lines = [awaiting ? "Requirements met. Signed application not in yet." : "Signed application is on file."];
+  return (
+    <GraduationCard
+      selected={selected}
+      checkbox={canSelect && (
+        <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />
+      )}
+      title={row.student.name}
+      subtitle={`${row.student.student_number} · ${row.student.program_code}`}
+      lines={lines}
+      next={row.next_action_owner || (awaiting ? "Student" : "Graduate School Staff")}
+      chip={<StatusChip status={row.application_status} dot={false} />}
+      notes={(
+        <>
           {row.has_submitted_documents && applicationFile?.file_exists !== false && applicationFile?.url && (
             <a
               href={applicationFile.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-brand-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+              className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
               aria-label={`View submitted graduation application PDF for ${row.student.name}`}
             >
-              <FileText className="h-3.5 w-3.5" /> View PDF <ArrowUpRight className="h-3 w-3" />
+              <FileText className="h-3.5 w-3.5" aria-hidden="true" /> View PDF <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
             </a>
           )}
-          {row.has_submitted_documents && applicationFile?.file_exists === false && (
-            <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">PDF unavailable</span>
-          )}
-        </span>
-      </div>
-      <GraduationRequirementBoxes row={row} />
-      {completedCourses.length > 0 && (
-        <p className="mt-2 text-xs text-slate-500">
-          <span className="font-semibold text-slate-700">Completed-course cohort:</span>{" "}
-          {completedCourses.slice(0, 4).map((course) => course.code).join(", ")}
-          {completedCourses.length > 4 ? ` +${completedCourses.length - 4} more` : ""}
-        </p>
+          {row.has_submitted_documents && applicationFile?.file_exists === false && <p className="mt-2 text-xs font-semibold text-red-700">PDF unavailable</p>}
+          {row.messages?.length > 0 && <GraduationNote>{row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</GraduationNote>}
+        </>
       )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs"><Eye className="h-3.5 w-3.5" /> View student</button>
-      </div>
+    >
+      <button type="button" onClick={() => onOpenStudent(row.student.id)} className={viewButtonClass} aria-label={`View details for ${row.student.name}`}>
+        <Eye className="h-3.5 w-3.5" /> View details
+      </button>
+    </GraduationCard>
+  );
+}
+
+function GraduationBatchCard({ group, accountRole, selectedIds, onToggleBatch, onProcessBatch, onViewBatch, onExportBatch, exporting = false }) {
+  const selectionState = graduationBatchSelectionState(group, selectedIds);
+  const stageSelection = graduationStageSelection(group.rows, accountRole);
+  const currentStage = graduationBatchCurrentStage(group);
+  const names = group.rows.map((row) => row.student.name).slice(0, 3).join(", ");
+  const hiddenCount = group.rows.length - Math.min(group.rows.length, 3);
+  const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
+  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
+  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
+  const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
+  const programs = uniqueValues(group.rows.map((row) => row.student.program_code)).join(", ");
+  return (
+    <GraduationCard
+      selected={selectionState.selectedCount > 0}
+      checkbox={onToggleBatch && (
+        <input
+          type="checkbox"
+          checked={selectionState.allSelected}
+          aria-checked={selectionState.partiallySelected ? "mixed" : selectionState.allSelected}
+          onChange={() => onToggleBatch(group)}
+          className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          aria-label={`Select ${group.label}`}
+        />
+      )}
+      title={group.label}
+      subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"}${programs ? ` · ${programs}` : ""}`}
+      lines={[`Students: ${names}${hiddenCount > 0 ? ` +${hiddenCount} more` : ""}`, `Step ${currentStage.number}: ${currentStage.label}`]}
+      next={group.nextOwners.join(", ")}
+      chip={<StatusChip status={group.boardStatus === "Dean Approved" && alreadyExported ? "Exported - Ready to Send" : group.boardStatus} dot={false} />}
+      notes={(
+        <>
+          {!applicationComplete && <GraduationNote icon={FileText}>Some application documents are missing.</GraduationNote>}
+          {messageCount > 0 && <GraduationNote>{messageCount} discussion message{messageCount === 1 ? "" : "s"}</GraduationNote>}
+        </>
+      )}
+    >
+      <button type="button" onClick={() => onViewBatch(group)} className={viewButtonClass} aria-label={`View details for ${group.label}`}>
+        <Eye className="h-3.5 w-3.5" /> View details
+      </button>
+      {canExport ? (
+        <button type="button" disabled={exporting} onClick={() => onExportBatch(group)} className={stepButtonClass}>
+          <Download className="h-3.5 w-3.5 shrink-0" /> {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
+        </button>
+      ) : stageSelection.action ? (
+        <button type="button" onClick={() => onProcessBatch(group)} className={stepButtonClass}>
+          <CheckSquare className="h-3.5 w-3.5 shrink-0" /> {graduationBatchActionLabel(stageSelection.action)}
+        </button>
+      ) : null}
+    </GraduationCard>
+  );
+}
+
+// Appears when candidates are ticked, like the process boards' group-step bar.
+function GraduationSelectionBar({ count, onCreateBatch, stepLabel, onStep, note, onClear }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50/60 p-3" role="group" aria-label="Apply a step to the selected candidates">
+      <span className="mr-auto text-sm font-semibold text-ink" aria-live="polite">{count} candidate{count === 1 ? "" : "s"} selected</span>
+      {note && <span className="meta">{note}</span>}
+      {onCreateBatch && <Button icon={CheckSquare} onClick={onCreateBatch}>Create graduation batch</Button>}
+      {onStep && <Button icon={CheckSquare} onClick={onStep}>{stepLabel}</Button>}
+      <Button variant="secondary" onClick={onClear}>Clear selection</Button>
     </div>
   );
 }
@@ -473,24 +406,27 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
   const [messageNotice, setMessageNotice] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
-  const [expandedBatchIds, setExpandedBatchIds] = useState(() => new Set());
-  const [stageGroup, setStageGroup] = useState(null);
+  const [view, setView] = useState("board");
+  const [stageGroupId, setStageGroupId] = useState(null);
   const [exportingBatchId, setExportingBatchId] = useState("");
   const [exportError, setExportError] = useState("");
   const [exportNotice, setExportNotice] = useState(null);
   const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", course: "", secondary: "", dateFrom: "", dateTo: "", sort: "newest" });
+  // `secondary` is the completed-course filter (one more control in the shared toolbar).
+  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", sort: "newest" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map(graduationRowStatus)), [rows]);
-  const completedCourses = useMemo(() => {
+  const completedCourseOptions = useMemo(() => {
     const coursesByCode = new Map();
     rows.forEach((row) => {
       (row.eligibility?.completed_courses || []).forEach((course) => {
         if (course.code && !coursesByCode.has(course.code)) coursesByCode.set(course.code, course);
       });
     });
-    return [...coursesByCode.values()].sort((left, right) => left.code.localeCompare(right.code));
+    return [...coursesByCode.values()]
+      .sort((left, right) => left.code.localeCompare(right.code))
+      .map((course) => ({ value: course.code, label: `${course.code} — ${course.title}` }));
   }, [rows]);
   const filteredRows = useMemo(() => rows.filter((row) => {
     const courseText = (row.eligibility?.completed_courses || []).map((course) => `${course.code} ${course.title}`).join(" ");
@@ -498,7 +434,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
       && (!filters.status || graduationRowStatus(row) === filters.status)
-      && (!filters.course || (row.eligibility?.completed_courses || []).some((course) => course.code === filters.course));
+      && (!filters.secondary || (row.eligibility?.completed_courses || []).some((course) => course.code === filters.secondary));
   }).sort((left, right) => left.student.name.localeCompare(right.student.name)), [rows, filters]);
   const visibleRows = useMemo(
     () => sortSelectedWorkflowRows(filteredRows, selectedIds, (row) => row.student.name, (row) => row.student.id),
@@ -532,13 +468,47 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     ],
     [awaitingApplicationRows, readyForBatchRows, visibleBatchGroups],
   );
-  function toggleReadyStudent(studentId) {
-    const readyIds = new Set(readyForBatchRows.map((row) => row.student.id));
+  // The table lists the same students as the board, one row each, with the batch under the stage.
+  const columnLabelByKey = useMemo(() => Object.fromEntries(GRADUATION_ALL_BOARD_COLUMNS.map((column) => [column.key, column.label])), []);
+  const tableRows = useMemo(
+    () => [
+      ...awaitingApplicationRows.map((row) => ({ row, stage: "stage-1", batch: "", status: row.application_status })),
+      ...readyForBatchRows.map((row) => ({ row, stage: "stage-2", batch: "", status: row.application_status })),
+      ...visibleBatchGroups.flatMap((group) => group.rows.map((row) => ({
+        row,
+        stage: graduationBoardColumnKey({ kind: "batch", group }),
+        batch: group.label,
+        status: graduationRowStatus(row),
+      }))),
+    ].map((item) => ({
+      ...item,
+      id: item.row.student.id,
+      stageLabel: columnLabelByKey[item.stage] || "",
+      waitingOn: item.row.next_action_owner || (item.stage === "stage-2" ? "Graduate School Staff" : "Student"),
+      updatedAt: item.row.last_activity_at || item.row.endorsement?.updated_at || "",
+    })),
+    [awaitingApplicationRows, readyForBatchRows, visibleBatchGroups, columnLabelByKey],
+  );
+
+  // What the ticked candidates can do: students with a signed application create a batch; students already in a batch
+  // share one step when the signed-in role has the same step due for all of them.
+  const readyIds = useMemo(() => new Set(readyForBatchRows.map((row) => row.student.id)), [readyForBatchRows]);
+  const tickedReady = readyForBatchRows.filter((row) => selectedIds.has(row.student.id));
+  const tickedBatched = visibleBatchedRows.filter((row) => selectedIds.has(row.student.id));
+  const tickedStep = tickedBatched.length ? graduationStageSelection(tickedBatched, accountRole) : null;
+
+  function toggleInGroup(studentId, groupIds) {
     setSelectedIds((current) => {
-      const next = new Set([...current].filter((id) => readyIds.has(id)));
+      const next = new Set([...current].filter((id) => groupIds.has(id)));
       if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
       return next;
     });
+  }
+  function toggleReadyStudent(studentId) {
+    toggleInGroup(studentId, readyIds);
+  }
+  function toggleBatchedStudent(studentId) {
+    toggleInGroup(studentId, new Set(visibleBatchedRows.map((row) => row.student.id)));
   }
   function createPreBatch() {
     const candidateIds = readyForBatchRows.filter((row) => selectedIds.has(row.student.id)).map((row) => row.student.id);
@@ -560,6 +530,11 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     setSelectedIds(new Set(group.rows.map((row) => row.student.id)));
     setBatchOpen(true);
   }
+  function processTickedStep() {
+    if (!tickedStep?.action) return;
+    setSelectedIds(new Set(tickedStep.processableRows.map((row) => row.student.id)));
+    setBatchOpen(true);
+  }
   // A drop (or the "Move to..." menu) only opens the same confirmation dialog the card buttons open.
   // The dialog posts to the guarded endpoint and the server checks every rule again.
   function moveGraduationBoardItem(item) {
@@ -576,12 +551,11 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
   }
   function renderGraduationBoardCard(item) {
     if (item.kind === "student") {
-      const canSelect = item.stage === "stage-2" && accountRole === "staff";
       return (
         <GraduationStudentCard
           row={item.row}
-          selectable={item.stage === "stage-2"}
-          canSelect={canSelect}
+          stage={item.stage}
+          canSelect={item.stage === "stage-2" && accountRole === "staff"}
           selected={selectedIds.has(item.row.student.id)}
           onToggleStudent={toggleReadyStudent}
           onOpenStudent={openCase}
@@ -589,28 +563,30 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       );
     }
     return (
-      <GraduationBatchRow
+      <GraduationBatchCard
         group={item.group}
         accountRole={accountRole}
         selectedIds={selectedIds}
-        expanded={expandedBatchIds.has(item.group.id)}
         onToggleBatch={["staff", "academic_coordinator", "research_coordinator"].includes(accountRole) ? toggleBatchGroup : null}
-        onToggleExpanded={toggleExpandedBatch}
         onProcessBatch={processBatchGroup}
-        onOpenStudent={openCase}
-        onMessageStudent={setMessageRow}
-        onViewStage={setStageGroup}
+        onViewBatch={(group) => setStageGroupId(group.id)}
         onExportBatch={accountRole === "dean" ? exportApprovedBatch : null}
         exporting={exportingBatchId === item.group.id}
       />
     );
   }
-  function toggleExpandedBatch(groupId) {
-    setExpandedBatchIds((current) => {
-      const next = new Set(current);
-      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
-      return next;
-    });
+  function renderColumnFooter(column, columnItems) {
+    if (column.key !== "stage-2" || accountRole !== "staff" || !columnItems.length) return null;
+    const allOn = columnItems.every((item) => selectedIds.has(item.row.student.id));
+    return (
+      <button
+        type="button"
+        onClick={() => setSelectedIds(allOn ? new Set() : new Set(readyForBatchRows.map((row) => row.student.id)))}
+        className="mt-3 cursor-pointer rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-700 transition-colors duration-200 hover:bg-brand-50 focus:outline-none focus:ring-2 focus:ring-brand-500 max-sm:min-h-11"
+      >
+        {allOn ? "Clear selection in this column" : "Select all in this column"}
+      </button>
+    );
   }
   async function exportApprovedBatch(group) {
     setExportingBatchId(group.id);
@@ -631,58 +607,137 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
   const selectedStageAction = selectedRow ? graduationStageActionForRow(selectedRow, accountRole) : null;
   const selectedEndorsement = selectedRow?.endorsement || null;
   const graduationSteps = selectedRow ? graduationTimelineSteps(selectedEndorsement?.endorsement_status, selectedRow.eligibility) : [];
+  const stageGroup = stageGroupId ? visibleBatchGroups.find((group) => group.id === stageGroupId) || graduationBatchGroups(rows.filter((row) => row.endorsement?.batch_name === stageGroupId))[0] || null : null;
 
   function openCase(studentId) {
     clearSubmitFeedback();
     reset.clearResetFeedback();
     setSelectedStudentId(studentId);
   }
+
+  const tableColumns = [
+    {
+      key: "select",
+      header: <span className="sr-only">Select</span>,
+      width: "2.5rem",
+      cell: ({ row, stage }) => {
+        const selectable = stage === "stage-2" ? accountRole === "staff" : Boolean(row.endorsement?.batch_name) && Boolean(graduationStageActionForRow(row, accountRole));
+        if (!selectable) return <span aria-hidden="true" />;
+        return (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(row.student.id)}
+            onChange={() => (stage === "stage-2" ? toggleReadyStudent(row.student.id) : toggleBatchedStudent(row.student.id))}
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            aria-label={stage === "stage-2" ? `Select ${row.student.name} for batch creation` : `Select ${row.student.name} for a group step`}
+          />
+        );
+      },
+    },
+    {
+      key: "student",
+      header: "Student",
+      sortable: true,
+      sortValue: ({ row }) => row.student.name,
+      cell: ({ row }) => (
+        <>
+          <p className="font-semibold text-ink">{row.student.name}</p>
+          <p className="meta">{row.student.student_number}</p>
+        </>
+      ),
+    },
+    { key: "program", header: "Program", sortable: true, sortValue: ({ row }) => row.student.program_code, cell: ({ row }) => row.student.program_code },
+    {
+      key: "stage",
+      header: "Stage",
+      sortable: true,
+      sortValue: (item) => GRADUATION_ALL_BOARD_COLUMNS.findIndex((column) => column.key === item.stage),
+      cell: (item) => (
+        <>
+          <p className="font-medium text-slate-700">{item.stageLabel}</p>
+          {item.batch && <p className="meta">{item.batch}</p>}
+        </>
+      ),
+    },
+    { key: "status", header: "Status", sortable: true, sortValue: (item) => item.status, cell: (item) => <StatusChip status={item.status} dot={false} /> },
+    { key: "waitingOn", header: "Waiting on", sortable: true, sortValue: (item) => item.waitingOn, cell: (item) => item.waitingOn },
+    {
+      key: "updated",
+      header: "Updated",
+      sortable: true,
+      sortValue: (item) => (item.updatedAt ? new Date(item.updatedAt) : null),
+      hideBelow: "sm",
+      cell: (item) => (item.updatedAt ? formatDate(item.updatedAt) : "—"),
+    },
+    {
+      key: "open",
+      header: <span className="sr-only">Open</span>,
+      cell: ({ row }) => (
+        <Button variant="secondary" size="sm" icon={Eye} onClick={() => openCase(row.student.id)} aria-label={`View details for ${row.student.name}`}>View</Button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`} icon={GraduationCap} />
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       {exportError && <div role="alert"><ErrorNote message={exportError} /></div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-      <RosterFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} count={filteredRows.length} total={rows.length} showAdvanced={false} />
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <label className="block max-w-xl">
-          <span className="field-label">Completed course cohort</span>
-          <select
-            value={filters.course}
-            onChange={(event) => setFilters((current) => ({ ...current, course: event.target.value }))}
-            className="field-input"
-          >
-            <option value="">All completed courses</option>
-            {completedCourses.map((course) => <option key={course.code} value={course.code}>{course.code} — {course.title}</option>)}
-          </select>
-        </label>
-        <p className="mt-2 text-xs text-slate-500">GS Staff can filter by program or completed course, choose “Select all visible” in Step 2, and create a cohort-specific graduation batch.</p>
-      </div>
-      <StageBoard
-        ariaLabel="Graduation workflow Kanban board"
-        columns={GRADUATION_ALL_BOARD_COLUMNS}
-        items={boardItems}
-        getItemId={graduationBoardItemId}
-        getColumnKey={graduationBoardColumnKey}
-        renderCard={renderGraduationBoardCard}
-        canDrag={(item) => graduationBoardCanDrag(item, accountRole)}
-        lockReason={(item) => graduationBoardLockReason(item, accountRole)}
-        showMoveMenu={(item) => !(item.kind === "student" && item.stage === "stage-1")}
-        checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}
-        onMove={moveGraduationBoardItem}
-        columnClassName="min-h-[520px] w-[380px]"
-        renderColumnHeader={(column, columnItems) => (
-          <GraduationBoardColumnHeader
-            column={column}
-            items={columnItems}
-            accountRole={accountRole}
-            selectedIds={selectedIds}
-            onSelectAll={() => setSelectedIds(new Set(readyForBatchRows.map((row) => row.student.id)))}
-            onClearSelection={() => setSelectedIds(new Set())}
-            onCreateBatch={createPreBatch}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <RosterFilters
+            filters={filters}
+            setFilters={setFilters}
+            programs={programs}
+            statuses={statuses}
+            secondaryLabel="completed courses"
+            secondaryOptions={completedCourseOptions}
+            count={filteredRows.length}
+            total={rows.length}
+            showAdvanced={false}
           />
-        )}
-      />
+        </div>
+        <ViewToggle value={view} onChange={setView} />
+      </div>
+      {selectedIds.size > 0 && (tickedReady.length > 0 || tickedBatched.length > 0) && (
+        <GraduationSelectionBar
+          count={tickedReady.length + tickedBatched.length}
+          onCreateBatch={tickedReady.length > 0 && accountRole === "staff" ? createPreBatch : null}
+          stepLabel={tickedStep?.action ? graduationBatchActionLabel(tickedStep.action) : ""}
+          onStep={tickedStep?.action && tickedReady.length === 0 ? processTickedStep : null}
+          note={tickedBatched.length > 0 && !tickedStep?.action ? "These candidates do not share a step that is due to you." : ""}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
+      {view === "board" ? (
+        <StageBoard
+          ariaLabel="Graduation workflow Kanban board"
+          columns={GRADUATION_ALL_BOARD_COLUMNS}
+          items={boardItems}
+          getItemId={graduationBoardItemId}
+          getColumnKey={graduationBoardColumnKey}
+          renderCard={renderGraduationBoardCard}
+          canDrag={(item) => graduationBoardCanDrag(item, accountRole)}
+          lockReason={(item) => graduationBoardLockReason(item, accountRole)}
+          showMoveMenu={(item) => !(item.kind === "student" && item.stage === "stage-1")}
+          checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}
+          onMove={moveGraduationBoardItem}
+          renderColumnFooter={renderColumnFooter}
+          emptyText="No candidates here"
+        />
+      ) : tableRows.length ? (
+        <DataTable
+          caption="Graduation candidates, one row per student"
+          columns={tableColumns}
+          rows={tableRows}
+          rowKey={(item) => item.id}
+          minWidth="lg"
+        />
+      ) : (
+        <EmptyState title="No candidates match these filters" hint="Clear a filter to see more." />
+      )}
+      {stageGroup && <GraduationBatchDetailsModal group={stageGroup} accountRole={accountRole} onClose={() => setStageGroupId(null)} onOpenStudent={openCase} onMessageStudent={setMessageRow} />}
       {selectedRow && (
         <WorkflowCaseModal
           id={`graduation-case-${selectedRow.student.id}`}
@@ -694,15 +749,15 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
           footer={(
             <>
               {accountRole === "staff" && selectedEndorsement && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
-              {selectedEndorsement && <button type="button" onClick={() => setMessageRow(selectedRow)} className="btn cursor-pointer border border-red-200 bg-red-50 px-4 py-2 text-red-700 hover:border-red-300 hover:bg-red-100"><MessageSquare className="h-4 w-4" /> Message / Return</button>}
+              {selectedEndorsement && <Button variant="danger" icon={MessageSquare} onClick={() => setMessageRow(selectedRow)}>Message / Return</Button>}
               {selectedStageAction ? (
-                <button type="button" disabled={submitting || refreshing} onClick={() => { setSelectedIds(new Set([selectedRow.student.id])); setBatchOpen(true); }} className="btn-primary cursor-pointer px-4 py-2">
+                <Button disabled={submitting || refreshing} onClick={() => { setSelectedIds(new Set([selectedRow.student.id])); setBatchOpen(true); }}>
                   {submitting ? "Saving…" : refreshing ? "Updating…" : selectedStageAction.label}
-                </button>
+                </Button>
               ) : selectedEndorsement?.endorsement_status === "Dean Approved" ? (
-                <span className="self-center rounded-lg bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700 ring-1 ring-brand-200">Awaiting Dean export</span>
+                <StatusChip status="Approved" label="Awaiting Dean export" dot={false} className="self-center" />
               ) : (
-                <span className="self-center text-xs font-semibold text-slate-500">No {WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.</span>
+                <span className="meta self-center font-semibold">No {WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.</span>
               )}
             </>
           )}
@@ -715,7 +770,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-brand-900">Student graduation application PDF</p>
-                  <p className="truncate text-xs text-brand-700">{selectedEndorsement.request_attachment.name}</p>
+                  <p className="meta truncate text-brand-700">{selectedEndorsement.request_attachment.name}</p>
                 </div>
                 <a href={selectedEndorsement.request_attachment.url} target="_blank" rel="noreferrer" className="btn-primary cursor-pointer px-3 py-2">
                   <Eye className="h-4 w-4" /> View submitted PDF <ArrowUpRight className="h-3.5 w-3.5" />
@@ -735,7 +790,6 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       )}
       {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
       {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
-      {stageGroup && <GraduationBatchStageModal group={stageGroup} onClose={() => setStageGroup(null)} />}
       {exportNotice && (
         <ExportFollowUpModal
           id="graduation-export-follow-up"
@@ -747,98 +801,5 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
         />
       )}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Graduation Endorsement
-// ---------------------------------------------------------------------------
-function GraduationForm({ context, studentId, submit, submitting }) {
-  const eligibility = context.graduation_eligibility || {};
-  const current = context.graduation_endorsement;
-  const reviewWindows = context.graduation_review_windows || [];
-  const activeReviewWindow = context.graduation_default_review_window || reviewWindows[0] || "";
-  const defaultReviewWindow = activeReviewWindow || current?.review_window || "";
-  const reviewWindowOptions = reviewWindows.map((schoolYear) => ({
-    value: schoolYear,
-    label: schoolYear === activeReviewWindow ? `${schoolYear} — Current school year` : `${schoolYear} — Not currently open`,
-    disabled: schoolYear !== activeReviewWindow,
-  }));
-  const [form, setForm] = useState({
-    review_window: defaultReviewWindow,
-    endorsement_status: "For Review",
-    dean_remarks: "",
-    source_reference: "",
-  });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  useEffect(() => {
-    setForm({
-      review_window: defaultReviewWindow,
-      endorsement_status: current?.endorsement_status || (eligibility.eligible ? "Ready for Dean Review" : "For Review"),
-      dean_remarks: current?.dean_remarks || "",
-      source_reference: "",
-    });
-  }, [studentId, current?.id, current?.updated_at, eligibility.eligible, defaultReviewWindow]);
-
-  function onSubmit(e) {
-    e.preventDefault();
-    submit({ student_id: studentId, ...form });
-  }
-
-  const missing = [
-    ...(eligibility.missing_coursework || []).map((item) => ({ type: "Coursework", item })),
-    ...(eligibility.missing_research_requirements || []).map((item) => ({ type: "Research", item })),
-    ...(eligibility.missing_practicum_requirement ? [{ type: "Practicum", item: eligibility.missing_practicum_requirement }] : []),
-  ];
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Review graduation endorsement" subtitle="Monitor endorsement readiness before the external graduation process" icon={GraduationCap} />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-        <MiniBox label="Coursework" value={eligibility.coursework_status || "Pending"} tone={eligibility.coursework_status === "Complete" ? "brand" : "amber"} />
-        <MiniBox label="Research" value={eligibility.research_status || "Pending"} tone={eligibility.research_status === "Complete" ? "brand" : "amber"} />
-        <MiniBox label="Practicum" value={eligibility.practicum_status || "Not Required"} tone={eligibility.practicum_status === "Not Required" || eligibility.practicum_status === "Dean Reviewed" ? "brand" : "amber"} />
-        <MiniBox label="Eligible" value={eligibility.eligible ? "Yes" : "No"} tone={eligibility.eligible ? "brand" : "red"} />
-      </div>
-      {missing.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="mb-2 text-sm font-semibold text-amber-900">Missing requirements</p>
-          <ul className="space-y-1.5">
-            {missing.slice(0, 10).map((row, index) => (
-              <li key={`${row.type}-${index}`} className="flex items-start gap-2 text-sm text-amber-800">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                <span><span className="font-semibold">{row.type}:</span> {row.item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Graduation school year" required>
-          <Select value={form.review_window} onChange={set("review_window")} options={reviewWindowOptions} placeholder="" required />
-        </Field>
-        <Field label="Endorsement status">
-          <Select
-            value={form.endorsement_status}
-            onChange={set("endorsement_status")}
-            placeholder=""
-            options={["For Review", "Ready for Dean Review", "Not Eligible", "Returned for Revision"]}
-          />
-        </Field>
-        <Field label="Source reference">
-          <Input value={form.source_reference} onChange={set("source_reference")} />
-        </Field>
-      </div>
-      <Field label="Dean remarks">
-        <Textarea value={form.dean_remarks} onChange={set("dean_remarks")} />
-      </Field>
-      {!eligibility.eligible && form.endorsement_status === "Ready for Dean Review" && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          This candidate still has missing requirements. Saving will keep the backend status as Not Eligible and queue the listed owner.
-        </div>
-      )}
-      <SubmitButton submitting={submitting}>Save endorsement review</SubmitButton>
-    </form>
   );
 }

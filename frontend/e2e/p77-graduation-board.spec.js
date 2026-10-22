@@ -234,7 +234,7 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await batch.getByRole("button", { name: /Move to/ }).click();
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole("menuitem", { name: /Coursework review/ })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: "Coursework review", exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);
     await shot(page, "staff-actions-1366.png");

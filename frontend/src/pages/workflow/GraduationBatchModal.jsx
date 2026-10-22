@@ -30,6 +30,8 @@ function graduationBatchName(form) {
   return `Batch ${form.batch_no || "1"} ${form.batch_month || GRADUATION_BATCH_MONTHS[new Date().getMonth()]} ${form.batch_year || new Date().getFullYear()}`;
 }
 
+const completedCourses = (row) => row.eligibility?.completed_courses || [];
+
 function graduationSelectedActionLabel(action) {
   if (!action) return "Review selected candidates";
   return action.label;
@@ -142,7 +144,7 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
           </Field>
         )}
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Selected action</p>
+          <p className="eyebrow">Selected action</p>
           {action ? (
             <>
               <p className="mt-2 text-sm font-semibold text-ink">{action.label}</p>
@@ -229,6 +231,13 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
                     </div>
                   </div>
                   <GraduationRequirementBoxes row={row} />
+                  {completedCourses(row).length > 0 && (
+                    <p className="meta mt-2">
+                      <span className="font-semibold text-slate-700">Completed-course cohort:</span>{" "}
+                      {completedCourses(row).slice(0, 4).map((course) => course.code).join(", ")}
+                      {completedCourses(row).length > 4 ? ` +${completedCourses(row).length - 4} more` : ""}
+                    </p>
+                  )}
                   {showCourseworkActions && courseworkOpen && <GraduationCompletedCourseworkView id={courseworkPanelId} row={row} />}
                   {showResearchPracticumActions && researchOpen && <GraduationResearchRequirementsView id={researchPanelId} row={row} />}
                   {showResearchPracticumActions && practicumOpen && <GraduationPracticumCompletionView id={practicumPanelId} row={row} />}
