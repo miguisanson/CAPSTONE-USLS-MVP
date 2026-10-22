@@ -184,7 +184,7 @@ class NavigationStructureTests(unittest.TestCase):
         self.assertRegex(dean_routes, r'path="adviser-appointments" element=\{<Navigate to="/dean/approvals"')
 
     def test_calendar_and_adviser_designation_are_tabs_inside_the_research_flow(self):
-        workflow = _src("pages/WorkflowPage.jsx")
+        workflow = _src("pages/workflow/WorkflowPage.jsx")  # split out of pages/WorkflowPage.jsx (P7.1)
         self.assertIn('"research-gate": [', workflow)
         self.assertIn("Adviser designation", workflow)
         self.assertIn('"defense-scheduling": [', workflow)

@@ -418,12 +418,14 @@ class StandaloneConsistencyTests(unittest.TestCase):
         self.assertIn("StageBoard", page)
         self.assertRegex(page, r"onMove=\{onMove\}")
         self.assertIn("processCaseTransition", api_js)
-        for slug_file in ("pages/WorkflowPage.jsx", "pages/dean/DeanPages.jsx"):
+        # WorkflowPage.jsx was split into pages/workflow/ (Phase 5 P7.1-P7.4); the slug routing lives in workflow/WorkflowPage.jsx.
+        for slug_file in ("pages/workflow/WorkflowPage.jsx", "pages/dean/DeanPages.jsx"):
             text = (FRONTEND / slug_file).read_text(encoding="utf-8")
             self.assertIn("ProcessBoardPage", text, slug_file)
         for old in ("LeaveCasesBoard", "WithdrawalRoster", "AwolResidencyPanel"):
             self.assertFalse((FRONTEND / "pages" / f"{old}.jsx").exists(), old)
-            self.assertNotIn(f"function {old}", (FRONTEND / "pages" / "WorkflowPage.jsx").read_text(encoding="utf-8"), old)
+            for part in [FRONTEND / "pages" / "WorkflowPage.jsx", *sorted((FRONTEND / "pages" / "workflow").glob("*.jsx"))]:
+                self.assertNotIn(f"function {old}", part.read_text(encoding="utf-8"), f"{old} in {part.name}")
 
     # ---- the same pieces on every page ---------------------------------------------
     def test_every_listing_carries_recent_activity_and_the_admin_questions(self):
