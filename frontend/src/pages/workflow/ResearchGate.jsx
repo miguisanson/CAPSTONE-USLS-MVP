@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { FileCheck, CheckCircle2, ArrowUpRight, UserRoundCheck } from "lucide-react";
-import { SectionTitle, StatusBadge } from "../../components/ui";
-import { Field, Input, Select } from "../../components/forms";
+import { ArrowUpRight, CheckCircle2, Clock, FileCheck, UserRoundCheck } from "lucide-react";
+import { Button, Card, Field, Input, SectionTitle, Select, StatCard, Stepper, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
+import { toneOf } from "../../lib/tone";
 import { useAuth } from "../../auth";
 import { Form1EndorsementQueue } from "../Form1Endorsements";
-import { MiniBox, SubmitButton, WorkflowSubmitFeedback } from "./shared";
+import { SubmitButton, WorkflowSubmitFeedback } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Research Gate
@@ -24,6 +24,12 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
   const panel = context.panel_status || {};
   const scheduleRequirement = requirements.find((item) => item.source_type?.includes("schedule"));
   const outcomeRequirement = requirements.find((item) => item.source_type === "system_defense_result");
+  const stageSteps = (progress.stages || []).map((stage, index) => ({
+    key: stage.name,
+    label: stage.name,
+    hint: stage.status,
+    state: index === progress.stage_index ? "current" : stage.complete ? "complete" : "upcoming",
+  }));
 
   function onSubmit(e) {
     e.preventDefault();
@@ -51,128 +57,134 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
           ["Student", student.name], ["Student ID", student.student_number], ["Program", student.program_name],
           ["Adviser", student.adviser_name || "Not assigned"], ["Research title", researchCase.title || "Pending Form 1"], ["Current stage", progress.stage || "Title Defense"],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-            <p className="mt-1 text-sm font-semibold text-ink">{value}</p>
-          </div>
+          <StatCard key={label} size="sm" tone="neutral" label={label} value={value} />
         ))}
       </div>
 
-      <div>
-        <p className="field-label">Automatic research progress</p>
-        <div className="mt-2 grid gap-2 sm:grid-cols-4">
-          {(progress.stages || []).map((stage, index) => (
-            <div key={stage.name} className={`rounded-xl border px-3 py-3 ${index === progress.stage_index ? "border-brand-300 bg-brand-50" : stage.complete ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-              <p className={`text-xs font-bold ${index === progress.stage_index ? "text-brand-700" : stage.complete ? "text-emerald-700" : "text-slate-500"}`}>{stage.name}</p>
-              <p className="mt-1 text-[11px] text-slate-500">{stage.status}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <Stepper title="Automatic research progress" steps={stageSteps} />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <MiniBox label="Completed requirements" value={completed.length} tone="brand" />
-        <MiniBox label="Pending requirements" value={pending.length} tone={pending.length ? "amber" : "brand"} />
+        <StatCard size="sm" tone="success" icon={CheckCircle2} label="Completed requirements" value={completed.length} />
+        <StatCard size="sm" tone={pending.length ? "warning" : "success"} icon={pending.length ? Clock : CheckCircle2} label="Pending requirements" value={pending.length} />
       </div>
 
       <div>
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-          <div><p className="field-label">{progress.stage || "Current"} requirements</p><p className="text-xs text-slate-500">Uploaded and pending documents appear together. Open any file to preview it.</p></div>
-          <StatusBadge value={progress.status || "Pending"} dot={false} />
+          <div>
+            <p className="field-label">{progress.stage || "Current"} requirements</p>
+            <p className="meta">Uploaded and pending documents appear together. Open any file to preview it.</p>
+          </div>
+          <StatusChip status={progress.status || "Pending"} dot={false} />
         </div>
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
           {requirements.map((requirement) => (
-            <div key={requirement.item_name} className="border-b border-slate-100 px-4 py-3 last:border-b-0">
+            <li key={requirement.item_name} className="px-4 py-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink">{requirement.label}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">{requirement.description}</p>
-                  <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{requirement.student_upload ? `Student upload · ${requirement.file_count}/${requirement.required_file_count} files` : "Staff / system managed"}</p>
+                  <p className="meta mt-0.5">{requirement.description}</p>
+                  <p className="micro mt-1 font-medium uppercase tracking-wide">{requirement.student_upload ? `Student upload · ${requirement.file_count}/${requirement.required_file_count} files` : "Staff / system managed"}</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
-                  <StatusBadge value={requirement.status_label} dot={false} />
+                  <StatusChip status={requirement.status_label} dot={false} />
                   {requirement.source_type === "coordinator_endorsement" && user?.role === "academic_coordinator" && (
-                    <a href="#form1-endorsement-queue" className="btn-primary cursor-pointer justify-center whitespace-nowrap">
-                      <UserRoundCheck className="h-4 w-4" /> Form 1 endorsements
-                    </a>
+                    <Button as="a" href="#form1-endorsement-queue" icon={UserRoundCheck} className="justify-center whitespace-nowrap">
+                      Form 1 endorsements
+                    </Button>
                   )}
                   {requirement.item_name === "Ethics Clearance" && user?.role === "research_coordinator" && (
-                    <button type="button" disabled={!requirement.files?.length} onClick={() => document.getElementById("ethics-clearance-record")?.scrollIntoView({ behavior: "smooth", block: "center" })} className="btn-ghost cursor-pointer justify-center whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60">
-                      <FileCheck className="h-4 w-4" /> Record clearance
-                    </button>
+                    <Button
+                      variant="secondary"
+                      icon={FileCheck}
+                      disabled={!requirement.files?.length}
+                      onClick={() => document.getElementById("ethics-clearance-record")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                      className="justify-center whitespace-nowrap"
+                    >
+                      Record clearance
+                    </Button>
                   )}
                 </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(requirement.files || []).map((file) => (
-                  <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 transition-colors hover:bg-brand-100">
-                    {file.name} · PDF · {formatDate(file.uploaded_at)} <ArrowUpRight className="h-3.5 w-3.5" />
-                  </a>
-                ))}
-              </div>
-            </div>
+              {(requirement.files || []).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {requirement.files.map((file) => (
+                    <Button key={file.id} as="a" href={file.url} target="_blank" rel="noreferrer" variant="secondary" size="sm" className="border-brand-200 text-brand-700">
+                      {file.name} · PDF · {formatDate(file.uploaded_at)} <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
       {requirements.some((item) => item.item_name === "Ethics Clearance") && (
-        <section id="ethics-clearance-record" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <Card as="section" id="ethics-clearance-record" pad="sm" className="bg-slate-50 shadow-none">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-ink">Research Protocol Form 5.2 ethics clearance</p>
-              <p className="mt-1 text-xs text-slate-500">Opens after the proposal defense is passed. Preview Form 5.1 and the signed Ethics Office form (Form 5.2, due within one month of the defense), then record the clearance status and date. Ethics clearance is needed before the Final Defense.</p>
+              <p className="meta mt-1">Opens after the proposal defense is passed. Preview Form 5.1 and the signed Ethics Office form (Form 5.2, due within one month of the defense), then record the clearance status and date. Ethics clearance is needed before the Final Defense.</p>
             </div>
-            <StatusBadge value={requirements.find((item) => item.item_name === "Ethics clearance status and date")?.status_label || "Pending"} dot={false} />
+            <StatusChip status={requirements.find((item) => item.item_name === "Ethics clearance status and date")?.status_label || "Pending"} dot={false} />
           </div>
           {user?.role === "research_coordinator" && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
               <Field label="Clearance status">
-                <Select value={ethicsReview.status} onChange={(event) => setEthicsReview((current) => ({ ...current, status: event.target.value }))} options={["Cleared", "Returned", "Not cleared"]} />
+                <Select value={ethicsReview.status} onChange={(event) => setEthicsReview((current) => ({ ...current, status: event.target.value }))} placeholder="" options={["Cleared", "Returned", "Not cleared"]} />
               </Field>
               <Field label="Clearance date">
                 <Input type="date" value={ethicsReview.date} onChange={(event) => setEthicsReview((current) => ({ ...current, date: event.target.value }))} />
               </Field>
-              <button type="button" disabled={submitting} onClick={recordEthicsClearance} className="btn-primary mt-6 cursor-pointer px-4 py-2">
-                <CheckCircle2 className="h-4 w-4" /> Record ethics clearance
-              </button>
+              <Button disabled={submitting} onClick={recordEthicsClearance} icon={CheckCircle2}>
+                Record ethics clearance
+              </Button>
             </div>
           )}
-        </section>
+        </Card>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <Card pad="sm" className="bg-slate-50 shadow-none">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><p className="text-sm font-semibold text-ink">Panel Matching</p><p className="text-xs text-slate-500">System-generated from the active paper body after required clearances.</p></div>
-          <div className="flex items-center gap-2"><StatusBadge value={panel.status || "Not yet generated"} dot={false} /><Link to={`/workflow/panel-matching?student_id=${studentId}`} className="btn-ghost cursor-pointer">Open matching <ArrowUpRight className="h-4 w-4" /></Link></div>
+          <div>
+            <p className="text-sm font-semibold text-ink">Panel Matching</p>
+            <p className="meta">System-generated from the active paper body after required clearances.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusChip status={panel.status || "Not yet generated"} dot={false} />
+            <Button as={Link} to={`/workflow/panel-matching?student_id=${studentId}`} variant="secondary">
+              Open matching <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
-        {panel.recommendations?.length > 0 && <p className="mt-2 text-xs text-slate-600">{panel.recommendations.map((item) => item.faculty_name).filter(Boolean).join(" · ")}</p>}
-      </div>
+        {panel.recommendations?.length > 0 && <p className="meta mt-2 text-slate-600">{panel.recommendations.map((item) => item.faculty_name).filter(Boolean).join(" · ")}</p>}
+      </Card>
 
       <SubmitButton submitting={submitting}>Verify submitted requirements</SubmitButton>
       <WorkflowSubmitFeedback result={result} error={submitError} />
 
       {outcomeRequirement && (
-        <section className={`rounded-2xl border p-5 ${outcomeRequirement.status === "Complete" ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}`}>
+        <section className={`rounded-2xl border p-4 sm:p-5 ${toneOf(outcomeRequirement.status === "Complete" ? "success" : "warning").notice}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Defense result gate</p>
-              <h3 className="mt-1 font-display text-lg font-semibold text-ink">{outcomeRequirement.label}</h3>
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow">Defense result gate</p>
+              <h3 className="card-title mt-1">{outcomeRequirement.label}</h3>
               <p className="mt-1 text-sm text-slate-600">
                 {scheduleRequirement?.status === "Complete"
                   ? "Record whether the scheduled defense was passed before the student can move to the next Research Gate stage."
                   : "Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded."}
               </p>
             </div>
-            <StatusBadge value={outcomeRequirement.status_label} dot={false} />
+            <StatusChip status={outcomeRequirement.status_label} dot={false} />
           </div>
           {user?.role === "staff" && <p className="mt-4 text-xs font-semibold text-slate-600">Read-only for GS staff. The assigned panel chair or panel lead submits the verdict from the Faculty Portal.</p>}
         </section>
       )}
 
       {user?.role === "academic_coordinator" && (
-        <section id="form1-endorsement-queue" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <Card as="section" id="form1-endorsement-queue" pad="lg" className="scroll-mt-24">
           <Form1EndorsementQueue embedded />
-        </section>
+        </Card>
       )}
     </form>
   );

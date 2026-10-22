@@ -223,8 +223,9 @@ test.describe("Research Gate (research coordinator)", () => {
       await expect(main(page).getByText(text).first(), text).toBeVisible();
     }
     await expect(main(page).getByText("Automatic research progress")).toBeVisible();
+    const stages = main(page).getByRole("list", { name: "Automatic research progress" });
     for (const stage of ["Title Defense", "Proposal Defense", "Final Defense", "Completion"]) {
-      await expect(main(page).getByText(stage, { exact: true }).first(), stage).toBeVisible();
+      await expect(stages.getByRole("listitem").filter({ hasText: stage }), stage).toBeVisible();
     }
     await expect(main(page).getByText("Completed requirements")).toBeVisible();
     await expect(main(page).getByText("Pending requirements")).toBeVisible();
