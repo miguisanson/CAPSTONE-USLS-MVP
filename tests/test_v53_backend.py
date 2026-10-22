@@ -181,6 +181,18 @@ class V53BackendTests(unittest.TestCase):
         self.assertEqual(refused.status_code, 400, refused.get_json())
         self.assertIn("Graduate School Staff", refused.get_json()["error"])
 
+    # ------------------------------------------------------------------ I-036
+    def test_every_defense_scheduling_nav_entry_is_a_page_the_role_can_load(self):
+        """The Academic Coordinator has no part in Defense Scheduling (its actor line is GS Staff /
+        Research Coordinator), so the API answers 403; the nav must not offer the page."""
+        layout = (REPO_ROOT / "frontend" / "src" / "components" / "Layout.jsx").read_text(encoding="utf-8")
+        for role in ("academic_coordinator", "research_coordinator"):
+            block = re.search(rf"{role}:\s*new Set\(\[(.*?)\]\)", layout, re.S)
+            self.assertIsNotNone(block, role)
+            slugs = re.findall(r'"/workflow/([a-z-]+)"', block.group(1))
+            allowed = ROLE_TRANSACTION_ACCESS[role]
+            self.assertEqual([slug for slug in slugs if slug not in allowed], [], role)
+
 
 if __name__ == "__main__":
     unittest.main()
