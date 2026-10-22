@@ -39,6 +39,10 @@ const env = {
   RAG_PREWARM: "0",
   PYTHONUNBUFFERED: "1",
   PYTHONIOENCODING: "utf-8",
+  // The run is keyless on every machine: an empty value wins over the developer's .env
+  // (load_dotenv never overrides a variable that is already set), so the assistant takes the offline path.
+  GOOGLE_API_KEY: "",
+  GOOGLE_AI_STUDIO_API_KEY: "",
 };
 
 console.log(`[e2e] python: ${python}`);
