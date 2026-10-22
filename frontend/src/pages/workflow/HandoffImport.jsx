@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  UserPlus,
   AlertTriangle,
   UploadCloud,
   FileSpreadsheet,
@@ -15,12 +14,11 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { SectionTitle, StatusBadge, ErrorNote } from "../../components/ui";
-import { Field, Input, Textarea, Select } from "../../components/forms";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
+import { Button, Card, DataTable, EmptyState, Field, HistoryPanel, InlineNotice, Input, SectionTitle, StatusChip } from "../../components/ui/index.js";
 import HandoffResult from "../../components/HandoffResult";
 import { formatDate } from "../../lib/format";
-import { SubmitButton, WorkflowCaseModal } from "./shared";
+import { toneOf } from "../../lib/tone";
+import { WorkflowCaseModal } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Student Handoff — AIMS export import & reconciliation (no manual student creation).
@@ -125,11 +123,7 @@ function HandoffImport({ context }) {
             : "Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically"
         }
         icon={FileSpreadsheet}
-        action={
-          <Link to="/monitoring-sheet" className="btn-ghost shrink-0">
-            <Table2 className="h-4 w-4" /> Full sheet
-          </Link>
-        }
+        action={<Button as={Link} to="/monitoring-sheet" variant="secondary" icon={Table2} className="shrink-0">Full sheet</Button>}
       />
 
       {/* Dropzone */}
@@ -144,60 +138,45 @@ function HandoffImport({ context }) {
           setDragging(false);
           pick(e.dataTransfer.files?.[0]);
         }}
-        className={`rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
+        className={`rounded-2xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
           dragging ? "border-brand-500 bg-brand-50" : "border-slate-300 bg-slate-50/60"
         }`}
       >
-        <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-brand-100 text-brand-700">
-          <UploadCloud className="h-6 w-6" />
+        <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
+          <UploadCloud className="h-6 w-6" aria-hidden="true" />
         </span>
         {file ? (
           <div className="flex items-center justify-center gap-2 text-sm">
-            <FileSpreadsheet className="h-4 w-4 text-brand-600" />
-            <span className="font-semibold text-ink">{file.name}</span>
-            <button
-              type="button"
-              onClick={() => setFile(null)}
-              className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-white hover:text-slate-600 cursor-pointer"
-              aria-label="Remove file"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <FileSpreadsheet className="h-4 w-4 shrink-0 text-brand-700" aria-hidden="true" />
+            <span className="min-w-0 break-all font-semibold text-ink">{file.name}</span>
+            <Button variant="icon" icon={X} aria-label="Remove file" onClick={() => setFile(null)} />
           </div>
         ) : (
           <>
             <p className="text-sm font-semibold text-ink">Drag &amp; drop your .xlsx here</p>
-            <p className="text-xs text-slate-500">or</p>
+            <p className="meta">or</p>
           </>
         )}
         <label className="mt-3 inline-block">
           <input
             type="file"
             accept=".xlsx,.xlsm"
-            className="hidden"
+            className="sr-only peer"
             onChange={(e) => pick(e.target.files?.[0])}
           />
-          <span className="btn-ghost cursor-pointer">{file ? "Choose a different file" : "Browse files"}</span>
+          <span className="btn-ghost cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500">{file ? "Choose a different file" : "Browse files"}</span>
         </label>
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="meta mt-3">
           Expected format: AC Student Monitoring template — program in cell A1, one student per row.
         </p>
       </div>
 
-      <ErrorNote message={error} />
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={runImport} disabled={!file || busy} className="btn-primary w-full sm:w-auto">
-          {busy ? (
-            <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Importing…
-            </>
-          ) : (
-            <>
-              <UploadCloud className="h-4 w-4" /> {isAudit ? "Update audits" : "Import students"}
-            </>
-          )}
-        </button>
+        <Button onClick={runImport} disabled={!file} loading={busy} icon={UploadCloud} className="w-full sm:w-auto">
+          {busy ? "Importing…" : isAudit ? "Update audits" : "Import students"}
+        </Button>
       </div>
 
       {result && (
@@ -215,46 +194,54 @@ function HandoffImport({ context }) {
         />
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="flex items-center gap-2 font-semibold text-ink"><History className="h-4 w-4 text-brand-600" /> Upload history</h3>
-            <p className="mt-1 text-xs text-slate-500">Every uploaded workbook is preserved. Open a version to review conflicts between its values and the current record.</p>
+      <Card>
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="card-title flex items-center gap-2"><History className="h-4 w-4 text-brand-700" aria-hidden="true" /> Upload history</h3>
+            <p className="meta mt-1">Every uploaded workbook is preserved. Open a version to review conflicts between its values and the current record.</p>
           </div>
-          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{uploadHistory?.items?.length || 0} backups</span>
+          <StatusChip tone="neutral" status={`${uploadHistory?.items?.length || 0} ${uploadHistory?.items?.length === 1 ? "backup" : "backups"}`} dot={false} />
         </div>
         {uploadHistory?.items?.length ? (
-          <HistoryDisclosure label="View upload history" hideLabel="Hide upload history" count={uploadHistory.items.length}>
-          <div className="space-y-2">
-            {uploadHistory.items.map((upload) => (
-              <details key={upload.id} className="group rounded-xl border border-slate-200 p-3">
-                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{upload.original_name}</p>
-                    <p className="text-xs text-slate-500">{upload.program} · {upload.rows} students · {formatDate(upload.uploaded_at)}</p>
+          <HistoryPanel label="View upload history" hideLabel="Hide upload history" count={uploadHistory.items.length}>
+            <div className="space-y-2">
+              {uploadHistory.items.map((upload) => (
+                <details key={upload.id} className="group rounded-xl border border-slate-200 p-3">
+                  <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{upload.original_name}</p>
+                      <p className="meta">{upload.program} · {upload.rows} students · {formatDate(upload.uploaded_at)}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusChip status={upload.unresolved_count ? `${upload.unresolved_count} unresolved` : "Validated"} tone={upload.unresolved_count ? "warning" : "success"} dot={false} />
+                      <Button
+                        as="a"
+                        href={upload.download_url}
+                        onClick={(event) => event.stopPropagation()}
+                        variant="secondary"
+                        size="sm"
+                        icon={Download}
+                        aria-label={`Download ${upload.original_name}`}
+                      >
+                        Backup
+                      </Button>
+                    </div>
+                  </summary>
+                  <div className="mt-3 border-t border-slate-100 pt-3">
+                    {upload.issues?.length ? (
+                      <ValidationIssueTable issues={upload.issues} onOpen={setSelectedIssue} onBulkResolved={applyBulkResolution} compact />
+                    ) : (
+                      <p className="text-sm text-slate-500">This version matches existing records or added new students without conflicts.</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge value={upload.unresolved_count ? `${upload.unresolved_count} unresolved` : "Validated"} dot={false} />
-                    <a href={upload.download_url} onClick={(event) => event.stopPropagation()} className="btn-ghost px-2.5 py-1.5" aria-label={`Download ${upload.original_name}`}>
-                      <Download className="h-3.5 w-3.5" /> Backup
-                    </a>
-                  </div>
-                </summary>
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  {upload.issues?.length ? (
-                    <ValidationIssueTable issues={upload.issues} onOpen={setSelectedIssue} onBulkResolved={applyBulkResolution} compact />
-                  ) : (
-                    <p className="text-sm text-slate-500">This version matches existing records or added new students without conflicts.</p>
-                  )}
-                </div>
-              </details>
-            ))}
-          </div>
-          </HistoryDisclosure>
+                </details>
+              ))}
+            </div>
+          </HistoryPanel>
         ) : (
-          <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No monitoring-sheet backups yet.</p>
+          <EmptyState size="sm" title="No monitoring-sheet backups yet." />
         )}
-      </div>
+      </Card>
       {selectedIssue && (
         <MonitoringIssueModal
           issue={selectedIssue}
@@ -264,6 +251,24 @@ function HandoffImport({ context }) {
           onResolve={resolveIssue}
         />
       )}
+    </div>
+  );
+}
+
+function DiscrepancyList({ issue }) {
+  const rows = issue.discrepancies?.length
+    ? issue.discrepancies
+    : [{ type: issue.issue, messages: issue.details || [issue.summary].filter(Boolean) }];
+  return (
+    <div className="space-y-1.5">
+      {rows.map((item, index) => (
+        <div key={`${item.type}-${index}`} className={`rounded-lg border px-2.5 py-2 ${toneOf("warning").notice}`}>
+          <p className="text-xs font-semibold">{item.type}</p>
+          {(item.messages || []).map((message, messageIndex) => (
+            <p key={messageIndex} className="meta mt-0.5 leading-relaxed text-slate-600">{message}</p>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -335,37 +340,63 @@ function ValidationIssueTable({ issues = [], onOpen, onBulkResolved, title = "",
     }
   }
 
-  function DiscrepancyList({ issue }) {
-    const rows = issue.discrepancies?.length
-      ? issue.discrepancies
-      : [{ type: issue.issue, messages: issue.details || [issue.summary].filter(Boolean) }];
-    return (
-      <div className="space-y-1.5">
-        {rows.map((item, index) => (
-          <div key={`${item.type}-${index}`} className="rounded-lg border border-amber-100 bg-amber-50/60 px-2.5 py-2">
-            <p className="text-xs font-bold text-amber-900">{item.type}</p>
-            {(item.messages || []).map((message, messageIndex) => (
-              <p key={messageIndex} className="mt-0.5 text-xs leading-relaxed text-slate-600">{message}</p>
-            ))}
-          </div>
-        ))}
-      </div>
-    );
-  }
+  const nameOf = (issue) => issue.incoming_name || issue.existing?.name || `Row ${issue.row_number}`;
+  const columns = [
+    {
+      key: "select",
+      width: "3rem",
+      header: (
+        <input
+          type="checkbox"
+          checked={allUnresolvedSelected}
+          onChange={toggleAll}
+          disabled={!unresolved.length}
+          className="h-4 w-4 cursor-pointer accent-brand-600"
+          aria-label="Select all unresolved students"
+        />
+      ),
+      cell: (issue) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(issue.id)}
+          onChange={() => toggleIssue(issue.id)}
+          disabled={issue.status !== "Unresolved"}
+          className="h-4 w-4 cursor-pointer accent-brand-600 disabled:cursor-not-allowed"
+          aria-label={`Select ${nameOf(issue)}`}
+        />
+      ),
+    },
+    {
+      key: "student",
+      header: "Student",
+      cell: (issue) => (
+        <div>
+          <p className="font-semibold text-ink">{nameOf(issue)}</p>
+          <p className="meta">{issue.incoming_student_number || "No student ID"}</p>
+        </div>
+      ),
+    },
+    { key: "discrepancies", header: "Discrepancies", className: "max-w-lg", cell: (issue) => <DiscrepancyList issue={issue} /> },
+    { key: "status", header: "Status", cell: (issue) => <StatusChip status={issue.status} dot={false} /> },
+    {
+      key: "action",
+      header: "Action",
+      align: "right",
+      cell: (issue) => <Button variant="secondary" size="sm" onClick={() => onOpen(issue)}>Compare</Button>,
+    },
+  ];
 
   return (
     <section className={`rounded-xl border ${compact ? "border-slate-200" : "border-amber-200 bg-white"}`}>
       {(title || !compact) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
           <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <AlertTriangle className="h-4 w-4 text-amber-600" /> {title || "Validation issues"}
+            <h3 className="card-title flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" /> {title || "Validation issues"}
             </h3>
-            <p className="mt-0.5 text-xs text-slate-500">Each student can have several discrepancies. Select rows to resolve several students with one corrected workbook.</p>
+            <p className="meta mt-0.5">Each student can have several discrepancies. Select rows to resolve several students with one corrected workbook.</p>
           </div>
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
-            {ordered.filter((item) => item.status === "Unresolved").length} unresolved
-          </span>
+          <StatusChip tone="warning" status={`${unresolved.length} unresolved`} dot={false} />
         </div>
       )}
       {unresolved.length > 0 && (
@@ -373,49 +404,60 @@ function ValidationIssueTable({ issues = [], onOpen, onBulkResolved, title = "",
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-semibold text-ink">Bulk resolution</p>
-              <p className="mt-0.5 text-xs text-slate-500">Select students below, then upload one corrected monitoring workbook containing those students.</p>
+              <p className="meta mt-0.5">Select students below, then upload one corrected monitoring workbook containing those students.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{selectedUnresolved.length} selected</span>
+              <StatusChip tone="neutral" status={`${selectedUnresolved.length} selected`} dot={false} />
               <label className={`btn-ghost cursor-pointer ${selectedUnresolved.length ? "" : "pointer-events-none opacity-50"}`}>
-                <FileUp className="h-4 w-4" /> {correctionFile ? "Change file" : "Choose corrected file"}
+                <FileUp className="h-4 w-4" aria-hidden="true" /> {correctionFile ? "Change file" : "Choose corrected file"}
                 <input type="file" accept=".xlsx,.xlsm" className="sr-only" disabled={!selectedUnresolved.length || uploading} onChange={(event) => chooseCorrectionFile(event.target.files?.[0])} />
               </label>
-              <button type="button" onClick={uploadCorrection} disabled={!correctionFile || !selectedUnresolved.length || uploading} className="btn-primary cursor-pointer">
+              <Button onClick={uploadCorrection} disabled={!correctionFile || !selectedUnresolved.length} loading={uploading}>
                 {uploading ? "Checking…" : "Apply to selected students"}
-              </button>
+              </Button>
             </div>
           </div>
           {correctionFile && <p className="mt-2 text-xs font-semibold text-brand-700">Selected file: {correctionFile.name}</p>}
-          {uploadMessage && <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">{uploadMessage}</p>}
-          {uploadError && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{uploadError}</p>}
+          {uploadMessage && <InlineNotice tone="success" className="mt-2">{uploadMessage}</InlineNotice>}
+          {uploadError && <InlineNotice tone="danger" className="mt-2">{uploadError}</InlineNotice>}
         </div>
       )}
-      <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
-            <tr><th className="w-12 px-4 py-2.5"><input type="checkbox" checked={allUnresolvedSelected} onChange={toggleAll} disabled={!unresolved.length} className="h-4 w-4 cursor-pointer accent-brand-600" aria-label="Select all unresolved students" /></th><th className="px-4 py-2.5">Student</th><th className="px-4 py-2.5">Discrepancies</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5 text-right">Action</th></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {ordered.map((issue) => (
-              <tr key={issue.id} className="transition-colors hover:bg-slate-50">
-                <td className="px-4 py-3 align-top"><input type="checkbox" checked={selectedIds.has(issue.id)} onChange={() => toggleIssue(issue.id)} disabled={issue.status !== "Unresolved"} className="h-4 w-4 cursor-pointer accent-brand-600 disabled:cursor-not-allowed" aria-label={`Select ${issue.incoming_name || issue.existing?.name || `row ${issue.row_number}`}`} /></td>
-                <td className="px-4 py-3"><p className="font-semibold text-ink">{issue.incoming_name || issue.existing?.name || `Row ${issue.row_number}`}</p><p className="text-xs text-slate-500">{issue.incoming_student_number || "No student ID"}</p></td>
-                <td className="max-w-lg px-4 py-3"><DiscrepancyList issue={issue} /></td>
-                <td className="px-4 py-3"><StatusBadge value={issue.status} dot={false} /></td>
-                <td className="px-4 py-3 text-right"><button type="button" onClick={() => onOpen(issue)} className="btn-ghost cursor-pointer px-3 py-1.5">Compare</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="hidden p-3 md:block">
+        <DataTable
+          caption={title || "Validation issues"}
+          columns={columns}
+          rows={ordered}
+          rowKey="id"
+          minWidth="sm"
+          empty={{ title: "No validation issues", hint: "Every row of this workbook matched an existing record." }}
+        />
       </div>
-      <div className="divide-y divide-slate-100 md:hidden">
+      {/* Phones: one card per student, so nothing needs sideways scrolling. */}
+      <ul className="divide-y divide-slate-100 md:hidden">
         {ordered.map((issue) => (
-          <div key={issue.id} className="px-4 py-3">
-            <div className="flex items-start gap-3"><input type="checkbox" checked={selectedIds.has(issue.id)} onChange={() => toggleIssue(issue.id)} disabled={issue.status !== "Unresolved"} className="mt-1 h-4 w-4 cursor-pointer accent-brand-600 disabled:cursor-not-allowed" aria-label={`Select ${issue.incoming_name || issue.existing?.name || `row ${issue.row_number}`}`} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink">{issue.incoming_name || issue.existing?.name || `Row ${issue.row_number}`}</p><p className="text-xs text-slate-500">{issue.incoming_student_number || "No student ID"}</p></div><StatusBadge value={issue.status} dot={false} /></div><div className="mt-2"><DiscrepancyList issue={issue} /></div><button type="button" onClick={() => onOpen(issue)} className="btn-ghost mt-2 cursor-pointer px-3 py-1.5">Compare records</button></div></div>
-          </div>
+          <li key={issue.id} className="flex items-start gap-3 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={selectedIds.has(issue.id)}
+              onChange={() => toggleIssue(issue.id)}
+              disabled={issue.status !== "Unresolved"}
+              className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-brand-600 disabled:cursor-not-allowed"
+              aria-label={`Select ${nameOf(issue)}`}
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-ink">{nameOf(issue)}</p>
+                  <p className="meta">{issue.incoming_student_number || "No student ID"}</p>
+                </div>
+                <StatusChip status={issue.status} dot={false} size="sm" />
+              </div>
+              <DiscrepancyList issue={issue} />
+              <Button variant="secondary" size="sm" onClick={() => onOpen(issue)}>Compare records</Button>
+            </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }
@@ -435,26 +477,31 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
   const unresolved = issue.status === "Unresolved";
   const footer = unresolved ? (
     <>
-      <button type="button" disabled={busy} onClick={() => onResolve("keep_existing")} className="btn-ghost cursor-pointer">
-        <Database className="h-4 w-4" /> Keep Existing
-      </button>
-      <button type="button" disabled={busy} onClick={() => onResolve("use_uploaded")} className="btn-ghost cursor-pointer border-brand-200 text-brand-700">
-        <FileUp className="h-4 w-4" /> Use Uploaded
-      </button>
+      <Button variant="secondary" disabled={busy} onClick={() => onResolve("keep_existing")} icon={Database}>Keep Existing</Button>
+      <Button variant="secondary" disabled={busy} onClick={() => onResolve("use_uploaded")} icon={FileUp} className="border-brand-200 text-brand-700">Use Uploaded</Button>
       {editMode ? (
-        <button type="button" disabled={busy} onClick={() => onResolve("edit", edited)} className="btn-primary cursor-pointer">
-          {busy ? "Saving…" : "Save Edited Record"}
-        </button>
+        <Button disabled={busy} onClick={() => onResolve("edit", edited)} loading={busy}>{busy ? "Saving…" : "Save Edited Record"}</Button>
       ) : (
-        <button type="button" disabled={busy} onClick={() => setEditMode(true)} className="btn-primary cursor-pointer">
-          <Pencil className="h-4 w-4" /> Edit
-        </button>
+        <Button disabled={busy} onClick={() => setEditMode(true)} icon={Pencil}>Edit</Button>
       )}
     </>
-  ) : <span className="text-sm font-medium text-emerald-700">Resolved: {(issue.resolution_action || "").replaceAll("_", " ")}</span>;
+  ) : <span className="text-sm font-semibold text-brand-700">Resolved: {(issue.resolution_action || "").replaceAll("_", " ")}</span>;
+  const subjectColumns = [
+    { key: "code", header: "Subject", cell: (row) => <span className="font-semibold text-ink">{row.code}</span> },
+    { key: "existing", header: "Existing" },
+    {
+      key: "uploaded",
+      header: "Uploaded",
+      cell: (row) => (
+        <span className="inline-flex flex-wrap items-center gap-2">
+          {row.uploaded}
+          {row.regression && <StatusChip tone="warning" status="Needs review" size="sm" dot={false} />}
+        </span>
+      ),
+    },
+  ];
   return (
     <WorkflowCaseModal
-      id={`monitoring-issue-${issue.id}`}
       title={issue.incoming_name || existing.name || `Monitoring row ${issue.row_number}`}
       subtitle={`Row ${issue.row_number || "—"} · ${issue.issue}`}
       status={issue.status}
@@ -463,42 +510,50 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
       size="wide"
     >
       <div className="space-y-5">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Detected discrepancies</p>
+        <InlineNotice tone="warning" title="Detected discrepancies">
           <div className="mt-2 space-y-2">
             {(issue.discrepancies?.length ? issue.discrepancies : [{ type: issue.issue, messages: issue.details || [issue.summary] }]).map((item, index) => (
               <div key={`${item.type}-${index}`} className="rounded-lg bg-white/70 px-3 py-2">
                 <p className="text-sm font-semibold text-amber-950">{item.type}</p>
-                {(item.messages || []).map((message, messageIndex) => <p key={messageIndex} className="mt-0.5 text-xs text-slate-600">{message}</p>)}
+                {(item.messages || []).map((message, messageIndex) => <p key={messageIndex} className="meta mt-0.5 text-slate-600">{message}</p>)}
               </div>
             ))}
           </div>
-        </div>
-        <ErrorNote message={error} />
+        </InlineNotice>
+        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
         <div className="grid gap-4 lg:grid-cols-2">
           <ComparisonRecord title="Existing record" icon={Database} record={existing} empty="No matching student record" />
           <ComparisonRecord title="Uploaded record" icon={FileUp} record={uploaded} />
         </div>
         {subjectRows.length > 0 && (
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">Subject comparison</h3>
-            <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200">
-              <table className="min-w-full text-left text-sm">
-                <thead className="sticky top-0 bg-slate-50 text-xs font-bold uppercase text-slate-500"><tr><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Existing</th><th className="px-3 py-2">Uploaded</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{subjectRows.map((row) => <tr key={row.code} className={row.regression ? "bg-amber-50" : ""}><td className="px-3 py-2 font-semibold text-ink">{row.code}</td><td className="px-3 py-2 text-slate-600">{row.existing}</td><td className="px-3 py-2 text-slate-600">{row.uploaded}{row.regression ? " · needs review" : ""}</td></tr>)}</tbody>
-              </table>
-            </div>
+            <h3 className="card-title mb-2">Subject comparison</h3>
+            <DataTable caption="Subject comparison" columns={subjectColumns} rows={subjectRows} rowKey="code" dense stickyHeader pageSize={0} />
           </section>
         )}
         {editMode && (
           <section className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
-            <h3 className="flex items-center gap-2 font-semibold text-ink"><Pencil className="h-4 w-4 text-brand-700" /> Edit uploaded values</h3>
+            <h3 className="card-title flex items-center gap-2"><Pencil className="h-4 w-4 text-brand-700" aria-hidden="true" /> Edit uploaded values</h3>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {[['student_number', 'Student ID'], ['first_name', 'First name'], ['last_name', 'Last name'], ['academic_year_entry', 'School Year / AY Entry']].map(([key, label]) => (
-                <label key={key} htmlFor={`monitoring-${issue.id}-${key}`} className="text-sm font-semibold text-slate-700">{label}<input id={`monitoring-${issue.id}-${key}`} value={edited[key]} onChange={(event) => setEdited((current) => ({ ...current, [key]: event.target.value }))} className="input mt-1 w-full" /></label>
+              {[["student_number", "Student ID"], ["first_name", "First name"], ["last_name", "Last name"], ["academic_year_entry", "School Year / AY Entry"]].map(([key, label]) => (
+                <Field key={key} label={label}>
+                  <Input value={edited[key]} onChange={(event) => setEdited((current) => ({ ...current, [key]: event.target.value }))} />
+                </Field>
               ))}
             </div>
-            {Object.keys(edited.subjects).length > 0 && <fieldset className="mt-4"><legend className="text-sm font-semibold text-slate-700">Completed subjects</legend><div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{Object.keys(edited.subjects).sort().map((code) => <label key={code} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><input type="checkbox" checked={Boolean(edited.subjects[code])} onChange={(event) => setEdited((current) => ({ ...current, subjects: { ...current.subjects, [code]: event.target.checked } }))} className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" /><span>{code}</span></label>)}</div></fieldset>}
+            {Object.keys(edited.subjects).length > 0 && (
+              <fieldset className="mt-4">
+                <legend className="field-label">Completed subjects</legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {Object.keys(edited.subjects).sort().map((code) => (
+                    <label key={code} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                      <input type="checkbox" checked={Boolean(edited.subjects[code])} onChange={(event) => setEdited((current) => ({ ...current, subjects: { ...current.subjects, [code]: event.target.checked } }))} className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                      <span>{code}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
           </section>
         )}
       </div>
@@ -507,144 +562,35 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
 }
 
 function ComparisonRecord({ title, icon: Icon, record, empty = "No values supplied" }) {
-  if (!record || !Object.keys(record).length) return <div className="rounded-xl border border-dashed border-slate-300 p-4"><h3 className="flex items-center gap-2 font-semibold text-ink"><Icon className="h-4 w-4 text-slate-500" /> {title}</h3><p className="mt-4 text-sm text-slate-500">{empty}</p></div>;
-  return <section className="rounded-xl border border-slate-200 p-4"><h3 className="flex items-center gap-2 font-semibold text-ink"><Icon className="h-4 w-4 text-brand-700" /> {title}</h3><dl className="mt-4 space-y-3 text-sm">{[["Name", record.name || `${record.first_name || ""} ${record.last_name || ""}`.trim()], ["Student ID", record.student_number], ["School Year", record.academic_year_entry], ["Completed subjects", record.completed_count ?? (record.completed_subjects || []).length]].map(([label, value]) => <div key={label} className="grid grid-cols-[8rem_1fr] gap-2"><dt className="text-slate-500">{label}</dt><dd className="font-semibold text-slate-800">{value || "—"}</dd></div>)}</dl></section>;
-}
-
-// ---------------------------------------------------------------------------
-// Student Handoff — manual entry (fallback)
-// ---------------------------------------------------------------------------
-function HandoffForm({ meta, context, submit, submitting }) {
-  const onboarding = context.onboarding_requirements || [];
-  const [form, setForm] = useState({
-    program_id: "",
-    term_id: "",
-    admission_signal: "Admission Confirmed",
-    first_name: "",
-    last_name: "",
-    student_number: "",
-    email: "",
-    entry_year: new Date().getFullYear(),
-    additional_missing_items: "",
-    source_reference: "",
-    transcript_status: "Not verified",
-  });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const derivedRequirements = onboarding.map((item) => {
-    let complete = false;
-    let evidence = "Missing or not verified";
-    if (item === "Admission approval") {
-      complete = ["Admission Confirmed", "Enrollment Confirmed"].includes(form.admission_signal);
-      evidence = complete ? form.admission_signal : "Admission has not been confirmed";
-    } else if (item === "Student profile sheet") {
-      complete = Boolean(form.source_reference.trim());
-      evidence = complete ? form.source_reference : "Add the source/profile reference";
-    } else if (item === "Program assignment") {
-      complete = Boolean(form.program_id);
-      evidence = complete ? "Selected program" : "Choose a program";
-    } else if (item === "Enrollment signal") {
-      complete = Boolean(form.term_id && form.admission_signal);
-      evidence = complete ? `${form.admission_signal} · selected semester` : "Choose a semester and signal";
-    } else if (item === "Official transcript") {
-      complete = form.transcript_status === "Received";
-      evidence = `Transcript: ${form.transcript_status}`;
-    }
-    return { item, complete, evidence };
-  });
-
-  function onSubmit(e) {
-    e.preventDefault();
-    submit(form);
+  if (!record || !Object.keys(record).length) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 p-4">
+        <h3 className="card-title flex items-center gap-2"><Icon className="h-4 w-4 text-slate-500" aria-hidden="true" /> {title}</h3>
+        <p className="mt-4 text-sm text-slate-500">{empty}</p>
+      </div>
+    );
   }
-
+  // A subject count of 0 is a real answer, so only a missing value shows a dash.
+  const completed = record.completed_count
+    ?? record.completed_subjects?.length
+    ?? (record.subjects ? Object.values(record.subjects).filter(Boolean).length : undefined);
+  const rows = [
+    ["Name", record.name || `${record.first_name || ""} ${record.last_name || ""}`.trim()],
+    ["Student ID", record.student_number],
+    ["School Year", record.academic_year_entry],
+    ["Completed subjects", completed],
+  ];
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Or add a student manually" subtitle="One-off entry — compares received onboarding items against requirements" icon={UserPlus} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="First name" required>
-          <Input value={form.first_name} onChange={set("first_name")} required />
-        </Field>
-        <Field label="Last name" required>
-          <Input value={form.last_name} onChange={set("last_name")} required />
-        </Field>
-        <Field label="Program" required>
-          <Select
-            value={form.program_id}
-            onChange={set("program_id")}
-            required
-            options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
-          />
-        </Field>
-        <Field label="Entry semester" required>
-          <Select value={form.term_id} onChange={set("term_id")} required options={(meta?.terms || []).map((t) => ({ value: t.id, label: t.label }))} />
-        </Field>
-        <Field label="Admission / enrollment signal" required>
-          <Select
-            value={form.admission_signal}
-            onChange={set("admission_signal")}
-            placeholder=""
-            options={["Admission Confirmed", "Enrollment Confirmed", "For Completion"]}
-          />
-        </Field>
-        <Field label="Entry year">
-          <Input type="number" value={form.entry_year} onChange={set("entry_year")} />
-        </Field>
-        <Field label="Student number" hint="Leave blank to auto-generate">
-          <Input value={form.student_number} onChange={set("student_number")} placeholder="2026-0001" />
-        </Field>
-        <Field label="Email" hint="Leave blank to auto-generate">
-          <Input type="email" value={form.email} onChange={set("email")} />
-        </Field>
-      </div>
-
-      <Field label="Official transcript">
-        <Select
-          value={form.transcript_status}
-          onChange={set("transcript_status")}
-          placeholder=""
-          options={["Received", "Not received", "Not verified"]}
-        />
-      </Field>
-
-      <div className="overflow-hidden rounded-xl border border-slate-200">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <p className="text-sm font-semibold text-ink">Automatic handoff requirement check</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Statuses are derived from the form and stored evidence; there are no manual “received” checkboxes.
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                <th className="px-4 py-2.5">Requirement</th>
-                <th className="px-3 py-2.5">Evidence used</th>
-                <th className="px-4 py-2.5 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {derivedRequirements.map((requirement) => (
-                <tr key={requirement.item} className="border-b border-slate-50">
-                  <td className="px-4 py-2.5 font-semibold text-ink">{requirement.item}</td>
-                  <td className="px-3 py-2.5 text-slate-500">{requirement.evidence}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <StatusBadge value={requirement.complete ? "Complete" : "Missing"} dot={false} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <Field label="Other missing items" hint="Comma- or line-separated, optional">
-        <Textarea value={form.additional_missing_items} onChange={set("additional_missing_items")} />
-      </Field>
-      <Field label="Source reference" hint="e.g. AIMS batch, email subject">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
-      </Field>
-
-      <SubmitButton submitting={submitting}>Create monitoring record</SubmitButton>
-    </form>
+    <Card as="section" pad="sm" className="shadow-none">
+      <h3 className="card-title flex items-center gap-2"><Icon className="h-4 w-4 text-brand-700" aria-hidden="true" /> {title}</h3>
+      <dl className="mt-4 space-y-3 text-sm">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[8rem_1fr] gap-2">
+            <dt className="text-slate-500">{label}</dt>
+            <dd className="font-semibold text-slate-800">{value || value === 0 ? value : "—"}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
   );
 }

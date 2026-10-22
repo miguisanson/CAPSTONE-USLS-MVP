@@ -19,10 +19,8 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, SectionTitle, Spinner, EmptyState, ErrorNote } from "../../components/ui";
+import { Button, Card, EmptyState, HistoryPanel, InlineNotice, PageHeader, SectionTitle, Spinner } from "../../components/ui/index.js";
 import StudentPicker from "../../components/StudentPicker";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
-import { formatDate } from "../../lib/format";
 import { useAuth } from "../../auth";
 import { OnboardingGatePanel } from "../../components/ProcessGates";
 import PolicyRules from "../../components/PolicyRules";
@@ -57,11 +55,6 @@ const ICONS = {
   practicum: Briefcase,
   graduation: GraduationCap,
 };
-
-// Student-initiated workflows: staff pick from the submitted-request queue,
-// not the full student list (students file these from their own portal).
-// (The four standalone processes are not here: they all use ProcessBoardPage.)
-const USES_REQUEST_QUEUE = {};
 
 const NEEDS_STUDENT = {
   "student-handoff": false,
@@ -99,7 +92,7 @@ function SubviewTabs({ tabs, active, onChange }) {
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(tab.key)}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors cursor-pointer ${selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
+            className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors max-sm:min-h-11 ${selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
           >
             <TabIcon className="h-4 w-4" aria-hidden="true" /> {tab.label}
           </button>
@@ -141,22 +134,11 @@ function SingleWorkflowPage() {
     setSpecialization("");
     setResult(null);
     setSubmitError("");
-    if (USES_REQUEST_QUEUE[slug]) {
-      window.localStorage.removeItem("workflowStudentId");
-      if (!searchParams.get("student_id")) {
-        setStudentId(null);
-        setStudentLabel("");
-      }
-    }
   }, [slug]);
 
   useEffect(() => {
     if (studentId) {
-      if (USES_REQUEST_QUEUE[slug]) {
-        window.localStorage.removeItem("workflowStudentId");
-      } else {
-        window.localStorage.setItem("workflowStudentId", String(studentId));
-      }
+      window.localStorage.setItem("workflowStudentId", String(studentId));
       if (searchParams.get("student_id") !== String(studentId)) {
         const next = new URLSearchParams(searchParams);
         next.set("student_id", String(studentId));
@@ -173,11 +155,12 @@ function SingleWorkflowPage() {
   const tx = context?.transaction || meta?.transactions?.find((t) => t.slug === slug);
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
-  const usesQueue = USES_REQUEST_QUEUE[slug];
   const overviewWorkflow = OVERVIEW_WORKFLOWS.has(slug);
   const subviewTabs = SUBVIEW_TABS[slug] || null;
   const subview = subviewTabs && subviewTabs.some((tab) => tab.key && tab.key === searchParams.get("view")) ? searchParams.get("view") : "";
   const hideSideRail = overviewWorkflow || slug === "course-audit" || Boolean(subview);
+  // Panel Matching holds a wide ranked table: the notes move under it so the table gets the full page width.
+  const railBelow = slug === "panel-matching";
 
   function changeSubview(key) {
     const next = new URLSearchParams(searchParams);
@@ -196,16 +179,6 @@ function SingleWorkflowPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlStudentId]);
-
-  useEffect(() => {
-    if (!usesQueue || loading || !studentId || !context?.submitted_requests) return;
-    if (context.submitted_requests.some((request) => request.id === studentId)) return;
-    setStudentId(null);
-    setStudentLabel("");
-    const next = new URLSearchParams(searchParams);
-    next.delete("student_id");
-    setSearchParams(next, { replace: true });
-  }, [usesQueue, loading, studentId, context?.submitted_requests, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!studentLabel && context?.selected_student?.search_label) {
@@ -255,37 +228,22 @@ function SingleWorkflowPage() {
   };
 
   return (
-    <div className="space-y-5 animate-fade-up">
-      {/* Header */}
-      <Card className="p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white">
-            <Icon className="h-6 w-6" />
-          </span>
-          <div className="flex-1">
-            <h1 className="font-display text-2xl font-semibold text-ink">{tx.title}</h1>
-            <p className="mt-1 text-sm text-slate-600">{tx.short}</p>
-            <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-2">
-              <p>
-                <span className="font-bold uppercase tracking-wide text-slate-400">Who uses it · </span>
-                {tx.actor}
-              </p>
-              <p>
-                <span className="font-bold uppercase tracking-wide text-slate-400">Data captured · </span>
-                {tx.data}
-              </p>
-            </div>
-          </div>
-          {overviewWorkflow && (
-            <div className="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:justify-end">
-              <button type="button" onClick={() => setSupportModal("guide")} className="btn-ghost cursor-pointer px-3 py-2">
-                <HelpCircle className="h-4 w-4" /> How this works
-              </button>
-              <button type="button" onClick={() => setSupportModal("activity")} className="btn-ghost cursor-pointer px-3 py-2">
-                <History className="h-4 w-4" /> View recent activity
-              </button>
-            </div>
-          )}
+    <div className="page-stack animate-fade-up">
+      <Card pad="lg">
+        <PageHeader
+          title={tx.title}
+          description={tx.short}
+          icon={Icon}
+          actions={overviewWorkflow ? (
+            <>
+              <Button variant="secondary" icon={HelpCircle} onClick={() => setSupportModal("guide")}>How this works</Button>
+              <Button variant="secondary" icon={History} onClick={() => setSupportModal("activity")}>View recent activity</Button>
+            </>
+          ) : null}
+        />
+        <div className="meta mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:pl-14">
+          <p><span className="eyebrow">Who uses it · </span>{tx.actor}</p>
+          <p><span className="eyebrow">Data captured · </span>{tx.data}</p>
         </div>
       </Card>
 
@@ -293,21 +251,17 @@ function SingleWorkflowPage() {
 
       {subviewTabs && <SubviewTabs tabs={subviewTabs} active={subview} onChange={changeSubview} />}
 
-      {slug !== "defense-scheduling" && result && (
-        <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800 animate-fade-up">
-          <CheckCircle2 className="h-5 w-5" /> {result.message}
-        </div>
-      )}
-      {slug !== "defense-scheduling" && <ErrorNote message={submitError} />}
+      {slug !== "defense-scheduling" && result && <InlineNotice tone="success" icon={CheckCircle2}>{result.message}</InlineNotice>}
+      {slug !== "defense-scheduling" && submitError && <InlineNotice tone="danger">{submitError}</InlineNotice>}
 
-      <div className={hideSideRail ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
-        <div className={hideSideRail ? "space-y-5" : "space-y-5 lg:col-span-2"}>
+      <div className={hideSideRail || railBelow ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
+        <div className={hideSideRail || railBelow ? "page-stack" : "page-stack lg:col-span-2"}>
           {subview === "adviser" && <AdviserAppointments role={user?.role} embedded />}
           {subview === "calendar" && (
             <CalendarPage scope="staff" embedded title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in the Scheduling tab." />
           )}
-          {!subview && needsStudent && !usesQueue && (
-            <Card className="p-6">
+          {!subview && needsStudent && (
+            <Card pad="lg">
               <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
               <StudentPicker
                 value={studentId}
@@ -329,25 +283,21 @@ function SingleWorkflowPage() {
           )}
 
           {subview ? null : needsStudent && !studentId ? (
-            usesQueue ? null : (
-              <Card className="p-6">
-                <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
-              </Card>
-            )
+            <Card pad="lg">
+              <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
+            </Card>
           ) : loading && !context ? (
-            <Card className="p-6">
+            <Card pad="lg">
               <Spinner label="Loading workflow data…" />
             </Card>
           ) : error && !context ? (
-            <Card className="p-6">
+            <Card pad="lg">
               <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
             </Card>
-          ) : usesQueue ? (
-            null
           ) : slug === "research-gate" ? (
             <ResearchGateForm {...formProps} />
           ) : (
-            <Card className="p-6">
+            <Card pad="lg">
               {slug === "student-handoff" && <HandoffPanel {...formProps} />}
               {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
@@ -360,37 +310,37 @@ function SingleWorkflowPage() {
           {/* BPMN 1 Admission: the onboarding report and the Dean's approval
               gate that turns an import batch into a recorded admission completion. */}
           {!subview && slug === "student-handoff" ? (
-            <div className="mt-5"><OnboardingGatePanel role={user?.role} /></div>
+            <div><OnboardingGatePanel role={user?.role} /></div>
           ) : null}
         </div>
 
         {/* Side rail */}
-        {!hideSideRail && <div className="space-y-5">
-          <Card className="p-6">
-            <SectionTitle title="How this works" icon={Sparkles} />
-            <p className="text-sm leading-relaxed text-slate-600">{workflowGuidance(slug)}</p>
-          </Card>
-          <Card className="p-6">
-            <SectionTitle title="Recent in this workflow" icon={Info} />
-            {context?.recent_logs?.length ? (
-              <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={context.recent_logs.length}>
-                <ul className="space-y-3">
-                  {context.recent_logs.map((log) => (
-                    <li key={log.id} className="rounded-xl border border-slate-100 p-3">
-                      <p className="text-sm font-semibold text-ink">{log.result}</p>
-                      <p className="text-xs text-slate-500">
-                        {log.student_name || log.source_reference || "Workflow"} · {formatDate(log.created_at)}
-                      </p>
-                      {log.notes && <p className="mt-1 text-xs leading-relaxed text-slate-400">{log.notes}</p>}
-                    </li>
-                  ))}
-                </ul>
-              </HistoryDisclosure>
-            ) : (
-              <EmptyState title="No recent actions" />
-            )}
-          </Card>
-        </div>}
+        {!hideSideRail && (
+          <div className={railBelow ? "grid grid-cols-1 gap-5 md:grid-cols-2" : "page-stack"}>
+            <Card pad="lg">
+              <SectionTitle title="How this works" icon={Sparkles} />
+              <p className="text-sm leading-relaxed text-slate-600">{workflowGuidance(slug)}</p>
+            </Card>
+            <Card pad="lg">
+              <SectionTitle title="Recent in this workflow" icon={Info} />
+              {context?.recent_logs?.length ? (
+                <HistoryPanel
+                  label="View logs"
+                  hideLabel="Hide logs"
+                  entries={context.recent_logs.map((log) => ({
+                    id: log.id,
+                    title: log.result,
+                    at: log.created_at,
+                    actor: log.student_name || log.source_reference || "Workflow",
+                    note: log.notes,
+                  }))}
+                />
+              ) : (
+                <EmptyState title="No recent actions" size="sm" />
+              )}
+            </Card>
+          </div>
+        )}
       </div>
       {supportModal && (
         <WorkflowSupportModal

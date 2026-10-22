@@ -1,19 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  FileCheck,
-  CheckCircle2,
-  X,
-  RotateCcw,
-  Eye,
-  Search,
-  SlidersHorizontal,
-  Send,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, Clock, Eye, FileCheck, Info, RotateCcw, Send, SlidersHorizontal, XCircle } from "lucide-react";
 import { api } from "../../api";
-import { StatusBadge, EmptyState, ErrorNote } from "../../components/ui";
-import { Field, Textarea, Select } from "../../components/forms";
+import { Button, Card, EmptyState, Field, HistoryList, HistoryPanel, InlineNotice, Input, Modal, SearchInput, Select, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
+import { formatDateTime } from "../../lib/format";
 import { useAuth } from "../../auth";
 
 export const WORKFLOW_ROLE_LABELS = {
@@ -26,15 +16,9 @@ export const WORKFLOW_ROLE_LABELS = {
 
 export function SubmitButton({ submitting, children }) {
   return (
-    <button type="submit" disabled={submitting} className="btn-primary w-full sm:w-auto">
-      {submitting ? (
-        <>
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Saving…
-        </>
-      ) : (
-        children
-      )}
-    </button>
+    <Button type="submit" loading={submitting} className="w-full sm:w-auto">
+      {submitting ? "Saving…" : children}
+    </Button>
   );
 }
 
@@ -95,120 +79,56 @@ export function DemoResetButton({ student, resettingId, onReset }) {
   if (!demoMode) return null;
   const busy = resettingId === student.id;
   return (
-    <button
-      type="button"
-      disabled={busy}
+    <Button
+      variant="secondary"
+      icon={RotateCcw}
+      loading={busy}
       onClick={() => onReset(student)}
-      className="btn-ghost cursor-pointer px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+      className="text-red-700 hover:bg-red-50 hover:text-red-800"
     >
-      <RotateCcw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
       {busy ? "Resetting…" : "Reset demo case"}
-    </button>
+    </Button>
   );
 }
 
 export function DemoResetFeedback({ message, error }) {
   return (
     <>
-      {message && <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{message}</div>}
-      {error && <ErrorNote message={error} />}
+      {message && <InlineNotice tone="success">{message}</InlineNotice>}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
     </>
   );
 }
 
 export function WorkflowSubmitFeedback({ result, error }) {
   return (
-    <div aria-live="polite">
-      {result?.message && (
-        <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
-          <CheckCircle2 className="h-4 w-4 shrink-0" /> {result.message}
-        </div>
-      )}
-      {error && <ErrorNote message={error} />}
+    <div aria-live="polite" className="space-y-3">
+      {result?.message && <InlineNotice tone="success" icon={CheckCircle2}>{result.message}</InlineNotice>}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
     </div>
   );
 }
 
-export function WorkflowCaseModal({ id, title, subtitle, status, onClose, children, footer, size = "default" }) {
-  const closeButtonRef = useRef(null);
-  const onCloseRef = useRef(onClose);
-  const widthClass = size === "wide" ? "max-w-[96rem]" : "max-w-3xl";
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
-
-    function onKeyDown(event) {
-      const modal = closeButtonRef.current?.closest('[role="dialog"]');
-      const dialogs = [...document.querySelectorAll('[role="dialog"]')];
-      if (modal && dialogs[dialogs.length - 1] !== modal) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = modal ? [...modal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')] : [];
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus?.();
-    };
-  }, [id]);
-
+// The case dialog every workflow page opens: a Modal (lg), or xl for the wide batch and comparison views. "Close details"
+// stays at the left of the footer; the caller's buttons follow on the right.
+export function WorkflowCaseModal({ title, subtitle, status, onClose, children, footer, size = "default" }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6">
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${id}-title`}
-        aria-describedby={`${id}-description`}
-        className={`flex max-h-[88vh] w-full ${widthClass} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}
-      >
-        <header className="flex shrink-0 items-start gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 id={`${id}-title`} className="font-display text-xl font-semibold text-ink">{title}</h2>
-              {status && <StatusBadge value={status} dot={false} />}
-            </div>
-            <p id={`${id}-description`} className="mt-1 text-sm text-slate-500">{subtitle}</p>
-          </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={onClose}
-            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:ring-2 focus:ring-brand-500"
-            aria-label="Close case details"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6"><div className="w-full">{children}</div></div>
-        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-          <button type="button" onClick={onClose} className="btn-ghost cursor-pointer px-4 py-2">Close details</button>
-          <div className="flex flex-wrap justify-end gap-2">{footer}</div>
-        </footer>
-      </section>
-    </div>
+    <Modal
+      title={title}
+      subtitle={subtitle}
+      badge={status ? <StatusChip status={status} dot={false} /> : null}
+      size={size === "wide" ? "xl" : "lg"}
+      onClose={onClose}
+      closeLabel="Close case details"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} className="sm:mr-auto">Close details</Button>
+          {footer}
+        </>
+      }
+    >
+      {children}
+    </Modal>
   );
 }
 
@@ -236,7 +156,6 @@ export function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClos
   const title = mode === "activity" ? "Recent workflow activity" : `How ${guide ? slug : "this workflow"} works`;
   return (
     <WorkflowCaseModal
-      id={`${slug}-${mode}`}
       title={title}
       subtitle={mode === "activity" ? "A timestamped audit trail of recent actions and handoffs" : "A concise guide for students and reviewers"}
       onClose={onClose}
@@ -252,46 +171,40 @@ export function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClos
             <Detail label="When something is incomplete" value={guide.incomplete} />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Main stages</p>
+            <p className="eyebrow">Main stages</p>
             <ol className="mt-2 grid gap-2 sm:grid-cols-2">
-              {guide.stages.map((stage, index) => <li key={stage} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs text-brand-700">{index + 1}</span>{stage}</li>)}
+              {guide.stages.map((stage, index) => (
+                <li key={stage} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs text-brand-700">{index + 1}</span>
+                  {stage}
+                </li>
+              ))}
             </ol>
           </div>
-          <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900"><span className="font-semibold">What completion means: </span>{guide.final}</div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-900">Admin note · confirm with Sir De Paula / GS office before production</p>
-            <ul className="mt-2 space-y-1.5 text-sm text-amber-800">{policyQuestions.map((question) => <li key={question}>• {question}</li>)}</ul>
-          </div>
+          <InlineNotice tone="success" title="What completion means">{guide.final}</InlineNotice>
+          <InlineNotice tone="warning" title="Admin note · confirm with Sir De Paula / GS office before production">
+            <ul className="mt-1 space-y-1.5">{policyQuestions.map((question) => <li key={question}>• {question}</li>)}</ul>
+          </InlineNotice>
         </div>
       ) : null}
     </WorkflowCaseModal>
   );
 }
 
+// The workflow audit trail: HistoryPanel entries (newest first), behind a "View logs" toggle unless `collapsible` is off.
 export function WorkflowActivityList({ logs, collapsible = true }) {
   if (!logs.length) return <EmptyState title="No activity yet" hint="New submissions, messages, and decisions will appear here." />;
-  const activity = (
-    <ol className="relative space-y-4 border-l-2 border-slate-100 pl-5">
-      {logs.map((log) => (
-        <li key={log.id} className="relative rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-          <span className="absolute -left-[27px] top-4 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <p className="text-sm font-semibold text-ink">{log.result}</p>
-            <time className="text-xs text-slate-400">{formatDateTime(log.created_at)}</time>
-          </div>
-          <p className="mt-1 text-xs text-slate-500">{log.actor_role}{log.student_name ? ` · ${log.student_name}` : ""}{log.request_id ? ` · Request #${log.request_id}` : ""}{log.action_type ? ` · ${log.action_type}` : ""}</p>
-          {(log.previous_status || log.new_status) && <p className="mt-2 text-xs font-semibold text-slate-600">{log.previous_status || "—"} <span className="mx-1 text-slate-300">→</span> {log.new_status || "—"}</p>}
-          {log.notes && <p className="mt-2 text-xs leading-relaxed text-slate-500">{log.notes}</p>}
-        </li>
-      ))}
-    </ol>
-  );
-  if (!collapsible) return activity;
-  return (
-    <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={logs.length}>
-      {activity}
-    </HistoryDisclosure>
-  );
+  const entries = logs.map((log) => ({
+    id: log.id,
+    title: log.result,
+    at: log.created_at,
+    actor: [log.actor_role, log.student_name, log.request_id ? `Request #${log.request_id}` : "", log.action_type].filter(Boolean).join(" · "),
+    from: log.previous_status,
+    to: log.new_status,
+    note: log.notes,
+  }));
+  if (!collapsible) return <HistoryList entries={entries} />;
+  return <HistoryPanel entries={entries} label="View logs" hideLabel="Hide logs" count={logs.length} />;
 }
 
 export function WorkflowMessageModal({ slug, row, context, replyTo = null, onClose, onSaved }) {
@@ -337,33 +250,42 @@ export function WorkflowMessageModal({ slug, row, context, replyTo = null, onClo
 
   return (
     <WorkflowCaseModal
-      id={`${slug}-message-${student.id}`}
       title={replyTo ? "Reply in case discussion" : "Message / return for clarification"}
       subtitle={`${student.name} · ${student.student_number}`}
       onClose={onClose}
       size={["practicum", "graduation"].includes(slug) ? "wide" : "default"}
-      footer={<button type="submit" form={`${slug}-message-form-${student.id}`} disabled={busy} className={`${returningToStudent ? "btn cursor-pointer bg-red-600 px-4 py-2 text-white hover:bg-red-700" : "btn-primary cursor-pointer px-4 py-2"}`}><Send className="h-4 w-4" /> {busy ? "Saving…" : returningToStudent ? "Return to student" : "Send message"}</button>}
+      footer={<Button type="submit" form={`${slug}-message-form-${student.id}`} variant={returningToStudent ? "danger" : "primary"} icon={Send} loading={busy}>{busy ? "Saving…" : returningToStudent ? "Return to student" : "Send message"}</Button>}
     >
       <form id={`${slug}-message-form-${student.id}`} onSubmit={save} className="space-y-4">
-        <ErrorNote message={error} />
-        {replyTo && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-sm font-semibold text-emerald-950">Replying to {replyTo.sender_name || replyTo.sender_role}{replyTo.sender_name && replyTo.sender_role ? ` (${replyTo.sender_role})` : ""} → {replyTo.recipient_role}</p>{replyTo.comment && <p className="mt-2 text-sm text-emerald-800">{replyTo.comment}</p>}</div>}
+        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+        {replyTo && (
+          <InlineNotice tone="success" title={`Replying to ${replyTo.sender_name || replyTo.sender_role}${replyTo.sender_name && replyTo.sender_role ? ` (${replyTo.sender_role})` : ""} → ${replyTo.recipient_role}`}>
+            {replyTo.comment}
+          </InlineNotice>
+        )}
         {!replyTo && <>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Action">
-            <select value={form.action_type} onChange={(event) => setForm((current) => ({ ...current, action_type: event.target.value, require_document_resubmission: false }))} className="field-input cursor-pointer">
-              <option value="return">Return for clarification</option>
-              <option value="note">Send note to current reviewer</option>
-            </select>
+            <Select
+              value={form.action_type}
+              onChange={(event) => setForm((current) => ({ ...current, action_type: event.target.value, require_document_resubmission: false }))}
+              placeholder=""
+              options={[{ value: "return", label: "Return for clarification" }, { value: "note", label: "Send note to current reviewer" }]}
+            />
           </Field>
           <Field label="Recipient / next stage">
             <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal", require_document_resubmission: event.target.value === "Student" ? current.require_document_resubmission : false }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean"]} />
           </Field>
         </div>
         <Field label="Visibility">
-          <select value={form.visibility} onChange={update("visibility")} disabled={form.recipient_role === "Student"} className="field-input cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100">
-            <option value="student_visible">Visible to student</option>
-            <option value="internal">Internal reviewers only</option>
-          </select>
+          <Select
+            value={form.visibility}
+            onChange={update("visibility")}
+            disabled={form.recipient_role === "Student"}
+            className="disabled:cursor-not-allowed disabled:bg-slate-100"
+            placeholder=""
+            options={[{ value: "student_visible", label: "Visible to student" }, { value: "internal", label: "Internal reviewers only" }]}
+          />
         </Field>
         {!remarksOnly && <Field label="Message template">
           <Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} />
@@ -379,14 +301,14 @@ export function WorkflowMessageModal({ slug, row, context, replyTo = null, onClo
             />
             <span>
               <span className="block text-sm font-semibold text-slate-900">Have student resubmit document</span>
-              <span className="mt-1 block text-xs leading-relaxed text-slate-600">When checked, Graduation Step 1 is reset. The existing PDF stays in file history, but the student must upload a new PDF before resubmitting.</span>
+              <span className="meta mt-1 block leading-relaxed text-slate-600">When checked, Graduation Step 1 is reset. The existing PDF stays in file history, but the student must upload a new PDF before resubmitting.</span>
             </span>
           </label>
         )}
         <Field label={replyTo ? "Reply" : remarksOnly ? "Remarks" : form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"} required={commentRequired}>
           <Textarea value={form.comment} onChange={update("comment")} required={commentRequired} placeholder={remarksOnly ? "Type your remarks or message." : "Add the exact file, record, or detail that needs attention."} />
         </Field>
-        <p className="text-xs leading-relaxed text-slate-500">{replyTo ? "Your reply is added chronologically to this case discussion and routed to the original sender." : "Returning the case moves it back to the selected recipient's stage and requires a reason. Use the case action button for normal forward approval; a note keeps the current stage unchanged."}</p>
+        <p className="meta leading-relaxed">{replyTo ? "Your reply is added chronologically to this case discussion and routed to the original sender." : "Returning the case moves it back to the selected recipient's stage and requires a reason. Use the case action button for normal forward approval; a note keeps the current stage unchanged."}</p>
       </form>
     </WorkflowCaseModal>
   );
@@ -407,22 +329,24 @@ export function CaseMessageHistory({ messages = [], onReply = null }) {
 export function WorkflowFileHistory({ files = [] }) {
   if (!files.length) return <EmptyState title="No uploaded files for this request" />;
   return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400"><FileCheck className="h-4 w-4" /> Submitted file history</p>
+    <Card pad="sm">
+      <p className="eyebrow flex items-center gap-2"><FileCheck className="h-4 w-4" /> Submitted file history</p>
       <ul className="mt-3 space-y-2">
         {files.map((file) => (
           <li key={file.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{file.name}</p>
-              <p className="text-xs text-slate-500">Uploaded by {file.uploaded_by || "Uploader not recorded"} ({file.uploaded_by_role || "role not recorded"}) · {formatDateTime(file.uploaded_at)}{file.stage ? ` · ${file.stage}` : ""}</p>
+              <p className="meta">Uploaded by {file.uploaded_by || "Uploader not recorded"} ({file.uploaded_by_role || "role not recorded"}) · {formatDateTime(file.uploaded_at)}{file.stage ? ` · ${file.stage}` : ""}</p>
             </div>
-            {file.file_exists !== false ? <a href={file.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-1.5">
-              <Eye className="h-3.5 w-3.5" /> View file
-            </a> : <span className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">File unavailable</span>}
+            {file.file_exists !== false ? (
+              <Button as="a" href={file.url} target="_blank" rel="noreferrer" variant="secondary" size="sm" icon={Eye}>View file</Button>
+            ) : (
+              <StatusChip tone="danger" status="File unavailable" dot={false} size="sm" />
+            )}
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }
 
@@ -433,25 +357,41 @@ export function RosterFilters({ filters, setFilters, programs, statuses, seconda
     Object.keys(filters).map((key) => [key, key === "sort" ? "newest" : ""])
   ));
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+    <Card pad="sm" className="bg-slate-50/70">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="relative block">
-          <span className="sr-only">Search list</span>
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={filters.query} onChange={update("query")} className="field-input pl-10" placeholder="Search name, ID, program…" aria-label="Search list" />
-        </label>
-        <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
-        <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter by workflow stage or status"><option value="">All stages / statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
-        {secondaryLabel && <select value={filters.secondary || ""} onChange={update("secondary")} className="field-input cursor-pointer" aria-label={`Filter by ${secondaryLabel}`}><option value="">All {secondaryLabel.toLowerCase()}</option>{secondaryOptions.map((option) => <option key={option}>{option}</option>)}</select>}
-        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated from</span><input type="date" value={filters.dateFrom || ""} onChange={update("dateFrom")} className="field-input" /></label>}
-        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Updated through</span><input type="date" value={filters.dateTo || ""} onChange={update("dateTo")} className="field-input" /></label>}
-        {showAdvanced && <label><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Sort</span><select value={filters.sort || "newest"} onChange={update("sort")} className="field-input cursor-pointer"><option value="newest">Newest updated</option><option value="oldest">Oldest updated</option><option value="student">Student name</option></select></label>}
+        <SearchInput
+          value={filters.query}
+          onChange={(text) => setFilters((current) => ({ ...current, query: text }))}
+          placeholder="Search name, ID, program…"
+          label="Search list"
+        />
+        <Select value={filters.program} onChange={update("program")} aria-label="Filter by program" placeholder="All programs" options={programs} />
+        <Select value={filters.status} onChange={update("status")} aria-label="Filter by workflow stage or status" placeholder="All stages / statuses" options={statuses} />
+        {secondaryLabel && (
+          <Select value={filters.secondary || ""} onChange={update("secondary")} aria-label={`Filter by ${secondaryLabel}`} placeholder={`All ${secondaryLabel.toLowerCase()}`} options={secondaryOptions} />
+        )}
+        {showAdvanced && <Field label="Updated from"><Input type="date" value={filters.dateFrom || ""} onChange={update("dateFrom")} /></Field>}
+        {showAdvanced && <Field label="Updated through"><Input type="date" value={filters.dateTo || ""} onChange={update("dateTo")} /></Field>}
+        {showAdvanced && (
+          <Field label="Sort">
+            <Select
+              value={filters.sort || "newest"}
+              onChange={update("sort")}
+              placeholder=""
+              options={[{ value: "newest", label: "Newest updated" }, { value: "oldest", label: "Oldest updated" }, { value: "student", label: "Student name" }]}
+            />
+          </Field>
+        )}
       </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
         <span>Showing {count} of {total} records</span>
-        {active > 0 && <button type="button" onClick={clearFilters} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button>}
+        {active > 0 && (
+          <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={clearFilters}>
+            Clear {active} filter{active === 1 ? "" : "s"}
+          </Button>
+        )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -460,7 +400,12 @@ export function uniqueValues(values) {
 }
 
 export function Detail({ label, value }) {
-  return <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 font-semibold text-slate-700">{value || "—"}</p></div>;
+  return (
+    <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+      <p className="eyebrow">{label}</p>
+      <p className="mt-1 font-semibold text-slate-700">{value || "—"}</p>
+    </div>
+  );
 }
 
 export function shortDate(value) {
@@ -474,13 +419,6 @@ export function shortDate(value) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
-function formatDateTime(value) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-PH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 
 export function formatTime(value) {
   if (!value) return "";
@@ -497,20 +435,15 @@ export function timeRange(start, end) {
   return `${formatTime(start)}-${formatTime(end)}`;
 }
 
-// ---------------------------------------------------------------------------
-// AWOL & Residency
-// ---------------------------------------------------------------------------
+// A small figure tile. New code uses StatCard size="sm" directly; the Practicum and Graduation rosters still call this
+// (their packet replaces it). The tone name is the old one (brand / blue / amber / red); the icon makes the tone visible.
+const MINI_TONES = {
+  brand: { tone: "success", icon: CheckCircle2 },
+  blue: { tone: "info", icon: Info },
+  amber: { tone: "warning", icon: Clock },
+  red: { tone: "danger", icon: XCircle },
+};
 export function MiniBox({ label, value, tone }) {
-  const tones = {
-    brand: "text-brand-700 bg-brand-50",
-    blue: "text-blue-700 bg-blue-50",
-    amber: "text-amber-700 bg-amber-50",
-    red: "text-red-700 bg-red-50",
-  };
-  return (
-    <div className={`rounded-xl p-3 ${tones[tone]}`}>
-      <p className="font-display text-xl font-semibold leading-none">{value}</p>
-      <p className="mt-1 text-xs font-semibold">{label}</p>
-    </div>
-  );
+  const mapped = MINI_TONES[tone] || { tone: "neutral", icon: AlertTriangle };
+  return <StatCard size="sm" label={label} value={value} tone={mapped.tone} icon={mapped.icon} />;
 }

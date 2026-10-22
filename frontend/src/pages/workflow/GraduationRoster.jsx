@@ -18,7 +18,6 @@ import { Field, Input, Textarea, Select } from "../../components/forms";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import StageBoard from "../../components/StageBoard";
-import { formatDate } from "../../lib/format";
 import { GraduationBatchModal } from "./GraduationBatchModal";
 import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, sortSelectedWorkflowRows } from "./graduationShared";
 import { CaseMessageHistory, DemoResetButton, DemoResetFeedback, Detail, MiniBox, RosterFilters, SubmitButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, WorkflowSubmitFeedback, uniqueValues, useDemoCaseReset } from "./shared";
@@ -46,67 +45,6 @@ function GraduationBatchStageModal({ group, onClose }) {
       <GraduationBatchStageCheck group={group} />
     </WorkflowCaseModal>
   );
-}
-
-function graduationRequirementTone(item) {
-  if (item?.passed === true || item?.complete === true || item?.status === "Passed") return "complete";
-  return "missing";
-}
-
-function graduationRequirementClasses(tone) {
-  return tone === "complete"
-    ? {
-      card: "border-emerald-200 bg-emerald-50 text-emerald-900",
-      icon: "bg-emerald-600 text-white",
-      text: "text-emerald-800",
-      muted: "text-emerald-700",
-    }
-    : {
-      card: "border-red-200 bg-red-50 text-red-900",
-      icon: "bg-red-600 text-white",
-      text: "text-red-800",
-      muted: "text-red-700",
-    };
-}
-
-function graduationRequirementDetailLines(item) {
-  const actual = item.actual_value ?? item.actual ?? item.status ?? "Pending";
-  const required = item.required_value ?? item.required;
-  return [
-    String(actual),
-    required != null ? `Required: ${String(required)}` : "",
-    item.note || "",
-  ].filter(Boolean);
-}
-
-function graduationFallbackChecklist(row) {
-  const eligibility = row.eligibility || {};
-  return [
-    {
-      key: "coursework",
-      label: "Coursework",
-      actual_value: eligibility.coursework_status || "Pending",
-      status: eligibility.coursework_status === "Complete" ? "Passed" : eligibility.coursework_status || "Not met",
-      passed: eligibility.coursework_status === "Complete",
-      note: eligibility.missing_coursework?.length ? `Missing: ${eligibility.missing_coursework.slice(0, 2).join(", ")}${eligibility.missing_coursework.length > 2 ? "..." : ""}` : "",
-    },
-    {
-      key: "research",
-      label: "Thesis / research",
-      actual_value: eligibility.research_status || "Pending",
-      status: eligibility.research_status === "Complete" ? "Passed" : eligibility.research_status || "Not met",
-      passed: eligibility.research_status === "Complete",
-      note: eligibility.missing_research_requirements?.length ? `Missing: ${eligibility.missing_research_requirements.slice(0, 2).join(", ")}${eligibility.missing_research_requirements.length > 2 ? "..." : ""}` : "",
-    },
-    {
-      key: "practicum",
-      label: "Practicum",
-      actual_value: eligibility.practicum_status || "Pending",
-      status: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status) ? "Passed" : eligibility.practicum_status || "Not met",
-      passed: ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"].includes(eligibility.practicum_status),
-      note: eligibility.missing_practicum_requirement || "",
-    },
-  ];
 }
 
 const GRADUATION_BOARD_COLUMNS = [
@@ -525,60 +463,6 @@ function GraduationStudentCard({ row, selectable, canSelect, selected, onToggleS
         <button type="button" onClick={() => onOpenStudent(row.student.id)} className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs"><Eye className="h-3.5 w-3.5" /> View student</button>
       </div>
     </div>
-  );
-}
-
-function GraduationBatchOverviewSection({ groups, accountRole, onSelectBatch, onProcessBatch, onViewStage }) {
-  if (!groups.length) return null;
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="font-display text-lg font-semibold text-ink">Created graduation batches</p>
-          <p className="text-xs text-slate-500">Track each batch after GS Staff compiles the candidate list, with every student still visible inside.</p>
-        </div>
-        <StatusBadge value={`${groups.length} batch${groups.length === 1 ? "" : "es"}`} dot={false} />
-      </div>
-      <div className="space-y-2">
-        {groups.map((group) => {
-          const stageSelection = graduationStageSelection(group.rows, accountRole);
-          const actionLabel = graduationBatchActionLabel(stageSelection.action);
-          const currentStage = graduationBatchCurrentStage(group);
-          const names = group.rows.map((row) => row.student.name).slice(0, 4).join(", ");
-          const hiddenCount = group.rows.length - Math.min(group.rows.length, 4);
-          const readyForDean = graduationReadyForDeanReview(group);
-          const readyToDrag = group.rows.every((row) => row.has_submitted_documents) || readyForDean;
-          return (
-            <div
-              key={group.id}
-              className={`rounded-xl border px-3 py-2 ${readyToDrag ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50/60"}`}
-            >
-              <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{group.label}</p>
-                  <p className="text-xs text-slate-500">{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"} · Updated {formatDate(group.updatedAt)}</p>
-                  {readyForDean && <span className="mt-1 inline-flex rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>}
-                  {!readyToDrag && <span className="mt-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">Waiting for documents</span>}
-                </div>
-                <div className="min-w-0 text-xs text-slate-600">
-                  <p className="truncate"><span className="font-semibold text-slate-700">Students:</span> {names}{hiddenCount > 0 ? ` +${hiddenCount} more` : ""}</p>
-                  <p className="mt-0.5 truncate"><span className="font-semibold text-slate-700">Next:</span> {group.nextOwners.join(", ")}</p>
-                </div>
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <p className="truncate text-xs font-semibold text-slate-700">{currentStage.label}</p>
-                  <StatusBadge value={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
-                  <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>
-                </div>
-                <div className="flex min-w-0 flex-wrap justify-start gap-1.5 lg:justify-end">
-                  <button type="button" onClick={() => onSelectBatch(group)} className="btn-ghost cursor-pointer px-2.5 py-1">Select batch</button>
-                  <button type="button" disabled={!stageSelection.action} onClick={() => onProcessBatch(group)} className="btn-primary min-w-0 cursor-pointer whitespace-normal px-2.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"><CheckSquare className="h-4 w-4 shrink-0" /> {actionLabel}</button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
