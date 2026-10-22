@@ -16,6 +16,15 @@ const STATUS_FILTER = [
 const RISK_FILTER = ["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"];
 const STANDING_FILTER = ["Active", "On Leave", "AWOL", "Withdrawn"];
 
+// I-075: what stands between a student and the Compre exam, in the API's own words. The eligibility rule is by
+// category (the units needed differ by program), so no unit total is printed here.
+function compreProgress(compre) {
+  const left = compre?.missing_subjects || 0;
+  if (left > 0) return `${left} subject${left === 1 ? "" : "s"} left`;
+  const failed = compre?.failed_subjects || 0;
+  return failed > 0 ? `Not eligible: ${failed} failed subject${failed === 1 ? "" : "s"}` : "Not eligible";
+}
+
 // One column per field of the old table, same order. The first cell links to the record, so the row is also keyboard reachable.
 const COLUMNS = [
   {
@@ -59,7 +68,7 @@ const COLUMNS = [
       ) : s.compre_eligibility?.eligible ? (
         <StatusChip status="Eligible to take" dot={false} />
       ) : (
-        <span className="meta">{s.compre_eligibility?.completed_units || 0}/21 units</span>
+        <span className="meta">{compreProgress(s.compre_eligibility)}</span>
       ),
   },
   { key: "adviser_name", header: "Adviser" },
