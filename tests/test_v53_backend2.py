@@ -438,6 +438,31 @@ class V53Backend2Tests(unittest.TestCase):
         self.assertEqual({row["id"] for row in listed["items"]}, expected)
         self.assertEqual(listed["total"], len(expected))
 
+    # ------------------------------------------------------------------ I-047
+    def test_every_daily_change_row_names_its_student(self):
+        with app.app_context():
+            log = (
+                TransactionLog.query.filter(
+                    TransactionLog.transaction_slug.in_(REGISTRAR_CHANGE_SLUGS),
+                    TransactionLog.student_id.isnot(None),
+                ).order_by(TransactionLog.id.desc()).first()
+            )
+            self.assertIsNotNone(log)
+            day = log.created_at.date().isoformat()
+            student_ids = {
+                row.student_id for row in TransactionLog.query.filter(
+                    TransactionLog.transaction_slug.in_(REGISTRAR_CHANGE_SLUGS),
+                    TransactionLog.student_id.isnot(None),
+                ).all()
+                if row.created_at.date().isoformat() == day
+            }
+        staff = sign_in(STAFF_EMAIL)
+        items = staff.get("/api/reports/daily-changes", query_string={"date": day}).get_json()["items"]
+        self.assertTrue(items)
+        for row in items:
+            self.assertIn("student_id", row)
+            self.assertIn(row["student_id"], student_ids)
+
 
 if __name__ == "__main__":
     unittest.main()
