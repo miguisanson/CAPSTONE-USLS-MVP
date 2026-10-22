@@ -7267,7 +7267,25 @@ def leave_case_apply(case: LeaveCase, action: str, account: UserAccount | None, 
         raise LeaveError("Enter a comment or reason before doing this.", 400)
     result = LEAVE_HANDLERS[action](case, account, comment, data, move)
     case.updated_at = now_utc()
+    if account is not None and action not in {"start_review", "close"}:
+        notify_leave_step(case, account)
     return result
+
+
+def notify_leave_step(case: LeaveCase, account: UserAccount) -> int:
+    """Bell notification for the move just made: the student hears the decision, the next owner hears it waits."""
+    db.session.flush()
+    event = (
+        LeaveCaseEvent.query.filter(LeaveCaseEvent.case_id == case.id, LeaveCaseEvent.log_id.isnot(None))
+        .order_by(LeaveCaseEvent.id.desc()).first()
+    )
+    log = db.session.get(TransactionLog, event.log_id) if event else None
+    if log is None:
+        return 0
+    return notify_workflow_step(
+        SLUG_FOR_KIND[case.kind], case.student, log.result, log.new_status, log.next_owner,
+        f"leave:{case.id}:{event.id}", student_visible=log.visibility == "student_visible", actor=account,
+    )
 
 
 # ---- dates move cases along (run at start-up, at sign-in, and from the staff screen) -----
@@ -8948,7 +8966,31 @@ def process_case_apply(slug: str, kind: str, record, action: str, account: UserA
     if isinstance(fresh, ResidencyEnrollment):
         after = residency_enrollment_dict(fresh)["status"]
     label = _sp.status_by_key(slug).get(after, {}).get("label", after)
+    # The Dean's decisions already told the student and the next owner inside workflow_approval_decide.
+    decided_by_dean = action in ({"approve", "deny"} if slug == _sp.SLUG_WITHDRAWAL else {"approve", "deny", "return"})
+    if not decided_by_dean:
+        notify_process_step(slug, student, action, label, account)
     return {"message": f"{move['label']}: now '{label}'.", "from": before, "to": after}
+
+
+def notify_process_step(slug: str, student: Student, action: str, status_label: str, account: UserAccount) -> int:
+    """Bell notification for a move on the standalone board (forward, tag, return, re-enrollment...)."""
+    log_slug = "awol" if slug == _sp.SLUG_AWOL else slug
+    if action == "return":
+        return notify_workflow_step(
+            log_slug, student, "Returned to you with a comment", status_label, "Student",
+            f"process:{log_slug}:{student.id}:return:{now_utc().strftime('%Y%m%d%H%M%S%f')}", actor=account,
+        )
+    log = (
+        TransactionLog.query.filter_by(student_id=student.id, transaction_slug=log_slug)
+        .order_by(TransactionLog.id.desc()).first()
+    )
+    if log is None:
+        return 0
+    return notify_workflow_step(
+        log_slug, student, log.result, log.new_status or status_label, log.next_owner,
+        f"process:{log_slug}:{log.id}", student_visible=log.visibility == "student_visible", actor=account,
+    )
 
 
 def _status_sentence(student: Student, ind: dict) -> str:
@@ -17253,6 +17295,8 @@ def register_routes(app: Flask) -> None:
                 previous_status=previous_status, new_status=record.status,
                 visibility="internal" if decision == "return" else "student_visible",
             )
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "practicum", record.student, record.id, record.status)
 
         elif case_type == "withdrawal":
             application = WithdrawalApplication.query.get_or_404(item_id)
@@ -17307,6 +17351,8 @@ def register_routes(app: Flask) -> None:
                     result, note, previous_status, application.status,
                 )
             add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application), previous_status=previous_status, new_status=application.status)
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "withdrawal", application.student, application.id, application.status)
 
         elif case_type in {"leave-of-absence", "readmission"}:
             case = LeaveCase.query.get_or_404(item_id)
@@ -17398,6 +17444,8 @@ def register_routes(app: Flask) -> None:
                 result, next_owner, " ".join(part for part in [item.policy_classification, note] if part),
                 previous_status=previous_status, new_status=item.status,
             )
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "awol", student, item.id, item.status)
 
         elif case_type == "graduation":
             endorsement = GraduationEndorsement.query.get_or_404(item_id)
@@ -17440,9 +17488,16 @@ def register_routes(app: Flask) -> None:
                 previous_status=previous_status, new_status=endorsement.endorsement_status,
                 visibility="internal" if decision == "return" else "student_visible",
             )
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "graduation", endorsement.student, endorsement.id, endorsement.endorsement_status)
         else:
             return jsonify({"error": "Unknown workflow approval type."}), 404
 
+        notify_workflow_step(
+            decided_slug, decided_student, result, decided_status, next_owner,
+            f"decision:{decided_slug}:{decided_record_id}:{decided_status}:{now_utc().strftime('%Y%m%d%H%M%S%f')}",
+            student_visible=decision != "return" or case_type in {"awol-return", "withdrawal"}, actor=account,
+        )
         db.session.commit()
         return jsonify({"ok": True, "message": result})
 
@@ -20355,6 +20410,8 @@ def register_routes(app: Flask) -> None:
 
         updated = []
         skipped = []
+        waiting_for: dict[str, list[Student]] = {}
+        batch_stamp = now_utc().strftime("%Y%m%d%H%M%S%f")
         comment = (data.get("comment") or "").strip()
         try:
             review_window = (
@@ -20532,10 +20589,21 @@ def register_routes(app: Flask) -> None:
                     previous_status=previous, new_status=endorsement.endorsement_status,
                     visibility="internal" if next_owner != "Student" else "student_visible",
                 )
+                notify_workflow_step(
+                    "graduation", student, result, endorsement.endorsement_status, next_owner,
+                    f"batch:{action}:{student.id}:{batch_stamp}", actor=account, owner=False,
+                    student_visible=action in {"approve", "mark_not_eligible", "create_batch", "compile_to_ac"},
+                )
+                waiting_for.setdefault(next_owner, []).append(student)
                 updated.append({"student_id": student.id, "student_name": student.name})
             except ValueError as exc:
                 skipped.append({"student_id": student.id, "student_name": student.name, "reason": str(exc)})
 
+        for owner_label, waiting in waiting_for.items():
+            notify_workflow_owner(
+                "graduation", waiting[0], action_labels[action], owner_label,
+                f"batch:{action}:{batch_stamp}:{owner_label}", count=len(waiting), actor=account,
+            )
         db.session.commit()
         return jsonify({
             "ok": True,
@@ -27741,6 +27809,76 @@ def notify_many(accounts: list[UserAccount], kind: str, title: str, body: str = 
     for account in accounts:
         if notify_account(account, kind, title, body, **kwargs):
             sent += 1
+    return sent
+
+
+# ---- a workflow step tells the student and the next owner (I-059) ----------------------------
+# Where each process lives for the student, and the account role behind each owner label.
+STUDENT_PAGE_FOR_WORKFLOW = {
+    "leave-of-absence": "/student/requests/leave-of-absence",
+    "readmission": "/student/requests/readmission",
+    "awol": "/student/requests/awol-return",
+    "awol-return": "/student/requests/awol-return",
+    "withdrawal": "/student/requests/withdrawal",
+    "practicum": "/student/practicum",
+    "graduation": "/student/graduation",
+}
+WORKFLOW_NOTIFICATION_NAMES = {
+    "leave-of-absence": "Leave of absence", "readmission": "Readmission", "awol": "AWOL return",
+    "awol-return": "AWOL return", "withdrawal": "Subject withdrawal", "practicum": "Practicum",
+    "graduation": "Graduation",
+}
+OWNER_LABEL_ACCOUNT_ROLE = {
+    ROLE_LABELS["staff"]: "staff",
+    ROLE_LABELS["dean"]: "dean",
+    ROLE_LABELS["academic_coordinator"]: "academic_coordinator",
+    ROLE_LABELS["research_coordinator"]: "research_coordinator",
+}
+
+
+def notify_workflow_owner(
+    slug: str, student: Student, result: str, next_owner: str | None, key: str, *,
+    count: int = 1, actor: UserAccount | None = None,
+) -> int:
+    """Tell the people of the next owner role that a case now waits for them. Never the person who acted."""
+    role = OWNER_LABEL_ACCOUNT_ROLE.get(normalize_owner_label(next_owner or ""))
+    if not role:
+        return 0
+    name = WORKFLOW_NOTIFICATION_NAMES.get(slug, slug)
+    if count > 1:
+        title, body = f"{count} {name.lower()} cases are waiting for you", result
+    else:
+        title, body = f"{name}: {student.name} is waiting for you", f"{result}."
+    recipients = [row for row in accounts_for_roles(role) if not actor or row.id != actor.id]
+    return notify_many(
+        recipients, "workflow_waiting", title, body, link=f"/workflow/{slug.replace('awol-return', 'awol')}",
+        related_type=slug, related_id=student.id, dedupe_key=f"waiting:{key}",
+    )
+
+
+def notify_workflow_step(
+    slug: str, student: Student | None, result: str, new_status: str | None, next_owner: str | None, key: str, *,
+    student_visible: bool = True, actor: UserAccount | None = None, owner: bool = True,
+) -> int:
+    """One bell notification for the student (what was decided) and one for the next owner.
+
+    ``key`` makes it idempotent per step; a person who made the move is never told about their own move.
+    """
+    if student is None:
+        return 0
+    sent = 0
+    name = WORKFLOW_NOTIFICATION_NAMES.get(slug, slug)
+    if student_visible and not (actor and actor.role == "student"):
+        status_text = f" Status: {new_status}." if new_status else ""
+        owner_text = normalize_owner_label(next_owner or "")
+        next_text = f" Next: {owner_text}." if owner_text and owner_text.lower() not in CASE_CLOSED_OWNER_VALUES else ""
+        sent += notify_many(
+            accounts_for_student(student.id), "workflow_update", f"{name}: {result}"[:180], f"{result}.{status_text}{next_text}",
+            link=STUDENT_PAGE_FOR_WORKFLOW.get(slug), related_type=slug, related_id=student.id,
+            dedupe_key=f"step:{key}",
+        )
+    if owner:
+        sent += notify_workflow_owner(slug, student, result, next_owner, key, actor=actor)
     return sent
 
 
