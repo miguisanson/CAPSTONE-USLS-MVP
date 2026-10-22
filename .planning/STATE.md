@@ -16,7 +16,7 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/fac2` (I-079, I-090, I-085, I-099, I-100). Its worktree `wt/fac2` may still have a helper process; remove it later (rmdir junction first).
   - MERGED `pkt/wf` (P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/`); e2e after it -> `E:/Temp/claude/gate53/e2e_after_wf.txt`.
   - MERGED `pkt/wf2` (P7.5 restyle of six workflow files, dead code out).
-  - `grad` / `pkt/grad` — Graduation onto the shared board + Board/Table toggle (I-065, I-051) (spec `e2e/p77-graduation-board.spec.js`, port 5307).
+  - MERGED `pkt/grad` (I-065, I-051). New: I-105 (batch 'Next: Dean' wrong), I-106, I-107.
   - `wf4` / `pkt/wf4` — PageHeader on all workflow pages (I-063), Practicum/DefenseScheduling/Availability restyle + Practicum banner/width (I-089), Pill size (I-102) (spec `e2e/p78-practicum-scheduling.spec.js`, port 5308).
   - After `pkt/vocab` merges (it owns Layout.jsx): sidebar nav clipped by the footer (I-103, P2) + course-audit nav entry (I-101).
   - Fable review DONE -> `.planning/research/FULL-REVIEW-2026-10-22.md`; findings F-01..F-41 filed as I-055..I-095 (I-0xx = F-xx + 54). Worktree `review` can be removed (rmdir junction first).

@@ -64,3 +64,7 @@ Legend: yes = offered; reason = a card that cannot move shows a lock and why; po
 - N6. The Practicum move path ("Move to..." opening the confirm window) is covered by the code, not by a live demo case:
   both seeded Practicum cards are "Waiting for: Student", so the e2e spec checks the lock for them and the process
   boards cover the drag path.
+
+## Update 2026-10-22 (pkt/grad, v5.3)
+
+Board / Table toggle (same `ViewToggle`): Graduation = **yes** (student table with a batch line under the stage; group steps via the selection bar). Replaces N1 and the "no" in the Graduation column. Graduation filters = `RosterFilters` with the completed-course select, in one toolbar. Column names are plain (no "1 ·" numbering), default width; cards use the LOA layout. Column widths and the "N more stages" cue are shared by every board (pkt/board, I-067).
