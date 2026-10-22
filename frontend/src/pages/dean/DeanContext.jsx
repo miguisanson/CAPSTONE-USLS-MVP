@@ -89,13 +89,15 @@ export function DeanProvider({ children }) {
     return [...workflowPending, ...workflowOverview, ...workflowRecent].find((item) => item.type === type && String(item.id) === key) || null;
   }
 
-  async function decidePlan(plan, decision) {
+  // Called by the plan card's DecisionPanel once the Dean has typed the note (a return needs one) and confirmed.
+  async function decidePlan(plan, decision, comment = note[plan.id] || "") {
     setBusy(plan.id);
     setMsg("");
     setActErr("");
     try {
-      const res = await api.decideApproval(plan.id, { decision, note: note[plan.id] || "" });
+      const res = await api.decideApproval(plan.id, { decision, note: comment });
       setMsg(res.message);
+      setNote((current) => ({ ...current, [plan.id]: "" }));
       refetch();
     } catch (e) {
       setActErr(e.message);

@@ -288,24 +288,26 @@ test.describe("P3.2 Dean pages", () => {
     await expect(first).toContainText(/[A-Z]+-[A-Z]+\d+/);
     await expect(first).toContainText(/Suggested|Offered|Not Offered/);
 
-    // Return for revision without a note: the server refuses, its message is shown, the plan stays.
-    const note = card.getByRole("textbox", { name: /Optional decision note for / });
-    await expect(note).toHaveAttribute("placeholder", "Optional note to the Graduate School…");
+    // Return for revision without a note: the page refuses it before anything is sent (conA I-127: the same decision
+    // panel as every other Dean decision; it used to send the call and show the server's message), the plan stays.
+    const note = card.getByLabel("Note to the Academic Coordinator");
     await card.getByRole("button", { name: "Approve" }).waitFor();
     await card.getByRole("button", { name: "Return for revision" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "Enter a comment explaining what to revise before returning the plan." })).toBeVisible();
-    expect(decideCalls).toHaveLength(1);
-    expect(decideCalls[0]).toMatchObject({ decision: "return", note: "" });
+    await expect(card.getByText("Enter a comment explaining what to revise before returning the plan.")).toBeVisible();
+    expect(decideCalls, "a return with no note sends nothing").toHaveLength(0);
     await expect(plan).toBeVisible();
     await expect(card.getByRole("button", { name: "Return for revision" })).toBeEnabled();
     await page.screenshot({ path: join(SHOTS, "plan-error-1366.png"), fullPage: true });
 
-    // With a note it goes back to the Academic Coordinator; the server's message shows; the plan is under Recent decisions.
+    // With a note the Dean is asked first (the window is named after the button); then it goes back to the Academic
+    // Coordinator; the server's message shows; the plan is under Recent decisions.
     await note.fill("Please add a second section for the high-demand subjects.");
     await card.getByRole("button", { name: "Return for revision" }).click();
+    await expect(page.getByRole("dialog").last().getByRole("heading").first()).toHaveText("Confirm: Return for revision");
+    await page.getByRole("dialog").last().getByRole("button", { name: "Return for revision" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Offering plan returned by Dean for revision" })).toBeVisible();
-    expect(decideCalls).toHaveLength(2);
-    expect(decideCalls[1]).toMatchObject({ decision: "return", note: "Please add a second section for the high-demand subjects." });
+    expect(decideCalls).toHaveLength(1);
+    expect(decideCalls[0]).toMatchObject({ decision: "return", note: "Please add a second section for the high-demand subjects." });
     await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · MSCS/ })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · MIT/ })).toBeVisible(); // the seeded plan still waits
     const recent = page.getByRole("listitem").filter({ hasText: TERM });
@@ -336,14 +338,14 @@ test.describe("P3.2 Dean pages", () => {
     await expect(page.getByRole("main").getByRole("link", { name: "Approvals queue" })).toHaveAttribute("href", "/dean/approvals");
     await page.screenshot({ path: join(SHOTS, "case-not-found-1366.png"), fullPage: true });
 
-    // The practicum page: header, filters, the waiting list (what is in it depends on the other specs).
+    // The practicum page: header, the shared toolbar, the shared board (what is in it depends on the other specs).
+    // conA I-122: it is the same board as the other Dean pages now (no second "Waiting for your decision" table).
     await page.goto("/dean/approvals/practicum");
     await expect(page.getByRole("heading", { level: 1, name: "Practicum Reports" })).toBeVisible();
     await expect(page.getByText("Practicum completion reports sent to the Dean for final review.")).toBeVisible();
-    await expect(page.getByRole("searchbox", { name: "Search Dean review lists" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Waiting for your decision" })).toBeVisible();
-    await expect(page.getByText("Open a case to review it and decide")).toBeVisible();
-    await expect(page.getByRole("main").getByRole("link", { name: "All approvals" })).toHaveAttribute("href", "/dean/approvals");
+    await expect(page.getByRole("searchbox", { name: "Search requests by name, student number or program" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Choose how to show the requests" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Practicum workflow board" }).or(page.getByText("No practicum reports yet"))).toBeVisible();
     await page.screenshot({ path: join(SHOTS, "practicum-1366.png"), fullPage: true });
   });
 

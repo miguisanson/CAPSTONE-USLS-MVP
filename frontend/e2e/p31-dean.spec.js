@@ -1,7 +1,7 @@
 // Packet P3.1 (Phase 5 design system, dean stream): pins what the Dean's case page DOES, so the restyle onto
 // Modal / DataTable / StatusChip / DecisionPanel / HistoryPanel cannot change it. It was written against the old
 // code and must pass on both. Through the real UI, as the Dean:
-//   - the approvals list shows the case and its "Review" link opens the case card;
+//   - the approvals list shows the case and its "View details" link opens the case card;
 //   - "Return for revision" with no comment is blocked: no confirmation window, no request to the server, a message
 //     says a comment or reason is needed;
 //   - with a comment it opens a confirmation window titled "Confirm: Return for revision" that shows the comment;
@@ -123,12 +123,13 @@ test.describe("P3.1 Dean decisions on a case card", () => {
       }
     });
 
-    // 1. The list shows the case; Review opens the card.
+    // 1. The list shows the case; View details opens the card.
     await page.goto("/dean/approvals/practicum");
-    const row = page.getByRole("row").filter({ hasText: STUDENT });
-    await expect(row.first()).toBeVisible();
-    await expect(row.first()).toContainText("Report Sent to Dean");
-    await row.first().getByRole("link", { name: "Review" }).click();
+    // (conA I-122: the page is the shared board now - the report is a card, opened with "View details".)
+    const card = page.getByRole("article").filter({ hasText: STUDENT });
+    await expect(card.first()).toBeVisible();
+    await expect(card.first()).toContainText("Report Sent to Dean");
+    await card.first().getByRole("link", { name: /View details/ }).click();
     await expect(page).toHaveURL(/\/dean\/case\/practicum\/\d+$/);
     const caseId = page.url().match(/practicum\/(\d+)$/)[1];
     await expect(page.getByText(STUDENT).first()).toBeVisible();

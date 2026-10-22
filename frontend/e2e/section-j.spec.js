@@ -260,9 +260,9 @@ test.describe("I-008 Practicum: Dean marks a report reviewed", () => {
 
     // The screen under test, as the Dean.
     await page.goto("/dean/approvals/practicum");
-    const row = page.getByRole("row").filter({ hasText: "Paolo Ramirez" });
-    await expect(row.first()).toBeVisible();
-    await row.first().getByRole("link", { name: "Review" }).click();
+    const card = page.getByRole("article").filter({ hasText: "Paolo Ramirez" }); // the shared board (conA I-122)
+    await expect(card.first()).toBeVisible();
+    await card.first().getByRole("link", { name: /View details/ }).click();
     await page.getByLabel(/Review comment/i).first().fill("Practicum completed: 200 of 200 hours documented. Reviewed.");
     const button = page.getByRole("button", { name: "Mark reviewed" });
     await button.scrollIntoViewIfNeeded();

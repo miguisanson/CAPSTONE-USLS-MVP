@@ -53,6 +53,11 @@ const STAFF_VOICE = [
   "Withdraw a student from one subject until",
 ];
 
+// A page refetch can still be in flight when a test ends; end the mocked routes cleanly.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 const TOGGLE = { name: "Choose how to show the requests" };
 const SEARCH = { name: "Search requests by name, student number or program" };
 
@@ -358,5 +363,14 @@ test.describe("conA Dean Course Adjustments decides like every other Dean decisi
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(calls).toHaveLength(2);
     expect(calls[1]).toMatchObject({ decision: "approve" });
+  });
+
+  test("390 px: the plan card and its decision panel fit", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openAs(page, "/dean/approvals/course-adjustments", withPlan);
+    const card = page.getByRole("heading", { level: 2, name: /^Course offerings · MSCS/ }).locator("xpath=ancestor::*[contains(@class,'card')][1]");
+    await expect(card.getByRole("button", { name: "Return for revision" })).toBeVisible();
+    expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
+    await shot(page, "course-adjustments-390.png");
   });
 });
