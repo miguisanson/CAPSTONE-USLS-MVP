@@ -75,6 +75,30 @@ export const PAGE = Object.freeze({
 export const stepLabel = (number, name) => `${number} · ${name}`;
 export const withoutStep = (label) => String(label || "").replace(/^\d+\s*·\s*/, "").trim();
 
+/** App path -> the page's name, for every page a task or a link can open. */
+export const PAGE_BY_PATH = Object.freeze({
+  "/workflow/awol": PAGE.awolResidency,
+  "/workflow/readmission": PAGE.readmission,
+  "/workflow/leave-of-absence": PAGE.leaveOfAbsence,
+  "/workflow/withdrawal": PAGE.subjectWithdrawal,
+  "/workflow/practicum": PAGE.practicum,
+  "/workflow/graduation": PAGE.graduationEndorsement,
+  "/workflow/research-gate": PAGE.researchGate,
+  "/workflow/panel-matching": PAGE.panelMatching,
+  "/workflow/defense-scheduling": PAGE.defenseScheduling,
+  "/workflow/student-handoff": PAGE.studentHandoff,
+  "/course-adjustments": PAGE.courseAdjustments,
+  "/work-queue": PAGE.workQueue,
+});
+
+/** "Open <page name>" for a button that leads to an app path; the page name always comes from this file (I-116).
+ *  `fallback` is used for a path this file does not know. */
+export function openPageLabel(path, fallback = "Open") {
+  const clean = String(path || "").split(/[?#]/)[0];
+  const name = PAGE_BY_PATH[clean] || (clean.startsWith("/students/") ? "Student Record" : "");
+  return name ? `Open ${name}` : fallback;
+}
+
 /** The extra last part of a breadcrumb on a record page that is not in the sidebar. */
 export const RECORD_LABELS = Object.freeze({
   "/students": "Student Record",
