@@ -77,22 +77,20 @@ export function DeanGraduationWorkspace() {
   if (error && !context) return <Card pad="lg"><EmptyState icon={AlertTriangle} title="Could not load graduation workflow" hint={error} /></Card>;
 
   return (
-    <Card pad="lg">
-      <GraduationRoster
-        context={context || { roster: [] }}
-        submit={async () => false}
-        submitting={false}
-        refreshing={loading}
-        result={result}
-        submitError={submitError}
-        clearSubmitFeedback={() => {
-          setResult(null);
-          setSubmitError("");
-        }}
-        refetch={refetch}
-        accountRole="dean"
-      />
-    </Card>
+    <GraduationRoster
+      context={context || { roster: [] }}
+      submit={async () => false}
+      submitting={false}
+      refreshing={loading}
+      result={result}
+      submitError={submitError}
+      clearSubmitFeedback={() => {
+        setResult(null);
+        setSubmitError("");
+      }}
+      refetch={refetch}
+      accountRole="dean"
+    />
   );
 }
 
@@ -407,13 +405,7 @@ export function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
     return (
       <article
         key={`${item.type}-${item.id}`}
-        draggable={readyToDrag}
-        onDragStart={(event) => {
-          if (!readyToDrag) return;
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", `dean-review:${item.type}:${item.id}`);
-        }}
-        className={`rounded-xl border p-3 shadow-card transition-colors ${readyToDrag ? "cursor-grab border-brand-300 bg-brand-50 hover:border-brand-500 active:cursor-grabbing" : "border-slate-200 bg-white hover:border-slate-300"}`}
+        className={`rounded-xl border p-3 shadow-card transition-colors ${readyToDrag ? "border-brand-300 bg-brand-50 hover:border-brand-500" : "border-slate-200 bg-white hover:border-slate-300"}`}
       >
         <div className="flex items-start gap-2">
           {selectable && <input type="checkbox" checked={selectedIds.has(item.student.id)} onChange={() => onToggle(item.student.id)} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${item.student.name} for Dean group action`} />}

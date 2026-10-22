@@ -121,22 +121,14 @@ function DeanGraduationBatches() {
             </div>
             <StatusChip status={`${readyGraduationBatches.length} batch${readyGraduationBatches.length === 1 ? "" : "es"}`} tone="muted" dot={false} />
           </div>
-          <div className="space-y-2">
+          <ul className="space-y-2">
             {readyGraduationBatches.map((batch) => {
               const currentStage = deanGraduationCurrentStage(batch);
               const names = batch.rows.map((item) => item.student.name).slice(0, 4).join(", ");
               const hiddenCount = batch.rows.length - Math.min(batch.rows.length, 4);
               const expanded = expandedGraduationBatches.has(batch.label);
               return (
-                <div
-                  key={batch.label}
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", `graduation-batch:${batch.label}`);
-                  }}
-                  className="cursor-grab rounded-xl border border-brand-300 bg-brand-50 px-3 py-1.5 transition-colors hover:border-brand-500 active:cursor-grabbing"
-                >
+                <li key={batch.label} className="rounded-xl border border-brand-300 bg-brand-50 px-3 py-1.5">
                   <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(230px,0.95fr)] lg:items-center">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
@@ -161,10 +153,10 @@ function DeanGraduationBatches() {
                       <DeanGraduationBatchStudentList rows={batch.rows} />
                     </div>
                   )}
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </Card>
       )}
       {boardWorkflowRows.length > 0 && (
@@ -179,7 +171,7 @@ function DeanGraduationBatches() {
             </div>
             <StatusChip status={`${approvedGraduation.length} approved`} tone="muted" dot={false} />
           </div>
-          <div className="space-y-2">
+          <ul className="space-y-2">
             {approvedGraduationBatches.map((batch) => {
               const payload = graduationBatchExportPayload(batch);
               const currentStage = deanGraduationCurrentStage(batch);
@@ -189,7 +181,7 @@ function DeanGraduationBatches() {
               const readyToSend = graduationBatchReadyToSend(batch, exportedGraduationBatches);
               const exportBusy = busy === `export-${batch.label}`;
               return (
-                <div key={`approved-${batch.label}`} className="rounded-xl border border-brand-200 bg-brand-50/40 px-3 py-1.5">
+                <li key={`approved-${batch.label}`} className="rounded-xl border border-brand-200 bg-brand-50/40 px-3 py-1.5">
                   <div className="grid gap-1.5 lg:grid-cols-[minmax(230px,1.1fr)_minmax(240px,1.1fr)_minmax(210px,0.95fr)_minmax(320px,1.25fr)] lg:items-center">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-ink">{batch.label}</p>
@@ -213,10 +205,10 @@ function DeanGraduationBatches() {
                       <DeanGraduationBatchStudentList rows={batch.rows} />
                     </div>
                   )}
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </Card>
       )}
 

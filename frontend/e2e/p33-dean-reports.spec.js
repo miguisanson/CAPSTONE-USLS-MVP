@@ -134,7 +134,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
 
     // The four tiles; three of them open something.
     await expect(main.getByRole("link", { name: /Waiting now/ })).toHaveAttribute("href", "/dean/approvals");
-    await expect(main.getByRole("link", { name: /Decided \(recent\)/ })).toHaveAttribute("href", "/dean/activity");
+    await expect(main.getByRole("link", { name: /Decided this week/ })).toHaveAttribute("href", "/dean/activity");
     await expect(main.getByRole("link", { name: /Course plans waiting/ })).toHaveAttribute("href", "/dean/approvals/course-adjustments");
     await expect(main.getByText("Approval share")).toBeVisible();
     await expect(main.getByText("of recent workflow decisions")).toBeVisible();
