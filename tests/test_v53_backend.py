@@ -144,6 +144,43 @@ class V53BackendTests(unittest.TestCase):
         lines = {line.strip() for line in (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
         self.assertTrue({"instance/", "/instance/", "instance"} & lines)
 
+    # ------------------------------------------------------------------ I-058 (F-04)
+    def test_admin_can_complete_a_staff_practicum_step(self):
+        with app.app_context():
+            student = (
+                Student.query.filter(Student.program.has(has_practicum=True))
+                .order_by(Student.id).first()
+            )
+            student_id = student.id
+            PracticumRecord.query.filter_by(student_id=student_id).delete()
+            moa = StudentRequestAttachment(
+                student_id=student_id, request_type="practicum",
+                original_name="moa.pdf", stored_name="practicum-moa-v53.pdf",
+            )
+            db.session.add(moa)
+            db.session.flush()
+            db.session.add(PracticumRecord(
+                student_id=student_id, moa_attachment_id=moa.id, moa_uploaded=True,
+                moa_status="Uploaded", practicum_site="Partner Site", required_hours=200,
+                completed_hours=0, status="MOA Submitted",
+            ))
+            db.session.commit()
+        payload = {
+            "student_id": student_id, "status": "MOA Under Review",
+            "workflow_comment": "Forwarding the signed MOA to the Academic Coordinator.",
+        }
+        admin = self._role_client(self.admin_id, "admin")
+        response = admin.post("/api/transactions/practicum", json=payload)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        # the same step is still refused to a role that does not own it
+        with app.app_context():
+            PracticumRecord.query.filter_by(student_id=student_id).update({"status": "MOA Submitted"})
+            db.session.commit()
+        academic = self._role_client(self.academic_id, "academic_coordinator")
+        refused = academic.post("/api/transactions/practicum", json=payload)
+        self.assertEqual(refused.status_code, 400, refused.get_json())
+        self.assertIn("Graduate School Staff", refused.get_json()["error"])
+
 
 if __name__ == "__main__":
     unittest.main()
