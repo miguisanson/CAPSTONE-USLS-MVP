@@ -16,7 +16,10 @@ ode_modules` so the main node_modules is not deleted):**
   - Gate on 176b0cf: python **652 OK**; e2e 315/318 (3 p78 order failures, fixed by pkt/bpol). LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
   - MERGED `pkt/bpol` (I-110, I-108, I-106, I-111, I-113).
   - MERGED `pkt/p65` (P6.5, I-069, I-081 part). I-115 filed.
-  - MERGED `pkt/p24` (P2.4). New: I-117 (Course Adjustments lists subjects twice), I-118. NEXT after a slot frees: P6.6 StudentDetail/Assistant/ChangePassword/Login; then P8 close-out; Reports rebuild IM20 (needs app.py after seed2).
+  - MERGED `pkt/p24` (P2.4). New: I-117, I-118.
+  - `ca` / `pkt/ca` — I-117 one subject table on Course Adjustments (port 5324).
+  - `a11y` / `pkt/a11y` — axe-core check p89 + library/layout/token fixes (I-092) (port 5325). Dev dep @axe-core/playwright 4.13.0 added.
+  - NEXT: P8 close-out after p66 merges (StudentPicker, graduationShared, MonitoringGrid allow-list I-097, ui.jsx/forms.jsx shims, print.js AD3, --strict); Reports rebuild IM20 (app.py after be4); coordinator home frontend (after be4's API); ModalShell adapter out of ProcessBoardPage (I-118). NEXT after a slot frees: P6.6 StudentDetail/Assistant/ChangePassword/Login; then P8 close-out; Reports rebuild IM20 (needs app.py after seed2).
   - MERGED `pkt/stu` (P4.3/P4.4, I-087, I-086, error summaries).
   - MERGED `pkt/leave` (P5.3-P5.5).
   - MERGED `pkt/vocab` (I-076..I-078, I-080). Folder `wt/vocab` is deregistered but a locked file kept it on disk - delete it after a reboot. Follow-up I-112.
