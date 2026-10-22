@@ -12,7 +12,7 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/shell` (I-103, I-101, I-112); RoleSidebar.jsx deleted (unused).
   - MERGED `pkt/enr` (P6.7/P6.8, I-082, I-081 part). Folder wt/enr locked by a helper process; delete later.
   - MERGED `pkt/lists` (I-075, I-083, I-098, I-104, I-109). I-116 filed.
-  - `p66` / `pkt/p66` — Phase 5 P6.6 StudentDetail/Assistant/ChangePassword/Login + I-116 wording + WorkQueue ?q= (spec p88, port 5321).
+  - MERGED `pkt/p66` (P6.6, I-116). I-119 for the server strings.
   - Gate on 176b0cf: python **652 OK**; e2e 315/318 (3 p78 order failures, fixed by pkt/bpol). LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
   - MERGED `pkt/bpol` (I-110, I-108, I-106, I-111, I-113).
   - MERGED `pkt/p65` (P6.5, I-069, I-081 part). I-115 filed.
