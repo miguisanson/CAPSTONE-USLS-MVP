@@ -5,13 +5,18 @@
 - **Branch:** `v5.3-migui_test` (from `v5.2-migui_again` @ c426b6f, pushed). Owner decisions IM25-IM27 (4 helpers, agent decides everything, bolder improvements allowed).
 - **In flight (worktrees in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`; each `frontend/node_modules` is a JUNCTION to the main checkout — before `git worktree remove`, run `cmd //c rmdir <wt>rontend
 ode_modules` so the main node_modules is not deleted):**
-  - `be` / `pkt/be` — backend P1 bugs I-010, I-012, I-005, I-002 (test commit then fix commit each; new `tests/test_section_j_backend.py`). The only app.py editor.
+  - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
+  - `be2` / `pkt/be2` — the only app.py editor: I-055 demo reset needs login, I-056 soft per-IP login throttle, I-057 per-install secret key, I-058 admin acts as staff in workflow steps, I-036 AC defense-scheduling 403, I-073 withdrawal task link (new `tests/test_v53_backend.py`, port 5301).
   - `fac` / `pkt/fac` — Phase 5 P5.1+P5.2 faculty pages (spec `e2e/p51-faculty.spec.js`, port 5302).
   - `mon` / `pkt/mon` — Phase 5 P6.4 MonitoringGrid/EnrollmentClassList/AdviserRecordCard (spec `e2e/p64-monitoring-pages.spec.js`, port 5303).
   - MERGED `pkt/wf` (P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/`); e2e after it -> `E:/Temp/claude/gate53/e2e_after_wf.txt`.
   - `wf2` / `pkt/wf2` — dead code in workflow/ + restyle P7.5 of shared/WorkflowPage/HandoffImport/CourseAudit/ResearchGate/PanelMatching (spec `e2e/p75-workflow-pages.spec.js`, port 5304).
-  - `review` (detached, read-only) — one-time Fable full review -> `E:/Temp/claude/review53/FULL-REVIEW.md` (port 5310).
-  - web UX research (Sonnet, read-only) -> `E:/Temp/claude/review53/UX-RESEARCH.md`.
+  - Fable review DONE -> `.planning/research/FULL-REVIEW-2026-10-22.md`; findings F-01..F-41 filed as I-055..I-095 (I-0xx = F-xx + 54). Worktree `review` can be removed (rmdir junction first).
+- **Wave plan from the review (backend lane is serial, one app.py packet at a time):**
+  - be3 seed data: I-060 (F-06 advisers <=5, adviser never on panel), I-061 (F-07 stage vs units, titles, departments), I-062 (F-08 one case in every Dean queue), I-070 (F-16 dates spread over past weeks, R-001 stays green), I-094 (F-40), I-095 (F-41).
+  - be4: I-059 (F-05 notify student on decisions), I-071/I-072 (F-17/F-18 GETs and login write), I-066 (F-12 coordinator home API), I-093 (F-39 N+1).
+  - be5 + frontend: I-064 (F-10 rosters on Research Gate/Panel Matching/Defense Scheduling), I-068 (F-14 IM20 five real reports), I-074 (F-20).
+  - frontend lanes: wf3 Graduation onto StageBoard + table (I-065/I-051) and Practicum/DefenseScheduling/Availability restyle (I-063, I-089); StageBoard columns at 1366 (I-067) + empty states (I-088); vocabulary/breadcrumbs (I-077, I-078, I-076); faculty advisees/verdicts (I-079, I-090, after pkt/fac); jargon (I-081, I-082, I-069); small UI (I-075, I-080, I-083..I-087, I-091); a11y sweep (I-092) + axe-core check from UX research.
 - UX research saved: `.planning/research/UX-RESEARCH-2026-10-22.md` (top 15 checks at the end).
 - **Baseline gate** on v5.3 start: running -> `E:/Temp/claude/gate53/baseline.txt`.
 - **Next:** review + merge each packet one at a time (gate after each), file the Fable findings into ISSUES.md and plan the next waves from them.
