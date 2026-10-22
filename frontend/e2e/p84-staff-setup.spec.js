@@ -409,6 +409,8 @@ test.describe("pins: the Academic Coordinator edits the offering setup", () => {
 });
 
 // ================================================================================================ Part 2: P6.5 changes (RED first)
+/** The decision row of one subject (found by its Sections box, so DBA-COG1 never matches DBA-COG10). */
+const rowOf = (page, table, code) => table.locator("tbody tr").filter({ has: page.locator(`input[aria-label="Sections for ${code}"]`) });
 const headTexts = (table) => table.locator("thead th").evaluateAll((els) => els.map((e) => e.textContent.trim()));
 
 test.describe("P6.5: one header style on the five pages (review F-09)", () => {
@@ -452,7 +454,7 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     expect(heads.slice(0, 5)).toEqual(["Subject", "Demand", "Decision", "Sections", "Faculty"]);
     await expect(table.locator("tbody tr")).toHaveCount(data.demand.length);
     for (const row of data.demand) {
-      const line = table.locator("tbody tr").filter({ hasText: row.course.code }).first();
+      const line = rowOf(page, table, row.course.code);
       await expect(line).toBeVisible();
       await expect(line.locator(`input[aria-label="Sections for ${row.course.code}"]`)).toHaveCount(1);
       await expect(line.locator(`select[aria-label="Faculty assignment for ${row.course.code}"]`)).toHaveCount(1);
@@ -515,8 +517,8 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     const data = await openCourseAdjustments(page);
     const table = main(page).getByRole("table", { name: "Course offering decisions" });
     await expect(main(page).getByText(/same suggested faculty member/)).toHaveCount(0);
-    await expect(table.locator("tbody tr").filter({ hasText: data.demand[0].course.code }).first()).toContainText("Suggested: Dr. Alpha Cruz");
-    await expect(table.locator("tbody tr").filter({ hasText: data.demand[1].course.code }).first()).toContainText("Suggested: Dr. Beta Reyes");
+    await expect(rowOf(page, table, data.demand[0].course.code)).toContainText("Suggested: Dr. Alpha Cruz");
+    await expect(rowOf(page, table, data.demand[1].course.code)).toContainText("Suggested: Dr. Beta Reyes");
   });
 
   test("a row's details (who is affected) open in a drawer, not in the row", async ({ page }) => {
