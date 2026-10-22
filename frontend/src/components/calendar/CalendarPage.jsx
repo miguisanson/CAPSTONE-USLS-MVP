@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CalendarDays, CalendarPlus, ExternalLink, Flag, Printer } from "lucide-react";
 import { api } from "../../api";
-import { Card, ErrorNote, PageHeader, SectionTitle, StatusBadge } from "../ui";
+import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionTitle, Select, StatusChip, Textarea } from "../ui/index.js";
 import CalendarView, { CalendarLegend, isoDay, parseDay, visibleRange } from "./CalendarView";
 import CalendarFeedCard from "./CalendarFeedCard";
 
@@ -18,49 +18,34 @@ function FilterBar({ filters, options, onChange }) {
   const set = (key) => (event) => onChange({ ...filters, [key]: event.target.value });
   const clear = () => onChange(EMPTY_FILTERS);
   const active = Object.values(filters).some(Boolean);
+  const programs = (options.programs || []).map((item) => ({ value: String(item.id), label: `${item.code} · ${item.name}` }));
+  const faculty = (options.faculty || []).map((item) => ({ value: String(item.id), label: item.name }));
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <label className="block text-xs font-bold text-slate-500">
-        Program
-        <select className="field-input mt-1" value={filters.program_id} onChange={set("program_id")}>
-          <option value="">All programs</option>
-          {(options.programs || []).map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}
-        </select>
-      </label>
-      <label className="block text-xs font-bold text-slate-500">
-        Stage
-        <select className="field-input mt-1" value={filters.defense_type} onChange={set("defense_type")}>
-          <option value="">All stages</option>
-          {(options.defense_types || []).map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
-      </label>
-      <label className="block text-xs font-bold text-slate-500">
-        Status
-        <select className="field-input mt-1" value={filters.status} onChange={set("status")}>
-          <option value="">Booked and held</option>
-          {(options.statuses || []).map((item) => <option key={item} value={item}>{item}</option>)}
-          <option value="all">Everything</option>
-        </select>
-      </label>
-      <label className="block text-xs font-bold text-slate-500">
-        Panelist or adviser
-        <select className="field-input mt-1" value={filters.faculty_id} onChange={set("faculty_id")}>
-          <option value="">Anyone</option>
-          {(options.faculty || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-      </label>
-      <label className="block text-xs font-bold text-slate-500">
-        Venue
-        <input className="field-input mt-1" value={filters.venue} onChange={set("venue")} placeholder="Room or Zoom" list="calendar-venues" />
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <Field label="Program">
+        <Select placeholder="All programs" options={programs} value={filters.program_id} onChange={set("program_id")} />
+      </Field>
+      <Field label="Stage">
+        <Select placeholder="All stages" options={options.defense_types || []} value={filters.defense_type} onChange={set("defense_type")} />
+      </Field>
+      <Field label="Status">
+        <Select placeholder="Booked and held" options={[...(options.statuses || []), { value: "all", label: "Everything" }]} value={filters.status} onChange={set("status")} />
+      </Field>
+      <Field label="Panelist or adviser">
+        <Select placeholder="Anyone" options={faculty} value={filters.faculty_id} onChange={set("faculty_id")} />
+      </Field>
+      <Field label="Venue">
+        <Input value={filters.venue} onChange={set("venue")} placeholder="Room or Zoom" list="calendar-venues" />
         <datalist id="calendar-venues">{(options.venues || []).map((item) => <option key={item} value={item} />)}</datalist>
-      </label>
-      <label className="block text-xs font-bold text-slate-500">
-        Student
-        <div className="mt-1 flex gap-2">
-          <input className="field-input" value={filters.q} onChange={set("q")} placeholder="Name or ID" />
-          {active && <button type="button" className="btn-ghost shrink-0 px-3 text-xs" onClick={clear}>Clear</button>}
+      </Field>
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Field label="Student">
+            <Input value={filters.q} onChange={set("q")} placeholder="Name or ID" />
+          </Field>
         </div>
-      </label>
+        {active && <Button variant="secondary" className="shrink-0" onClick={clear}>Clear</Button>}
+      </div>
     </div>
   );
 }
@@ -68,7 +53,7 @@ function FilterBar({ filters, options, onChange }) {
 function Fact({ label, children }) {
   return (
     <div>
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="eyebrow">{label}</dt>
       <dd className="mt-0.5 text-sm font-semibold text-ink">{children}</dd>
     </div>
   );
@@ -94,16 +79,17 @@ function CannotAttend({ event, onDone }) {
     }
   }
   if (!open) {
-    return <button type="button" className="btn-ghost w-full justify-center text-xs" onClick={() => setOpen(true)}>I cannot attend this defense</button>;
+    return <Button variant="secondary" className="w-full justify-center" onClick={() => setOpen(true)}>I cannot attend this defense</Button>;
   }
   return (
-    <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <label className="block text-xs font-bold text-amber-900" htmlFor="cannot-attend-reason">Why can you not attend?</label>
-      <textarea id="cannot-attend-reason" className="field-input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="The Research Coordinator sees this and will reschedule or replace you." />
-      <ErrorNote message={error} />
-      <div className="flex gap-2">
-        <button type="button" className="btn-primary px-3 py-1.5 text-xs" disabled={busy || reason.trim().length < 3} onClick={send}>{busy ? "Sending..." : "Send request"}</button>
-        <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={() => setOpen(false)}>Cancel</button>
+    <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+      <Field label="Why can you not attend?">
+        <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="The Research Coordinator sees this and will reschedule or replace you." />
+      </Field>
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" loading={busy} disabled={reason.trim().length < 3} onClick={send}>{busy ? "Sending..." : "Send request"}</Button>
+        <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
       </div>
     </div>
   );
@@ -112,18 +98,18 @@ function CannotAttend({ event, onDone }) {
 function DetailPanel({ selected, scope, onClose, onChanged }) {
   if (!selected) {
     return (
-      <Card className="p-5">
+      <Card>
         <p className="text-sm font-semibold text-slate-600">Select a defense or a deadline to see the details.</p>
-        <p className="mt-1 text-xs text-slate-400">Flagged items (amber or red outline) need someone to act.</p>
+        <p className="meta mt-1">Flagged items (amber or red outline) need someone to act.</p>
       </Card>
     );
   }
   if (selected.kind !== "defense") {
     return (
-      <Card className="space-y-3 p-5">
+      <Card className="space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <p className="flex items-center gap-2 text-sm font-bold text-ink"><Flag className="h-4 w-4 text-slate-500" aria-hidden="true" />Deadline</p>
-          <button type="button" className="text-xs font-semibold text-slate-400 hover:text-slate-600" onClick={onClose}>Close</button>
+          <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Flag className="h-4 w-4 text-slate-500" aria-hidden="true" />Deadline</p>
+          <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
         </div>
         <p className="text-sm font-semibold text-ink">{selected.label}</p>
         <dl className="grid grid-cols-2 gap-3">
@@ -133,24 +119,24 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
           {selected.defense_type && <Fact label="Defense">{selected.defense_type}</Fact>}
         </dl>
         {scope === "staff" && selected.student_id && (
-          <Link to={`/workflow/defense-scheduling?student_id=${selected.student_id}`} className="btn-ghost w-full justify-center text-xs">Open Defense Scheduling <ExternalLink className="h-3.5 w-3.5" /></Link>
+          <Button as={Link} to={`/workflow/defense-scheduling?student_id=${selected.student_id}`} variant="secondary" className="w-full justify-center">Open Defense Scheduling <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></Button>
         )}
       </Card>
     );
   }
   return (
-    <Card className="space-y-4 p-5">
+    <Card className="space-y-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-display text-base font-semibold text-ink">{selected.defense_type}</p>
           <p className="text-sm text-slate-500">{selected.student_name}{selected.student_number ? ` · ${selected.student_number}` : ""}</p>
         </div>
-        <button type="button" className="text-xs font-semibold text-slate-400 hover:text-slate-600" onClick={onClose}>Close</button>
+        <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge value={selected.status} dot={false} />
-        {selected.verdict_overdue && <StatusBadge value="Verdict overdue" dot={false} className="!bg-red-50 !text-red-700 !ring-red-200" />}
-        {selected.has_verdict && <StatusBadge value="Verdict recorded" dot={false} className="!bg-slate-100 !text-slate-700 !ring-slate-200" />}
+        <StatusChip status={selected.status} dot={false} />
+        {selected.verdict_overdue && <StatusChip status="Verdict overdue" tone="bad" dot={false} />}
+        {selected.has_verdict && <StatusChip status="Verdict recorded" tone="muted" dot={false} />}
       </div>
       {(selected.attention || []).length > 0 && (
         <ul className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
@@ -168,7 +154,7 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
         {selected.change_reason && <Fact label="Last change">{selected.change_reason}</Fact>}
       </dl>
       <div>
-        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Panel</p>
+        <p className="eyebrow mb-1.5">Panel</p>
         <ul className="space-y-1">
           {(selected.panel || []).map((seat) => (
             <li key={`${seat.faculty_id}-${seat.role}`} className="flex items-center justify-between gap-2 text-sm">
@@ -180,13 +166,13 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
         </ul>
       </div>
       <div className="space-y-2">
-        <a href={selected.ics_url} className="btn-ghost w-full justify-center text-xs" download>
-          <CalendarPlus className="h-4 w-4" aria-hidden="true" />Add to my calendar (.ics)
-        </a>
+        <Button as="a" href={selected.ics_url} variant="secondary" icon={CalendarPlus} className="w-full justify-center" download>
+          Add to my calendar (.ics)
+        </Button>
         {scope === "staff" && (
-          <Link to={`/workflow/defense-scheduling?student_id=${selected.student_id}`} className="btn-primary w-full justify-center text-xs">
-            Open in Defense Scheduling <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
+          <Button as={Link} to={`/workflow/defense-scheduling?student_id=${selected.student_id}`} className="w-full justify-center">
+            Open in Defense Scheduling <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
         )}
         {scope === "faculty" && ["Scheduled", "Needs Re-confirmation"].includes(selected.status) && (
           <CannotAttend event={selected} onDone={onChanged} />
@@ -237,23 +223,23 @@ export default function CalendarPage({ scope = "staff", title, description, embe
       {embedded ? (
         <div className="flex flex-wrap items-start justify-between gap-3">
           <p className="max-w-3xl text-sm text-slate-600">{description}</p>
-          <button type="button" className="btn-ghost text-xs" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button>
+          <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>
         </div>
       ) : (
         <PageHeader
           title={title}
           description={description}
           icon={CalendarDays}
-          actions={<button type="button" className="btn-ghost text-xs" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button>}
+          actions={<Button variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>}
         />
       )}
-      <ErrorNote message={error} />
-      {!isFaculty && <Card className="p-4"><FilterBar filters={filters} options={payload?.filters || {}} onChange={setFilters} /></Card>}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      {!isFaculty && <Card><FilterBar filters={filters} options={payload?.filters || {}} onChange={setFilters} /></Card>}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
         <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showDeadlines} onChange={(e) => setShowDeadlines(e.target.checked)} />Deadlines</label>
         {isFaculty && <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showAvailability} onChange={(e) => setShowAvailability(e.target.checked)} />My availability</label>}
         {isFaculty && <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showBusy} onChange={(e) => setShowBusy(e.target.checked)} />Google busy times</label>}
-        {payload?.busy_status && <span className="text-slate-400">{payload.busy_status}</span>}
+        {payload?.busy_status && <span className="font-normal text-slate-500">{payload.busy_status}</span>}
       </div>
       <CalendarLegend showAvailability={isFaculty && showAvailability} showBusy={isFaculty && showBusy} />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
@@ -277,7 +263,7 @@ export default function CalendarPage({ scope = "staff", title, description, embe
         <div className="space-y-5 xl:col-span-4">
           <DetailPanel selected={selected} scope={scope} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); setReload((n) => n + 1); }} />
           {attention.length > 0 && (
-            <Card className="p-5">
+            <Card>
               <SectionTitle title="Needs attention" subtitle="In the period on screen" icon={AlertTriangle} />
               <ul className="space-y-2">
                 {attention.map((event) => (
