@@ -1734,6 +1734,8 @@ def ensure_practicum_program_policy() -> int:
     if legacy_guidance and not msgc:
         legacy_guidance.code = PRACTICUM_MSGC_CODE
         legacy_guidance.name = "Master of Science in Guidance and Counseling"
+        if legacy_guidance.college in (None, "", "Imported"):
+            legacy_guidance.college = "Education"
         msgc = legacy_guidance
         changed += 1
         for course in Course.query.filter_by(program_id=legacy_guidance.id).all():
@@ -2414,7 +2416,7 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         categories = [
             {
                 "category": category,
-                "completed": completed.get(category, 0),
+                "completed": min(completed.get(category, 0), required),
                 "required": required,
                 "complete": completed.get(category, 0) >= required,
             }
@@ -36180,6 +36182,132 @@ def seed_dean_review_cases() -> int:
     return made
 
 
+SEED_RESEARCH_STAGES = ("Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense", "Completed")
+
+
+def seed_subject_titles() -> int:
+    """Give the sheet's subject columns real titles and suggested semesters (I-061, F-07).
+
+    The registrar sheets name a column only by its code, so the import stored the code as the
+    title and "Year 1" as the term for every subject. Only subjects that still carry the code
+    as their title are touched; MBA and DPSY already have their real curriculum.
+    """
+    from seed_curriculum_data import SUGGESTED_TERMS, subject_title
+
+    changed = 0
+    for course in Course.query.all():
+        program = db.session.get(Program, course.program_id)
+        match = re.fullmatch(r"([A-Z]+)-([A-Z]+\d*)", course.code or "")
+        if not program or not match:
+            continue
+        title = (course.title or "").strip()
+        if title.upper() != course.code.upper() and not title.upper().startswith("MAGC"):
+            continue  # a title somebody gave it
+        new_title = subject_title(program.code, match.group(2))
+        if not new_title:
+            continue
+        course.title = new_title
+        course.recommended_term = SUGGESTED_TERMS.get(match.group(2), course.recommended_term)
+        changed += 1
+    db.session.flush()
+    return changed
+
+
+def map_sheet_subjects_to_authoritative_curricula() -> int:
+    """Carry what the monitoring sheet says a student finished over to the real MBA curriculum.
+
+    The MBA sheet's columns (MBA-STAT, MBA-MAJ1 ...) are not the MBA subjects of the supplied
+    curriculum (MBA201 ... MBA220), so a student who finished everything on the sheet showed 0
+    completed units. The i-th sheet column of a category is the i-th curriculum subject of that
+    category; the sheet columns and their records stay as imported (a re-import still matches).
+    """
+    changed = 0
+    for program_code in AUTHORITATIVE_CURRICULA:
+        program = Program.query.filter_by(code=program_code).first()
+        if not program:
+            continue
+        pattern = re.compile(rf"{re.escape(program_code)}-(?:STAT|MOR|FED|MAJ\d+|COG\d+)")
+        sheet_courses = [
+            course for course in Course.query.filter_by(program_id=program.id).order_by(Course.id).all()
+            if pattern.fullmatch(course.code or "")
+        ]
+        if not sheet_courses:
+            continue
+        pairs = []
+        for category in ("Basic", "Major", "Cognate"):
+            sheet = [course for course in sheet_courses if course.category == category]
+            curriculum = [course for course in monitoring_curriculum_courses(program) if course.category == category]
+            pairs.extend(zip(sheet, curriculum))
+        for sheet_course, course in pairs:
+            # the sheet column is the same subject, so it reads like it
+            if (sheet_course.title or "").strip().upper() == sheet_course.code.upper():
+                sheet_course.title, sheet_course.recommended_term = course.title, course.recommended_term
+                changed += 1
+        for student in Student.query.filter_by(program_id=program.id).all():
+            records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
+            for sheet_course, course in pairs:
+                finished = records.get(sheet_course.id)
+                if not finished or finished.status != "Completed":
+                    continue
+                record = records.get(course.id)
+                if record is None:
+                    record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+                    db.session.add(record)
+                if record.status == "Completed":
+                    continue
+                record.status, record.grade_status, record.term_label = "Completed", "No Grade", ""
+                record.evidence_reference, record.source = "AC Student Monitoring import", "Imported"
+                record.updated_at = now_utc()
+                changed += 1
+    db.session.flush()
+    return changed
+
+
+def complete_coursework_of_research_students() -> int:
+    """A student who is writing a proposal or later has finished the coursework and passed the compre.
+
+    The research rules open only then (Handbook), so the seed may not show such a student with
+    unfinished subjects or an exam that was not taken.
+    """
+    changed = 0
+    touched = []
+    for student in Student.query.filter(Student.current_stage.in_(SEED_RESEARCH_STAGES)).order_by(Student.id).all():
+        records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
+        student_changed = False
+        for course in monitoring_curriculum_courses(student.program):
+            record = records.get(course.id)
+            if record is None:
+                record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+                db.session.add(record)
+            if record.status != "Completed":
+                record.status, record.grade_status, record.term_label = "Completed", "No Grade", ""
+                record.evidence_reference = "Demo seed: coursework complete"
+                record.updated_at = now_utc()
+                student_changed = True
+                changed += 1
+        if student.comprehensive_exam_status != "Passed":
+            student.comprehensive_exam_status = "Passed"
+            student_changed = True
+            changed += 1
+        if student_changed:
+            touched.append(student)
+    db.session.flush()
+    for student in touched:
+        recompute_risk(student)
+    return changed
+
+
+def normalize_seed_curricula() -> dict:
+    """Titles, sheet-to-curriculum mapping and research prerequisites, in that order (I-061)."""
+    result = {
+        "titles": seed_subject_titles(),
+        "mapped": map_sheet_subjects_to_authoritative_curricula(),
+        "research_students": complete_coursework_of_research_students(),
+    }
+    ensure_delay_status_consistency()
+    return result
+
+
 def seed_bianca_mendoza_enrollment() -> None:
     """Give the official DBA roster student her current semester/account fixture."""
     student = Student.query.filter_by(student_number="2560052").first()
@@ -36792,7 +36920,9 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             elif is_loa_demo or is_readmission_demo:
                 completed_count = min(3, len(demo_courses))
             elif is_awol_demo:
-                completed_count = min(4, len(demo_courses))
+                # the residency demo is a research-stage student, so every subject is finished
+                residency = (demo_config or {}).get("scenario") == "residency"
+                completed_count = len(demo_courses) if residency else min(4, len(demo_courses))
             completed = course_index < completed_count
             record.status = "Completed" if completed else "Not Started"
             record.grade_status = "Passed" if completed else "No Grade"
@@ -37554,6 +37684,7 @@ def build_demo_database() -> dict:
         ensure_upcoming_defense_demo()
         sync_all_panel_invitations()  # seats the seeders placed directly get their invitations (no page view makes them)
         seed_dean_review_cases()  # a case waiting in every Dean queue, and a few decided ones
+        normalize_seed_curricula()  # real subject titles; a research student has finished the coursework
         db.session.commit()
         # 5. Last syncs, once everything above exists.
         sync_result = sync_all_curricula()
