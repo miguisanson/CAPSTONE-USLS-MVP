@@ -68,3 +68,5 @@ Legend: yes = offered; reason = a card that cannot move shows a lock and why; po
 ## Update 2026-10-22 (pkt/grad, v5.3)
 
 Board / Table toggle (same `ViewToggle`): Graduation = **yes** (student table with a batch line under the stage; group steps via the selection bar). Replaces N1 and the "no" in the Graduation column. Graduation filters = `RosterFilters` with the completed-course select, in one toolbar. Column names are plain (no "1 ·" numbering), default width; cards use the LOA layout. Column widths and the "N more stages" cue are shared by every board (pkt/board, I-067).
+
+Dean Practicum (pkt/conA, 2026-10-22): Board/Table toggle yes, drag and Move to... yes (only 'With the Dean' to Reviewed or Returned), lock reasons yes, rules panel and header buttons yes, shared filter row yes. The Dean decides in one confirm window; the case page keeps Mark reviewed. Dean Graduation and Dean Course Adjustments still lack the header buttons and rules panel (I-123 follow-up).
