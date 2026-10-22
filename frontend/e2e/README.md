@@ -83,6 +83,18 @@ The role sign-in tests it needs run automatically (the `setup` project).
 `--grep` matches the role key (`student`, `faculty`, `dean`, `staff`,
 `academic-coordinator`, `research-coordinator`, `admin`).
 
+## Specs share one database (read before writing a spec)
+
+Every spec in one run talks to the same seeded server, and specs run in parallel workers in any order. A spec that
+passes alone can fail in the full run because another spec answered an invitation, moved a card or wrote activity first
+(I-100 p51, I-113 p78). Rules for every `p<NN>-*.spec.js`:
+
+1. Never assert seeded state that another spec can change (counts, "No activity yet", a card's column, "Waiting for
+   documents"). Read the API at test time and assert the page agrees, or mock that response with `page.route`.
+2. A spec that changes data uses its own demo student (see `section-j.spec.js`) and never one another spec reads.
+3. Before a packet merges, its new spec must pass in the combined run
+   `node scripts/e2e.mjs test --project=sweep --project=section-j --project=pages`, not only alone.
+
 ## Section J bug tests (data-changing)
 
 `e2e/section-j.spec.js` (Playwright project `section-j`) has one test per defense-walkthrough bug
