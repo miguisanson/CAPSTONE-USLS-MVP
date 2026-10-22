@@ -86,7 +86,7 @@ export default function Reports() {
               role="tab"
               aria-selected={selected}
               onClick={() => chooseTab(tab)}
-              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors max-sm:min-h-11 ${selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors max-sm:min-h-11 ${selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
             >
               <Icon className="h-4 w-4" aria-hidden="true" /> {tab.tab}
             </button>

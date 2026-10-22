@@ -42,6 +42,7 @@ function columnsFor(data) {
     header: column.label,
     sortable: true,
     align: isCount(column.key) ? "right" : "left",
+    className: column.key === "student" ? "min-w-40" : DATE_COLUMNS.has(column.key) ? "whitespace-nowrap" : undefined,
     sortValue: (row) => (column.key === "student" ? row.student : row[column.key]),
     cell: (row) => cellFor(column.key, row),
   }));
