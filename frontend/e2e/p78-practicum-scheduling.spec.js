@@ -47,6 +47,27 @@ async function shotsAt(page, name) {
   await page.setViewportSize(original);
 }
 
+/**
+ * The practicum roster as the seed leaves it: nobody has a record, a message, a date or an activity line. Other specs in a
+ * full run file practicum cases against the same database first, so the tests that read "nothing has happened yet" (cards
+ * that wait for documents, no "Updated" line, "No activity yet") say so to the page instead of trusting the shared data.
+ */
+async function withPristineRoster(page) {
+  await page.route(/\/api\/transactions\/practicum\/context/, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    for (const row of body.roster) {
+      row.record = null;
+      row.has_submitted_documents = false;
+      row.last_activity_at = null;
+      row.messages = [];
+      row.history = [];
+    }
+    body.recent_logs = [];
+    await route.fulfill({ response, json: body });
+  });
+}
+
 /** The practicum roster of the seed plus one case with a record, so the card, the table and the case window have data. */
 async function withOneCase(page) {
   await page.route(/\/api\/transactions\/practicum\/context/, async (route) => {
@@ -92,6 +113,7 @@ test.describe("Practicum (staff)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
   test("header, scope note, filters and the board columns", async ({ page }) => {
+    await withPristineRoster(page);
     await page.goto("/workflow/practicum");
     await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
     await expect(main(page).getByText("Track practicum MOA receipt, hours, certificates, completion report, and Dean review")).toBeVisible();
@@ -99,7 +121,7 @@ test.describe("Practicum (staff)", () => {
     await expect(main(page).getByRole("button", { name: "View recent activity" })).toBeVisible();
     await expect(main(page).getByText(/Psychology and MSGC/).first()).toBeVisible();
     await expect(main(page).getByText(/5 rules from the Graduate School policies/)).toBeVisible();
-    await expect(main(page).getByPlaceholder(/Search name, ID, program/)).toBeVisible();
+    await expect(main(page).getByPlaceholder(/Search students/)).toBeVisible();
     await expect(main(page).getByRole("combobox", { name: "Filter by program" })).toBeVisible();
     await expect(main(page).getByText(/Showing 2 of 2/)).toBeVisible();
     const board = main(page).getByRole("region", { name: "Practicum workflow board" });
@@ -120,10 +142,10 @@ test.describe("Practicum (staff)", () => {
     await page.goto("/workflow/practicum");
     const board = main(page).getByRole("region", { name: "Practicum workflow board" });
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toBeVisible();
-    await main(page).getByPlaceholder(/Search name, ID, program/).fill("Andrea");
+    await main(page).getByPlaceholder(/Search students/).fill("Andrea");
     await expect(main(page).getByText(/Showing 1 of 2/)).toBeVisible();
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toHaveCount(0);
-    await main(page).getByPlaceholder(/Search name, ID, program/).fill("zzzz-nobody");
+    await main(page).getByPlaceholder(/Search students/).fill("zzzz-nobody");
     await expect(main(page).getByText("No recent practicum submissions match the filters.")).toBeVisible();
     await main(page).getByRole("button", { name: /Clear 1 filter/ }).click();
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toBeVisible();
@@ -182,6 +204,7 @@ test.describe("Practicum (staff)", () => {
   });
 
   test("the two header buttons open the guide and the activity window", async ({ page }) => {
+    await withPristineRoster(page);
     await page.goto("/workflow/practicum");
     await main(page).getByRole("button", { name: "How this works" }).click();
     const guide = page.getByRole("dialog");
@@ -379,6 +402,7 @@ test.describe("Practicum board matches the other boards (I-089)", () => {
   });
 
   test("a card with no date does not say Updated", async ({ page }) => {
+    await withPristineRoster(page);
     await page.goto("/workflow/practicum");
     const board = main(page).getByRole("region", { name: "Practicum workflow board" });
     await expect(board.getByText("Andrea Villanueva", { exact: true })).toBeVisible();

@@ -376,7 +376,7 @@ export function RosterFilters({ filters, setFilters, programs, statuses, seconda
         <SearchInput
           value={filters.query}
           onChange={(text) => setFilters((current) => ({ ...current, query: text }))}
-          placeholder="Search name, ID, program…"
+          placeholder="Search students"
           label="Search list"
         />
         <Select value={filters.program} onChange={update("program")} aria-label="Filter by program" placeholder="All programs" options={programs} />

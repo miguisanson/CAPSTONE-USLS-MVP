@@ -11,7 +11,7 @@ import ActionDialog from "../pages/leave/ActionDialog";
 import BatchBar, { BatchResult } from "../pages/leave/BatchBar";
 import CaseCard, { CaseTable } from "../pages/leave/CaseCard";
 import CaseDetailModal from "../pages/leave/CaseDetailModal";
-import LeaveFilters, { ViewToggle } from "../pages/leave/LeaveFilters";
+import LeaveFilters, { BoardFilterRow, ViewToggle } from "../pages/leave/LeaveFilters";
 import ModalShell from "../pages/leave/ModalShell";
 import {
   EMPTY_FILTERS,
@@ -453,22 +453,19 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
         <EmptyState title={config.emptyTitle} hint={config.emptyHint} />
       ) : (
         <>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <LeaveFilters
-                filters={filters}
-                setFilters={setFilters}
-                programs={data.programs || []}
-                statusOptions={statusOptions}
-                reasons={data.reasons || []}
-                kindOptions={kindOptions}
-                count={filtered.length}
-                total={cases.length}
-                noun={config.noun}
-              />
-            </div>
-            <ViewToggle value={view} onChange={setView} />
-          </div>
+          <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
+            <LeaveFilters
+              filters={filters}
+              setFilters={setFilters}
+              programs={data.programs || []}
+              statusOptions={statusOptions}
+              reasons={data.reasons || []}
+              kindOptions={kindOptions}
+              count={filtered.length}
+              total={cases.length}
+              noun={config.noun}
+            />
+          </BoardFilterRow>
 
           {selectedItems.length > 0 && (
             <BatchBar

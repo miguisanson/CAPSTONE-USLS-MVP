@@ -22,6 +22,19 @@ export function ViewToggle({ value, onChange }) {
   );
 }
 
+/**
+ * The line above every board: the filter box and the Board/Table toggle. One layout for all boards, so they wrap alike:
+ * the box never shrinks below ~18 rem (it takes the whole row when it must), and on a phone the toggle drops to its own row.
+ */
+export function BoardFilterRow({ children, toggle }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 flex-1 basis-72">{children}</div>
+      {toggle}
+    </div>
+  );
+}
+
 export default function LeaveFilters({ filters, setFilters, programs, statusOptions, reasons = [], kindOptions, count, total, noun = "requests" }) {
   const active = Object.values(filters).filter(Boolean).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
@@ -35,7 +48,7 @@ export default function LeaveFilters({ filters, setFilters, programs, statusOpti
             value={filters.query}
             onChange={update("query")}
             className="field-input pl-10"
-            placeholder="Search name, ID, program..."
+            placeholder="Search students"
             aria-label="Search requests by name, student number or program"
           />
         </label>

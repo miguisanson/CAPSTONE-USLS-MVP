@@ -18,7 +18,7 @@ import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/i
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import StageBoard from "../../components/StageBoard";
-import { ViewToggle } from "../leave/LeaveFilters";
+import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { GraduationBatchModal } from "./GraduationBatchModal";
 import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, sortSelectedWorkflowRows } from "./graduationShared";
 import { CaseMessageHistory, DemoResetButton, DemoResetFeedback, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, WorkflowSubmitFeedback, uniqueValues, useDemoCaseReset } from "./shared";
@@ -685,22 +685,19 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       {exportError && <div role="alert"><ErrorNote message={exportError} /></div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 basis-72">
-          <RosterFilters
-            filters={filters}
-            setFilters={setFilters}
-            programs={programs}
-            statuses={statuses}
-            secondaryLabel="completed courses"
-            secondaryOptions={completedCourseOptions}
-            count={filteredRows.length}
-            total={rows.length}
-            showAdvanced={false}
-          />
-        </div>
-        <ViewToggle value={view} onChange={setView} />
-      </div>
+      <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
+        <RosterFilters
+          filters={filters}
+          setFilters={setFilters}
+          programs={programs}
+          statuses={statuses}
+          secondaryLabel="completed courses"
+          secondaryOptions={completedCourseOptions}
+          count={filteredRows.length}
+          total={rows.length}
+          showAdvanced={false}
+        />
+      </BoardFilterRow>
       {selectedIds.size > 0 && (tickedReady.length > 0 || tickedBatched.length > 0) && (
         <GraduationSelectionBar
           count={tickedReady.length + tickedBatched.length}

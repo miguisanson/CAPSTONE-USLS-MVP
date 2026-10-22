@@ -3,7 +3,7 @@ import { ArrowUpRight, Eye, MessageSquare } from "lucide-react";
 import { Button, DataTable, EmptyState, Field, InlineNotice, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import WorkflowTimeline from "../../components/WorkflowTimeline";
 import StageBoard from "../../components/StageBoard";
-import LeaveFilters, { ViewToggle } from "../leave/LeaveFilters";
+import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { formatDate } from "../../lib/format";
 import { CaseMessageHistory, DemoResetButton, DemoResetFeedback, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, WorkflowSubmitFeedback, uniqueValues, useDemoCaseReset } from "./shared";
@@ -205,12 +205,9 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
     <div className="page-stack">
       {messageNotice && <InlineNotice tone="success" onDismiss={() => setMessageNotice("")}>{messageNotice}</InlineNotice>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
-        </div>
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-      </div>
+      <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
+        <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
+      </BoardFilterRow>
       {filteredRows.length === 0 ? (
         <EmptyState title="No recent practicum submissions match the filters." hint={rows.length ? "Clear a filter to see more." : "No eligible Psychology or MSGC practicum students found."} />
       ) : viewMode === "board" ? (

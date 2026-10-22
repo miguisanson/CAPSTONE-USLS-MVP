@@ -15,18 +15,9 @@ import { PAGE } from "../../lib/labels.js";
 // ------------------------------------------------ Admission & coursework reports
 // Gates the Dean owns that are not per-student cases: the admission onboarding
 // report (BPMN 1) and the coursework status report (BPMN 4).
-// The shared report panels explain an empty list to the staff who fill it ("Generate one to send to the Dean"). The
-// Dean is the one who receives the reports, so while a list is empty the Dean sees a card in the Dean's own words
-// (I-084); as soon as there is a report the shared panel takes over.
-function useHasReports(load) {
-  const { data, error, refetch } = useApi(() => load().then((res) => ({ count: (res.items || []).length })), []);
-  // `ready` keeps the shared panel (and its staff wording) from showing for a moment before this answer arrives.
-  return { ready: data !== null || Boolean(error), empty: !error && data?.count === 0, refetch };
-}
-
+// The shared report panels speak to the person who opens them: for the Dean an empty list reads "No ... reports have
+// been sent to you yet." (I-084, I-111), so this page just renders them and each asks the server once.
 export function DeanGateReportsPage() {
-  const onboarding = useHasReports(api.onboardingReviews);
-  const coursework = useHasReports(api.courseworkReports);
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -34,28 +25,8 @@ export function DeanGateReportsPage() {
         description="Reports sent to the Dean for a decision: the admission onboarding report and the coursework status report."
         icon={ClipboardCheck}
       />
-      {!onboarding.ready ? (
-        <Spinner label="Loading onboarding reports..." />
-      ) : onboarding.empty ? (
-        <SectionCard
-          title="Onboarding report & Dean approval"
-          icon={GraduationCap}
-          action={<Button variant="secondary" icon={RefreshCw} onClick={onboarding.refetch}>Refresh</Button>}
-        >
-          <EmptyState icon={FileSpreadsheet} title="No onboarding reports have been sent to you yet." hint="When Graduate School staff report an import batch, it appears here for your approval." />
-        </SectionCard>
-      ) : (
-        <OnboardingGatePanel role="dean" />
-      )}
-      {!coursework.ready ? (
-        <Spinner label="Loading coursework reports..." />
-      ) : coursework.empty ? (
-        <SectionCard title="Coursework status report to the Dean" icon={FileSpreadsheet}>
-          <EmptyState icon={FileSpreadsheet} title="No coursework reports have been sent to you yet." hint="When Graduate School staff send a coursework status report, it appears here for your review." />
-        </SectionCard>
-      ) : (
-        <CourseworkReportPanel role="dean" />
-      )}
+      <OnboardingGatePanel role="dean" />
+      <CourseworkReportPanel role="dean" />
     </div>
   );
 }
