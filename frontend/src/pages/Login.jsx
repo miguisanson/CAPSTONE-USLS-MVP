@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import { ErrorNote } from "../components/ui";
+import { Button, InlineNotice, Input, PageHeader } from "../components/ui/index.js";
 
 const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/dean", student: "/student", faculty: "/faculty-portal" };
 
@@ -74,11 +74,14 @@ const STANDALONE_STUDENT_DEMOS = [
 ];
 
 export default function Login() {
-  const { user, login, loading, error } = useAuth();
-  const navigate = useNavigate();
+  const { user, refresh } = useAuth();
   // The form always starts empty: nothing is pre-filled, so a real typed login can be shown.
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
+  // The sign-in is made here (not through the auth context's login(), which sets the app-wide loading flag and so
+  // unmounts this page): a wrong password keeps what was typed, the open demo panel and the scroll position.
+  const [signInError, setSignInError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const [demoAccounts, setDemoAccounts] = useState([]);
@@ -133,21 +136,26 @@ export default function Login() {
 
   async function signIn(credentials) {
     // The role is decided by the server from the account; the form never sends one.
-    const signedIn = await login({ email: credentials.email.trim(), password: credentials.password });
-    navigate(HOME[signedIn.role] || "/", { replace: true });
+    await api.login({ email: credentials.email.trim(), password: credentials.password });
+    // The session now exists: load it. The page then redirects to the role's home (see the Navigate above).
+    await refresh();
   }
 
   async function onSubmit(e) {
     e.preventDefault();
+    setSignInError("");
+    setSigningIn(true);
     try {
       await signIn(form);
-    } catch {
-      /* the message is shown from the auth context */
+    } catch (requestError) {
+      setSignInError(requestError.message || "Could not sign in.");
+      setSigningIn(false);
     }
   }
 
   function fillForm(account) {
     setDemoError("");
+    setSignInError("");
     setForm({ email: account.email, password: account.password });
     setShowPassword(true);
   }
@@ -213,19 +221,20 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <main className="mx-auto grid min-h-screen w-full max-w-6xl grid-cols-1 items-start gap-8 px-4 py-8 lg:grid-cols-2 lg:items-center lg:px-8">
+      <main className="mx-auto grid min-h-screen w-full max-w-page grid-cols-1 items-start gap-8 px-4 py-8 lg:grid-cols-2 lg:px-8 lg:py-16">
         <section className="space-y-5">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-white shadow-sm">
-            <GraduationCap className="h-8 w-8" />
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-white shadow-card">
+            <GraduationCap className="h-8 w-8" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-sm font-bold uppercase text-brand-700">University of St. La Salle</p>
-            <h1 className="mt-2 font-display text-4xl font-semibold leading-tight text-ink">
-              Graduate School Lifecycle Portal
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-600">
-              Sign in with your Graduate School account. The screens you see depend on the role your account holds.
-            </p>
+            <p className="eyebrow !text-brand-700">University of St. La Salle</p>
+            {/* The one large title in the app (UI-SPEC AD1): text-3xl is allowed in this file only */}
+            <PageHeader
+              className="mt-2"
+              title="Graduate School Lifecycle Portal"
+              titleProps={{ className: "!text-3xl leading-tight" }}
+              description="Sign in with your Graduate School account. The screens you see depend on the role your account holds."
+            />
           </div>
 
           {demoMode && (
@@ -238,20 +247,20 @@ export default function Login() {
                 className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-2 text-sm font-bold text-amber-900">
-                    <PlayCircle className="h-4 w-4" /> Demo accounts
-                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">Demo mode</span>
+                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
+                    <PlayCircle className="h-4 w-4" aria-hidden="true" /> Demo accounts
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
                   </span>
-                  <span className="mt-0.5 block text-xs text-amber-800/80">
+                  <span className="mt-0.5 block text-xs text-amber-800">
                     For presentations only. Expand to see ready-made accounts; nothing is filled in until you choose.
                   </span>
                 </span>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-amber-800 transition-transform ${demoOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-amber-800 transition-transform ${demoOpen ? "rotate-180" : ""}`} aria-hidden="true" />
               </button>
 
               {demoOpen && (
                 <div id="demo-accounts-panel" className="space-y-4 border-t border-amber-200 px-4 pb-4 pt-3">
-                  {demoLoading && <p className="text-sm text-slate-500">Loading demo accounts…</p>}
+                  {demoLoading && <p role="status" className="text-sm text-slate-500">Loading demo accounts…</p>}
 
                   {demoAccounts.length > 0 && (
                     <div className="space-y-2">
@@ -259,28 +268,28 @@ export default function Login() {
                       {sharedPassword && (
                         <p className="text-xs text-slate-600">
                           Demo password for every account below:{" "}
-                          <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[12px] text-ink ring-1 ring-slate-200">{sharedPassword}</code>
+                          <code className="rounded-md bg-white px-1.5 py-0.5 font-mono text-xs text-ink ring-1 ring-slate-200">{sharedPassword}</code>
                         </p>
                       )}
                       <ul className="divide-y divide-amber-100 overflow-hidden rounded-xl border border-amber-100 bg-white">
                         {demoAccounts.map((account) => (
                           <li key={account.email} className="flex items-center gap-2 p-2">
                             <span className="min-w-0 flex-1 px-1">
-                              <span className="block truncate text-sm font-bold text-ink">{account.label}</span>
-                              <span className="block truncate text-[11px] text-slate-500">{account.email} · {account.detail}</span>
+                              <span className="block truncate text-sm font-semibold text-ink">{account.label}</span>
+                              <span className="meta block truncate">{account.email} · {account.detail}</span>
                             </span>
-                            <button type="button" onClick={() => fillForm(account)} className="btn-ghost shrink-0 px-2.5 py-1.5 text-xs">
+                            <Button variant="secondary" size="sm" className="shrink-0" onClick={() => fillForm(account)}>
                               Fill form
-                            </button>
-                            <button
-                              type="button"
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="shrink-0"
                               onClick={() => quickLogin(account, account.email)}
                               disabled={Boolean(quickLoginBusy || resetBusy)}
-                              className="btn-primary shrink-0 px-2.5 py-1.5 text-xs"
                               aria-label={`Sign in as ${account.label} (demo)`}
                             >
                               {quickLoginBusy === account.email ? "Signing in…" : "Sign in"}
-                            </button>
+                            </Button>
                           </li>
                         ))}
                       </ul>
@@ -291,7 +300,7 @@ export default function Login() {
                     <div className="space-y-3">
                       <div>
                         <p className="field-label">Student workflow demos</p>
-                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                        <p className="meta mt-1 leading-relaxed">
                           Arranged in the Graduate School lifecycle sequence. Select a student to sign in, or reset one case for a clean walkthrough.
                         </p>
                       </div>
@@ -314,7 +323,7 @@ export default function Login() {
                       </div>
                       <div>
                         <p className="field-label">Standalone processes</p>
-                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                        <p className="meta mt-1 leading-relaxed">
                           Leave, return, AWOL or residency, and early subject-withdrawal scenarios that branch from the main student lifecycle.
                         </p>
                       </div>
@@ -340,11 +349,11 @@ export default function Login() {
 
                   <div aria-live="polite" className="min-h-5">
                     {demoNotice && (
-                      <p className="flex items-start gap-1.5 text-xs font-semibold leading-relaxed text-emerald-700">
-                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {demoNotice}
+                      <p className="flex items-start gap-1.5 text-xs font-semibold leading-relaxed text-brand-700">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {demoNotice}
                       </p>
                     )}
-                    {demoError && <ErrorNote message={demoError} />}
+                    {demoError && <InlineNotice tone="danger">{demoError}</InlineNotice>}
                   </div>
                 </div>
               )}
@@ -352,61 +361,62 @@ export default function Login() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+        <section className="card p-5 sm:p-6 lg:sticky lg:top-8" aria-labelledby="sign-in-title">
           <div className="mb-5">
-            <h2 className="font-display text-2xl font-semibold text-ink">Sign in</h2>
-            <p className="mt-1 text-sm text-slate-500">Accounts are created by the Graduate School office.</p>
+            <h2 id="sign-in-title" className="section-title">Sign in</h2>
+            <p className="meta mt-1">Accounts are created by the Graduate School office.</p>
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-4" autoComplete="on">
-            <label className="block">
-              <span className="field-label">Email</span>
-              <input
+          <form onSubmit={onSubmit} className="space-y-4" autoComplete="on" noValidate>
+            <div>
+              <label htmlFor="login-email" className="field-label">Email</label>
+              <Input
+                id="login-email"
                 type="email"
                 name="email"
                 autoComplete="username"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="field-input"
+                aria-invalid={signInError ? true : undefined}
+                aria-describedby={signInError ? "sign-in-error" : undefined}
                 required
               />
-            </label>
-            <label className="block">
-              <span className="field-label">Password</span>
-              <span className="relative block">
-                <input
+            </div>
+            <div>
+              <label htmlFor="login-password" className="field-label">Password</label>
+              <div className="relative">
+                <Input
+                  id="login-password"
                   type={showPassword ? "text" : "password"}
                   name="password"
                   autoComplete="current-password"
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  className="field-input pr-11"
+                  className="pr-12"
+                  aria-invalid={signInError ? true : undefined}
+                  aria-describedby={signInError ? "sign-in-error" : undefined}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 max-sm:h-10 max-sm:w-10"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                 </button>
-              </span>
-            </label>
+              </div>
+            </div>
 
-            <ErrorNote message={error} />
-
-            <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Signing in...
-                </>
-              ) : (
-                <>
-                  <LockKeyhole className="h-4 w-4" /> Sign in
-                </>
-              )}
-            </button>
+            <Button type="submit" loading={signingIn} icon={signingIn ? undefined : LockKeyhole} className="w-full">
+              {signingIn ? "Signing in…" : "Sign in"}
+            </Button>
+            {/* Under the button, so the message appears without moving anything that was already on screen */}
+            {signInError && (
+              <InlineNotice tone="danger" id="sign-in-error">
+                {signInError}
+              </InlineNotice>
+            )}
           </form>
         </section>
       </main>
@@ -417,7 +427,7 @@ export default function Login() {
 function DemoStudentGroup({ className = "", open, onToggle, title, description, icon: Icon, students, quickLoginBusy, resetBusy, onLogin, onReset }) {
   const contentId = `demo-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-students`;
   return (
-    <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`} aria-label={`${title} demo students`}>
+    <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white ${className}`} aria-label={`${title} demo students`}>
       <button
         type="button"
         onClick={onToggle}
@@ -426,16 +436,16 @@ function DemoStudentGroup({ className = "", open, onToggle, title, description, 
         className={`flex w-full cursor-pointer items-center justify-between gap-3 bg-slate-50 px-3.5 py-3 text-left transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${open ? "border-b border-slate-100" : ""}`}
       >
         <span className="min-w-0">
-          <span className="flex items-center gap-2 text-sm font-bold text-ink">
-            <Icon className="h-4 w-4 text-brand-700" /> {title}
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Icon className="h-4 w-4 text-brand-700" aria-hidden="true" /> {title}
           </span>
-          <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">{description}</span>
+          <span className="meta mt-1 block leading-relaxed">{description}</span>
         </span>
         <span className="inline-flex shrink-0 items-center gap-2">
-          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500 ring-1 ring-slate-200">
+          <span className="rounded-full bg-white px-2 py-0.5 text-2xs font-semibold text-slate-500 ring-1 ring-slate-200">
             {students.length}
           </span>
-          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
         </span>
       </button>
       {open && (
@@ -453,27 +463,28 @@ function DemoStudentGroup({ className = "", open, onToggle, title, description, 
                 className="min-w-0 flex-1 cursor-pointer rounded-xl px-2 py-2 text-left transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-wait disabled:opacity-60"
                 aria-label={`Sign in as ${student.name}, ${title} demo student`}
               >
-                <span className="block truncate text-sm font-bold text-ink">
+                <span className="block truncate text-sm font-semibold text-ink">
                   {isLoggingIn ? "Signing in…" : student.name}
                 </span>
-                <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                <span className="meta mt-0.5 block truncate">
                   {student.student_number} · {student.program_code}
                 </span>
-                <span className="mt-1 flex items-start gap-1 text-[11px] font-semibold leading-snug text-emerald-700">
-                  <CheckCircle2 className="mt-px h-3 w-3 shrink-0" /> {student.ready_label}
+                <span className="mt-1 flex items-start gap-1 text-2xs font-semibold leading-snug text-brand-700">
+                  <CheckCircle2 className="mt-px h-3 w-3 shrink-0" aria-hidden="true" /> {student.ready_label}
                 </span>
               </button>
-              <button
-                type="button"
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={() => onReset(student)}
                 disabled={anyBusy}
-                className="my-1 flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border border-red-700 bg-red-600 px-2.5 text-[11px] font-bold text-white transition-colors hover:border-red-800 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-50"
+                className="my-1 shrink-0 self-center"
                 aria-label={`Reset ${student.name}'s ${title} demo data`}
                 title={`Reset ${student.name}'s demo data`}
               >
-                <RotateCcw className={`h-3.5 w-3.5 ${isResetting ? "animate-spin" : ""}`} />
+                <RotateCcw className={`h-3.5 w-3.5 ${isResetting ? "animate-spin" : ""}`} aria-hidden="true" />
                 {isResetting ? "Resetting" : "Reset"}
-              </button>
+              </Button>
             </div>
           );
         })}
