@@ -19,6 +19,8 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/p65` (P6.5, I-069, I-081 part). I-115 filed.
   - MERGED `pkt/p24` (P2.4). New: I-117, I-118.
   - MERGED `pkt/ca` (I-117). I-121 filed (p32 order dependence).
+  - `iso` / `pkt/iso` — class fix for e2e order dependence (I-100/I-113/I-121): DATA-OWNERSHIP.md, collisions fixed, ownership guard, three run orders (port 5327).
+  - Read-only consistency sweep (IM24) on 726c3c8 -> `E:/Temp/claude/review53/CONSISTENCY-2026-10-22.md` (port 5331).
   - MERGED `pkt/a11y` (p89 axe check, contrast tokens, table scroll regions). Follow-up I-120.
   - NEXT: P8 close-out after p66 merges (StudentPicker, graduationShared, MonitoringGrid allow-list I-097, ui.jsx/forms.jsx shims, print.js AD3, --strict); Reports rebuild IM20 (app.py after be4); coordinator home frontend (after be4's API); ModalShell adapter out of ProcessBoardPage (I-118). NEXT after a slot frees: P6.6 StudentDetail/Assistant/ChangePassword/Login; then P8 close-out; Reports rebuild IM20 (needs app.py after seed2).
   - MERGED `pkt/stu` (P4.3/P4.4, I-087, I-086, error summaries).
