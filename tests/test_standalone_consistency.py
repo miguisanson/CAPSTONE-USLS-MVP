@@ -469,7 +469,11 @@ class StandaloneConsistencyTests(unittest.TestCase):
         withdrawal_id = self.make_withdrawal(status="Dean Review")
         case = [row for row in self.listing("withdrawal", self.dean())["cases"] if row["id"] == withdrawal_id][0]
         self.assertEqual({a["action"] for a in case["actions"]}, {"approve", "deny", "return"})
-        self.assertEqual([a["action"] for a in self.listing("withdrawal")["cases"][0]["actions"]], ["return"])
+        # AD9 / I-130: staff see the lock ("Waiting for: Dean") on a Dean Review case, no move.
+        self.assertEqual([a["action"] for a in self.listing("withdrawal")["cases"][0]["actions"]], [])
+        refused = self.move("withdrawal", withdrawal_id, "return", comment="Staff cannot return a case the Dean holds.")
+        self.assertEqual(refused.status_code, 409, refused.get_json())
+        self.assertIn("waiting for Dean", refused.get_json()["error"])
 
     def test_the_student_pages_use_one_case_card(self):
         forms = (FRONTEND / "pages" / "student" / "RequestForms.jsx").read_text(encoding="utf-8")
