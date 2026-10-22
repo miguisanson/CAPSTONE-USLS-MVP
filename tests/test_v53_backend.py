@@ -126,6 +126,24 @@ class V53BackendTests(unittest.TestCase):
                 self.assertEqual(self._login(STAFF_EMAIL, "wrong-password")[1].status_code, 401)
             self.assertEqual(delays, [2, 4, 8, 16, 30, 30, 30])
 
+    # ------------------------------------------------------------------ I-057 (F-03)
+    def test_demo_mode_secret_key_is_generated_once_and_reused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            key_file = Path(folder) / "instance" / "secret_key"
+            environ = {"DEMO_MODE": "1", "SECRET_KEY_FILE": str(key_file)}
+            first = resolve_secret_key(environ)
+            second = resolve_secret_key(environ)
+            self.assertNotEqual(first, "demo-only-secret")
+            self.assertGreaterEqual(len(first), 32)
+            self.assertEqual(first, second)
+            self.assertTrue(key_file.exists())
+            # an explicit SECRET_KEY still wins over the file
+            self.assertEqual(resolve_secret_key({**environ, "SECRET_KEY": "from-env"}), "from-env")
+
+    def test_instance_folder_is_gitignored(self):
+        lines = {line.strip() for line in (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
+        self.assertTrue({"instance/", "/instance/", "instance"} & lines)
+
 
 if __name__ == "__main__":
     unittest.main()
