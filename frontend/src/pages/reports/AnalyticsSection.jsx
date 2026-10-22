@@ -1,11 +1,12 @@
 // The Analytics tab of Reports (IM20): four charts that moved off the staff home - lifecycle stage, risk level, students
-// by college, research gate position - narrowed by the same filters as every other Reports tab (program, progress,
-// risk, standing). Clicking a bar, a slice, or the chip under a chart opens the students behind that category.
+// by college, research gate position - narrowed by the filters above them (program, stage, risk). All four are bar
+// charts (a quantity is never a pie), sorted the way the data is meant to be read. Clicking a bar or the chip under a
+// chart opens the students behind that category.
 // Every bar is labelled: the axis shows every category (interval 0, a label column wide enough for the longest
 // name) and the figure sits at the end of the bar, so nothing has to be read off a grid.
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bar, BarChart, Cell, Legend, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, BarChart3 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
@@ -23,7 +24,7 @@ const LABEL_WIDTH = 190; // wide enough for "Withdrawal In Progress" on one line
 const ROW_HEIGHT = 30;
 
 /** One horizontal bar per category, every category labelled. */
-function CategoryBars({ data, labelKey, onSelect, rowHeight = ROW_HEIGHT, ariaLabel }) {
+function CategoryBars({ data, labelKey, onSelect, rowHeight = ROW_HEIGHT, ariaLabel, colorOf }) {
   const height = data.length * rowHeight + 16;
   return (
     <div role="img" aria-label={ariaLabel}>
@@ -33,6 +34,7 @@ function CategoryBars({ data, labelKey, onSelect, rowHeight = ROW_HEIGHT, ariaLa
           <YAxis type="category" dataKey={labelKey} width={LABEL_WIDTH} interval={0} tick={AXIS_TICK} tickLine={false} axisLine={false} />
           <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
           <Bar dataKey="count" name="Students" isAnimationActive={false} radius={[0, 6, 6, 0]} fill={CHART_COLORS[0]} cursor="pointer" onClick={(entry) => onSelect(entry?.[labelKey])}>
+            {colorOf && data.map((entry) => <Cell key={entry[labelKey]} fill={colorOf(entry[labelKey])} />)}
             <LabelList dataKey="count" position="right" style={{ fontSize: 12, fill: "#334155", fontWeight: 600 }} />
           </Bar>
         </BarChart>
@@ -73,8 +75,8 @@ function ChartBlock({ title, subtitle, children }) {
 }
 
 export default function AnalyticsSection({ filters }) {
-  const params = { program_id: filters.program_id, stage: filters.stage, risk: filters.risk, standing: filters.standing };
-  const { data, loading, error, refetch } = useApi(() => api.dashboard(params), [params.program_id, params.stage, params.risk, params.standing]);
+  const params = { program_id: filters.program_id, stage: filters.stage, risk: filters.risk };
+  const { data, loading, error, refetch } = useApi(() => api.dashboard(params), [params.program_id, params.stage, params.risk]);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
@@ -114,7 +116,7 @@ export default function AnalyticsSection({ filters }) {
     <>
       <SectionCard
         title="Analytics"
-        subtitle="Computed live from recorded transactions, for the students the filters above select. Select a bar, a slice or a chip to see the students."
+        subtitle="Computed live from recorded transactions, for the students the filters above select. Select a bar or a chip to see the students."
         icon={BarChart3}
       >
         <div className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-2">
@@ -125,17 +127,7 @@ export default function AnalyticsSection({ filters }) {
 
           <div className="space-y-8">
             <ChartBlock title="Risk level" subtitle="Computed from monitoring signals">
-              <ResponsiveContainer width="100%" height={240}>
-                <PieChart>
-                  <Pie data={risks} isAnimationActive={false} dataKey="count" nameKey="risk" innerRadius={56} outerRadius={88} paddingAngle={2} cursor="pointer" onClick={(entry) => openDetail("risk", entry?.risk)}>
-                    {risks.map((entry) => (
-                      <Cell key={entry.risk} fill={RISK_COLORS[entry.risk] || "#94a3b8"} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <CategoryBars data={risks} labelKey="risk" onSelect={(value) => openDetail("risk", value)} ariaLabel="Students per risk level" colorOf={(risk) => RISK_COLORS[risk] || "#94a3b8"} />
               <CategoryChips items={risks.map((item) => ({ label: item.risk, count: item.count }))} onClick={(value) => openDetail("risk", value)} />
             </ChartBlock>
 

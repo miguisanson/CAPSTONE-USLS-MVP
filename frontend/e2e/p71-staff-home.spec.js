@@ -152,8 +152,8 @@ test.describe("analytics on Reports", () => {
     const dash = await (await context.request.get("/api/dashboard")).json();
     await page.goto("/reports");
     await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
-    await page.getByRole("button", { name: "Analytics", exact: true }).click();
-    await expect(page).toHaveURL(/workflow_type=analytics/);
+    await page.getByRole("tab", { name: "Analytics", exact: true }).click(); // P9.3: the pill buttons became a tab list
+    await expect(page).toHaveURL(/report=analytics/);
     await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true })).toBeVisible();
     for (const title of ["Lifecycle stage distribution", "Risk level", "Students by college", "Research gate position"]) {
       await expect(page.getByRole("heading", { level: 3, name: title, exact: true }), title).toBeVisible();
@@ -250,6 +250,6 @@ test.describe("academic coordinator home", () => {
 
     await page.goto("/reports");
     await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Analytics", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Analytics", exact: true })).toHaveCount(0); // P9.3: a tab, no longer a button
   });
 });
