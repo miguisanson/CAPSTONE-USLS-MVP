@@ -40,6 +40,7 @@ export const PAGE = Object.freeze({
   enrollmentClassList: "Enrollment Class List",
   studentHandoff: "Student Handoff",
   defenseScheduling: "Defense Scheduling",
+  courseAudit: "Course Audit",
   researchGate: "Research Gate",
   panelMatching: "Panel Matching",
   workQueue: "Work Queue",

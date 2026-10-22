@@ -217,7 +217,7 @@ test.describe("Research Gate (research coordinator)", () => {
 
   test("record, progress, requirement rows and the coordinator's own buttons", async ({ page }) => {
     await openFromSidebar(page, /4 · Research Gate/, "/workflow/research-gate?student_id=146");
-    await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate Readiness" })).toBeVisible();
+    await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Research Gate record" })).toBeVisible();
     for (const text of ["Nico Barrientos", "GS-2026-UD-01", "Dr. Paolo Navarro", "Reorder Point Policies and Service Levels for a Regional Hardware Distributor"]) {
       await expect(main(page).getByText(text).first(), text).toBeVisible();

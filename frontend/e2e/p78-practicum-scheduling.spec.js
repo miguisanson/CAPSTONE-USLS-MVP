@@ -281,7 +281,7 @@ test.describe("Defense scheduling and the Research Gate header (research coordin
 
   test("Research Gate header at the three widths", async ({ page }) => {
     await page.goto("/workflow/research-gate?student_id=146");
-    await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate Readiness" })).toBeVisible();
+    await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Research Gate record" })).toBeVisible();
     await page.waitForLoadState("networkidle");
     await shotsAt(page, "research-gate-header");
@@ -296,7 +296,7 @@ test.describe("Defense scheduling and the Research Gate header (research coordin
 const LIFECYCLE_PAGES = [
   ["student-handoff", "Student Handoff"],
   ["course-audit", "Course Audit"],
-  ["research-gate", "Research Gate Readiness"],
+  ["research-gate", "Research Gate"],
   ["panel-matching", "Panel Matching"],
   ["defense-scheduling", "Defense Scheduling"],
   ["practicum", "Practicum"],
