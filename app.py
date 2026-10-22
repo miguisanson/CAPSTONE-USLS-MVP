@@ -14886,6 +14886,7 @@ def register_routes(app: Flask) -> None:
                 "time": iso(log.created_at),
                 "change_type": CHANGE_TYPE_LABELS.get(log.transaction_slug, log.transaction_slug),
                 "slug": log.transaction_slug,
+                "student_id": student.id,
                 "student_name": student.name,
                 "student_number": student.student_number,
                 "program_code": student.program.code if student.program else "",
