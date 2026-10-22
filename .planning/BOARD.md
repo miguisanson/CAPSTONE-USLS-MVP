@@ -21,8 +21,14 @@ filed as I-055..I-095). Web research added 15 UX checks (`research/UX-RESEARCH-2
   one line instead of eight empty boxes.
 - **Monitoring Sheet:** sort works (it did nothing), filters can no longer show stale results, CSV export is safe in Excel.
 
-**In progress:** demo data that makes sense (advisers within their limit, never on their own student's panel, a case
-waiting in every Dean queue, dates spread over past weeks); sidebar cut off at laptop height; board polish; student pages.
+**Also merged later the same day:** demo data that makes sense (advisers within their limit, a case waiting in every
+Dean queue, dates over past weeks); students get a notification when the Dean decides; opening a page or signing in
+never changes data any more; coordinators have their own home; Course Adjustments is one table; the design system is
+finished (every page on it, check at zero); an automatic accessibility check (WCAG 2.2); Dean, workflow and student
+pages made consistent.
+
+**Paused (2026-10-22 night), finished but not merged yet:** the Reports rebuild into five real reports with Excel/PDF
+export; the last consistency fixes for faculty pages and the coordinator home; test-isolation work.
 
 Screenshots of each change: `E:/Temp/claude/shots-<packet>/after/` (fac, mon, wf2, wf4, board, grad, dean, fac2).
 
