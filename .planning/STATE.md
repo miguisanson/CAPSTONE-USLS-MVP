@@ -14,6 +14,7 @@ ode_modules` so the main node_modules is not deleted):**
   - Gate on 176b0cf: python **652 OK**; e2e 315/318 (3 p78 order failures, fixed by pkt/bpol). LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
   - MERGED `pkt/bpol` (I-110, I-108, I-106, I-111, I-113).
   - MERGED `pkt/p65` (P6.5, I-069, I-081 part). I-115 filed.
+  - `p24` / `pkt/p24` — Phase 5 P2.4 shared components (spec p87, port 5319). NEXT after a slot frees: P6.6 StudentDetail/Assistant/ChangePassword/Login; then P8 close-out; Reports rebuild IM20 (needs app.py after seed2).
   - MERGED `pkt/stu` (P4.3/P4.4, I-087, I-086, error summaries).
   - `leave` / `pkt/leave` — Phase 5 P5.3-P5.5 leave/process dialogs (spec p86, port 5318).
   - MERGED `pkt/vocab` (I-076..I-078, I-080). Folder `wt/vocab` is deregistered but a locked file kept it on disk - delete it after a reboot. Follow-up I-112.
