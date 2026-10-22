@@ -136,9 +136,13 @@ export function OnboardingGatePanel({ role }) {
 }
 
 /* ---------------------------------------------------------------- BPMN 2 */
-export function StudyPlanPanel({ students = [] }) {
+/** `studentId` (optional): the page already has a student chosen (Enrollment); then this panel works on that student
+ *  and shows no picker of its own. `studentName` is shown in its place. Without it the panel has its own picker. */
+export function StudyPlanPanel({ students = [], studentId: fixedStudentId, studentName }) {
   const [plans, setPlans] = useState(null);
-  const [studentId, setStudentId] = useState("");
+  const [pickedStudentId, setStudentId] = useState("");
+  const fixed = fixedStudentId !== undefined && fixedStudentId !== null && fixedStudentId !== "";
+  const studentId = fixed ? String(fixedStudentId) : pickedStudentId;
   const [tag, setTag] = useState(null);
   const [version, setVersion] = useState("");
   const [rationale, setRationale] = useState("");
@@ -154,7 +158,8 @@ export function StudyPlanPanel({ students = [] }) {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!studentId) { setTag(null); return; }
+    setRationale("");
+    if (!studentId) { setTag(null); setVersion(""); return; }
     api.curriculumTag(studentId)
       .then((res) => { setTag(res); setVersion(res.tag?.curriculum_version || ""); })
       .catch((e) => setMsg({ tone: "danger", text: e.message }));
@@ -246,16 +251,25 @@ export function StudyPlanPanel({ students = [] }) {
       <p className="text-sm text-slate-500">Tag the curriculum version the student is tracked against, then generate the study plan from the curriculum audit and send it to the Academic Coordinator. The plan is derived, never typed.</p>
       <Notice msg={msg} />
 
+      {fixed ? (
+        <p className="text-sm text-slate-700">
+          Study plan for <span className="font-semibold text-ink">{studentName || "the selected student"}</span>
+          <span className="meta"> · the student chosen at the top of the page</span>
+        </p>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Student">
-          <Select
-            aria-label="Student"
-            options={studentOptions}
-            placeholder="Select a student…"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-          />
-        </Field>
+        {!fixed ? (
+          <Field label="Student">
+            <Select
+              aria-label="Student"
+              options={studentOptions}
+              placeholder="Select a student…"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+            />
+          </Field>
+        ) : null}
         <Field label="Curriculum version">
           <Select
             aria-label="Curriculum version"
