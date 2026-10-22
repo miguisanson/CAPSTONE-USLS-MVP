@@ -407,3 +407,190 @@ test.describe("pins: the Academic Coordinator edits the offering setup", () => {
     await shotAll(page, "offering-setup-coordinator");
   });
 });
+
+// ================================================================================================ Part 2: P6.5 changes (RED first)
+const headTexts = (table) => table.locator("thead th").evaluateAll((els) => els.map((e) => e.textContent.trim()));
+
+test.describe("P6.5: one header style on the five pages (review F-09)", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  for (const [label, path, title] of [
+    ["Course Adjustments", /Course Adjustments$/, "Course Adjustments"],
+    ["Academic Semesters", "Academic Semesters", "Academic Semesters"],
+    ["Policy Documents", "Policy Documents", "Policy Documents"],
+  ]) {
+    test(`${label}: the title is the PageHeader (one h1.page-title in a header, no hero, no eyebrow line)`, async ({ page }) => {
+      await page.goto("/");
+      await sidebarLink(page, path).click();
+      await expect(heading1(page, title)).toBeVisible();
+      await expect(main(page).locator("h1")).toHaveCount(1);
+      await expect(main(page).locator("h1.page-title")).toHaveCount(1);
+      await expect(main(page).locator("h1").locator("xpath=ancestor::header[1]")).toHaveCount(1);
+      await expect(main(page).locator(".bg-gradient-to-br")).toHaveCount(0);
+      await expect(main(page).getByText(/Academic lifecycle/i)).toHaveCount(0);
+      await expect(main(page).getByText(/Who uses it/i)).toHaveCount(0);
+    });
+  }
+
+  test("Offering setup: still one h1 (the page's), and the section is an h2", async ({ page }) => {
+    await openOfferingSetup(page);
+    await expect(main(page).locator("h1")).toHaveCount(1);
+    await expect(main(page).locator("h1.page-title")).toHaveCount(1);
+    await expect(main(page).getByRole("heading", { level: 2, name: "Course Offering Setup" })).toBeVisible();
+  });
+});
+
+test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-15)", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  test("one table: subject, demand, decision, sections, faculty; one row per subject, none taller than 72 px on average", async ({ page }) => {
+    test.setTimeout(120_000);
+    const data = await openCourseAdjustments(page);
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    await expect(table).toBeVisible();
+    const heads = await headTexts(table);
+    expect(heads.slice(0, 5)).toEqual(["Subject", "Demand", "Decision", "Sections", "Faculty"]);
+    await expect(table.locator("tbody tr")).toHaveCount(data.demand.length);
+    for (const row of data.demand) {
+      const line = table.locator("tbody tr").filter({ hasText: row.course.code }).first();
+      await expect(line).toBeVisible();
+      await expect(line.locator(`input[aria-label="Sections for ${row.course.code}"]`)).toHaveCount(1);
+      await expect(line.locator(`select[aria-label="Faculty assignment for ${row.course.code}"]`)).toHaveCount(1);
+      await expect(line.locator(`button[aria-label="Offer ${row.course.code}"], button[aria-label="Hold ${row.course.code}"]`)).toHaveCount(1);
+    }
+    const box = await table.locator("tbody").boundingBox();
+    expect(box.height / data.demand.length, `average row height ${Math.round(box.height / data.demand.length)} px`).toBeLessThan(72);
+    // the stacked cards of the old page are gone
+    await expect(main(page).getByText(/^Show the \d+ affected students?$/)).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(4000);
+    for (const view of VIEWS.slice(1)) {
+      await page.setViewportSize(view);
+      expect(await noOverflow(page), `sideways scroll at ${view.width}`).toBe(true);
+    }
+  });
+
+  test("the plan's four steps are one Stepper whose current step is the plan status", async ({ page }) => {
+    const data = await openCourseAdjustments(page);
+    const steps = main(page).getByRole("list", { name: "Offering plan progress" });
+    await expect(steps.getByRole("listitem")).toHaveCount(4);
+    const known = ["Draft", "Submitted", "Approved", "Published"];
+    const status = data.latest_plan?.status || null;
+    await expect(steps.locator('[aria-current="step"]')).toHaveCount(known.includes(status) ? 1 : 0);
+    if (known.includes(status)) await expect(steps.locator('[aria-current="step"]')).toContainText(status);
+  });
+
+  test("when every subject has the same suggested faculty member no row repeats it; one note above the table says so", async ({ page }) => {
+    // the live data is the 18-subject case; force it so the test does not depend on the seed
+    await page.route("**/api/course-adjustments*", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const response = await route.fetch();
+      const body = await response.json();
+      for (const row of body.demand) row.faculty_candidates = [{ id: 1, name: "Dr. Same Everywhere", preferred: false, current_load: 0, projected_load: 3 }];
+      return route.fulfill({ response, json: body });
+    });
+    const data = await openCourseAdjustments(page);
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    await expect(table).toBeVisible();
+    await expect(table.getByText(/Suggested:/)).toHaveCount(0);
+    await expect(table.getByText("Dr. Same Everywhere")).toHaveCount(0);
+    const note = main(page).getByText(/same suggested faculty member/);
+    await expect(note).toHaveCount(1);
+    await expect(note).toContainText("Dr. Same Everywhere");
+    const noteBox = await note.boundingBox();
+    const tableBox = await table.boundingBox();
+    expect(noteBox.y, "the note sits above the table").toBeLessThan(tableBox.y);
+    expect(data.demand.length).toBeGreaterThan(1);
+  });
+
+  test("when the suggestions differ each row shows its own and there is no 'same for every subject' note", async ({ page }) => {
+    await page.route("**/api/course-adjustments*", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const response = await route.fetch();
+      const body = await response.json();
+      body.demand.forEach((row, i) => {
+        row.faculty_candidates = [{ id: 1 + (i % 2), name: i % 2 ? "Dr. Beta Reyes" : "Dr. Alpha Cruz", preferred: false, current_load: 0, projected_load: 3 }];
+      });
+      return route.fulfill({ response, json: body });
+    });
+    const data = await openCourseAdjustments(page);
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    await expect(main(page).getByText(/same suggested faculty member/)).toHaveCount(0);
+    await expect(table.locator("tbody tr").filter({ hasText: data.demand[0].course.code }).first()).toContainText("Suggested: Dr. Alpha Cruz");
+    await expect(table.locator("tbody tr").filter({ hasText: data.demand[1].course.code }).first()).toContainText("Suggested: Dr. Beta Reyes");
+  });
+
+  test("a row's details (who is affected) open in a drawer, not in the row", async ({ page }) => {
+    test.setTimeout(120_000);
+    const data = await openCourseAdjustments(page);
+    const withStudents = data.demand.find((row) => (row.affected_students || []).length > 0);
+    test.skip(!withStudents, "no subject has an affected student on this database");
+    const code = withStudents.course.code;
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    await table.getByRole("button", { name: `Details for ${code}` }).click();
+    const drawer = page.getByRole("dialog", { name: new RegExp(code) });
+    await expect(drawer).toBeVisible();
+    for (const student of withStudents.affected_students.slice(0, 3)) await expect(drawer.getByText(student.name).first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toHaveCount(0);
+    await expect(table.getByRole("button", { name: `Details for ${code}` })).toBeFocused();
+  });
+});
+
+test.describe("P6.5: the library on the other pages", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  test("Offering setup and Academic Semesters tables are DataTables; Academic Semesters dialogs are real dialogs", async ({ page }) => {
+    test.setTimeout(120_000);
+    const offerings = await openOfferingSetup(page);
+    if (offerings.offerings.length) await expect(main(page).locator("[data-table-scroll] table")).toHaveCount(1);
+
+    await page.goto("/");
+    await sidebarLink(page, "Academic Semesters").click();
+    await expect(heading1(page, "Academic Semesters")).toBeVisible();
+    await expect(main(page).locator("[data-table-scroll] table")).toHaveCount(1);
+    const currentRow = main(page).locator("tbody tr").filter({ has: page.getByText("Current", { exact: true }) });
+    await expect(currentRow.locator("[data-status-tone]")).toHaveCount(1);
+
+    const other = main(page).locator("tbody tr").filter({ hasNot: page.getByText("Current", { exact: true }) }).first();
+    await other.getByRole("button", { name: /Edit dates/ }).click();
+    const edit = page.getByRole("dialog", { name: /^Edit dates/ });
+    await expect(edit).toBeVisible();
+    await expect(edit.locator("[data-modal-header]")).toHaveCount(1);
+    await expect(edit.getByLabel("Start date")).toBeVisible();
+    await edit.getByRole("button", { name: "Cancel" }).click();
+    await expect(edit).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Add semester", exact: true }).click();
+    const add = page.getByRole("dialog", { name: "Add semester" });
+    await expect(add).toBeVisible();
+    await add.getByRole("button", { name: "Save semester" }).click();
+    await expect(add.getByText("Enter the semester name, start date, and end date.")).toBeVisible(); // the message is IN the dialog
+    await page.keyboard.press("Escape");
+    await expect(add).toHaveCount(0);
+  });
+
+  test("Policy Documents: library tiles, chips and dialog; the test-question example is a graduate-school question (I-081)", async ({ page }) => {
+    test.setTimeout(120_000);
+    const loaded = nextGet(page, "policy-documents");
+    await page.goto("/");
+    await sidebarLink(page, "Policy Documents").click();
+    await expect(heading1(page, "Policy Documents")).toBeVisible();
+    const data = await loaded;
+    await expect(main(page).locator('[data-slot="label"]')).toHaveText(["All sources", "Staff uploads", "Drafts pending validation", "Ready for assistant"]);
+    await expect(main(page).locator("[data-status-tone]").first()).toBeVisible();
+    for (const item of data.items) {
+      const card = main(page).locator("h3", { hasText: item.title }).locator("xpath=ancestor::*[contains(@class,'card')][1]");
+      await expect(card.locator("[data-status-tone]").first()).toContainText(/Active|Draft|Archived/);
+    }
+    const placeholder = await page.getByLabel("Question to test").getAttribute("placeholder");
+    expect(placeholder).not.toMatch(/library|tablet/i);
+    expect(placeholder).toMatch(/leave of absence/i);
+
+    await page.getByRole("button", { name: "Add document" }).click();
+    const add = page.getByRole("dialog", { name: "Add policy document" });
+    await expect(add.locator("[data-modal-header]")).toHaveCount(1);
+    await expect(add.locator("[data-modal-footer]")).toContainText("Upload and index");
+    await page.keyboard.press("Escape");
+    await expect(add).toHaveCount(0);
+  });
+});
