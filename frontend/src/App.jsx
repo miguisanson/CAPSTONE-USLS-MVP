@@ -11,7 +11,7 @@ import Faculty from "./pages/Faculty";
 import StudentDetail from "./pages/StudentDetail";
 import WorkQueue from "./pages/WorkQueue";
 import ActivityLog from "./pages/ActivityLog";
-import WorkflowPage from "./pages/WorkflowPage";
+import WorkflowPage from "./pages/workflow/WorkflowPage";
 import MonitoringGrid from "./pages/MonitoringGrid";
 import CoursePlanning from "./pages/CoursePlanning";
 import EnrollmentClassList from "./pages/EnrollmentClassList";
