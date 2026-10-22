@@ -35931,6 +35931,255 @@ def seed_database() -> None:
     db.session.commit()
 
 
+# Cases that wait for (or already have) a Dean decision, so the Dean's screens are not empty on a
+# fresh seed (I-062). Students come from the monitoring sheets and belong to no other demo.
+DEAN_DEMO_STUDENTS = {
+    "leave-of-absence": "2360074",      # Lorenzo Reyes, MSN: LOA with the Dean
+    "readmission": "2360031",           # Hazel Castillo, MIT: on leave, readmission with the Dean
+    "awol-return": "2560085",           # Noel Navarro, MAN: AWOL, return declaration with the Dean
+    "withdrawal": "2360087",            # Hazel Flores, MAN: subject withdrawal with the Dean
+    "practicum": "2360101",             # Isabel Mendoza, MAPSY: practicum report sent to the Dean
+    "graduation": "2360008",            # Hector Ong, MAED: graduation endorsement ready for the Dean
+    "leave-of-absence-decided": "2460017",   # Olivia Cabrera, MSCS: LOA the Dean approved
+    "withdrawal-decided": "2460068",    # Gian Lacson, MSN: withdrawal the Dean denied
+}
+DEAN_DEMO_PLANS = (("MIT", "Submitted"), ("MSCS", "Approved"))
+
+
+def seed_dean_review_cases() -> int:
+    """One case waiting in each Dean queue plus a few decided ones (I-062). Returns the cases made.
+
+    LOA and readmission go through the real leave workflow (leave_case_apply) so their history,
+    tasks and notices are the ones a live case would have; the others are written the way the
+    persona fixtures write theirs. Dates are spread afterwards by spread_seed_history().
+    """
+    staff = UserAccount.query.filter_by(role="staff").order_by(UserAccount.id).first()
+    dean = UserAccount.query.filter_by(role="dean").order_by(UserAccount.id).first()
+    active_term = get_active_term()
+    upcoming = future_semester_labels(1)
+    if not (staff and dean and active_term and upcoming):
+        return 0
+    next_term = leave_term(upcoming[0])
+    made = 0
+
+    def student_for(key: str) -> Student | None:
+        return Student.query.filter_by(student_number=DEAN_DEMO_STUDENTS[key]).first()
+
+    def portal_account(student: Student) -> UserAccount | None:
+        return UserAccount.query.filter_by(student_id=student.id, role="student").order_by(UserAccount.id).first()
+
+    def with_dean(student: Student, kind: str) -> LeaveCase:
+        if kind == KIND_LOA:
+            case = LeaveCase(
+                student_id=student.id, kind=KIND_LOA, source="demo",
+                start_term_id=next_term.id, end_term_id=next_term.id,
+                start_label=next_term.label, end_label=next_term.label,
+                reason_category="Family emergency",
+                reason_text="Caring for a family member during the coming semester.",
+                prior_stage=student.current_stage, prior_enrollment_tag=student.enrollment_tag,
+            )
+        else:
+            on_leave = ensure_demo_leave_case(student, None)
+            case = LeaveCase(
+                student_id=student.id, kind=KIND_READMISSION, source="demo",
+                linked_case_id=on_leave.id, start_term_id=on_leave.start_term_id, end_term_id=on_leave.end_term_id,
+                start_label=on_leave.start_label, end_label=on_leave.end_label,
+                target_term_id=next_term.id, target_label=next_term.label,
+                return_intent="I am ready to resume my graduate studies.",
+                checklist_json=json.dumps({item: True for item in readmission_requirements()}),
+            )
+        leave_submit_new(case, portal_account(student))
+        leave_case_apply(case, "start_review", staff)
+        data = {"confirmed_items": readmission_requirements()} if kind == KIND_READMISSION else {}
+        leave_case_apply(case, "forward", staff, data=data)
+        return case
+
+    def active_subject(student: Student) -> SubjectEnrollment | None:
+        """A subject the student is taking this semester (the withdrawal needs one to point at)."""
+        taken = {
+            record.course_id: record.status
+            for record in CourseRecord.query.filter_by(student_id=student.id).all()
+        }
+        course = next(
+            (item for item in monitoring_curriculum_courses(student.program)
+             if taken.get(item.id) not in ("Completed", "Withdrawn")),
+            None,
+        )
+        if course is None:
+            return None
+        record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+        if record is None:
+            record = CourseRecord(student_id=student.id, course_id=course.id, status="Current")
+            db.session.add(record)
+        record.status, record.term_label = "Current", active_term.label
+        enrollment = SubjectEnrollment.query.filter_by(
+            student_id=student.id, course_id=course.id, term_id=active_term.id,
+        ).first()
+        if enrollment is None:
+            enrollment = SubjectEnrollment(
+                student_id=student.id, course_id=course.id, term_id=active_term.id,
+                status="Enrolled", source_reference="Dean queue demo",
+            )
+            db.session.add(enrollment)
+        db.session.flush()
+        return enrollment
+
+    # LOA with the Dean
+    student = student_for("leave-of-absence")
+    if student and not LeaveCase.query.filter_by(student_id=student.id).first():
+        with_dean(student, KIND_LOA)
+        ensure_term_enrollment(student, active_term, "LOA Pending", "Dean queue demo")
+        made += 1
+
+    # LOA the Dean already approved (starts next semester, so the student is still active)
+    student = student_for("leave-of-absence-decided")
+    if student and not LeaveCase.query.filter_by(student_id=student.id).first():
+        case = with_dean(student, KIND_LOA)
+        leave_case_apply(case, "approve", dean, comment="Approved. The leave starts next semester.")
+        made += 1
+
+    # Readmission with the Dean (the student is on an approved leave)
+    student = student_for("readmission")
+    if student and not LeaveCase.query.filter_by(student_id=student.id, kind=KIND_READMISSION).first():
+        with_dean(student, KIND_READMISSION)
+        made += 1
+
+    # AWOL return declaration with the Dean
+    student = student_for("awol-return")
+    if student and not AwolCase.query.filter_by(student_id=student.id).first():
+        student.current_stage, student.standing, student.enrollment_tag, student.risk_level = "AWOL", "AWOL", "AWOL", "Delayed"
+        ensure_term_enrollment(student, active_term, "AWOL", "Dean queue demo")
+        db.session.add(AwolCase(
+            student_id=student.id, status="Dean Review", dean_decision="Pending",
+            awol_effective_date=date.today() - timedelta(days=150),
+            last_enrolled_term="AY 2025-2026 2nd Semester",
+            return_requested_at=now_utc(), target_return_term=upcoming[0],
+            return_intent="I intend to resume enrollment in the selected semester.",
+            return_reason="My circumstances have stabilized and I am ready to continue the program.",
+            detection_source="Imported AWOL standing", automatically_flagged_at=now_utc(),
+            years_in_program=2, normal_residence_years=5, absolute_residence_years=7,
+            policy_classification="Within Maximum Residence",
+            staff_notes="Return declaration checked against the residence limits; forwarded to the Dean.",
+        ))
+        add_task(student.id, "Decide structured AWOL return declaration", "Dean", 3, 70)
+        add_log(
+            "awol", student.id, "Graduate School Staff", "AWOL return review",
+            "AWOL return declaration forwarded to Dean", "Dean",
+            "Policy classification: Within Maximum Residence.",
+            previous_status="Return Submitted", new_status="Dean Review",
+        )
+        made += 1
+
+    # Subject withdrawal with the Dean, and one the Dean denied
+    for key, status, decision in (
+        ("withdrawal", "Dean Review", "Pending"),
+        ("withdrawal-decided", "Denied", "Denied"),
+    ):
+        student = student_for(key)
+        if not student or WithdrawalApplication.query.filter_by(student_id=student.id).first():
+            continue
+        subject = active_subject(student)
+        if subject is None:
+            continue
+        ensure_term_enrollment(student, active_term, "Enrolled", "Dean queue demo")
+        application = WithdrawalApplication(
+            student_id=student.id, reason="The workload clashes with my full-time job.",
+            effective_term=active_term.label, subject_enrollment_id=subject.id, withdrawal_scope="Subject",
+            fee_status="Pending", requirement_status="Pending", dean_decision=decision, status=status,
+            decided_at=now_utc() if decision != "Pending" else None,
+            staff_remarks=None if decision == "Pending" else "Dean: Denied. The withdrawal window had closed.",
+        )
+        db.session.add(application)
+        db.session.flush()
+        if decision == "Pending":
+            add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+        add_log(
+            "withdrawal", student.id, "Graduate School Staff" if decision == "Pending" else "Dean",
+            "Withdrawal request",
+            "Withdrawal request recorded and forwarded to the Dean" if decision == "Pending"
+            else "Withdrawal denied by Dean; student informed and remains Active",
+            "Dean" if decision == "Pending" else "Student",
+            f"Subject: {subject.course.code}. Effective semester: {active_term.label}.",
+            previous_status="Submitted to GS Staff" if decision == "Pending" else "Dean Review",
+            new_status=status,
+        )
+        made += 1
+
+    # Practicum status report sent to the Dean
+    student = student_for("practicum")
+    if student and not PracticumRecord.query.filter_by(student_id=student.id).first():
+        db.session.add(PracticumRecord(
+            student_id=student.id, moa_status="Approved", moa_uploaded=True,
+            practicum_site="USLS Partner Institution", supervisor_name="Demo Practicum Supervisor",
+            required_hours=practicum_required_hours(), completed_hours=practicum_required_hours(),
+            document_status="Verified", certificate_count=0, completion_status="Completed and accepted",
+            status="Report Sent to Dean", report_sent_at=now_utc(),
+        ))
+        add_task(student.id, "Review practicum status report", "Dean", 5, 35)
+        add_log(
+            "practicum", student.id, "Academic Coordinator", "Practicum workflow",
+            "Practicum status updated: Report Sent to Dean", "Dean",
+            "Required hours are met and the documents are verified.",
+            previous_status="Documents Received", new_status="Report Sent to Dean",
+        )
+        made += 1
+
+    # Graduation endorsement ready for the Dean (a student whose coursework and research are complete)
+    student = student_for("graduation")
+    if student and not GraduationEndorsement.query.filter_by(student_id=student.id).first():
+        endorsement = GraduationEndorsement(
+            student_id=student.id, review_window="Current review window", batch_name="Batch 1 October 2026",
+            endorsement_status="Ready for Dean Review", registrar_status="Pending", submitted_at=now_utc(),
+        )
+        db.session.add(endorsement)
+        db.session.flush()
+        apply_graduation_eligibility(endorsement, graduation_eligibility(student))
+        endorsement.endorsement_status = "Ready for Dean Review"
+        add_task(student.id, "Review graduation endorsement", "Dean", 5, 50)
+        add_log(
+            "graduation", student.id, "Graduate School Staff", "Graduation endorsement list",
+            "Graduation endorsement sent to the Dean", "Dean",
+            "Coursework, research and post-defense evidence are complete.",
+            previous_status="For Review", new_status="Ready for Dean Review",
+        )
+        made += 1
+
+    # Course offering plans: one waiting for the Dean, one the Dean approved
+    for program_code, status in DEAN_DEMO_PLANS:
+        program = Program.query.filter_by(code=program_code).first()
+        if not program or not next_term or CourseOfferingPlan.query.filter_by(
+            program_id=program.id, term_label=next_term.label,
+        ).first():
+            continue
+        plan = CourseOfferingPlan(
+            program_id=program.id, term_label=next_term.label, status=status,
+            notes="Proposed offerings from the subject demand of the current students.",
+            target_term_id=next_term.id, reference_term_id=active_term.id, submitted_at=now_utc(),
+            approved_at=now_utc() if status == "Approved" else None,
+            approved_by=dean.full_name if status == "Approved" else None,
+        )
+        db.session.add(plan)
+        db.session.flush()
+        faculty_ids = [row.id for row in Faculty.query.filter_by(active=True).order_by(Faculty.id).limit(4).all()]
+        for index, course in enumerate(monitoring_curriculum_courses(program)[:4]):
+            db.session.add(CourseOffering(
+                plan_id=plan.id, course_id=course.id, demand_count=6 - index, section_count=1,
+                availability_count=len(faculty_ids), status="Offered",
+                assigned_faculty_id=faculty_ids[index % len(faculty_ids)] if faculty_ids else None,
+                assignment_status="Approved" if status == "Approved" else "Proposed",
+            ))
+        add_log(
+            "course-adjustments", None, "Academic Coordinator", "Course Adjustments",
+            f"Offering plan sent to the Dean: {program.code} {next_term.label}" if status == "Submitted"
+            else f"Offering plan approved by Dean: {program.code} {next_term.label}",
+            "Dean" if status == "Submitted" else "Academic Coordinator", plan.notes or "",
+        )
+        made += 1
+
+    db.session.flush()
+    return made
+
+
 def seed_bianca_mendoza_enrollment() -> None:
     """Give the official DBA roster student her current semester/account fixture."""
     student = Student.query.filter_by(student_number="2560052").first()
@@ -37304,6 +37553,7 @@ def build_demo_database() -> dict:
         ensure_operations_manual_policy_document()  # the draft manual is searchable as a Draft
         ensure_upcoming_defense_demo()
         sync_all_panel_invitations()  # seats the seeders placed directly get their invitations (no page view makes them)
+        seed_dean_review_cases()  # a case waiting in every Dean queue, and a few decided ones
         db.session.commit()
         # 5. Last syncs, once everything above exists.
         sync_result = sync_all_curricula()
