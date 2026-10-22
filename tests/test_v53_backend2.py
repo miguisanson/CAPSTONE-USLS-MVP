@@ -209,6 +209,141 @@ class V53Backend2Tests(unittest.TestCase):
         self.assertEqual(len(fresh), 1, fresh)
         self.assertIn("graduation", (fresh[0]["title"] + " " + (fresh[0]["body"] or "")).lower())
 
+    # ------------------------------------------------------------------ I-071 (F-17)
+    def _make_stale_risk(self) -> int:
+        with app.app_context():
+            student = Student.query.order_by(Student.id).first()
+            wrong = "Delayed" if student_priority(student)["level"] != "Delayed" else "On Track"
+            student.risk_level = wrong
+            db.session.commit()
+            return student.id
+
+    def _make_stale_awol(self) -> int:
+        """A student whose latest semester is Withdrawn with no leave: the sweep would open an AWOL case."""
+        with app.app_context():
+            for student in Student.query.filter(Student.enrollment_tag == "Enrolled").order_by(Student.id).all():
+                term_row = (
+                    TermEnrollment.query.filter_by(student_id=student.id).join(AcademicTerm)
+                    .order_by(AcademicTerm.start_date.desc(), TermEnrollment.id.desc()).first()
+                )
+                if term_row is None or AwolCase.query.filter_by(student_id=student.id).first():
+                    continue
+                term_row.status = "Withdrawn"
+                db.session.commit()
+                return student.id
+        self.fail("no student to make stale")
+
+    def _get_changes_nothing(self, client, url, **kwargs):
+        before = dump_database()
+        response = client.get(url, **kwargs)
+        self.assertEqual(response.status_code, 200, (url, response.get_data(as_text=True)[:300]))
+        self.assertEqual(changed_tables(before, dump_database()), [], url)
+        return response
+
+    def test_dashboard_and_reports_gets_change_nothing_even_when_risk_and_awol_are_stale(self):
+        self._make_stale_risk()
+        self._make_stale_awol()
+        staff = sign_in(STAFF_EMAIL)
+        for url in ("/api/dashboard", "/api/dashboard/drilldown?type=risk&value=Delayed", "/api/reports",
+                    "/api/reports/analytics", "/api/students"):
+            self._get_changes_nothing(staff, url)
+
+    def test_explicit_refresh_post_does_the_sweeps_the_gets_no_longer_do(self):
+        student_id = self._make_stale_risk()
+        awol_student_id = self._make_stale_awol()
+        staff = sign_in(STAFF_EMAIL)
+        response = staff.post("/api/maintenance/refresh", json={})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertTrue(response.get_json()["ok"])
+        with app.app_context():
+            student = db.session.get(Student, student_id)
+            self.assertEqual(student.risk_level, student_priority(student)["level"])
+            self.assertIsNotNone(AwolCase.query.filter_by(student_id=awol_student_id).first())
+        # students cannot trigger it
+        student_client = self.student_client_for("2360074")
+        self.assertEqual(student_client.post("/api/maintenance/refresh", json={}).status_code, 403)
+
+    def test_leave_board_get_changes_nothing_when_an_old_log_has_no_case_yet(self):
+        staff = sign_in(STAFF_EMAIL)  # signing in first: today it also adopts old logs (I-072)
+        with app.app_context():
+            free = (
+                Student.query.filter(~Student.id.in_(db.session.query(LeaveCase.student_id)))
+                .order_by(Student.id).first()
+            )
+            db.session.add(TransactionLog(
+                transaction_slug="leave-of-absence", student_id=free.id, actor_role="Student",
+                source_reference="legacy", result="LOA application submitted", next_owner="Graduate School Staff",
+                notes="old log row", new_status="Submitted",
+            ))
+            db.session.commit()
+            student_id = free.id
+        self._get_changes_nothing(staff, "/api/leave-cases?slug=leave-of-absence")
+        self._get_changes_nothing(staff, "/api/leave-cases?slug=readmission")
+        # the explicit refresh turns the old log into a case
+        self.assertEqual(staff.post("/api/leave-cases/sync", json={}).status_code, 200)
+        with app.app_context():
+            self.assertIsNotNone(LeaveCase.query.filter_by(student_id=student_id).first())
+
+    def test_onboarding_reviews_get_changes_nothing_and_the_upload_makes_the_review(self):
+        with app.app_context():
+            self.assertEqual(OnboardingReview.query.count(), 0)
+            db.session.add(MonitoringSheetUpload(
+                original_name="sheet.xlsx", stored_name="stale-upload-test.xlsx", program_code="MIT",
+                row_count=1, subject_count=1, snapshot_json="{}", result_json="{}",
+            ))
+            db.session.commit()
+        staff = sign_in(STAFF_EMAIL)
+        self._get_changes_nothing(staff, "/api/onboarding/reviews")
+        # the maintenance refresh is what builds the missing review rows
+        self.assertEqual(staff.post("/api/maintenance/refresh", json={}).status_code, 200)
+        with app.app_context():
+            self.assertEqual(OnboardingReview.query.count(), 1)
+        self._get_changes_nothing(staff, "/api/onboarding/reviews")
+
+    def test_adviser_tracker_get_changes_nothing_for_a_student_with_an_old_adviser_record(self):
+        with app.app_context():
+            from app import Faculty
+            student = (
+                Student.query.filter(~Student.id.in_(db.session.query(AdviserAppointment.student_id)))
+                .filter(Student.id.in_(db.session.query(UserAccount.student_id).filter(UserAccount.role == "student")))
+                .order_by(Student.id).first()
+            )
+            self.assertIsNotNone(student)
+            db.session.add(AdviserAssignment(student_id=student.id, faculty_id=Faculty.query.first().id, status="Active"))
+            db.session.commit()
+            email = UserAccount.query.filter_by(student_id=student.id, role="student").first().email
+        client = sign_in(email)
+        self._get_changes_nothing(client, "/api/student-portal/adviser")
+
+    def test_notifications_get_changes_nothing_and_reminders_come_from_an_explicit_refresh(self):
+        with app.app_context():
+            from app import SLOT_HOLDING_DEFENSE_STATUSES, ScheduleRequest, schedule_panel_ids
+            email = None
+            for schedule in ScheduleRequest.query.filter(
+                    ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES)).order_by(ScheduleRequest.id).all():
+                for faculty_id in sorted(schedule_panel_ids(schedule)):
+                    account = UserAccount.query.filter_by(faculty_id=faculty_id, role="faculty", active=True).first()
+                    if account:
+                        email = account.email
+                        break
+                if email:
+                    schedule.preferred_date = date.today() + timedelta(days=1)  # a reminder is due today
+                    break
+            self.assertIsNotNone(email, "no booked defense has a panel member with an account")
+            db.session.commit()
+        client = sign_in(email)
+        before = self._get_changes_nothing(client, "/api/notifications", query_string={"limit": 200}).get_json()
+        response = client.post("/api/notifications/refresh", json={})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        refreshed = response.get_json()
+        self.assertGreater(len(refreshed["items"]), len(before["items"]))
+        self.assertGreater(refreshed["unread_count"], before["unread_count"])
+        # the next read shows the same list without writing anything
+        again = self._get_changes_nothing(client, "/api/notifications").get_json()
+        self.assertEqual([item["id"] for item in again["items"]], [item["id"] for item in refreshed["items"]])
+        # marking read is a POST
+        self.assertEqual(client.post(f"/api/notifications/{again['items'][0]['id']}/read", json={}).status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
