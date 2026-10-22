@@ -24,7 +24,7 @@ filed as I-055..I-095). Web research added 15 UX checks (`research/UX-RESEARCH-2
 **In progress:** demo data that makes sense (advisers within their limit, never on their own student's panel, a case
 waiting in every Dean queue, dates spread over past weeks); sidebar cut off at laptop height; board polish; student pages.
 
-Screenshots of each change: `E:\Temp\claude\shots-<packet>fter\` (fac, mon, wf2, wf4, board, grad, dean, fac2).
+Screenshots of each change: `E:/Temp/claude/shots-<packet>/after/` (fac, mon, wf2, wf4, board, grad, dean, fac2).
 
 ---
 
