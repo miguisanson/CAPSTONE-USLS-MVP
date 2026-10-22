@@ -14,7 +14,7 @@ ode_modules` so the main node_modules is not deleted):**
   - Gate on 176b0cf: python **652 OK**; e2e 315/318 (3 p78 order failures, fixed by pkt/bpol). LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
   - MERGED `pkt/bpol` (I-110, I-108, I-106, I-111, I-113).
   - `p65` / `pkt/p65` — P6.5 staff setup pages + Course Adjustments decision table (I-069) + policy placeholder (I-081 part) (spec p84, port 5316).
-  - `stu` / `pkt/stu` — student P4.3/P4.4 + I-087, I-086, form error summaries (spec p82, port 5314).
+  - MERGED `pkt/stu` (P4.3/P4.4, I-087, I-086, error summaries).
   - MERGED `pkt/vocab` (I-076..I-078, I-080). Folder `wt/vocab` is deregistered but a locked file kept it on disk - delete it after a reboot. Follow-up I-112.
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
   - MERGED `pkt/board` (I-067, I-088). Follow-up: Practicum `w-[300px]` and Graduation `w-[380px]` column overrides (workflow packet).
