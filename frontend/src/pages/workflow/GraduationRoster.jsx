@@ -413,6 +413,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
   const [exportNotice, setExportNotice] = useState(null);
   const reset = useDemoCaseReset("graduation", refetch);
   const rows = context.roster || [];
+  const canTickBatches = ["staff", "academic_coordinator", "research_coordinator"].includes(accountRole); // the Dean uses the step buttons
   // `secondary` is the completed-course filter (one more control in the shared toolbar).
   const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", sort: "newest" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
@@ -567,7 +568,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
         group={item.group}
         accountRole={accountRole}
         selectedIds={selectedIds}
-        onToggleBatch={["staff", "academic_coordinator", "research_coordinator"].includes(accountRole) ? toggleBatchGroup : null}
+        onToggleBatch={canTickBatches ? toggleBatchGroup : null}
         onProcessBatch={processBatchGroup}
         onViewBatch={(group) => setStageGroupId(group.id)}
         onExportBatch={accountRole === "dean" ? exportApprovedBatch : null}
@@ -621,7 +622,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       header: <span className="sr-only">Select</span>,
       width: "2.5rem",
       cell: ({ row, stage }) => {
-        const selectable = stage === "stage-2" ? accountRole === "staff" : Boolean(row.endorsement?.batch_name) && Boolean(graduationStageActionForRow(row, accountRole));
+        const selectable = stage === "stage-2" ? accountRole === "staff" : canTickBatches && Boolean(row.endorsement?.batch_name) && Boolean(graduationStageActionForRow(row, accountRole));
         if (!selectable) return <span aria-hidden="true" />;
         return (
           <input
@@ -642,7 +643,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       cell: ({ row }) => (
         <>
           <p className="font-semibold text-ink">{row.student.name}</p>
-          <p className="meta">{row.student.student_number}</p>
+          <p className="meta whitespace-nowrap">{row.student.student_number}</p>
         </>
       ),
     },
@@ -685,7 +686,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
       {exportError && <div role="alert"><ErrorNote message={exportError} /></div>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-72">
           <RosterFilters
             filters={filters}
             setFilters={setFilters}
