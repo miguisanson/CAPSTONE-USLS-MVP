@@ -17,7 +17,7 @@ import math
 import threading
 import zipfile
 import xml.etree.ElementTree as ET
-from collections import Counter, OrderedDict
+from collections import Counter, OrderedDict, defaultdict
 from functools import wraps
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -30,9 +30,9 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from flask import Flask, Response, has_app_context, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event, func, inspect, or_, text
+from sqlalchemy import event, func, inspect, or_, text, true
 from sqlalchemy import event as _sa_event
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 from sqlalchemy.orm.attributes import get_history as _sa_get_history
 from werkzeug.exceptions import NotFound
 from werkzeug.exceptions import BadRequestKeyError
@@ -2182,8 +2182,15 @@ def faculty_dict(faculty: Faculty) -> dict:
     }
 
 
-def student_brief(student: Student) -> dict:
-    course_year = student_current_course_year(student)
+_TERM_NOT_GIVEN = object()
+
+
+def student_brief(student: Student, active_term=_TERM_NOT_GIVEN) -> dict:
+    # A caller that builds many briefs passes the active term (or None) it already looked up.
+    if active_term is _TERM_NOT_GIVEN:
+        course_year = student_current_course_year(student)
+    else:
+        course_year = years_in_program(student, term=active_term)
     return {
         "id": student.id,
         "student_number": student.student_number,
@@ -2312,21 +2319,33 @@ def monitoring_template_codes(program_code: str) -> list[str]:
     return [monitoring_course_code(program_code, suffix) for suffix, *_ in MONITORING_CURRICULUM_TEMPLATE]
 
 
-def monitoring_curriculum_courses(program: Program) -> list[Course]:
-    """Prefer the AC template columns for monitoring when the program has them."""
+def monitoring_curriculum_courses(program: Program, program_courses: list[Course] | None = None) -> list[Course]:
+    """Prefer the AC template columns for monitoring when the program has them.
+
+    ``program_courses`` is every Course row of the program when the caller already loaded them (one query
+    for a whole page of students); the answer is the same as asking the database here.
+    """
     authoritative = AUTHORITATIVE_CURRICULA.get(program.code)
     if authoritative:
         codes = [row[0] for row in authoritative["courses"]]
-        by_code = {
-            course.code: course
-            for course in Course.query.filter_by(program_id=program.id).filter(Course.code.in_(codes)).all()
-        }
+        if program_courses is None:
+            candidates = Course.query.filter_by(program_id=program.id).filter(Course.code.in_(codes)).all()
+        else:
+            wanted = set(codes)
+            candidates = [course for course in program_courses if course.code in wanted]
+        by_code = {course.code: course for course in candidates}
         return [by_code[code] for code in codes if code in by_code]
     template_codes = monitoring_template_codes(program.code)
-    courses = (
-        Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter())
-        .order_by(Course.category, Course.code).all()
-    )
+    if program_courses is None:
+        courses = (
+            Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter())
+            .order_by(Course.category, Course.code).all()
+        )
+    else:  # the same filter and the same order (NULL category first) the query above uses
+        courses = sorted(
+            (course for course in program_courses if (course.category or "Core") != MONITORING_FREE_FORM_CATEGORY),
+            key=lambda course: (course.category is not None, course.category or "", course.code),
+        )
     by_code = {course.code: course for course in courses}
     template_courses = [by_code[code] for code in template_codes if code in by_code]
     return template_courses if template_courses else courses
@@ -2417,9 +2436,9 @@ def ensure_monitoring_template_courses() -> int:
     return changed
 
 
-def comprehensive_exam_eligibility(student: Student) -> dict:
+def comprehensive_exam_eligibility(student: Student, audit: dict | None = None) -> dict:
     """Apply program unit requirements without treating subjects as prerequisites."""
-    audit = compute_course_audit(student)
+    audit = audit if audit is not None else compute_course_audit(student)
     completed = {row["category"]: row["completed_units"] for row in audit.get("by_category", [])}
     failed_count = sum(1 for row in audit.get("incomplete", []) if row.get("status") == "Failed")
     if student.program.code in AUTHORITATIVE_CURRICULA:
@@ -2477,6 +2496,34 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         "failed_subjects": failed_count,
         "required_subjects": len(audit.get("completed", [])) + missing_count,
     }
+
+
+def comprehensive_eligibility_for(students: list[Student]) -> dict[int, dict]:
+    """comprehensive_exam_eligibility() for many students: the same answers, a fixed number of queries.
+
+    Loads the course records of the students and the courses of their programs once per block of 400
+    students instead of once per student.
+    """
+    result: dict[int, dict] = {}
+    for start in range(0, len(students), 400):
+        block = students[start:start + 400]
+        records_by_student: dict[int, dict] = defaultdict(dict)
+        for record in CourseRecord.query.filter(CourseRecord.student_id.in_([item.id for item in block])).all():
+            records_by_student[record.student_id][record.course_id] = record
+        programs = {item.program_id: item.program for item in block}
+        courses_by_program: dict[int, list[Course]] = defaultdict(list)
+        for course in Course.query.filter(Course.program_id.in_(list(programs))).all():
+            courses_by_program[course.program_id].append(course)
+        curricula = {
+            program_id: monitoring_curriculum_courses(program, courses_by_program[program_id])
+            for program_id, program in programs.items()
+        }
+        for item in block:
+            audit = compute_course_audit(
+                item, records=records_by_student.get(item.id, {}), required_courses=curricula[item.program_id],
+            )
+            result[item.id] = comprehensive_exam_eligibility(item, audit=audit)
+    return result
 
 
 def monitoring_research_milestones(student: Student) -> dict:
@@ -5247,6 +5294,23 @@ RISK_REFRESH_SECONDS = max(int(os.getenv("USLS_RISK_REFRESH_SECONDS", "60") or 6
 _RISK_REFRESH_STATE: dict = {"at": None, "day": None}
 
 
+def run_maintenance_sweeps() -> dict:
+    """Every sweep that depends on the clock or on data entered elsewhere. Writes; the caller commits.
+
+    The seed runs it once, and ``POST /api/maintenance/refresh`` runs it on request. A page view never does.
+    """
+    awol = sync_automatic_awol_statuses(commit=False)
+    leave = sync_leave_cases(commit=False)
+    risk = refresh_risk_levels(force=True)
+    reviews = ensure_onboarding_reviews()
+    advisers = migrate_adviser_appointments()
+    reminders = generate_reminders()
+    return {
+        "awol_cases_checked": awol, "leave": leave, "risk_levels_changed": risk,
+        "onboarding_reviews_made": reviews, "adviser_appointments_made": advisers, "reminders_made": reminders,
+    }
+
+
 def refresh_risk_levels(force: bool = False) -> int:
     """Bring every student's stored risk level up to date; returns how many changed."""
     import time as _time
@@ -5875,7 +5939,6 @@ def active_leave_case(student_id: int) -> LeaveCase | None:
 
 def leave_approved_semesters(student: Student, exclude_case_id: int | None = None) -> int:
     """Semesters of leave already approved (extensions are part of their leave)."""
-    adopt_legacy_leave_logs(student.id)
     total = 0
     for case in LeaveCase.query.filter(
         LeaveCase.student_id == student.id,
@@ -7267,7 +7330,25 @@ def leave_case_apply(case: LeaveCase, action: str, account: UserAccount | None, 
         raise LeaveError("Enter a comment or reason before doing this.", 400)
     result = LEAVE_HANDLERS[action](case, account, comment, data, move)
     case.updated_at = now_utc()
+    if account is not None and action not in {"start_review", "close"}:
+        notify_leave_step(case, account)
     return result
+
+
+def notify_leave_step(case: LeaveCase, account: UserAccount) -> int:
+    """Bell notification for the move just made: the student hears the decision, the next owner hears it waits."""
+    db.session.flush()
+    event = (
+        LeaveCaseEvent.query.filter(LeaveCaseEvent.case_id == case.id, LeaveCaseEvent.log_id.isnot(None))
+        .order_by(LeaveCaseEvent.id.desc()).first()
+    )
+    log = db.session.get(TransactionLog, event.log_id) if event else None
+    if log is None:
+        return 0
+    return notify_workflow_step(
+        SLUG_FOR_KIND[case.kind], case.student, log.result, log.new_status, log.next_owner,
+        f"leave:{case.id}:{event.id}", student_visible=log.visibility == "student_visible", actor=account,
+    )
 
 
 # ---- dates move cases along (run at start-up, at sign-in, and from the staff screen) -----
@@ -7525,7 +7606,6 @@ def leave_vocabulary() -> dict:
 
 def leave_student_overview(student: Student) -> dict:
     """What the student's pages need: their cases and what they may file now."""
-    adopt_legacy_leave_logs(student.id, commit=True)
     cases = leave_family_cases(student.id)
     active = active_leave_case(student.id)
     today = date.today()
@@ -7614,7 +7694,6 @@ def leave_student_overview(student: Student) -> dict:
 
 def submitted_request_students(request_type: str) -> list[dict]:
     """One row per leave or readmission case (newest change first), for staff rosters."""
-    adopt_legacy_leave_logs(commit=True)
     rows: list[dict] = []
     kinds = KINDS_FOR_SLUG[request_type]
     for case in (
@@ -8948,7 +9027,31 @@ def process_case_apply(slug: str, kind: str, record, action: str, account: UserA
     if isinstance(fresh, ResidencyEnrollment):
         after = residency_enrollment_dict(fresh)["status"]
     label = _sp.status_by_key(slug).get(after, {}).get("label", after)
+    # The Dean's decisions already told the student and the next owner inside workflow_approval_decide.
+    decided_by_dean = action in ({"approve", "deny"} if slug == _sp.SLUG_WITHDRAWAL else {"approve", "deny", "return"})
+    if not decided_by_dean:
+        notify_process_step(slug, student, action, label, account)
     return {"message": f"{move['label']}: now '{label}'.", "from": before, "to": after}
+
+
+def notify_process_step(slug: str, student: Student, action: str, status_label: str, account: UserAccount) -> int:
+    """Bell notification for a move on the standalone board (forward, tag, return, re-enrollment...)."""
+    log_slug = "awol" if slug == _sp.SLUG_AWOL else slug
+    if action == "return":
+        return notify_workflow_step(
+            log_slug, student, "Returned to you with a comment", status_label, "Student",
+            f"process:{log_slug}:{student.id}:return:{now_utc().strftime('%Y%m%d%H%M%S%f')}", actor=account,
+        )
+    log = (
+        TransactionLog.query.filter_by(student_id=student.id, transaction_slug=log_slug)
+        .order_by(TransactionLog.id.desc()).first()
+    )
+    if log is None:
+        return 0
+    return notify_workflow_step(
+        log_slug, student, log.result, log.new_status or status_label, log.next_owner,
+        f"process:{log_slug}:{log.id}", student_visible=log.visibility == "student_visible", actor=account,
+    )
 
 
 def _status_sentence(student: Student, ind: dict) -> str:
@@ -12448,23 +12551,8 @@ def register_routes(app: Flask) -> None:
             LOGIN_THROTTLE.record_failure(email, client_ip)
             return no_store(jsonify({"error": "Incorrect email or password."})), 401
         LOGIN_THROTTLE.record_success(email, client_ip)
-        if demo_mode_enabled():
-            _, demo_config = workflow_demo_config_for_student(account.student)
-            if demo_config:
-                try:
-                    # Logging in repairs prerequisite source data but deliberately keeps
-                    # the current workflow progress. The adjacent Reset button clears it.
-                    ensure_workflow_demo_student_baseline(account.student, demo_config["workflow"])
-                    db.session.commit()
-                except Exception as exc:  # noqa: BLE001
-                    db.session.rollback()
-                    return jsonify({"error": f"Could not prepare the demo account: {exc}"}), 400
-        try:
-            # Start leaves that begin today and flag leaves that are ending (idempotent).
-            sync_leave_cases(commit=True)
-        except Exception:  # noqa: BLE001 - signing in must never fail because of this
-            db.session.rollback()
-            app.logger.exception("Leave date sweep failed at sign-in")
+        # Signing in writes nothing (I-072). The demo personas' prerequisites are built by the seed and
+        # repaired by their Reset button; the leave-date sweep runs from POST /api/maintenance/refresh.
         session.clear()  # a fresh session on every sign-in (no session fixation)
         session["account_id"] = account.id
         session["role"] = account.role
@@ -12729,26 +12817,42 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "term": term_dict(term)})
 
+    # The date-driven sweeps used to run inside page views (dashboard, reports, leave board, bell). A page
+    # view now only reads (I-071); everything that moves with the clock runs here, on request, and once at
+    # seed time. The staff dashboard's "Refresh" button calls it.
+    @app.route("/api/maintenance/refresh", methods=["POST"])
+    @require_api_login("staff")
+    def maintenance_refresh():
+        summary = run_maintenance_sweeps()
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Dates, risk levels and reminders are up to date.", **summary})
+
     # Dashboard metrics are computed live from transaction-backed tables.
     @app.route("/api/dashboard")
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def dashboard():
-        sync_automatic_awol_statuses(commit=True)
-        refresh_risk_levels()
-        return jsonify(dashboard_stats(request.args))
+        """Staff see the whole school. A coordinator sees the same cards for their own caseload: the students
+        who have open work owned by their role, and only that work in the action list and the owner chart."""
+        account = current_account()
+        owner = ROLE_LABELS[account.role] if account.role in COORDINATOR_ROLES else None
+        filters = request.args
+        if owner:
+            filters = MultiDict(request.args)
+            filters["owner"] = owner
+        payload = dashboard_stats(filters, locked_owner=owner)
+        payload["viewer"] = {"role": account.role, "owner": owner}
+        return jsonify(payload)
 
     @app.route("/api/dashboard/drilldown")
     @require_api_login("staff")
     def dashboard_drilldown():
-        refresh_risk_levels()
         return jsonify(dashboard_drilldown_payload(request.args))
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def students_list():
-        refresh_risk_levels()
-        query = Student.query.join(Program)
+        query = Student.query.join(Program).options(contains_eager(Student.program))
         q = request.args.get("q", "").strip()
         if q:
             pattern = f"%{q}%"
@@ -12781,7 +12885,9 @@ def register_routes(app: Flask) -> None:
         elif student_status == "loa":
             query = query.filter(on_leave_clause())
         elif student_status == "compre-eligible":
-            eligible_ids = [student.id for student in query.all() if comprehensive_exam_eligibility(student)["eligible"]]
+            everyone = query.all()
+            eligibility = comprehensive_eligibility_for(everyone)
+            eligible_ids = [student.id for student in everyone if eligibility[student.id]["eligible"]]
             query = query.filter(Student.id.in_(eligible_ids or [-1]))
 
         page = max(request.args.get("page", 1, type=int), 1)
@@ -12793,9 +12899,13 @@ def register_routes(app: Flask) -> None:
             .limit(page_size)
             .all()
         )
+        eligibility = comprehensive_eligibility_for(items)
         return jsonify(
             {
-                "items": [{**student_directory_brief(s), "compre_eligibility": comprehensive_exam_eligibility(s)} for s in items],
+                "items": [
+                    {**brief, "compre_eligibility": eligibility[student.id]}
+                    for student, brief in zip(items, student_directory_briefs(items))
+                ],
                 "total": total,
                 "page": page,
                 "page_size": page_size,
@@ -12975,7 +13085,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/student-portal/context")
     @require_api_login("student")
     def student_portal_context():
-        sync_automatic_awol_statuses(commit=True)
         account = current_account()
         student_id = account.student_id if account else None
         if not student_id:
@@ -14030,7 +14139,6 @@ def register_routes(app: Flask) -> None:
         if slug not in LEAVE_SLUGS:
             return jsonify({"error": "This standing-change report is not supported."}), 404
         student = Student.query.get_or_404(student_id)
-        adopt_legacy_leave_logs(student.id)
         case = (
             LeaveCase.query.filter(
                 LeaveCase.student_id == student.id,
@@ -14513,7 +14621,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports")
     @require_api_login("staff", "academic_coordinator")
     def reports():
-        refresh_risk_levels()
         return jsonify(reports_payload(request.args))
 
     # Analytics is computed on demand rather than folded into /api/reports so
@@ -14521,17 +14628,12 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports/analytics")
     @require_api_login("staff", "academic_coordinator")
     def reports_analytics():
-        refresh_risk_levels()
         return jsonify(analytics_payload(request.args))
 
     # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
     @app.route("/api/onboarding/reviews")
     @require_api_login("staff", "academic_coordinator", "dean")
     def onboarding_reviews():
-        uploads = MonitoringSheetUpload.query.order_by(MonitoringSheetUpload.uploaded_at.desc()).limit(12).all()
-        for upload in uploads:
-            build_onboarding_review(upload)
-        db.session.commit()
         rows = (
             OnboardingReview.query.order_by(OnboardingReview.created_at.desc()).limit(12).all()
         )
@@ -14784,6 +14886,7 @@ def register_routes(app: Flask) -> None:
                 "time": iso(log.created_at),
                 "change_type": CHANGE_TYPE_LABELS.get(log.transaction_slug, log.transaction_slug),
                 "slug": log.transaction_slug,
+                "student_id": student.id,
                 "student_name": student.name,
                 "student_number": student.student_number,
                 "program_code": student.program.code if student.program else "",
@@ -17253,6 +17356,8 @@ def register_routes(app: Flask) -> None:
                 previous_status=previous_status, new_status=record.status,
                 visibility="internal" if decision == "return" else "student_visible",
             )
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "practicum", record.student, record.id, record.status)
 
         elif case_type == "withdrawal":
             application = WithdrawalApplication.query.get_or_404(item_id)
@@ -17307,6 +17412,8 @@ def register_routes(app: Flask) -> None:
                     result, note, previous_status, application.status,
                 )
             add_log("withdrawal", application.student_id, f"Dean · {account.full_name}", "Approvals", result, next_owner, note or withdrawal_notes(application), previous_status=previous_status, new_status=application.status)
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "withdrawal", application.student, application.id, application.status)
 
         elif case_type in {"leave-of-absence", "readmission"}:
             case = LeaveCase.query.get_or_404(item_id)
@@ -17398,6 +17505,8 @@ def register_routes(app: Flask) -> None:
                 result, next_owner, " ".join(part for part in [item.policy_classification, note] if part),
                 previous_status=previous_status, new_status=item.status,
             )
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "awol", student, item.id, item.status)
 
         elif case_type == "graduation":
             endorsement = GraduationEndorsement.query.get_or_404(item_id)
@@ -17440,9 +17549,16 @@ def register_routes(app: Flask) -> None:
                 previous_status=previous_status, new_status=endorsement.endorsement_status,
                 visibility="internal" if decision == "return" else "student_visible",
             )
+            decided_slug, decided_student, decided_record_id, decided_status = (
+                "graduation", endorsement.student, endorsement.id, endorsement.endorsement_status)
         else:
             return jsonify({"error": "Unknown workflow approval type."}), 404
 
+        notify_workflow_step(
+            decided_slug, decided_student, result, decided_status, next_owner,
+            f"decision:{decided_slug}:{decided_record_id}:{decided_status}:{now_utc().strftime('%Y%m%d%H%M%S%f')}",
+            student_visible=decision != "return" or case_type in {"awol-return", "withdrawal"}, actor=account,
+        )
         db.session.commit()
         return jsonify({"ok": True, "message": result})
 
@@ -17954,7 +18070,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/monitoring/grid")
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def monitoring_grid():
-        sync_automatic_awol_statuses(commit=True)
         program_id = request.args.get("program_id", type=int)
         program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
         if not program:
@@ -18513,8 +18628,6 @@ def register_routes(app: Flask) -> None:
         slug = (request.args.get("slug") or SLUG_LOA).strip()
         if slug not in LEAVE_SLUGS:
             return jsonify({"error": "Choose leave-of-absence or readmission."}), 400
-        adopt_legacy_leave_logs()
-        db.session.commit()
         cases = (
             LeaveCase.query.filter(LeaveCase.kind.in_(KINDS_FOR_SLUG[slug]))
             .order_by(LeaveCase.updated_at.desc(), LeaveCase.id.desc())
@@ -18917,6 +19030,7 @@ def register_routes(app: Flask) -> None:
                 ],
             }
             upload.result_json = json.dumps(stored_result, ensure_ascii=False)
+            build_onboarding_review(upload)
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
@@ -19173,6 +19287,7 @@ def register_routes(app: Flask) -> None:
                 "outcomes": outcomes,
             }
             correction_upload.result_json = json.dumps(correction_result, ensure_ascii=False)
+            build_onboarding_review(correction_upload)
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
@@ -19557,9 +19672,7 @@ def register_routes(app: Flask) -> None:
         _account, student = signed_in_student()
         if not student:
             return jsonify({"error": "This account is not linked to a student record."}), 400
-        payload = adviser_tracker_payload(student)
-        db.session.commit()
-        return jsonify(payload)
+        return jsonify(adviser_tracker_payload(student))
 
     @app.route("/api/student-portal/adviser/apply", methods=["POST"])
     @require_api_login("student")
@@ -20139,16 +20252,16 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/notifications")
     @require_api_login()
     def notifications_list():
+        return jsonify(notification_list_payload(current_account()))
+
+    @app.route("/api/notifications/refresh", methods=["POST"])
+    @require_api_login()
+    def notifications_refresh():
+        """Make the reminders that are due for this person (a read never does), then return their list."""
         account = current_account()
         generate_reminders(account=account)
         db.session.commit()
-        limit = min(max(request.args.get("limit", default=50, type=int), 1), 200)
-        query = Notification.query.filter_by(account_id=account.id)
-        if request.args.get("unread") in {"1", "true"}:
-            query = query.filter(Notification.read_at.is_(None))
-        rows = query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit).all()
-        unread = Notification.query.filter_by(account_id=account.id, read_at=None).count()
-        return jsonify({"items": [notification_dict(row) for row in rows], "unread_count": unread})
+        return jsonify(notification_list_payload(account))
 
     @app.route("/api/notifications/<int:notification_id>/read", methods=["POST"])
     @require_api_login()
@@ -20355,6 +20468,8 @@ def register_routes(app: Flask) -> None:
 
         updated = []
         skipped = []
+        waiting_for: dict[str, list[Student]] = {}
+        batch_stamp = now_utc().strftime("%Y%m%d%H%M%S%f")
         comment = (data.get("comment") or "").strip()
         try:
             review_window = (
@@ -20532,10 +20647,21 @@ def register_routes(app: Flask) -> None:
                     previous_status=previous, new_status=endorsement.endorsement_status,
                     visibility="internal" if next_owner != "Student" else "student_visible",
                 )
+                notify_workflow_step(
+                    "graduation", student, result, endorsement.endorsement_status, next_owner,
+                    f"batch:{action}:{student.id}:{batch_stamp}", actor=account, owner=False,
+                    student_visible=action in {"approve", "mark_not_eligible", "create_batch", "compile_to_ac"},
+                )
+                waiting_for.setdefault(next_owner, []).append(student)
                 updated.append({"student_id": student.id, "student_name": student.name})
             except ValueError as exc:
                 skipped.append({"student_id": student.id, "student_name": student.name, "reason": str(exc)})
 
+        for owner_label, waiting in waiting_for.items():
+            notify_workflow_owner(
+                "graduation", waiting[0], action_labels[action], owner_label,
+                f"batch:{action}:{batch_stamp}:{owner_label}", count=len(waiting), actor=account,
+            )
         db.session.commit()
         return jsonify({
             "ok": True,
@@ -20696,7 +20822,10 @@ def filtered_students_query(filters):
     return query
 
 
-def dashboard_stats(filters=None) -> dict:
+COORDINATOR_ROLES = ("academic_coordinator", "research_coordinator")
+
+
+def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     # The dashboard intentionally uses live SQL aggregates instead of cached
     # values so every completed workflow is visible immediately during the demo.
     filters = filters or {}
@@ -20786,6 +20915,7 @@ def dashboard_stats(filters=None) -> dict:
         db.session.query(Task.owner_role, func.count(Task.id))
         .filter(Task.student_id.in_(student_ids) if not empty else False)
         .filter(Task.status.in_(["Pending", "Overdue"]))
+        .filter(owner_task_clause(locked_owner) if locked_owner else true())
         .group_by(Task.owner_role)
         .order_by(func.count(Task.id).desc())
         .all()
@@ -22427,7 +22557,6 @@ def workflow_approvals_payload() -> dict:
             query = query.order_by(LeaveCase.forwarded_at.asc(), LeaveCase.id.asc())
         return query.limit(limit).all()
 
-    adopt_legacy_leave_logs(commit=True)
     standing_pending = {slug: standing_cases(slug, ("Dean Review",)) for slug in LEAVE_SLUGS}
     decided_statuses = ("Leave Scheduled", "On Leave", "Return Due", "Approved", "Denied", "Closed", "Expired", "Returned")
     standing_recent = {slug: standing_cases(slug, decided_statuses, 12, recent=True) for slug in LEAVE_SLUGS}
@@ -22578,14 +22707,17 @@ def onboarding_checklist_state(upload: MonitoringSheetUpload) -> list[dict]:
 
 
 def onboarding_review_dict(item: OnboardingReview) -> dict:
-    checklist = json.loads(item.checklist_json) if item.checklist_json else []
+    # The checklist and counts are worked out from the import every time, so a page view never has to
+    # write them back (a stored copy would go stale as soon as a validation issue is resolved).
+    live = onboarding_review_figures(item.upload) if item.upload else None
+    checklist = live["checklist"] if live else (json.loads(item.checklist_json) if item.checklist_json else [])
     return {
         "id": item.id,
         "upload_id": item.upload_id,
         "program_code": item.program_code,
-        "student_count": item.student_count,
-        "new_student_count": item.new_student_count,
-        "unresolved_issue_count": item.unresolved_issue_count,
+        "student_count": live["student_count"] if live else item.student_count,
+        "new_student_count": live["new_student_count"] if live else item.new_student_count,
+        "unresolved_issue_count": live["unresolved_issue_count"] if live else item.unresolved_issue_count,
         "checklist": checklist,
         "checklist_complete": all(c.get("passed") for c in checklist) if checklist else False,
         "status": item.status,
@@ -22598,22 +22730,43 @@ def onboarding_review_dict(item: OnboardingReview) -> dict:
     }
 
 
+def onboarding_review_figures(upload: MonitoringSheetUpload) -> dict:
+    """The counts and checklist of one import, read from the data (no writes)."""
+    students = Student.query.filter_by(monitoring_upload_id=upload.id).all()
+    return {
+        "checklist": onboarding_checklist_state(upload),
+        "student_count": len(students),
+        "new_student_count": sum(1 for s in students if s.monitoring_new_student),
+        "unresolved_issue_count": MonitoringValidationIssue.query.filter(
+            MonitoringValidationIssue.upload_id == upload.id,
+            MonitoringValidationIssue.status != "Resolved",
+        ).count(),
+    }
+
+
 def build_onboarding_review(upload: MonitoringSheetUpload) -> OnboardingReview:
+    """Make (or bring up to date) the Dean-gate row of one import. A write: imports and the refresh call it."""
     review = OnboardingReview.query.filter_by(upload_id=upload.id).first()
     if review is None:
         review = OnboardingReview(upload_id=upload.id)
         db.session.add(review)
-    students = Student.query.filter_by(monitoring_upload_id=upload.id).all()
-    checklist = onboarding_checklist_state(upload)
+    figures = onboarding_review_figures(upload)
     review.program_code = upload.program_code
-    review.student_count = len(students)
-    review.new_student_count = sum(1 for s in students if s.monitoring_new_student)
-    review.unresolved_issue_count = MonitoringValidationIssue.query.filter(
-        MonitoringValidationIssue.upload_id == upload.id,
-        MonitoringValidationIssue.status != "Resolved",
-    ).count()
-    review.checklist_json = json.dumps(checklist)
+    review.student_count = figures["student_count"]
+    review.new_student_count = figures["new_student_count"]
+    review.unresolved_issue_count = figures["unresolved_issue_count"]
+    review.checklist_json = json.dumps(figures["checklist"])
     return review
+
+
+def ensure_onboarding_reviews(limit: int = 12) -> int:
+    """Give each recent import its onboarding row. Returns how many were made."""
+    made = 0
+    for upload in MonitoringSheetUpload.query.order_by(MonitoringSheetUpload.uploaded_at.desc()).limit(limit).all():
+        if OnboardingReview.query.filter_by(upload_id=upload.id).first() is None:
+            made += 1
+        build_onboarding_review(upload)
+    return made
 
 
 # ---------------------------------------------------------------------------
@@ -23799,7 +23952,6 @@ def reports_payload(filters=None) -> dict:
     ]
     missing_section = section("missing_requirements", len(missing_all), missing_rows)
 
-    adopt_legacy_leave_logs(commit=True)
     leave_query = LeaveCase.query.order_by(LeaveCase.updated_at.desc(), LeaveCase.id.desc())
     leave_query = leave_query.filter(LeaveCase.student_id.in_(student_ids)) if not empty else leave_query.filter(False)
     loa_readmission_rows = []
@@ -24035,7 +24187,6 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         context["graduation_review_windows"] = graduation_school_year_options()
         context["graduation_default_review_window"] = default_graduation_school_year()
     elif slug == "awol":
-        sync_automatic_awol_statuses(commit=True)
         context["roster"] = awol_residency_roster_payload()
         context["residency_reasons"] = RESIDENCY_REASONS
         context["policy_citations"] = AWOL_RESIDENCY_CITATIONS
@@ -24255,13 +24406,28 @@ def student_search_label(student: Student | None) -> str:
     return f"{student.student_number} - {student.last_name}, {student.first_name} - {student.program.code}"
 
 
-def student_directory_brief(student: Student) -> dict:
-    payload = student_brief(student)
-    research_case = (
-        ResearchCase.query.filter_by(student_id=student.id)
-        .order_by(ResearchCase.opened_at.desc())
-        .first()
-    )
+def student_directory_briefs(students: list[Student]) -> list[dict]:
+    """student_directory_brief() for a page of students with the lookups done once for the whole page."""
+    if not students:
+        return []
+    active_term = get_active_term()
+    cases: dict[int, ResearchCase] = {}
+    for case in (
+        ResearchCase.query.filter(ResearchCase.student_id.in_([item.id for item in students]))
+        .order_by(ResearchCase.opened_at.desc()).all()
+    ):
+        cases.setdefault(case.student_id, case)
+    return [student_directory_brief(item, research_case=cases.get(item.id), active_term=active_term) for item in students]
+
+
+def student_directory_brief(student: Student, research_case=_TERM_NOT_GIVEN, active_term=_TERM_NOT_GIVEN) -> dict:
+    payload = student_brief(student, active_term)
+    if research_case is _TERM_NOT_GIVEN:
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id)
+            .order_by(ResearchCase.opened_at.desc())
+            .first()
+        )
     gate = research_case.current_gate if research_case else None
     stage_by_gate = {
         "Form 1 - Title Defense": "Title Defense",
@@ -27744,6 +27910,76 @@ def notify_many(accounts: list[UserAccount], kind: str, title: str, body: str = 
     return sent
 
 
+# ---- a workflow step tells the student and the next owner (I-059) ----------------------------
+# Where each process lives for the student, and the account role behind each owner label.
+STUDENT_PAGE_FOR_WORKFLOW = {
+    "leave-of-absence": "/student/requests/leave-of-absence",
+    "readmission": "/student/requests/readmission",
+    "awol": "/student/requests/awol-return",
+    "awol-return": "/student/requests/awol-return",
+    "withdrawal": "/student/requests/withdrawal",
+    "practicum": "/student/practicum",
+    "graduation": "/student/graduation",
+}
+WORKFLOW_NOTIFICATION_NAMES = {
+    "leave-of-absence": "Leave of absence", "readmission": "Readmission", "awol": "AWOL return",
+    "awol-return": "AWOL return", "withdrawal": "Subject withdrawal", "practicum": "Practicum",
+    "graduation": "Graduation",
+}
+OWNER_LABEL_ACCOUNT_ROLE = {
+    ROLE_LABELS["staff"]: "staff",
+    ROLE_LABELS["dean"]: "dean",
+    ROLE_LABELS["academic_coordinator"]: "academic_coordinator",
+    ROLE_LABELS["research_coordinator"]: "research_coordinator",
+}
+
+
+def notify_workflow_owner(
+    slug: str, student: Student, result: str, next_owner: str | None, key: str, *,
+    count: int = 1, actor: UserAccount | None = None,
+) -> int:
+    """Tell the people of the next owner role that a case now waits for them. Never the person who acted."""
+    role = OWNER_LABEL_ACCOUNT_ROLE.get(normalize_owner_label(next_owner or ""))
+    if not role:
+        return 0
+    name = WORKFLOW_NOTIFICATION_NAMES.get(slug, slug)
+    if count > 1:
+        title, body = f"{count} {name.lower()} cases are waiting for you", result
+    else:
+        title, body = f"{name}: {student.name} is waiting for you", f"{result}."
+    recipients = [row for row in accounts_for_roles(role) if not actor or row.id != actor.id]
+    return notify_many(
+        recipients, "workflow_waiting", title, body, link=f"/workflow/{slug.replace('awol-return', 'awol')}",
+        related_type=slug, related_id=student.id, dedupe_key=f"waiting:{key}",
+    )
+
+
+def notify_workflow_step(
+    slug: str, student: Student | None, result: str, new_status: str | None, next_owner: str | None, key: str, *,
+    student_visible: bool = True, actor: UserAccount | None = None, owner: bool = True,
+) -> int:
+    """One bell notification for the student (what was decided) and one for the next owner.
+
+    ``key`` makes it idempotent per step; a person who made the move is never told about their own move.
+    """
+    if student is None:
+        return 0
+    sent = 0
+    name = WORKFLOW_NOTIFICATION_NAMES.get(slug, slug)
+    if student_visible and not (actor and actor.role == "student"):
+        status_text = f" Status: {new_status}." if new_status else ""
+        owner_text = normalize_owner_label(next_owner or "")
+        next_text = f" Next: {owner_text}." if owner_text and owner_text.lower() not in CASE_CLOSED_OWNER_VALUES else ""
+        sent += notify_many(
+            accounts_for_student(student.id), "workflow_update", f"{name}: {result}"[:180], f"{result}.{status_text}{next_text}",
+            link=STUDENT_PAGE_FOR_WORKFLOW.get(slug), related_type=slug, related_id=student.id,
+            dedupe_key=f"step:{key}",
+        )
+    if owner:
+        sent += notify_workflow_owner(slug, student, result, next_owner, key, actor=actor)
+    return sent
+
+
 # ---- availability requests --------------------------------------------------------------------
 def availability_request_dict(item: AvailabilityRequest) -> dict:
     faculty = item.faculty
@@ -28172,8 +28408,8 @@ def adviser_candidate_list() -> list[dict]:
 
 
 def adviser_tracker_payload(student: Student) -> dict:
-    """Everything the student's 'My research adviser' page shows."""
-    migrate_student_adviser(student)
+    """Everything the student's 'My research adviser' page shows. It only reads: the appointment record is
+    made when the adviser is recorded (import, designation, application) or by the seed."""
     rows = AdviserAppointment.query.filter_by(student_id=student.id).order_by(AdviserAppointment.id.desc()).all()
     active = student_active_appointments(student.id)
     open_row = next((row for row in rows if row.status in ADVISER_OPEN_STATUSES), None)
@@ -28992,6 +29228,16 @@ def generate_reminders(account: UserAccount | None = None, today: date | None = 
                 link="/student/calendar", related_type=item["kind"], dedupe_key=f"deadline_soon:{item['id']}", due_on=parse_date(item["date"]),
             )
     return created
+
+
+def notification_list_payload(account: UserAccount) -> dict:
+    limit = min(max(request.args.get("limit", default=50, type=int), 1), 200)
+    query = Notification.query.filter_by(account_id=account.id)
+    if request.args.get("unread") in {"1", "true"}:
+        query = query.filter(Notification.read_at.is_(None))
+    rows = query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit).all()
+    unread = Notification.query.filter_by(account_id=account.id, read_at=None).count()
+    return {"items": [notification_dict(row) for row in rows], "unread_count": unread}
 
 
 def notification_dict(row: Notification) -> dict:
@@ -33126,11 +33372,14 @@ def readmission_requirements() -> list[str]:
     ]
 
 
-def compute_course_audit(student: Student) -> dict:
+def compute_course_audit(student: Student, *, records: dict | None = None, required_courses: list | None = None) -> dict:
     # Builds the student's curriculum picture from required program subjects and
-    # recorded subject statuses.
-    required_courses = monitoring_curriculum_courses(student.program)
-    records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
+    # recorded subject statuses. A caller that already loaded a page of students' records and curricula
+    # passes them in (see comprehensive_eligibility_for) so the page costs a fixed number of queries.
+    if required_courses is None:
+        required_courses = monitoring_curriculum_courses(student.program)
+    if records is None:
+        records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
     completed = []
     current = []
     missing = []
@@ -37807,6 +38056,9 @@ def build_demo_database() -> dict:
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         sync_leave_cases(commit=True)  # dates move leave cases along
+        ensure_onboarding_reviews()
+        generate_reminders()  # the reminders that are due today (a page view no longer makes them)
+        db.session.commit()
         spread_seed_history()  # last, so nothing is stamped after it: history over the previous weeks
         return sync_result
 

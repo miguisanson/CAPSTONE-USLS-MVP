@@ -1142,6 +1142,13 @@ class NotificationTests(CalendarDataBase):
         self.assertEqual(response.status_code, 200, response.get_json())
         return response.get_json()
 
+    def refreshed_feed(self, client):
+        """The bell asks the server to make the reminders that are due (POST) and then shows the list. A plain
+        GET only reads (I-071), so these reminder tests go through the refresh the bell uses."""
+        response = client.post("/api/notifications/refresh", json={})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return response.get_json()
+
     def test_the_bell_needs_a_sign_in_and_starts_empty(self):
         self.assertEqual(app.test_client().get("/api/notifications").status_code, 401)
         body = self.feed(self.student())
@@ -1208,36 +1215,36 @@ class NotificationTests(CalendarDataBase):
             tomorrow = date.today() + timedelta(days=1)
             self.schedule(self.student_id, "Proposal Defense", day=tomorrow, names=FOUR)
             db.session.commit()
-        first = self.feed(self.student())
-        second = self.feed(self.student())
+        first = self.refreshed_feed(self.student())
+        second = self.refreshed_feed(self.student())
         reminders = [item for item in second["items"] if item["kind"] == "defense_reminder"]
         self.assertEqual(len(reminders), 1)
         self.assertEqual(len(first["items"]), len(second["items"]))
 
     def test_a_panelist_with_no_availability_is_reminded(self):
         self.ready_for_title(["Chair Person", "Content Person", "Unentered Person"])
-        body = self.feed(self.faculty_client("Unentered Person"))
+        body = self.refreshed_feed(self.faculty_client("Unentered Person"))
         self.assertTrue(any(item["kind"] == "availability_missing" for item in body["items"]), body)
-        self.assertEqual(len([i for i in self.feed(self.faculty_client("Unentered Person"))["items"] if i["kind"] == "availability_missing"]), 1)
-        self.assertFalse(any(item["kind"] == "availability_missing" for item in self.feed(self.faculty_client("Chair Person"))["items"]))
+        self.assertEqual(len([i for i in self.refreshed_feed(self.faculty_client("Unentered Person"))["items"] if i["kind"] == "availability_missing"]), 1)
+        self.assertFalse(any(item["kind"] == "availability_missing" for item in self.refreshed_feed(self.faculty_client("Chair Person"))["items"]))
 
     def test_an_adviser_is_reminded_when_a_signature_has_waited_three_days(self):
         with app.app_context():
             files = self.add_file(self.student_id, PROPOSAL, "Proposal manuscript")
             files[0].uploaded_at = datetime.now() - timedelta(days=5)
             db.session.commit()
-        body = self.feed(self.faculty_client("Adviser Person"))
+        body = self.refreshed_feed(self.faculty_client("Adviser Person"))
         self.assertTrue(any(item["kind"] == "signature_waiting" for item in body["items"]), body)
-        self.assertEqual(len([i for i in self.feed(self.faculty_client("Adviser Person"))["items"] if i["kind"] == "signature_waiting"]), 1)
+        self.assertEqual(len([i for i in self.refreshed_feed(self.faculty_client("Adviser Person"))["items"] if i["kind"] == "signature_waiting"]), 1)
 
     def test_the_chair_is_told_when_a_verdict_is_due(self):
         self.ready_for_proposal()
         with app.app_context():
             self.schedule(self.student_id, "Proposal Defense", day=date.today() - timedelta(days=1), names=FOUR)
             db.session.commit()
-        items = self.feed(self.faculty_client("Chair Person"))["items"]
+        items = self.refreshed_feed(self.faculty_client("Chair Person"))["items"]
         self.assertTrue(any(item["kind"] == "verdict_due" for item in items), items)
-        self.assertFalse(any(item["kind"] == "verdict_due" for item in self.feed(self.faculty_client("Content Person"))["items"]))
+        self.assertFalse(any(item["kind"] == "verdict_due" for item in self.refreshed_feed(self.faculty_client("Content Person"))["items"]))
 
     def test_reading_marks_a_notification_and_the_count_follows(self):
         self.ready_for_proposal()
