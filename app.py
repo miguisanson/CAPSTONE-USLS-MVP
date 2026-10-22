@@ -36319,6 +36319,110 @@ def normalize_seed_curricula() -> dict:
     return result
 
 
+# Rows whose timestamps the seed spreads over the previous weeks (I-070). Per table: the column that
+# names the student (or an SQL expression for it), then the timestamp columns in the order they
+# happen; columns in one inner tuple happen together. Nothing here reads the clock's time of day.
+SEED_HISTORY_TABLES = (
+    ("transaction_log", "student_id", (("created_at",),)),
+    ("adviser_appointment", "student_id", (("created_at", "applied_at"), ("adviser_responded_at",), ("updated_at",))),
+    ("adviser_assignment", "student_id", (("assigned_at",),)),
+    ("panel_assignment", "student_id", (("assigned_at",),)),
+    ("panel_invitation", "student_id", (("invited_at",), ("responded_at",))),
+    ("research_evidence_file", "student_id", (("uploaded_at",),)),
+    ("document_check", "student_id", (("updated_at",),)),
+    ("leave_case", "student_id", (
+        ("created_at",), ("submitted_at",), ("forwarded_at",), ("decided_at",), ("started_at",), ("updated_at",),
+    )),
+    ("leave_case_event", "(SELECT student_id FROM leave_case WHERE leave_case.id = leave_case_event.case_id)",
+     (("created_at",),)),
+    ("workflow_message", "student_id", (("created_at",), ("read_at",))),
+    ("awol_case", "student_id", (
+        ("created_at", "automatically_flagged_at"), ("return_requested_at",), ("decided_at",), ("updated_at",),
+    )),
+    ("practicum_record", "student_id", (
+        ("created_at",), ("report_sent_at",), ("dean_reviewed_at",), ("updated_at",),
+    )),
+    ("withdrawal_application", "student_id", (("created_at",), ("decided_at",), ("updated_at",))),
+    ("graduation_endorsement", "student_id", (
+        ("created_at",), ("submitted_at",), ("dean_decision_at",), ("updated_at",),
+    )),
+    ("course_offering_plan", "id", (("created_at",), ("submitted_at",), ("approved_at",), ("updated_at",))),
+    ("term_enrollment", "student_id", (("confirmed_at",),)),
+    ("subject_enrollment", "student_id", (("enrolled_at",), ("updated_at",))),
+)
+
+
+def spread_seed_history(today: date | None = None) -> int:
+    """Move the seed-day timestamps of the demo history to 1-12 weeks before the seed day (I-070).
+
+    Every seeder stamps its rows "now", so on a fresh seed all appointments, activity, tasks and
+    verdicts fell on one day and one second. Each student gets a fixed offset of 7 to 84 days from
+    the seed day (arithmetic on the student's id, no randomness), their rows keep their order a few
+    hours apart, and task due dates and verdict clock times are varied too. Only values stamped on
+    the seed day move; dates the seeders chose (a defense in April, a leave from August) stay, and
+    nothing else is touched. Raw SQL, so no "updated_at" is stamped by the write. Returns the
+    number of values moved.
+    """
+    today = today or date.today()
+    day = today.isoformat()
+    connection = db.session.connection()
+    step_hours = 8.0
+    moved = 0
+    for table, key_expression, groups in SEED_HISTORY_TABLES:
+        columns = [column for group in groups for column in group]
+        rank = {column: position for position, group in enumerate(groups) for column in group}
+        rows = connection.execute(text(
+            f"SELECT id, COALESCE({key_expression}, id) AS history_key, {', '.join(columns)} FROM {table} ORDER BY id"
+        )).fetchall()
+        slots: dict[int, int] = {}
+        for row in rows:
+            key = int(row[1])
+            stamped = [(column, row[2 + index]) for index, column in enumerate(columns)]
+            on_seed_day = [(column, value) for column, value in stamped if value and str(value)[:10] == day]
+            if not on_seed_day:
+                continue
+            slot = slots.get(key, 0)
+            slots[key] = slot + 1
+            offset_days = 7 + (key * 29) % 78  # 7..84 days, i.e. 1 to 12 weeks
+            span_hours = offset_days * 24 - 24
+            anchor = datetime.combine(today - timedelta(days=offset_days), time(8, 0)) + timedelta(minutes=(key * 47) % 600)
+            # a row that already has dates the seeder chose (a leave filed in August) keeps its own
+            # timeline: its seed-day columns sit at the start or the end of those dates
+            chosen = sorted(str(value) for column, value in stamped if value and str(value)[:10] != day)
+            values = {}
+            for column, _value in on_seed_day:
+                if chosen:
+                    values[column] = (chosen[0] if rank[column] == 0 else chosen[-1])
+                    continue
+                position = slot * len(groups) + rank[column]
+                hours = min(position * step_hours, span_hours)
+                values[column] = (anchor + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S.%f")
+            assignments = ", ".join(f"{column} = :{column}" for column in values)
+            connection.execute(text(f"UPDATE {table} SET {assignments} WHERE id = :row_id"), {**values, "row_id": row[0]})
+            moved += len(values)
+
+    # Tasks: due dates 1 to 12 days ahead instead of all within three days (none becomes overdue).
+    for task_id, due in connection.execute(text("SELECT id, due_at FROM task ORDER BY id")).fetchall():
+        if due and today <= date.fromisoformat(str(due)[:10]) <= today + timedelta(days=3):
+            new_due = today + timedelta(days=1 + (task_id * 5) % 12)
+            connection.execute(text("UPDATE task SET due_at = :due WHERE id = :id"), {"due": new_due.isoformat(), "id": task_id})
+            moved += 1
+
+    # Defense verdicts are dated in the past already; give each its own clock time (office hours).
+    for verdict_id, submitted in connection.execute(text("SELECT id, submitted_at FROM defense_verdict ORDER BY id")).fetchall():
+        if submitted:
+            minutes = 9 * 60 + (verdict_id * 53) % 480
+            stamped = datetime.fromisoformat(str(submitted)).replace(hour=minutes // 60, minute=minutes % 60, second=0, microsecond=0)
+            connection.execute(
+                text("UPDATE defense_verdict SET submitted_at = :value WHERE id = :id"),
+                {"value": stamped.strftime("%Y-%m-%d %H:%M:%S.%f"), "id": verdict_id},
+            )
+            moved += 1
+    db.session.commit()
+    db.session.expire_all()
+    return moved
+
+
 def seed_bianca_mendoza_enrollment() -> None:
     """Give the official DBA roster student her current semester/account fixture."""
     student = Student.query.filter_by(student_number="2560052").first()
@@ -37702,6 +37806,7 @@ def build_demo_database() -> dict:
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         sync_leave_cases(commit=True)  # dates move leave cases along
+        spread_seed_history()  # last, so nothing is stamped after it: history over the previous weeks
         return sync_result
 
 
