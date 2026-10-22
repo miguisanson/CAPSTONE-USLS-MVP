@@ -6,11 +6,10 @@ import {
   AlertTriangle,
   ArrowUpRight,
   MapPin,
+  Users,
 } from "lucide-react";
 import { api } from "../../api";
-import { SectionTitle, StatusBadge, ErrorNote } from "../../components/ui";
-import { Field, Input, Textarea, Select } from "../../components/forms";
-import HistoryDisclosure from "../../components/HistoryDisclosure";
+import { Button, Card, Field, HistoryPanel, InlineNotice, Input, SectionCard, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import SlotCheck, { useSlotCheck } from "../../components/scheduling/SlotCheck";
 import AvailabilityRequestPanel, { InvitationChip } from "../../components/scheduling/AvailabilityRequestPanel";
 import { availabilityLabel, isAvailabilityEntered } from "../../components/scheduling/dates";
@@ -214,123 +213,136 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
     submit({ student_id: studentId, ...form, preferred_end_date: window.end || form.preferred_date });
   }
 
+  const submitDisabled = submitting || actionBusy || !schedulableTypes.length || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements) || (overrideNeedsReason && !form.override_reason.trim()) || (activeSchedule && !form.reason.trim()) || check.blocked || softWithoutOverride;
+  const checkbox = "mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500";
+
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle
+    <form onSubmit={onSubmit} className="page-stack">
+      <SectionCard
         title="Coordinate the defense schedule"
         subtitle="Review readiness and the matched panel, compare overlap, then make the final staff decision"
         icon={CalendarCheck}
-      />
-      <section aria-labelledby="student-readiness-heading" className={`rounded-2xl border p-5 ${readiness.ready ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"}`}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p id="student-readiness-heading" className="text-xs font-bold uppercase tracking-wide text-slate-500">Student readiness</p>
-            <h3 className="mt-1 font-display text-lg font-semibold text-ink">{readiness.stage || "Research stage unavailable"}</h3>
-            <p className="mt-1 text-sm text-slate-600">{readiness.research_title || "Research title not recorded"}</p>
-            <p className="mt-1 text-xs text-slate-500">Adviser: {readiness.adviser_name || "Not assigned"}</p>
-          </div>
-          <StatusBadge value={readiness.ready ? "Requirements complete" : readiness.status || "Pending requirements"} />
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {(readiness.requirements || []).map((item) => (
-            <div key={item.item_name} className="flex items-start gap-2 rounded-xl bg-white/90 px-3 py-2.5 ring-1 ring-black/5">
-              {item.status === "Complete" ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}
-              <div><p className="text-sm font-semibold text-slate-700">{item.label || item.item_name}</p><p className="text-xs text-slate-500">{item.status_label || item.status}</p></div>
+      >
+        <section aria-labelledby="student-readiness-heading" className={`rounded-xl border p-4 ${readiness.ready ? "border-brand-200 bg-brand-50/60" : "border-amber-200 bg-amber-50/60"}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p id="student-readiness-heading" className="eyebrow">Student readiness</p>
+              <h3 className="card-title mt-1">{readiness.stage || "Research stage unavailable"}</h3>
+              <p className="mt-1 text-sm text-slate-600">{readiness.research_title || "Research title not recorded"}</p>
+              <p className="meta mt-1">Adviser: {readiness.adviser_name || "Not assigned"}</p>
             </div>
-          ))}
-        </div>
-        {!readiness.ready && (
-          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-amber-300 bg-white px-3.5 py-3 text-sm text-amber-900">
-            <input type="checkbox" checked={form.override_requirements} onChange={(e) => setForm((current) => ({ ...current, override_requirements: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-amber-400" />
-            <span><strong>Staff override:</strong> I reviewed the pending Research Gate requirements and still want to schedule this defense.</span>
-          </label>
-        )}
-      </section>
+            <StatusChip status={readiness.ready ? "Requirements complete" : readiness.status || "Pending requirements"} />
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {(readiness.requirements || []).map((item) => (
+              <div key={item.item_name} className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                {item.status === "Complete" ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-700">{item.label || item.item_name}</p>
+                  <p className="meta">{item.status_label || item.status}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {!readiness.ready && (
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-amber-300 bg-white px-3.5 py-3 text-sm text-amber-900">
+              <input type="checkbox" checked={form.override_requirements} onChange={(e) => setForm((current) => ({ ...current, override_requirements: e.target.checked }))} className={checkbox} />
+              <span><strong>Staff override:</strong> I reviewed the pending Research Gate requirements and still want to schedule this defense.</span>
+            </label>
+          )}
+        </section>
 
-      {stageOutcome && !stageOutcome.complete && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">Last verdict: {stageOutcome.label}</p>
-          <p className="mt-1 text-xs">{stageOutcome.verdict?.follow_up}</p>
-        </div>
-      )}
-      {flaggedSchedule && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">Needs re-confirmation: the panel changed after this defense was booked.</p>
-          <p className="mt-1 text-xs">{flaggedSchedule.conflict_reason}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" disabled={actionBusy} onClick={() => runScheduleAction(() => api.reconfirmDefense(flaggedSchedule.id), "Schedule re-confirmed.")} className="btn-primary cursor-pointer px-3 py-1.5 text-xs">Re-confirm with the new panel</button>
-            <button type="button" disabled={actionBusy} onClick={() => cancelActiveSchedule(flaggedSchedule)} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs">Cancel this booking</button>
+        {stageOutcome && !stageOutcome.complete && (
+          <InlineNotice tone="warning" title={`Last verdict: ${stageOutcome.label}`}>{stageOutcome.verdict?.follow_up}</InlineNotice>
+        )}
+        {flaggedSchedule && (
+          <InlineNotice tone="warning" title="Needs re-confirmation: the panel changed after this defense was booked.">
+            <p>{flaggedSchedule.conflict_reason}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" disabled={actionBusy} onClick={() => runScheduleAction(() => api.reconfirmDefense(flaggedSchedule.id), "Schedule re-confirmed.")}>Re-confirm with the new panel</Button>
+              <Button variant="secondary" size="sm" disabled={actionBusy} onClick={() => cancelActiveSchedule(flaggedSchedule)}>Cancel this booking</Button>
+            </div>
+          </InlineNotice>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="Panel members"
+        subtitle="Matched panel is the default — you can reassign from the full faculty list"
+        icon={Users}
+        action={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <StatusChip status={panelComplete ? "Complete" : "Pending"} label={panelComplete ? `${panel.length} selected` : `${panel.length}/${requiredPanelCount} selected`} />
+            <Button variant="secondary" size="sm" onClick={() => setEditingPanel((value) => !value)}>{editingPanel ? "Close" : "Change panel"}</Button>
           </div>
-        </div>
-      )}
-      <section aria-labelledby="panel-members-heading" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><p id="panel-members-heading" className="text-sm font-semibold text-ink">Panel members</p><p className="text-xs text-slate-500">Matched panel is the default — you can reassign from the full faculty list</p></div>
-          <div className="flex items-center gap-2">
-            <StatusBadge value={panelComplete ? `${panel.length} selected` : `${panel.length}/${requiredPanelCount} selected`} />
-            <button type="button" onClick={() => setEditingPanel((value) => !value)} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs">{editingPanel ? "Close" : "Change panel"}</button>
-          </div>
-        </div>
+        }
+      >
         {editingPanel && (
-          <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
-            <p className="text-xs font-semibold text-brand-700">Reassign the defense panel — pick {requiredPanelCount} faculty from the full directory. This updates the student's official panel for this gate, then availability recomputes.</p>
+          <Card pad="sm" className="space-y-3 border-brand-200 bg-brand-50/50">
+            <p className="text-sm font-semibold text-brand-700">Reassign the defense panel — pick {requiredPanelCount} faculty from the full directory. This updates the student's official panel for this gate, then availability recomputes.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               {Array.from({ length: requiredPanelCount }).map((_, idx) => (
-                <label key={idx} className="block">
-                  <span className="field-label">{panelRoleLabels[idx] || `Panel member ${idx + 1}`}</span>
-                  <select
-                    className="field-input cursor-pointer"
+                <Field key={idx} label={panelRoleLabels[idx] || `Panel member ${idx + 1}`}>
+                  <Select
+                    placeholder="Select faculty…"
                     value={panelEditIds[idx] || ""}
                     onChange={(event) => {
                       const next = [...panelEditIds];
                       next[idx] = event.target.value ? Number(event.target.value) : "";
                       setPanelEditIds(next);
                     }}
-                  >
-                    <option value="">Select faculty…</option>
-                    {facultyDirectory.map((faculty) => (
-                      <option
-                        key={faculty.faculty_id}
-                        value={faculty.faculty_id}
-                        disabled={panelEditIds.includes(faculty.faculty_id) && panelEditIds[idx] !== faculty.faculty_id}
-                      >
-                        {faculty.name}{faculty.specialization ? ` — ${faculty.specialization}` : ""} · {faculty.upcoming_windows} slot{faculty.upcoming_windows === 1 ? "" : "s"} · load {faculty.workload}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={facultyDirectory.map((faculty) => ({
+                      value: faculty.faculty_id,
+                      label: `${faculty.name}${faculty.specialization ? ` — ${faculty.specialization}` : ""} · ${faculty.upcoming_windows} slot${faculty.upcoming_windows === 1 ? "" : "s"} · load ${faculty.workload}`,
+                      disabled: panelEditIds.includes(faculty.faculty_id) && panelEditIds[idx] !== faculty.faculty_id,
+                    }))}
+                  />
+                </Field>
               ))}
             </div>
             <Field label="Reason for changing the panel (required when a panel already exists; recorded, and a booked schedule must then be re-confirmed)">
               <Input value={form.panel_change_reason} onChange={set("panel_change_reason")} placeholder="e.g. external panelist withdrew" />
             </Field>
-            {facultyDirectory.length === 0 && <p className="text-xs text-amber-700">No faculty with an active login are available to assign yet.</p>}
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={updatePanel} disabled={submitting || !panelSelectionValid} className="btn-primary cursor-pointer px-4 py-2 text-sm">{submitting ? "Updating…" : "Update panel"}</button>
-              <button type="button" onClick={() => { setPanelEditIds(panel.map((member) => member.faculty_id)); setEditingPanel(false); }} className="btn-ghost cursor-pointer px-4 py-2 text-sm">Cancel</button>
-              {!panelSelectionValid && <span className="self-center text-xs text-slate-500">Choose {requiredPanelCount} different faculty to enable Update.</span>}
+            {facultyDirectory.length === 0 && <InlineNotice tone="warning">No faculty with an active login are available to assign yet.</InlineNotice>}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={updatePanel} disabled={submitting || !panelSelectionValid}>{submitting ? "Updating…" : "Update panel"}</Button>
+              <Button variant="secondary" onClick={() => { setPanelEditIds(panel.map((member) => member.faculty_id)); setEditingPanel(false); }}>Cancel</Button>
+              {!panelSelectionValid && <span className="meta">Choose {requiredPanelCount} different faculty to enable Update.</span>}
             </div>
-          </div>
+          </Card>
         )}
-        {panel.length ? <div className="grid gap-3 sm:grid-cols-2">
-          {panel.map((member) => {
-            const participant = participants.find((item) => item.faculty_id === member.faculty_id);
-            const invitation = invitations.find((item) => item.faculty_id === member.faculty_id);
-            return <div key={member.id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{member.faculty_name}</p><p className="text-xs font-semibold text-brand-700">{member.panel_role}</p></div><StatusBadge value={isAvailabilityEntered(participant) ? "Entered" : "Not entered"} dot={false} /></div>
-              <p className="mt-3 text-xs text-slate-500">{member.college || "Department not recorded"}</p>
-              <p className="mt-1 text-sm text-slate-700">{member.specialization || "Specialization not recorded"}</p>
-              <p className="mt-1 text-xs text-slate-500">{availabilityLabel(participant)}</p>
-              <InvitationChip invitation={invitation} />
-            </div>;
-          })}
-        </div> : <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">No final panel is available. Complete Panel Matching before scheduling.</div>}
-      </section>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-        <span>Availability comes only from what each person entered (weekly hours and dates) or their connected Google Calendar. Nobody is assumed free. All times are Philippine time.</span>
+        {panel.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {panel.map((member) => {
+              const participant = participants.find((item) => item.faculty_id === member.faculty_id);
+              const invitation = invitations.find((item) => item.faculty_id === member.faculty_id);
+              return (
+                <Card key={member.id} pad="sm" className="rounded-xl">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink">{member.faculty_name}</p>
+                      <p className="meta font-semibold text-brand-700">{member.panel_role}</p>
+                    </div>
+                    <StatusChip status={isAvailabilityEntered(participant) ? "Entered" : "Not entered"} dot={false} size="sm" />
+                  </div>
+                  <p className="meta mt-3">{member.college || "Department not recorded"}</p>
+                  <p className="mt-1 text-sm text-slate-700">{member.specialization || "Specialization not recorded"}</p>
+                  <p className="meta mt-1">{availabilityLabel(participant)}</p>
+                  <InvitationChip invitation={invitation} />
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <InlineNotice tone="warning">No final panel is available. Complete Panel Matching before scheduling.</InlineNotice>
+        )}
+      </SectionCard>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <span className="meta">Availability comes only from what each person entered (weekly hours and dates) or their connected Google Calendar. Nobody is assumed free. All times are Philippine time.</span>
         <span className="flex flex-wrap items-center gap-3">
-          <Link to="/workflow/defense-scheduling?view=calendar" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">Open the defense calendar <ArrowUpRight className="h-3.5 w-3.5" /></Link>
-          <Link to="/faculty" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+          <Link to="/workflow/defense-scheduling?view=calendar" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800">Open the defense calendar <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
+          <Link to="/faculty" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
         </span>
       </div>
       <AvailabilityRequestPanel context={context} studentId={studentId} refetch={refetch} />
@@ -346,75 +358,78 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
         form={form}
         chooseSlot={chooseSlot}
       />
-      <div className="border-t border-slate-200 pt-5"><p className="text-sm font-semibold text-ink">Final schedule</p><p className="text-xs text-slate-500">Only staff can finalize this stage schedule.</p></div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Selected date" required>
-          <Input type="date" value={form.preferred_date} min={availability.today || window.start} max={window.end} onChange={set("preferred_date")} required />
+
+      <SectionCard title="Final schedule" subtitle="Only staff can finalize this stage schedule.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Selected date" required>
+            <Input type="date" value={form.preferred_date} min={availability.today || window.start} max={window.end} onChange={set("preferred_date")} required />
+          </Field>
+          <Field label="Start time" required>
+            <Input type="time" value={form.selected_start} onChange={set("selected_start")} required />
+          </Field>
+          <Field label="End time" required>
+            <Input type="time" value={form.selected_end} min={form.selected_start} onChange={set("selected_end")} required />
+          </Field>
+          <Field label="Defense type" required>
+            <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={schedulableTypes.length ? schedulableTypes : [form.defense_type]} />
+          </Field>
+          {usesManuscriptDate && (
+            <Field label="Date the panel received the manuscript">
+              <Input type="date" value={form.manuscript_received_on} max={availability.today} onChange={set("manuscript_received_on")} />
+            </Field>
+          )}
+          <Field label="Mode" required>
+            <Select value={form.mode} onChange={set("mode")} placeholder="" options={["On-site", "Online", "Hybrid"]} />
+          </Field>
+          <Field label="Venue / meeting link">
+            <div className="relative">
+              <MapPin className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" aria-hidden="true" />
+              <Input className="pl-9" value={form.venue} onChange={set("venue")} placeholder="GS Conference Room / Zoom link" />
+            </div>
+          </Field>
+        </div>
+        <Field label="Scheduling constraints">
+          <Textarea value={form.constraints} onChange={set("constraints")} placeholder="e.g. external panel only available afternoons" />
         </Field>
-        <Field label="Start time" required>
-          <Input type="time" value={form.selected_start} onChange={set("selected_start")} required />
-        </Field>
-        <Field label="End time" required>
-          <Input type="time" value={form.selected_end} min={form.selected_start} onChange={set("selected_end")} required />
-        </Field>
-        <Field label="Defense type" required>
-          <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={schedulableTypes.length ? schedulableTypes : [form.defense_type]} />
-        </Field>
-        {usesManuscriptDate && (
-          <Field label="Date the panel received the manuscript">
-            <Input type="date" value={form.manuscript_received_on} max={availability.today} onChange={set("manuscript_received_on")} />
+        <SlotCheck check={check} />
+        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 text-sm ${softWithoutOverride ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+          <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className={checkbox} />
+          <span><strong>Warning override:</strong> finalize despite the warnings (before the lead time, or a panelist who has not entered availability) and record why. Double-booked panelists or rooms, people outside their entered hours, a declined invitation, and slots in the past cannot be overridden.</span>
+        </label>
+        {overrideNeedsReason && (
+          <Field label="Reason for the staff override (required, recorded with the schedule)" required>
+            <Textarea value={form.override_reason} onChange={set("override_reason")} placeholder="Why is the override justified?" />
           </Field>
         )}
-        <Field label="Mode" required>
-          <Select value={form.mode} onChange={set("mode")} placeholder="" options={["On-site", "Online", "Hybrid"]} />
-        </Field>
-        <Field label="Venue / meeting link">
-          <div className="relative">
-            <MapPin className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
-            <Input className="pl-9" value={form.venue} onChange={set("venue")} placeholder="GS Conference Room / Zoom link" />
+        {leadReference.label && (
+          <p className="meta">Lead time ({leadReference.days} days) is counted from {leadReference.label}{leadReference.date ? `: ${shortDate(leadReference.date)}` : ""}.</p>
+        )}
+        {activeSchedule && (
+          <div className="grid grid-cols-1 gap-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 sm:grid-cols-2">
+            <p className="text-sm font-semibold text-blue-900 sm:col-span-2">This stage is already booked for {shortDate(activeSchedule.preferred_date)}. Saving will reschedule it: the old record is kept and linked.</p>
+            <Field label="Reason for rescheduling" required>
+              <Input value={form.reason} onChange={set("reason")} placeholder="e.g. panelist unavailable" required />
+            </Field>
+            <Field label="Requested by" required>
+              <Select value={form.requested_by} onChange={set("requested_by")} placeholder="" options={context.change_requesters || ["GS Office"]} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Button variant="secondary" size="sm" disabled={actionBusy} onClick={() => cancelActiveSchedule(activeSchedule)}>Cancel this booking instead</Button>
+            </div>
           </div>
+        )}
+        <Field label="Source reference">
+          <Input value={form.source_reference} onChange={set("source_reference")} />
         </Field>
-      </div>
-      <Field label="Scheduling constraints">
-        <Textarea value={form.constraints} onChange={set("constraints")} placeholder="e.g. external panel only available afternoons" />
-      </Field>
-      <SlotCheck check={check} />
-      <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 text-sm ${softWithoutOverride ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-        <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-slate-400" />
-        <span><strong>Warning override:</strong> finalize despite the warnings (before the lead time, or a panelist who has not entered availability) and record why. Double-booked panelists or rooms, people outside their entered hours, a declined invitation, and slots in the past cannot be overridden.</span>
-      </label>
-      {overrideNeedsReason && (
-        <Field label="Reason for the staff override (required, recorded with the schedule)" required>
-          <Textarea value={form.override_reason} onChange={set("override_reason")} placeholder="Why is the override justified?" />
-        </Field>
-      )}
-      {leadReference.label && (
-        <p className="text-xs text-slate-500">Lead time ({leadReference.days} days) is counted from {leadReference.label}{leadReference.date ? `: ${shortDate(leadReference.date)}` : ""}.</p>
-      )}
-      {activeSchedule && (
-        <div className="grid grid-cols-1 gap-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 sm:grid-cols-2">
-          <p className="text-sm font-semibold text-blue-900 sm:col-span-2">This stage is already booked for {shortDate(activeSchedule.preferred_date)}. Saving will reschedule it: the old record is kept and linked.</p>
-          <Field label="Reason for rescheduling" required>
-            <Input value={form.reason} onChange={set("reason")} placeholder="e.g. panelist unavailable" required />
-          </Field>
-          <Field label="Requested by" required>
-            <Select value={form.requested_by} onChange={set("requested_by")} placeholder="" options={context.change_requesters || ["GS Office"]} />
-          </Field>
-          <div className="sm:col-span-2">
-            <button type="button" disabled={actionBusy} onClick={() => cancelActiveSchedule(activeSchedule)} className="btn-ghost cursor-pointer px-3 py-1.5 text-xs">Cancel this booking instead</button>
-          </div>
-        </div>
-      )}
-      <Field label="Source reference">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
-      </Field>
-      <button type="submit" disabled={submitting || actionBusy || !schedulableTypes.length || !form.preferred_date || !panelComplete || (!readiness.ready && !form.override_requirements) || (overrideNeedsReason && !form.override_reason.trim()) || (activeSchedule && !form.reason.trim()) || check.blocked || softWithoutOverride} className="btn-primary w-full sm:w-auto">
-        {submitting || actionBusy ? "Saving..." : activeSchedule ? "Reschedule defense" : isRetry ? "Book the re-defense" : "Set defense schedule"}
-      </button>
-      {!schedulableTypes.length && <p className="text-xs font-semibold text-amber-700">No defense can be booked at this stage right now{stageOutcome && !stageOutcome.complete ? ` (${stageOutcome.label})` : ""}.</p>}
-      {actionMessage && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-4 w-4" /> {actionMessage}</div>}
-      <ErrorNote message={actionError} />
-      <WorkflowSubmitFeedback result={result} error={submitError} />
+        <Button type="submit" loading={submitting || actionBusy} disabled={submitDisabled} className="w-full sm:w-auto">
+          {submitting || actionBusy ? "Saving…" : activeSchedule ? "Reschedule defense" : isRetry ? "Book the re-defense" : "Set defense schedule"}
+        </Button>
+        {!schedulableTypes.length && <p className="text-xs font-semibold text-amber-800">No defense can be booked at this stage right now{stageOutcome && !stageOutcome.complete ? ` (${stageOutcome.label})` : ""}.</p>}
+        {actionMessage && <InlineNotice tone="success" icon={CheckCircle2}>{actionMessage}</InlineNotice>}
+        {actionError && <InlineNotice tone="danger">{actionError}</InlineNotice>}
+        <WorkflowSubmitFeedback result={result} error={submitError} />
+      </SectionCard>
+
       {schedules.length > 0 && <ScheduleHistory schedules={schedules} />}
     </form>
   );
@@ -422,27 +437,25 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
 
 function ScheduleHistory({ schedules }) {
   return (
-    <div className="border-t border-slate-200 pt-5">
-      <HistoryDisclosure label="View schedule history" hideLabel="Hide schedule history" count={schedules.length}>
-        <div className="space-y-2">
-          {schedules.map((schedule) => (
-            <div key={schedule.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
-                <p className="mt-0.5 text-xs text-slate-500">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
-                {schedule.display_conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-700">Warning/override: {schedule.display_conflict_reason}</p>}
-                {schedule.rescheduled_from_id && <p className="mt-1 text-xs text-slate-500">Rescheduled from booking #{schedule.rescheduled_from_id}{schedule.requested_by ? ` · requested by ${schedule.requested_by}` : ""}</p>}
-                {schedule.change_reason && <p className="mt-1 text-xs text-slate-500">Reason: {schedule.change_reason}</p>}
-                {schedule.override_reason && <p className="mt-1 text-xs text-slate-500">Override reason: {schedule.override_reason}</p>}
-                {schedule.panelists?.length > 0 && <p className="mt-1 text-xs text-slate-500">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
-                {(schedule.attention || []).map((line) => <p key={line} className="mt-1 text-xs font-semibold text-amber-800">{line}</p>)}
-                {schedule.ics_url && schedule.is_active && <a href={schedule.ics_url} download className="mt-1 inline-block text-xs font-semibold text-brand-700 hover:underline">Add to calendar (.ics)</a>}
-              </div>
-              <StatusBadge value={schedule.display_status || schedule.status} />
+    <HistoryPanel label="View schedule history" hideLabel="Hide schedule history" count={schedules.length}>
+      <div className="space-y-2">
+        {schedules.map((schedule) => (
+          <div key={schedule.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">{schedule.defense_type || "Defense"} · {shortDate(schedule.preferred_date)} {schedule.start_time ? `· ${timeRange(schedule.start_time, schedule.end_time)}` : ""}</p>
+              <p className="meta mt-0.5">{schedule.mode} · {schedule.venue || "Arrangement pending"} · Forms: {schedule.required_forms_status || "Not recorded"}</p>
+              {schedule.display_conflict_reason && <p className="mt-1 text-xs font-semibold text-amber-800">Warning/override: {schedule.display_conflict_reason}</p>}
+              {schedule.rescheduled_from_id && <p className="meta mt-1">Rescheduled from booking #{schedule.rescheduled_from_id}{schedule.requested_by ? ` · requested by ${schedule.requested_by}` : ""}</p>}
+              {schedule.change_reason && <p className="meta mt-1">Reason: {schedule.change_reason}</p>}
+              {schedule.override_reason && <p className="meta mt-1">Override reason: {schedule.override_reason}</p>}
+              {schedule.panelists?.length > 0 && <p className="meta mt-1">Panel: {schedule.panelists.map((item) => item.name).join(", ")}</p>}
+              {(schedule.attention || []).map((line) => <p key={line} className="mt-1 text-xs font-semibold text-amber-800">{line}</p>)}
+              {schedule.ics_url && schedule.is_active && <a href={schedule.ics_url} download className="mt-1 inline-block text-xs font-semibold text-brand-700 hover:underline">Add to calendar (.ics)</a>}
             </div>
-          ))}
-        </div>
-      </HistoryDisclosure>
-    </div>
+            <StatusChip status={schedule.display_status || schedule.status} />
+          </div>
+        ))}
+      </div>
+    </HistoryPanel>
   );
 }
