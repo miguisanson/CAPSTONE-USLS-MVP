@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, EmptyState, HistoryPanel, InlineNotice, SectionTitle, StatusChip, Stepper } from "../../components/ui/index.js";
-import { ProgressBar } from "../../components/ui";
+import { ProgressBar } from "../../components/ui/ProgressBar.jsx";
 import { stageSteps } from "../../lib/stages";
 import { RESEARCH_GATE_KEYS } from "./shared";
 import { PAGE } from "../../lib/labels.js";

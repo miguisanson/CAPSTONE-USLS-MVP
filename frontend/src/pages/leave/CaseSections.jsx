@@ -1,6 +1,6 @@
 import { CheckCircle2, Circle, Download, FileCheck, FileSpreadsheet, Eye, GraduationCap, History, ListChecks, ShieldCheck, Users } from "lucide-react";
 import { formatDate, formatDateTime } from "../../lib/format";
-import { ProgressBar } from "../../components/ui";
+import { ProgressBar } from "../../components/ui/ProgressBar.jsx";
 import { Button, HistoryPanel, StatusChip } from "../../components/ui/index.js";
 import { Block } from "./leaveUi";
 import { plural, whenDates, whenText } from "./leaveHelpers";

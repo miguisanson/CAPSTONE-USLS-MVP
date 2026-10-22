@@ -21,7 +21,7 @@ import {
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Button, Card, DataTable, EmptyState, HistoryPanel, PageHeader, SectionCard, Spinner, StatCard, StatusChip, Stepper } from "../components/ui/index.js";
-import { ProgressBar } from "../components/ui";
+import { ProgressBar } from "../components/ui/ProgressBar.jsx";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { activityTitle } from "../lib/staffHome.js";
 

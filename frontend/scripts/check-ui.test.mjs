@@ -41,6 +41,18 @@ test("offScaleText: the allowlist lets pages/Login.jsx use text-3xl, and nothing
   assert.equal(count([login]).offScaleText, 2, "without the allowlist both count");
 });
 
+test("the allowlist works for every metric, with a reason, and only for the named file and hit", () => {
+  const allow = {
+    rawTable: { "lib/print.js": { hits: ["<table"], reason: "print window" } },
+    rawH1: { "lib/print.js": { hits: ["<h1"], reason: "print window" } },
+  };
+  const text = `<h1>x</h1><table></table>`;
+  const c = count([file("lib/print.js", text), file("pages/A.jsx", text)], allow);
+  assert.equal(c.rawTable, 1, "only the other file counts");
+  assert.equal(c.rawH1, 1);
+  assert.equal(count([file("lib/print.js", text)]).rawTable, 1, "without the allowlist it counts");
+});
+
 test("rawTable and rawH1: count <table and <h1 tags, not <tbody or <h10", () => {
   const hit = file("pages/A.jsx", `<table className="w-full"><tbody/></table><h1>Title</h1><h1 className="x">T</h1>`);
   const miss = file("pages/B.jsx", `<tablet/><h10/><thead/>`);

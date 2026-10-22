@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, BookOpenCheck, CalendarCheck, CheckCircle2, UserX, Users } from "lucide-react";
 import { Button, Card, Field, InlineNotice, Input, SectionTitle, Select, StatCard, StatusChip } from "../../components/ui/index.js";
-import { Pill } from "../../components/ui";
+import { Pill } from "../../components/ui/Pill.jsx";
 import { toneOf } from "../../lib/tone";
 
 const PANEL_MATCHING_DEFAULT_LIMIT = 15;

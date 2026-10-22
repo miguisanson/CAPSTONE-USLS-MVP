@@ -315,7 +315,7 @@ function ConflictsPanel({ state }) {
                     ) : (
                       <StatusChip
                         status="Needs coordinator action"
-                        tone="warn"
+                        tone="warning"
                         dot={false}
                         label={<><Flag className="h-3 w-3" aria-hidden="true" /> Needs coordinator action</>}
                       />

@@ -1,5 +1,24 @@
 {
   "offScaleText": {
-    "pages/Login.jsx": ["text-3xl"]
+    "pages/Login.jsx": {
+      "hits": ["text-3xl"],
+      "reason": "AD1: the one large title in the app (the Login hero)"
+    }
+  },
+  "rawTable": {
+    "lib/print.js": {
+      "hits": ["<table"],
+      "reason": "AD3: lib/print.js writes a standalone print window; it has no React and no Tailwind"
+    },
+    "pages/MonitoringGrid.jsx": {
+      "hits": ["<table"],
+      "reason": "I-097: the Monitoring Sheet matrix has two header rows and three sticky columns that DataTable does not do"
+    }
+  },
+  "rawH1": {
+    "lib/print.js": {
+      "hits": ["<h1"],
+      "reason": "AD3: standalone print window, no React"
+    }
   }
 }

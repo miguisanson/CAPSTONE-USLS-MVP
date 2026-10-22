@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { FileCheck, Briefcase, CheckSquare, BookOpenCheck } from "lucide-react";
 import { api } from "../../api";
-import { ErrorNote } from "../../components/ui";
-import { Field, Input, Textarea, Select } from "../../components/forms";
+import { Field, InlineNotice, Input, Select, Textarea } from "../../components/ui/index.js";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
 import { GRADUATION_STAGE_ACTIONS, GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchGroups, graduationStageSelection } from "./graduationShared";
 import { WorkflowCaseModal } from "./shared";
@@ -126,7 +125,7 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
       footer={<button type="submit" form="graduation-batch-form" disabled={busy || !action} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applying..." : action ? modalActionLabel : "No action available"}</button>}
     >
       <form id="graduation-batch-form" onSubmit={confirm} className="space-y-4">
-        <ErrorNote message={error} />
+        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
         {accountRole === "dean" && stageAction?.id === "approve" && (
           <Field label="Dean decision" required>
             <Select

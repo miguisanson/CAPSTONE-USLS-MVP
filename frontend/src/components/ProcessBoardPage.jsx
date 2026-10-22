@@ -3,7 +3,7 @@ import { HelpCircle, History, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { formatDateTime } from "../lib/format";
-import { Button, EmptyState, InlineNotice, PageHeader, Spinner } from "./ui/index.js";
+import { Button, EmptyState, InlineNotice, Modal, PageHeader, Spinner } from "./ui/index.js";
 import PolicyRules from "./PolicyRules";
 import StageBoard from "./StageBoard";
 import { GUIDES, PROCESS_CONFIG } from "./processConfig";
@@ -12,7 +12,6 @@ import BatchBar, { BatchResult } from "../pages/leave/BatchBar";
 import CaseCard, { CaseTable } from "../pages/leave/CaseCard";
 import CaseDetailModal from "../pages/leave/CaseDetailModal";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../pages/leave/LeaveFilters";
-import ModalShell from "../pages/leave/ModalShell";
 import {
   EMPTY_FILTERS,
   actionsIntoColumn,
@@ -36,9 +35,8 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
     </div>
   );
   return (
-    <ModalShell
-      id={`${slug}-guide`}
-      size="wide"
+    <Modal
+      size="lg"
       title={`How ${PROCESS_CONFIG[slug].title} works`}
       subtitle="A short guide for students and reviewers"
       onClose={onClose}
@@ -82,15 +80,14 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
           )}
         </div>
       )}
-    </ModalShell>
+    </Modal>
   );
 }
 
 function ActivityWindow({ logs, onClose }) {
   return (
-    <ModalShell
-      id="process-activity"
-      size="wide"
+    <Modal
+      size="lg"
       title="Recent activity"
       subtitle="A timestamped trail of the latest steps and handoffs in this process"
       onClose={onClose}
@@ -119,7 +116,7 @@ function ActivityWindow({ logs, onClose }) {
           ))}
         </ol>
       )}
-    </ModalShell>
+    </Modal>
   );
 }
 

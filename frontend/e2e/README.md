@@ -43,7 +43,7 @@ Set that variable yourself to use another folder.
    - any `/api/*` response with status >= 400 (allow-list in
      `e2e/support/checker.js`, empty, each entry needs a written reason);
    - a failed `/api/*` request;
-   - a visible red error banner (`ErrorNote` in `components/ui.jsx`), a
+   - a visible red error banner (`InlineNotice tone="danger"`), a
      `role="alert"` region, the text "Something went wrong", or the "This page
      is not available yet" screen;
    - horizontal overflow (`scrollWidth > innerWidth + 1`) at any of the three widths;
@@ -125,9 +125,9 @@ means nothing.
 
 ## UI check and component gallery (Phase 5)
 
-`npm run e2e` first runs `npm run check:ui` (`scripts/check-ui.mjs`): a ratchet over
+`npm run e2e` first runs `npm run check:ui:strict` (`scripts/check-ui.mjs --strict`): every count must be 0, over
 `src/` that counts arbitrary text sizes, off-scale sizes, raw `<table>`, `<h1>`, modal
-overlays and local status colour maps. A count may fall, never rise
+overlays and local status colour maps. Files in `check-ui.allow.json` are exempt, each with a reason. A count may fall, never rise
 (`check-ui.baseline.json`); `npm run check:ui:strict` is the end state (all zero).
 Its own test: `npm run test:check-ui`.
 

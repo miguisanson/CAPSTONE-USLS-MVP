@@ -442,7 +442,7 @@ export default function MonitoringGrid() {
                                 <StatusChip status={s.enrollment_tag} size="sm" dot={false} />
                               )}
                               {s.entry_source === "Manual entry" && (
-                                <StatusChip tone="warn" label="Manual" size="sm" dot={false} title="This student was added in the portal rather than imported from a sheet." />
+                                <StatusChip tone="warning" label="Manual" size="sm" dot={false} title="This student was added in the portal rather than imported from a sheet." />
                               )}
                               <StatusChip status={s.risk} size="sm" dot={false} />
                             </span>
@@ -550,7 +550,7 @@ export default function MonitoringGrid() {
                         <p className="mt-1 text-sm">{item.note}</p>
                         <p className="mt-2 text-xs opacity-80">{item.source} · {item.created_by}</p>
                       </div>
-                      <StatusChip tone="warn" label="Open flag" dot={false} />
+                      <StatusChip tone="warning" label="Open flag" dot={false} />
                     </div>
                     {resolvingFlagId === item.id ? (
                       <div className="mt-4 space-y-2 border-t border-amber-200 pt-4">

@@ -1,6 +1,5 @@
-// P1b shim: Field, Input, Textarea and Select now live in ./ui/Field.jsx. RadioRow stays here.
-export { Field, Input, Textarea, Select } from "./ui/Field.jsx";
-
+// A row of pill-shaped choices where exactly one is on. `options` are strings or { value, label }.
+// Moved here from the old components/forms.jsx (Phase 5 P8).
 export function RadioRow({ name, options, value, onChange }) {
   return (
     <div className="flex flex-wrap gap-2">
