@@ -32,9 +32,10 @@ import ProcessBoardPage from "../../components/ProcessBoardPage";
 import { PROCESS_SLUGS } from "../../components/processConfig";
 import { CourseAuditPanel } from "./CourseAudit";
 import { DefenseSchedulingForm } from "./DefenseScheduling";
+import { GraduationRoster } from "./GraduationRoster";
 import { HandoffPanel } from "./HandoffImport";
-import { GraduationRoster, PracticumRoster } from "../WorkflowPage";
 import { PanelMatchingForm } from "./PanelMatching";
+import { PracticumRoster } from "./Practicum";
 import { ResearchGateForm } from "./ResearchGate";
 import { WorkflowSupportModal } from "./shared";
 
