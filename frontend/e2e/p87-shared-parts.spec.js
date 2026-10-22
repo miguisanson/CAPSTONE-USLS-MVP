@@ -100,34 +100,64 @@ const REPORT = {
   ],
 };
 
-async function openSubjectNeeds(page) {
-  await mockGet(page, /\/api\/course-adjustments\/subject-needs-report/, REPORT);
+/** The plan's own demand rows for the report's subjects, so the one subjects table and the report agree (I-117). */
+function demandFor(report, { zero = false } = {}) {
+  return report.rows.map((row) => {
+    const due = zero ? [] : row.students.filter((s) => s.due_next);
+    const delayed = row.course.id === 901 && !zero ? 1 : 0;
+    return {
+      course: { id: row.course.id, code: row.course.code, title: row.course.title, category: row.course.category },
+      demand_count: zero ? 0 : row.need_count,
+      student_sample: [],
+      affected_students: due.map((s, i) => ({ id: s.id, name: s.name, student_number: s.student_number, impact_basis: "Next semester", will_be_delayed: delayed > 0 && i === 0 })),
+      affected_count: due.length,
+      delayed_count: delayed,
+      suggested_sections: 1,
+      availability_count: 0,
+      faculty_candidates: [],
+      priority: "Manual",
+      recommendation: "",
+      demand_status: zero ? "no_demand" : "meets_minimum",
+      offering_status: zero ? null : "Suggested",
+      section_count: 1,
+      offering_notes: "",
+      assigned_faculty_id: null,
+      assigned_faculty_name: null,
+      assignment_status: "Unassigned",
+      selection_source: zero ? "Manual" : "Demand",
+    };
+  });
+}
+
+async function openSubjectNeeds(page, { report = REPORT, zero = false } = {}) {
+  await mockGet(page, /\/api\/course-adjustments\/subject-needs-report/, report);
+  await editGet(page, /\/api\/course-adjustments(\?.*)?$/, (body) => ({ ...body, demand: demandFor(REPORT, { zero }) }));
   await page.goto("/");
   await sidebarLink(page, /Course Adjustments$/).click();
   await expect(page).toHaveURL(/\/course-adjustments/);
-  const card = main(page).locator(".card", { has: page.getByRole("heading", { level: 2, name: "Subject-needs report" }) });
+  const card = main(page).locator(".card", { has: page.getByRole("heading", { level: 2, name: "Course offering decisions" }) });
   await expect(card).toBeVisible();
-  return card;
+  return { card, table: card.getByRole("table", { name: "Course offering decisions" }) };
 }
+const subjectRow = (table, code) => table.locator("tbody tr").filter({ has: table.page().getByRole("button", { name: `Details for ${code}` }) });
 
-test.describe("Subject-needs report (staff, Course Adjustments)", () => {
+// I-117: the report is no longer a second list of the same subjects. Its figures, search, filter, CSV and students live
+// in the one Course offering decisions card (a table row per subject, the students in the row's Details drawer).
+test.describe("Subject needs in the Course offering decisions card (staff, Course Adjustments)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
-  test("heading, program line, four figures, the two meanings and the download", async ({ page }) => {
+  test("program line, four figures, the two meanings and the download", async ({ page }) => {
     test.setTimeout(120_000);
-    const card = await openSubjectNeeds(page);
+    const { card } = await openSubjectNeeds(page);
     await expect(card).toContainText("MAED");
     await expect(card).toContainText("Master of Arts in Education");
     await expect(card).toContainText("planning for ");
     await expect(card).toContainText("generated ");
     // the two meanings
-    await expect(card.getByText("Needing next term.", { exact: false }).first()).toBeVisible();
-    await expect(card.getByText("Not taken yet.", { exact: false }).first()).toBeVisible();
-    // the four figures: label then number
-    for (const [label, value] of [["Students reviewed", "12"], ["Subjects needed next term", "2"], ["Student seats needed", "4"], ["Subjects with a backlog", "3"]]) {
-      const tile = card.getByText(label, { exact: true }).locator("xpath=..");
-      await expect(tile, label).toContainText(value);
-    }
+    await expect(card.getByText("Needing next term:", { exact: false }).first()).toBeVisible(); // CHANGED BY I-117: was "Needing next term." (a sentence in its own box)
+    await expect(card.getByText("Not taken yet:", { exact: false }).first()).toBeVisible(); // CHANGED BY I-117: was "Not taken yet."
+    // the four figures, as one line (CHANGED BY I-117: were four tiles, label then number)
+    await expect(card.getByText("12 students reviewed · 2 subjects needed next term · 4 student seats needed · 3 subjects with a backlog")).toBeVisible();
     // the CSV: one line per student per subject, with a header
     const download = page.waitForEvent("download");
     await card.getByRole("button", { name: "Download CSV" }).click();
@@ -141,82 +171,81 @@ test.describe("Subject-needs report (staff, Course Adjustments)", () => {
     await shotAll(page, "subject-needs");
   });
 
-  test("due subjects, a row's students behind Show students, the scope tabs and the later group", async ({ page }) => {
+  test("one row per subject, due first; the later subjects are a filter; a row's students are behind Details and its scope tabs", async ({ page }) => {
     test.setTimeout(120_000);
-    const card = await openSubjectNeeds(page);
-    // the two due subjects; the later one is hidden behind its toggle
-    await expect(card.getByText("Needed next term · 2 subjects")).toBeVisible();
-    await expect(card.getByText("SPEC 101", { exact: false }).first()).toBeVisible();
-    await expect(card.getByText("SPEC 102", { exact: false }).first()).toBeVisible();
-    await expect(card.getByText("SPEC 201")).toHaveCount(0);
-    const later = card.getByRole("button", { name: /Later in the curriculum · 1 subject nobody needs yet/ });
-    await expect(later).toHaveAttribute("aria-expanded", "false"); // CHANGED BY P87: was "" (not a boolean) when closed
-    await later.click();
-    await expect(later).toHaveAttribute("aria-expanded", "true");
-    await expect(card.getByText("SPEC 201", { exact: false }).first()).toBeVisible();
-    await later.click();
-    await expect(card.getByText("SPEC 201")).toHaveCount(0);
-
-    // a row: counts, then its students in a table
-    const row = card.locator("li", { hasText: "SPEC 101" });
-    await expect(row).toContainText("3 units · Core · 1st Year, 1st Sem");
-    await expect(row).toContainText("Needing next");
-    await expect(row).toContainText("Not taken yet");
-    await expect(row).toContainText("Retakes");
-    await expect(row.getByRole("img", { name: "3 of 12 students" })).toBeVisible();
-    const toggle = row.getByRole("button", { name: "Show students" });
-    await expect(toggle).toHaveAttribute("aria-expanded", "false"); // CHANGED BY P87: was "" when closed
-    await expect(row.getByRole("table")).toHaveCount(0);
-    await toggle.click();
-    await expect(row.getByRole("button", { name: "Hide students" })).toHaveAttribute("aria-expanded", "true");
-    const table = row.getByRole("table");
-    for (const header of ["Student", "Student no.", "Year", "Status"]) {
-      await expect(table.getByRole("columnheader", { name: header, exact: true }), header).toBeVisible();
-    }
-    // default scope: only the students due next term
-    await expect(table.getByRole("row")).toHaveCount(1 + 3);
-    await expect(table.getByRole("row", { name: /Ana Spec/ })).toContainText("Due next term");
-    await expect(table.getByRole("row", { name: /Ben Spec/ })).toContainText("Failed · retake");
-    await expect(table.getByRole("row", { name: /Dan Spec/ })).toHaveCount(0);
-    const due = row.getByRole("button", { name: "Needing next term (3)" });
-    const all = row.getByRole("button", { name: "All who have not taken it (4)" });
-    await expect(due).toHaveAttribute("aria-pressed", "true");
-    await expect(all).toHaveAttribute("aria-pressed", "false");
-    await all.click();
+    const { card, table } = await openSubjectNeeds(page);
+    // every subject once, the ones needed next term first
+    await expect(table.locator("tbody tr")).toHaveCount(3);
+    const order = await table.locator("tbody tr td:first-child p:first-child").allTextContents();
+    expect(order).toEqual(["SPEC 101", "SPEC 102", "SPEC 201"]);
+    // the filter (CHANGED BY I-117: was a "Later in the curriculum" toggle with aria-expanded; now aria-pressed pills)
+    const all = card.getByRole("button", { name: "All subjects (3)" });
+    const due = card.getByRole("button", { name: "Needed next term (2)" });
+    const later = card.getByRole("button", { name: "Later in the curriculum (1)" });
     await expect(all).toHaveAttribute("aria-pressed", "true");
-    await expect(table.getByRole("row")).toHaveCount(1 + 4);
-    await expect(table.getByRole("row", { name: /Dan Spec/ })).toContainText("Later");
+    await due.click();
+    await expect(due).toHaveAttribute("aria-pressed", "true");
+    await expect(table.locator("tbody tr")).toHaveCount(2);
+    await expect(subjectRow(table, "SPEC 201")).toHaveCount(0);
+    await later.click();
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await expect(subjectRow(table, "SPEC 201")).toBeVisible();
+    await all.click();
+
+    // a row: counts (CHANGED BY I-117: "Needing next" and "Not taken yet" are table columns, the retakes sit in the first)
+    const row = subjectRow(table, "SPEC 101");
+    await expect(row.locator("td").nth(1)).toHaveText(/^\s*3\s*1 retake$/);
+    await expect(row.locator("td").nth(2)).toHaveText("4");
+    await expect(card.getByRole("button", { name: "Show students" })).toHaveCount(0); // CHANGED BY I-117: the students are in Details
+    await row.getByRole("button", { name: "Details for SPEC 101" }).click();
+    const drawer = page.getByRole("dialog", { name: /SPEC 101/ });
+    await expect(drawer).toContainText("3 students need it next term");
+    await expect(drawer).toContainText("4 not taken yet");
+    await expect(drawer).toContainText("1 delayed if withheld");
+    const duePill = drawer.getByRole("button", { name: "Needing next term (3)" });
+    const everyone = drawer.getByRole("button", { name: "All who have not taken it (4)" });
+    await expect(duePill).toHaveAttribute("aria-pressed", "true");
+    await expect(everyone).toHaveAttribute("aria-pressed", "false");
+    // default scope: only the students due next term
+    await expect(drawer.getByText("Ana Spec")).toBeVisible();
+    await expect(drawer.getByText("Ana Spec").locator("xpath=ancestor::li[1]")).toContainText("delayed if not offered");
+    await expect(drawer.getByText("Ben Spec").locator("xpath=ancestor::li[1]")).toContainText("Failed · retake");
+    await expect(drawer.getByText("Cora Spec")).toBeVisible();
+    await expect(drawer.getByText("Dan Spec")).toHaveCount(0);
+    await everyone.click();
+    await expect(everyone).toHaveAttribute("aria-pressed", "true");
+    await expect(drawer.getByText("Dan Spec").locator("xpath=ancestor::li[1]")).toContainText("Later");
     await shotAll(page, "subject-needs-open");
   });
 
-  test("search narrows the subjects (and opens a row for a student match); no match says so", async ({ page }) => {
+  test("search narrows the subjects (and names the student it matched); no match says so", async ({ page }) => {
     test.setTimeout(120_000);
-    const card = await openSubjectNeeds(page);
+    const { card, table } = await openSubjectNeeds(page);
     const search = card.getByLabel("Search subjects or students");
     await expect(search).toBeVisible();
     await search.fill("Eva");
-    await expect(card.getByText("SPEC 102", { exact: false }).first()).toBeVisible();
-    await expect(card.getByText("SPEC 101")).toHaveCount(0);
-    // a student match opens that row by itself
-    await expect(card.locator("li", { hasText: "SPEC 102" }).getByRole("table")).toBeVisible();
-    await search.fill("Finn");
-    // a student who only a later subject needs opens the later group
-    await expect(card.getByText("SPEC 201", { exact: false }).first()).toBeVisible();
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await expect(subjectRow(table, "SPEC 102")).toContainText("Student match: Eva Spec");
+    await search.fill("Finn"); // a student only a later subject needs
+    await expect(subjectRow(table, "SPEC 201")).toContainText("Student match: Finn Spec");
+    await search.fill("spec thesis"); // a subject title
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await expect(subjectRow(table, "SPEC 201")).not.toContainText("Student match");
     await search.fill("zzzz-nobody");
     await expect(card.getByText("Nothing matches that search")).toBeVisible();
     await expect(card.getByText("Try a subject code, a title or a student name.")).toBeVisible();
     await search.fill("");
-    await expect(card.getByText("Needed next term · 2 subjects")).toBeVisible();
+    await expect(table.locator("tbody tr")).toHaveCount(3);
   });
 
-  test("a program where nobody needs a subject says so", async ({ page }) => {
+  test("a program where nobody needs a subject still lists its subjects, and the empty group says so", async ({ page }) => {
     test.setTimeout(120_000);
-    await mockGet(page, /\/api\/course-adjustments\/subject-needs-report/, { ...REPORT, summary: { ...REPORT.summary, students_reviewed: 0 }, rows: [] });
-    await page.goto("/");
-    await sidebarLink(page, /Course Adjustments$/).click();
-    const card = main(page).locator(".card", { has: page.getByRole("heading", { level: 2, name: "Subject-needs report" }) });
-    await expect(card.getByText("No subject is waiting on any student")).toBeVisible();
-    await expect(card.getByText("Every reviewed student has completed, or is taking, every subject.")).toBeVisible();
+    const { card, table } = await openSubjectNeeds(page, { report: { ...REPORT, summary: { ...REPORT.summary, students_reviewed: 0 }, rows: [] }, zero: true });
+    await expect(table.locator("tbody tr")).toHaveCount(3); // every curriculum subject stays open to a manual decision
+    await expect(subjectRow(table, "SPEC 101").locator("td").nth(1)).toHaveText("0");
+    await card.getByRole("button", { name: "Needed next term (0)" }).click();
+    await expect(card.getByText("No subject in this group")).toBeVisible();
+    await expect(card.getByText("Choose All subjects to see every curriculum subject.")).toBeVisible();
   });
 });
 

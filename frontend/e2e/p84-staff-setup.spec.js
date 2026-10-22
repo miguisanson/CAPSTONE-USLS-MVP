@@ -140,7 +140,7 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     await expect(tileOf(page, "Selected to offer")).toContainText(String(offered));
 
     // the subject-needs report and the decisions
-    await expect(main(page).getByText("Subject-needs report")).toBeVisible();
+    await expect(main(page).getByText(/students? reviewed/)).toBeVisible(); // CHANGED BY I-117: was the "Subject-needs report" heading; its summary now sits in the one subjects card
     await expect(main(page).getByText("Course offering decisions", { exact: true })).toBeVisible();
     await expect(main(page).locator('input[aria-label^="Sections for "]')).toHaveCount(data.demand.length);
     await expect(main(page).locator('select[aria-label^="Faculty assignment for "]')).toHaveCount(data.demand.length);
@@ -445,13 +445,13 @@ test.describe("P6.5: one header style on the five pages (review F-09)", () => {
 test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-15)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
-  test("one table: subject, demand, decision, sections, faculty; one row per subject, none taller than 96 px on average (two-line subject titles; the old stacked cards were ~250 px)", async ({ page }) => {
+  test("one table: subject, needing next term, not taken yet, decision, sections, faculty; one row per subject, none taller than 96 px on average (two-line subject titles; the old stacked cards were ~250 px)", async ({ page }) => {
     test.setTimeout(120_000);
     const data = await openCourseAdjustments(page);
     const table = main(page).getByRole("table", { name: "Course offering decisions" });
     await expect(table).toBeVisible();
     const heads = await headTexts(table);
-    expect(heads.slice(0, 5)).toEqual(["Subject", "Demand", "Decision", "Sections", "Faculty"]);
+    expect(heads.slice(0, 6)).toEqual(["Subject", "Needing next term", "Not taken yet", "Decision", "Sections", "Faculty"]); // CHANGED BY I-117: was Subject, Demand, Decision, Sections, Faculty
     await expect(table.locator("tbody tr")).toHaveCount(data.demand.length);
     for (const row of data.demand) {
       const line = rowOf(page, table, row.course.code);
@@ -464,7 +464,7 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     expect(box.height / data.demand.length, `average row height ${Math.round(box.height / data.demand.length)} px`).toBeLessThan(96);
     // the stacked cards of the old page are gone
     await expect(main(page).getByText(/^Show the \d+ affected students?$/)).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(4300); // was 4,790 px before P6.5; real subject titles add lines (I-117 merges the two subject lists)
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(3000); // was 4,790 px before P6.5 and ~4,000 before I-117 merged the two subject lists
     for (const view of VIEWS.slice(1)) {
       await page.setViewportSize(view);
       expect(await noOverflow(page), `sideways scroll at ${view.width}`).toBe(true);
@@ -566,6 +566,9 @@ test.describe("I-117: Course Adjustments lists each subject once", () => {
     await expect(main(page).getByRole("button", { name: "Show students" })).toHaveCount(0);
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     expect(height, `page height ${height} px`).toBeLessThan(3000);
+    // the table fits its card at 1366: the Details button is not pushed out of sight (the scroll wrapper is for narrow screens)
+    const clipped = await main(page).locator("[data-table-scroll]").first().evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(clipped, `the table is ${clipped} px wider than its card`).toBeLessThanOrEqual(1);
   });
 
   test("columns: subject, needing next term, not taken yet, decision, sections, faculty, details - with the report's numbers", async ({ page }) => {
