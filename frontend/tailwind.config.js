@@ -19,6 +19,15 @@ export default {
         },
         canvas: "#f4f7f9",
         ink: "#0f172a",
+        // Muted text must reach 4.5:1 on white, the page background (canvas #f4f7f9) and slate-100 (WCAG 1.4.3; I-092).
+        // Tailwind's slate-500 (#64748b) is 4.42:1 on canvas and slate-400 (#94a3b8) is 2.4:1, and both are used as
+        // muted text all over the app, so the two steps are darkened here once instead of editing every page:
+        // 400 = 5.7:1 on white / 5.3 on canvas / 5.2 on slate-100 / 4.6 on slate-200; 500 = 6.6:1 on white. Backgrounds that use
+        // bg-slate-400 (status dots) get the same darker grey.
+        slate: {
+          400: "#586880",
+          500: "#4e5e74",
+        },
       },
       fontFamily: {
         sans: ["'Open Sans'", "ui-sans-serif", "system-ui", "sans-serif"],
