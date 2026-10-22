@@ -10,11 +10,15 @@ normal start writes nothing; the same holds for a page view. Two bugs broke it:
   The page view itself is covered by frontend/e2e/p90-reads.spec.js; here the server side is
   pinned: the board's GET answers without writing, and the explicit sync endpoint still works.
 """
+import itertools
 import os
+import re
 import sqlite3
 import tempfile
 import threading
 import unittest
+
+from sqlalchemy import event
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
@@ -34,6 +38,19 @@ from app import (  # noqa: E402
 )
 
 PASSWORD = "DemoPass123!"
+
+# Sign-in accounts, one per role (the demo accounts every seeded database has).
+ROLE_EMAILS = {
+    "staff": "staff@usls.edu.ph", "dean": "dean@usls.edu.ph", "academic_coordinator": "academic@usls.edu.ph",
+    "research_coordinator": "research@usls.edu.ph", "admin": "admin@usls.edu.ph",
+    "faculty": "liwayway.bautista@usls.edu.ph", "student": "student@usls.edu.ph",
+}
+# A GET that is allowed to write, each with its reason. Keep this list short.
+GET_WRITES_ALLOWED = (
+    # Downloading the Registrar sheet of a residency case records that the report was generated (an export
+    # audit row, like the other Registrar exports). It is a download, not a page view.
+    re.compile(r"^/api/residency/\d+/registrar-report$"),
+)
 
 
 def dump_database() -> dict:
@@ -181,6 +198,64 @@ class ReadsDoNotWriteTests(unittest.TestCase):
         response = client.post("/api/leave-cases/sync", json={})
         self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
         self.assertTrue(response.get_json()["ok"])
+
+    def test_no_get_route_of_any_role_writes(self):
+        """The sweep behind I-071: every GET a role can reach, with ids and process names filled in, issues no
+        INSERT, UPDATE or DELETE (not even one that is rolled back). Signing in is a POST and is not counted."""
+        routes = set()
+        for rule in app.url_map.iter_rules():
+            if "GET" not in rule.methods or rule.endpoint == "static":
+                continue
+            if not rule.arguments:
+                routes.add(rule.rule)
+                continue
+            options = []
+            for name in rule.arguments:
+                kind = rule._converters[name].__class__.__name__
+                if kind == "IntegerConverter":
+                    options.append([(name, 1), (name, 3)])
+                elif name in ("slug", "case_type"):
+                    options.append([(name, value) for value in (
+                        "leave-of-absence", "readmission", "practicum", "withdrawal", "graduation", "awol",
+                        "research-gate", "student-handoff")])
+                else:
+                    options = None
+                    break
+            if options is None:
+                continue
+            for combo in itertools.product(*options):
+                routes.add(app.url_map.bind("localhost").build(rule.endpoint, dict(combo)))
+        self.assertGreater(len(routes), 100)
+        writes, current = [], {}
+
+        def trace(conn, cursor, statement, parameters, context, executemany):
+            if statement.lstrip()[:6].upper() in ("INSERT", "UPDATE", "DELETE"):
+                writes.append((current["role"], current["url"], statement.strip().splitlines()[0][:80]))
+
+        clients = {role: sign_in(email) for role, email in ROLE_EMAILS.items()}
+        with app.app_context():
+            event.listen(db.engine, "before_cursor_execute", trace)
+        try:
+            for role, client in clients.items():
+                for url in sorted(routes):
+                    if url.startswith("/api/auth/"):
+                        continue
+                    if any(pattern.match(url) for pattern in GET_WRITES_ALLOWED):
+                        continue
+                    current.update(role=role, url=url)
+                    client.get(url)
+        finally:
+            with app.app_context():
+                event.remove(db.engine, "before_cursor_execute", trace)
+        self.assertEqual(sorted(set(writes)), [])
+
+    def test_the_explicit_refresh_actions_work(self):
+        """The sweeps a GET used to run (I-071) are now these two POSTs."""
+        client = sign_in("staff@usls.edu.ph")
+        response = client.post("/api/maintenance/refresh", json={})
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+        self.assertTrue(response.get_json()["ok"])
+        self.assertEqual(client.post("/api/notifications/refresh", json={}).status_code, 200)
 
 
 if __name__ == "__main__":
