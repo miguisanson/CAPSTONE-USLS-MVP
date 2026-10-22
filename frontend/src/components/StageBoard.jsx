@@ -318,7 +318,7 @@ export default function StageBoard({
 // The line every board carries above its filters: how many cards are in each column ("1 submitted, 2 on leave") and how
 // a card is moved. Process boards, Practicum and Graduation all use it, so the boards read alike (IM24).
 export function boardSummaryLine(columns, totals, noun) {
-  const parts = columns.filter((column) => (totals[column.key] || 0) > 0).map((column) => `${totals[column.key]} ${column.label.toLowerCase()}`);
+  const parts = columns.filter((column) => (totals[column.key] || 0) > 0).map((column) => `${totals[column.key]} ${column.label}`); // a stage name stays as written: "AWOL", "With the Dean"
   return parts.length ? parts.join(", ") : `No ${noun} yet`;
 }
 

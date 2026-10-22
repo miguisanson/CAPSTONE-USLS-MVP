@@ -284,13 +284,17 @@ class LeaveCaseTests(unittest.TestCase):
             self.assertEqual(case.target_term.label, "Term Three")
             self.assertEqual(case.return_intent, "I am ready")  # old rows lost the final period
 
-    def test_staff_roster_helper_reads_cases_and_adopts_old_rows_on_the_fly(self):
+    def test_staff_roster_helper_reads_cases_and_old_rows_are_adopted_by_the_explicit_sweep(self):
         with app.app_context():
             add_log("leave-of-absence", self.student_id, "Student", "Structured LOA portal form",
                     "LOA application submitted", "GS Staff",
                     "Requested period: Term One to Term One.\nReason/remarks: Family.",
                     new_status="Submitted")
             db.session.commit()
+            # reading the roster writes nothing (I-071), so an old log-only row is not a case yet
+            self.assertEqual(submitted_request_students("leave-of-absence"), [])
+            self.assertEqual(LeaveCase.query.count(), 0)
+            adopt_legacy_leave_logs(commit=True)
             rows = submitted_request_students("leave-of-absence")
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["status"], "Submitted")

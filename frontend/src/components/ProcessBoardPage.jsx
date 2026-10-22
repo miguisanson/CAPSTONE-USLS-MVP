@@ -130,10 +130,13 @@ function ActivityWindow({ logs, onClose }) {
  * steps, same request window, same Registrar follow-up block. A process only brings its
  * stages, steps and card fields (from the server) and a few extras (processConfig.jsx).
  *
+ * `headerBadge` is the chip beside the title (the Dean's pages pass "N waiting"); `config.deanDescription` is the
+ * Dean's own one-line description (finding 10, IM24).
+ *
  * Every move, from every place, goes through `submitTransition`, which makes the one
  * guarded call (api.processCaseTransition). The server refuses anything illegal again.
  */
-export default function ProcessBoardPage({ slug, onChanged = null }) {
+export default function ProcessBoardPage({ slug, onChanged = null, headerBadge = null }) {
   const config = PROCESS_CONFIG[slug];
   const { user } = useAuth();
   const role = user?.role || "";
@@ -407,8 +410,9 @@ export default function ProcessBoardPage({ slug, onChanged = null }) {
       {/* Header: the same in every process */}
       <PageHeader
         title={config.title}
-        description={config.description}
+        description={(role === "dean" && config.deanDescription) || config.description}
         icon={Icon}
+        badge={headerBadge}
         actions={
           <>
             <Button variant="secondary" icon={HelpCircle} onClick={() => setSupport("guide")}>How this works</Button>
