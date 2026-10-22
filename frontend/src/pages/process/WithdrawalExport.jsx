@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { api } from "../../api";
-import { ErrorNote, StatusBadge } from "../../components/ui";
+import { Button, DataTable, InlineNotice, Modal, StatusChip } from "../../components/ui/index.js";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
-import ModalShell from "../leave/ModalShell";
 import { plural } from "../leave/leaveHelpers";
 
 const TAGGED = "Subject Tagged - Registrar Preparation";
@@ -76,6 +75,63 @@ export default function WithdrawalExport({ ctx }) {
     }
   }
 
+  const columns = [
+    {
+      key: "tick",
+      width: "2.5rem",
+      header: <span className="sr-only">Tick</span>,
+      cell: (item) => (
+        <input
+          type="checkbox"
+          checked={selected.has(item.id)}
+          onChange={() => toggle(item.id)}
+          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          aria-label={`Tick ${item.student.name}`}
+        />
+      ),
+    },
+    {
+      key: "student",
+      header: "Student",
+      cell: (item) => (
+        <>
+          <p className="font-semibold text-ink">{item.student.name}</p>
+          <p className="meta">{item.student.student_number} · {item.student.program_code}</p>
+        </>
+      ),
+    },
+    {
+      key: "subject",
+      header: "Subject",
+      cell: (item) => (
+        <>
+          <p className="font-semibold text-slate-700">{item.subject?.code || "Subject pending"}</p>
+          <p className="meta">{item.subject?.title || ""}</p>
+        </>
+      ),
+    },
+    {
+      key: "term",
+      header: "Semester / deadline",
+      cell: (item) => (
+        <div className="text-xs text-slate-600">
+          <p className="font-semibold">{item.term_label || "Not recorded"}</p>
+          <p>Deadline: {item.window?.deadline || "Not recorded"}</p>
+        </div>
+      ),
+    },
+    {
+      key: "fee",
+      header: "Fee",
+      cell: (item) => (
+        <span className="text-xs font-semibold text-brand-700">
+          {item.window?.fee_percent != null ? `${item.window.fee_percent}% of term (${item.window.fee_tier})` : "Fee not stated"}
+        </span>
+      ),
+    },
+    { key: "status", header: "Status", cell: (item) => <StatusChip status={item.status_label} dot={false} /> },
+  ];
+
   return (
     <>
       {ctx.isStaff && (
@@ -85,7 +141,7 @@ export default function WithdrawalExport({ ctx }) {
               <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <h3 id="registrar-heading" className="text-base font-semibold text-ink">Registrar list</h3>
+              <h3 id="registrar-heading" className="card-title">Registrar list</h3>
               <p className="mt-0.5 text-sm text-slate-600">
                 Dean-approved withdrawals whose subject is tagged go to the Registrar. The portal does not send any email: download the
                 Excel list, email it through the official channel, and wait for the Registrar to acknowledge.
@@ -94,9 +150,7 @@ export default function WithdrawalExport({ ctx }) {
                 <p className="mt-3 text-sm text-slate-500">Nothing to send to the Registrar yet. Tagged withdrawals appear here.</p>
               ) : (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button type="button" onClick={openPicker} className="btn-primary px-4 py-2">
-                    <FileSpreadsheet className="h-4 w-4" /> Prepare Excel export
-                  </button>
+                  <Button icon={FileSpreadsheet} onClick={openPicker}>Prepare Excel export</Button>
                   <p className="text-sm text-slate-600">
                     {plural(pending.length, "tagged withdrawal")} waiting for the Excel list
                     {rows.length > pending.length ? `, ${plural(rows.length - pending.length, "withdrawal")} already exported` : ""}.
@@ -109,19 +163,19 @@ export default function WithdrawalExport({ ctx }) {
       )}
 
       {open && (
-        <ModalShell
-          id="withdrawal-registrar-handoff"
-          size="wide"
+        <Modal
+          size="xl"
           title="Approved subject withdrawals"
           subtitle={`${plural(selected.size, "request")} ticked · export the Excel list for the manual Registrar email`}
           onClose={close}
+          dismissible={!busy}
           closeLabel="Close the export window"
           footer={
             <>
-              <button type="button" onClick={close} disabled={busy} className="btn-ghost px-4 py-2">Close</button>
-              <button type="button" onClick={download} disabled={busy || !selected.size} className="btn-primary px-4 py-2">
-                <Download className="h-4 w-4" /> {busy ? "Exporting..." : "Download Excel list"}
-              </button>
+              <Button variant="secondary" onClick={close} disabled={busy}>Close</Button>
+              <Button icon={Download} loading={busy} onClick={download} disabled={busy || !selected.size}>
+                {busy ? "Exporting..." : "Download Excel list"}
+              </Button>
             </>
           }
         >
@@ -129,58 +183,17 @@ export default function WithdrawalExport({ ctx }) {
             <p className="text-sm text-slate-600">
               Every ticked subject already shows Withdrawn in Official Offered Subjects. Fees are settled with the Business Office.
             </p>
-            <div aria-live="polite"><ErrorNote message={error} /></div>
-            {rows.length === 0 ? (
-              <p className="text-sm text-slate-500">No tagged withdrawals yet.</p>
-            ) : (
-              <div className="relative overflow-x-auto rounded-xl border border-slate-200">
-                <table className="w-full min-w-[40rem] text-left text-sm">
-                  <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th scope="col" className="w-10 px-3 py-2.5"><span className="sr-only">Tick</span></th>
-                      <th scope="col" className="px-3 py-2.5">Student</th>
-                      <th scope="col" className="px-3 py-2.5">Subject</th>
-                      <th scope="col" className="px-3 py-2.5">Semester / deadline</th>
-                      <th scope="col" className="px-3 py-2.5">Fee</th>
-                      <th scope="col" className="px-3 py-2.5">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {rows.map((item) => (
-                      <tr key={item.id} className={selected.has(item.id) ? "bg-emerald-50/40" : ""}>
-                        <td className="px-3 py-3 align-top">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(item.id)}
-                            onChange={() => toggle(item.id)}
-                            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                            aria-label={`Tick ${item.student.name}`}
-                          />
-                        </td>
-                        <td className="px-3 py-3 align-top">
-                          <p className="font-semibold text-ink">{item.student.name}</p>
-                          <p className="text-xs text-slate-500">{item.student.student_number} · {item.student.program_code}</p>
-                        </td>
-                        <td className="px-3 py-3 align-top">
-                          <p className="font-semibold text-slate-700">{item.subject?.code || "Subject pending"}</p>
-                          <p className="text-xs text-slate-500">{item.subject?.title || ""}</p>
-                        </td>
-                        <td className="px-3 py-3 align-top text-xs text-slate-600">
-                          <p className="font-semibold">{item.term_label || "Not recorded"}</p>
-                          <p>Deadline: {item.window?.deadline || "Not recorded"}</p>
-                        </td>
-                        <td className="px-3 py-3 align-top text-xs font-semibold text-emerald-700">
-                          {item.window?.fee_percent != null ? `${item.window.fee_percent}% of term (${item.window.fee_tier})` : "Fee not stated"}
-                        </td>
-                        <td className="px-3 py-3 align-top"><StatusBadge value={item.status_label} dot={false} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+            <DataTable
+              caption="Approved subject withdrawals"
+              columns={columns}
+              rows={rows}
+              minWidth="md"
+              pageSize={0}
+              empty={{ title: "No tagged withdrawals yet" }}
+            />
           </div>
-        </ModalShell>
+        </Modal>
       )}
 
       {followUp && (
