@@ -1,5 +1,20 @@
 # State
 
+## CURRENT RUN (2026-10-22, v5.3) — read this first
+
+- **Branch:** `v5.3-migui_test` (from `v5.2-migui_again` @ c426b6f, pushed). Owner decisions IM25-IM27 (4 helpers, agent decides everything, bolder improvements allowed).
+- **In flight (worktrees in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`; each `frontend/node_modules` is a JUNCTION to the main checkout — before `git worktree remove`, run `cmd //c rmdir <wt>rontend
+ode_modules` so the main node_modules is not deleted):**
+  - `be` / `pkt/be` — backend P1 bugs I-010, I-012, I-005, I-002 (test commit then fix commit each; new `tests/test_section_j_backend.py`). The only app.py editor.
+  - `fac` / `pkt/fac` — Phase 5 P5.1+P5.2 faculty pages (spec `e2e/p51-faculty.spec.js`, port 5302).
+  - `mon` / `pkt/mon` — Phase 5 P6.4 MonitoringGrid/EnrollmentClassList/AdviserRecordCard (spec `e2e/p64-monitoring-pages.spec.js`, port 5303).
+  - `wf` / `pkt/wf` — Phase 5 P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/` (port 5304).
+  - `review` (detached, read-only) — one-time Fable full review -> `E:/Temp/claude/review53/FULL-REVIEW.md` (port 5310).
+  - web UX research (Sonnet, read-only) -> `E:/Temp/claude/review53/UX-RESEARCH.md`.
+- **Baseline gate** on v5.3 start: running -> `E:/Temp/claude/gate53/baseline.txt`.
+- **Next:** review + merge each packet one at a time (gate after each), file the Fable findings into ISSUES.md and plan the next waves from them.
+
+
 ## HANDOVER FOR THE NEXT SESSION / ACCOUNT (kept current; read this first)
 
 Session closed by the owner on 2026-10-17 evening (their usage limit resets Thursday, not today). The next session starts with
