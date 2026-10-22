@@ -12504,23 +12504,8 @@ def register_routes(app: Flask) -> None:
             LOGIN_THROTTLE.record_failure(email, client_ip)
             return no_store(jsonify({"error": "Incorrect email or password."})), 401
         LOGIN_THROTTLE.record_success(email, client_ip)
-        if demo_mode_enabled():
-            _, demo_config = workflow_demo_config_for_student(account.student)
-            if demo_config:
-                try:
-                    # Logging in repairs prerequisite source data but deliberately keeps
-                    # the current workflow progress. The adjacent Reset button clears it.
-                    ensure_workflow_demo_student_baseline(account.student, demo_config["workflow"])
-                    db.session.commit()
-                except Exception as exc:  # noqa: BLE001
-                    db.session.rollback()
-                    return jsonify({"error": f"Could not prepare the demo account: {exc}"}), 400
-        try:
-            # Start leaves that begin today and flag leaves that are ending (idempotent).
-            sync_leave_cases(commit=True)
-        except Exception:  # noqa: BLE001 - signing in must never fail because of this
-            db.session.rollback()
-            app.logger.exception("Leave date sweep failed at sign-in")
+        # Signing in writes nothing (I-072). The demo personas' prerequisites are built by the seed and
+        # repaired by their Reset button; the leave-date sweep runs from POST /api/maintenance/refresh.
         session.clear()  # a fresh session on every sign-in (no session fixation)
         session["account_id"] = account.id
         session["role"] = account.role
