@@ -30,7 +30,11 @@ import AdviserAppointments from "../AdviserAppointments";
 import CalendarPage from "../../components/calendar/CalendarPage";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
 import { PROCESS_SLUGS } from "../../components/processConfig";
-import { CourseAuditPanel, DefenseSchedulingForm, GraduationRoster, HandoffPanel, PanelMatchingForm, PracticumRoster, ResearchGateForm } from "../WorkflowPage";
+import { CourseAuditPanel } from "./CourseAudit";
+import { HandoffPanel } from "./HandoffImport";
+import { DefenseSchedulingForm, GraduationRoster, PracticumRoster } from "../WorkflowPage";
+import { PanelMatchingForm } from "./PanelMatching";
+import { ResearchGateForm } from "./ResearchGate";
 import { WorkflowSupportModal } from "./shared";
 
 // Which business-rules process each workflow screen applies.
