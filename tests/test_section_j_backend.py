@@ -239,7 +239,7 @@ class SectionJBackendTests(unittest.TestCase):
                 ))
             db.session.commit()
 
-        reset = app.test_client().post("/api/auth/demo-students/enrollment-clarissa/reset", json={})
+        reset = self._role_client(staff_id, "staff").post("/api/auth/demo-students/enrollment-clarissa/reset", json={})
         self.assertEqual(reset.status_code, 200, reset.get_json())
 
         staff = self._role_client(staff_id, "staff")

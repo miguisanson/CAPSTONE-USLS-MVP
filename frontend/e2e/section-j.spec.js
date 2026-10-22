@@ -31,7 +31,7 @@ async function okJson(res, what) {
 }
 
 async function resetDemoStudent(playwright, key) {
-  const ctx = await playwright.request.newContext({ baseURL: BASE_URL });
+  const ctx = await apiAs(playwright, "staff@usls.edu.ph"); // the reset needs a signed-in session (I-055)
   await okJson(await ctx.post(`/api/auth/demo-students/${key}/reset`, { data: {} }), `reset ${key}`);
   await ctx.dispose();
 }

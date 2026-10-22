@@ -241,7 +241,7 @@ def capture_course_adjustments(
 
 
 def reset_standing_demos(page: Page, base_url: str) -> None:
-    page.context.clear_cookies()
+    sign_in(page, base_url, "staff", "staff@usls.edu.ph")  # the reset needs a signed-in session (I-055)
     for demo_key in STANDING_DEMO_KEYS:
         checked_json(
             page.request.post(
@@ -494,6 +494,7 @@ def capture_residency_flow(
     base_url: str,
     output_dir: Path,
 ) -> None:
+    sign_in(page, base_url, "staff", "staff@usls.edu.ph")  # the reset needs a signed-in session (I-055)
     checked_json(
         page.request.post(
             f"{base_url}/api/auth/demo-students/residency-nicolas/reset",
@@ -501,7 +502,6 @@ def capture_residency_flow(
         ),
         "Reset residency demo",
     )
-    sign_in(page, base_url, "staff", "staff@usls.edu.ph")
     open_screen(page, base_url, "/workflow/awol")
     capture(page, output_dir, "awol_residency_staff")
 

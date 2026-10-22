@@ -76,3 +76,6 @@ uploads/policy_documents/*Operations*Manual*
 frontend/e2e-artifacts/
 frontend/playwright-report/
 frontend/test-results/
+
+# Per-install runtime files (the generated session secret key)
+instance/

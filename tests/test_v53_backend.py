@@ -1,0 +1,205 @@
+"""v5.3 review fixes, backend side (FULL-REVIEW-2026-10-22.md: F-01..F-04, F-19, I-036).
+
+One seeded demo database is built once for the whole module (seeding is slow) and
+every test only reads it or leaves it as it found it. The DATABASE_URL points at a
+temp SQLite file before ``app`` is imported, the way tests/test_section_j_backend.py does.
+"""
+import os
+import re
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+_DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
+_DB_FILE.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
+os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
+
+from app import (  # noqa: E402
+    LOGIN_THROTTLE,
+    ROLE_TRANSACTION_ACCESS,
+    PracticumRecord,
+    Student,
+    StudentRequestAttachment,
+    Task,
+    UserAccount,
+    app,
+    db,
+    resolve_secret_key,
+    seed_database,
+    task_dict,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEMO_PASSWORD = "DemoPass123!"
+STAFF_EMAIL = "staff@usls.edu.ph"
+
+
+class V53BackendTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        app.config.update(TESTING=True)
+        with app.app_context():
+            seed_database()
+            cls.admin_id = UserAccount.query.filter_by(role="admin").first().id
+            cls.academic_id = UserAccount.query.filter_by(role="academic_coordinator").first().id
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            with app.app_context():
+                db.session.remove()
+                db.engine.dispose()
+            os.unlink(_DB_FILE.name)
+        except (FileNotFoundError, PermissionError):
+            pass
+
+    def setUp(self):
+        LOGIN_THROTTLE.reset()
+
+    tearDown = setUp
+
+    # ------------------------------------------------------------------ helpers
+    @staticmethod
+    def _login(email, password=DEMO_PASSWORD, ip="10.0.0.1", client=None):
+        client = client or app.test_client()
+        response = client.post(
+            "/api/auth/login", json={"email": email, "password": password},
+            environ_overrides={"REMOTE_ADDR": ip},
+        )
+        return client, response
+
+    @staticmethod
+    def _role_client(account_id, role):
+        client = app.test_client()
+        with client.session_transaction() as session:
+            session["account_id"] = account_id
+            session["role"] = role
+        return client
+
+    # ------------------------------------------------------------------ I-055 (F-01)
+    def test_demo_student_reset_needs_a_signed_in_session(self):
+        with patch.dict(os.environ, {"DEMO_MODE": "1"}):
+            anonymous = app.test_client().post("/api/auth/demo-students/practicum-andrea/reset", json={})
+            self.assertEqual(anonymous.status_code, 401, anonymous.get_json())
+            client, response = self._login(STAFF_EMAIL)
+            self.assertEqual(response.status_code, 200, response.get_json())
+            signed_in = client.post("/api/auth/demo-students/practicum-andrea/reset", json={})
+            self.assertEqual(signed_in.status_code, 200, signed_in.get_json())
+
+    # ------------------------------------------------------------------ I-056 (F-02)
+    def test_wrong_passwords_from_one_address_never_block_the_right_password_from_another(self):
+        clock = {"now": 1000.0}
+        with patch.object(LOGIN_THROTTLE, "clock", lambda: clock["now"]):
+            for _ in range(7):
+                self._login(STAFF_EMAIL, "wrong-password", ip="10.0.0.1")
+            _, other_address = self._login(STAFF_EMAIL, ip="10.0.0.2")
+            self.assertEqual(other_address.status_code, 200, other_address.get_json())
+
+    def test_throttle_is_a_short_growing_delay_not_a_five_minute_lock(self):
+        clock = {"now": 1000.0}
+        with patch.object(LOGIN_THROTTLE, "clock", lambda: clock["now"]):
+            for _ in range(7):
+                self._login(STAFF_EMAIL, "wrong-password", ip="10.0.0.1")
+            _, blocked = self._login(STAFF_EMAIL, ip="10.0.0.1")
+            self.assertEqual(blocked.status_code, 429, blocked.get_json())
+            retry = int(blocked.headers["Retry-After"])
+            self.assertTrue(1 <= retry <= 30, retry)
+            clock["now"] += 31
+            _, allowed = self._login(STAFF_EMAIL, ip="10.0.0.1")
+            self.assertEqual(allowed.status_code, 200, allowed.get_json())
+
+    def test_throttle_delay_doubles_and_stops_at_thirty_seconds(self):
+        clock = {"now": 1000.0}
+        with patch.object(LOGIN_THROTTLE, "clock", lambda: clock["now"]):
+            for _ in range(5):
+                self.assertEqual(self._login(STAFF_EMAIL, "wrong-password")[1].status_code, 401)
+            delays = []
+            for _ in range(7):
+                _, blocked = self._login(STAFF_EMAIL, "wrong-password")
+                self.assertEqual(blocked.status_code, 429)
+                delays.append(int(blocked.headers["Retry-After"]))
+                clock["now"] += delays[-1]
+                # once the delay is over the next wrong password is counted again
+                self.assertEqual(self._login(STAFF_EMAIL, "wrong-password")[1].status_code, 401)
+            self.assertEqual(delays, [2, 4, 8, 16, 30, 30, 30])
+
+    # ------------------------------------------------------------------ I-057 (F-03)
+    def test_demo_mode_secret_key_is_generated_once_and_reused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            key_file = Path(folder) / "instance" / "secret_key"
+            environ = {"DEMO_MODE": "1", "SECRET_KEY_FILE": str(key_file)}
+            first = resolve_secret_key(environ)
+            second = resolve_secret_key(environ)
+            self.assertNotEqual(first, "demo-only-secret")
+            self.assertGreaterEqual(len(first), 32)
+            self.assertEqual(first, second)
+            self.assertTrue(key_file.exists())
+            # an explicit SECRET_KEY still wins over the file
+            self.assertEqual(resolve_secret_key({**environ, "SECRET_KEY": "from-env"}), "from-env")
+
+    def test_instance_folder_is_gitignored(self):
+        lines = {line.strip() for line in (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
+        self.assertTrue({"instance/", "/instance/", "instance"} & lines)
+
+    # ------------------------------------------------------------------ I-058 (F-04)
+    def test_admin_can_complete_a_staff_practicum_step(self):
+        with app.app_context():
+            student = (
+                Student.query.filter(Student.program.has(has_practicum=True))
+                .order_by(Student.id).first()
+            )
+            student_id = student.id
+            PracticumRecord.query.filter_by(student_id=student_id).delete()
+            moa = StudentRequestAttachment(
+                student_id=student_id, request_type="practicum",
+                original_name="moa.pdf", stored_name="practicum-moa-v53.pdf",
+            )
+            db.session.add(moa)
+            db.session.flush()
+            db.session.add(PracticumRecord(
+                student_id=student_id, moa_attachment_id=moa.id, moa_uploaded=True,
+                moa_status="Uploaded", practicum_site="Partner Site", required_hours=200,
+                completed_hours=0, status="MOA Submitted",
+            ))
+            db.session.commit()
+        payload = {
+            "student_id": student_id, "status": "MOA Under Review",
+            "workflow_comment": "Forwarding the signed MOA to the Academic Coordinator.",
+        }
+        admin = self._role_client(self.admin_id, "admin")
+        response = admin.post("/api/transactions/practicum", json=payload)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        # the same step is still refused to a role that does not own it
+        with app.app_context():
+            PracticumRecord.query.filter_by(student_id=student_id).update({"status": "MOA Submitted"})
+            db.session.commit()
+        academic = self._role_client(self.academic_id, "academic_coordinator")
+        refused = academic.post("/api/transactions/practicum", json=payload)
+        self.assertEqual(refused.status_code, 400, refused.get_json())
+        self.assertIn("Graduate School Staff", refused.get_json()["error"])
+
+    # ------------------------------------------------------------------ I-036
+    def test_every_defense_scheduling_nav_entry_is_a_page_the_role_can_load(self):
+        """The Academic Coordinator has no part in Defense Scheduling (its actor line is GS Staff /
+        Research Coordinator), so the API answers 403; the nav must not offer the page."""
+        layout = (REPO_ROOT / "frontend" / "src" / "components" / "Layout.jsx").read_text(encoding="utf-8")
+        for role in ("academic_coordinator", "research_coordinator"):
+            block = re.search(rf"{role}:\s*new Set\(\[(.*?)\]\)", layout, re.S)
+            self.assertIsNotNone(block, role)
+            slugs = re.findall(r'"/workflow/([a-z-]+)"', block.group(1))
+            allowed = ROLE_TRANSACTION_ACCESS[role]
+            self.assertEqual([slug for slug in slugs if slug not in allowed], [], role)
+
+    # ------------------------------------------------------------------ I-073 (F-19)
+    def test_withdrawal_review_task_links_to_the_withdrawal_screen(self):
+        with app.app_context():
+            task = Task.query.filter_by(title="Review student withdrawal request").first()
+            self.assertIsNotNone(task)
+            self.assertEqual(task_dict(task)["action_url"], "/workflow/withdrawal")
+
+
+if __name__ == "__main__":
+    unittest.main()
