@@ -6,7 +6,9 @@
 - **In flight (worktrees in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`; each `frontend/node_modules` is a JUNCTION to the main checkout — before `git worktree remove`, run `cmd //c rmdir <wt>rontend
 ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
-  - `be2` / `pkt/be2` — the only app.py editor: I-055 demo reset needs login, I-056 soft per-IP login throttle, I-057 per-install secret key, I-058 admin acts as staff in workflow steps, I-036 AC defense-scheduling 403, I-073 withdrawal task link (new `tests/test_v53_backend.py`, port 5301).
+  - MERGED `pkt/be2` (I-055..I-058, I-036, I-073; R-012).
+  - `seed2` / `pkt/seed2` — the only app.py editor: seed quality I-060 advisers<=limit and never on own panel, I-062 Dean queues seeded, I-061 stage vs units/titles/departments, I-070 dates spread, I-094, I-095 (new `tests/test_seed_quality.py`, port 5311).
+  - `vocab` finished its work (pkt/vocab, 2 commits), waiting for its last background run before merge.
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
   - MERGED `pkt/board` (I-067, I-088). Follow-up: Practicum `w-[300px]` and Graduation `w-[380px]` column overrides (workflow packet).
   - `vocab` / `pkt/vocab` — one name table `lib/labels.js`, breadcrumb rule Portal > Page (I-077, I-078), rules collapsed (I-076), Activity Log open (I-080) (spec `e2e/p76-vocabulary.spec.js`, port 5306).
