@@ -24,6 +24,7 @@ import { useApi } from "../hooks";
 import { Card, EmptyState, ErrorNote, Spinner } from "../components/ui";
 import { useConfirm } from "../components/confirm";
 import { formatDate, formatDateTime } from "../lib/format";
+import { PAGE } from "../lib/labels.js";
 
 const ACCEPT = "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.docx";
 const STATUS_LABELS = { active: "Active", draft: "Draft", archived: "Archived" };
@@ -163,7 +164,7 @@ export default function PolicyDocuments() {
           <div className="flex gap-4">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/25"><LibraryBig className="h-6 w-6" /></span>
             <div>
-              <h1 className="font-display text-2xl font-semibold">Policy document library</h1>
+              <h1 className="font-display text-2xl font-semibold">{PAGE.policyDocuments}</h1>
               <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/85">Manage the approved PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Drafts are searched but flagged as pending validation.</p>
             </div>
           </div>

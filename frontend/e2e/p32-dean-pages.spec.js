@@ -175,7 +175,7 @@ test.describe("P3.2 Dean pages", () => {
       "Leave of Absence": "leave-of-absence",
       Readmission: "readmission",
       "AWOL & Residency": "awol",
-      "Withdrawal Requests": "withdrawal",
+      "Subject Withdrawal": "withdrawal",
       "Practicum Reports": "practicum",
       "Graduation Endorsement": "graduation",
     };

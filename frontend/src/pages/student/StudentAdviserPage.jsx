@@ -6,6 +6,7 @@ import { Card, ErrorNote, InlineNotice, PageHeader, SectionTitle, Spinner, Statu
 import { Field, Select, Textarea } from "../../components/forms";
 import { useConfirm } from "../../components/confirm";
 import { daysPhrase, fmtDay } from "./shared";
+import { PAGE } from "../../lib/labels.js";
 
 // Small local hook: run one API action, show its error, refetch the page after success.
 function useAction(refetch) {
@@ -300,7 +301,7 @@ export default function StudentAdviserPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="My research adviser"
+        title={PAGE.researchAdviser}
         icon={UserCheck}
         description="You nominate an adviser on Form 3. The Academic Coordinator notes it, the Dean decides, and the adviser accepts. Then you email Forms 3.2 and 3.3 to the Research Coordinator within a few days."
       />

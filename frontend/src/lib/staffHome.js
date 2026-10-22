@@ -6,6 +6,8 @@
 // A task's `target` is { to, label }: `to` is an app path, `label` names the page for the link button.
 // Dates stay raw (ISO strings); the page formats them.
 
+import { PAGE } from "./labels.js";
+
 /** The most "Needs your action" rows shown; the work queue holds the rest. */
 export const MAX_ACTIONS = 8;
 const DUE_SOON_DAYS = 7;
@@ -40,17 +42,17 @@ const workQueuePath = (owner) => `/work-queue?owner=${encodeURIComponent(owner)}
 
 // Where a task is handled, by what its title names. Order matters: the first match wins.
 const TITLE_TARGETS = [
-  [/awol|refresher|return declaration|maximum residence/i, "/workflow/awol", "AWOL & Residency"],
-  [/readmi/i, "/workflow/readmission", "Readmission"],
-  [/leave/i, "/workflow/leave-of-absence", "Leave of Absence"],
-  [/practicum/i, "/workflow/practicum", "Practicum"],
-  [/withdrawal/i, "/workflow/withdrawal", "Withdrawal"],
-  [/graduation|endorse/i, "/workflow/graduation", "Graduation"],
-  [/adviser|advisor|forms? 3/i, "/workflow/research-gate?view=adviser", "Research Gate"],
-  [/panel/i, "/workflow/panel-matching", "Panel Matching"],
-  [/defense|schedule/i, "/workflow/defense-scheduling", "Defense Scheduling"],
-  [/handoff|admission/i, "/workflow/student-handoff", "Student Handoff"],
-  [/curriculum|offering plan|course adjust/i, "/course-adjustments", "Course Adjustments"],
+  [/awol|refresher|return declaration|maximum residence/i, "/workflow/awol", PAGE.awolResidency],
+  [/readmi/i, "/workflow/readmission", PAGE.readmission],
+  [/leave/i, "/workflow/leave-of-absence", PAGE.leaveOfAbsence],
+  [/practicum/i, "/workflow/practicum", PAGE.practicum],
+  [/withdrawal/i, "/workflow/withdrawal", PAGE.subjectWithdrawal],
+  [/graduation|endorse/i, "/workflow/graduation", PAGE.graduationEndorsement],
+  [/adviser|advisor|forms? 3/i, "/workflow/research-gate?view=adviser", PAGE.researchGate],
+  [/panel/i, "/workflow/panel-matching", PAGE.panelMatching],
+  [/defense|schedule/i, "/workflow/defense-scheduling", PAGE.defenseScheduling],
+  [/handoff|admission/i, "/workflow/student-handoff", PAGE.studentHandoff],
+  [/curriculum|offering plan|course adjust/i, "/course-adjustments", PAGE.courseAdjustments],
 ];
 // The Students page is for Graduate School staff, the administrator and the Academic Coordinator.
 const CAN_OPEN_STUDENTS = new Set(["staff", "admin", "academic_coordinator"]);

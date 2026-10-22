@@ -6,6 +6,7 @@ import { Button, Card, DecisionPanel, EmptyState, InlineNotice, PageHeader, Sect
 import { formatDate } from "../lib/format";
 import { toneOf } from "../lib/tone";
 import SignaturePad from "../components/SignaturePad";
+import { PAGE } from "../lib/labels.js";
 
 const INTRO = "Review the student's uploaded Form 1 and details before endorsing. The endorsement immediately updates Research Gate progress.";
 const SUBTITLE = "Academic Coordinator review and in-system signature queue";
@@ -72,7 +73,7 @@ export function Form1EndorsementQueue({ embedded = false }) {
     <div className={embedded ? "page-stack" : "page-stack animate-fade-up"}>
       {embedded ? (
         <div>
-          <SectionTitle title="Form 1 Endorsements" subtitle={SUBTITLE} icon={FileSignature} />
+          <SectionTitle title={PAGE.form1Endorsements} subtitle={SUBTITLE} icon={FileSignature} />
           <p className="text-sm text-slate-600">{INTRO}</p>
         </div>
       ) : (

@@ -8,6 +8,7 @@ import { Button, Card, DataTable, EmptyState, Field, InlineNotice, Input, PageHe
 import { csvCell, downloadBlob } from "../lib/format";
 import { printDataTable } from "../lib/print";
 import AnalyticsSection from "./reports/AnalyticsSection.jsx";
+import { PAGE } from "../lib/labels.js";
 
 const REPORT_TABS = [
   { id: "summary", label: "Dashboard summary", icon: FileText },
@@ -131,7 +132,7 @@ export default function Reports() {
   return (
     <div className="page-stack animate-fade-up">
       <PageHeader
-        title="Reports"
+        title={PAGE.reportsAnalytics}
         description="Filterable monitoring reports generated from student records, tasks, and workflow cases."
         actions={<Button as={Link} to="/" variant="secondary">Back to dashboard</Button>}
       />

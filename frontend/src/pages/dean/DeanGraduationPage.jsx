@@ -24,6 +24,7 @@ import {
   printGraduationBatch,
   sortSelectedDeanItems,
 } from "./deanHelpers";
+import { PAGE } from "../../lib/labels.js";
 
 // Endorsement batches: the Dean's group actions, stage checks, print and CSV
 // export for graduation candidates (previously part of the single approvals page).
@@ -261,7 +262,7 @@ function DeanGraduationBody() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Graduation Endorsement"
+        title={PAGE.graduationEndorsement}
         description="Review the endorsement lists prepared by Graduate School staff, approve or return them, then export the approved list for the Registrar."
         icon={GraduationCap}
         badge={<StatusChip status={`${counts.pendingGraduation} waiting`} tone="muted" dot={false} />}

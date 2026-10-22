@@ -8,6 +8,7 @@ import Assistant from "../Assistant";
 import { DEAN_PROCESSES, DeanGate, processOfType, useDean } from "./DeanContext";
 import { casePath, daysSince } from "./DeanShared";
 import { deanBoardGroup, deanItemDate } from "./deanHelpers";
+import { PAGE } from "../../lib/labels.js";
 
 // ------------------------------------------------ Admission & coursework reports
 // Gates the Dean owns that are not per-student cases: the admission onboarding
@@ -16,7 +17,7 @@ export function DeanGateReportsPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Admission & Coursework Reports"
+        title={PAGE.gateReports}
         description="Reports sent to the Dean for a decision: the admission onboarding report and the coursework status report."
         icon={ClipboardCheck}
       />
@@ -109,7 +110,7 @@ function DeanAnalyticsBody() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Reports & Analytics"
+        title={PAGE.reportsAnalytics}
         description="Where Dean decisions stand across every process. Figures are computed live from the approvals records."
         icon={BarChart3}
       />
@@ -210,7 +211,7 @@ function DeanHistoryBody() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="Decision History"
+        title={PAGE.activityLog}
         description="Recent decisions recorded against the Dean account, newest first. Each entry keeps its full stage history on the case page."
         icon={Activity}
       />

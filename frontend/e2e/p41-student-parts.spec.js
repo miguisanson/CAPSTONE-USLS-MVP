@@ -285,7 +285,7 @@ test.describe("P4.1 shared student parts", () => {
 
   test("Activity page (Therese): the logs, their toggle and their entries", async ({ browser }) => {
     await runPage(browser, { email: THERESE, mutate: overviewScenario, path: "/student/activity", shot: "activity-therese" }, async (page) => {
-      const activity = panel(page, "Activity History");
+      const activity = panel(page, "Activity Log");
       await expect(activity).toContainText("Submissions, decisions, and next owners");
       const toggle = activity.getByRole("button", { name: /View logs/ });
       await expect(toggle).toContainText("2");
@@ -337,8 +337,8 @@ test.describe("P4.1 shared student parts", () => {
       await expect(sectionOf(page, "Elsewhere in your portal")).toContainText("No defense is booked yet.");
     });
     await runPage(browser, { email: MAYA, mutate, path: "/student/activity", shot: "activity-empty" }, async (page) => {
-      await expect(panel(page, "Activity History")).toContainText("No activity yet");
-      await expect(panel(page, "Activity History").getByRole("button")).toHaveCount(0);
+      await expect(panel(page, "Activity Log")).toContainText("No activity yet");
+      await expect(panel(page, "Activity Log").getByRole("button")).toHaveCount(0);
     });
     await runPage(browser, { email: MAYA, mutate, path: "/student/defense-schedule", shot: "defense-empty" }, async (page) => {
       await expect(panel(page, "Schedule requests")).toContainText("No schedule requests");
@@ -402,7 +402,7 @@ test.describe("P4.1 shared student parts", () => {
     });
     // the Activity page: the same panel with the same logs
     await runPage(browser, { email: THERESE, mutate, path: "/student/activity", shot: "activity" }, async (page) => {
-      const activity = panel(page, "Activity History");
+      const activity = panel(page, "Activity Log");
       await activity.getByRole("button", { name: /View logs/ }).click();
       await expect(activity).toContainText("Document received");
       await expect(activity).toContainText("Thank you.");

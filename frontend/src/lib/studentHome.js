@@ -5,17 +5,18 @@
 // An item names its destination as a `target`: { view } is a request view id (research, schedule, loa, readmission,
 // awol, withdrawal, practicum, graduation - the page turns it into a path with STUDENT_REQUEST_PATHS) or { to } is a
 // student path. Dates stay raw (ISO strings); the page formats them.
+import { PAGE } from "./labels.js";
 
 /** Short names of the request pages, as the sidebar and the Request Center call them. */
 export const VIEW_LABELS = Object.freeze({
-  research: "Research Progress",
-  schedule: "Defense Schedule",
-  loa: "Leave of Absence",
-  readmission: "Readmission",
-  awol: "Return from AWOL",
-  withdrawal: "Subject Withdrawal",
-  practicum: "Practicum",
-  graduation: "Graduation",
+  research: PAGE.researchProgress,
+  schedule: PAGE.defenseSchedule,
+  loa: PAGE.leaveOfAbsence,
+  readmission: PAGE.readmission,
+  awol: PAGE.returnFromAwol,
+  withdrawal: PAGE.subjectWithdrawal,
+  practicum: PAGE.practicum,
+  graduation: PAGE.graduationEndorsement,
 });
 
 /** workflow message `transaction_slug` -> request view id (the slugs that have a student page). */

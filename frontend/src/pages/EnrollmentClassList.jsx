@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { Button, Card, DataTable, EmptyState, InlineNotice, PageHeader, Select, Spinner, StatusChip } from "../components/ui/index.js";
 import { csvCell, downloadBlob, formatDate } from "../lib/format";
+import { PAGE } from "../lib/labels.js";
 
 const NO_CLASS_EMPTY = {
   icon: UsersRound,
@@ -116,7 +117,7 @@ export default function EnrollmentClassList() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         icon={BookOpenCheck}
-        title="Enrollment Class List"
+        title={PAGE.enrollmentClassList}
         description="Read-only class rosters synchronized automatically with confirmed Enrollment records."
       />
 

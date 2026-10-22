@@ -15,6 +15,7 @@ import { Button, Card, EmptyState, HistoryPanel, InlineNotice, SectionTitle, Sta
 import { ProgressBar } from "../../components/ui";
 import { stageSteps } from "../../lib/stages";
 import { RESEARCH_GATE_KEYS } from "./shared";
+import { PAGE } from "../../lib/labels.js";
 
 export function ProgressPanel({ data }) {
   const { stages, student, course_audit, research_case } = data;
@@ -224,7 +225,7 @@ export function ActivityPanel({ logs }) {
   const visibleLogs = logs || [];
   return (
     <Card pad="lg">
-      <SectionTitle title="Activity History" subtitle="Submissions, decisions, and next owners" icon={Activity} />
+      <SectionTitle title={PAGE.activityLog} subtitle="Submissions, decisions, and next owners" icon={Activity} />
       {visibleLogs.length ? (
         <HistoryPanel label="View logs" hideLabel="Hide logs" entries={visibleLogs.map(logEntry)} sort="given" />
       ) : (
