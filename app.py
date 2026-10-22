@@ -35956,7 +35956,7 @@ DEAN_DEMO_STUDENTS = {
     "leave-of-absence-decided": "2460017",   # Olivia Cabrera, MSCS: LOA the Dean approved
     "withdrawal-decided": "2460068",    # Gian Lacson, MSN: withdrawal the Dean denied
 }
-DEAN_DEMO_PLANS = (("MIT", "Submitted"), ("MSCS", "Approved"))
+DEAN_DEMO_PLANS = (("MIT", "Submitted"), ("MSN", "Approved"))
 
 
 def seed_dean_review_cases() -> int:
@@ -36141,7 +36141,7 @@ def seed_dean_review_cases() -> int:
     student = student_for("graduation")
     if student and not GraduationEndorsement.query.filter_by(student_id=student.id).first():
         endorsement = GraduationEndorsement(
-            student_id=student.id, review_window="Current review window", batch_name="Batch 1 October 2026",
+            student_id=student.id, review_window="Current review window", batch_name="Batch 2 October 2026",
             endorsement_status="Ready for Dean Review", registrar_status="Pending", submitted_at=now_utc(),
         )
         db.session.add(endorsement)

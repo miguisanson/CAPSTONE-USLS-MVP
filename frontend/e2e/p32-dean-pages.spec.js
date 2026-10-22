@@ -139,12 +139,21 @@ test.describe("P3.2 Dean pages", () => {
     // Needs your action: the oldest decisions first, each with a Review link to its case.
     const mine = page.locator("main section", { has: page.getByRole("heading", { name: "Needs your action", exact: true }) });
     await expect(mine).toBeVisible();
-    for (const [name, type] of [["Maureen Castillo", "leave-of-absence"], ["Daniel Fernandez", "leave-of-absence"], ["Gabriel Domingo", "readmission"]]) {
-      const row = mine.getByRole("listitem").filter({ hasText: name }).first();
-      await expect(row, `${name} in Needs your action`).toBeVisible();
-      await expect(row.getByRole("link", { name: "Review" })).toHaveAttribute("href", new RegExp(`^/dean/case/${type}/\\d+$`));
+    // The seed already has decisions waiting for the Dean (I-062) and they have waited longer than the three put in front of
+    // the Dean above, so the home (oldest eight first) lists those; the three are checked in the whole queue instead.
+    const listed = mine.getByRole("listitem");
+    const shown = await listed.count();
+    expect(shown, "the home lists at most eight decisions").toBeGreaterThan(0);
+    expect(shown).toBeLessThanOrEqual(8);
+    for (let index = 0; index < shown; index += 1) {
+      await expect(listed.nth(index).getByRole("link", { name: "Review" }), `row ${index + 1} has a Review link`).toHaveAttribute("href", /^\/dean\/(case|approvals)\//);
     }
-    await expect(mine.getByRole("listitem").filter({ hasText: "Maureen Castillo" }).first()).toContainText("Leave of Absence");
+    const queue = await okJson(await page.request.get("/api/approvals"), "the Dean's queue");
+    for (const [name, type] of [["Maureen Castillo", "leave-of-absence"], ["Daniel Fernandez", "leave-of-absence"], ["Gabriel Domingo", "readmission"]]) {
+      const item = queue.workflow_pending.find((entry) => entry.student.name === name);
+      expect(item, `${name} waits for the Dean`).toBeTruthy();
+      expect(item.type).toBe(type);
+    }
 
     // The course offering plan is a row of its own and opens the plan page.
     const planRow = mine.getByRole("listitem").filter({ hasText: /Course offerings/ }).first();
@@ -188,7 +197,7 @@ test.describe("P3.2 Dean pages", () => {
     await expect(page.getByRole("heading", { level: 2, name: /^Adviser Designation\s*\d+$/ })).toBeVisible();
 
     // The course-plan row: what it is, how old, and a Review link to the plan page.
-    const planRow = page.getByRole("listitem").filter({ hasText: /Course offerings · / });
+    const planRow = page.getByRole("listitem").filter({ hasText: /Course offerings · MSCS/ });
     await expect(planRow.first()).toContainText(TERM);
     await expect(planRow.first()).toContainText(/subject\(s\) proposed · submitted/);
     await expect(planRow.first().getByText("today")).toBeVisible();
@@ -254,7 +263,8 @@ test.describe("P3.2 Dean pages", () => {
     await expect(page.getByText("Course offering plans submitted by the Academic Coordinator. Approve them or return them for revision.")).toBeVisible();
     await expect(page.getByRole("main").getByRole("link", { name: "All approvals" })).toHaveAttribute("href", "/dean/approvals");
 
-    const plan = page.getByRole("heading", { level: 2, name: /^Course offerings · / }).first();
+    // The seed has an MIT plan waiting as well (I-062); this test is about the MSCS plan put in front of the Dean above.
+    const plan = page.getByRole("heading", { level: 2, name: /^Course offerings · MSCS/ }).first();
     await expect(plan).toBeVisible();
     const card = plan.locator("xpath=ancestor::*[contains(@class,'card')][1]");
     await expect(card).toContainText(TERM);
@@ -289,9 +299,8 @@ test.describe("P3.2 Dean pages", () => {
     await expect(page.getByRole("status").filter({ hasText: "Offering plan returned by Dean for revision" })).toBeVisible();
     expect(decideCalls).toHaveLength(2);
     expect(decideCalls[1]).toMatchObject({ decision: "return", note: "Please add a second section for the high-demand subjects." });
-    await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · / })).toHaveCount(0);
-    await expect(page.getByText("No course offering plans waiting")).toBeVisible();
-    await expect(page.getByText("Plans the Academic Coordinator submits for approval appear here.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · MSCS/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · MIT/ })).toBeVisible(); // the seeded plan still waits
     const recent = page.getByRole("listitem").filter({ hasText: TERM });
     await expect(recent.first()).toContainText("Returned");
     await expect(page.getByText("Recent decisions", { exact: true })).toBeVisible();
