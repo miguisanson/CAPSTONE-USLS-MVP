@@ -159,7 +159,15 @@ export default function StudentOverview() {
       }}
       stats={[
         { key: "coursework", label: "Coursework", value: `${audit.completion_rate}%`, sub: `${audit.completed.length} completed, ${audit.missing_count} missing`, to: "/student/progress" },
-        { key: "research", label: "Research", badge: true, value: researchCase?.status || "Not started", sub: researchCase?.current_gate_label || "Open the Research page to begin", tone: "info", to: "/student/research" },
+        {
+          key: "research",
+          label: "Research",
+          // the stage in the figure (like the other three cards show a number); the status is a chip in the sub-line
+          value: researchCase ? data.research_progress?.stage || researchCase.current_gate_label || "Not started" : "Not started",
+          sub: researchCase?.status ? <StatusChip status={researchCase.status} dot={false} size="sm" /> : "Open the Research page to begin",
+          tone: "info",
+          to: "/student/research",
+        },
         { key: "tasks", label: "Your open tasks", value: tasks.length, sub: `${tasks.filter((task) => task.overdue).length} overdue`, tone: tasks.length ? "warning" : "neutral" },
         { key: "messages", label: "Unread messages", value: unreadCount, sub: "Replies on your requests", tone: unreadCount ? "danger" : "neutral", to: "/student/messages" },
       ]}

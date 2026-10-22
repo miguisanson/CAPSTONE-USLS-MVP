@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
-import { Check, CheckCircle2, Circle, FileCheck, UserCheck, UserPlus } from "lucide-react";
+import { CheckCircle2, FileCheck, UserCheck, UserPlus } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, ErrorNote, InlineNotice, PageHeader, SectionTitle, Spinner, StatusBadge } from "../../components/ui";
-import { Field, Select, Textarea } from "../../components/forms";
+import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionCard, Select, Spinner, StatusChip, Stepper, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
 import { daysPhrase, fmtDay } from "./shared";
 import { PAGE } from "../../lib/labels.js";
@@ -29,34 +28,19 @@ function useAction(refetch) {
   return { busy, error, run, setError };
 }
 
+// The application's own steps, as the shared Stepper: done / the one in progress / later.
 function StepTracker({ steps = [] }) {
   return (
-    <ol className="space-y-0" aria-label="Where your application stands">
-      {steps.map((step, index) => {
-        const state = step.done ? "done" : step.current ? "current" : "pending";
-        return (
-          <li key={step.key || index} className="relative flex gap-3 pb-4 last:pb-0" aria-current={state === "current" ? "step" : undefined}>
-            {index < steps.length - 1 && <span className="absolute left-[13px] top-7 h-[calc(100%-1.5rem)] w-0.5 bg-slate-200" aria-hidden="true" />}
-            <span
-              className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full ${
-                state === "done" ? "bg-brand-600 text-white" : state === "current" ? "bg-amber-100 text-amber-800 ring-2 ring-amber-400" : "bg-slate-100 text-slate-400"
-              }`}
-            >
-              {state === "done" ? <Check className="h-4 w-4" strokeWidth={3} /> : <Circle className="h-3 w-3" />}
-            </span>
-            <div className={`min-w-0 rounded-lg px-2 py-0.5 ${state === "current" ? "bg-amber-50" : ""}`}>
-              <p className={`text-sm font-semibold ${state === "pending" ? "text-slate-400" : "text-ink"}`}>
-                {step.label}
-                <span className="ml-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  {state === "done" ? "Done" : state === "current" ? "Now" : "Later"}
-                </span>
-              </p>
-              {step.at && <p className="text-xs text-slate-500">{fmtDay(step.at)}</p>}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <Stepper
+      orientation="vertical"
+      title="Where your application stands"
+      steps={steps.map((step, index) => ({
+        key: step.key || index,
+        label: step.label,
+        state: step.done ? "complete" : step.current ? "current" : "upcoming",
+        hint: step.at ? fmtDay(step.at) : undefined,
+      }))}
+    />
   );
 }
 
@@ -78,13 +62,12 @@ function ContractBlock({ appointment, onChanged }) {
     <div className="rounded-xl border border-slate-200 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink"><FileCheck className="h-4 w-4 text-brand-700" aria-hidden="true" />Forms 3.2 and 3.3 (research timetable and advising contract)</p>
-        <StatusBadge value={contract.status} dot={false} />
+        <StatusChip status={contract.status} dot={false} />
       </div>
       {contract.status === "Received" ? (
-        <p className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+        <InlineNotice tone="success" icon={CheckCircle2} className="mt-3">
           The Research Coordinator received your forms{contract.received_at ? ` on ${fmtDay(contract.received_at)}` : ""}.
-        </p>
+        </InlineNotice>
       ) : (
         <>
           <p className={`mt-2 text-sm font-semibold ${contract.status === "Overdue" ? "text-red-700" : "text-slate-600"}`}>{dueText}</p>
@@ -96,10 +79,10 @@ function ContractBlock({ appointment, onChanged }) {
               <Field label="Note for the Research Coordinator (optional)">
                 <Textarea rows={2} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
               </Field>
-              <ErrorNote message={error} />
-              <button type="button" className="btn-primary" disabled={busy} onClick={() => run(() => api.submitAdviserContract(appointment.id, note))}>
+              {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+              <Button loading={busy} onClick={() => run(() => api.submitAdviserContract(appointment.id, note))}>
                 {busy ? "Saving..." : "I emailed Forms 3.2 and 3.3 to the Research Coordinator"}
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -128,7 +111,7 @@ function ChangeForm({ tracker, onChanged }) {
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-slate-200 p-4">
       <p className="text-sm font-semibold text-ink">Request change of adviser (Form 3.1.1)</p>
-      <p className="text-xs text-slate-500">
+      <p className="meta">
         A change is allowed once, and only before your proposal defense. Form 3.1.1 needs both your current and your new adviser to agree, then the Dean decides.
       </p>
       <Field label="New adviser" required>
@@ -137,8 +120,8 @@ function ChangeForm({ tracker, onChanged }) {
       <Field label="Reason for the change" required hint="Give a clear, justifiable reason (at least 5 characters).">
         <Textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={600} required />
       </Field>
-      <ErrorNote message={error} />
-      <button type="submit" className="btn-primary" disabled={busy || !valid}>{busy ? "Sending..." : "Send change request"}</button>
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      <Button type="submit" loading={busy} disabled={!valid}>{busy ? "Sending..." : "Send change request"}</Button>
     </form>
   );
 }
@@ -146,17 +129,16 @@ function ChangeForm({ tracker, onChanged }) {
 function CurrentCard({ tracker, onChanged }) {
   const current = tracker.current;
   return (
-    <Card className="space-y-4 p-6">
-      <SectionTitle title="Your research adviser" icon={UserCheck} />
+    <SectionCard pad="lg" title="Your research adviser" icon={UserCheck}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-display text-xl font-semibold text-ink">{current.faculty_name}</p>
+          <p className="section-title">{current.faculty_name}</p>
           {current.faculty_college && <p className="text-sm text-slate-500">{current.faculty_college}</p>}
           <p className="mt-1 text-sm text-slate-600">{current.form31_issued_on || current.adviser_responded_at
               ? `Appointed: ${fmtDay(current.form31_issued_on || String(current.adviser_responded_at).slice(0, 10))}`
               : "Appointed before the online appointment process (no date on file)"}</p>
         </div>
-        <StatusBadge value={current.status} dot={false} />
+        <StatusChip status={current.status} dot={false} />
       </div>
       <ContractBlock appointment={current} onChanged={onChanged} />
       {tracker.can_request_change ? (
@@ -164,7 +146,7 @@ function CurrentCard({ tracker, onChanged }) {
       ) : (
         tracker.change_blocked_reason && <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">{tracker.change_blocked_reason}</p>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -182,14 +164,13 @@ function OpenCard({ open, onChanged }) {
     if (ok) run(() => api.withdrawAdviserApplication(open.id));
   }
   return (
-    <Card className="space-y-4 p-6">
-      <SectionTitle title={isChange ? "Change of adviser in progress" : "Adviser application in progress"} icon={UserPlus} />
+    <SectionCard pad="lg" title={isChange ? "Change of adviser in progress" : "Adviser application in progress"} icon={UserPlus}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{isChange ? "New adviser you nominated" : "Adviser you nominated"}</p>
-          <p className="font-display text-lg font-semibold text-ink">{open.faculty_name}</p>
+          <p className="eyebrow">{isChange ? "New adviser you nominated" : "Adviser you nominated"}</p>
+          <p className="card-title">{open.faculty_name}</p>
         </div>
-        <StatusBadge value={open.status} dot={false} />
+        <StatusChip status={open.status} dot={false} />
       </div>
       <StepTracker steps={open.steps || []} />
       {open.ac_note && <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"><span className="font-semibold">Academic Coordinator note:</span> {open.ac_note}</p>}
@@ -206,10 +187,12 @@ function OpenCard({ open, onChanged }) {
           <span className="font-semibold">Nominated adviser:</span> {open.adviser_response}{open.adviser_response_reason ? ` - ${open.adviser_response_reason}` : ""}
         </p>
       )}
-      {(open.warnings || []).map((line) => <InlineNotice key={line} tone="warn">{line}</InlineNotice>)}
-      <ErrorNote message={error} />
-      <button type="button" className="btn-ghost" disabled={busy} onClick={withdraw}>{busy ? "Withdrawing..." : "Withdraw application"}</button>
-    </Card>
+      {(open.warnings || []).map((line) => <InlineNotice key={line} tone="warning">{line}</InlineNotice>)}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      <div>
+        <Button variant="secondary" loading={busy} onClick={withdraw}>{busy ? "Withdrawing..." : "Withdraw application"}</Button>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -228,11 +211,10 @@ function ApplyForm({ tracker, onChanged }) {
     await run(() => api.applyForAdviser({ faculty_id: Number(facultyId), note: note.trim() }));
   }
   return (
-    <Card className="p-6">
-      <SectionTitle title="Nominate your research adviser (Form 3)" subtitle="Choose the faculty member you want. The Academic Coordinator notes your application, then the Dean decides." icon={UserPlus} />
+    <SectionCard pad="lg" title="Nominate your research adviser (Form 3)" subtitle="Choose the faculty member you want. The Academic Coordinator notes your application, then the Dean decides." icon={UserPlus}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Find a faculty member">
-          <input className="field-input" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, college or specialization" />
+          <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, college or specialization" />
         </Field>
         <fieldset>
           <legend className="field-label">Faculty members <span className="text-red-500">*</span></legend>
@@ -244,8 +226,8 @@ function ApplyForm({ tracker, onChanged }) {
                   <input type="radio" name="adviser" className="mt-1" value={person.id} checked={active} onChange={() => setFacultyId(String(person.id))} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-ink">{person.name}</span>
-                    <span className="block text-xs text-slate-500">{[person.college, person.specialization].filter(Boolean).join(" - ") || "Details not entered"}</span>
-                    <span className={`mt-0.5 block text-xs font-semibold ${person.available ? "text-slate-600" : "text-amber-800"}`}>
+                    <span className="meta block">{[person.college, person.specialization].filter(Boolean).join(" - ") || "Details not entered"}</span>
+                    <span className={`meta mt-0.5 block font-semibold ${person.available ? "text-slate-600" : "text-amber-800"}`}>
                       {person.advisees} of {person.max_advisees} advisees{person.available ? "" : " - Full - the Dean must approve an exception"}
                     </span>
                   </span>
@@ -256,23 +238,22 @@ function ApplyForm({ tracker, onChanged }) {
           </div>
         </fieldset>
         {chosen && !chosen.available && (
-          <InlineNotice tone="warn">{chosen.name} already has {chosen.advisees} of {chosen.max_advisees} advisees. You may still apply, but the Dean must approve an exception.</InlineNotice>
+          <InlineNotice tone="warning">{chosen.name} already has {chosen.advisees} of {chosen.max_advisees} advisees. You may still apply, but the Dean must approve an exception.</InlineNotice>
         )}
         <Field label="Note (optional)">
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
         </Field>
-        <ErrorNote message={error} />
-        <button type="submit" className="btn-primary" disabled={busy || !facultyId}>{busy ? "Sending..." : "Send Form 3 application"}</button>
+        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+        <Button type="submit" loading={busy} disabled={!facultyId}>{busy ? "Sending..." : "Send Form 3 application"}</Button>
       </form>
-    </Card>
+    </SectionCard>
   );
 }
 
 function HistoryList({ rows }) {
   if (!rows.length) return null;
   return (
-    <Card className="p-6">
-      <SectionTitle title="Earlier applications" />
+    <SectionCard pad="lg" title="Earlier applications">
       <ul className="space-y-2">
         {rows.map((row) => {
           const why = row.adviser_response_reason || row.decision_note || row.end_reason;
@@ -280,14 +261,14 @@ function HistoryList({ rows }) {
             <li key={row.id} className="rounded-xl border border-slate-100 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-ink">{row.faculty_name} <span className="font-normal text-slate-500">({row.kind === "Change" ? "change of adviser" : "application"}, {fmtDay(row.applied_at)})</span></p>
-                <StatusBadge value={row.status} dot={false} />
+                <StatusChip status={row.status} dot={false} />
               </div>
-              {why && <p className="mt-1 text-xs text-slate-600">{why}</p>}
+              {why && <p className="meta mt-1 text-slate-600">{why}</p>}
             </li>
           );
         })}
       </ul>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -299,14 +280,14 @@ export default function StudentAdviserPage() {
     return (tracker?.history || []).filter((row) => !live.has(row.id));
   }, [tracker]);
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.researchAdviser}
         icon={UserCheck}
         description="You nominate an adviser on Form 3. The Academic Coordinator notes it, the Dean decides, and the adviser accepts. Then you email Forms 3.2 and 3.3 to the Research Coordinator within a few days."
       />
-      {loading && !tracker && <Card className="p-6"><Spinner /></Card>}
-      <ErrorNote message={error} />
+      {loading && !tracker && <Card pad="lg"><Spinner /></Card>}
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {tracker && (
         <>
           {tracker.current && <CurrentCard tracker={tracker} onChanged={refetch} />}
