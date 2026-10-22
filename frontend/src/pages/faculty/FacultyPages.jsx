@@ -19,6 +19,7 @@ import { facultyActions, facultyStats, facultyUpcoming, facultyWaiting } from ".
 import { firstNameOf } from "../../lib/staffHome.js";
 import { formatDate } from "../../lib/format";
 import FacultyResearchWorkspace from "../../components/FacultyResearchWorkspace";
+import FacultyVerdicts from "./FacultyVerdicts";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 import { FacultyAdviserPanel } from "./FacultyAdviserPanel";
 import { FacultyClasses } from "./FacultyClasses";
@@ -256,7 +257,7 @@ export function FacultyVerdictsPage() {
         description="The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff have read-only access."
         icon={Scale}
       />
-      <FacultyResearchWorkspace advisees={data.advisees || []} panels={data.panels || []} refetch={refetch} view="verdicts" />
+      <FacultyVerdicts panels={data.panels || []} refetch={refetch} />
     </div>
   );
 }
