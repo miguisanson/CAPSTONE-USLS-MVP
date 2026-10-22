@@ -7,8 +7,8 @@
 //     queue" button stays; with nothing waiting the section says so; nothing overflows at 390;
 //   - Faculty (the seeded adviser the sweep uses): the first section is "Needs your action" and holds only what this
 //     member must do, every row with a working link; four key numbers read from the portal context, each named once;
-//     "Upcoming defenses" has its View schedule link; the Google Calendar card and the calendar-connected notice are
-//     still there; nothing overflows at 390.
+//     "Upcoming defenses" has its View schedule link; the calendar-connected notice stays; the Google Calendar card
+//     moved to My Availability and the home only has a small link to it (I-085); nothing overflows at 390.
 // Setup changes data in the throwaway harness database and touches only the demo student Martin Gonzales
 // (enrollment-martin), whom no other spec uses.
 import { test, expect } from "@playwright/test";
@@ -288,14 +288,15 @@ test.describe("Faculty home", () => {
     await expect(main(page).getByRole("link", { name: /Advisees/ }).first()).toHaveAttribute("href", "/faculty-portal/advisees");
   });
 
-  test("upcoming defenses keep their list and View schedule link; the Google Calendar card and its notice stay", async ({ page }) => {
+  test("upcoming defenses keep their list and View schedule link; the Google Calendar card is not on the home (only a small link) and the callback notice stays", async ({ page }) => {
     const data = await openHome(page);
     const upcoming = sectionOf(page, "Upcoming defenses");
     await expect(upcoming.getByRole("link", { name: "View schedule" })).toHaveAttribute("href", "/faculty-portal/defenses");
     expect(await upcoming.locator("li").count(), "a short list").toBeLessThanOrEqual(6);
     if (data.upcoming_defenses.length) await expect(upcoming.locator("li").first()).toContainText(data.upcoming_defenses[0].student.name);
     else await expect(upcoming.getByText("No defenses scheduled")).toBeVisible();
-    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
+    await expect(main(page).getByRole("link", { name: "Calendar connection" })).toHaveAttribute("href", "/faculty-portal/availability");
     // the OAuth callback lands here with ?calendar=connected
     await openHome(page, "?calendar=connected");
     await expect(page.getByRole("status").filter({ hasText: "Google Calendar connected." })).toBeVisible();
