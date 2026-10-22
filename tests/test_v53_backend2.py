@@ -396,6 +396,38 @@ class V53Backend2Tests(unittest.TestCase):
         owners = {row["owner"] for row in staff["tasks_by_owner"]}
         self.assertGreater(len(owners), 1)
 
+    # ------------------------------------------------------------------ I-093 (F-39)
+    def test_student_directory_query_count_does_not_grow_with_the_page_size(self):
+        staff = sign_in(STAFF_EMAIL)
+        counts = {}
+        for size in (10, 25):
+            statements = []
+
+            def count(conn, cursor, statement, parameters, context, executemany):
+                statements.append(statement)
+
+            with app.app_context():
+                event.listen(db.engine, "before_cursor_execute", count)
+            try:
+                response = staff.get("/api/students", query_string={"page_size": size})
+            finally:
+                with app.app_context():
+                    event.remove(db.engine, "before_cursor_execute", count)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(response.get_json()["items"]), size)
+            counts[size] = len(statements)
+        self.assertLess(counts[25] - counts[10], 5, counts)
+
+    def test_student_directory_rows_keep_their_comprehensive_exam_answer(self):
+        staff = sign_in(STAFF_EMAIL)
+        rows = staff.get("/api/students", query_string={"page_size": 25}).get_json()["items"]
+        from app import comprehensive_exam_eligibility
+        with app.app_context():
+            for row in rows[:8]:
+                expected = comprehensive_exam_eligibility(db.session.get(Student, row["id"]))
+                self.assertEqual(row["compre_eligibility"], expected, row["id"])
+        self.assertTrue(any(row["program_code"] for row in rows))
+
 
 if __name__ == "__main__":
     unittest.main()
