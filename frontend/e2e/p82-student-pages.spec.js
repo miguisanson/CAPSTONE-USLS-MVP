@@ -548,3 +548,341 @@ test.describe("P82 student pages (pinned)", () => {
   });
 });
 
+// ============================================================================================================================
+// P82 changes: the spec of what is meant to change. Red on the old pages.
+// ============================================================================================================================
+
+const FINISHED_PROPOSAL = {
+  id: 9201, defense_type: "Proposal Defense", preferred_date: "2026-08-08", status: "Held", display_status: "Finished", is_active: false,
+  start_time: "09:00", end_time: "10:30", mode: "In person", venue: "Spec Room", panelists: [], attention: [],
+};
+const LIVE_FINAL = { id: 9202, defense_type: "Final Defense", preferred_date: "2027-03-01", status: "Scheduled", display_status: "Scheduled", is_active: true, start_time: "09:00", end_time: "10:30", mode: "In person", venue: "Spec Room", panelists: [], attention: [] };
+const DEFERRED_FINAL = { id: 9203, defense_type: "Final Defense", preferred_date: "2026-09-01", status: "Deferred", display_status: "Deferred", is_active: false, start_time: null, end_time: null, mode: null, venue: null, panelists: [], attention: [] };
+
+const atStage = (stage, schedules) => (d) => {
+  d.student.current_stage = stage;
+  d.research_progress = { ...(d.research_progress || {}), stage };
+  d.schedules = schedules;
+};
+
+test.describe("P82 changes: the student home", () => {
+  test("I-087: the Research key number says the stage in the figure and the status as a chip in the sub-line", async ({ browser }) => {
+    const { page, finish } = await studentPage(browser, {
+      mutate: (d) => {
+        d.research_case = { ...(d.research_case || {}), id: 1, status: "Pending Staff Action", current_gate_label: "Proposal Defense Readiness" };
+        d.research_progress = { ...(d.research_progress || {}), stage: "Proposal Defense", status: "Pending Staff Action" };
+      },
+    });
+    try {
+      await open(page, "/student");
+      const card = stat(page, "Research");
+      await expect(card.locator('[data-slot="value"]'), "the figure is the stage name").toHaveText("Proposal Defense");
+      await expect(card.locator('[data-slot="value"] span.ring-1'), "no status chip in the figure").toHaveCount(0);
+      const sub = card.locator('[data-slot="sub"]');
+      await expect(sub.locator("span.ring-1"), "the status is a chip in the sub-line").toHaveText("Pending Staff Action");
+      // the other three cards still show a plain number
+      for (const label of ["Coursework", "Your open tasks", "Unread messages"]) await expect(stat(page, label).locator('[data-slot="value"] span.ring-1'), label).toHaveCount(0);
+    } finally {
+      await finish();
+    }
+  });
+
+  test("I-087: with no research case the Research card says 'Not started' and how to begin", async ({ browser }) => {
+    const { page, finish } = await studentPage(browser, { mutate: (d) => { d.research_case = null; d.research_progress = null; } });
+    try {
+      await open(page, "/student");
+      const card = stat(page, "Research");
+      await expect(card.locator('[data-slot="value"]')).toHaveText("Not started");
+      await expect(card.locator('[data-slot="sub"]')).toContainText("Open the Research page to begin");
+    } finally {
+      await finish();
+    }
+  });
+});
+
+test.describe("P82 changes: the Defense Schedule page", () => {
+  test("I-086: no link to the page the student is on; the research page keeps its link", async ({ browser }) => {
+    const { page, finish } = await studentPage(browser);
+    try {
+      await open(page, "/student/defense-schedule");
+      await expect(main(page).locator('a[href="/student/defense-schedule"]'), "no self-link on the Defense Schedule page").toHaveCount(0);
+      await expect(h2s(page).filter({ hasText: "Adviser and panel" })).toHaveCount(1);
+      await open(page, "/student/research");
+      await expect(main(page).locator('a[href="/student/defense-schedule"]')).toHaveCount(1);
+    } finally {
+      await finish();
+    }
+  });
+
+  test("I-086: the title chip shows the NEXT defense's state, not the last one that finished", async ({ browser }) => {
+    const chip = (page) => h1(page).locator("xpath=..");
+    // Final Defense stage, only the Proposal Defense is behind: the form below is for a new request
+    let s = await studentPage(browser, { mutate: atStage("Final Defense", [FINISHED_PROPOSAL]) });
+    try {
+      await open(s.page, "/student/defense-schedule");
+      await expect(chip(s.page)).not.toContainText("Finished");
+      await expect(chip(s.page)).toContainText("No request");
+      await expect(main(s.page).getByRole("button", { name: "Submit schedule request" })).toBeVisible();
+      // the list below still shows the finished defense as Finished
+      await expect(cardOf(s.page, "Schedule requests")).toContainText("Finished");
+    } finally {
+      await s.finish();
+    }
+    // a booked Final Defense: the chip says so, the form is closed
+    s = await studentPage(browser, { mutate: atStage("Final Defense", [LIVE_FINAL, FINISHED_PROPOSAL]) });
+    try {
+      await open(s.page, "/student/defense-schedule");
+      await expect(chip(s.page)).toContainText("Scheduled");
+      await expect(chip(s.page)).not.toContainText("Finished");
+    } finally {
+      await s.finish();
+    }
+    // a deferred Final Defense: the chip follows that one
+    s = await studentPage(browser, { mutate: atStage("Final Defense", [DEFERRED_FINAL, FINISHED_PROPOSAL]) });
+    try {
+      await open(s.page, "/student/defense-schedule");
+      await expect(chip(s.page)).toContainText("Deferred");
+      // the Request Center tile says the same
+      await open(s.page, "/student/requests");
+      await expect(main(s.page).locator('a[href="/student/defense-schedule"]')).toContainText("Deferred");
+    } finally {
+      await s.finish();
+    }
+  });
+});
+
+// ---- request forms: an error summary on submit (UX research section 3: items 1-4) -------------------------------------------
+
+/** A form page: the real context plus a state; EVERY write is answered by the browser and recorded. */
+async function formPage(browser, mutate, { failPath, failMessage = "Spec: the server said no." } = {}) {
+  const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 768 } });
+  await stubExternal(context);
+  const res = await context.request.post("/api/auth/login", { data: { email: MIGUEL, password: PASSWORD } });
+  expect(res.ok()).toBeTruthy();
+  const writes = [];
+  await context.route("**/api/student-portal/context", async (route) => {
+    try {
+      const response = await route.fetch();
+      const data = await response.json();
+      mutate?.(data);
+      await route.fulfill({ response, json: data });
+    } catch (error) {
+      if (!/already handled|disposed|closed/i.test(String(error))) throw error;
+    }
+  });
+  const answer = (path, json) => async (route) => {
+    const request = route.request();
+    let body = null;
+    try { body = JSON.parse(request.postDataBuffer()?.toString("latin1") || ""); } catch { /* multipart */ }
+    writes.push({ path, body });
+    if (failPath && path.includes(failPath)) return route.fulfill({ status: 400, json: { error: failMessage } });
+    return route.fulfill({ json });
+  };
+  await context.route("**/api/student-portal/requests/*", async (route) => answer(new URL(route.request().url()).pathname.replace("/api/student-portal/requests/", "requests/"), { message: "Spec: request saved." })(route));
+  await context.route("**/api/student-portal/request-attachments/upload", answer("request-attachments/upload", { attachment: { id: 7001, name: "spec.pdf", url: "/spec/spec.pdf", file_exists: true } }));
+  const page = await context.newPage();
+  const close = context.close.bind(context);
+  context.close = async () => {
+    for (const open of context.pages()) await open.waitForLoadState("networkidle").catch(() => {});
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+    await close();
+  };
+  return { context, page, writes };
+}
+const lastWrite = (writes, prefix) => [...writes].reverse().find((w) => w.path.startsWith(prefix));
+const labelRe = (label) => new RegExp(`^${esc(label)}(\\s*\\*)?\\s*$`);
+const fieldOf = (page, label) => page.locator("label.block").filter({ has: page.locator(".field-label", { hasText: labelRe(label) }) });
+const ctl = (page, label) => fieldOf(page, label).locator("select, input:not([type=file]), textarea").first();
+const submitButton = (page, name) => page.getByRole("button", { name, exact: true });
+const summary = (page) => page.getByRole("alert").filter({ hasText: "There is a problem" });
+
+/**
+ * Press Submit with nothing filled in: the summary shows at the top of the form with one link per problem, its words are
+ * repeated under the field, the first link moves the focus to its field, the page title starts with "Error: ", and nothing
+ * is sent. `problems` = [[field label, message]].
+ */
+async function expectSummaryOnSubmit(page, writes, button, problems, { prefix, focusTarget }) {
+  const submit = submitButton(page, button);
+  await expect(submit, "Submit is not switched off while answers are missing").toBeEnabled();
+  await submit.click();
+  const box = summary(page);
+  await expect(box).toBeVisible();
+  await expect(box.getByRole("link")).toHaveCount(problems.length);
+  for (const [label, message] of problems) {
+    await expect(box.getByRole("link", { name: message, exact: true }), `summary item: ${message}`).toBeVisible();
+    await expect(fieldOf(page, label).getByText(message, { exact: true }), `under "${label}"`).toBeVisible();
+  }
+  await expect(page, "the page title starts with Error:").toHaveTitle(/^Error: /);
+  await box.getByRole("link", { name: problems[0][1], exact: true }).click();
+  await expect(focusTarget ? focusTarget(page) : ctl(page, problems[0][0]), "the first link focuses its field").toBeFocused();
+  expect(lastWrite(writes, prefix), "nothing was sent").toBeUndefined();
+}
+
+const SEM = (label, extra = {}) => ({ label, start_date: "2027-01-10", end_date: "2027-05-10", state: "Upcoming", filing_status: "Pass", filing_detail: "Spec.", ...extra });
+function leaveOpen(data) {
+  data.student.standing = "Active";
+  data.student.enrollment_tag = "";
+  const o = data.leave_overview;
+  o.cases = [];
+  o.banner = null;
+  o.rules = { max_period_semesters: 2, max_total_semesters: 4 };
+  o.loa_semester_options = [SEM("AY 2026-2027 2nd Semester"), SEM("AY 2027-2028 1st Semester", { start_date: "2027-08-01", end_date: "2027-11-29" })];
+  o.can_file = { extension: { allowed: false, reason: "" }, loa: { allowed: true, reason: "" }, readmission: { allowed: false, reason: "" } };
+  data.loa_allowed_reasons = ["Medical / health", "Family emergency"];
+}
+
+test.describe("P82 changes: request forms show an error summary on submit", () => {
+  test("Leave of Absence: the summary lists what is missing; each link focuses its field; answers survive a server error", async ({ browser }) => {
+    const { context, page, writes } = await formPage(browser, leaveOpen, { failPath: "requests/leave-of-absence", failMessage: "Spec: the Dean office is closed." });
+    try {
+      await page.goto("/student/requests/leave-of-absence");
+      await expectSummaryOnSubmit(page, writes, "Submit leave request", [
+        ["Leave starts", "Choose the semester your leave starts in."],
+        ["Reason", "Choose the reason for your leave."],
+        ["Tell us what is happening", "Explain what is happening so staff can review your request."],
+      ], { prefix: "requests/leave-of-absence" });
+      // fixing one problem and sending again: only the rest is listed
+      await ctl(page, "Leave starts").selectOption("AY 2026-2027 2nd Semester");
+      await ctl(page, "Reason").selectOption("Family emergency");
+      await submitButton(page, "Submit leave request").click();
+      await expect(summary(page).getByRole("link")).toHaveCount(1);
+      await ctl(page, "Tell us what is happening").fill("Spec: a family matter.");
+      await submitButton(page, "Submit leave request").click();
+      await expect(page.getByRole("alert").filter({ hasText: "Spec: the Dean office is closed." })).toBeVisible();
+      await expect(summary(page), "a clean form shows no summary").toHaveCount(0);
+      // the server said no: every answer is still in the form
+      await expect(ctl(page, "Leave starts")).toHaveValue("AY 2026-2027 2nd Semester");
+      await expect(ctl(page, "Reason")).toHaveValue("Family emergency");
+      await expect(ctl(page, "Tell us what is happening")).toHaveValue("Spec: a family matter.");
+      await expect(submitButton(page, "Submit leave request")).toBeEnabled();
+      expect(lastWrite(writes, "requests/leave-of-absence").body).toEqual({ effective_start: "AY 2026-2027 2nd Semester", effective_end: "AY 2026-2027 2nd Semester", reason_category: "Family emergency", reason_remarks: "Spec: a family matter." });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Readmission: the summary lists the missing answers and the unticked checklist", async ({ browser }) => {
+    const ITEMS = ["Structured return intention completed", "Updated study plan confirmed"];
+    const { context, page, writes } = await formPage(browser, (d) => {
+      leaveOpen(d);
+      d.leave_overview.can_file.readmission = { allowed: true, reason: "" };
+      d.leave_overview.return_semester_options = ["AY 2026-2027 2nd Semester"];
+      d.semester_options = ["AY 2025-2026 1st Semester"];
+      d.readmission_requirements = ITEMS;
+    });
+    try {
+      await page.goto("/student/requests/readmission");
+      const submit = submitButton(page, "Submit readmission request");
+      await expect(submit).toBeEnabled();
+      await submit.click();
+      const box = summary(page);
+      await expect(box).toBeVisible();
+      for (const message of ["Choose the semester your leave started in.", "Choose the semester your leave ended in.", "Choose the semester you want to return in.", "Say why you are ready to come back.", "Tick every item on the checklist."]) {
+        await expect(box.getByRole("link", { name: message, exact: true }), message).toBeVisible();
+      }
+      await box.getByRole("link", { name: "Tick every item on the checklist.", exact: true }).click();
+      await expect(page.getByRole("checkbox", { name: ITEMS[0] }), "the checklist link focuses its first item").toBeFocused();
+      expect(lastWrite(writes, "requests/readmission")).toBeUndefined();
+      // a fully answered form sends
+      await ctl(page, "Your leave started in").selectOption("AY 2025-2026 1st Semester");
+      await ctl(page, "Semester you want to return in").selectOption("AY 2026-2027 2nd Semester");
+      await ctl(page, "Why you are ready to come back").fill("Spec: ready.");
+      for (const item of ITEMS) await page.getByLabel(item).check();
+      await submit.click();
+      await expect(page.getByText("Spec: request saved.")).toBeVisible();
+      expect(lastWrite(writes, "requests/readmission").body).toMatchObject({ target_return_term: "AY 2026-2027 2nd Semester", readmission_items: ITEMS });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Return from AWOL: the summary lists the three required answers", async ({ browser }) => {
+    const { context, page, writes } = await formPage(browser, (d) => {
+      d.student.standing = "AWOL";
+      d.student.enrollment_tag = "AWOL";
+      d.awol_case = null;
+      d.standalone_cases = { ...(d.standalone_cases || {}), awol: [] };
+      d.upcoming_semesters = ["AY 2026-2027 2nd Semester"];
+      d.semester_options = ["AY 2025-2026 2nd Semester"];
+    });
+    try {
+      await page.goto("/student/requests/awol-return");
+      await expectSummaryOnSubmit(page, writes, "Submit return declaration", [
+        ["Intended return semester", "Choose your intended return semester."],
+        ["Written intention to resume enrollment", "Write your intention to resume enrollment."],
+        ["Reason for returning and readiness to continue", "Explain why you are returning and how you are ready to continue."],
+      ], { prefix: "requests/awol-return" });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Withdrawal: an empty reason is reported in the summary, not by the browser's own bubble", async ({ browser }) => {
+    const { context, page, writes } = await formPage(browser, (d) => {
+      d.withdrawal_application = null;
+      d.standalone_cases = { ...(d.standalone_cases || {}), withdrawal: [] };
+      d.workflow_messages = [];
+      d.subject_enrollments = [{
+        id: 901, course_code: "SPEC-101", course_title: "Spec SPEC-101", term_label: "AY 2026-2027 1st Semester", status: "Enrolled", withdrawal_eligible: true,
+        withdrawal_window: { eligible: true, deadline: "2026-11-20", status: "Withdrawal window open", term_start_date: "2026-11-07", fee_consequence: "Spec fee.", rule_source: "Spec", policy: "Spec policy." },
+      }];
+    });
+    try {
+      await page.goto("/student/requests/withdrawal");
+      await expect(ctl(page, "Reason for withdrawing from this subject")).not.toHaveAttribute("required", /.*/);
+      await expectSummaryOnSubmit(page, writes, "Send withdrawal request", [["Reason for withdrawing from this subject", "Explain why you are withdrawing from this subject."]], { prefix: "requests/withdrawal" });
+      await ctl(page, "Reason for withdrawing from this subject").fill("Spec: schedule clash.");
+      await submitButton(page, "Send withdrawal request").click();
+      await expect(page.getByText("Spec: request saved.")).toBeVisible();
+      expect(lastWrite(writes, "requests/withdrawal").body).toMatchObject({ reason: "Spec: schedule clash.", subject_enrollment_id: 901 });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Defense schedule request: a missing date is reported in the summary", async ({ browser }) => {
+    const { context, page, writes } = await formPage(browser, atStage("Final Defense", [FINISHED_PROPOSAL]));
+    try {
+      await page.goto("/student/defense-schedule");
+      await expectSummaryOnSubmit(page, writes, "Submit schedule request", [["Preferred date", "Choose the date you want for your defense."]], { prefix: "requests/defense-scheduling" });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Practicum MOA step: the site and the MOA file are reported in the summary", async ({ browser }) => {
+    const { context, page, writes } = await formPage(browser, (d) => {
+      d.student.program_has_practicum = true;
+      d.student.program_code = "MAPSY";
+      d.practicum_eligibility = { eligible: true, status: "Verified", checklist: [], program_scope: {} };
+      d.practicum_program_scope = { description: "Spec scope." };
+      d.practicum_record = null;
+      d.workflow_messages = [];
+    });
+    try {
+      await page.goto("/student/practicum");
+      await expectSummaryOnSubmit(page, writes, "Submit MOA stage", [
+        ["Practicum site / company", "Enter the practicum site or company."],
+        ["Practicum MOA PDF", "Upload the signed MOA as a PDF."],
+      ], { prefix: "requests/practicum" });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Graduation application: the missing PDF is reported in the summary", async ({ browser }) => {
+    const { context, page, writes } = await formPage(browser, (d) => {
+      d.graduation_endorsement = null;
+      d.graduation_eligibility = { eligible: true, status: "Eligible", missing_coursework: [], missing_research_requirements: [] };
+      d.graduation_review_windows = ["2026-2027"];
+      d.graduation_default_review_window = "2026-2027";
+      d.workflow_messages = [];
+    });
+    try {
+      await page.goto("/student/graduation");
+      await expectSummaryOnSubmit(page, writes, "Submit graduation application", [["Signed graduation application / review-window PDF", "Upload your signed graduation application as a PDF."]], { prefix: "requests/graduation", focusTarget: (p) => p.locator('input[type="file"]').first() });
+    } finally {
+      await context.close();
+    }
+  });
+});
