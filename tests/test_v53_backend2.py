@@ -344,6 +344,29 @@ class V53Backend2Tests(unittest.TestCase):
         # marking read is a POST
         self.assertEqual(client.post(f"/api/notifications/{again['items'][0]['id']}/read", json={}).status_code, 200)
 
+    # ------------------------------------------------------------------ I-072 (F-18)
+    def test_signing_in_writes_no_data(self):
+        # a leave that should have started by now, and a demo persona whose baseline would be repaired
+        with app.app_context():
+            case = LeaveCase.query.filter_by(kind="LOA", status="Leave Scheduled").first()
+            if case is None:
+                case = LeaveCase.query.filter_by(kind="LOA", status="Dean Review").first()
+                case.status = "Leave Scheduled"
+            case.start_term_id = AcademicTerm.query.order_by(AcademicTerm.start_date).first().id
+            case.end_term_id = case.start_term_id
+            db.session.commit()
+            case_id = case.id
+        for email in (STAFF_EMAIL, DEAN_EMAIL, "practicum.andrea@usls.edu.ph", "loa.daniel@usls.edu.ph"):
+            LOGIN_THROTTLE.reset()
+            before = dump_database()
+            with patch.dict(os.environ, {"DEMO_MODE": "1"}):
+                client = app.test_client()
+                response = client.post("/api/auth/login", json={"email": email, "password": PASSWORD})
+            self.assertEqual(response.status_code, 200, (email, response.get_json()))
+            self.assertEqual(changed_tables(before, dump_database()), [], email)
+        with app.app_context():
+            self.assertEqual(db.session.get(LeaveCase, case_id).status, "Leave Scheduled")
+
 
 if __name__ == "__main__":
     unittest.main()
