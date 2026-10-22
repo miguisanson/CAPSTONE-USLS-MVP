@@ -158,7 +158,7 @@ test.describe("Student Handoff (staff)", () => {
   test("an upload with an unresolved discrepancy: the table, Compare, the dialog", async ({ page }) => {
     await page.route(/\/api\/monitoring\/uploads$/, (route) => route.fulfill({ json: UPLOADS }));
     await openFromSidebar(page, /1 · Student Handoff/);
-    await expect(main(page).getByText("1 backups")).toBeVisible();
+    await expect(main(page).getByText("1 backup", { exact: true })).toBeVisible();
     await main(page).getByRole("button", { name: /View upload history/ }).click();
     await expect(main(page).getByText("MIT_Monitoring_Fixture.xlsx")).toBeVisible();
     await expect(main(page).getByText("1 unresolved").first()).toBeVisible();
@@ -182,7 +182,7 @@ test.describe("Student Handoff (staff)", () => {
     await expect(dialog.getByRole("heading", { name: "Existing record" })).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Uploaded record" })).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Subject comparison" })).toBeVisible();
-    await expect(dialog.getByRole("row", { name: /MIT 201/ })).toContainText("needs review");
+    await expect(dialog.getByRole("row", { name: /MIT 201/ })).toContainText(/needs review/i);
     await expect(dialog.getByRole("button", { name: /Keep Existing/ })).toBeVisible();
     await expect(dialog.getByRole("button", { name: /Use Uploaded/ })).toBeVisible();
     await dialog.getByRole("button", { name: /^Edit$/ }).click();
