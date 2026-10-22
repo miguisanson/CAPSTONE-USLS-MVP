@@ -367,6 +367,28 @@ class V53Backend2Tests(unittest.TestCase):
         with app.app_context():
             self.assertEqual(db.session.get(LeaveCase, case_id).status, "Leave Scheduled")
 
+    # ------------------------------------------------------------------ I-066 (F-12)
+    def test_each_coordinator_gets_a_dashboard_holding_only_their_own_work(self):
+        labels = {"academic@usls.edu.ph": "Academic Coordinator", "research@usls.edu.ph": "Research Coordinator"}
+        for email, label in labels.items():
+            client = sign_in(email)
+            response = client.get("/api/dashboard")
+            self.assertEqual(response.status_code, 200, (email, response.get_json()))
+            payload = response.get_json()
+            tasks = payload["open_tasks"]
+            self.assertTrue(tasks, email)
+            self.assertEqual({task["owner_role"] for task in tasks}, {label}, email)
+            self.assertEqual([row["owner"] for row in payload["tasks_by_owner"]], [label], email)
+            own = client.get("/api/tasks", query_string={"owner": label, "page_size": 200}).get_json()
+            derived = [item for item in own["items"] if not item.get("student_id")]
+            self.assertEqual(payload["kpis"]["pending_tasks"], own["total"] - len(derived), email)
+            self.assertEqual(payload["viewer"], {"role": email.split("@")[0] + "_coordinator", "owner": label})
+
+    def test_staff_dashboard_is_unchanged_by_the_coordinator_filter(self):
+        staff = sign_in(STAFF_EMAIL).get("/api/dashboard").get_json()
+        owners = {row["owner"] for row in staff["tasks_by_owner"]}
+        self.assertGreater(len(owners), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
