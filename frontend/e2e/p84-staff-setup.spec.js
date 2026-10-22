@@ -140,7 +140,7 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     await expect(tileOf(page, "Selected to offer")).toContainText(String(offered));
 
     // the subject-needs report and the decisions
-    await expect(main(page).getByText("Subject-needs report")).toBeVisible();
+    await expect(main(page).getByText(/students? reviewed/)).toBeVisible(); // CHANGED BY I-117: was the "Subject-needs report" heading; its summary now sits in the one subjects card
     await expect(main(page).getByText("Course offering decisions", { exact: true })).toBeVisible();
     await expect(main(page).locator('input[aria-label^="Sections for "]')).toHaveCount(data.demand.length);
     await expect(main(page).locator('select[aria-label^="Faculty assignment for "]')).toHaveCount(data.demand.length);
@@ -445,13 +445,13 @@ test.describe("P6.5: one header style on the five pages (review F-09)", () => {
 test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-15)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
-  test("one table: subject, demand, decision, sections, faculty; one row per subject, none taller than 96 px on average (two-line subject titles; the old stacked cards were ~250 px)", async ({ page }) => {
+  test("one table: subject, needing next term, not taken yet, decision, sections, faculty; one row per subject, none taller than 96 px on average (two-line subject titles; the old stacked cards were ~250 px)", async ({ page }) => {
     test.setTimeout(120_000);
     const data = await openCourseAdjustments(page);
     const table = main(page).getByRole("table", { name: "Course offering decisions" });
     await expect(table).toBeVisible();
     const heads = await headTexts(table);
-    expect(heads.slice(0, 5)).toEqual(["Subject", "Demand", "Decision", "Sections", "Faculty"]);
+    expect(heads.slice(0, 6)).toEqual(["Subject", "Needing next term", "Not taken yet", "Decision", "Sections", "Faculty"]); // CHANGED BY I-117: was Subject, Demand, Decision, Sections, Faculty
     await expect(table.locator("tbody tr")).toHaveCount(data.demand.length);
     for (const row of data.demand) {
       const line = rowOf(page, table, row.course.code);
@@ -464,7 +464,7 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     expect(box.height / data.demand.length, `average row height ${Math.round(box.height / data.demand.length)} px`).toBeLessThan(96);
     // the stacked cards of the old page are gone
     await expect(main(page).getByText(/^Show the \d+ affected students?$/)).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(4300); // was 4,790 px before P6.5; real subject titles add lines (I-117 merges the two subject lists)
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(3000); // was 4,790 px before P6.5 and ~4,000 before I-117 merged the two subject lists
     for (const view of VIEWS.slice(1)) {
       await page.setViewportSize(view);
       expect(await noOverflow(page), `sideways scroll at ${view.width}`).toBe(true);
@@ -535,6 +535,98 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     await page.keyboard.press("Escape");
     await expect(drawer).toHaveCount(0);
     await expect(table.getByRole("button", { name: `Details for ${code}` })).toBeFocused();
+  });
+});
+
+// I-117: the Subject-needs report and the Course offering decisions listed the same subjects twice (page ~4,000 px at
+// 1366). Now ONE table: subject, needing next term, not taken yet, decision, sections, faculty, Details. "Show students"
+// and "delayed if withheld" live in the row's Details drawer.
+test.describe("I-117: Course Adjustments lists each subject once", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  /** The page's two GETs: the plan with its demand rows, and the subject-needs report. */
+  async function openWithReport(page) {
+    const reportLoaded = nextGet(page, "course-adjustments/subject-needs-report");
+    const data = await openCourseAdjustments(page);
+    const report = await reportLoaded;
+    return { data, report };
+  }
+  // the title follows the code with no space in the row text, so a code ending in a digit must not be followed by another digit (COG1 vs COG10)
+  const codeRe = (code) => new RegExp(code + (/[0-9]$/.test(code) ? "(?![0-9])" : ""));
+
+  test("the page is under 3,000 px tall at 1366 and each subject code is in exactly one table row, not in a second list", async ({ page }) => {
+    test.setTimeout(120_000);
+    const { data } = await openWithReport(page);
+    for (const row of data.demand) {
+      const re = codeRe(row.course.code);
+      await expect(main(page).locator("tr").filter({ hasText: re }), `${row.course.code} rows`).toHaveCount(1);
+      await expect(main(page).getByRole("listitem").filter({ hasText: re }), `${row.course.code} list items`).toHaveCount(0);
+    }
+    await expect(main(page).getByRole("heading", { name: "Subject-needs report" })).toHaveCount(0);
+    await expect(main(page).getByRole("button", { name: "Show students" })).toHaveCount(0);
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(height, `page height ${height} px`).toBeLessThan(3000);
+    // the table fits its card at 1366: the Details button is not pushed out of sight (the scroll wrapper is for narrow screens)
+    const clipped = await main(page).locator("[data-table-scroll]").first().evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(clipped, `the table is ${clipped} px wider than its card`).toBeLessThanOrEqual(1);
+  });
+
+  test("columns: subject, needing next term, not taken yet, decision, sections, faculty, details - with the report's numbers", async ({ page }) => {
+    test.setTimeout(120_000);
+    const { data, report } = await openWithReport(page);
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    expect(await headTexts(table)).toEqual(["Subject", "Needing next term", "Not taken yet", "Decision", "Sections", "Faculty", "Details"]);
+    await expect(table.locator("tbody tr")).toHaveCount(data.demand.length);
+    const byCourse = new Map(report.rows.map((row) => [row.course.id, row]));
+    for (const row of data.demand) {
+      const line = rowOf(page, table, row.course.code);
+      const mine = byCourse.get(row.course.id);
+      const cells = line.locator("td");
+      await expect(cells.nth(1), `${row.course.code} needing next term`).toHaveText(new RegExp("^\\s*" + (mine ? mine.need_count : 0) + "(\\D|$)"));
+      await expect(cells.nth(2), `${row.course.code} not taken yet`).toHaveText(new RegExp("^\\s*" + (mine ? mine.not_taken_count : 0) + "(\\D|$)"));
+    }
+    // the report's other parts: summary figures and the download
+    await expect(main(page).getByText(new RegExp(`${report.summary.students_reviewed} students? reviewed`))).toBeVisible();
+    await expect(main(page).getByRole("button", { name: "Download CSV" })).toBeVisible();
+  });
+
+  test("the later subjects are a filter; the default shows every subject", async ({ page }) => {
+    test.setTimeout(120_000);
+    const { data, report } = await openWithReport(page);
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    const due = report.rows.filter((row) => row.need_count > 0).length;
+    const later = report.rows.filter((row) => row.need_count === 0 && row.not_taken_count > 0).length;
+    const all = main(page).getByRole("button", { name: /^All subjects/ });
+    await expect(all).toHaveAttribute("aria-pressed", "true");
+    await expect(table.locator("tbody tr")).toHaveCount(data.demand.length);
+    await main(page).getByRole("button", { name: /^Needed next term/ }).click();
+    await expect(table.locator("tbody tr")).toHaveCount(due);
+    await main(page).getByRole("button", { name: /^Later in the curriculum/ }).click();
+    await expect(table.locator("tbody tr")).toHaveCount(later);
+    await all.click();
+    await expect(table.locator("tbody tr")).toHaveCount(data.demand.length);
+  });
+
+  test("Details holds the students (Show students) and who is delayed if the subject is withheld", async ({ page }) => {
+    test.setTimeout(120_000);
+    const { data, report } = await openWithReport(page);
+    const mine = report.rows.find((row) => row.need_count > 0);
+    test.skip(!mine, "no subject is needed next term on this database");
+    const demand = data.demand.find((row) => row.course.id === mine.course.id);
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    await table.getByRole("button", { name: `Details for ${mine.course.code}` }).click();
+    const drawer = page.getByRole("dialog", { name: new RegExp(mine.course.code) });
+    await expect(drawer).toBeVisible();
+    const due = mine.students.filter((student) => student.due_next);
+    const everyone = drawer.getByRole("button", { name: `All who have not taken it (${mine.students.length})` });
+    await expect(drawer.getByRole("button", { name: `Needing next term (${due.length})` })).toHaveAttribute("aria-pressed", "true");
+    for (const student of due.slice(0, 3)) await expect(drawer.getByText(student.name).first()).toBeVisible();
+    await everyone.click();
+    await expect(everyone).toHaveAttribute("aria-pressed", "true");
+    for (const student of mine.students.slice(0, 3)) await expect(drawer.getByText(student.name).first()).toBeVisible();
+    if (demand.delayed_count) await expect(drawer.getByText(new RegExp(`${demand.delayed_count} delayed if withheld`)).first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toHaveCount(0);
   });
 });
 
