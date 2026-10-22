@@ -161,5 +161,50 @@ class SectionJBackendTests(unittest.TestCase):
             self.assertEqual(latest_log.new_status, "Exported - Ready to Send")
 
 
+    # ------------------------------------------------------------------ I-012 (J12)
+    def _residency_case(self):
+        """A student the residency checker cannot clear: Coursework stage, purpose 'Comprehensive examination'."""
+        student = db.session.get(Student, self.student_id)
+        student.entry_year = date.today().year
+        student.current_stage = "Coursework"
+        student.standing = "Active"
+        student.enrollment_tag = "Enrolled"
+        term = AcademicTerm(
+            label="AY 2026-2027 1st Semester",
+            start_date=date(date.today().year, 1, 1),
+            end_date=date(date.today().year, 5, 31),
+            is_active_planning_term=True,
+        )
+        db.session.add(term)
+        db.session.commit()
+        return student.id, term.id
+
+    def test_residency_cannot_be_recorded_while_the_checker_says_needs_human_review(self):
+        """J12: the handbook allows residency only for the listed purposes; no override exists."""
+        with app.app_context():
+            student_id, term_id = self._residency_case()
+            staff = self._role_client(self.staff_id, "staff")
+            review = staff.post("/api/awol/policy-review", json={
+                "student_id": student_id,
+                "workflow_action": "record_residency",
+                "residency_reason": "Comprehensive examination",
+            })
+            self.assertEqual(review.status_code, 200, review.get_json())
+            self.assertEqual(review.get_json()["review"]["recommendation"], "Needs Human Review")
+
+            for notes in ("", "Verified by hand with the adviser."):
+                response = staff.post("/api/transactions/awol", json={
+                    "student_id": student_id,
+                    "workflow_action": "record_residency",
+                    "term_id": term_id,
+                    "residency_reason": "Comprehensive examination",
+                    "staff_notes": notes,
+                })
+                self.assertEqual(response.status_code, 400, (notes, response.get_json()))
+                self.assertIn("human review", response.get_json()["error"].lower())
+                self.assertEqual(ResidencyEnrollment.query.filter_by(student_id=student_id).count(), 0)
+                self.assertEqual(db.session.get(Student, student_id).enrollment_tag, "Enrolled")
+
+
 if __name__ == "__main__":
     unittest.main()
