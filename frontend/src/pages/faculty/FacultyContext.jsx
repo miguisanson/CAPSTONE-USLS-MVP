@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, EmptyState, Spinner } from "../../components/ui";
+import { Card, EmptyState, Spinner } from "../../components/ui/index.js";
 import { PortalNavProvider } from "../../components/portalNav";
 import { parseDay } from "../../components/calendar/CalendarView";
 
@@ -60,14 +60,14 @@ export function FacultyGate({ children }) {
   const { data, loading, error } = useFaculty();
   if (loading && !data) {
     return (
-      <Card className="p-6">
+      <Card>
         <Spinner label="Loading faculty portal..." />
       </Card>
     );
   }
   if (error && !data) {
     return (
-      <Card className="p-6">
+      <Card>
         <EmptyState icon={AlertTriangle} title="Could not load the faculty portal" hint={error} />
       </Card>
     );

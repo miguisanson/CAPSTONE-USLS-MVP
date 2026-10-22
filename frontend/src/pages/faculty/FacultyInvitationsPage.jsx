@@ -2,12 +2,16 @@ import { useState } from "react";
 import { CalendarClock, CalendarDays, MailCheck, UserX, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, EmptyState, ErrorNote, InlineNotice, PageHeader, SectionTitle, Spinner, StatusBadge } from "../../components/ui";
-import { Field, Textarea } from "../../components/forms";
+import { Button, Card, EmptyState, Field, InlineNotice, PageHeader, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDateTime } from "../../lib/format";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 
 const MIN_REASON = 3;
+
+// An error line from a message string; nothing when there is no message.
+function ErrorLine({ message }) {
+  return message ? <InlineNotice tone="danger">{message}</InlineNotice> : null;
+}
 
 function ScheduleLine({ schedule }) {
   return (
@@ -16,7 +20,7 @@ function ScheduleLine({ schedule }) {
       <span className="font-semibold text-ink">{formatDay(schedule.preferred_date)}</span>
       <span className="text-slate-600">{formatTimeRange(schedule.start_time, schedule.end_time)} (Philippine time)</span>
       <span className="text-slate-600">{schedule.venue || "Venue not set"}</span>
-      <StatusBadge value={schedule.display_status || schedule.status} dot={false} />
+      <StatusChip status={schedule.display_status || schedule.status} dot={false} />
     </div>
   );
 }
@@ -39,10 +43,10 @@ function ReasonForm({ label, confirmLabel, busy, error, onCancel, onSubmit }) {
       <Field label={label} required>
         <Textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={500} />
       </Field>
-      <ErrorNote message={localError || error} />
+      <ErrorLine message={localError || error} />
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 cursor-pointer disabled:opacity-60" disabled={busy}>{busy ? "Sending..." : confirmLabel}</button>
-        <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>Cancel</button>
+        <Button type="submit" variant="danger" disabled={busy}>{busy ? "Sending..." : confirmLabel}</Button>
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
       </div>
     </form>
   );
@@ -75,17 +79,17 @@ function InvitationCard({ invitation, onChanged }) {
   const cannotAttend = (reason) => run(() => api.cannotAttendDefense(activeSchedule.id, { reason }));
 
   return (
-    <li className="space-y-3 rounded-2xl border border-slate-100 p-4">
+    <li className="space-y-3 rounded-xl border border-slate-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">{student.name || "Student"}</p>
-          <p className="text-xs text-slate-500">
+          <p className="meta">
             {[student.program_code, student.student_number].filter(Boolean).join(" · ") || "Program not set"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge value={invitation.defense_type} dot={false} />
-          <StatusBadge value={invitation.status} dot={false} />
+          <StatusChip status={invitation.defense_type} dot={false} />
+          <StatusChip status={invitation.status} dot={false} />
         </div>
       </div>
       <p className="text-sm text-slate-600">
@@ -93,7 +97,7 @@ function InvitationCard({ invitation, onChanged }) {
       </p>
       {(invitation.other_members || []).length > 0 && (
         <div>
-          <p className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <p className="eyebrow mb-1 flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5" aria-hidden="true" /> Other panel members
           </p>
           <ul className="flex flex-wrap gap-2">
@@ -105,12 +109,12 @@ function InvitationCard({ invitation, onChanged }) {
           </ul>
         </div>
       )}
-      {schedule ? <ScheduleLine schedule={schedule} /> : <p className="text-xs text-slate-500">No date has been booked yet.</p>}
+      {schedule ? <ScheduleLine schedule={schedule} /> : <p className="meta">No date has been booked yet.</p>}
       {invitation.status === "Declined" && invitation.reason && (
-        <p className="text-xs text-slate-500">Your reason: {invitation.reason}</p>
+        <p className="meta">Your reason: {invitation.reason}</p>
       )}
       {invitation.responded_at && invitation.status !== "Invited" && (
-        <p className="text-xs text-slate-400">Answered {formatDateTime(invitation.responded_at)}</p>
+        <p className="meta">Answered {formatDateTime(invitation.responded_at)}</p>
       )}
 
       {mode === "decline" ? (
@@ -133,22 +137,22 @@ function InvitationCard({ invitation, onChanged }) {
         />
       ) : (
         <>
-          <ErrorNote message={error} />
+          <ErrorLine message={error} />
           <div className="flex flex-wrap items-center gap-2">
             {invitation.status !== "Accepted" && (
-              <button type="button" className="btn-primary" onClick={accept} disabled={busy}>
+              <Button onClick={accept} disabled={busy}>
                 {busy ? "Saving..." : "Accept"}
-              </button>
+              </Button>
             )}
             {invitation.status !== "Declined" && (
-              <button type="button" className="btn-ghost" onClick={() => { setMode("decline"); setError(""); }} disabled={busy}>
+              <Button variant="secondary" onClick={() => { setMode("decline"); setError(""); }} disabled={busy}>
                 Decline
-              </button>
+              </Button>
             )}
             {activeSchedule && invitation.status !== "Declined" && (
-              <button type="button" className="btn-ghost ml-auto px-3 py-1.5 text-xs text-red-600" onClick={() => { setMode("cannot-attend"); setError(""); }} disabled={busy}>
-                <UserX className="h-4 w-4" /> I cannot attend this defense
-              </button>
+              <Button variant="secondary" size="sm" icon={UserX} className="ml-auto text-red-600" onClick={() => { setMode("cannot-attend"); setError(""); }} disabled={busy}>
+                I cannot attend this defense
+              </Button>
             )}
           </div>
         </>
@@ -160,7 +164,7 @@ function InvitationCard({ invitation, onChanged }) {
 function Group({ title, hint, items, onChanged }) {
   if (!items.length) return null;
   return (
-    <Card className="p-6">
+    <Card>
       <SectionTitle title={`${title} (${items.length})`} subtitle={hint} icon={MailCheck} />
       <ul className="space-y-3">
         {items.map((invitation) => (
@@ -192,7 +196,7 @@ export default function FacultyInvitationsPage() {
     return (
       <div className="space-y-5">
         {header}
-        <Card className="p-6"><Spinner label="Loading your invitations..." /></Card>
+        <Card><Spinner label="Loading your invitations..." /></Card>
       </div>
     );
   }
@@ -200,7 +204,7 @@ export default function FacultyInvitationsPage() {
     return (
       <div className="space-y-5">
         {header}
-        <ErrorNote message={error || "Could not load your invitations."} />
+        <ErrorLine message={error || "Could not load your invitations."} />
       </div>
     );
   }
@@ -213,10 +217,10 @@ export default function FacultyInvitationsPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       {header}
-      <ErrorNote message={error} />
-      {waiting.length > 0 && <InlineNotice tone="warn">{waiting.length} invitation{waiting.length === 1 ? " is" : "s are"} waiting for your answer.</InlineNotice>}
+      <ErrorLine message={error} />
+      {waiting.length > 0 && <InlineNotice tone="warning">{waiting.length} invitation{waiting.length === 1 ? " is" : "s are"} waiting for your answer.</InlineNotice>}
       {invitations.length === 0 ? (
-        <Card className="p-6">
+        <Card>
           <EmptyState icon={MailCheck} title="No panel invitations" hint="When the Research Coordinator puts you on a defense panel, the invitation shows up here." />
         </Card>
       ) : (
