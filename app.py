@@ -35956,7 +35956,7 @@ DEAN_DEMO_STUDENTS = {
     "leave-of-absence-decided": "2460017",   # Olivia Cabrera, MSCS: LOA the Dean approved
     "withdrawal-decided": "2460068",    # Gian Lacson, MSN: withdrawal the Dean denied
 }
-DEAN_DEMO_PLANS = (("MIT", "Submitted"), ("MSN", "Approved"))
+DEAN_DEMO_PLANS = (("MIT", "Submitted"), ("MSN", "Returned"))
 
 
 def seed_dean_review_cases() -> int:
@@ -36166,10 +36166,11 @@ def seed_dean_review_cases() -> int:
             continue
         plan = CourseOfferingPlan(
             program_id=program.id, term_label=next_term.label, status=status,
-            notes="Proposed offerings from the subject demand of the current students.",
+            notes=(
+                "Proposed offerings from the subject demand of the current students."
+                if status == "Submitted" else "Please add a second section for the high-demand subjects."
+            ),
             target_term_id=next_term.id, reference_term_id=active_term.id, submitted_at=now_utc(),
-            approved_at=now_utc() if status == "Approved" else None,
-            approved_by=dean.full_name if status == "Approved" else None,
         )
         db.session.add(plan)
         db.session.flush()
@@ -36179,12 +36180,12 @@ def seed_dean_review_cases() -> int:
                 plan_id=plan.id, course_id=course.id, demand_count=6 - index, section_count=1,
                 availability_count=len(faculty_ids), status="Offered",
                 assigned_faculty_id=faculty_ids[index % len(faculty_ids)] if faculty_ids else None,
-                assignment_status="Approved" if status == "Approved" else "Proposed",
+                assignment_status="Proposed",
             ))
         add_log(
             "course-adjustments", None, "Academic Coordinator", "Course Adjustments",
             f"Offering plan sent to the Dean: {program.code} {next_term.label}" if status == "Submitted"
-            else f"Offering plan approved by Dean: {program.code} {next_term.label}",
+            else f"Offering plan returned by Dean for revision: {program.code} {next_term.label}",
             "Dean" if status == "Submitted" else "Academic Coordinator", plan.notes or "",
         )
         made += 1
