@@ -3,6 +3,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
+import { requestStateLabel } from "./requestMeta";
 import { ErrorSummary, useFormErrors, useSubmitRequest, StageCard, SavedWorkflowFiles, RequestPdfUpload, SubmitState } from "./shared";
 
 export function PracticumRequestForm({ data, onSaved }) {
@@ -77,7 +78,7 @@ export function PracticumRequestForm({ data, onSaved }) {
           {scope.description || "Practicum is restricted to Psychology programs and the Master of Science in Guidance and Counseling (MSGC)."} Your program, {data.student.program_code} — {data.student.program_name}, is within this scope.
         </p>
       </InlineNotice>
-      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current practicum stage</p><p className="meta mt-1">Only the requirements due now can be edited. Completed submissions stay available below.</p></div><StatusChip status={status} dot={false} /></div></div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current practicum stage</p><p className="meta mt-1">Only the requirements due now can be edited. Completed submissions stay available below.</p></div><StatusChip status={requestStateLabel(status)} dot={false} /></div></div>
 
       <StageCard number={1} title="Eligibility Check / Pre-Practicum Requirements" state={eligibilityReady ? "complete" : "pending"} helper={existing ? "The eligibility gate was completed for this request. The values below continue to reflect the latest monitoring and research records." : "Automatically checked from your monitoring sheet and research milestones."}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
@@ -163,7 +164,7 @@ export function GraduationRequestForm({ data, onSaved }) {
   return (
     <form noValidate onSubmit={onSubmit} className="space-y-4">
       <ErrorSummary errors={errors} />
-      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current graduation stage</p><p className="meta mt-1">Your application stays visible while each reviewing office completes its part.</p></div><StatusChip status={status} dot={false} /></div></div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">Current graduation stage</p><p className="meta mt-1">Your application stays visible while each reviewing office completes its part.</p></div><StatusChip status={requestStateLabel(status)} dot={false} /></div></div>
       <StageCard number={1} title="Application / Review Window" state={!eligibilityReady && !existing ? "locked" : applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={!eligibilityReady && !existing ? "This step opens only after coursework, research, completion documents, and any required practicum are complete." : applicationEditable ? "What you need to submit now: the review window and signed graduation application / review-window PDF." : "Your submitted application is saved and read-only during review."}>
         {applicationEditable ? <div className="space-y-4"><Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} is open. Other school years are shown in gray and cannot be selected.`} required error={messageFor("graduation-year")}><Select id="graduation-year" value={form.review_window} onChange={set("review_window")} options={reviewWindowOptions} placeholder="" /></Field><RequestPdfUpload id="graduation-pdf" invalid={messageFor("graduation-pdf")} requestType="graduation" label="Signed graduation application / review-window PDF" initialAttachment={existing?.request_attachment} onUploaded={(attachment) => setForm((current) => ({ ...current, attachment_id: attachment?.id || null }))} /><Field label="Remarks for the reviewer"><Textarea value={form.remarks} onChange={set("remarks")} placeholder="Add a message to the staff reviewing your graduation submission." /></Field><SubmitState busy={busy} error={error} message={message} label={returned || status === "Not Eligible" ? "Resubmit graduation application" : "Submit graduation application"} /></div> : existing ? <div className="space-y-3"><p className="text-sm font-semibold text-ink">{existing.review_window}</p><SavedWorkflowFiles files={existing.attachments || []} /></div> : <InlineNotice tone="neutral">Complete the requirements listed in Step 3 before submitting a graduation application.</InlineNotice>}
       </StageCard>

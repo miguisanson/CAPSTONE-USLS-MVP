@@ -273,7 +273,7 @@ test.describe("P4.1 shared student parts", () => {
       const workflow = panel(page, "Workflow Status");
       await expect(workflow).toContainText("Administrative and completion requests currently visible to you");
       for (const [label, chip, detail] of [
-        ["Withdrawal", "No request", "No withdrawal request is active."],
+        ["Withdrawal", "Not submitted", "No withdrawal request is active."],
         ["Graduation Endorsement", "Needs verification", "Resolve graduation missing coursework"],
       ]) {
         const row = workflow.getByText(label, { exact: true }).locator("xpath=ancestor::div[.//p][1]");
@@ -662,11 +662,11 @@ test.describe("P4.1 shared student parts", () => {
       await c.getByRole("button", { name: /View stage history/ }).click();
       await expect(c.getByText("Nothing has happened on this request yet.")).toBeVisible();
 
-      // the numbered stage card of the form
-      const stage = page.locator("section").filter({ has: page.getByRole("heading", { level: 3, name: "Send your withdrawal request", exact: true }) });
-      await expect(stage.first()).toContainText("Choose one eligible enrolled subject and state the reason for withdrawing.");
-      await expect(stage.first().getByText("Current stage", { exact: true })).toBeVisible();
-      await expect(stage.first().getByText("1", { exact: true })).toBeVisible();
+      // the form card (the same card as Leave of Absence, Readmission and Return from AWOL; no numbered stage)
+      const stage = page.getByRole("region", { name: "Ask to withdraw from a subject" });
+      await expect(stage.getByRole("heading", { level: 3, name: "Ask to withdraw from a subject", exact: true })).toBeVisible();
+      await expect(stage).toContainText("Choose one eligible enrolled subject and state the reason for withdrawing.");
+      await expect(stage.getByText("Current stage", { exact: true })).toHaveCount(0);
 
       // the discussion panel: a message with a required PDF, and a reply box
       const talk = page.getByRole("region", { name: "Request discussion" });

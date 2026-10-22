@@ -29,15 +29,24 @@ export default function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [error, setError] = useState("");
   const wrapper = useRef(null);
+  // False once the bell is gone (sign-out unmounts the shell): a refresh that was still running must not read the list
+  // with a session that has ended - that read came back 401 (I-131).
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true; // React development mode mounts twice
+    return () => { alive.current = false; };
+  }, []);
 
   const load = useCallback(async () => {
+    if (!alive.current) return;
     try {
       const body = await api.notifications({ limit: 30 });
+      if (!alive.current) return;
       setItems(body.items || []);
       setUnread(body.unread_count || 0);
       setError("");
     } catch (err) {
-      setError(err.message || "Could not load notifications.");
+      if (alive.current) setError(err.message || "Could not load notifications.");
     }
   }, []);
 

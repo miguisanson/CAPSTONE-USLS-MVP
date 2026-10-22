@@ -1,6 +1,5 @@
 import { Component, useEffect, useId, useState } from "react";
 import {
-  AlertTriangle,
   CalendarClock,
   CalendarPlus,
   CheckCircle2,
@@ -30,6 +29,35 @@ export const STUDENT_MESSAGE_SLUG_BY_VIEW = Object.fromEntries(
   Object.entries(STUDENT_REQUEST_VIEW_BY_SLUG).map(([slug, view]) => [view, slug]),
 );
 
+/**
+ * A student page (or part of one) that could not load: the library's danger notice with a "Try again" button, the same
+ * look the staff pages use, so a failure reads the same on every page and can be retried without reloading.
+ */
+export function LoadError({ title, onRetry, children }) {
+  return (
+    <InlineNotice tone="danger" title={title}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="font-normal">{children}</span>
+        {onRetry && <Button variant="secondary" size="sm" onClick={onRetry}>Try again</Button>}
+      </div>
+    </InlineNotice>
+  );
+}
+
+/**
+ * The card every single-step request page puts its form in (Leave of Absence, Readmission, Return from AWOL, Withdrawal):
+ * a title, one line saying what to do, then the form. Multi-step requests (Practicum, Graduation) use numbered stages.
+ */
+export function RequestFormCard({ title, description, children }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label={title}>
+      <h3 className="card-title">{title}</h3>
+      {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+      {children}
+    </section>
+  );
+}
+
 export class StudentPortalSectionBoundary extends Component {
   constructor(props) {
     super(props);
@@ -49,13 +77,9 @@ export class StudentPortalSectionBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <Card pad="lg">
-          <EmptyState
-            icon={AlertTriangle}
-            title="This page could not load"
-            hint="Please try another section or refresh the portal. The rest of your student portal is still available."
-          />
-        </Card>
+        <LoadError title="This page could not load" onRetry={() => this.setState({ hasError: false })}>
+          Please try another section or refresh the portal. The rest of your student portal is still available.
+        </LoadError>
       );
     }
     return this.props.children;
@@ -314,7 +338,7 @@ export function RequestPdfUpload({ requestType, label, onUploaded, initialAttach
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 focus-within:ring-2 focus-within:ring-brand-500 hover:bg-slate-50">
         <span className="flex min-w-0 items-center gap-2">
           <FileUp className="h-4 w-4 shrink-0 text-brand-700" />
-          <span className="truncate">{attachment?.name || (busy ? "Uploading..." : "Choose PDF file")}</span>
+          <span className="truncate">{attachment?.name || (busy ? "Uploading…" : "Choose PDF file")}</span>
         </span>
         <span className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
           Browse
@@ -340,7 +364,7 @@ export function SubmitState({ busy, error, message, label, disabled = false, dis
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {message && <InlineNotice tone="success" icon={CheckCircle2}>{message}</InlineNotice>}
       <Button type="submit" icon={Send} loading={busy} disabled={disabled} className="w-full sm:w-auto">
-        {busy ? "Submitting..." : label}
+        {busy ? "Submitting…" : label}
       </Button>
       {disabledHint && <p className="meta font-medium">{disabledHint}</p>}
     </div>

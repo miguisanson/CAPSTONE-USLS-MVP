@@ -295,7 +295,7 @@ test.describe("P4.2 student request forms", () => {
       await expectRequired(page, "Extra time ends", true);
       await expect(ctl(page, "Extra time starts")).toHaveValue("AY 2026-2027 2nd Semester"); // the only choice, preselected
       await expect(ctl(page, "Extra time ends")).toHaveValue("AY 2026-2027 2nd Semester");
-      const submit = submitButton(page, "Send request for more time");
+      const submit = submitButton(page, "Submit leave extension request");
       await expect(submit).toBeEnabled();
       await submit.click(); // the semesters are preselected: the reason and the explanation are listed (P82)
       await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link")).toHaveCount(2);
@@ -331,7 +331,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(ctl(page, "Tell us what is happening")).toHaveValue("Spec reason text.");
       await ctl(page, "Tell us what is happening").fill("Spec reason text, with the certificate.");
       await snap(page, "loa-returned");
-      await submitButton(page, "Send again").click();
+      await submitButton(page, "Resubmit leave request").click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/leave-of-absence").body).toEqual({ effective_start: "AY 2026-2027 2nd Semester", effective_end: "AY 2026-2027 2nd Semester", reason_category: "Medical / health", reason_remarks: "Spec reason text, with the certificate." });
     } finally {
@@ -508,9 +508,9 @@ test.describe("P4.2 student request forms", () => {
       const main = page.locator("main");
       await expect(main).toContainText("When you can withdraw a subject");
       await expect(main).toContainText("Spec policy: withdraw before the deadline.");
-      await expect(main.getByRole("heading", { level: 3, name: "Send your withdrawal request" })).toBeVisible();
+      await expect(main.getByRole("heading", { level: 3, name: "Ask to withdraw from a subject" })).toBeVisible();
       await expect(main).toContainText("Choose one eligible enrolled subject and state the reason for withdrawing.");
-      await expect(main).toContainText("Current stage");
+      await expect(main.getByText("Current stage", { exact: true })).toHaveCount(0);
       await expect(fieldOf(page, "Enrolled subject").locator(".field-label span.text-red-500")).toHaveCount(1);
       await expectRequired(page, "Reason for withdrawing from this subject", true);
       const subject = ctl(page, "Enrolled subject");
@@ -532,7 +532,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(card).toContainText("Fee: Spec fee two.");
 
       // no reason: the form's own problem summary stops it (P82), nothing is sent
-      const submit = submitButton(page, "Send withdrawal request");
+      const submit = submitButton(page, "Submit withdrawal request");
       await expect(submit).toBeEnabled();
       await submit.click();
       await page.waitForTimeout(300);
@@ -563,7 +563,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(main.getByRole("alert").filter({ hasText: "No active subject" })).toHaveCount(0);
       await expect(main).toContainText("When you can withdraw a subject");
       await expect(ctl(page, "Enrolled subject")).toHaveValue("");
-      await expect(submitButton(page, "Send withdrawal request")).toBeDisabled();
+      await expect(submitButton(page, "Submit withdrawal request")).toBeDisabled();
       await expect(main).toContainText("No subject is currently inside the withdrawal window.");
       await snap(page, "withdrawal-none");
       // choosing the closed subject is impossible (its option is disabled), so no red "window closed" card appears
@@ -598,16 +598,16 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("Withdrawal window open");
       await expect(main).toContainText("Fee: Spec fee: 10%.");
       await expect(main).toContainText("Spec saved reason.");
-      await expect(main).toContainText("Completed");
+      await expect(main.getByText("Completed", { exact: true })).toHaveCount(0);
       await expect(page.getByRole("button", { name: /withdrawal/i })).toHaveCount(0);
       await snap(page, "withdrawal-readonly");
 
       returned = true;
       await page.reload();
-      await expect(main.getByRole("heading", { level: 3, name: "Send your withdrawal request" })).toBeVisible();
-      await expect(main).toContainText("Needs revision");
+      await expect(main.getByRole("heading", { level: 3, name: "Ask to withdraw from a subject" })).toBeVisible();
+      await expect(main.getByText("Needs revision", { exact: true })).toHaveCount(0);
       await expect(ctl(page, "Reason for withdrawing from this subject")).toHaveValue("Spec first reason.");
-      await submitButton(page, "Resubmit subject withdrawal").click();
+      await submitButton(page, "Resubmit withdrawal request").click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/withdrawal").body).toEqual({ student_id: info.studentId, reason: "Spec first reason.", subject_enrollment_id: 901 });
       await snap(page, "withdrawal-returned");
@@ -838,7 +838,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(fieldOf(page, "What you revised")).toContainText("Optional when you attach the manuscript.");
       await expect(fieldOf(page, "Revised manuscript")).toContainText("Optional when you describe the revisions above.");
       await expect(revisions.locator('input[type="file"]')).not.toHaveAttribute("accept", /./);
-      const send = revisions.getByRole("button", { name: "Send revisions", exact: true });
+      const send = revisions.getByRole("button", { name: "Submit revisions", exact: true });
       await send.click();
       await expect(revisions.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link", { name: "Attach the revised manuscript or describe what you revised." })).toBeVisible();
       expect(writes.filter((w) => w.path === "defense-verdicts/revisions")).toHaveLength(0);
@@ -870,7 +870,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("Spec practicum scope text. Your program, MAPSY — Master of Arts in Psychology, is within this scope.");
       await expect(main).toContainText("Current practicum stage");
       await expect(main).toContainText("Only the requirements due now can be edited. Completed submissions stay available below.");
-      await expect(main).toContainText("Not Submitted");
+      await expect(main).toContainText("Not submitted");
       await expect(main).toContainText("Eligibility Check / Pre-Practicum Requirements");
       await expect(main).toContainText("Eligibility recommendation");
       await expect(main).toContainText("Based on the encoded course audit and research milestone records.");
@@ -986,7 +986,7 @@ test.describe("P4.2 student request forms", () => {
       const main = page.locator("main");
       await expect(main).toContainText("Current graduation stage");
       await expect(main).toContainText("Your application stays visible while each reviewing office completes its part.");
-      await expect(main).toContainText("Not Submitted");
+      await expect(main).toContainText("Not submitted");
       await expect(main).toContainText("What you need to submit now: the review window and signed graduation application / review-window PDF.");
       await expectRequired(page, "Graduation school year", true);
       await expect(fieldOf(page, "Graduation school year")).toContainText("Only AY 2026-2027 is open. Other school years are shown in gray and cannot be selected.");

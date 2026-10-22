@@ -3,7 +3,7 @@ import { CalendarClock } from "lucide-react";
 import { Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import { ProcessCaseList } from "./ProcessCaseCard";
-import { ErrorSummary, useFormErrors, useSubmitRequest, StageCard, SavedWorkflowFiles, SubmitState } from "./shared";
+import { ErrorSummary, LoadError, RequestFormCard, useFormErrors, useSubmitRequest, SavedWorkflowFiles, SubmitState } from "./shared";
 import {
   EarlierCases,
   LOA_KINDS,
@@ -41,7 +41,7 @@ export function LoaRequestForm({ data, onSaved }) {
   const submitState = useSubmitRequest("leave-of-absence", onSaved);
   const overview = data.leave_overview;
   if (!overview) {
-    return <LeaveReasonNote>Your leave information could not be loaded. Please refresh the page.</LeaveReasonNote>;
+    return <LoadError title="Could not load your leave information" onRetry={onSaved}>Your leave information could not be loaded.</LoadError>;
   }
   const cases = overview.cases || [];
   const { shown, earlier } = splitLeaveCases(overview, LOA_KINDS);
@@ -150,18 +150,19 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
   ].filter(Boolean).join(" ");
 
   const title = editable ? "Correct your request and send it again" : extension ? "Ask for more time" : "Ask for a leave of absence";
-  const label = editable ? "Send again" : extension ? "Send request for more time" : "Submit leave request";
+  const label = editable ? "Resubmit leave request" : extension ? "Submit leave extension request" : "Submit leave request";
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label={title}>
-      <h3 className="card-title">{title}</h3>
-      <p className="mt-1 text-sm text-slate-600">
-        {editable
+    <RequestFormCard
+      title={title}
+      description={
+        editable
           ? "Change what the comment above asks for, then send your request again."
           : extension
             ? `Your leave can be renewed once, and never beyond ${maxTotal > 0 ? pluralize(maxTotal, "semester") : "the total the handbook allows"} in all. The extra time starts in the semester after your current leave ends${parentEnd ? ` (${formatDate(parentEnd)})` : ""}.`
-            : "Choose the semesters you want to be away and tell us why. Graduate School staff check your request first, then the Dean decides."}
-      </p>
+            : "Choose the semesters you want to be away and tell us why. Graduate School staff check your request first, then the Dean decides."
+      }
+    >
       {!(extension && !editable) && <p className="mt-1 text-sm text-slate-600">{rulesText}</p>}
       {extension && !editable && remaining > 0 && <p className="mt-1 text-sm text-slate-600">You can ask for up to {pluralize(span, "more semester")} now.</p>}
 
@@ -209,7 +210,7 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
         </Field>
         <SubmitState busy={busy} error={error} message={message} disabled={disabled} disabledHint={hint} label={label} />
       </form>
-    </section>
+    </RequestFormCard>
   );
 }
 
@@ -219,7 +220,7 @@ export function ReadmissionRequestForm({ data, onSaved }) {
   const submitState = useSubmitRequest("readmission", onSaved);
   const overview = data.leave_overview;
   if (!overview) {
-    return <LeaveReasonNote>Your leave information could not be loaded. Please refresh the page.</LeaveReasonNote>;
+    return <LoadError title="Could not load your leave information" onRetry={onSaved}>Your leave information could not be loaded.</LoadError>;
   }
   const cases = overview.cases || [];
   const { shown, earlier } = splitLeaveCases(overview, READMISSION_KINDS);
@@ -315,13 +316,10 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
   const title = editable ? "Correct your request and send it again" : "Ask to come back";
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label={title}>
-      <h3 className="card-title">{title}</h3>
-      <p className="mt-1 text-sm text-slate-600">
-        {editable
-          ? "Change what the comment above asks for, then send your request again."
-          : "Graduate School staff check your request first, then the Dean decides."}
-      </p>
+    <RequestFormCard
+      title={title}
+      description={editable ? "Change what the comment above asks for, then send your request again." : "Graduate School staff check your request first, then the Dean decides."}
+    >
 
       <form noValidate onSubmit={onSubmit} className="mt-4 space-y-4">
         <ErrorSummary errors={errors} />
@@ -376,9 +374,9 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
           </div>
         )}
 
-        <SubmitState busy={busy} error={error} message={message} disabled={noReturnSemester} disabledHint={hint} label={editable ? "Send again" : "Submit readmission request"} />
+        <SubmitState busy={busy} error={error} message={message} disabled={noReturnSemester} disabledHint={hint} label={editable ? "Resubmit readmission request" : "Submit readmission request"} />
       </form>
-    </section>
+    </RequestFormCard>
   );
 }
 
@@ -427,7 +425,8 @@ export function AwolReturnRequestForm({ data, onSaved }) {
       {locked ? (
         <InlineNotice tone="warning">Your return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</InlineNotice>
       ) : (
-        <form noValidate onSubmit={onSubmit} className="space-y-4">
+        <RequestFormCard title="Tell us you are coming back" description="Choose the semester you want to return in and tell us why you are ready. The request goes to the Graduate School Dean.">
+        <form noValidate onSubmit={onSubmit} className="mt-4 space-y-4">
           <ErrorSummary errors={errors} />
           <InlineNotice tone="info">
             The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete the form below; no file needs to be uploaded.
@@ -440,6 +439,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
           <Field label="Reason for returning and readiness to continue" required error={messageFor("awol-reason")}><Textarea id="awol-reason" value={form.return_reason} onChange={(event) => setForm((current) => ({ ...current, return_reason: event.target.value }))} /></Field>
           <SubmitState busy={busy} error={error} message={message} label={existing?.status === "Returned for Revision" ? "Resubmit return declaration" : "Submit return declaration"} />
         </form>
+        </RequestFormCard>
       )}
     </div>
   );
@@ -494,9 +494,12 @@ export function WithdrawalRequestForm({ data, onSaved }) {
       <InlineNotice tone="warning" title="When you can withdraw a subject">
         <p className="text-xs leading-relaxed">{(selectedSubject || activeSubjects[0])?.withdrawal_window?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of the term's total is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
       </InlineNotice>
-      <StageCard number={1} title={applicationEditable ? "Send your withdrawal request" : "Your withdrawal request"} state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}>
+      <RequestFormCard
+        title={applicationEditable ? "Ask to withdraw from a subject" : "Your withdrawal request"}
+        description={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}
+      >
         {applicationEditable ? (
-          <div className="space-y-4">
+          <div className="mt-4 space-y-4">
             <Field label="Enrolled subject" required error={messageFor("withdrawal-subject")}>
               <Select
                 id="withdrawal-subject"
@@ -543,11 +546,11 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               message={message}
               disabled={blocked}
               disabledHint={blockedHint}
-              label={returned ? "Resubmit subject withdrawal" : "Send withdrawal request"}
+              label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"}
             />
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="mt-4 space-y-3">
             <p className="text-sm font-semibold text-ink">{existing?.subject?.course_code || "Subject pending"} — {existing?.subject?.course_title || "Selected subject"}</p>
             <p className="text-sm text-slate-600">{existing?.effective_term || existing?.subject?.term_label || "Semester pending"} · submitted {formatDate(existing?.created_at)}</p>
             <InlineNotice tone="success" role="status" icon={CalendarClock}>
@@ -559,7 +562,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
             <p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>
           </div>
         )}
-      </StageCard>
+      </RequestFormCard>
       {existing?.attachments?.length > 1 && <SavedWorkflowFiles files={existing.attachments} />}
     </form>
   );

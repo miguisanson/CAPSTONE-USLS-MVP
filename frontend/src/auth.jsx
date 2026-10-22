@@ -41,11 +41,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      await api.logout();
-    } finally {
-      setUser(null);
-    }
+    // Leave the signed-in shell first, so nothing in it (the notification bell's poll) asks the server again while
+    // the session is ending; a request in that gap came back 401 (I-131).
+    setUser(null);
+    await api.logout();
   }, []);
 
   const value = useMemo(() => ({ user, loading, error, login, logout, refresh }), [user, loading, error, login, logout, refresh]);
