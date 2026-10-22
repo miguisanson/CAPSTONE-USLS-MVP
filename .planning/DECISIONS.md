@@ -49,3 +49,13 @@ new grill-me with the owner; agents never re-decide these.
 | AD5 | 2026-10-17 | Stepper: a `Completed` student shows all 8 lifecycle steps complete plus a final complete "Completed" step (not a "stopped" chip); LOA/AWOL/Withdrawal show a trailing stopped chip and leave the path steps upcoming (the stage list does not record where they were). | A graduate marked "stopped" reads wrong; nothing is invented about earlier progress. |
 | AD6 | 2026-10-17 | Monitoring record panel: Add/Edit of a subject row opens the editor in a block above the table instead of turning the row into a form; calendar defense-type colours (emerald/blue/violet/amber) stay as they are (they mean defense type, not status). | DataTable rows cannot hold a form; type colours are a legend, not the status map. |
 | AD7 | 2026-10-17 | On every role home, "Needs your action" lists only what that user must do; items held by another office go in a smaller "Waiting on …" group under it (max 3 + View all). The open-tasks number counts only the user's own tasks. | A student cannot act on the coordinator's task; mixing them misleads (IM19). |
+
+## 2026-10-22 — owner starts v5.3 (session opener)
+
+Owner's words: "make a new branch call it v5.3-migui_test … use 4 helpers, make sure to find bug do bug fixes, use website skills look up online, research. do a complete improvement on this website … keep going without stopping … you may even use 1 time fable helper to conduct a full review. i wont make decisions, so i leave all decsiions upto you … this is a new branch anyway so go for it if you think tis better."
+
+| # | Decision | What it means for the work |
+|---|---|---|
+| IM25 | **Work lands on branch `v5.3-migui_test`** (cut from `v5.2-migui_again` at c426b6f). | Replaces IM9's branch name for this run. Pushed to origin as work lands. `v5.1-migui_clean` and `v5.2-migui_again` are not touched. |
+| IM26 | **Up to 4 implementer helpers at once** (supersedes IM10's 3). | Still one `app.py` editor at a time, non-overlapping file sets, one integrator, gate after every merge. Read-only review/research agents stay uncapped. One Fable full-app review is allowed. |
+| IM27 | **All decisions are the agent's; bolder improvements are allowed on this branch.** | No QUESTION rows wait for the owner — the main session picks the recommended option and logs it as `AD#`. IM6 "not a redesign" is relaxed: a clearly better layout, flow or wording may replace the old one, as long as tests stay green, the demo flows keep working and the AIMS read-only rule (Rule 4) holds. |
