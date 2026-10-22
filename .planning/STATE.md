@@ -10,7 +10,8 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
   - `board` / `pkt/board` — StageBoard columns fit at 1366 + scroll cue (I-067), one EmptyState for columns (I-088) (spec `e2e/p74-board-fit.spec.js`, port 5305).
   - Fixed on the branch: I-096 e2e harness now keyless (the main checkout's .env key broke p80).
-  - `mon` / `pkt/mon` — Phase 5 P6.4 MonitoringGrid/EnrollmentClassList/AdviserRecordCard (spec `e2e/p64-monitoring-pages.spec.js`, port 5303).
+  - MERGED `pkt/mon` (P6.4 Monitoring Sheet / class list / adviser record).
+  - `fac2` / `pkt/fac2` — faculty follow-ups I-079 one advisees table, I-090 verdicts grouping, I-085 Google card, I-099 Received chip (port 5302).
   - MERGED `pkt/wf` (P7.1-P7.4 move-only split of WorkflowPage.jsx into `pages/workflow/`); e2e after it -> `E:/Temp/claude/gate53/e2e_after_wf.txt`.
   - `wf2` / `pkt/wf2` — dead code in workflow/ + restyle P7.5 of shared/WorkflowPage/HandoffImport/CourseAudit/ResearchGate/PanelMatching (spec `e2e/p75-workflow-pages.spec.js`, port 5304).
   - Fable review DONE -> `.planning/research/FULL-REVIEW-2026-10-22.md`; findings F-01..F-41 filed as I-055..I-095 (I-0xx = F-xx + 54). Worktree `review` can be removed (rmdir junction first).
