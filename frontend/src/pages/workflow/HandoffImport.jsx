@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  UserPlus,
   AlertTriangle,
   UploadCloud,
   FileSpreadsheet,
@@ -16,11 +15,11 @@ import {
 import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { SectionTitle, StatusBadge, ErrorNote } from "../../components/ui";
-import { Field, Input, Textarea, Select } from "../../components/forms";
+import { Select } from "../../components/forms";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
 import HandoffResult from "../../components/HandoffResult";
 import { formatDate } from "../../lib/format";
-import { SubmitButton, WorkflowCaseModal } from "./shared";
+import { WorkflowCaseModal } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Student Handoff — AIMS export import & reconciliation (no manual student creation).
@@ -509,142 +508,4 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
 function ComparisonRecord({ title, icon: Icon, record, empty = "No values supplied" }) {
   if (!record || !Object.keys(record).length) return <div className="rounded-xl border border-dashed border-slate-300 p-4"><h3 className="flex items-center gap-2 font-semibold text-ink"><Icon className="h-4 w-4 text-slate-500" /> {title}</h3><p className="mt-4 text-sm text-slate-500">{empty}</p></div>;
   return <section className="rounded-xl border border-slate-200 p-4"><h3 className="flex items-center gap-2 font-semibold text-ink"><Icon className="h-4 w-4 text-brand-700" /> {title}</h3><dl className="mt-4 space-y-3 text-sm">{[["Name", record.name || `${record.first_name || ""} ${record.last_name || ""}`.trim()], ["Student ID", record.student_number], ["School Year", record.academic_year_entry], ["Completed subjects", record.completed_count ?? (record.completed_subjects || []).length]].map(([label, value]) => <div key={label} className="grid grid-cols-[8rem_1fr] gap-2"><dt className="text-slate-500">{label}</dt><dd className="font-semibold text-slate-800">{value || "—"}</dd></div>)}</dl></section>;
-}
-
-// ---------------------------------------------------------------------------
-// Student Handoff — manual entry (fallback)
-// ---------------------------------------------------------------------------
-function HandoffForm({ meta, context, submit, submitting }) {
-  const onboarding = context.onboarding_requirements || [];
-  const [form, setForm] = useState({
-    program_id: "",
-    term_id: "",
-    admission_signal: "Admission Confirmed",
-    first_name: "",
-    last_name: "",
-    student_number: "",
-    email: "",
-    entry_year: new Date().getFullYear(),
-    additional_missing_items: "",
-    source_reference: "",
-    transcript_status: "Not verified",
-  });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const derivedRequirements = onboarding.map((item) => {
-    let complete = false;
-    let evidence = "Missing or not verified";
-    if (item === "Admission approval") {
-      complete = ["Admission Confirmed", "Enrollment Confirmed"].includes(form.admission_signal);
-      evidence = complete ? form.admission_signal : "Admission has not been confirmed";
-    } else if (item === "Student profile sheet") {
-      complete = Boolean(form.source_reference.trim());
-      evidence = complete ? form.source_reference : "Add the source/profile reference";
-    } else if (item === "Program assignment") {
-      complete = Boolean(form.program_id);
-      evidence = complete ? "Selected program" : "Choose a program";
-    } else if (item === "Enrollment signal") {
-      complete = Boolean(form.term_id && form.admission_signal);
-      evidence = complete ? `${form.admission_signal} · selected semester` : "Choose a semester and signal";
-    } else if (item === "Official transcript") {
-      complete = form.transcript_status === "Received";
-      evidence = `Transcript: ${form.transcript_status}`;
-    }
-    return { item, complete, evidence };
-  });
-
-  function onSubmit(e) {
-    e.preventDefault();
-    submit(form);
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <SectionTitle title="Or add a student manually" subtitle="One-off entry — compares received onboarding items against requirements" icon={UserPlus} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="First name" required>
-          <Input value={form.first_name} onChange={set("first_name")} required />
-        </Field>
-        <Field label="Last name" required>
-          <Input value={form.last_name} onChange={set("last_name")} required />
-        </Field>
-        <Field label="Program" required>
-          <Select
-            value={form.program_id}
-            onChange={set("program_id")}
-            required
-            options={(meta?.programs || []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
-          />
-        </Field>
-        <Field label="Entry semester" required>
-          <Select value={form.term_id} onChange={set("term_id")} required options={(meta?.terms || []).map((t) => ({ value: t.id, label: t.label }))} />
-        </Field>
-        <Field label="Admission / enrollment signal" required>
-          <Select
-            value={form.admission_signal}
-            onChange={set("admission_signal")}
-            placeholder=""
-            options={["Admission Confirmed", "Enrollment Confirmed", "For Completion"]}
-          />
-        </Field>
-        <Field label="Entry year">
-          <Input type="number" value={form.entry_year} onChange={set("entry_year")} />
-        </Field>
-        <Field label="Student number" hint="Leave blank to auto-generate">
-          <Input value={form.student_number} onChange={set("student_number")} placeholder="2026-0001" />
-        </Field>
-        <Field label="Email" hint="Leave blank to auto-generate">
-          <Input type="email" value={form.email} onChange={set("email")} />
-        </Field>
-      </div>
-
-      <Field label="Official transcript">
-        <Select
-          value={form.transcript_status}
-          onChange={set("transcript_status")}
-          placeholder=""
-          options={["Received", "Not received", "Not verified"]}
-        />
-      </Field>
-
-      <div className="overflow-hidden rounded-xl border border-slate-200">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <p className="text-sm font-semibold text-ink">Automatic handoff requirement check</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Statuses are derived from the form and stored evidence; there are no manual “received” checkboxes.
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-                <th className="px-4 py-2.5">Requirement</th>
-                <th className="px-3 py-2.5">Evidence used</th>
-                <th className="px-4 py-2.5 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {derivedRequirements.map((requirement) => (
-                <tr key={requirement.item} className="border-b border-slate-50">
-                  <td className="px-4 py-2.5 font-semibold text-ink">{requirement.item}</td>
-                  <td className="px-3 py-2.5 text-slate-500">{requirement.evidence}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <StatusBadge value={requirement.complete ? "Complete" : "Missing"} dot={false} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <Field label="Other missing items" hint="Comma- or line-separated, optional">
-        <Textarea value={form.additional_missing_items} onChange={set("additional_missing_items")} />
-      </Field>
-      <Field label="Source reference" hint="e.g. AIMS batch, email subject">
-        <Input value={form.source_reference} onChange={set("source_reference")} />
-      </Field>
-
-      <SubmitButton submitting={submitting}>Create monitoring record</SubmitButton>
-    </form>
-  );
 }

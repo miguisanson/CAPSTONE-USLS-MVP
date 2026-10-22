@@ -58,11 +58,6 @@ const ICONS = {
   graduation: GraduationCap,
 };
 
-// Student-initiated workflows: staff pick from the submitted-request queue,
-// not the full student list (students file these from their own portal).
-// (The four standalone processes are not here: they all use ProcessBoardPage.)
-const USES_REQUEST_QUEUE = {};
-
 const NEEDS_STUDENT = {
   "student-handoff": false,
   "course-audit": false,
@@ -141,22 +136,11 @@ function SingleWorkflowPage() {
     setSpecialization("");
     setResult(null);
     setSubmitError("");
-    if (USES_REQUEST_QUEUE[slug]) {
-      window.localStorage.removeItem("workflowStudentId");
-      if (!searchParams.get("student_id")) {
-        setStudentId(null);
-        setStudentLabel("");
-      }
-    }
   }, [slug]);
 
   useEffect(() => {
     if (studentId) {
-      if (USES_REQUEST_QUEUE[slug]) {
-        window.localStorage.removeItem("workflowStudentId");
-      } else {
-        window.localStorage.setItem("workflowStudentId", String(studentId));
-      }
+      window.localStorage.setItem("workflowStudentId", String(studentId));
       if (searchParams.get("student_id") !== String(studentId)) {
         const next = new URLSearchParams(searchParams);
         next.set("student_id", String(studentId));
@@ -173,7 +157,6 @@ function SingleWorkflowPage() {
   const tx = context?.transaction || meta?.transactions?.find((t) => t.slug === slug);
   const Icon = ICONS[slug] || FileCheck;
   const needsStudent = NEEDS_STUDENT[slug];
-  const usesQueue = USES_REQUEST_QUEUE[slug];
   const overviewWorkflow = OVERVIEW_WORKFLOWS.has(slug);
   const subviewTabs = SUBVIEW_TABS[slug] || null;
   const subview = subviewTabs && subviewTabs.some((tab) => tab.key && tab.key === searchParams.get("view")) ? searchParams.get("view") : "";
@@ -196,16 +179,6 @@ function SingleWorkflowPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlStudentId]);
-
-  useEffect(() => {
-    if (!usesQueue || loading || !studentId || !context?.submitted_requests) return;
-    if (context.submitted_requests.some((request) => request.id === studentId)) return;
-    setStudentId(null);
-    setStudentLabel("");
-    const next = new URLSearchParams(searchParams);
-    next.delete("student_id");
-    setSearchParams(next, { replace: true });
-  }, [usesQueue, loading, studentId, context?.submitted_requests, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!studentLabel && context?.selected_student?.search_label) {
@@ -306,7 +279,7 @@ function SingleWorkflowPage() {
           {subview === "calendar" && (
             <CalendarPage scope="staff" embedded title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in the Scheduling tab." />
           )}
-          {!subview && needsStudent && !usesQueue && (
+          {!subview && needsStudent && (
             <Card className="p-6">
               <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
               <StudentPicker
@@ -329,11 +302,9 @@ function SingleWorkflowPage() {
           )}
 
           {subview ? null : needsStudent && !studentId ? (
-            usesQueue ? null : (
-              <Card className="p-6">
-                <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
-              </Card>
-            )
+            <Card className="p-6">
+              <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
+            </Card>
           ) : loading && !context ? (
             <Card className="p-6">
               <Spinner label="Loading workflow data…" />
@@ -342,8 +313,6 @@ function SingleWorkflowPage() {
             <Card className="p-6">
               <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />
             </Card>
-          ) : usesQueue ? (
-            null
           ) : slug === "research-gate" ? (
             <ResearchGateForm {...formProps} />
           ) : (

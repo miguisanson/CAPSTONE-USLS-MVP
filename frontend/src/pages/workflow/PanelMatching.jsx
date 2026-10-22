@@ -5,7 +5,6 @@ import { SectionTitle, StatusBadge } from "../../components/ui";
 import { MiniBox } from "./shared";
 
 const PANEL_MATCHING_DEFAULT_LIMIT = 15;
-const PANEL_MATCHING_RECOMMENDED_COUNT = 4;
 
 // ---------------------------------------------------------------------------
 // Panel Matching

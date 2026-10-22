@@ -93,10 +93,6 @@ function practicumReadyForDeanReview(row) {
   return row.record?.status === "Report Sent to Dean";
 }
 
-function withdrawalReadyForDeanReview(item) {
-  return item.status === "Dean Review";
-}
-
 function PracticumBoardCard({ row, onOpen, onMessage }) {
   const record = row.record;
   const readyForDean = practicumReadyForDeanReview(row);
