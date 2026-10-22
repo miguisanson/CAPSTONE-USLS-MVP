@@ -342,7 +342,7 @@ export default function FacultyAvailabilityEditor() {
   if (loading && !data) {
     return (
       <div className="space-y-5">
-        <PageHeader title="My availability" icon={CalendarDays} />
+        <PageHeader title="My Availability" icon={CalendarDays} />
         <Card><Spinner label="Loading your availability..." /></Card>
       </div>
     );
@@ -350,7 +350,7 @@ export default function FacultyAvailabilityEditor() {
   if (!data) {
     return (
       <div className="space-y-5">
-        <PageHeader title="My availability" icon={CalendarDays} />
+        <PageHeader title="My Availability" icon={CalendarDays} />
         <ErrorLine message={error || "Could not load your availability."} />
       </div>
     );
@@ -360,7 +360,7 @@ export default function FacultyAvailabilityEditor() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="My availability"
+        title="My Availability"
         description="Tell the Graduate School when you can sit in a defense. All times are Philippine time."
         icon={CalendarDays}
         actions={<Button as={Link} variant="secondary" icon={CalendarDays} to="/faculty-portal/calendar">See your calendar</Button>}

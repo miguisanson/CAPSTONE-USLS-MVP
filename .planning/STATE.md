@@ -6,7 +6,14 @@
 - **In flight (worktrees in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/`; each `frontend/node_modules` is a JUNCTION to the main checkout — before `git worktree remove`, run `cmd //c rmdir <wt>rontend
 ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
-  - `be2` / `pkt/be2` — the only app.py editor: I-055 demo reset needs login, I-056 soft per-IP login throttle, I-057 per-install secret key, I-058 admin acts as staff in workflow steps, I-036 AC defense-scheduling 403, I-073 withdrawal task link (new `tests/test_v53_backend.py`, port 5301).
+  - MERGED `pkt/be2` (I-055..I-058, I-036, I-073; R-012).
+  - `seed2` / `pkt/seed2` — the only app.py editor: seed quality I-060 advisers<=limit and never on own panel, I-062 Dean queues seeded, I-061 stage vs units/titles/departments, I-070 dates spread, I-094, I-095 (new `tests/test_seed_quality.py`, port 5311).
+  - MERGED `pkt/shell` (I-103, I-101, I-112); RoleSidebar.jsx deleted (unused).
+  - `enr` / `pkt/enr` — Enrollment P6.7/P6.8 + one student picker (I-082) + jargon widget out (I-081 part) (spec p83, port 5315).
+  - Gate on 176b0cf running in `wt/gate`: python -> `E:/Temp/claude/gate53/gate_176b0cf.txt`, e2e (port 5330) -> `e2e_176b0cf.txt`. LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
+  - `bpol` / `pkt/bpol` — flaky p74 (I-110), filter bar placeholder/390 (I-108, I-106), staff graduation wrapper + ProcessGates role copy (I-111) (port 5313).
+  - `stu` / `pkt/stu` — student P4.3/P4.4 + I-087, I-086, form error summaries (spec p82, port 5314).
+  - MERGED `pkt/vocab` (I-076..I-078, I-080). Folder `wt/vocab` is deregistered but a locked file kept it on disk - delete it after a reboot. Follow-up I-112.
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
   - MERGED `pkt/board` (I-067, I-088). Follow-up: Practicum `w-[300px]` and Graduation `w-[380px]` column overrides (workflow packet).
   - `vocab` / `pkt/vocab` — one name table `lib/labels.js`, breadcrumb rule Portal > Page (I-077, I-078), rules collapsed (I-076), Activity Log open (I-080) (spec `e2e/p76-vocabulary.spec.js`, port 5306).
@@ -18,7 +25,7 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/wf2` (P7.5 restyle of six workflow files, dead code out).
   - MERGED `pkt/grad` (I-065, I-051). New: I-105 (batch 'Next: Dean' wrong), I-106, I-107.
   - MERGED `pkt/wf4` (I-063, I-089, I-102).
-  - `dean` / `pkt/dean` — Dean numbers agree (I-074), Dean copy + collapsed empty queues (I-084), Dean graduation wrapper/drag (I-106 part) (port 5309).
+  - MERGED `pkt/dean` (I-074, I-084, I-106 part). Follow-up I-111.
   - After `pkt/vocab` merges (it owns Layout.jsx): sidebar nav clipped by the footer (I-103, P2) + course-audit nav entry (I-101).
   - Fable review DONE -> `.planning/research/FULL-REVIEW-2026-10-22.md`; findings F-01..F-41 filed as I-055..I-095 (I-0xx = F-xx + 54). Worktree `review` can be removed (rmdir junction first).
 - **Wave plan from the review (backend lane is serial, one app.py packet at a time):**

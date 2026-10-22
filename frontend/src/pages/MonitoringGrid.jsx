@@ -8,6 +8,7 @@ import { csvCell, downloadBlob } from "../lib/format";
 import { toneOf } from "../lib/tone";
 import AddStudentDialog from "../components/monitoring/AddStudentDialog";
 import StudentRecordPanel from "../components/monitoring/StudentRecordPanel";
+import { PAGE } from "../lib/labels.js";
 
 // One colour per subject status in the matrix. The colours follow the semantic tones (UI-SPEC section 3): brand
 // green = done, blue = in progress or ahead, red = failed or gone, amber = needs a person, grey = nothing yet.
@@ -235,7 +236,7 @@ export default function MonitoringGrid() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         icon={Table2}
-        title="Monitoring Sheet"
+        title={PAGE.monitoringSheet}
         description={canEdit
           ? "Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff."
           : "Curriculum progress for each student (view only)."}

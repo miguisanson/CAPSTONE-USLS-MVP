@@ -186,7 +186,7 @@ export default function FacultyInvitationsPage() {
 
   const header = (
     <PageHeader
-      title="Panel invitations"
+      title="Panel Invitations"
       description="Research defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense."
       icon={CalendarDays}
     />

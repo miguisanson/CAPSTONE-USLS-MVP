@@ -10,7 +10,7 @@
 //     stage-check window (six steps: which are complete, which is current, which is pending), the Dean group action that
 //     approves it, the approved batch (stage check all complete, "Export approved list" downloads a CSV and shows the
 //     follow-up window, then "Export again");
-//   - Decision History: the entry the approval wrote (link to the case, process, status), the process filter and its count.
+//   - Activity Log (was Decision History): the entry the approval wrote (link to the case, process, status), the process filter and its count.
 // Setup (one graduation batch reaching the Dean) goes through each role's own API login, like p31 / p32. It changes data in
 // the throwaway harness database and touches only the demo student Isabel Flores (2260007, "Batch 1 October 2026"), whom no
 // other spec uses.
@@ -134,7 +134,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
 
     // The four tiles; three of them open something.
     await expect(main.getByRole("link", { name: /Waiting now/ })).toHaveAttribute("href", "/dean/approvals");
-    await expect(main.getByRole("link", { name: /Decided \(recent\)/ })).toHaveAttribute("href", "/dean/activity");
+    await expect(main.getByRole("link", { name: /Decided this week/ })).toHaveAttribute("href", "/dean/activity");
     await expect(main.getByRole("link", { name: /Course plans waiting/ })).toHaveAttribute("href", "/dean/approvals/course-adjustments");
     await expect(main.getByText("Approval share")).toBeVisible();
     await expect(main.getByText("of recent workflow decisions")).toBeVisible();
@@ -150,7 +150,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
       "Leave of Absence": "leave-of-absence",
       Readmission: "readmission",
       "AWOL & Residency": "awol",
-      "Withdrawal Requests": "withdrawal",
+      "Subject Withdrawal": "withdrawal",
       "Practicum Reports": "practicum",
       "Graduation Endorsement": "graduation",
       "Course Adjustments": "course-adjustments",
@@ -208,7 +208,9 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(main.getByText("Ready graduation batches")).toBeVisible();
     await expect(main.getByText("Select or process a whole batch while still seeing every student in it.")).toBeVisible();
     await expect(main.getByText("1 batch", { exact: true })).toBeVisible();
-    const batch = main.locator("div[draggable=true]").filter({ hasText: BATCH }).filter({ hasText: "Ready for Dean review" });
+    // The batches are a list, not draggable cards: there is no board to drop them on (I-106).
+    await expect(main.locator("[draggable=true]"), "no draggable batch card on this tab").toHaveCount(0);
+    const batch = main.getByRole("listitem").filter({ hasText: BATCH }).filter({ hasText: "Ready for Dean review" });
     await expect(batch).toHaveCount(1);
     await expect(batch).toContainText("1 candidate");
     await expect(batch).toContainText("Students: Isabel Flores");
@@ -348,9 +350,9 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await shot(page, "batches-approved-390.png");
   });
 
-  test("Decision History and the analytics table pick up the approval", async ({ page }) => {
+  test("Activity Log and the analytics table pick up the approval", async ({ page }) => {
     await page.goto("/dean/activity");
-    await expect(page.getByRole("heading", { level: 1, name: "Decision History" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Activity Log" })).toBeVisible();
     await expect(page.getByText("Recent decisions recorded against the Dean account, newest first. Each entry keeps its full stage history on the case page.")).toBeVisible();
     const main = page.getByRole("main");
 
@@ -373,7 +375,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(main.getByText("1 entry", { exact: true })).toBeVisible();
     await expect(link).toBeVisible();
     await shot(page, "history-filtered-1366.png");
-    for (const label of ["Leave of Absence", "Readmission", "AWOL & Residency", "Withdrawal Requests", "Practicum Reports", "Course Adjustments"]) {
+    for (const label of ["Leave of Absence", "Readmission", "AWOL & Residency", "Subject Withdrawal", "Practicum Reports", "Course Adjustments"]) {
       await filter.selectOption({ label });
       await expect(link, `${label} hides the graduation entry`).toHaveCount(0);
       const count = await numberIn(main.getByText(/^\d+ entr(y|ies)$/));
@@ -386,7 +388,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await shot(page, "history-1366.png");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(page.getByRole("heading", { level: 1, name: "Decision History" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Activity Log" })).toBeVisible();
     await expect(link).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
     await shot(page, "history-390.png");

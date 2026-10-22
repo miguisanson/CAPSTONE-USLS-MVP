@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { Button, Card, DataTable, InlineNotice, PageHeader, SearchInput, SectionCard, Select, StatusChip } from "../components/ui/index.js";
 import { initials } from "../lib/format";
+import { PAGE } from "../lib/labels.js";
 
 const PAGE_SIZE = 25;
 const STATUS_FILTER = [
@@ -142,7 +143,7 @@ export default function Students() {
   return (
     <div className="page-stack animate-fade-up">
       <PageHeader
-        title="Students"
+        title={PAGE.students}
         description="Search and filter the monitored graduate population, then open a record for the full lifecycle view."
       />
 

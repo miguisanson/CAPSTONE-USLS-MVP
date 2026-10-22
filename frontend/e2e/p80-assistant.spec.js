@@ -48,11 +48,11 @@ test.describe("staff", () => {
 
   test("a covered question: offline label, sources with document and page, then a not-covered question and a personal one", async ({ page }) => {
     await page.goto("/assistant");
-    await expect(page.getByRole("heading", { level: 1, name: "Policy & Case Guidance" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Policy Assistant" })).toBeVisible();
     // 3-4 suggested questions, one of them personal
     await expect(suggestions(page)).toHaveCount(4);
     await expect(suggestions(page).filter({ hasText: "What is waiting on me?" })).toHaveCount(1);
-    await expect(page.getByRole("log")).toContainText("Hi! I'm the Policy & Case Guidance assistant");
+    await expect(page.getByRole("log")).toContainText("Hi! I'm the Policy Assistant.");
 
     // covered: answered from the Handbook, offline (no key), with a source that names document and page
     await ask(page, COVERED);

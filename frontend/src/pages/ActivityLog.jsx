@@ -4,26 +4,26 @@ import { Activity, AlertTriangle, SlidersHorizontal } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, PageHeader, SearchInput, Select, Spinner } from "../components/ui/index.js";
-import HistoryDisclosure from "../components/HistoryDisclosure";
+import { PAGE } from "../lib/labels.js";
 import { formatDate } from "../lib/format";
 
 const SLUG_LABEL = {
-  "student-handoff": "Student Handoff",
-  enrollment: "Enrollment",
+  "student-handoff": PAGE.studentHandoff,
+  enrollment: PAGE.enrollment,
   "curriculum-planning": "Curriculum Planning",
-  "course-adjustments": "Course Adjustments",
+  "course-adjustments": PAGE.courseAdjustments,
   "loa-decision": "LOA / Readmission",
-  "leave-of-absence": "Leave of Absence",
-  readmission: "Readmission",
+  "leave-of-absence": PAGE.leaveOfAbsence,
+  readmission: PAGE.readmission,
   "course-audit": "Course Audit",
-  "research-gate": "Research Gate",
-  "panel-matching": "Panel Matching",
-  "defense-scheduling": "Defense Scheduling",
-  practicum: "Practicum",
-  withdrawal: "Withdrawal Requests",
-  graduation: "Graduation Endorsement",
+  "research-gate": PAGE.researchGate,
+  "panel-matching": PAGE.panelMatching,
+  "defense-scheduling": PAGE.defenseScheduling,
+  practicum: PAGE.practicum,
+  withdrawal: PAGE.subjectWithdrawal,
+  graduation: PAGE.graduationEndorsement,
   "aims-discrepancy": "AIMS discrepancy",
-  "academic-semesters": "Academic semesters",
+  "academic-semesters": PAGE.academicSemesters,
 };
 
 function workflowLabel(slug) {
@@ -50,7 +50,7 @@ export default function ActivityLog() {
   return (
     <div className="page-stack animate-fade-up">
       <PageHeader
-        title="Activity Log"
+        title={PAGE.activityLog}
         description="An append-style trail of recorded transactions — the audit basis for accountability and monitoring."
       />
 
@@ -99,37 +99,35 @@ export default function ActivityLog() {
         ) : filtered.length === 0 ? (
           <EmptyState icon={Activity} title="No activity matches the selected filters" hint="Clear a filter or use a broader search." />
         ) : (
-          <HistoryDisclosure label="View logs" hideLabel="Hide logs" count={filtered.length}>
-            <ol className="relative space-y-5 border-l-2 border-slate-100 pl-6">
-              {filtered.map((log) => (
-                <li key={log.id} className="relative">
-                  <span className="absolute -left-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-white bg-brand-500" />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-600">
-                      {workflowLabel(log.transaction_slug)}
-                    </span>
-                    <span className="meta">{formatDate(log.created_at, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                  </div>
-                  <p className="mt-1 text-sm font-semibold text-ink">{log.result}</p>
-                  <p className="meta">
-                    {log.actor_role}
-                    {log.student_id && (
-                      <>
-                        {" · "}
-                        <Link to={`/students/${log.student_id}`} className="font-semibold text-brand-700 hover:underline">
-                          {log.student_name}
-                        </Link>
-                      </>
-                    )}
-                    {!log.student_id && log.source_reference && <>{" · "}{log.source_reference}</>}
-                    {" · next owner: "}
-                    {log.next_owner || "—"}
-                  </p>
-                  {log.notes && <p className="meta mt-1 leading-relaxed">{log.notes}</p>}
-                </li>
-              ))}
-            </ol>
-          </HistoryDisclosure>
+          <ol className="relative space-y-5 border-l-2 border-slate-100 pl-6">
+            {filtered.map((log) => (
+              <li key={log.id} className="relative">
+                <span className="absolute -left-[31px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-white bg-brand-500" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-600">
+                    {workflowLabel(log.transaction_slug)}
+                  </span>
+                  <span className="meta">{formatDate(log.created_at, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <p className="mt-1 text-sm font-semibold text-ink">{log.result}</p>
+                <p className="meta">
+                  {log.actor_role}
+                  {log.student_id && (
+                    <>
+                      {" · "}
+                      <Link to={`/students/${log.student_id}`} className="font-semibold text-brand-700 hover:underline">
+                        {log.student_name}
+                      </Link>
+                    </>
+                  )}
+                  {!log.student_id && log.source_reference && <>{" · "}{log.source_reference}</>}
+                  {" · next owner: "}
+                  {log.next_owner || "—"}
+                </p>
+                {log.notes && <p className="meta mt-1 leading-relaxed">{log.notes}</p>}
+              </li>
+            ))}
+          </ol>
         )}
       </Card>
     </div>

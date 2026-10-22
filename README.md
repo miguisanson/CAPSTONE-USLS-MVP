@@ -24,7 +24,7 @@ assignments, schedule requests, tasks, and an activity trail):
 5. **Readmission** - staff review return eligibility and forward the request; the Dean's approval reactivates the student and records the notice.
 6. **AWOL & Residency** - records AWOL, accepts written return intent, applies program-specific maximum-residence rules, routes Dean decisions, and records valid no-subject residency.
 7. **Course Audit** - maps completed/current/missing subjects against curriculum requirements, alerts students about INC grades, and applies the one-year lapse/retake rule.
-8. **Research Gate Readiness** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
+8. **Research Gate** - compares Form 1 / Form 4 / final / completion evidence with the protocol.
 9. **Panel Matching** - ranks faculty out of 100: expertise similarity between the student's paper and the faculty's expertise records (60, TF-IDF, or Gemini embeddings when a key is set), availability (25), and workload (15). The student's adviser is never recommended and the panel is checked against the Research Protocol composition rules.
 10. **Defense Scheduling** - checks panel availability and protocol lead-time before confirming.
 11. **Practicum** - tracks eligibility, placement, hours, evidence, re-placement, and Dean review.

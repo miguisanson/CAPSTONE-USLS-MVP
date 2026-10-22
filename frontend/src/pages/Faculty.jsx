@@ -12,6 +12,7 @@ import { Button, Card, DataTable, Field, InlineNotice, Input, Modal, PageHeader,
 import { initials } from "../lib/format";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import { useConfirm } from "../components/confirm";
+import { PAGE } from "../lib/labels.js";
 
 const FACULTY_ROLE_OPTIONS = ["Faculty Adviser", "Panel Member", "Panel Chair", "Academic Coordinator", "Research Coordinator"];
 const AVAILABILITY_OPTIONS = ["Available", "Unavailable", "Not entered", "Google Calendar connected"];
@@ -118,7 +119,7 @@ export default function Faculty() {
   return (
     <div className="page-stack animate-fade-up">
       <PageHeader
-        title="Faculty Profiles"
+        title={PAGE.faculty}
         description="Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered."
         actions={canManage ? <Button icon={Plus} onClick={() => { setNotice(""); setFormFor("new"); }}>Add faculty</Button> : null}
       />

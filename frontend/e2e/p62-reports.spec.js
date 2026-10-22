@@ -372,7 +372,7 @@ test.describe("Reports", () => {
 // ---------------------------------------------------------------------------------------------------- Activity Log
 
 test.describe("Activity Log", () => {
-  test("loads once; search, workflow and next-owner filters work on the loaded list; Clear filters; the log opens", async ({ page }) => {
+  test("loads once; search, workflow and next-owner filters work on the loaded list; Clear filters; the log is open", async ({ page }) => {
     let calls = 0;
     page.on("request", (r) => {
       if (r.method() === "GET" && new URL(r.url()).pathname === "/api/activity") calls += 1;
@@ -400,11 +400,8 @@ test.describe("Activity Log", () => {
     await expect(workflow.locator("option")).toHaveCount(1 + slugs.length);
     await expect(owner.locator("option")).toHaveCount(1 + owners.length);
 
-    // the log is folded away until opened
-    const toggle = page.getByRole("button", { name: /View logs/ });
-    await expect(toggle).toBeVisible();
-    await expect(page.locator("main ol > li")).toHaveCount(0);
-    await toggle.click();
+    // the log is open from the start (I-080: it used to be folded away behind a "View logs" button)
+    await expect(page.getByRole("button", { name: /View logs|Hide logs/ })).toHaveCount(0);
     await expect(page.locator("main ol > li")).toHaveCount(items.length);
     await shot(page, "activity-open-1366.png");
     const withStudent = items.find((i) => i.student_id);

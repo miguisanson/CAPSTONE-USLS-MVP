@@ -6,6 +6,7 @@ import { useApi } from "../hooks";
 import { Button, Card, DataTable, EmptyState, Field, InlineNotice, PageHeader, Pagination, SearchInput, Spinner, StatCard, StatusChip, Textarea } from "../components/ui/index.js";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { useAuth } from "../auth";
+import { PAGE } from "../lib/labels.js";
 
 const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
 const PAGE_SIZE = 50;
@@ -33,7 +34,7 @@ export default function WorkQueue() {
   return (
     <div className="page-stack animate-fade-up">
       <PageHeader
-        title="Work Queue"
+        title={PAGE.workQueue}
         description="Everything that needs attention in one place — pending tasks, students at risk of delay with the next step for each, and open monitoring conflicts."
       />
 

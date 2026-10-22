@@ -7,6 +7,7 @@ import { Card, EmptyState, ErrorNote, PageHeader, SectionTitle, Spinner, StatusB
 import CalendarView, { CalendarLegend } from "../../components/calendar/CalendarView";
 import CalendarFeedCard from "../../components/calendar/CalendarFeedCard";
 import { daysPhrase, fmtDay } from "./shared";
+import { PAGE } from "../../lib/labels.js";
 
 const timeOf = (value) => (value ? String(value).slice(11, 16) : "");
 
@@ -199,7 +200,7 @@ export default function StudentCalendarPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title="My research calendar"
+        title={PAGE.researchCalendar}
         description="Your defense date, the deadlines that lead to it, and a link to put them in your own calendar. All times are Philippine time."
         icon={CalendarDays}
       />

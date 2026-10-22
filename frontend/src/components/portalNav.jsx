@@ -32,6 +32,7 @@ import {
   Users,
   UserX,
 } from "lucide-react";
+import { PAGE } from "../lib/labels.js";
 
 // Navigation for the role portals (student, dean, faculty). Staff, admin and
 // the coordinators keep their own groups in Layout.jsx. Every role renders in
@@ -45,46 +46,46 @@ export const STUDENT_NAV_GROUPS = [
   {
     label: "Overview",
     items: [
-      { to: "/student", label: "Dashboard", icon: LayoutDashboard, end: true },
-      { to: "/student/progress", label: "My Progress", icon: ListChecks },
+      { to: "/student", label: PAGE.dashboard, icon: LayoutDashboard, end: true },
+      { to: "/student/progress", label: PAGE.myProgress, icon: ListChecks },
     ],
   },
   {
     label: "Academics",
     items: [
-      { to: "/student/enrollment", label: "Enrollment", icon: BookPlus },
-      { to: "/student/practicum", label: "Practicum", icon: Briefcase, hideWhen: "noPracticum" },
-      { to: "/student/graduation", label: "Graduation", icon: GraduationCap },
+      { to: "/student/enrollment", label: PAGE.enrollment, icon: BookPlus },
+      { to: "/student/practicum", label: PAGE.practicum, icon: Briefcase, hideWhen: "noPracticum" },
+      { to: "/student/graduation", label: PAGE.graduationEndorsement, icon: GraduationCap },
     ],
   },
   {
     // Adviser, defense schedule and calendar are steps of the research flow, not processes of their own.
     label: "Research",
     items: [
-      { to: "/student/research", label: "Research Progress", icon: FileCheck },
-      { to: "/student/adviser", label: "Research Adviser", icon: UserRoundCheck },
-      { to: "/student/defense-schedule", label: "Defense Schedule", icon: CalendarCheck },
-      { to: "/student/calendar", label: "Research Calendar", icon: CalendarDays },
+      { to: "/student/research", label: PAGE.researchProgress, icon: FileCheck },
+      { to: "/student/adviser", label: PAGE.researchAdviser, icon: UserRoundCheck },
+      { to: "/student/defense-schedule", label: PAGE.defenseSchedule, icon: CalendarCheck },
+      { to: "/student/calendar", label: PAGE.researchCalendar, icon: CalendarDays },
     ],
   },
   {
     label: "Requests",
     items: [
-      { to: "/student/requests", label: "Request Center", icon: Send, end: true },
-      { to: "/student/requests/leave-of-absence", label: "Leave of Absence", icon: CalendarOff },
-      { to: "/student/requests/readmission", label: "Readmission", icon: UserCheck },
-      { to: "/student/requests/awol-return", label: "Return from AWOL", icon: UserX },
-      { to: "/student/requests/withdrawal", label: "Subject Withdrawal", icon: LogOut },
+      { to: "/student/requests", label: PAGE.requestCenter, icon: Send, end: true },
+      { to: "/student/requests/leave-of-absence", label: PAGE.leaveOfAbsence, icon: CalendarOff },
+      { to: "/student/requests/readmission", label: PAGE.readmission, icon: UserCheck },
+      { to: "/student/requests/awol-return", label: PAGE.returnFromAwol, icon: UserX },
+      { to: "/student/requests/withdrawal", label: PAGE.subjectWithdrawal, icon: LogOut },
     ],
   },
   {
     label: "Support",
     items: [
-      { to: "/student/messages", label: "Messages", icon: Mail, badge: "unreadMessages" },
-      { to: "/student/documents", label: "Documents", icon: FileUp },
-      { to: "/student/activity", label: "Activity History", icon: History },
-      { to: "/student/assistant", label: "Policy Assistant", icon: Bot },
-      { to: "/student/profile", label: "My Profile", icon: UserRound },
+      { to: "/student/messages", label: PAGE.messages, icon: Mail, badge: "unreadMessages" },
+      { to: "/student/documents", label: PAGE.documents, icon: FileUp },
+      { to: "/student/activity", label: PAGE.activityLog, icon: History },
+      { to: "/student/assistant", label: PAGE.assistant, icon: Bot },
+      { to: "/student/profile", label: PAGE.myProfile, icon: UserRound },
     ],
   },
 ];
@@ -92,30 +93,30 @@ export const STUDENT_NAV_GROUPS = [
 export const DEAN_NAV_GROUPS = [
   {
     label: "Overview",
-    items: [{ to: "/dean", label: "Dashboard", icon: LayoutDashboard, end: true }],
+    items: [{ to: "/dean", label: PAGE.dashboard, icon: LayoutDashboard, end: true }],
   },
   {
     label: "Approvals",
     items: [
       // The queue also holds the adviser-designation decisions (research flow) as one more process group.
-      { to: "/dean/approvals", label: "Approvals Queue", icon: Inbox, end: true, matches: ["/dean/case"], badge: "pendingTotal" },
-      { to: "/dean/approvals/course-adjustments", label: "Course Adjustments", icon: SlidersHorizontal, badge: "pendingPlans" },
-      { to: "/dean/approvals/leave-of-absence", label: "Leave of Absence", icon: CalendarOff, badge: "pendingLeaveOfAbsence" },
-      { to: "/dean/approvals/readmission", label: "Readmission", icon: UserCheck, badge: "pendingReadmission" },
-      { to: "/dean/approvals/awol", label: "AWOL & Residency", icon: UserX, badge: "pendingAwol" },
-      { to: "/dean/approvals/withdrawal", label: "Withdrawal Requests", icon: LogOut, badge: "pendingWithdrawal" },
-      { to: "/dean/approvals/practicum", label: "Practicum Reports", icon: Briefcase, badge: "pendingPracticum" },
-      { to: "/dean/approvals/graduation", label: "Graduation Endorsement", icon: GraduationCap, badge: "pendingGraduation" },
-      { to: "/dean/gate-reports", label: "Admission & Coursework Reports", icon: ClipboardCheck },
+      { to: "/dean/approvals", label: PAGE.approvalsQueue, icon: Inbox, end: true, matches: ["/dean/case"], badge: "pendingTotal" },
+      { to: "/dean/approvals/course-adjustments", label: PAGE.courseAdjustments, icon: SlidersHorizontal, badge: "pendingPlans" },
+      { to: "/dean/approvals/leave-of-absence", label: PAGE.leaveOfAbsence, icon: CalendarOff, badge: "pendingLeaveOfAbsence" },
+      { to: "/dean/approvals/readmission", label: PAGE.readmission, icon: UserCheck, badge: "pendingReadmission" },
+      { to: "/dean/approvals/awol", label: PAGE.awolResidency, icon: UserX, badge: "pendingAwol" },
+      { to: "/dean/approvals/withdrawal", label: PAGE.subjectWithdrawal, icon: LogOut, badge: "pendingWithdrawal" },
+      { to: "/dean/approvals/practicum", label: PAGE.practicumReports, icon: Briefcase, badge: "pendingPracticum" },
+      { to: "/dean/approvals/graduation", label: PAGE.graduationEndorsement, icon: GraduationCap, badge: "pendingGraduation" },
+      { to: "/dean/gate-reports", label: PAGE.gateReports, icon: ClipboardCheck },
     ],
   },
   {
     label: "Monitoring & Support",
     items: [
-      { to: "/dean/analytics", label: "Reports & Analytics", icon: BarChart3 },
-      { to: "/dean/activity", label: "Decision History", icon: Activity },
-      { to: "/dean/assistant", label: "Policy Assistant", icon: Bot },
-      { to: "/dean/business-rules", label: "Business Rules", icon: Scale },
+      { to: "/dean/analytics", label: PAGE.reportsAnalytics, icon: BarChart3 },
+      { to: "/dean/activity", label: PAGE.activityLog, icon: Activity },
+      { to: "/dean/assistant", label: PAGE.assistant, icon: Bot },
+      { to: "/dean/business-rules", label: PAGE.businessRules, icon: Scale },
     ],
   },
 ];
@@ -123,32 +124,32 @@ export const DEAN_NAV_GROUPS = [
 export const FACULTY_NAV_GROUPS = [
   {
     label: "Overview",
-    items: [{ to: "/faculty-portal", label: "Dashboard", icon: LayoutDashboard, end: true }],
+    items: [{ to: "/faculty-portal", label: PAGE.dashboard, icon: LayoutDashboard, end: true }],
   },
   {
     label: "Advising & Research",
     items: [
-      { to: "/faculty-portal/advisees", label: "My Advisees", icon: Users, badge: "pendingAdviserRequests" },
-      { to: "/faculty-portal/signatures", label: "Signatures & Endorsements", icon: FileSignature, badge: "pendingSignatures" },
-      { to: "/faculty-portal/panels", label: "Panel Assignments & Papers", icon: FileText },
-      { to: "/faculty-portal/invitations", label: "Panel Invitations", icon: MailCheck, badge: "pendingInvitations" },
-      { to: "/faculty-portal/defenses", label: "Defense Schedule", icon: CalendarClock },
-      { to: "/faculty-portal/calendar", label: "My Calendar", icon: CalendarDays },
-      { to: "/faculty-portal/availability", label: "My Availability", icon: CalendarCheck },
-      { to: "/faculty-portal/verdicts", label: "Verdicts", icon: Scale, badge: "pendingVerdicts" },
+      { to: "/faculty-portal/advisees", label: PAGE.myAdvisees, icon: Users, badge: "pendingAdviserRequests" },
+      { to: "/faculty-portal/signatures", label: PAGE.signatures, icon: FileSignature, badge: "pendingSignatures" },
+      { to: "/faculty-portal/panels", label: PAGE.panelAssignments, icon: FileText },
+      { to: "/faculty-portal/invitations", label: PAGE.panelInvitations, icon: MailCheck, badge: "pendingInvitations" },
+      { to: "/faculty-portal/defenses", label: PAGE.defenseSchedule, icon: CalendarClock },
+      { to: "/faculty-portal/calendar", label: PAGE.myCalendar, icon: CalendarDays },
+      { to: "/faculty-portal/availability", label: PAGE.myAvailability, icon: CalendarCheck },
+      { to: "/faculty-portal/verdicts", label: PAGE.verdicts, icon: Scale, badge: "pendingVerdicts" },
     ],
   },
   {
     label: "Teaching",
     items: [
-      { to: "/faculty-portal/classes", label: "Assigned Classes", icon: BookOpenCheck },
+      { to: "/faculty-portal/classes", label: PAGE.assignedClasses, icon: BookOpenCheck },
     ],
   },
   {
     label: "Support",
     items: [
-      { to: "/faculty-portal/assistant", label: "Policy Assistant", icon: Bot },
-      { to: "/faculty-portal/business-rules", label: "Business Rules", icon: BookOpenCheck },
+      { to: "/faculty-portal/assistant", label: PAGE.assistant, icon: Bot },
+      { to: "/faculty-portal/business-rules", label: PAGE.businessRules, icon: BookOpenCheck },
     ],
   },
 ];

@@ -33,7 +33,7 @@ export function FacultyRoutes() {
         <Route path="invitations" element={<FacultyInvitationsPage />} />
         <Route
           path="calendar"
-          element={<CalendarPage scope="faculty" title="My calendar" description="Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times." />}
+          element={<CalendarPage scope="faculty" title="My Calendar" description="Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times." />}
         />
         <Route path="assistant" element={<Assistant policyOnly />} />
         <Route path="business-rules" element={<BusinessRules />} />

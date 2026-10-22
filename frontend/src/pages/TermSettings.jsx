@@ -4,6 +4,7 @@ import { useApi } from "../hooks";
 import { Card, ErrorNote, Spinner } from "../components/ui";
 import { useConfirm } from "../components/confirm";
 import { useState } from "react";
+import { PAGE } from "../lib/labels.js";
 
 const EMPTY_FORM = { label: "", start_date: "", end_date: "", planning_window_open: "", planning_window_close: "" };
 const DATE_FIELDS = ["start_date", "end_date", "planning_window_open", "planning_window_close"];
@@ -133,7 +134,7 @@ export default function TermSettings() {
         <div className="flex gap-4">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white"><CalendarClock className="h-6 w-6" /></span>
           <div>
-            <h1 className="font-display text-2xl font-semibold text-ink">Academic semesters</h1>
+            <h1 className="font-display text-2xl font-semibold text-ink">{PAGE.academicSemesters}</h1>
             <p className="mt-1 text-sm text-slate-600">Maintain the list of academic semesters and mark the current planning term. Enrollment, course adjustments, and reporting use these semesters.</p>
           </div>
         </div>

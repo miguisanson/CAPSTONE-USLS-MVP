@@ -7,6 +7,7 @@ import { PageHeader, SectionCard } from "../components/ui/index.js";
 import StudentPicker from "../components/StudentPicker";
 import AssistantChat from "../components/AssistantChat";
 import { useAuth } from "../auth";
+import { PAGE } from "../lib/labels.js";
 
 // Staff and admin can focus the chat on a student record; every other signed-in
 // role (Dean, coordinators, faculty) asks policy questions and questions about their own queue.
@@ -28,12 +29,12 @@ export default function Assistant({ policyOnly: policyOnlyProp = false }) {
       : "General · policy documents and all students";
   const greeting = policyOnly
     ? "Hi! I'm the Policy Assistant. I answer from the Graduate School policy documents and show the document, page and section behind every answer. Ask what is waiting on you, or any question about policy, forms, procedures or deadlines."
-    : "Hi! I'm the Policy & Case Guidance assistant. Ask about a student's status, what is waiting on you, or Graduate School policy. I answer from live records and the policy documents, and I say so when the documents do not cover a question.";
+    : "Hi! I'm the Policy Assistant. Ask about a student's status, what is waiting on you, or Graduate School policy. I answer from live records and the policy documents, and I say so when the documents do not cover a question.";
 
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
-        title={policyOnly ? "Policy Assistant" : "Policy & Case Guidance"}
+        title={PAGE.assistant}
         icon={Bot}
         description="Answers come only from the uploaded policy documents and your own records, with the sources shown. For guidance only: final decisions stay with authorized personnel."
       />
