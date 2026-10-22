@@ -4815,12 +4815,15 @@ WORKFLOW_RECIPIENTS = {
 
 
 class LoginThrottle:
-    """Per-process brake on repeated failed sign-ins.
+    """Per-process brake on repeated failed sign-ins: a short, growing delay, never a lock.
 
-    An email (known or not, so lockout reveals nothing) is locked for
-    ``lockout_seconds`` after ``max_failures`` failures inside ``window_seconds``;
-    one client address gets a larger allowance. State lives in memory, so it
-    resets on restart and is per worker process.
+    Failures are counted per (e-mail, client address), so one person mistyping a password
+    cannot keep anybody else (another address) out of a shared account. Once
+    ``max_failures`` failures fall inside ``window_seconds`` the next attempt must wait
+    ``base_delay_seconds``, and every further failure doubles the wait up to
+    ``lockout_seconds`` (30 s). One client address gets a larger allowance across all
+    e-mails. An e-mail that does not exist is counted the same way, so the delay reveals
+    nothing. State lives in memory, so it resets on restart and is per worker process.
     """
 
     def __init__(self, clock=None):
@@ -4829,11 +4832,12 @@ class LoginThrottle:
         self.max_failures = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
         self.ip_max_failures = int(os.getenv("LOGIN_IP_MAX_FAILURES", "40"))
         self.window_seconds = int(os.getenv("LOGIN_FAILURE_WINDOW_SECONDS", "900"))
-        self.lockout_seconds = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "300"))
+        self.base_delay_seconds = int(os.getenv("LOGIN_BASE_DELAY_SECONDS", "2"))
+        self.lockout_seconds = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "30"))  # the longest single wait
         self.clock = clock or monotonic
         self._lock = threading.Lock()
-        self._failures: dict[tuple[str, str], list[float]] = {}
-        self._locked_until: dict[tuple[str, str], float] = {}
+        self._failures: dict[tuple, list[float]] = {}
+        self._locked_until: dict[tuple, float] = {}
 
     def reset(self) -> None:
         with self._lock:
@@ -4841,11 +4845,11 @@ class LoginThrottle:
             self._locked_until.clear()
 
     @staticmethod
-    def _keys(email: str, ip: str) -> list[tuple[tuple[str, str], int]]:
-        return [(("email", (email or "")[:254].lower()), 0), (("ip", ip or ""), 1)]
+    def _keys(email: str, ip: str) -> list[tuple[tuple, int]]:
+        return [(("email-ip", (email or "")[:254].lower(), ip or ""), 0), (("ip", ip or ""), 1)]
 
     def retry_after(self, email: str, ip: str) -> int:
-        """Seconds until sign-in may be tried again; 0 when not locked."""
+        """Seconds until sign-in may be tried again; 0 when not delayed."""
         now = self.clock()
         with self._lock:
             waits = [self._locked_until.get(key, 0) - now for key, _ in self._keys(email, ip)]
@@ -4861,13 +4865,14 @@ class LoginThrottle:
                 recent = [t for t in self._failures.get(key, []) if now - t < self.window_seconds]
                 recent.append(now)
                 self._failures[key] = recent
-                if len(recent) >= (self.ip_max_failures if kind else self.max_failures):
-                    self._locked_until[key] = now + self.lockout_seconds
-                    self._failures[key] = []
+                threshold = self.ip_max_failures if kind else self.max_failures
+                if len(recent) >= threshold:
+                    delay = min(self.lockout_seconds, self.base_delay_seconds * 2 ** (len(recent) - threshold))
+                    self._locked_until[key] = now + delay
 
-    def record_success(self, email: str) -> None:
+    def record_success(self, email: str, ip: str = "") -> None:
         with self._lock:
-            key = ("email", (email or "")[:254].lower())
+            key = ("email-ip", (email or "")[:254].lower(), ip or "")
             self._failures.pop(key, None)
             self._locked_until.pop(key, None)
 
@@ -12400,7 +12405,7 @@ def register_routes(app: Flask) -> None:
         wait = LOGIN_THROTTLE.retry_after(email, client_ip)
         if wait:
             response = jsonify({
-                "error": f"Too many failed sign-in attempts. Try again in {max(1, (wait + 59) // 60)} minute(s).",
+                "error": f"Too many failed sign-in attempts. Try again in {wait} second(s).",
             })
             response.headers["Retry-After"] = str(wait)
             return no_store(response), 429
@@ -12412,7 +12417,7 @@ def register_routes(app: Flask) -> None:
         if not account or not password_ok:
             LOGIN_THROTTLE.record_failure(email, client_ip)
             return no_store(jsonify({"error": "Incorrect email or password."})), 401
-        LOGIN_THROTTLE.record_success(email)
+        LOGIN_THROTTLE.record_success(email, client_ip)
         if demo_mode_enabled():
             _, demo_config = workflow_demo_config_for_student(account.student)
             if demo_config:
@@ -12457,7 +12462,7 @@ def register_routes(app: Flask) -> None:
         wait = LOGIN_THROTTLE.retry_after(account.email, client_ip)
         if wait:
             return no_store(jsonify({
-                "error": f"Too many failed attempts. Try again in {max(1, (wait + 59) // 60)} minute(s).",
+                "error": f"Too many failed attempts. Try again in {wait} second(s).",
             })), 429
         if not check_password_hash(account.password_hash, current_password):
             LOGIN_THROTTLE.record_failure(account.email, client_ip)
@@ -12471,7 +12476,7 @@ def register_routes(app: Flask) -> None:
         account.password_hash = generate_password_hash(new_password)
         account.must_change_password = False
         db.session.commit()
-        LOGIN_THROTTLE.record_success(account.email)
+        LOGIN_THROTTLE.record_success(account.email, client_ip)
         return no_store(jsonify({"ok": True, "user": account_dict(account)}))
 
     # Shared reference data used to render filters, dropdowns, and workflow cards.
