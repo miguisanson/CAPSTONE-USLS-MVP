@@ -2,8 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, UserRoundPlus } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, ErrorNote, InlineNotice } from "../components/ui";
-import { Field, Input, Select, Textarea } from "../components/forms";
+import { Button, Card, Field, InlineNotice, Input, Select, Textarea } from "../components/ui/index.js";
 import StudentPicker from "../components/StudentPicker";
 
 // Collapsible form for a student whose adviser was appointed outside the portal
@@ -51,24 +50,24 @@ export default function AdviserRecordCard({ onRecorded }) {
   }
 
   return (
-    <Card className="p-4 sm:p-5">
+    <Card>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="adviser-record-form"
-        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg text-left"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg text-left max-sm:min-h-11"
       >
         <span className="flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-700"><UserRoundPlus className="h-5 w-5" /></span>
           <span>
-            <span className="block text-base font-semibold text-ink">Record an adviser appointed outside the portal</span>
+            <span className="card-title block">Record an adviser appointed outside the portal</span>
             <span className="block text-sm text-slate-500">For students imported from the monitoring sheet who already have an adviser.</span>
           </span>
         </span>
         {open ? <ChevronUp className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" /> : <ChevronDown className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />}
       </button>
-      {done && !open && <div className="mt-3"><InlineNotice>{done}</InlineNotice></div>}
+      {done && !open && <div className="mt-3"><InlineNotice tone="success">{done}</InlineNotice></div>}
       {open && (
         <form id="adviser-record-form" onSubmit={submit} className="mt-4 space-y-4">
           <div>
@@ -94,9 +93,9 @@ export default function AdviserRecordCard({ onRecorded }) {
           <Field label="Note (optional)">
             <Textarea value={note} rows={2} maxLength={500} onChange={(event) => setNote(event.target.value)} />
           </Field>
-          <ErrorNote message={error} />
-          {done && <InlineNotice>{done}</InlineNotice>}
-          <button type="submit" className="btn-primary" disabled={busy}>{busy ? "Recording..." : "Record the appointment"}</button>
+          {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+          {done && <InlineNotice tone="success">{done}</InlineNotice>}
+          <Button type="submit" loading={busy}>{busy ? "Recording…" : "Record the appointment"}</Button>
         </form>
       )}
     </Card>
