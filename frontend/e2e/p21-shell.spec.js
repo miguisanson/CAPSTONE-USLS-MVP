@@ -92,6 +92,7 @@ const EXPECTED_LINKS = {
     "/workflow/withdrawal | Subject Withdrawal",
   ],
   "academic-coordinator": [
+    "/ | Dashboard",
     "/assistant | Policy Assistant",
     "/business-rules | Business Rules",
     "/course-adjustments | 2 · Course Adjustments",
@@ -110,6 +111,7 @@ const EXPECTED_LINKS = {
     "/workflow/research-gate | 4 · Research Gate",
   ],
   "research-coordinator": [
+    "/ | Dashboard",
     "/assistant | Policy Assistant",
     "/business-rules | Business Rules",
     "/monitoring-sheet | Monitoring Sheet",
