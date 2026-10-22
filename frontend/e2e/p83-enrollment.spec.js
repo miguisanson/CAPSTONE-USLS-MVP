@@ -268,3 +268,129 @@ test.describe("Enrollment (GS staff): behaviour that must not change", () => {
     await shotAll(page, "enrollment-bottom");
   });
 });
+
+// ================================================================================================ Part 2: P8.3 changes
+// What changes on purpose. The server's answer is read at test time (or replaced by page.route) so these do not depend on
+// seeded state that other specs change.
+
+/** Serve /api/enrollment as the server does, with `patch(json)` applied to the answer. */
+async function patchEnrollment(page, patch) {
+  await page.route(/\/api\/enrollment(\?|$)/, async (route) => {
+    const response = await route.fetch();
+    const json = await response.json();
+    await route.fulfill({ response, json: patch(json) || json });
+  });
+}
+
+test.describe("Enrollment (GS staff): P8.3 changes", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  test("I-082: one student picker; the study-plan section follows the student chosen at the top", async ({ page }) => {
+    await openEnrollment(page);
+    const { first, q } = await readSetup(page);
+
+    // exactly one student picker on the whole page (a select that lists this student), and no "Select a student…"
+    await expect(page.locator("select").filter({ has: page.locator("option", { hasText: first.selected_student.student_number }) })).toHaveCount(1);
+    await expect(page.locator("option", { hasText: "Select a student…" })).toHaveCount(0);
+
+    const plan = page.getByRole("heading", { level: 2, name: "Curriculum version & study plan draft" });
+    await plan.scrollIntoViewIfNeeded();
+    await expect(page.getByText(`Study plan for ${first.selected_student.name}`)).toBeVisible();
+    // no second pick is needed: the buttons are live and the version list is open
+    await expect(page.getByRole("button", { name: "Generate study plan draft" })).toBeEnabled();
+    await expect(page.getByLabel("Curriculum version")).toBeEnabled();
+
+    // choosing another student at the top changes the study-plan section
+    const other = first.students.find((s) => s.id !== first.selected_student.id);
+    test.skip(!other, "the demo program has only one student");
+    const data = await getJson(page, q(other));
+    await studentSelect(page).selectOption(String(other.id));
+    await expect(page.getByText(`Study plan for ${data.selected_student.name}`)).toBeVisible();
+    await expect(page.getByText(`Study plan for ${first.selected_student.name}`)).toHaveCount(0);
+  });
+
+  test("I-081: no 'Cross-screen consistency' widget when the check is clean", async ({ page }) => {
+    await patchEnrollment(page, (json) => {
+      json.integrity = { status: "Consistent", issue_count: 0, checked_enrollments: 3, issues: [], surfaces: [] };
+    });
+    await openEnrollment(page);
+    await expect(page.getByText("Cross-screen consistency")).toHaveCount(0);
+    await expect(page.getByText(/enrollment row\(s\) checked/)).toHaveCount(0);
+    await expect(page.getByText("no inconsistencies")).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: "Enrollment history" })).toBeVisible();
+  });
+
+  test("I-081: a problem the check found is a plain warning beside the subject it is about", async ({ page }) => {
+    let subject;
+    await patchEnrollment(page, (json) => {
+      subject = json.offered_subjects[0];
+      json.integrity = {
+        status: "Needs review",
+        issue_count: 1,
+        checked_enrollments: 3,
+        surfaces: [],
+        issues: [{
+          id: "projection-1",
+          type: "Monitoring/profile mismatch",
+          line: `${json.selected_student.student_number} · ${subject.course_code}`,
+          message: "Enrollment says Enrolled in this term, but the shared monitoring/profile row says Missing.",
+          student_id: json.selected_student.id,
+        }],
+      };
+    });
+    await openEnrollment(page);
+    const row = page.locator("main table").first().locator("tbody tr").filter({ hasText: subject.course_code }).first();
+    await expect(row.getByText("This subject's status differs from the Monitoring Sheet:")).toBeVisible();
+    await expect(row).toContainText("the shared monitoring/profile row says Missing");
+    // the note sits on that subject only
+    await expect(page.getByText("This subject's status differs from the Monitoring Sheet:")).toHaveCount(1);
+    await expect(page.getByText("Cross-screen consistency")).toHaveCount(0);
+    await shotAll(page, "enrollment-row-warning");
+  });
+
+  test("forms: Record dropped subject marks required fields and checks them when Save is pressed", async ({ page }) => {
+    await openEnrollment(page);
+    const { first, withEnrolled } = await readSetup(page);
+    test.skip(!withEnrolled, "no demo student has a subject enrolled this semester");
+    if (withEnrolled.student.id !== first.selected_student.id) await studentSelect(page).selectOption(String(withEnrolled.student.id));
+    const code = withEnrolled.row.course_code;
+    await page.getByRole("button", { name: `Change ${code} student status` }).click();
+    const dialog = page.getByRole("dialog", { name: "Record dropped subject" });
+    await expect(dialog).toBeVisible();
+
+    // required fields say so, and the button is not greyed out
+    for (const name of ["New status", "Effective date", "Unexcused absences", "Coordinator note"]) {
+      await expect(dialog.getByLabel(name)).toHaveAttribute("aria-required", "true");
+    }
+    const save = dialog.getByRole("button", { name: /^Save/ });
+    await expect(save).toBeEnabled();
+
+    // pressing Save with the form empty: an error summary with a link to each field, and the answers stay put
+    await dialog.getByLabel("Effective date").fill("2026-10-01");
+    await save.click();
+    await expect(dialog).toBeVisible();
+    const summary = dialog.getByRole("alert").filter({ hasText: "There is a problem" });
+    await expect(summary).toBeVisible();
+    await expect(summary.getByRole("link")).toHaveCount(3); // status, absences, note (the date is filled in)
+    await expect(summary).toContainText("Choose Dropped as the new status.");
+    await expect(summary).toContainText("Add a coordinator note");
+    await expect(dialog.getByLabel("Effective date")).toHaveValue("2026-10-01");
+    await expect(summary).toBeFocused();
+
+    // each message links to its field
+    await summary.getByRole("link", { name: /coordinator note/i }).click();
+    await expect(dialog.getByLabel("Coordinator note")).toBeFocused();
+    // and the same message sits beside the field
+    await expect(dialog.getByLabel("Coordinator note")).toHaveAttribute("aria-invalid", "true");
+    await shotAll(page, "enrollment-drop-errors", { full: false });
+  });
+
+  test("empty draft tells the coordinator what to do", async ({ page }) => {
+    await patchEnrollment(page, (json) => {
+      json.current_course_ids = [];
+    });
+    await openEnrollment(page);
+    await expect(page.getByText("No subjects selected yet")).toBeVisible();
+    await expect(page.getByText(/Choose Add on a subject/)).toBeVisible();
+  });
+});
