@@ -18,16 +18,9 @@ const authFile = (key) => join(AUTH_DIR, `${key}.json`);
 // Path -> why this page has no <h1> to compare. (Empty on purpose: add an entry only with a reason.)
 const NO_H1 = {};
 
-// Titles that this packet could not change because they live in files other helpers were editing (pages/faculty/) or
-// come from the server (app.py: the staff lifecycle pages take their <h1> from the transaction title). Path -> the title
-// the page still shows. The breadcrumb and the sidebar already use the one name; delete an entry when its title is fixed
-// (the test also passes once the title equals the link text).
-const TITLE_PENDING = {
-  "/workflow/research-gate": "Research Gate Readiness",
-  "/faculty-portal/invitations": "Panel invitations",
-  "/faculty-portal/calendar": "My calendar",
-  "/faculty-portal/availability": "My availability",
-};
+// Titles that cannot be fixed yet. Path -> the title the page still shows. Empty since I-112 (pkt/shell): the faculty
+// titles are Title Case and Research Gate's server title is "Research Gate". Add an entry only with a reason.
+const TITLE_PENDING = {};
 
 const stripStep = (label) => label.replace(/^\d+\s*·\s*/, "").trim();
 const norm = (text) => (text || "").replace(/\s+/g, " ").trim();

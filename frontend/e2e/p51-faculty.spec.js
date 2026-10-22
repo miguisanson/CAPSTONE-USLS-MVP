@@ -134,7 +134,7 @@ test.describe("Dashboard", () => {
   });
 
   test("Google Calendar preview dialog (on My Availability): content, focus, Tab trap, Escape, backdrop, Not now, open in a new tab", async ({ page, context }) => {
-    await openFromSidebar(page, "My Availability", "My availability");
+    await openFromSidebar(page, "My Availability", "My Availability");
     const connect = page.getByRole("button", { name: "Connect Google Calendar" });
     await connect.click();
     const dialog = page.getByRole("dialog", { name: /Allow USLS Graduate School to use your calendar availability/ });
@@ -446,7 +446,7 @@ test.describe("Panel invitations", () => {
         other_members: [{ name: "Dr. Marlon Geronimo", role: "Panel Chair" }], schedule: null,
       }],
     }));
-    await openFromSidebar(page, "Panel Invitations", "Panel invitations");
+    await openFromSidebar(page, "Panel Invitations", "Panel Invitations");
     await expect(page.getByText("Research defense panels you have been asked to join.")).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: /invitations? (is|are) waiting for your answer\./ })).toBeVisible();
     await expect(page.getByRole("heading", { name: /^Waiting for your answer \(\d+\)$/ })).toBeVisible();
@@ -499,7 +499,7 @@ test.describe("Panel invitations", () => {
       state.invitations.find((i) => i.id === 2).status = "Declined";
     });
 
-    await openFromSidebar(page, "Panel Invitations", "Panel invitations");
+    await openFromSidebar(page, "Panel Invitations", "Panel Invitations");
     await expect(page.getByRole("status").filter({ hasText: "1 invitation is waiting for your answer." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Waiting for your answer (1)" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Accepted (1)" })).toBeVisible();
@@ -538,7 +538,7 @@ test.describe("Panel invitations", () => {
 
   test("no invitations (mocked): empty state", async ({ page }) => {
     await mockJson(page, "**/api/faculty-portal/panel-invitations", () => ({ invitations: [] }));
-    await openFromSidebar(page, "Panel Invitations", "Panel invitations");
+    await openFromSidebar(page, "Panel Invitations", "Panel Invitations");
     await expect(page.getByText("No panel invitations")).toBeVisible();
     await expect(page.getByText("When the Research Coordinator puts you on a defense panel, the invitation shows up here.")).toBeVisible();
     await shots(page, "invitations-empty");
@@ -547,7 +547,7 @@ test.describe("Panel invitations", () => {
   test("a failed load shows the message under the header (mocked)", async ({ page }) => {
     await page.route("**/api/faculty-portal/panel-invitations", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "The invitations could not be read." }) }));
     await page.goto("/faculty-portal/invitations");
-    await expect(page.getByRole("heading", { level: 1, name: "Panel invitations" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Panel Invitations", exact: true })).toBeVisible();
     await expect(page.getByText("The invitations could not be read.")).toBeVisible();
     tracker.problems = tracker.problems.filter((p) => !/API 500|Failed to load resource/.test(p.problem));
   });
@@ -618,7 +618,7 @@ test.describe("Defense Schedule", () => {
 
 // ================================================================================================ Calendar
 test("My Calendar: header and the shared calendar view", async ({ page }) => {
-  await openFromSidebar(page, "My Calendar", "My calendar");
+  await openFromSidebar(page, "My Calendar", "My Calendar");
   await expect(page.getByText("Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
   await expect(page.getByText("All times are Philippine time (Asia/Manila).")).toBeVisible();
@@ -628,7 +628,7 @@ test("My Calendar: header and the shared calendar view", async ({ page }) => {
 // ================================================================================================ Availability
 test.describe("My Availability", () => {
   test("page: header, notice, weekly hours, specific dates form, requests, calendar card, other windows", async ({ page }) => {
-    await openFromSidebar(page, "My Availability", "My availability");
+    await openFromSidebar(page, "My Availability", "My Availability");
     await expect(page.getByText("Tell the Graduate School when you can sit in a defense. All times are Philippine time.")).toBeVisible();
     await expect(page.getByRole("link", { name: "See your calendar" })).toHaveAttribute("href", "/faculty-portal/calendar");
     await expect(page.getByRole("status").filter({ hasText: /Availability entered\.|Last updated/ })).toBeVisible();
@@ -664,7 +664,7 @@ test.describe("My Availability", () => {
   });
 
   test("weekly hours: validation, copy Monday, nothing is saved by copying", async ({ page }) => {
-    await openFromSidebar(page, "My Availability", "My availability");
+    await openFromSidebar(page, "My Availability", "My Availability");
     const puts = [];
     page.on("request", (r) => r.method() === "PUT" && puts.push(r.url()));
     // an enabled day without times is refused before anything is sent
@@ -691,7 +691,7 @@ test.describe("My Availability", () => {
   });
 
   test("weekly hours: saving sends all seven days and shows the notice", async ({ page }) => {
-    await openFromSidebar(page, "My Availability", "My availability");
+    await openFromSidebar(page, "My Availability", "My Availability");
     const save = page.waitForRequest((r) => r.method() === "PUT" && r.url().endsWith("/api/faculty-portal/availability/working-hours"));
     await page.getByRole("button", { name: "Save weekly hours" }).click();
     const body = (await save).postDataJSON();
@@ -701,7 +701,7 @@ test.describe("My Availability", () => {
   });
 
   test("specific dates: validation, 'only these hours', add, list, remove with a confirmation", async ({ page }) => {
-    await openFromSidebar(page, "My Availability", "My availability");
+    await openFromSidebar(page, "My Availability", "My Availability");
     const form = page.getByRole("form", { name: "Add a specific date" });
     await form.getByRole("button", { name: "Add date" }).click();
     await expect(page.getByText("Choose the first date.")).toBeVisible();
@@ -746,7 +746,7 @@ test.describe("My Availability", () => {
   });
 
   test("calendar card on this page opens the same preview dialog", async ({ page }) => {
-    await openFromSidebar(page, "My Availability", "My availability");
+    await openFromSidebar(page, "My Availability", "My Availability");
     await page.getByRole("button", { name: "Connect Google Calendar" }).click();
     const dialog = page.getByRole("dialog", { name: /Allow USLS Graduate School to use your calendar availability/ });
     await expect(dialog).toBeVisible();
@@ -771,7 +771,7 @@ test.describe("My Availability", () => {
     await mockPost(page, "**/api/faculty-portal/availability/requests/*/answer", calls, (call) => {
       state.requests.find((r) => call.url === `/faculty-portal/availability/requests/${r.id}/answer`).status = "Answered";
     });
-    await openFromSidebar(page, "My Availability", "My availability");
+    await openFromSidebar(page, "My Availability", "My Availability");
     await expect(page.getByRole("status").filter({ hasText: "You have not entered any availability." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Other open windows" })).toHaveCount(0);
     const open = page.getByRole("listitem").filter({ hasText: "For Mock Student's defense" });

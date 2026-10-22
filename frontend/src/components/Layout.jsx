@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -61,6 +61,8 @@ const NAV_GROUPS = [
       { to: "/workflow/student-handoff", label: stepLabel(1, PAGE.studentHandoff), icon: UserPlus },
       { to: "/course-adjustments", label: stepLabel(2, PAGE.courseAdjustments), icon: SlidersHorizontal },
       { to: "/enrollment", label: stepLabel(3, PAGE.enrollment), icon: BookPlus },
+      // Not a numbered step: a read-only check of subjects against the curriculum, done before the research gate (I-101).
+      { to: "/workflow/course-audit", label: PAGE.courseAudit, icon: ClipboardCheck },
       { to: "/workflow/research-gate", label: stepLabel(4, PAGE.researchGate), icon: FileCheck },
       { to: "/workflow/panel-matching", label: stepLabel(5, PAGE.panelMatching), icon: UsersRound },
       { to: "/workflow/defense-scheduling", label: stepLabel(6, PAGE.defenseScheduling), icon: CalendarCheck },
@@ -100,7 +102,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
+  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
   // Protocol: the Research Coordinator nominates the panel and informs panel and student of the date.
   research_coordinator: new Set(["/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
 };
@@ -113,6 +115,7 @@ function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {
       to={to}
       end={end}
       onClick={onClick}
+      data-also-active={alsoActive || undefined}
       className={({ isActive }) =>
         `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors duration-200 cursor-pointer ${
           isActive || alsoActive
@@ -132,8 +135,21 @@ function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {
   );
 }
 
+// A faint shadow at the top and/or bottom edge of the nav while there is more to scroll in that direction (I-103): the
+// "local" layers hide the shadow once the list is scrolled to that end, the "scroll" layers stay put on the box.
+const NAV_SCROLL_SHADOW = {
+  background: [
+    "linear-gradient(#fff 30%, rgba(255,255,255,0)) top / 100% 28px no-repeat local",
+    "linear-gradient(rgba(255,255,255,0), #fff 70%) bottom / 100% 28px no-repeat local",
+    "radial-gradient(farthest-side at 50% 0, rgba(15,23,42,0.16), rgba(15,23,42,0)) top / 100% 10px no-repeat scroll",
+    "radial-gradient(farthest-side at 50% 100%, rgba(15,23,42,0.16), rgba(15,23,42,0)) bottom / 100% 10px no-repeat scroll",
+  ].join(", "),
+};
+
 function SidebarContent({ onNavigate, onClose, user }) {
   const { counts, flags } = usePortalNav();
+  const { pathname } = useLocation();
+  const navRef = useRef(null);
   const portalGroups = PORTAL_NAV[user?.role];
   const allowedPaths = ROLE_PATHS[user?.role];
   const roleAllowed = (item) => !item.roles || item.roles.includes(user?.role);
@@ -145,8 +161,23 @@ function SidebarContent({ onNavigate, onClose, user }) {
         .map((item) => ({ ...item, badge: item.badge ? counts[item.badge] || 0 : 0 })),
     }))
     .filter((group) => group.items.length);
+  const shape = groups.map((group) => group.items.length).join(",");
+
+  // I-103: the nav scrolls between the brand and the footer; open it with the page you are on in view (only the nav
+  // moves, never the page).
+  useEffect(() => {
+    const nav = navRef.current;
+    const current = nav?.querySelector('a[aria-current="page"], a[data-also-active]');
+    if (!nav || !current) return;
+    const box = nav.getBoundingClientRect();
+    const item = current.getBoundingClientRect();
+    const margin = 40; // leaves the next item (or the group's label above) peeking in
+    if (item.bottom + margin > box.bottom) nav.scrollTop += item.bottom + margin - box.bottom;
+    else if (item.top - margin < box.top) nav.scrollTop -= box.top - (item.top - margin);
+  }, [pathname, shape]);
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-3 px-5 py-5">
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white shadow-sm">
           <GraduationCap className="h-6 w-6" />
@@ -158,7 +189,7 @@ function SidebarContent({ onNavigate, onClose, user }) {
         {onClose && <Button variant="icon" icon={X} aria-label="Close menu" onClick={onClose} className="ml-auto" />}
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
+      <nav ref={navRef} style={NAV_SCROLL_SHADOW} className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 pb-6">
         {groups.map((group) => (
           <div key={group.label}>
             <p className="eyebrow px-3 pb-2">{group.label}</p>
@@ -171,7 +202,7 @@ function SidebarContent({ onNavigate, onClose, user }) {
         ))}
       </nav>
 
-      <div className="border-t border-slate-200 px-5 py-4">
+      <div className="shrink-0 border-t border-slate-200 px-5 py-4">
         <p className="mb-1 text-xs font-semibold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
         <p className="micro leading-relaxed">
           {PORTAL_FOOTERS[user?.role] || "Figures are computed live from recorded transactions."}

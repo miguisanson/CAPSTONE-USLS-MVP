@@ -171,7 +171,7 @@ TRANSACTIONS = [
     {
         "slug": "research-gate",
         "priority": "P1",
-        "title": "Research Gate Readiness",
+        "title": "Research Gate",
         "icon": "file-check",
         "group": "Research",
         "short": "Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.",
