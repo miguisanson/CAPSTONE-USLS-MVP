@@ -171,3 +171,28 @@ test("the welcome name skips an honorific", () => {
   assert.equal(firstNameOf(""), "");
   assert.equal(firstNameOf(undefined), "");
 });
+
+test("waiting (I-083): identical alerts held by one owner are one row with a count; other titles stay single", () => {
+  const alert = (student) => task("Academic Coordinator", "Review automatic AWOL policy alert", "2026-10-22", { student_name: student });
+  const waiting = officeWaiting(
+    [alert("Paulo Garcia"), alert("Clarisse Tan"), alert("Maya Torres"), task("Dean", "Review automatic AWOL policy alert", "2026-10-23"), task("Student", "Upload the signed form", "2026-10-25")],
+    "staff",
+  );
+  assert.deepEqual(waiting.items.map((i) => i.title), ["3 automatic AWOL policy alerts", "Review automatic AWOL policy alert", "Upload the signed form"], "the Dean's single alert is not merged with the Academic Coordinator's three");
+  assert.equal(waiting.total, 5, "the total counts tasks, not rows");
+  assert.equal(waiting.items[0].count, 3);
+  assert.match(waiting.items[0].detail, /With the Academic Coordinator\. Paulo Garcia, Clarisse Tan, Maya Torres/);
+  assert.equal(waiting.items[0].target.to, "/work-queue?owner=Academic%20Coordinator");
+});
+
+test("where a task opens (I-109): a coordinator is never sent to a page its role cannot open", () => {
+  const ac = (title, extra = {}) => taskTarget(task("Academic Coordinator", title, "2026-10-20", extra), "academic_coordinator").to;
+  assert.equal(ac("Schedule the proposal defense"), "/students/7", "Defense Scheduling is the Research Coordinator's page");
+  assert.equal(ac("Complete admission handoff missing items"), "/students/7");
+  assert.equal(ac("Review student readmission request", { action_url: "/workflow/readmission" }), "/students/7");
+  assert.equal(ac("Record and forward practicum MOA"), "/workflow/practicum", "the Academic Coordinator keeps its own pages");
+  assert.equal(ac("Resolve missing curriculum subjects"), "/course-adjustments");
+  const rc = (title, extra = {}) => taskTarget(task("Research Coordinator", title, "2026-10-20", extra), "research_coordinator").to;
+  assert.equal(rc("Schedule the proposal defense"), "/workflow/defense-scheduling");
+  assert.equal(rc("Resolve missing curriculum subjects"), "/work-queue", "no Course Adjustments for the Research Coordinator, and no Students page");
+});

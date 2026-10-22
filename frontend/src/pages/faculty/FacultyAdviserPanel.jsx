@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 import { Handshake, UserCheck, UserRoundCog, Users } from "lucide-react";
 import { api } from "../../api";
@@ -157,6 +157,36 @@ export function adviseeRows(appointments = [], portalAdvisees = []) {
   return rows.sort((left, right) => right.pending - left.pending || String(left.name).localeCompare(String(right.name)));
 }
 
+function ContractCell({ row }) {
+  const status = contractStatus(row.contract);
+  if (status === "Not applicable") return <span className="meta">Not applicable</span>;
+  const overdue = status === "Overdue";
+  const showDue = row.contract?.due_on && status !== "Received";
+  return (
+    <>
+      <StatusChip status={status} dot={false} />
+      {showDue && (
+        <span className={`meta mt-1 block ${overdue ? "font-semibold text-red-700" : ""}`}>
+          {overdue ? "Overdue since" : "Due"} {formatDay(row.contract.due_on)}
+        </span>
+      )}
+    </>
+  );
+}
+
+function SignatureCell({ row }) {
+  return row.pending ? (
+    <>
+      <StatusChip status="Pending" label={`${row.pending} pending`} dot={false} />
+      <Link to="/faculty-portal/signatures" aria-label={`Review and sign for ${row.name}`} className="meta mt-1 block font-semibold text-brand-700 hover:underline">
+        Review and sign
+      </Link>
+    </>
+  ) : (
+    <span className="meta">None</span>
+  );
+}
+
 const ADVISEE_COLUMNS = [
   {
     key: "student",
@@ -175,22 +205,7 @@ const ADVISEE_COLUMNS = [
   {
     key: "contract",
     header: "Adviser contract",
-    cell: (row) => {
-      const status = contractStatus(row.contract);
-      if (status === "Not applicable") return <span className="meta">Not applicable</span>;
-      const overdue = status === "Overdue";
-      const showDue = row.contract?.due_on && status !== "Received";
-      return (
-        <>
-          <StatusChip status={status} dot={false} />
-          {showDue && (
-            <span className={`meta mt-1 block ${overdue ? "font-semibold text-red-700" : ""}`}>
-              {overdue ? "Overdue since" : "Due"} {formatDay(row.contract.due_on)}
-            </span>
-          )}
-        </>
-      );
-    },
+    cell: (row) => <ContractCell row={row} />,
     sortable: true,
     sortValue: (row) => contractStatus(row.contract),
   },
@@ -198,35 +213,73 @@ const ADVISEE_COLUMNS = [
   {
     key: "pending",
     header: "Needs signature",
-    cell: (row) =>
-      row.pending ? (
-        <>
-          <StatusChip status="Pending" label={`${row.pending} pending`} dot={false} />
-          <Link to="/faculty-portal/signatures" aria-label={`Review and sign for ${row.name}`} className="meta mt-1 block font-semibold text-brand-700 hover:underline">
-            Review and sign
-          </Link>
-        </>
-      ) : (
-        <span className="meta">None</span>
-      ),
+    cell: (row) => <SignatureCell row={row} />,
     sortable: true,
     sortValue: (row) => row.pending,
   },
 ];
 
+// I-104: below 768 px the table would scroll sideways and hide "Needs signature", so each advisee is a card with
+// the action first. One of the two is rendered, never both.
+const PHONE = "(max-width: 767px)";
+const subscribePhone = (notify) => {
+  const query = window.matchMedia(PHONE);
+  query.addEventListener("change", notify);
+  return () => query.removeEventListener("change", notify);
+};
+const useIsPhone = () => useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE).matches, () => false);
+
+function AdviseeCards({ rows }) {
+  return (
+    <ul aria-label="Your advisees, the research documents that need your signature first" className="space-y-3">
+      {rows.map((row) => (
+        <li key={row.key} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">{row.name}</p>
+            <p className="meta">{[row.number, row.program].filter(Boolean).join(" · ")}</p>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
+            <div className="col-span-2">
+              <dt className="eyebrow">Needs signature</dt>
+              <dd className="mt-1"><SignatureCell row={row} /></dd>
+            </div>
+            <div>
+              <dt className="eyebrow">Stage</dt>
+              <dd className="mt-1">{row.stage || "Not set"}</dd>
+            </div>
+            <div>
+              <dt className="eyebrow">Documents</dt>
+              <dd className="mt-1">{row.documents}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="eyebrow">Adviser contract</dt>
+              <dd className="mt-1"><ContractCell row={row} /></dd>
+            </div>
+          </dl>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function AdviseeTable({ rows }) {
+  const phone = useIsPhone();
   return (
     <Card>
       <SectionTitle title="Your advisees" subtitle="Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1." icon={Handshake} />
-      <DataTable
-        caption="Your advisees, the state of their adviser contract and the research documents that need your signature"
-        columns={ADVISEE_COLUMNS}
-        rows={rows}
-        rowKey="key"
-        pageSize={0}
-        minWidth="md"
-        empty={{ icon: Users, title: "No appointed advisees yet", hint: "Students appear here once you accept their request." }}
-      />
+      {phone && rows.length > 0 ? (
+        <AdviseeCards rows={rows} />
+      ) : (
+        <DataTable
+          caption="Your advisees, the state of their adviser contract and the research documents that need your signature"
+          columns={ADVISEE_COLUMNS}
+          rows={rows}
+          rowKey="key"
+          pageSize={0}
+          minWidth="md"
+          empty={{ icon: Users, title: "No appointed advisees yet", hint: "Students appear here once you accept their request." }}
+        />
+      )}
     </Card>
   );
 }
