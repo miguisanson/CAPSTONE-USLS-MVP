@@ -1,7 +1,7 @@
 // DataTable (UI-SPEC section 4 and 5): one table for the whole app. It scrolls sideways INSIDE its own wrapper (the
 // page never does), has sticky-able headers with scope="col", optional sort / search / pagination / CSV export done
 // on the client, and hooks to let the server do paging and sorting instead.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Inbox } from "lucide-react";
 import { csvCell, downloadBlob } from "../../lib/format";
@@ -203,6 +203,24 @@ export function DataTable({
 
   const clickable = Boolean(onRowClick || rowHref);
 
+  // A box that scrolls sideways must be reachable by keyboard, or a keyboard user can never see the cut-off columns
+  // (axe: scrollable-region-focusable, WCAG 2.1.1). It becomes a focusable, named region only while it really scrolls,
+  // so a table that fits adds no extra Tab stop.
+  const scrollRef = useRef(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    const measure = () => setScrolls(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    const table = el.querySelector("table");
+    if (table) observer.observe(table);
+    return () => observer.disconnect();
+  }, [loading, noRows, visibleRows.length, columns.length]);
+
   return (
     <div className={cx("space-y-3", className)} {...rest}>
       {showToolbar && (
@@ -226,8 +244,15 @@ export function DataTable({
       )}
 
       <div
+        ref={scrollRef}
         data-table-scroll=""
-        className={cx("relative overflow-x-auto rounded-xl border border-slate-200 bg-white", stickyHeader && "max-h-[70dvh] overflow-y-auto")}
+        tabIndex={scrolls ? 0 : undefined}
+        role={scrolls ? "region" : undefined}
+        aria-label={scrolls ? (caption ? `${caption} (scrolls sideways)` : "Table (scrolls sideways)") : undefined}
+        className={cx(
+          "relative overflow-x-auto rounded-xl border border-slate-200 bg-white focus-visible:ring-inset focus-visible:ring-offset-0",
+          stickyHeader && "max-h-[70dvh] overflow-y-auto",
+        )}
       >
         {loading ? (
           <SkeletonTable rows={Math.min(size || 5, 8)} />

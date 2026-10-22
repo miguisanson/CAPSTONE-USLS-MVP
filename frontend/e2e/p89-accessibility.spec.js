@@ -122,6 +122,23 @@ test.describe("staff pages", () => {
   });
 });
 
+// ---- a phone: tables scroll sideways inside their own box, which must be reachable by keyboard ----------------------------
+test.describe("phone width", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 390, height: 844 } });
+
+  test("staff Enrollment table at 390 px", async ({ page }) => {
+    await page.goto("/enrollment");
+    await expect(page.getByRole("table").first()).toBeVisible();
+    judge("staff: table at 390", await scan(page, "staff: table at 390"));
+  });
+
+  test("staff Students list at 390 px", async ({ page }) => {
+    await page.goto("/students");
+    await expect(page.getByRole("table").first()).toBeVisible();
+    judge("staff: list at 390", await scan(page, "staff: list at 390"));
+  });
+});
+
 // ---- student: a form with its error summary showing -------------------------------------------------------------------
 test.describe("student form with errors", () => {
   test.use({ storageState: authFile("student"), viewport: { width: 1366, height: 768 } });
