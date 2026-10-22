@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronDown, KeyRound, Table2, Users } from "lucide-react";
+import { Button, InlineNotice, StatCard, StatusChip } from "./ui/index.js";
 
 // Result of a monitoring-sheet import (Student Handoff / course audit update).
 // Counts first, then each kind of detail in its own collapsed section, so a large
@@ -21,35 +22,34 @@ export default function HandoffResult({ result, isAudit = false, issues = null }
           <span className="min-w-0">{result.message}</span>
         </div>
         {(result.program || result.subjects != null) && (
-          <p className="max-w-full truncate rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200" title={`${result.program || ""} · ${result.subjects ?? 0} subjects`}>
-            {result.program || "Program"}{result.subjects != null ? ` · ${result.subjects} subjects` : ""}
-          </p>
+          <StatusChip
+            status={`${result.program || "Program"}${result.subjects != null ? ` · ${result.subjects} subjects` : ""}`}
+            tone="muted"
+            dot={false}
+            className="max-w-full truncate"
+            title={`${result.program || ""} · ${result.subjects ?? 0} subjects`}
+          />
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Stat label={isAudit ? "Students updated" : "New students"} value={result.created ?? 0} />
-        <Stat label="Already in system" value={result.skipped ?? 0} />
-        <Stat label="Year level refreshed" value={result.updated ?? 0} />
-        <Stat label="Subject cells changed" value={result.subject_changes ?? 0} />
-        <Stat label="Need your decision" value={result.conflict_count ?? 0} tone={unresolved > 0 ? "amber" : "slate"} />
+        <StatCard size="sm" label={isAudit ? "Students updated" : "New students"} value={result.created ?? 0} />
+        <StatCard size="sm" label="Already in system" value={result.skipped ?? 0} />
+        <StatCard size="sm" label="Year level refreshed" value={result.updated ?? 0} />
+        <StatCard size="sm" label="Subject cells changed" value={result.subject_changes ?? 0} />
+        <StatCard size="sm" label="Need your decision" value={result.conflict_count ?? 0} icon={AlertTriangle} tone={unresolved > 0 ? "warning" : "neutral"} />
       </div>
 
       {unresolved > 0 && (
-        <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900" role="status">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <InlineNotice tone="warning" icon>
           {unresolved} record{unresolved === 1 ? "" : "s"} differ from what is already stored. Nothing was overwritten; open the validation results below and choose what to keep.
-        </p>
+        </InlineNotice>
       )}
 
       {result.program_id && (
         <div className="flex flex-wrap gap-2">
-          <Link to={`/monitoring-sheet?program_id=${result.program_id}`} className="btn-primary">
-            <Table2 className="h-4 w-4" /> Open Monitoring Sheet
-          </Link>
-          <Link to="/students" className="btn-ghost">
-            <Users className="h-4 w-4" /> View Students
-          </Link>
+          <Button as={Link} to={`/monitoring-sheet?program_id=${result.program_id}`} icon={Table2}>Open Monitoring Sheet</Button>
+          <Button as={Link} to="/students" variant="secondary" icon={Users}>View Students</Button>
         </div>
       )}
 
@@ -78,7 +78,7 @@ export default function HandoffResult({ result, isAudit = false, issues = null }
               {needsReview.map((item) => (
                 <li key={item.student_number} className="rounded-lg bg-white px-3 py-1.5">
                   <span className="font-semibold">{item.name}</span> · {item.student_number}
-                  <span className="block text-xs text-slate-600">Note &quot;{item.note}&quot; suggests {item.suggested_standing}. Use the matching workflow if it is right.</span>
+                  <span className="meta block text-slate-600">Note &quot;{item.note}&quot; suggests {item.suggested_standing}. Use the matching workflow if it is right.</span>
                 </li>
               ))}
             </ul>
@@ -91,7 +91,7 @@ export default function HandoffResult({ result, isAudit = false, issues = null }
               {fromNote.map((item) => (
                 <li key={item.student_number} className="rounded-lg bg-slate-50 px-3 py-1.5">
                   <span className="font-semibold text-ink">{item.name}</span> · {item.student_number}
-                  <span className="block text-xs text-slate-500">{item.standing} (note: &quot;{item.note}&quot;)</span>
+                  <span className="meta block">{item.standing} (note: &quot;{item.note}&quot;)</span>
                 </li>
               ))}
             </ul>
@@ -104,7 +104,7 @@ export default function HandoffResult({ result, isAudit = false, issues = null }
               {duplicates.map((d) => (
                 <li key={`${d.incoming_student_number}-${d.matched_student.id}`} className="min-w-0 rounded-lg bg-slate-50 px-3 py-2 text-sm">
                   <p className="truncate font-semibold text-ink" title={d.incoming_name || d.matched_student.name}>{d.incoming_name || d.matched_student.name} · {d.incoming_student_number}</p>
-                  <p className="truncate text-xs text-slate-500" title={`${d.matched_student.name} · ${d.matched_student.student_number}`}>In the system as {d.matched_student.name} · {d.matched_student.student_number}</p>
+                  <p className="meta truncate" title={`${d.matched_student.name} · ${d.matched_student.student_number}`}>In the system as {d.matched_student.name} · {d.matched_student.student_number}</p>
                 </li>
               ))}
             </ul>
@@ -118,29 +118,17 @@ export default function HandoffResult({ result, isAudit = false, issues = null }
                 <li key={s.id} className="flex items-center justify-between gap-2 py-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
-                    <p className="truncate text-xs text-slate-400">{s.student_number} · {s.program_code} · {s.stage} · {s.completed}/{s.total_subjects} subjects</p>
+                    <p className="meta truncate">{s.student_number} · {s.program_code} · {s.stage} · {s.completed}/{s.total_subjects} subjects</p>
                   </div>
-                  <Link
-                    to={`/students/${s.id}`}
-                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50"
-                  >
-                    Open <ArrowUpRight className="h-3.5 w-3.5" />
-                  </Link>
+                  <Button as={Link} to={`/students/${s.id}`} variant="secondary" size="sm" className="shrink-0">
+                    Open <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
                 </li>
               ))}
             </ul>
           </Section>
         )}
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, tone = "slate" }) {
-  return (
-    <div className={`min-w-0 rounded-xl p-3 text-center ring-1 ${tone === "amber" ? "bg-amber-50 ring-amber-200" : "bg-white ring-slate-100"}`}>
-      <p className={`font-display text-2xl font-semibold leading-none ${tone === "amber" ? "text-amber-800" : "text-ink"}`}>{value}</p>
-      <p className="mt-1.5 text-xs leading-tight text-slate-500">{label}</p>
     </div>
   );
 }
@@ -152,11 +140,11 @@ export function Section({ title, count, icon: Icon, tone = "slate", defaultOpen 
     <details className={`group rounded-xl border ${frame}`} open={defaultOpen}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5">
         <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-ink">
-          {Icon && <Icon className="h-4 w-4 shrink-0 text-slate-500" />}
+          {Icon && <Icon className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />}
           <span className="min-w-0 truncate" title={title}>{title}</span>
-          {count != null && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{count}</span>}
+          {count != null && <StatusChip status={String(count)} tone="muted" size="sm" dot={false} className="shrink-0" />}
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="border-t border-slate-100 px-4 py-3">{children}</div>
     </details>
