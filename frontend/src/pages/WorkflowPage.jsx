@@ -3847,7 +3847,7 @@ function GraduationBatchRow({
                 <span>{group.rows.length} candidate{group.rows.length === 1 ? "" : "s"}</span>
                 <span>·</span>
                 <span>{selectionLabel}</span>
-                <StatusBadge value={group.boardStatus} dot={false} />
+                <StatusBadge value={group.boardStatus === "Dean Approved" && alreadyExported ? "Exported - Ready to Send" : group.boardStatus} dot={false} />
                 {readyForDean && <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-bold text-white">Ready for Dean review</span>}
                 {!applicationComplete && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Application document issue</span>}
                 {messageCount > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"><MessageSquare className="mr-1 inline h-3 w-3" />{messageCount} message{messageCount === 1 ? "" : "s"}</span>}

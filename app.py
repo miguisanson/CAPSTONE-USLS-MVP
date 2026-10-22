@@ -3046,6 +3046,16 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
     return payload
 
 
+GRADUATION_EXPORTED_STATUS = "Exported - Ready to Send"
+
+
+def graduation_display_status(endorsement: GraduationEndorsement) -> str:
+    """The status a person sees for an endorsement: the export is the last step in the portal."""
+    if endorsement.endorsement_status == "Dean Approved" and endorsement.registrar_status == GRADUATION_EXPORTED_STATUS:
+        return GRADUATION_EXPORTED_STATUS
+    return endorsement.endorsement_status
+
+
 def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, include_student: bool = True) -> dict | None:
     if not endorsement:
         return None
@@ -3062,6 +3072,9 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
         "missing_research_requirements": split_items(endorsement.missing_research_requirements or ""),
         "missing_practicum_requirement": endorsement.missing_practicum_requirement,
         "endorsement_status": endorsement.endorsement_status,
+        # What the screens show as the batch's status: once the Dean has exported an approved
+        # list it is "Exported - Ready to Send", not still "Dean Approved" (I-010 / J10).
+        "display_status": graduation_display_status(endorsement),
         "dean_remarks": endorsement.dean_remarks,
         "registrar_status": endorsement.registrar_status,
         "request_attachment": attachment_dict(endorsement.request_attachment),
@@ -14806,7 +14819,7 @@ def register_routes(app: Flask) -> None:
                 "Dean",
                 f"CSV exported and ready for the Dean to email manually. Previous Registrar status: {previous_registrar_status}.",
                 previous_status=previous_status,
-                new_status=item.endorsement_status,
+                new_status=GRADUATION_EXPORTED_STATUS,
             )
             writer.writerow([
                 item.batch_name or "",
