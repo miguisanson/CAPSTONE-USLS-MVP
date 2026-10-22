@@ -1900,6 +1900,17 @@ def generate_semester_calendar(from_year: int = 2023, to_year: int = 2030) -> li
     return rows
 
 
+def seed_semester_years(today: date | None = None) -> tuple[int, int]:
+    """First and last academic-year start for the seeded semesters: the current year plus or minus two.
+
+    The first semester of a year starts in August, so before August the current academic year
+    began the year before. More semesters are added from the admin screen when they are needed.
+    """
+    today = today or date.today()
+    current = today.year if today.month >= 8 else today.year - 1
+    return current - 2, current + 2
+
+
 def upcoming_semester_labels(count: int = 5, reference: date | None = None) -> list[str]:
     """The current and next few semesters (by label), for student/staff dropdowns."""
     reference = reference or date.today()
@@ -35899,7 +35910,7 @@ def seed_database() -> None:
     ensure_authoritative_curricula()
 
     terms = []
-    for label, start in generate_semester_calendar(2023, 2030):
+    for label, start in generate_semester_calendar(*seed_semester_years()):
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
         db.session.add(term)
         terms.append(term)

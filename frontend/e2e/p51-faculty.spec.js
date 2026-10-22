@@ -815,7 +815,7 @@ test.describe("Assigned Classes", () => {
     const otherCount = await rosterRows(page, () => subject.selectOption({ index: 18 })); // EDD-COG1
     await expect(rows).toHaveCount(otherCount);
     // another semester lists the same students (their status there is "Missing" when they have no record)
-    await term.selectOption("AY 2030-2031 2nd Semester");
+    await term.selectOption("AY 2027-2028 2nd Semester");
     await expect(rows.first()).toBeVisible();
     await expect(table).toContainText("Missing");
 
