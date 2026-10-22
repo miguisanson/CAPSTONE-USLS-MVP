@@ -169,7 +169,8 @@ test.describe("P3.2 Dean pages", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Approvals Queue" })).toBeVisible();
     await expect(page.getByText(/^\d+ waiting$/).first()).toBeVisible();
 
-    // Every process has its section with a count and an "Open ..." link.
+    // A process with something waiting has its section with a count and an "Open ..." link; one with nothing waiting
+    // is named, with a link to its page, in the single "Nothing waiting in: ..." line (I-084).
     const sections = {
       "Course Adjustments": "course-adjustments",
       "Leave of Absence": "leave-of-absence",
@@ -179,10 +180,16 @@ test.describe("P3.2 Dean pages", () => {
       "Practicum Reports": "practicum",
       "Graduation Endorsement": "graduation",
     };
+    const nothingLine = page.getByText(/^Nothing waiting in:/);
     for (const [label, key] of Object.entries(sections)) {
-      await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${label}\\s*\\d+$`) }), `${label} section`).toBeVisible();
-      await expect(page.getByRole("link", { name: `Open ${label}` }), `Open ${label}`).toHaveAttribute("href", `/dean/approvals/${key}`);
+      const heading = page.getByRole("heading", { level: 2, name: new RegExp(`^${label}\\s*\\d+$`) });
+      if (await heading.count()) {
+        await expect(page.getByRole("link", { name: `Open ${label}` }), `Open ${label}`).toHaveAttribute("href", `/dean/approvals/${key}`);
+      } else {
+        await expect(nothingLine.getByRole("link", { name: label, exact: true }), `${label} is in the nothing-waiting line`).toHaveAttribute("href", `/dean/approvals/${key}`);
+      }
     }
+    await expect(page.getByRole("heading", { level: 2, name: /^Leave of Absence\s*\d+$/ }), "Leave of Absence has requests waiting").toBeVisible();
     const leaveHeading = await page.getByRole("heading", { level: 2, name: /^Leave of Absence\s*\d+$/ }).innerText();
     expect(Number(leaveHeading.match(/(\d+)$/)[1]), "two leave requests wait").toBeGreaterThanOrEqual(2);
     await expect(page.getByRole("heading", { level: 2, name: /^Adviser Designation\s*\d+$/ })).toBeVisible();
@@ -219,11 +226,11 @@ test.describe("P3.2 Dean pages", () => {
     await expect(caseRow(page, "Gabriel Domingo").first()).toBeVisible();
     await page.getByRole("button", { name: "Clear 2 filters" }).click();
 
-    // A date range in the far future matches nothing: every section shows its empty state.
+    // A date range in the far future matches nothing: the queue says so once (no section per process).
     await page.getByLabel("Updated from").fill("2099-01-01");
     await expect(caseRow(page, "Maureen Castillo")).toHaveCount(0);
-    await expect(page.getByText("Nothing waiting").first()).toBeVisible();
-    await expect(page.getByText("No request of this kind needs a Dean decision right now.").first()).toBeVisible();
+    await expect(page.getByText("Nothing waiting", { exact: true })).toHaveCount(1);
+    await expect(page.getByText("No request matches these filters.")).toBeVisible();
     await page.getByRole("button", { name: "Clear 1 filter" }).click();
     await expect(caseRow(page, "Maureen Castillo").first()).toBeVisible();
 

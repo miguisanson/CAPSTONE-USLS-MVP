@@ -1,4 +1,5 @@
 import { printDataTable } from "../../lib/print";
+import { deanStats, processOfType } from "../../lib/deanHome.js";
 
 export const CLARIFICATION_TEMPLATES = [
   "Please upload the correct document.",
@@ -186,4 +187,48 @@ export function deanBoardGroup(item) {
     || ["Dean Approved", "Dean Reviewed", "Approved", "Withdrawn Confirmed"].includes(workflowStatus)) return "Approved / Completed";
   if (["Denied", "Rejected", "Cancelled"].includes(item.status) || ["Denied", "Rejected", "Cancelled"].includes(workflowStatus)) return "Rejected / Withdrawn";
   return "New / Submitted";
+}
+
+// ---------------------------------------------------------------- Decisions (home and Reports & Analytics)
+// The Dean home and Reports & Analytics must give the same numbers (I-074). Both read the decided cases from ONE
+// place: this list, built from /api/approvals `workflow_recent` and `workflow_overview` (a decided case can be in
+// either) plus the course plans in `recent`.
+const OUTCOME_STATUSES = {
+  approved: [
+    "Approved", "Dean Approved", "Dean Reviewed", "Withdrawn Confirmed", "Approved for Re-enrollment Review", "Published",
+    "Leave Scheduled", "On Leave", "Return Due", "Closed", "Expired", "Sent to Registrar", "Registrar Received",
+  ],
+  returned: ["Returned", "Returned for Clarification", "Returned for Revision", "Additional Certificates Requested"],
+  denied: ["Denied", "Rejected", "Cancelled"],
+};
+
+/** What the Dean decided on a case or a course plan: "approved", "returned", "denied", or null while it still waits. */
+export function deanOutcome(item) {
+  const statuses = [item.status, item.workflow_status];
+  return Object.keys(OUTCOME_STATUSES).find((outcome) => statuses.some((status) => OUTCOME_STATUSES[outcome].includes(status))) || null;
+}
+
+/**
+ * Every decision the Dean's pages know about, each once: [{ key, process, outcome, item }]. A course plan has the
+ * process "course-adjustments".
+ */
+export function deanDecisions({ recent = [], overview = [], recentPlans = [] } = {}) {
+  const seen = new Set();
+  const cases = [...recent, ...overview].flatMap((item) => {
+    const key = `${item.type}-${item.id}`;
+    const outcome = deanOutcome(item);
+    if (!outcome || seen.has(key)) return [];
+    seen.add(key);
+    return [{ key, process: processOfType(item.type), outcome, item }];
+  });
+  const plans = recentPlans.flatMap((plan) => {
+    const outcome = deanOutcome(plan);
+    return outcome ? [{ key: `plan-${plan.id}`, process: "course-adjustments", outcome, item: plan }] : [];
+  });
+  return [...cases, ...plans];
+}
+
+/** How many decisions were made in the last seven days: the Dean home's own figure, so both pages show the same one. */
+export function deanDecidedThisWeek({ recent = [], recentPlans = [], now = new Date() } = {}) {
+  return deanStats({ recent, recentPlans, now }).find((stat) => stat.key === "decided").value;
 }

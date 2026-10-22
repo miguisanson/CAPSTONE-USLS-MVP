@@ -1,18 +1,31 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, BarChart3, ClipboardCheck, Clock } from "lucide-react";
-import { DataTable, EmptyState, Field, PageHeader, SectionCard, Select, StatCard, StatusChip } from "../../components/ui/index.js";
+import { Activity, BarChart3, ClipboardCheck, Clock, FileSpreadsheet, GraduationCap, RefreshCw } from "lucide-react";
+import { Button, DataTable, EmptyState, Field, PageHeader, SectionCard, Select, Spinner, StatCard, StatusChip } from "../../components/ui/index.js";
+import { api } from "../../api";
+import { useApi } from "../../hooks";
 import { OnboardingGatePanel, CourseworkReportPanel } from "../../components/ProcessGates";
 import { formatDate } from "../../lib/format";
 import Assistant from "../Assistant";
 import { DEAN_PROCESSES, DeanGate, processOfType, useDean } from "./DeanContext";
 import { casePath, daysSince } from "./DeanShared";
-import { deanBoardGroup, deanItemDate } from "./deanHelpers";
+import { deanDecidedThisWeek, deanDecisions, deanItemDate } from "./deanHelpers";
 
 // ------------------------------------------------ Admission & coursework reports
 // Gates the Dean owns that are not per-student cases: the admission onboarding
 // report (BPMN 1) and the coursework status report (BPMN 4).
+// The shared report panels explain an empty list to the staff who fill it ("Generate one to send to the Dean"). The
+// Dean is the one who receives the reports, so while a list is empty the Dean sees a card in the Dean's own words
+// (I-084); as soon as there is a report the shared panel takes over.
+function useHasReports(load) {
+  const { data, error, refetch } = useApi(() => load().then((res) => ({ count: (res.items || []).length })), []);
+  // `ready` keeps the shared panel (and its staff wording) from showing for a moment before this answer arrives.
+  return { ready: data !== null || Boolean(error), empty: !error && data?.count === 0, refetch };
+}
+
 export function DeanGateReportsPage() {
+  const onboarding = useHasReports(api.onboardingReviews);
+  const coursework = useHasReports(api.courseworkReports);
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -20,8 +33,28 @@ export function DeanGateReportsPage() {
         description="Reports sent to the Dean for a decision: the admission onboarding report and the coursework status report."
         icon={ClipboardCheck}
       />
-      <OnboardingGatePanel role="dean" />
-      <CourseworkReportPanel role="dean" />
+      {!onboarding.ready ? (
+        <Spinner label="Loading onboarding reports..." />
+      ) : onboarding.empty ? (
+        <SectionCard
+          title="Onboarding report & Dean approval"
+          icon={GraduationCap}
+          action={<Button variant="secondary" icon={RefreshCw} onClick={onboarding.refetch}>Refresh</Button>}
+        >
+          <EmptyState icon={FileSpreadsheet} title="No onboarding reports have been sent to you yet." hint="When Graduate School staff report an import batch, it appears here for your approval." />
+        </SectionCard>
+      ) : (
+        <OnboardingGatePanel role="dean" />
+      )}
+      {!coursework.ready ? (
+        <Spinner label="Loading coursework reports..." />
+      ) : coursework.empty ? (
+        <SectionCard title="Coursework status report to the Dean" icon={FileSpreadsheet}>
+          <EmptyState icon={FileSpreadsheet} title="No coursework reports have been sent to you yet." hint="When Graduate School staff send a coursework status report, it appears here for your review." />
+        </SectionCard>
+      ) : (
+        <CourseworkReportPanel role="dean" />
+      )}
     </div>
   );
 }
@@ -63,33 +96,36 @@ export function DeanAnalyticsPage() {
 }
 
 function DeanAnalyticsBody() {
-  const { workflowPending, workflowOverview, pendingPlans, recentPlans, counts } = useDean();
+  const { workflowPending, workflowOverview, workflowRecent, pendingPlans, recentPlans, counts } = useDean();
+  const decisions = useMemo(
+    () => deanDecisions({ recent: workflowRecent, overview: workflowOverview, recentPlans }),
+    [workflowRecent, workflowOverview, recentPlans],
+  );
   const processKeys = Object.keys(DEAN_PROCESSES).filter((key) => key !== "course-adjustments");
+  const outcomeCount = (process, outcome) => decisions.filter((entry) => entry.process === process && entry.outcome === outcome).length;
   const rows = processKeys.map((key) => {
     const types = DEAN_PROCESSES[key].types;
-    const all = workflowOverview.filter((item) => types.includes(item.type));
     const pending = workflowPending.filter((item) => types.includes(item.type));
     const ages = pending.map((item) => daysSince(item.submitted_at || deanItemDate(item))).filter((days) => days !== null);
     return {
       key,
       label: DEAN_PROCESSES[key].label,
       waiting: pending.length,
-      approved: all.filter((item) => deanBoardGroup(item) === "Approved / Completed").length,
-      returned: all.filter((item) => deanBoardGroup(item) === "Returned for Revision").length,
-      rejected: all.filter((item) => deanBoardGroup(item) === "Rejected / Withdrawn").length,
+      approved: outcomeCount(key, "approved"),
+      returned: outcomeCount(key, "returned"),
+      rejected: outcomeCount(key, "denied"),
       avgAge: ages.length ? Math.round(ages.reduce((sum, days) => sum + days, 0) / ages.length) : null,
     };
   });
-  const planOutcome = (statuses) => recentPlans.filter((plan) => statuses.includes(plan.status)).length;
-  // Course adjustments are plans, not workflow cases: their recent outcomes are approved (or published) and returned.
+  // Course adjustments are plans, not workflow cases: their outcomes are approved (or published) and returned.
   const tableRows = [
     ...rows,
     {
       key: "course-adjustments",
       label: DEAN_PROCESSES["course-adjustments"].label,
       waiting: counts.pendingPlans,
-      approved: planOutcome(["Approved", "Published"]),
-      returned: planOutcome(["Returned"]),
+      approved: outcomeCount("course-adjustments", "approved"),
+      returned: outcomeCount("course-adjustments", "returned"),
       rejected: null,
       avgAge: null,
     },
@@ -104,8 +140,11 @@ function DeanAnalyticsBody() {
     pendingPlans.forEach((plan) => tally.set(plan.program_code, (tally.get(plan.program_code) || 0) + 1));
     return [...tally.entries()].sort((left, right) => right[1] - left[1]).slice(0, 8);
   }, [workflowPending, pendingPlans]);
-  const decided = rows.reduce((sum, row) => sum + row.approved + row.returned + row.rejected, 0);
-  const approvedTotal = rows.reduce((sum, row) => sum + row.approved, 0);
+  // Same figure as the Dean home: decisions made in the last seven days. The share is over the workflow decisions in the table.
+  const decidedThisWeek = deanDecidedThisWeek({ recent: workflowRecent, recentPlans });
+  const workflowDecisions = decisions.filter((entry) => entry.process !== "course-adjustments");
+  const decided = workflowDecisions.length;
+  const approvedTotal = workflowDecisions.filter((entry) => entry.outcome === "approved").length;
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -115,7 +154,7 @@ function DeanAnalyticsBody() {
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Clock} label="Waiting now" value={counts.pendingTotal} sub="across all processes" tone={counts.pendingTotal ? "warning" : "success"} to="/dean/approvals" />
-        <StatCard icon={BarChart3} label="Decided (recent)" value={decided + recentPlans.length} sub="workflow and course plans" tone="info" to="/dean/activity" />
+        <StatCard icon={BarChart3} label="Decided this week" value={decidedThisWeek} sub="See Decision History" tone="info" to="/dean/activity" />
         <StatCard icon={BarChart3} label="Approval share" value={decided ? `${Math.round((approvedTotal / decided) * 100)}%` : "-"} sub="of recent workflow decisions" tone="success" />
         <StatCard icon={Clock} label="Course plans waiting" value={counts.pendingPlans} tone="neutral" to="/dean/approvals/course-adjustments" />
       </div>

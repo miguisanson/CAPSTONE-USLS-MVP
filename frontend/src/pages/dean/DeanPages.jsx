@@ -143,6 +143,14 @@ function DeanQueueBody() {
   const { workflowPending, pendingPlans, counts, refetch } = useDean();
   const { filters, setFilters, programs, statuses, apply, matches } = useDeanFilters([...workflowPending, ...pendingPlans]);
   const plans = pendingPlans.filter(matches);
+  // One entry per process, in order; the ones with something waiting get a section, the rest share one line.
+  const entries = PROCESS_ORDER.map((key) => {
+    const items = key === "course-adjustments" ? [] : apply(workflowPending.filter((item) => DEAN_PROCESSES[key].types.includes(item.type)));
+    return { key, items, count: key === "course-adjustments" ? plans.length : items.length };
+  });
+  const sections = entries.filter((entry) => entry.count > 0);
+  const emptyKeys = entries.filter((entry) => entry.count === 0).map((entry) => entry.key);
+  const filtersActive = Object.entries(filters).some(([name, value]) => value && !(name === "sort" && value === "newest"));
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -153,27 +161,36 @@ function DeanQueueBody() {
       />
       <DeanFeedback />
       <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
-      {PROCESS_ORDER.map((key) => {
-        const items = key === "course-adjustments" ? [] : apply(workflowPending.filter((item) => DEAN_PROCESSES[key].types.includes(item.type)));
-        const count = key === "course-adjustments" ? plans.length : items.length;
-        return (
-          <SectionCard
-            key={key}
-            title={<>{DEAN_PROCESSES[key].label} <CountChip count={count} /></>}
-            action={
-              <Link to={`/dean/approvals/${key}`} className={`inline-flex shrink-0 items-center gap-1 ${VIEW_ALL_LINK}`}>
-                Open {DEAN_PROCESSES[key].label} <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            }
-          >
-            {key === "course-adjustments" ? (
-              <PlanRows plans={plans} />
-            ) : (
-              <CaseTable items={items} emptyTitle="Nothing waiting" emptyHint="No request of this kind needs a Dean decision right now." />
-            )}
-          </SectionCard>
-        );
-      })}
+      {sections.map(({ key, items, count }) => (
+        <SectionCard
+          key={key}
+          title={<>{DEAN_PROCESSES[key].label} <CountChip count={count} /></>}
+          action={
+            <Link to={`/dean/approvals/${key}`} className={`inline-flex shrink-0 items-center gap-1 ${VIEW_ALL_LINK}`}>
+              Open {DEAN_PROCESSES[key].label} <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          }
+        >
+          {key === "course-adjustments" ? <PlanRows plans={plans} /> : <CaseTable items={items} />}
+        </SectionCard>
+      ))}
+      {/* Processes with nothing waiting are one line, not one box each (I-084); each name still opens its page. */}
+      {sections.length === 0 && (
+        <Card pad="lg">
+          <EmptyState icon={Inbox} title="Nothing waiting" hint={filtersActive ? "No request matches these filters." : "No request needs a Dean decision right now."} />
+        </Card>
+      )}
+      {sections.length > 0 && emptyKeys.length > 0 && (
+        <p className="meta px-1">
+          Nothing waiting in:{" "}
+          {emptyKeys.map((key, index) => (
+            <span key={key}>
+              {index > 0 && ", "}
+              <Link to={`/dean/approvals/${key}`} className="font-semibold text-brand-700 hover:underline">{DEAN_PROCESSES[key].label}</Link>
+            </span>
+          ))}
+        </p>
+      )}
       {/* Adviser designation belongs to the research flow (BPMN 7); the Dean decides it here with the other approvals. */}
       <SectionCard title={<>Adviser Designation <CountChip count={counts.pendingAdviser} /></>}>
         <AdviserAppointments role="dean" embedded onChanged={refetch} />
