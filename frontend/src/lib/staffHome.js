@@ -6,7 +6,7 @@
 // A task's `target` is { to, label }: `to` is an app path, `label` names the page for the link button.
 // Dates stay raw (ISO strings); the page formats them.
 
-import { PAGE } from "./labels.js";
+import { openPageLabel } from "./labels.js";
 
 /** The most "Needs your action" rows shown; the work queue holds the rest. */
 export const MAX_ACTIONS = 8;
@@ -38,21 +38,23 @@ const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.
 const isOverdue = (task) => Boolean(task.overdue) || task.status === "Overdue";
 const byUrgency = (a, b) => Number(isOverdue(b)) - Number(isOverdue(a)) || time(a.due_at) - time(b.due_at);
 const sortTasks = (tasks) => [...tasks].sort(byUrgency);
-const workQueuePath = (owner) => `/work-queue?owner=${encodeURIComponent(owner)}`;
+// `search` pre-fills the Work Queue's search box (its ?q= parameter).
+const workQueuePath = (owner, search = "") => `/work-queue?owner=${encodeURIComponent(owner)}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
 
-// Where a task is handled, by what its title names. Order matters: the first match wins.
+// Where a task is handled, by what its title names. Order matters: the first match wins. The button's words are
+// "Open <page name>" from labels.js (I-116), never typed here.
 const TITLE_TARGETS = [
-  [/awol|refresher|return declaration|maximum residence/i, "/workflow/awol", PAGE.awolResidency],
-  [/readmi/i, "/workflow/readmission", PAGE.readmission],
-  [/leave/i, "/workflow/leave-of-absence", PAGE.leaveOfAbsence],
-  [/practicum/i, "/workflow/practicum", PAGE.practicum],
-  [/withdrawal/i, "/workflow/withdrawal", PAGE.subjectWithdrawal],
-  [/graduation|endorse/i, "/workflow/graduation", PAGE.graduationEndorsement],
-  [/adviser|advisor|forms? 3/i, "/workflow/research-gate?view=adviser", PAGE.researchGate],
-  [/panel/i, "/workflow/panel-matching", PAGE.panelMatching],
-  [/defense|schedule/i, "/workflow/defense-scheduling", PAGE.defenseScheduling],
-  [/handoff|admission/i, "/workflow/student-handoff", PAGE.studentHandoff],
-  [/curriculum|offering plan|course adjust/i, "/course-adjustments", PAGE.courseAdjustments],
+  [/awol|refresher|return declaration|maximum residence/i, "/workflow/awol"],
+  [/readmi/i, "/workflow/readmission"],
+  [/leave/i, "/workflow/leave-of-absence"],
+  [/practicum/i, "/workflow/practicum"],
+  [/withdrawal/i, "/workflow/withdrawal"],
+  [/graduation|endorse/i, "/workflow/graduation"],
+  [/adviser|advisor|forms? 3/i, "/workflow/research-gate?view=adviser"],
+  [/panel/i, "/workflow/panel-matching"],
+  [/defense|schedule/i, "/workflow/defense-scheduling"],
+  [/handoff|admission/i, "/workflow/student-handoff"],
+  [/curriculum|offering plan|course adjust/i, "/course-adjustments"],
 ];
 // The Students page is for Graduate School staff, the administrator and the Academic Coordinator.
 const CAN_OPEN_STUDENTS = new Set(["staff", "admin", "academic_coordinator"]);
@@ -85,15 +87,15 @@ const canOpen = (to, role) => {
  * @returns { to, label }
  */
 export function taskTarget(task, role) {
-  if (task.action_url && canOpen(task.action_url, role)) return { to: task.action_url, label: task.action_label || "Open" };
-  for (const [pattern, to, label] of TITLE_TARGETS) {
+  if (task.action_url && canOpen(task.action_url, role)) return { to: task.action_url, label: openPageLabel(task.action_url, task.action_label || "Open") };
+  for (const [pattern, to] of TITLE_TARGETS) {
     if (pattern.test(task.title || "")) {
-      if (canOpen(to, role)) return { to, label };
+      if (canOpen(to, role)) return { to, label: openPageLabel(to) };
       break; // the page the title names is not this role's: fall through to the record or the queue
     }
   }
-  if (task.student_id && CAN_OPEN_STUDENTS.has(role)) return { to: `/students/${task.student_id}`, label: "Student record" };
-  return { to: "/work-queue", label: "Work Queue" };
+  if (task.student_id && CAN_OPEN_STUDENTS.has(role)) return { to: `/students/${task.student_id}`, label: openPageLabel(`/students/${task.student_id}`) };
+  return { to: "/work-queue", label: openPageLabel("/work-queue") };
 }
 
 const toneOf = (task, now) => {
@@ -175,7 +177,8 @@ export function officeWaiting(tasks, role) {
       overdue,
       tone: "neutral",
       status: overdue ? "Overdue" : task.status || "Pending",
-      target: { to: workQueuePath(owner), label: "Work Queue" },
+      // I-116: the grouped row opens that owner's queue already searching for the alert's title
+      target: { to: workQueuePath(owner, many ? String(task.title || "").trim() : ""), label: openPageLabel("/work-queue") },
       ...(many ? { count: group.length } : {}),
     };
   });
@@ -216,6 +219,19 @@ export function officeStats({ role, own, waiting, kpis }) {
 }
 
 /**
+ * I-116: a monitoring flag in the "Other" category is logged as "Other resolved" / "Other flagged for <student> ...",
+ * where "Other" is only the category's name. Shown as a monitoring flag, in plain words. Any other title is returned
+ * as the server wrote it. (The server writes these titles in app.py, the monitoring flag routes.)
+ */
+export function activityTitle(result) {
+  const text = String(result ?? "");
+  const raised = text.match(/^Other flagged for (.+)$/s);
+  if (raised) return `Monitoring flag raised for ${raised[1]}`;
+  if (/^Other resolved$/.test(text.trim())) return "Monitoring flag resolved";
+  return text;
+}
+
+/**
  * Recent activity: the latest recorded transactions, newest first.
  * @param logs /api/dashboard `recent_logs`
  * @returns [{ key, title, detail, at, to? }]
@@ -226,7 +242,7 @@ export function officeActivity(logs, limit = 6) {
     .slice(0, limit)
     .map((log) => ({
       key: `log-${log.id}`,
-      title: log.result,
+      title: activityTitle(log.result),
       detail: `${log.student_name || log.source_reference || "Workflow"} · next: ${log.next_owner || "—"}`,
       at: log.created_at,
       to: log.student_id ? `/students/${log.student_id}` : undefined,

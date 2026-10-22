@@ -6,7 +6,7 @@ import { useApi } from "../hooks";
 import { Button, Card, DataTable, EmptyState, Field, InlineNotice, PageHeader, Pagination, SearchInput, Spinner, StatCard, StatusChip, Textarea } from "../components/ui/index.js";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { useAuth } from "../auth";
-import { PAGE } from "../lib/labels.js";
+import { PAGE, openPageLabel } from "../lib/labels.js";
 
 const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
 const PAGE_SIZE = 50;
@@ -162,7 +162,8 @@ function TasksPanel({ user }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [owner, setOwner] = useState(searchParams.get("owner") || (user?.role === "staff" ? "" : ACCOUNT_OWNER[user?.role] || ""));
   const [status, setStatus] = useState(searchParams.get("status") || "");
-  const [query, setQuery] = useState("");
+  // ?q= pre-fills the search box (the staff home's grouped alert row links here with the alert's title)
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [page, setPage] = useState(1);
   const { data, loading, error } = useApi(() => api.tasks({ owner, status, page, page_size: PAGE_SIZE }), [owner, status, page]);
   const items = data?.items || [];
@@ -201,7 +202,7 @@ function TasksPanel({ user }) {
       header: "Action",
       cell: (task) =>
         task.action_url ? (
-          <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">{task.action_label || "Open"}</Link>
+          <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">{openPageLabel(task.action_url, task.action_label || "Open")}</Link>
         ) : null,
     },
   ];
@@ -214,6 +215,7 @@ function TasksPanel({ user }) {
     const params = {};
     if (merged.owner) params.owner = merged.owner;
     if (merged.status) params.status = merged.status;
+    if (query) params.q = query;
     setSearchParams(params, { replace: true });
   }
 

@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { KeyRound, LogOut } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import { ErrorNote } from "../components/ui";
+import { Button, Card, Field, InlineNotice, Input, PageHeader } from "../components/ui/index.js";
 
 const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/dean", student: "/student", faculty: "/faculty-portal" };
 
@@ -13,6 +13,8 @@ export default function ChangePassword() {
   const { user, refresh, logout } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ current: "", next: "", confirm: "" });
+  // `fields` holds a message per field (shown under it and read out with it); `error` is a problem with the whole request
+  const [fields, setFields] = useState({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -22,14 +24,11 @@ export default function ChangePassword() {
   async function onSubmit(event) {
     event.preventDefault();
     setError("");
-    if (form.next.length < 10) {
-      setError("Choose a password of at least 10 characters.");
-      return;
-    }
-    if (form.next !== form.confirm) {
-      setError("The new password and its confirmation do not match.");
-      return;
-    }
+    const problems = {};
+    if (form.next.length < 10) problems.next = "Choose a password of at least 10 characters.";
+    if (form.next !== form.confirm) problems.confirm = "The new password and its confirmation do not match.";
+    setFields(problems);
+    if (Object.keys(problems).length) return;
     setBusy(true);
     try {
       await api.changePassword({ current_password: form.current, new_password: form.next });
@@ -45,48 +44,39 @@ export default function ChangePassword() {
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
 
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-50 p-4">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-lg" aria-labelledby="change-password-title">
-        <div className="mb-4 flex items-start gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-600 text-white">
-            <KeyRound className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div>
-            <h1 id="change-password-title" className="font-display text-xl font-semibold text-ink">
-              {forced ? "Choose your own password" : "Change password"}
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {forced
-                ? "You signed in with an initial password that was given to you. Choose a password only you know before you continue."
-                : "Enter your current password and a new one."}
-            </p>
-          </div>
-        </div>
-        <form onSubmit={onSubmit} className="space-y-4" autoComplete="off">
-          <label className="block">
-            <span className="field-label">{forced ? "Initial password" : "Current password"}</span>
-            <input type="password" autoComplete="current-password" value={form.current} onChange={set("current")} className="field-input" required />
-          </label>
-          <label className="block">
-            <span className="field-label">New password</span>
-            <input type="password" autoComplete="new-password" value={form.next} onChange={set("next")} className="field-input" minLength={10} required />
-            <span className="mt-1 block text-xs text-slate-400">At least 10 characters.</span>
-          </label>
-          <label className="block">
-            <span className="field-label">Confirm new password</span>
-            <input type="password" autoComplete="new-password" value={form.confirm} onChange={set("confirm")} className="field-input" minLength={10} required />
-          </label>
-          <ErrorNote message={error} />
-          <div className="flex flex-wrap justify-between gap-2">
-            <button type="button" onClick={logout} className="btn-ghost">
-              <LogOut className="h-4 w-4" aria-hidden="true" /> Sign out
-            </button>
-            <button type="submit" disabled={busy} className="btn-primary">
-              {busy ? "Saving..." : "Save password"}
-            </button>
+    <main className="grid min-h-screen place-items-center bg-canvas p-4">
+      <Card pad="lg" as="section" className="w-full max-w-md" aria-labelledby="change-password-title">
+        <PageHeader
+          icon={KeyRound}
+          title={forced ? "Choose your own password" : "Change password"}
+          titleProps={{ id: "change-password-title" }}
+          description={
+            forced
+              ? "You signed in with an initial password that was given to you. Choose a password only you know before you continue."
+              : "Enter your current password and a new one."
+          }
+        />
+        <form onSubmit={onSubmit} className="mt-5 space-y-4" autoComplete="off" noValidate>
+          <Field label={forced ? "Initial password" : "Current password"}>
+            <Input type="password" autoComplete="current-password" value={form.current} onChange={set("current")} required />
+          </Field>
+          <Field label="New password" hint="At least 10 characters." error={fields.next}>
+            <Input type="password" autoComplete="new-password" value={form.next} onChange={set("next")} required />
+          </Field>
+          <Field label="Confirm new password" error={fields.confirm}>
+            <Input type="password" autoComplete="new-password" value={form.confirm} onChange={set("confirm")} required />
+          </Field>
+          {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+          <div className="flex flex-wrap justify-between gap-2 max-sm:flex-col-reverse">
+            <Button variant="secondary" icon={LogOut} onClick={logout}>
+              Sign out
+            </Button>
+            <Button type="submit" loading={busy}>
+              {busy ? "Saving…" : "Save password"}
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
     </main>
   );
 }

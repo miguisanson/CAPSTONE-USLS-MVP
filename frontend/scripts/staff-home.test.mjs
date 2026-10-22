@@ -2,8 +2,10 @@
 // and "Waiting on others", the key numbers, and the recent-activity entries. Run: npm run test:staff-home
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { openPageLabel } from "../src/lib/labels.js";
 import {
   MAX_ACTIONS,
+  activityTitle,
   officeActions,
   officeActivity,
   officeOf,
@@ -182,7 +184,32 @@ test("waiting (I-083): identical alerts held by one owner are one row with a cou
   assert.equal(waiting.total, 5, "the total counts tasks, not rows");
   assert.equal(waiting.items[0].count, 3);
   assert.match(waiting.items[0].detail, /With the Academic Coordinator\. Paulo Garcia, Clarisse Tan, Maya Torres/);
-  assert.equal(waiting.items[0].target.to, "/work-queue?owner=Academic%20Coordinator");
+  // I-116: the grouped row opens that owner's queue already searching for the alert's title; a single row does not
+  assert.equal(waiting.items[0].target.to, "/work-queue?owner=Academic%20Coordinator&q=Review%20automatic%20AWOL%20policy%20alert");
+  assert.equal(waiting.items[1].target.to, "/work-queue?owner=Dean");
+});
+
+test("button words (I-116): every 'Open <page>' label is the page's name from labels.js", () => {
+  const label = (title, extra = {}) => taskTarget(task("Graduate School Staff", title, "2026-10-20", extra), "staff").label;
+  assert.equal(label("Anything", { action_url: "/workflow/withdrawal", action_label: "Open Withdrawal" }), "Open Subject Withdrawal", "the server's own words are replaced by the page's name");
+  assert.equal(label("Anything", { action_url: "/workflow/awol", action_label: "Open AWOL & Residency" }), "Open AWOL & Residency");
+  assert.equal(label("Record and forward withdrawal request"), "Open Subject Withdrawal");
+  assert.equal(label("Prepare graduation endorsement list"), "Open Graduation Endorsement");
+  assert.equal(label("Something unknown"), "Open Student Record");
+  assert.equal(label("Something unknown", { student_id: null }), "Open Work Queue");
+  assert.equal(label("Anything", { action_url: "/somewhere-new", action_label: "Open Elsewhere" }), "Open Elsewhere", "an unknown path keeps the server's label");
+  assert.equal(openPageLabel("/workflow/research-gate?view=adviser"), "Open Research Gate");
+  assert.equal(officeWaiting([task("Dean", "x", "2026-10-20")], "staff").items[0].target.label, "Open Work Queue");
+});
+
+test("activity titles (I-116): the category word 'Other' never stands alone as a title", () => {
+  assert.equal(activityTitle("Other resolved"), "Monitoring flag resolved");
+  assert.equal(activityTitle("Other flagged for Ana Reyes (2260001) on the whole record."), "Monitoring flag raised for Ana Reyes (2260001) on the whole record.");
+  assert.equal(activityTitle("Missing record resolved"), "Missing record resolved");
+  assert.equal(activityTitle("Other things happened"), "Other things happened");
+  assert.equal(activityTitle(undefined), "");
+  const [entry] = officeActivity([{ id: 1, result: "Other resolved", student_id: 4, student_name: "Ana Reyes", next_owner: "Academic Coordinator", created_at: "2026-10-10T08:00:00" }]);
+  assert.equal(entry.title, "Monitoring flag resolved");
 });
 
 test("where a task opens (I-109): a coordinator is never sent to a page its role cannot open", () => {
