@@ -24,7 +24,8 @@ test.beforeEach(async ({ page, context }, info) => {
   await stubExternal(context);
   attachWatchers(page, tracker);
 });
-test.afterEach(async () => {
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" }); // a mocked /api/enrollment answer must not outlive the test
   const report = formatProblems(tracker.problems);
   expect(report, report.join("\n")).toEqual([]);
 });
@@ -375,7 +376,8 @@ test.describe("Enrollment (GS staff): P8.3 changes", () => {
     await expect(summary).toContainText("Choose Dropped as the new status.");
     await expect(summary).toContainText("Add a coordinator note");
     await expect(dialog.getByLabel("Effective date")).toHaveValue("2026-10-01");
-    await expect(summary).toBeFocused();
+    // the focus moves to the summary so a screen reader reads it first
+    await expect(dialog.locator(":focus")).toContainText("There is a problem");
 
     // each message links to its field
     await summary.getByRole("link", { name: /coordinator note/i }).click();
