@@ -12703,7 +12703,7 @@ def register_routes(app: Flask) -> None:
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
-    @require_api_login("staff", "academic_coordinator")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def students_list():
         refresh_risk_levels()
         query = Student.query.join(Program)
@@ -23370,7 +23370,7 @@ ACCESS_CONTROL_SPEC = [
     ("Monitoring sheet subject rows", "monitoring_subject_add", {"staff", "academic_coordinator"}),
     ("Reports", "reports", {"staff", "academic_coordinator"}),
     ("Analytics", "reports_analytics", {"staff", "academic_coordinator"}),
-    ("Students", "students_list", {"staff", "academic_coordinator"}),
+    ("Students", "students_list", {"staff", "academic_coordinator", "research_coordinator"}),
     ("Faculty", "faculty_list", {"staff", "academic_coordinator"}),
     ("Monitoring sheet import", "student_handoff_import", {"staff"}),
     ("Recommendations", "decision_support", {"staff"}),
