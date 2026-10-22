@@ -12,6 +12,7 @@ ode_modules` so the main node_modules is not deleted):**
   - `enr` / `pkt/enr` — Enrollment P6.7/P6.8 + one student picker (I-082) + jargon widget out (I-081 part) (spec p83, port 5315).
   - Gate on 176b0cf running in `wt/gate`: python -> `E:/Temp/claude/gate53/gate_176b0cf.txt`, e2e (port 5330) -> `e2e_176b0cf.txt`. LESSON: run the full pages project after every merge that changes a nav or label (p21 was red after pkt/be2 until pkt/shell).
   - MERGED `pkt/bpol` (I-110, I-108, I-106, I-111, I-113).
+  - `p65` / `pkt/p65` — P6.5 staff setup pages + Course Adjustments decision table (I-069) + policy placeholder (I-081 part) (spec p84, port 5316).
   - `stu` / `pkt/stu` — student P4.3/P4.4 + I-087, I-086, form error summaries (spec p82, port 5314).
   - MERGED `pkt/vocab` (I-076..I-078, I-080). Folder `wt/vocab` is deregistered but a locked file kept it on disk - delete it after a reboot. Follow-up I-112.
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
