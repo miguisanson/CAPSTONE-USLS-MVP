@@ -87,9 +87,23 @@ async function mockPost(page, glob, calls, onCall) {
   });
 }
 
+/** The portal context as the API gives it right now. Other specs share the seeded database and change it, so a test
+ * that reads "the real data" derives its expectations from this instead of hard-coding names and counts. */
+const portalContext = async (page) => (await page.request.get("/api/faculty-portal/context")).json();
+
+/** Count the rows of the roster the page asked for (the roster size depends on what other specs enrolled). */
+const rosterRows = async (page, action) => {
+  const [response] = await Promise.all([page.waitForResponse((r) => r.url().includes("/api/course-audit/roster") && r.request().method() === "GET"), action()]);
+  return (await response.json()).students.length;
+};
+
 // ================================================================================================ Dashboard
 test.describe("Dashboard", () => {
   test("home: welcome header, action rows, key numbers, upcoming defenses, small calendar link", async ({ page }) => {
+    // one invitation is waiting (pinned here: another spec may already have answered the seeded one)
+    const context = await portalContext(page);
+    context.counts = { ...(context.counts || {}), pending_invitations: 1 };
+    await mockJson(page, "**/api/faculty-portal/context", () => context);
     await page.goto("/faculty-portal");
     await expect(page.getByRole("heading", { level: 1, name: "Welcome, Liwayway" })).toBeVisible();
     await expect(page.getByText("Learning analytics, online learning, and student engagement in graduate education")).toBeVisible();
@@ -199,21 +213,21 @@ test.describe("My Advisees", () => {
     const table = tableWith(page, "Needs signature");
     expect(await headerNames(table)).toEqual(["Student", "Program", "Stage", "Adviser contract", "Documents", "Needs signature"]);
     const names = await table.locator("tbody tr td:first-child p.font-semibold").allTextContents();
-    expect(names.length, "at least one advisee").toBeGreaterThan(0);
     expect(new Set(names).size, "no student listed twice").toBe(names.length);
-    const isabel = table.locator("tbody tr", { hasText: "Isabel Flores" });
-    await expect(isabel).toHaveCount(1);
-    await expect(isabel).toContainText("2260007");
-    await expect(isabel).toContainText("MAED");
-    await expect(isabel).toContainText("Completed");
-    await expect(isabel).toContainText("Not applicable"); // contract
-    await expect(isabel.locator("td").nth(4)).toHaveText("5"); // documents
-    await expect(isabel).toContainText("None"); // needs signature
-    await expect(table.locator("tbody tr", { hasText: "Miguel Yu" })).toContainText("Final Defense");
-    const row = table.locator("tbody tr", { hasText: "Roberto Aquino" });
-    await expect(row).toHaveCount(1);
-    await expect(row).toContainText("GS-2026-CA-02");
-    await expect(row).toContainText("Coursework");
+    // every advisee the API knows is one row with that student's own program, stage, documents and signatures
+    const portal = await portalContext(page);
+    expect(names.length, "one row per advisee").toBe(portal.advisees.length);
+    expect(names.length, "at least one advisee").toBeGreaterThan(0);
+    for (const entry of portal.advisees) {
+      const row = table.locator("tbody tr", { hasText: entry.student.student_number });
+      await expect(row, entry.student.name).toHaveCount(1);
+      await expect(row).toContainText(entry.student.name);
+      await expect(row).toContainText(entry.student.program_code);
+      await expect(row).toContainText(entry.student.current_stage || "Not set");
+      await expect(row.locator("td").nth(4)).toHaveText(String(entry.documents.length));
+      if (entry.pending_count) await expect(row.locator("td").nth(5)).toContainText(`${entry.pending_count} pending`);
+      else await expect(row.locator("td").nth(5)).toHaveText("None");
+    }
     await shots(page, "advisees");
   });
 
@@ -360,10 +374,20 @@ test.describe("Signatures, Panels, Verdicts", () => {
     await shots(page, "panels");
   });
 
-  test("Verdicts (real data): nothing waiting says so first; history below, newest first, five shown then Show all", async ({ page }) => {
+  test("Verdicts (fixture): nothing waiting says so first; history below, newest first, five shown then Show all", async ({ page }) => {
+    const context = await portalContext(page);
+    const finished = (id, name, date) => ({
+      student: { id, name, program_code: "MAED" }, gate: "Final Defense", panel_role: "Content Specialist", research_title: `Study of ${name}`, documents: [], can_submit_verdict: false,
+      defense: { id: 800 + id, defense_type: "Final Defense", preferred_date: date, start_time: "09:00", status: "Finished", display_status: "Finished",
+        verdict: { id: 900 + id, result: "Passed", label: "Passed", chair_name: "Dr. Chair", submitted_at: `${date}T12:00:00`, follow_up: "The stage is complete." } },
+    });
+    // deliberately out of order, so the page has to sort them
+    context.panels = [finished(1, "Fixture One", "2026-03-10"), finished(2, "Fixture Two", "2026-09-01"), finished(3, "Fixture Three", "2026-01-05"), finished(4, "Fixture Four", "2026-07-20"),
+      finished(5, "Fixture Five", "2026-05-02"), finished(6, "Fixture Six", "2026-11-11"), finished(7, "Fixture Seven", "2026-02-14")];
+    await mockJson(page, "**/api/faculty-portal/context", () => context);
     await openFromSidebar(page, "Verdicts", "Verdicts");
     await expect(page.getByText("The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff have read-only access.")).toBeVisible();
-    // I-090: the "needs your verdict" group comes first; this member has none, so it is a clear empty state
+    // I-090: the "needs your verdict" group comes first; nothing waits, so it is a clear empty state
     const headings = await main(page).locator("h2").allTextContents();
     expect(headings.slice(0, 2)).toEqual(["Needs your verdict", "Verdict history"]);
     await expect(page.getByText("No verdicts are waiting for you")).toBeVisible();
@@ -371,19 +395,15 @@ test.describe("Signatures, Panels, Verdicts", () => {
     await expect(history.getByText("Verdict: Passed").first()).toBeVisible();
     const cards = history.locator("article");
     await expect(cards).toHaveCount(5);
-    const showAll = history.getByRole("button", { name: /^Show all \d+ verdicts$/ });
+    const showAll = history.getByRole("button", { name: "Show all 7 verdicts" });
     await expect(showAll).toBeVisible();
-    // newest first: the defense dates read downwards in falling order
-    const dates = async () => (await history.locator("article time").evaluateAll((els) => els.map((e) => e.getAttribute("datetime"))));
-    const shown = await dates();
-    expect(shown, "every card carries its defense date").toHaveLength(5);
-    expect([...shown].sort().reverse()).toEqual(shown);
+    // newest first: the five newest, in falling order
+    const dates = async () => history.locator("article time").evaluateAll((els) => els.map((e) => e.getAttribute("datetime")));
+    expect(await dates()).toEqual(["2026-11-11T09:00", "2026-09-01T09:00", "2026-07-20T09:00", "2026-05-02T09:00", "2026-03-10T09:00"]);
     await shots(page, "verdicts");
     await showAll.click();
-    expect(await cards.count()).toBeGreaterThan(5);
-    const all = await dates();
-    expect([...all].sort().reverse()).toEqual(all);
-    await expect(history.getByRole("button", { name: "Show fewer" })).toBeVisible();
+    await expect(cards).toHaveCount(7);
+    expect((await dates()).slice(5)).toEqual(["2026-02-14T09:00", "2026-01-05T09:00"]);
     await history.getByRole("button", { name: "Show fewer" }).click();
     await expect(cards).toHaveCount(5);
   });
@@ -417,7 +437,15 @@ test.describe("Signatures, Panels, Verdicts", () => {
 
 // ================================================================================================ Panel invitations
 test.describe("Panel invitations", () => {
-  test("real data: the waiting invitation, role, other members, decline form validation", async ({ page }) => {
+  test("a waiting invitation (fixture): role, other members, decline form validation", async ({ page }) => {
+    // fixed here: another spec may already have answered the seeded invitation
+    await mockJson(page, "**/api/faculty-portal/panel-invitations", () => ({
+      invitations: [{
+        id: 1, status: "Invited", defense_type: "Final Defense", panel_role: "Content Specialist",
+        student: { id: 4, name: "Miguel Yu", program_code: "MAED", student_number: "2260004" },
+        other_members: [{ name: "Dr. Marlon Geronimo", role: "Panel Chair" }], schedule: null,
+      }],
+    }));
     await openFromSidebar(page, "Panel Invitations", "Panel invitations");
     await expect(page.getByText("Research defense panels you have been asked to join.")).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: /invitations? (is|are) waiting for your answer\./ })).toBeVisible();
@@ -545,7 +573,8 @@ test.describe("Defense Schedule", () => {
     const ics = first.getByRole("link", { name: "Add to calendar" });
     await expect(ics).toHaveAttribute("download", "");
     expect(await ics.getAttribute("href")).toBeTruthy();
-    expect(await table.locator("tbody tr").count()).toBeGreaterThanOrEqual(8);
+    const withDefense = (await portalContext(page)).panels.filter((panel) => panel.defense);
+    expect(await table.locator("tbody tr").count(), "one row per scheduled defense the API lists").toBe(withDefense.length);
     // sorted by date, oldest first
     const dates = await table.locator("tbody tr td:nth-child(3)").evaluateAll((els) => els.map((e) => e.textContent));
     const stamp = (text) => Date.parse(text.replace(" · ", " ").replace("Philippine time", ""));
@@ -761,7 +790,7 @@ test.describe("My Availability", () => {
 // ================================================================================================ Assigned Classes
 test.describe("Assigned Classes", () => {
   test("rosters: header, read-only note, term and subject selects, roster table, print button, empty state", async ({ page }) => {
-    await openFromSidebar(page, "Assigned Classes", "Assigned Classes");
+    const firstCount = await rosterRows(page, () => openFromSidebar(page, "Assigned Classes", "Assigned Classes"));
     await expect(page.getByText("Class rosters for your assigned subjects.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Assigned class rosters" })).toBeVisible();
     await expect(page.getByText("Review assigned subjects and students.")).toBeVisible();
@@ -777,14 +806,14 @@ test.describe("Assigned Classes", () => {
     await expect(table).toBeVisible();
     expect(await headerNames(table)).toEqual(["Student", "Status", "Remarks"]);
     const rows = table.locator("tbody tr");
-    await expect(rows).toHaveCount(10);
+    await expect(rows).toHaveCount(firstCount);
     await expect(rows.first().locator("p").first()).not.toBeEmpty();
     await expect(page.getByRole("button", { name: "Print roster" })).toBeVisible();
     await shots(page, "classes");
 
     // another subject loads another roster
-    await subject.selectOption({ index: 18 }); // EDD-COG1
-    await expect(rows).toHaveCount(9);
+    const otherCount = await rosterRows(page, () => subject.selectOption({ index: 18 })); // EDD-COG1
+    await expect(rows).toHaveCount(otherCount);
     // another semester lists the same students (their status there is "Missing" when they have no record)
     await term.selectOption("AY 2030-2031 2nd Semester");
     await expect(rows.first()).toBeVisible();
@@ -801,13 +830,13 @@ test.describe("Assigned Classes", () => {
   });
 
   test("print roster opens a printable list of the roster", async ({ page }) => {
-    await openFromSidebar(page, "Assigned Classes", "Assigned Classes");
+    const rosterCount = await rosterRows(page, () => openFromSidebar(page, "Assigned Classes", "Assigned Classes"));
     await expect(page.getByRole("button", { name: "Print roster" })).toBeVisible();
     const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Print roster" }).click()]);
     await expect(popup.locator("h1")).toContainText("Class Roster");
     await expect(popup.locator("h1")).toContainText("DBA-COG1");
     expect(await popup.locator("thead th").allTextContents()).toEqual(["Student ID", "Student name", "Program", "Status", "Remarks"]);
-    expect(await popup.locator("tbody tr").count()).toBe(10);
+    expect(await popup.locator("tbody tr").count()).toBe(rosterCount);
     await popup.close();
   });
 });
