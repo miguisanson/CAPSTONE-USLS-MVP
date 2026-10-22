@@ -1,5 +1,34 @@
 # USLS GS Platform — board
 
+## v5.3 run (2026-10-22, branch `v5.3-migui_test`) — what changed today
+
+A one-time senior review (Fable) of every page and the code found 41 new problems (`research/FULL-REVIEW-2026-10-22.md`,
+filed as I-055..I-095). Web research added 15 UX checks (`research/UX-RESEARCH-2026-10-22.md`). Merged so far:
+
+- **Demo-day safety:** nobody can reset a demo student without signing in; five wrong passwords no longer lock the
+  shared staff account for everyone (only that computer waits a few seconds); each install has its own secret key.
+- **Section J bugs fixed:** graduation batch shows "Exported - Ready to Send" after export; residency cannot be recorded
+  while the checker says "Needs Human Review" (handbook p. 51 has no override); the Research Coordinator's student search
+  works; demo reset no longer blocks enrollment. Admin can now do staff workflow steps; the Academic Coordinator no longer
+  sees a Defense Scheduling page that refused to open.
+- **Same look everywhere:** the 4,900-line workflow page is split into 12 files and every workflow page (Handoff, Research
+  Gate, Panel Matching, Defense Scheduling, Practicum, Graduation) now has the same header as the other boards; Graduation
+  and Practicum are on the same board as Leave of Absence (Board/Table toggle, same cards); boards show "N more stages to
+  the right" with scroll buttons instead of cutting columns off; one empty-state style.
+- **One name per page:** sidebar, page title and breadcrumb ("Dean Portal › Approvals Queue") always match.
+- **Faculty:** one advisee table instead of two; verdicts waiting on you come first; no big Google Calendar card.
+- **Dean:** the home and Reports & Analytics count the same decisions (they disagreed); empty approval queues collapse to
+  one line instead of eight empty boxes.
+- **Monitoring Sheet:** sort works (it did nothing), filters can no longer show stale results, CSV export is safe in Excel.
+
+**In progress:** demo data that makes sense (advisers within their limit, never on their own student's panel, a case
+waiting in every Dean queue, dates spread over past weeks); sidebar cut off at laptop height; board polish; student pages.
+
+Screenshots of each change: `E:\Temp\claude\shots-<packet>fter\` (fac, mon, wf2, wf4, board, grad, dean, fac2).
+
+---
+
+
 Updated after every step that lands. Branch: `v5.2-migui_again` (IM9). Plan: `ROADMAP.md`.
 Your decisions: `DECISIONS.md`. How unattended work runs: `IMPROVE.md`.
 

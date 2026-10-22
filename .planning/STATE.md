@@ -8,6 +8,9 @@ ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
   - MERGED `pkt/be2` (I-055..I-058, I-036, I-073; R-012).
   - `seed2` / `pkt/seed2` — the only app.py editor: seed quality I-060 advisers<=limit and never on own panel, I-062 Dean queues seeded, I-061 stage vs units/titles/departments, I-070 dates spread, I-094, I-095 (new `tests/test_seed_quality.py`, port 5311).
+  - `shell` / `pkt/shell` — sidebar clipped (I-103), course-audit nav (I-101), titles (I-112; one app.py string) (spec p81, port 5312).
+  - `bpol` / `pkt/bpol` — flaky p74 (I-110), filter bar placeholder/390 (I-108, I-106), staff graduation wrapper + ProcessGates role copy (I-111) (port 5313).
+  - `stu` / `pkt/stu` — student P4.3/P4.4 + I-087, I-086, form error summaries (spec p82, port 5314).
   - MERGED `pkt/vocab` (I-076..I-078, I-080). Folder `wt/vocab` is deregistered but a locked file kept it on disk - delete it after a reboot. Follow-up I-112.
   - MERGED `pkt/fac` (P5.1+P5.2 faculty pages). e2e after it -> `E:/Temp/claude/gate53/e2e_after_fac.txt`.
   - MERGED `pkt/board` (I-067, I-088). Follow-up: Practicum `w-[300px]` and Graduation `w-[380px]` column overrides (workflow packet).
