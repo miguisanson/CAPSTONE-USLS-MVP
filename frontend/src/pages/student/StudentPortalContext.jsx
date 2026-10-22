@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, EmptyState, Spinner } from "../../components/ui";
+import { Card, EmptyState, Spinner } from "../../components/ui/index.js";
 import { PortalNavProvider } from "../../components/portalNav";
 import { StudentPortalSectionBoundary } from "./shared";
 
@@ -39,14 +39,14 @@ export function StudentGate({ children }) {
   const location = useLocation();
   if (loading && !data) {
     return (
-      <Card className="p-6">
+      <Card pad="lg">
         <Spinner label="Loading student portal..." />
       </Card>
     );
   }
   if (error && !data) {
     return (
-      <Card className="p-6">
+      <Card pad="lg">
         <EmptyState icon={AlertTriangle} title="Could not load your student portal" hint={error} />
       </Card>
     );

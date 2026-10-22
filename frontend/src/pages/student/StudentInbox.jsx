@@ -6,10 +6,20 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "../../api";
-import { Card, EmptyState, ErrorNote, SectionTitle, StatusBadge } from "../../components/ui";
-import { Field, Select, Textarea } from "../../components/forms";
+import { Button, EmptyState, Field, InlineNotice, SectionCard, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { STUDENT_REQUEST_VIEW_BY_SLUG } from "./shared";
+
+const WORKFLOW_LABELS = {
+  "leave-of-absence": "Leave of Absence",
+  readmission: "Readmission",
+  "course-audit": "Course Audit",
+  awol: "AWOL / Residency",
+  practicum: "Practicum",
+  withdrawal: "Withdrawal",
+  graduation: "Graduation",
+};
+const FILTER_OPTIONS = [{ value: "all", label: "All workflows" }, ...Object.entries(WORKFLOW_LABELS).map(([value, label]) => ({ value, label }))];
 
 export function StudentInbox({ data, onSaved, onOpenRequest }) {
   const [drafts, setDrafts] = useState({});
@@ -83,18 +93,7 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
     };
   }, [messages.map((message) => `${message.id}:${message.is_unread}`).join("|")]);
 
-  function requestLabel(slug) {
-    const labels = {
-      "leave-of-absence": "Leave of Absence",
-      readmission: "Readmission",
-      "course-audit": "Course Audit",
-      awol: "AWOL / Residency",
-      practicum: "Practicum",
-      withdrawal: "Withdrawal",
-      graduation: "Graduation",
-    };
-    return labels[slug] || slug || "Request";
-  }
+  const requestLabel = (slug) => WORKFLOW_LABELS[slug] || slug || "Request";
 
   function canReply(message) {
     return message.recipient_role === "Student" && message.sender_role !== "Student";
@@ -148,18 +147,19 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
   }
 
   return (
-    <Card className="p-6">
-      <SectionTitle title="Inbox / Messages" subtitle="Clarifications and staff replies for your requests" icon={Mail} />
-      <ErrorNote message={error} />
-      {notice && <p aria-live="polite" className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{notice}</p>}
+    <SectionCard pad="lg" title="Inbox / Messages" subtitle="Clarifications and staff replies for your requests" icon={Mail}>
+      {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      {notice && <InlineNotice tone="success" aria-live="polite">{notice}</InlineNotice>}
       {activeWorkflows.length > 0 && (
-        <form onSubmit={sendQuestion} className="mb-5 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
+        <form onSubmit={sendQuestion} className="rounded-xl border border-brand-200 bg-brand-50/50 p-4">
           <div className="flex items-start gap-3">
-            <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-ink">Ask about an active request</p>
-              <p className="mt-1 text-xs text-slate-500">Your question is saved in the request thread and routed to the current reviewer when available.</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" aria-hidden="true" />
+            <div className="min-w-0 flex-1 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">Ask about an active request</p>
+                <p className="meta mt-1">Your question is saved in the request thread and routed to the current reviewer when available.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Workflow">
                   <Select value={composeWorkflow} onChange={(event) => setComposeWorkflow(event.target.value)} placeholder="" options={activeWorkflows.map((slug) => ({ value: slug, label: requestLabel(slug) }))} />
                 </Field>
@@ -170,25 +170,16 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
               <Field label="Question or clarification">
                 <Textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Write your question about this request." />
               </Field>
-              <button type="submit" disabled={questionBusy || !question.trim()} className="btn-primary mt-3 cursor-pointer">
-                <Send className="h-4 w-4" /> {questionBusy ? "Sending..." : "Send question"}
-              </button>
+              <Button type="submit" icon={Send} loading={questionBusy} disabled={!question.trim()}>
+                {questionBusy ? "Sending..." : "Send question"}
+              </Button>
             </div>
           </div>
         </form>
       )}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <label className="text-xs font-semibold text-slate-600" htmlFor="student-inbox-workflow-filter">Filter messages</label>
-        <select id="student-inbox-workflow-filter" value={workflowFilter} onChange={(event) => setWorkflowFilter(event.target.value)} className="field-input w-auto min-w-44 cursor-pointer">
-          <option value="all">All workflows</option>
-          <option value="leave-of-absence">Leave of Absence</option>
-          <option value="readmission">Readmission</option>
-          <option value="course-audit">Course Audit</option>
-          <option value="awol">AWOL / Residency</option>
-          <option value="practicum">Practicum</option>
-          <option value="withdrawal">Withdrawal</option>
-          <option value="graduation">Graduation</option>
-        </select>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="meta font-semibold text-slate-600" htmlFor="student-inbox-workflow-filter">Filter messages</label>
+        <Select id="student-inbox-workflow-filter" value={workflowFilter} onChange={(event) => setWorkflowFilter(event.target.value)} placeholder="" options={FILTER_OPTIONS} className="!w-auto min-w-44" />
       </div>
       {!threads.length ? (
         <EmptyState icon={Mail} title="No messages in this view" hint="Clarification requests, sent questions, and staff replies will appear here." />
@@ -204,18 +195,18 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink">
-                        <MessageSquare className="h-4 w-4 text-brand-700" />
+                        <MessageSquare className="h-4 w-4 text-brand-700" aria-hidden="true" />
                         {requestLabel(first.transaction_slug)} request #{first.request_id || "current"}
                       </span>
-                      <StatusBadge value={`${thread.items.length} message${thread.items.length === 1 ? "" : "s"}`} dot={false} />
-                      {thread.unread > 0 && <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-bold text-white">{thread.unread} unread</span>}
+                      <StatusChip status={`${thread.items.length} message${thread.items.length === 1 ? "" : "s"}`} tone="neutral" dot={false} />
+                      {thread.unread > 0 && <StatusChip status={`${thread.unread} unread`} tone="success" dot={false} />}
                     </div>
-                    <p className="mt-1 text-xs font-medium text-slate-500">Chronological request thread · current stage {latest.stage || latest.new_status || "not recorded"}</p>
+                    <p className="meta mt-1 font-medium">Chronological request thread · current stage {latest.stage || latest.new_status || "not recorded"}</p>
                   </div>
                   {targetView && (
-                    <button type="button" onClick={() => onOpenRequest(targetView)} className="btn-secondary shrink-0 cursor-pointer">
-                      Open request <ArrowRight className="h-4 w-4" />
-                    </button>
+                    <Button variant="secondary" onClick={() => onOpenRequest(targetView)} className="shrink-0">
+                      Open request <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Button>
                   )}
                 </div>
                 <div className="mt-4">
@@ -227,11 +218,11 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
                     highlightLatest
                     renderMessageFooter={(message, key) => canReply(message) ? (
                       <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                        <label className="text-xs font-semibold text-slate-600" htmlFor={`student-inbox-reply-${key}`}>Reply to {message.sender_name || message.sender_role || "staff"}</label>
-                        <textarea id={`student-inbox-reply-${key}`} value={drafts[key] || ""} onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} className="field-input mt-1 min-h-24" placeholder="Explain what you updated or ask a follow-up question." />
-                        <button type="button" disabled={busyId === key || !(drafts[key] || "").trim()} onClick={() => sendReply(message, key)} className="btn-primary mt-3 cursor-pointer">
-                          <Send className="h-4 w-4" /> {busyId === key ? "Sending..." : "Send reply"}
-                        </button>
+                        <label className="meta font-semibold text-slate-600" htmlFor={`student-inbox-reply-${key}`}>Reply to {message.sender_name || message.sender_role || "staff"}</label>
+                        <Textarea id={`student-inbox-reply-${key}`} value={drafts[key] || ""} onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-24" placeholder="Explain what you updated or ask a follow-up question." />
+                        <Button icon={Send} loading={busyId === key} disabled={!(drafts[key] || "").trim()} onClick={() => sendReply(message, key)} className="mt-3">
+                          {busyId === key ? "Sending..." : "Send reply"}
+                        </Button>
                       </div>
                     ) : null}
                   />
@@ -241,6 +232,6 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
           })}
         </div>
       )}
-    </Card>
+    </SectionCard>
   );
 }

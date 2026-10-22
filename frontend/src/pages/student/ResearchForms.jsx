@@ -8,7 +8,7 @@ import {
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
-import { useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
+import { ErrorSummary, useFormErrors, useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
 
 export function ResearchRequestForm({ data, onSaved }) {
   const progress = data.research_progress || {};
@@ -283,7 +283,7 @@ export function ConceptPaperCompliance({ compliance }) {
   );
 }
 
-const BOOKABLE_DEFENSES = ["Title Defense", "Proposal Defense", "Final Defense"];
+export const BOOKABLE_DEFENSES = ["Title Defense", "Proposal Defense", "Final Defense"];
 
 // After a verdict that asks for revisions: send the revised manuscript (and a note) for confirmation.
 function RevisionSubmitForm({ followUp, onSaved }) {
@@ -292,14 +292,16 @@ function RevisionSubmitForm({ followUp, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const verdictId = followUp.verdict?.id;
 
   async function onSubmit(e) {
     e.preventDefault();
     if (!note.trim() && !file) {
-      setError("Attach the revised manuscript or describe what you revised.");
+      fail([{ id: "revision-note", message: "Attach the revised manuscript or describe what you revised." }]);
       return;
     }
+    clear();
     setBusy(true);
     setError("");
     setMessage("");
@@ -317,7 +319,8 @@ function RevisionSubmitForm({ followUp, onSaved }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4" aria-label="Submit revised manuscript">
+    <form noValidate onSubmit={onSubmit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4" aria-label="Submit revised manuscript">
+      <ErrorSummary errors={errors} />
       <div>
         <h3 className="card-title">Submit revised manuscript</h3>
         {followUp.label && <p className="mt-1 text-xs font-semibold text-amber-900">Defense outcome: {followUp.label}</p>}
@@ -326,8 +329,8 @@ function RevisionSubmitForm({ followUp, onSaved }) {
           <p className="mt-1 text-xs text-slate-600">Your {followUp.confirmed_by_role} confirms the revisions. Only after that can you move to the next stage.</p>
         )}
       </div>
-      <Field label="What you revised" hint="Optional when you attach the manuscript.">
-        <Textarea value={note} onChange={(e) => setNote(e.target.value)} />
+      <Field label="What you revised" hint="Optional when you attach the manuscript." error={messageFor("revision-note")}>
+        <Textarea id="revision-note" value={note} onChange={(e) => setNote(e.target.value)} />
       </Field>
       <Field label="Revised manuscript" hint="Optional when you describe the revisions above.">
         <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 focus-within:ring-2 focus-within:ring-brand-500 hover:bg-slate-50">
@@ -358,11 +361,17 @@ export function ScheduleRequestForm({ data, onSaved }) {
     constraints: "",
   });
   const { busy, error, message, submit } = useSubmitRequest("defense-scheduling", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   function onSubmit(e) {
     e.preventDefault();
     if (liveSchedule) return;
+    if (!form.preferred_date) {
+      fail([{ id: "schedule-date", message: "Choose the date you want for your defense." }]);
+      return;
+    }
+    clear();
     submit({ student_id: studentId, ...form });
   }
 
@@ -374,11 +383,12 @@ export function ScheduleRequestForm({ data, onSaved }) {
           <p className="text-xs">Your {liveSchedule.defense_type || "defense"} is {liveSchedule.status === "Needs Re-confirmation" ? "waiting for the Research Coordinator to confirm it again" : "scheduled"}. To change it, ask the Research Coordinator.</p>
         </InlineNotice>
       )}
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form noValidate onSubmit={onSubmit} className="space-y-4">
+        <ErrorSummary errors={errors} />
         <fieldset disabled={Boolean(liveSchedule)} className="space-y-4 disabled:opacity-60">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Preferred date" required>
-              <Input type="date" value={form.preferred_date} onChange={set("preferred_date")} required />
+            <Field label="Preferred date" required error={messageFor("schedule-date")}>
+              <Input id="schedule-date" type="date" value={form.preferred_date} onChange={set("preferred_date")} />
             </Field>
             <Field label="Defense type" required hint={stage && BOOKABLE_DEFENSES.includes(stage) ? `Your current stage is ${stage}.` : undefined}>
               <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={BOOKABLE_DEFENSES} />

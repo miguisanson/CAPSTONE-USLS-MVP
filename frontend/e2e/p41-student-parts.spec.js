@@ -682,7 +682,7 @@ test.describe("P4.1 shared student parts", () => {
     });
   });
 
-  test("Graduation page (Carlo): numbered stage cards, the PDF upload field and the submit hint", async ({ browser }) => {
+  test("Graduation page (Carlo): numbered stage cards, the PDF upload field and the missing-PDF summary", async ({ browser }) => {
     await runPage(browser, { email: CARLO, path: "/student/graduation", shot: "graduation" }, async (page) => {
       const cards = [
         ["Application / Review Window", "Current stage", "What you need to submit now: the review window and signed graduation application / review-window PDF."],
@@ -698,13 +698,14 @@ test.describe("P4.1 shared student parts", () => {
         await expect(s.getByText(chip, { exact: true }).first(), title).toBeVisible();
         await expect(s.getByText(String(i + 1), { exact: true }).first(), title).toBeVisible();
       }
-      // the PDF field and the hint under the disabled submit button
+      // the PDF field; Submit stays usable and, with no PDF, lists the problem (P82)
       await expect(page.locator(".field-label", { hasText: "Signed graduation application / review-window PDF" })).toBeVisible();
       await expect(page.getByText("Choose PDF file", { exact: true })).toBeVisible();
       await expect(page.getByText("Browse", { exact: true })).toBeVisible();
       await expect(page.getByText("PDF only, up to 25 MB. The file is stored with your request.")).toBeVisible();
-      await expect(page.getByRole("button", { name: "Submit graduation application" })).toBeDisabled();
-      await expect(page.getByText("Upload the signed graduation application PDF before submitting Step 1.")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Submit graduation application" })).toBeEnabled();
+      await page.getByRole("button", { name: "Submit graduation application" }).click();
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link", { name: "Upload your signed graduation application as a PDF." })).toBeVisible();
       // a non-PDF is refused with a message, nothing is sent
       await page.locator('input[type="file"]').setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") });
       await expect(page.getByText("Please choose a PDF file.", { exact: true })).toBeVisible();

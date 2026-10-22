@@ -201,7 +201,7 @@ test.describe("P4.2 student request forms", () => {
   test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));
 
   // ---------------------------------------------------------------------------------------------- Leave of Absence
-  test("Leave of Absence (new): labels, filing rules, hints, the exact payload and the server error", async ({ browser }) => {
+  test("Leave of Absence (new): labels, filing rules, the problem summary, the exact payload and the server error", async ({ browser }) => {
     const { context, page, writes } = await formPage(browser, (d) => { leaveBase(d); });
     try {
       await page.goto("/student/requests/leave-of-absence");
@@ -211,10 +211,12 @@ test.describe("P4.2 student request forms", () => {
       await expect(form).toContainText("A leave can last up to 2 semesters at a time. It can be renewed once. All your leave together can never be more than 4 semesters.");
       for (const [label, required] of [["Leave starts", true], ["Leave ends", true], ["Reason", true], ["Tell us what is happening", true]]) await expectRequired(page, label, required);
 
-      // nothing chosen: Submit is off and says why; the end select waits for the start
+      // nothing chosen: Submit stays usable and, when pressed, lists what is missing (P82); the end select waits for the start
       const submit = submitButton(page, "Submit leave request");
-      await expect(submit).toBeDisabled();
-      await expect(form).toContainText("Choose the semesters, a reason, and explain your situation before sending.");
+      await expect(submit).toBeEnabled();
+      await submit.click();
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link")).toHaveCount(3);
+      expect(lastWrite(writes, "requests/leave-of-absence")).toBeUndefined();
       await expect(ctl(page, "Leave ends")).toBeDisabled();
       await expect(ctl(page, "Leave ends").locator("option").first()).toHaveText("Choose when it starts first");
       await expect(ctl(page, "Leave starts").locator("option").first()).toHaveText("Choose a semester");
@@ -294,8 +296,10 @@ test.describe("P4.2 student request forms", () => {
       await expect(ctl(page, "Extra time starts")).toHaveValue("AY 2026-2027 2nd Semester"); // the only choice, preselected
       await expect(ctl(page, "Extra time ends")).toHaveValue("AY 2026-2027 2nd Semester");
       const submit = submitButton(page, "Send request for more time");
-      await expect(submit).toBeDisabled();
-      await expect(form).toContainText("Choose the semesters, a reason, and explain your situation before sending.");
+      await expect(submit).toBeEnabled();
+      await submit.click(); // the semesters are preselected: the reason and the explanation are listed (P82)
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link")).toHaveCount(2);
+      expect(lastWrite(writes, "requests/leave-of-absence")).toBeUndefined();
       await snap(page, "loa-extension");
       await ctl(page, "Reason").selectOption("Other documented circumstance");
       await ctl(page, "Tell us what is happening").fill("Need one more semester.");
@@ -336,7 +340,7 @@ test.describe("P4.2 student request forms", () => {
   });
 
   // ---------------------------------------------------------------------------------------------- Readmission
-  test("Readmission (no linked leave): the hint walks through the missing parts, the checklist and the exact payload", async ({ browser }) => {
+  test("Readmission (no linked leave): the problem summary walks through the missing parts, the checklist and the exact payload", async ({ browser }) => {
     const ITEMS = ["Structured return intention completed", "Updated study plan confirmed", "Program or adviser consultation completed", "No pending accountability confirmed"];
     const { context, page, writes } = await formPage(browser, (d) => {
       leaveBase(d);
@@ -354,17 +358,20 @@ test.describe("P4.2 student request forms", () => {
       await expect(form).toContainText("Before you send this, confirm each item");
       await expect(form.getByRole("checkbox")).toHaveCount(4);
       const submit = submitButton(page, "Submit readmission request");
-      await expect(submit).toBeDisabled();
-      await expect(form).toContainText("Choose the semester you want to return in.");
+      const problems = page.getByRole("alert").filter({ hasText: "There is a problem" });
+      await expect(submit).toBeEnabled();
       await snap(page, "readmission-empty");
+      await submit.click(); // nothing answered: five problems (P82)
+      await expect(problems.getByRole("link")).toHaveCount(5);
+      expect(lastWrite(writes, "requests/readmission")).toBeUndefined();
       await ctl(page, "Semester you want to return in").selectOption("AY 2027-2028 1st Semester");
-      await expect(form).toContainText("Tell us why you are ready to come back.");
       await ctl(page, "Why you are ready to come back").fill("Spec: I am ready.");
-      await expect(form).toContainText("Choose the semesters your leave covered.");
       await ctl(page, "Your leave started in").selectOption("AY 2025-2026 2nd Semester");
       await expect(ctl(page, "Your leave ended in")).toHaveValue("AY 2025-2026 2nd Semester"); // follows the start
-      await expect(form).toContainText("Tick every item on the checklist.");
-      await expect(submit).toBeDisabled();
+      await submit.click(); // only the checklist is left
+      await expect(problems.getByRole("link")).toHaveCount(1);
+      await expect(problems).toContainText("Tick every item on the checklist.");
+      expect(lastWrite(writes, "requests/readmission")).toBeUndefined();
       for (const item of ITEMS) await form.getByLabel(item).check();
       await expect(submit).toBeEnabled();
       await snap(page, "readmission-ready");
@@ -406,7 +413,7 @@ test.describe("P4.2 student request forms", () => {
   });
 
   // ---------------------------------------------------------------------------------------------- Return from AWOL
-  test("Return from AWOL: the AWOL notice, labels, hints and the exact payload", async ({ browser }) => {
+  test("Return from AWOL: the AWOL notice, labels, the problem summary and the exact payload", async ({ browser }) => {
     const { context, page, writes, info } = await formPage(browser, (d) => {
       d.student.standing = "AWOL";
       d.student.enrollment_tag = "AWOL";
@@ -427,13 +434,16 @@ test.describe("P4.2 student request forms", () => {
       await expect(ctl(page, "Written intention to resume enrollment")).toHaveAttribute("placeholder", "I intend to resume enrollment in the selected semester…");
       await expect(ctl(page, "Intended return semester").locator("option").first()).toHaveText("Select semester");
       const submit = submitButton(page, "Submit return declaration");
-      await expect(submit).toBeDisabled();
-      await expect(main).toContainText("Choose your intended return semester.");
+      await expect(submit).toBeEnabled();
       await snap(page, "awol-empty");
+      await submit.click(); // nothing answered: three problems (P82)
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link")).toHaveCount(3);
+      expect(lastWrite(writes, "requests/awol-return")).toBeUndefined();
       await ctl(page, "Intended return semester").selectOption("AY 2027-2028 1st Semester");
-      await expect(main).toContainText("Complete the written intention and return reason.");
       await ctl(page, "Written intention to resume enrollment").fill("Spec intention.");
-      await expect(submit).toBeDisabled();
+      await submit.click();
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link")).toHaveCount(1);
+      expect(lastWrite(writes, "requests/awol-return")).toBeUndefined();
       await ctl(page, "Reason for returning and readiness to continue").fill("Spec reason.");
       await ctl(page, "Last enrolled semester").selectOption("AY 2025-2026 2nd Semester");
       await expect(submit).toBeEnabled();
@@ -486,7 +496,7 @@ test.describe("P4.2 student request forms", () => {
   });
 
   // ---------------------------------------------------------------------------------------------- Withdrawal
-  test("Withdrawal: the window card, the policy, a validation stop on the empty reason and the exact payload", async ({ browser }) => {
+  test("Withdrawal: the window card, the policy, the problem summary on the empty reason and the exact payload", async ({ browser }) => {
     const { context, page, writes, info } = await formPage(browser, (d) => {
       d.withdrawal_application = null;
       d.standalone_cases = { ...(d.standalone_cases || {}), withdrawal: [] };
@@ -521,13 +531,13 @@ test.describe("P4.2 student request forms", () => {
       await expect(card).toContainText("Eligible until Nov 25, 2026");
       await expect(card).toContainText("Fee: Spec fee two.");
 
-      // the reason is required by the browser: no reason, nothing is sent
+      // no reason: the form's own problem summary stops it (P82), nothing is sent
       const submit = submitButton(page, "Send withdrawal request");
       await expect(submit).toBeEnabled();
       await submit.click();
       await page.waitForTimeout(300);
       expect(lastWrite(writes, "requests/withdrawal")).toBeUndefined();
-      expect(await ctl(page, "Reason for withdrawing from this subject").evaluate((el) => el.validity.valueMissing)).toBe(true);
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" })).toContainText("Explain why you are withdrawing from this subject.");
       await ctl(page, "Reason for withdrawing from this subject").fill("Spec: schedule clash.");
       await submit.click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
@@ -759,7 +769,7 @@ test.describe("P4.2 student request forms", () => {
   });
 
   // ---------------------------------------------------------------------------------------------- Defense schedule
-  test("Defense schedule: the request form, the browser's date check and the exact payload", async ({ browser }) => {
+  test("Defense schedule: the request form, the missing-date summary and the exact payload", async ({ browser }) => {
     const { context, page, writes, info } = await formPage(browser, (d) => {
       researchBase(d, { panel: true, caseTitle: "Spec Saved Title" });
       d.schedules = [];
@@ -782,10 +792,10 @@ test.describe("P4.2 student request forms", () => {
       const submit = submitButton(page, "Submit schedule request");
       await expect(submit).toBeEnabled();
       await snap(page, "schedule-form");
-      await submit.click(); // no date: the browser stops it
+      await submit.click(); // no date: the problem summary stops it (P82)
       await page.waitForTimeout(300);
       expect(lastWrite(writes, "requests/defense-scheduling")).toBeUndefined();
-      expect(await ctl(page, "Preferred date").evaluate((el) => el.validity.valueMissing)).toBe(true);
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" })).toContainText("Choose the date you want for your defense.");
       await ctl(page, "Preferred date").fill("2026-12-04");
       await ctl(page, "Defense type").selectOption("Final Defense");
       await ctl(page, "Mode").selectOption("Online");
@@ -830,7 +840,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(revisions.locator('input[type="file"]')).not.toHaveAttribute("accept", /./);
       const send = revisions.getByRole("button", { name: "Send revisions", exact: true });
       await send.click();
-      await expect(revisions.getByRole("alert").filter({ hasText: "Attach the revised manuscript or describe what you revised." })).toBeVisible();
+      await expect(revisions.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link", { name: "Attach the revised manuscript or describe what you revised." })).toBeVisible();
       expect(writes.filter((w) => w.path === "defense-verdicts/revisions")).toHaveLength(0);
       await snap(page, "schedule-revisions-error");
       await ctl(page, "What you revised").fill("Spec: fixed chapter 3.");
@@ -881,8 +891,10 @@ test.describe("P4.2 student request forms", () => {
       await expect(main.locator('input[type="file"]')).toHaveAttribute("accept", "application/pdf,.pdf");
       await expect(ctl(page, "Remarks for the reviewer")).toHaveAttribute("placeholder", "Add a message for the staff reviewing this submission.");
       const submit = submitButton(page, "Submit MOA stage");
-      await expect(submit).toBeDisabled();
-      await expect(main).toContainText("Upload the practicum MOA before submitting.");
+      await expect(submit).toBeEnabled();
+      await submit.click(); // no site, no MOA: both are listed (P82)
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link")).toHaveCount(2);
+      expect(lastWrite(writes, "requests/practicum")).toBeUndefined();
       await snap(page, "practicum-moa");
       // a non-PDF is refused in the field, a PDF is stored and unlocks Submit
       await main.locator('input[type="file"]').setInputFiles(TXT);
@@ -941,8 +953,10 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("The system currently detects 1 submitted certificate file. Uploading an additional file updates this count.");
       await expect(fieldOf(page, "Completion certificates / forms / hours proof PDF")).toBeVisible();
       const submit = submitButton(page, "Submit completion stage");
-      await expect(submit).toBeDisabled();
-      await expect(main).toContainText("Upload the requested additional PDF before submitting.");
+      await expect(submit).toBeEnabled();
+      await submit.click(); // the new PDF is missing (P82)
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link", { name: "Upload the completion certificates as a PDF." })).toBeVisible();
+      expect(lastWrite(writes, "requests/practicum")).toBeUndefined();
       await snap(page, "practicum-completion");
       await main.locator('input[type="file"]').setInputFiles(PDF);
       await expect(submit).toBeEnabled();
@@ -983,8 +997,10 @@ test.describe("P4.2 student request forms", () => {
       await expectRequired(page, "Signed graduation application / review-window PDF", false);
       await expectRequired(page, "Remarks for the reviewer", false);
       const submit = submitButton(page, "Submit graduation application");
-      await expect(submit).toBeDisabled();
-      await expect(main).toContainText("Upload the signed graduation application PDF before submitting Step 1.");
+      await expect(submit).toBeEnabled();
+      await submit.click(); // no PDF yet (P82)
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link", { name: "Upload your signed graduation application as a PDF." })).toBeVisible();
+      expect(lastWrite(writes, "requests/graduation")).toBeUndefined();
       for (const title of ["Staff and Coursework Review", "Requirements Validation", "Dean Endorsement", "Endorsement Export", "Dean Emails List and Waits for Acknowledgement"]) await expect(main.getByRole("heading", { level: 3, name: title })).toBeVisible();
       await expect(main).toContainText("Monitoring eligibility recommendation");
       await expect(main).toContainText("No missing requirements are currently flagged by the monitoring layer.");

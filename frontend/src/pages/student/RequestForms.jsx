@@ -3,7 +3,7 @@ import { CalendarClock } from "lucide-react";
 import { Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import { ProcessCaseList } from "./ProcessCaseCard";
-import { useSubmitRequest, StageCard, SavedWorkflowFiles, SubmitState } from "./shared";
+import { ErrorSummary, useFormErrors, useSubmitRequest, StageCard, SavedWorkflowFiles, SubmitState } from "./shared";
 import {
   EarlierCases,
   LOA_KINDS,
@@ -84,6 +84,7 @@ export function LoaRequestForm({ data, onSaved }) {
 
 function LoaForm({ data, overview, mode, editable, parent, submitState }) {
   const { busy, error, message, submit } = submitState;
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const extension = mode === "extension";
   const all = overview.loa_semester_options || [];
   const rules = overview.rules || {};
@@ -126,13 +127,21 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
   const filingFail = !extension && startOption?.filing_status === "Fail";
   const filingWarning = !extension && startOption?.state === "Running" && startOption.filing_status === "Pass" && FILING_WARNING.test(startOption.filing_detail || "");
   const noLaterSemester = extension && Boolean(parentEnd) && startChoices.length === 0;
-  const incomplete = !form.effective_start || !form.effective_end || !form.reason_category || !form.reason_remarks.trim();
-  const disabled = incomplete || filingFail || noLaterSemester;
+  // Submit is off only when no answer can fix it; a missing answer is reported when Submit is pressed.
+  const disabled = filingFail || noLaterSemester;
 
   let hint = "";
   if (noLaterSemester) hint = "No later semester is set up yet. Please ask Graduate School staff.";
   else if (filingFail) hint = "You cannot send this request for the semester you chose. Choose another semester.";
-  else if (incomplete) hint = "Choose the semesters, a reason, and explain your situation before sending.";
+
+  function problems() {
+    const found = [];
+    if (!form.effective_start) found.push({ id: "loa-start", message: extension ? "Choose the semester the extra time starts in." : "Choose the semester your leave starts in." });
+    else if (!form.effective_end) found.push({ id: "loa-end", message: extension ? "Choose the semester the extra time ends in." : "Choose the semester your leave ends in." });
+    if (!form.reason_category) found.push({ id: "loa-reason", message: "Choose the reason for your leave." });
+    if (!form.reason_remarks.trim()) found.push({ id: "loa-remarks", message: "Explain what is happening so staff can review your request." });
+    return found;
+  }
 
   const rulesText = [
     maxPeriod > 0 ? `A leave can last up to ${pluralize(maxPeriod, "semester")} at a time.` : "",
@@ -157,8 +166,15 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
       {extension && !editable && remaining > 0 && <p className="mt-1 text-sm text-slate-600">You can ask for up to {pluralize(span, "more semester")} now.</p>}
 
       <form
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
+          const found = problems();
+          if (found.length) {
+            fail(found);
+            return;
+          }
+          clear();
           submit({
             effective_start: form.effective_start,
             effective_end: form.effective_end,
@@ -168,12 +184,13 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
         }}
         className="mt-4 space-y-4"
       >
+        <ErrorSummary errors={errors} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={extension ? "Extra time starts" : "Leave starts"} required>
-            <Select value={form.effective_start} onChange={changeStart} placeholder="Choose a semester" options={startOptions} required />
+          <Field label={extension ? "Extra time starts" : "Leave starts"} required error={messageFor("loa-start")}>
+            <Select id="loa-start" value={form.effective_start} onChange={changeStart} placeholder="Choose a semester" options={startOptions} />
           </Field>
-          <Field label={extension ? "Extra time ends" : "Leave ends"} required hint={semesterCount ? `That is ${pluralize(semesterCount, "semester")}.` : ""}>
-            <Select value={form.effective_end} onChange={set("effective_end")} placeholder={startIndex >= 0 ? "Choose a semester" : "Choose when it starts first"} options={endOptions} disabled={startIndex < 0 && !form.effective_end} required />
+          <Field label={extension ? "Extra time ends" : "Leave ends"} required hint={semesterCount ? `That is ${pluralize(semesterCount, "semester")}.` : ""} error={messageFor("loa-end")}>
+            <Select id="loa-end" value={form.effective_end} onChange={set("effective_end")} placeholder={startIndex >= 0 ? "Choose a semester" : "Choose when it starts first"} options={endOptions} disabled={startIndex < 0 && !form.effective_end} />
           </Field>
         </div>
 
@@ -184,11 +201,11 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
           </InlineNotice>
         )}
 
-        <Field label="Reason" required>
-          <Select value={form.reason_category} onChange={set("reason_category")} placeholder="Choose a reason" options={data.loa_allowed_reasons || []} required />
+        <Field label="Reason" required error={messageFor("loa-reason")}>
+          <Select id="loa-reason" value={form.reason_category} onChange={set("reason_category")} placeholder="Choose a reason" options={data.loa_allowed_reasons || []} />
         </Field>
-        <Field label="Tell us what is happening" required>
-          <Textarea value={form.reason_remarks} onChange={set("reason_remarks")} placeholder="Explain your situation in a few sentences." required />
+        <Field label="Tell us what is happening" required error={messageFor("loa-remarks")}>
+          <Textarea id="loa-remarks" value={form.reason_remarks} onChange={set("reason_remarks")} placeholder="Explain your situation in a few sentences." />
         </Field>
         <SubmitState busy={busy} error={error} message={message} disabled={disabled} disabledHint={hint} label={label} />
       </form>
@@ -238,6 +255,7 @@ export function ReadmissionRequestForm({ data, onSaved }) {
 
 function ReadmissionForm({ data, overview, can, editable, submitState }) {
   const { busy, error, message, submit } = submitState;
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const requirements = data.readmission_requirements || [];
   const previousSemesters = data.semester_options || [];
   const needsPreviousLeave = !can.linked_case_id;
@@ -259,26 +277,29 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const toggleItem = (item) => setSelectedItems((current) => (current.includes(item) ? current.filter((value) => value !== item) : [...current, item]));
 
-  const checklistDone = requirements.every((item) => selectedItems.includes(item));
-  const complete = Boolean(
-    form.target_return_term
-    && form.return_intent.trim()
-    && checklistDone
-    && (!needsPreviousLeave || (form.previous_loa_start && form.previous_loa_end)),
-  );
-  let hint = "";
-  if (!complete) {
-    hint = !form.target_return_term
-      ? "Choose the semester you want to return in."
-      : !form.return_intent.trim()
-        ? "Tell us why you are ready to come back."
-        : needsPreviousLeave && !(form.previous_loa_start && form.previous_loa_end)
-          ? "Choose the semesters your leave covered."
-          : "Tick every item on the checklist.";
+  const firstUnticked = requirements.findIndex((item) => !selectedItems.includes(item));
+  // Submit is off only when no answer can fix it; a missing answer is reported when Submit is pressed.
+  const noReturnSemester = returnOptions.length === 0;
+  const hint = noReturnSemester ? "No upcoming semester is set up yet. Please ask Graduate School staff." : "";
+
+  function problems() {
+    const found = [];
+    if (needsPreviousLeave && !form.previous_loa_start) found.push({ id: "readmission-leave-start", message: "Choose the semester your leave started in." });
+    if (needsPreviousLeave && !form.previous_loa_end) found.push({ id: "readmission-leave-end", message: "Choose the semester your leave ended in." });
+    if (!form.target_return_term) found.push({ id: "readmission-term", message: "Choose the semester you want to return in." });
+    if (!form.return_intent.trim()) found.push({ id: "readmission-intent", message: "Say why you are ready to come back." });
+    if (firstUnticked >= 0) found.push({ id: `readmission-item-${firstUnticked}`, message: "Tick every item on the checklist." });
+    return found;
   }
 
   function onSubmit(event) {
     event.preventDefault();
+    const found = problems();
+    if (found.length) {
+      fail(found);
+      return;
+    }
+    clear();
     const payload = {
       target_return_term: form.target_return_term,
       return_intent: form.return_intent,
@@ -302,24 +323,25 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
           : "Graduate School staff check your request first, then the Dean decides."}
       </p>
 
-      <form onSubmit={onSubmit} className="mt-4 space-y-4">
+      <form noValidate onSubmit={onSubmit} className="mt-4 space-y-4">
+        <ErrorSummary errors={errors} />
         {can.linked_case_id ? (
           <InlineNotice tone="info" title={`You are ending your leave: ${can.leave_period || "your leave of absence"}.`}>
             {can.leave_end && `It runs until ${formatDate(can.leave_end)}.`}
           </InlineNotice>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Your leave started in" required>
+            <Field label="Your leave started in" required error={messageFor("readmission-leave-start")}>
               <Select
+                id="readmission-leave-start"
                 value={form.previous_loa_start}
                 onChange={(event) => setForm((current) => ({ ...current, previous_loa_start: event.target.value, previous_loa_end: current.previous_loa_end || event.target.value }))}
                 placeholder="Choose a semester"
                 options={previousSemesters}
-                required
               />
             </Field>
-            <Field label="Your leave ended in" required>
-              <Select value={form.previous_loa_end} onChange={set("previous_loa_end")} placeholder="Choose a semester" options={previousSemesters} required />
+            <Field label="Your leave ended in" required error={messageFor("readmission-leave-end")}>
+              <Select id="readmission-leave-end" value={form.previous_loa_end} onChange={set("previous_loa_end")} placeholder="Choose a semester" options={previousSemesters} />
             </Field>
           </div>
         )}
@@ -328,29 +350,33 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
           label="Semester you want to return in"
           required
           hint="You can ask to return before your leave ends, but the Dean decides whether that is allowed."
+          error={messageFor("readmission-term")}
         >
-          <Select value={form.target_return_term} onChange={set("target_return_term")} placeholder={returnOptions.length ? "Choose a semester" : "No upcoming semester is set up yet"} options={returnOptions} required />
+          <Select id="readmission-term" value={form.target_return_term} onChange={set("target_return_term")} placeholder={returnOptions.length ? "Choose a semester" : "No upcoming semester is set up yet"} options={returnOptions} />
         </Field>
 
-        <Field label="Why you are ready to come back" required>
-          <Textarea value={form.return_intent} onChange={set("return_intent")} placeholder="Say that you want to return and briefly explain how you are ready to continue your studies." required />
+        <Field label="Why you are ready to come back" required error={messageFor("readmission-intent")}>
+          <Textarea id="readmission-intent" value={form.return_intent} onChange={set("return_intent")} placeholder="Say that you want to return and briefly explain how you are ready to continue your studies." />
         </Field>
 
         {requirements.length > 0 && (
           <div>
             <p className="field-label">Before you send this, confirm each item</p>
             <div className="mt-2 space-y-1.5">
-              {requirements.map((item) => (
+              {requirements.map((item, index) => (
                 <label key={item} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                  <input type="checkbox" checked={selectedItems.includes(item)} onChange={() => toggleItem(item)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
+                  <input id={`readmission-item-${index}`} type="checkbox" checked={selectedItems.includes(item)} onChange={() => toggleItem(item)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
                   {item}
                 </label>
               ))}
             </div>
+            {messageFor(`readmission-item-${firstUnticked}`) && (
+              <p role="alert" className="mt-1 text-xs font-medium text-red-700">{messageFor(`readmission-item-${firstUnticked}`)}</p>
+            )}
           </div>
         )}
 
-        <SubmitState busy={busy} error={error} message={message} disabled={!complete} disabledHint={hint} label={editable ? "Send again" : "Submit readmission request"} />
+        <SubmitState busy={busy} error={error} message={message} disabled={noReturnSemester} disabledHint={hint} label={editable ? "Send again" : "Submit readmission request"} />
       </form>
     </section>
   );
@@ -368,10 +394,20 @@ export function AwolReturnRequestForm({ data, onSaved }) {
     return_reason: existing?.return_reason || "",
   });
   const { busy, error, message, submit } = useSubmitRequest("awol-return", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const locked = existing && ["Dean Review", "Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(existing.status);
 
   function onSubmit(event) {
     event.preventDefault();
+    const found = [];
+    if (!form.target_return_term) found.push({ id: "awol-term", message: "Choose your intended return semester." });
+    if (!form.return_intent.trim()) found.push({ id: "awol-intent", message: "Write your intention to resume enrollment." });
+    if (!form.return_reason.trim()) found.push({ id: "awol-reason", message: "Explain why you are returning and how you are ready to continue." });
+    if (found.length) {
+      fail(found);
+      return;
+    }
+    clear();
     submit({ student_id: data.student.id, ...form });
   }
 
@@ -391,17 +427,18 @@ export function AwolReturnRequestForm({ data, onSaved }) {
       {locked ? (
         <InlineNotice tone="warning">Your return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</InlineNotice>
       ) : (
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form noValidate onSubmit={onSubmit} className="space-y-4">
+          <ErrorSummary errors={errors} />
           <InlineNotice tone="info">
             The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete the form below; no file needs to be uploaded.
           </InlineNotice>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Intended return semester" required><Select value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} required /></Field>
+            <Field label="Intended return semester" required error={messageFor("awol-term")}><Select id="awol-term" value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} /></Field>
             <Field label="Last enrolled semester"><Select value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="Select semester" options={allSemesters} /></Field>
           </div>
-          <Field label="Written intention to resume enrollment" required><Textarea value={form.return_intent} onChange={(event) => setForm((current) => ({ ...current, return_intent: event.target.value }))} placeholder="I intend to resume enrollment in the selected semester…" required /></Field>
-          <Field label="Reason for returning and readiness to continue" required><Textarea value={form.return_reason} onChange={(event) => setForm((current) => ({ ...current, return_reason: event.target.value }))} required /></Field>
-          <SubmitState busy={busy} error={error} message={message} disabled={!form.target_return_term || !form.return_intent.trim() || !form.return_reason.trim()} disabledHint={!form.target_return_term ? "Choose your intended return semester." : "Complete the written intention and return reason."} label={existing?.status === "Returned for Revision" ? "Resubmit return declaration" : "Submit return declaration"} />
+          <Field label="Written intention to resume enrollment" required error={messageFor("awol-intent")}><Textarea id="awol-intent" value={form.return_intent} onChange={(event) => setForm((current) => ({ ...current, return_intent: event.target.value }))} placeholder="I intend to resume enrollment in the selected semester…" /></Field>
+          <Field label="Reason for returning and readiness to continue" required error={messageFor("awol-reason")}><Textarea id="awol-reason" value={form.return_reason} onChange={(event) => setForm((current) => ({ ...current, return_reason: event.target.value }))} /></Field>
+          <SubmitState busy={busy} error={error} message={message} label={existing?.status === "Returned for Revision" ? "Resubmit return declaration" : "Submit return declaration"} />
         </form>
       )}
     </div>
@@ -417,10 +454,19 @@ export function WithdrawalRequestForm({ data, onSaved }) {
     subject_enrollment_id: existing?.subject_enrollment_id || eligibleSubjects[0]?.id || "",
   });
   const { busy, error, message, submit } = useSubmitRequest("withdrawal", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   function onSubmit(e) {
     e.preventDefault();
+    const found = [];
+    if (!form.subject_enrollment_id) found.push({ id: "withdrawal-subject", message: "Choose the subject you want to withdraw from." });
+    if (!String(form.reason || "").trim()) found.push({ id: "withdrawal-reason", message: "Explain why you are withdrawing from this subject." });
+    if (found.length) {
+      fail(found);
+      return;
+    }
+    clear();
     submit({ student_id: data.student.id, ...form });
   }
 
@@ -436,8 +482,14 @@ export function WithdrawalRequestForm({ data, onSaved }) {
     });
   }, [data.student.id, existing?.id, existing?.updated_at, eligibleSubjects[0]?.id]);
 
+  // Submit is off only when no answer can fix it: nothing in the window, or the chosen subject's window has closed.
+  const windowClosed = Boolean(selectedSubject) && !selectedSubject.withdrawal_eligible;
+  const blocked = !eligibleSubjects.length || windowClosed;
+  const blockedHint = !eligibleSubjects.length ? "No subject is currently inside the withdrawal window." : windowClosed ? "The withdrawal window for this subject has closed." : "";
+
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <ErrorSummary errors={errors} />
       <ProcessCaseList cases={data.standalone_cases?.withdrawal || []} />
       <InlineNotice tone="warning" title="When you can withdraw a subject">
         <p className="text-xs leading-relaxed">{(selectedSubject || activeSubjects[0])?.withdrawal_window?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of the term's total is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
@@ -445,8 +497,9 @@ export function WithdrawalRequestForm({ data, onSaved }) {
       <StageCard number={1} title={applicationEditable ? "Send your withdrawal request" : "Your withdrawal request"} state={applicationEditable ? (returned ? "returned" : "active") : "complete"} helper={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}>
         {applicationEditable ? (
           <div className="space-y-4">
-            <Field label="Enrolled subject" required>
+            <Field label="Enrolled subject" required error={messageFor("withdrawal-subject")}>
               <Select
+                id="withdrawal-subject"
                 value={form.subject_enrollment_id}
                 onChange={set("subject_enrollment_id")}
                 placeholder="Choose an eligible enrolled subject"
@@ -455,7 +508,6 @@ export function WithdrawalRequestForm({ data, onSaved }) {
                   disabled: !item.withdrawal_eligible,
                   label: `${item.course_code} — ${item.course_title} · ${item.term_label}${item.withdrawal_eligible ? ` · ELIGIBLE UNTIL ${item.withdrawal_window?.deadline || "semester deadline"}` : " · WITHDRAWAL WINDOW CLOSED"}`,
                 }))}
-                required
               />
               {selectedSubject?.withdrawal_window && (
                 <InlineNotice
@@ -482,15 +534,15 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               )}
               {!eligibleSubjects.length && <InlineNotice tone="info" className="mt-2">No active subject is currently inside the withdrawal window (until the end of the second week of classes). Contact Graduate School staff if the recorded semester dates are incorrect.</InlineNotice>}
             </Field>
-            <Field label="Reason for withdrawing from this subject" required>
-              <Textarea value={form.reason} onChange={set("reason")} required />
+            <Field label="Reason for withdrawing from this subject" required error={messageFor("withdrawal-reason")}>
+              <Textarea id="withdrawal-reason" value={form.reason} onChange={set("reason")} />
             </Field>
             <SubmitState
               busy={busy}
               error={error}
               message={message}
-              disabled={!form.subject_enrollment_id || !selectedSubject?.withdrawal_eligible}
-              disabledHint={!eligibleSubjects.length ? "No subject is currently inside the withdrawal window." : !form.subject_enrollment_id ? "Choose an eligible enrolled subject before submitting." : ""}
+              disabled={blocked}
+              disabledHint={blockedHint}
               label={returned ? "Resubmit subject withdrawal" : "Send withdrawal request"}
             />
           </div>
