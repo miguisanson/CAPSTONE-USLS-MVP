@@ -17,8 +17,8 @@ export const ROLES = [
   { key: "faculty", role: "faculty", email: () => loadState().facultyEmail, home: "/faculty-portal" },
   { key: "dean", role: "dean", email: "dean@usls.edu.ph", home: "/dean" },
   { key: "staff", role: "staff", email: "staff@usls.edu.ph", home: "/" },
-  { key: "academic-coordinator", role: "academic_coordinator", email: "academic@usls.edu.ph", home: "/monitoring-sheet" },
-  { key: "research-coordinator", role: "research_coordinator", email: "research@usls.edu.ph", home: "/workflow/graduation" },
+  { key: "academic-coordinator", role: "academic_coordinator", email: "academic@usls.edu.ph", home: "/" },
+  { key: "research-coordinator", role: "research_coordinator", email: "research@usls.edu.ph", home: "/" },
   { key: "admin", role: "admin", email: "admin@usls.edu.ph", home: "/" },
 ];
 

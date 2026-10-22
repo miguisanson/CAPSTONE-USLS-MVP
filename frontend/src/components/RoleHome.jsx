@@ -36,6 +36,7 @@ export const MAX_WAITING = 3;
  * @param activityAll    { to, label } the "View all" link
  * @param activityEmpty  { title, hint } shown when `activity` is empty
  * @param extra          a node shown under the actions (before the activity on a phone)
+ * @param notice         an optional node (an InlineNotice) shown between the header and the columns
  */
 export default function RoleHome({
   header,
@@ -51,12 +52,14 @@ export default function RoleHome({
   activityAll,
   activityEmpty = {},
   extra = null,
+  notice = null,
 }) {
   const shownActivity = (activity || []).slice(0, MAX_ACTIVITY);
   const waitingItems = waiting?.items || [];
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader {...header} />
+      {notice}
       {/* Below lg the two column wrappers dissolve (`contents`) so `order` can interleave their children. */}
       <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">

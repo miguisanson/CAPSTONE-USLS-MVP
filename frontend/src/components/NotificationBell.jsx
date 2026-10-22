@@ -4,9 +4,10 @@ import { Bell, CheckCheck } from "lucide-react";
 import { api } from "../api";
 import { Button } from "./ui/index.js";
 
-// In-app notification bell for the top bar of the shared shell (every role). Opening the bell asks
-// the server for the person's notifications; the server also creates any reminder that is due, so
-// no background scheduler is needed. Checked again every minute and whenever the page changes.
+// In-app notification bell for the top bar of the shared shell (every role). A read never makes anything on the
+// server (I-071), so when the page loads, and again every minute, the bell first asks the server to make the
+// reminders that are due for this person (POST /api/notifications/refresh) and then reads the list. Opening the bell
+// or moving to another page only reads the list again.
 const POLL_MS = 60000;
 
 function when(value) {
@@ -40,10 +41,29 @@ export default function NotificationBell() {
     }
   }, []);
 
+  // Make the due reminders, then read the list. A refresh that fails is not shown (the list is still worth
+  // reading); in development it is logged so it can be found.
+  const refreshThenLoad = useCallback(async () => {
+    try {
+      await api.refreshNotifications();
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn("Notification refresh failed:", err);
+    }
+    await load();
+  }, [load]);
+
   useEffect(() => {
-    load();
-    const timer = window.setInterval(load, POLL_MS);
+    refreshThenLoad();
+    const timer = window.setInterval(refreshThenLoad, POLL_MS);
     return () => window.clearInterval(timer);
+  }, [refreshThenLoad]);
+
+  // Moving to another page reads the list again (no refresh: the poll does that).
+  const firstPath = useRef(location.pathname);
+  useEffect(() => {
+    if (firstPath.current === location.pathname) return;
+    firstPath.current = location.pathname;
+    load();
   }, [load, location.pathname]);
 
   useEffect(() => {

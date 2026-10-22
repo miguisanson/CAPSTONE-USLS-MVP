@@ -14,6 +14,9 @@ async function writesOnOpen(page, path) {
   const writes = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
+    // The notification bell makes the due reminders with an explicit POST on every page load (I-071/I-072); that is
+    // the shell's refresh, not the page writing. Every other non-GET still counts.
+    if (url.pathname === "/api/notifications/refresh") return;
     if (url.pathname.startsWith("/api/") && request.method() !== "GET") writes.push(`${request.method()} ${url.pathname}`);
   });
   await page.goto(path);

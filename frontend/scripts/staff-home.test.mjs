@@ -14,6 +14,7 @@ import {
   officeWaiting,
   taskTarget,
 } from "../src/lib/staffHome.js";
+import { homePath } from "../src/lib/homePaths.js";
 
 const NOW = new Date("2026-10-17T09:00:00");
 let n = 0;
@@ -222,4 +223,44 @@ test("where a task opens (I-109): a coordinator is never sent to a page its role
   const rc = (title, extra = {}) => taskTarget(task("Research Coordinator", title, "2026-10-20", extra), "research_coordinator").to;
   assert.equal(rc("Schedule the proposal defense"), "/workflow/defense-scheduling");
   assert.equal(rc("Resolve missing curriculum subjects"), "/work-queue", "no Course Adjustments for the Research Coordinator, and no Students page");
+});
+
+// ---------------------------------------------------------------------------------------------------- wire (I-066 / F-12)
+test("key numbers, a coordinator WITH the coordinator dashboard payload: own tasks, caseload, a role-specific figure, due soon", () => {
+  const kpis = { total_students: 12, active_students: 11, at_risk: 4, high_risk: 1, confirmed_schedules: 3, needs_availability: 2 };
+  const own = { total: 5, overdue: 1, dueSoon: 2 };
+  const ac = officeStats({ role: "academic_coordinator", own, waiting: { total: 9 }, kpis });
+  assert.deepEqual(ac.map((s) => s.key), ["tasks", "students", "risk", "soon"]);
+  assert.deepEqual(ac.map((s) => s.value), [5, 12, 4, 2]);
+  assert.equal(ac[1].label, "Students with open work");
+  assert.equal(ac[1].to, "/students", "the Academic Coordinator has a Students page");
+  assert.equal(ac[2].to, "/students?risk=At Risk of Delay/Delayed");
+  const rc = officeStats({ role: "research_coordinator", own, waiting: { total: 9 }, kpis });
+  assert.deepEqual(rc.map((s) => s.key), ["tasks", "students", "defenses", "soon"]);
+  assert.deepEqual(rc.map((s) => s.value), [5, 12, 3, 2]);
+  assert.match(rc[2].sub, /2 awaiting availability/);
+  for (const stats of [ac, rc]) {
+    assert.equal(new Set(stats.map((s) => s.label)).size, 4, "each number is named once");
+    assert.ok(stats.every((s) => !String(s.to || "").startsWith("/activity") && !String(s.to || "").includes("drilldown")), "no staff-only link");
+  }
+  assert.ok(rc.every((s) => !String(s.to || "").startsWith("/students")), "the Research Coordinator has no Students page");
+  assert.equal(rc[1].to, "/monitoring-sheet");
+  assert.equal(rc[2].to, "/workflow/defense-scheduling", "the Research Coordinator's own page");
+});
+
+test("activity for a coordinator: a link only to a page the role can open", () => {
+  const logs = [{ id: 1, result: "Form 1 endorsed", student_id: 4, student_name: "Ana Reyes", next_owner: "Dean", created_at: "2026-10-10T08:00:00" }];
+  assert.equal(officeActivity(logs, 6, "academic_coordinator")[0].to, "/students/4");
+  assert.equal(officeActivity(logs, 6, "research_coordinator")[0].to, undefined, "the Research Coordinator has no Students page");
+  assert.equal(officeActivity(logs, 6, "staff")[0].to, "/students/4");
+  assert.equal(officeActivity(logs)[0].to, "/students/4", "no role named: unrestricted, as before");
+});
+
+test("where each role lands (I-066): every back-office role has the Dashboard at '/'", () => {
+  for (const role of ["staff", "admin", "academic_coordinator", "research_coordinator"]) assert.equal(homePath(role), "/", role);
+  assert.equal(homePath("student"), "/student");
+  assert.equal(homePath("dean"), "/dean");
+  assert.equal(homePath("faculty"), "/faculty-portal");
+  assert.equal(homePath("registrar"), "/", "an unknown role falls back to '/'");
+  assert.equal(homePath(undefined), "/login");
 });

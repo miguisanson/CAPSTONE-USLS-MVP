@@ -534,6 +534,9 @@ export const api = {
     const qs = queryString(params);
     return request(`/notifications${qs ? `?${qs}` : ""}`);
   },
+  // A read never makes anything (I-071): the due reminders are made by this explicit call, the sweeps by the next one.
+  refreshNotifications: () => request("/notifications/refresh", { method: "POST", body: JSON.stringify({}) }),
+  maintenanceRefresh: () => request("/maintenance/refresh", { method: "POST", body: JSON.stringify({}) }),
   markNotificationRead: (id) =>
     request(`/notifications/${id}/read`, { method: "POST", body: JSON.stringify({}) }),
   markAllNotificationsRead: () =>

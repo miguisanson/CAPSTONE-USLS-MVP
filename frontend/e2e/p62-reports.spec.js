@@ -452,7 +452,9 @@ test.describe("Activity Log", () => {
 const writes = (page) => {
   const seen = [];
   page.on("request", (r) => {
-    if (r.method() !== "GET" && new URL(r.url()).pathname.startsWith("/api/")) seen.push(`${r.method()} ${new URL(r.url()).pathname}`);
+    const path = new URL(r.url()).pathname;
+    // the notification bell's own refresh (I-071) is sent on every page; it is not something this page's form sent
+    if (r.method() !== "GET" && path.startsWith("/api/") && path !== "/api/notifications/refresh") seen.push(`${r.method()} ${path}`);
   });
   return seen;
 };

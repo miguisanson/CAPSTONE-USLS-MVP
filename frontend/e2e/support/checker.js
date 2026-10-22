@@ -31,6 +31,11 @@ export const slugify = (href) =>
 // machine, not the app: such a failure is logged as a note and not counted as a problem.
 const MACHINE_NETWORK_ERROR = /ERR_NO_BUFFER_SPACE/;
 
+// The notification bell makes the due reminders with this POST on every page load (I-071/I-072: a read never does).
+// It is a refresh, not something a page view changed on its own, so it is not counted as a write by the specs
+// that assert "no non-GET API calls while the pages were open". Its own spec (p92) asserts it is sent.
+const REFRESH_CALLS = new Set(["POST /api/notifications/refresh"]);
+
 export function attachWatchers(page, tracker) {
   const add = (problem) => tracker.problems.push({ ...tracker.where, problem });
   const machineHiccup = (text) => {
@@ -50,7 +55,7 @@ export function attachWatchers(page, tracker) {
     const url = new URL(response.url());
     if (!url.pathname.startsWith("/api/")) return;
     const method = response.request().method();
-    if (method !== "GET") tracker.writes.push(`${method} ${url.pathname} -> ${response.status()} (${tracker.where.page})`);
+    if (method !== "GET" && !REFRESH_CALLS.has(`${method} ${url.pathname}`)) tracker.writes.push(`${method} ${url.pathname} -> ${response.status()} (${tracker.where.page})`);
     if (response.status() < 400) return;
     const key = `${method} ${url.pathname}`;
     if (API_ALLOW_LIST.some((a) => a.match.test(key) && (!a.status || a.status === response.status()))) return;
