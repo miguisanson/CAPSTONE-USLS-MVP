@@ -27,6 +27,10 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
 
   const activeTerm = String(meta?.terms?.find((item) => item.is_active_planning_term)?.id || "");
   const selectedTerm = termId || activeTerm;
+  // The handbook has no staff override: residency is recorded only when the checker clears the case.
+  const blockedReason = review && review.recommendation !== "Eligible for Residency"
+    ? "The policy checker says this case needs human review, so residency cannot be recorded. Fix the flagged record or use leave of absence instead."
+    : "";
 
   async function runCheck() {
     if (!student.id || !reason) {
@@ -54,6 +58,10 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
     if (saving) return;
     if (!review) {
       setError("Run the policy checker before recording residency.");
+      return;
+    }
+    if (blockedReason) {
+      setError(blockedReason);
       return;
     }
     setSaving(true);
@@ -88,7 +96,7 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
             <button type="button" onClick={runCheck} disabled={checking || saving} className="btn-ghost px-4 py-2">
               <ClipboardCheck className="h-4 w-4" /> {checking ? "Checking..." : "Run residency policy checker"}
             </button>
-            <button type="submit" form={formId} disabled={saving || !review} className="btn-primary px-4 py-2">
+            <button type="submit" form={formId} disabled={saving || !review || Boolean(blockedReason)} title={blockedReason || undefined} className="btn-primary px-4 py-2">
               {saving ? "Saving..." : "Record residency"}
             </button>
           </div>
@@ -138,7 +146,7 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
             required
           />
         </Field>
-        <Field label="Staff verification notes" hint="Required when the residency policy result needs human review.">
+        <Field label="Staff notes" hint="Optional. Kept with the residency record.">
           <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
         </Field>
         {review && (
@@ -161,6 +169,7 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
             </ul>
           </section>
         )}
+        {blockedReason && <p role="alert" className="text-sm font-semibold text-red-700">{blockedReason}</p>}
         <div aria-live="polite"><ErrorNote message={error} /></div>
       </form>
     </ModalShell>

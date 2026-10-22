@@ -3046,6 +3046,16 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
     return payload
 
 
+GRADUATION_EXPORTED_STATUS = "Exported - Ready to Send"
+
+
+def graduation_display_status(endorsement: GraduationEndorsement) -> str:
+    """The status a person sees for an endorsement: the export is the last step in the portal."""
+    if endorsement.endorsement_status == "Dean Approved" and endorsement.registrar_status == GRADUATION_EXPORTED_STATUS:
+        return GRADUATION_EXPORTED_STATUS
+    return endorsement.endorsement_status
+
+
 def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, include_student: bool = True) -> dict | None:
     if not endorsement:
         return None
@@ -3062,6 +3072,9 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
         "missing_research_requirements": split_items(endorsement.missing_research_requirements or ""),
         "missing_practicum_requirement": endorsement.missing_practicum_requirement,
         "endorsement_status": endorsement.endorsement_status,
+        # What the screens show as the batch's status: once the Dean has exported an approved
+        # list it is "Exported - Ready to Send", not still "Dean Approved" (I-010 / J10).
+        "display_status": graduation_display_status(endorsement),
         "dean_remarks": endorsement.dean_remarks,
         "registrar_status": endorsement.registrar_status,
         "request_attachment": attachment_dict(endorsement.request_attachment),
@@ -3651,7 +3664,9 @@ RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Dropped",
     "Withdrawn",
 }
-NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken", "Planned"}
+# "Not Started" is what the demo seed/reset and the withdrawal and leave resets write for a subject
+# the student has not taken; the monitoring sheet already treats it as "no row" (I-002 / J2).
+NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken", "Not Started", "Planned"}
 # Statuses a person may type into the Monitoring Sheet in the portal. Grades and
 # pass/fail outcomes stay out of scope; "Missing" means "no row" and is what a
 # removed row goes back to.
@@ -12690,7 +12705,7 @@ def register_routes(app: Flask) -> None:
 
     # Searchable/paginated directory for the Students page.
     @app.route("/api/students")
-    @require_api_login("staff", "academic_coordinator")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def students_list():
         refresh_risk_levels()
         query = Student.query.join(Program)
@@ -14806,7 +14821,7 @@ def register_routes(app: Flask) -> None:
                 "Dean",
                 f"CSV exported and ready for the Dean to email manually. Previous Registrar status: {previous_registrar_status}.",
                 previous_status=previous_status,
-                new_status=item.endorsement_status,
+                new_status=GRADUATION_EXPORTED_STATUS,
             )
             writer.writerow([
                 item.batch_name or "",
@@ -23357,7 +23372,7 @@ ACCESS_CONTROL_SPEC = [
     ("Monitoring sheet subject rows", "monitoring_subject_add", {"staff", "academic_coordinator"}),
     ("Reports", "reports", {"staff", "academic_coordinator"}),
     ("Analytics", "reports_analytics", {"staff", "academic_coordinator"}),
-    ("Students", "students_list", {"staff", "academic_coordinator"}),
+    ("Students", "students_list", {"staff", "academic_coordinator", "research_coordinator"}),
     ("Faculty", "faculty_list", {"staff", "academic_coordinator"}),
     ("Monitoring sheet import", "student_handoff_import", {"staff"}),
     ("Recommendations", "decision_support", {"staff"}),
@@ -29316,8 +29331,13 @@ def handle_awol(data: MultiDict) -> int:
         if reason not in RESIDENCY_REASONS:
             raise ValueError("Choose a handbook-supported residency reason.")
         review = awol_policy_review(student, {"workflow_action": "record_residency", "residency_reason": reason})
-        if review["recommendation"] != "Eligible for Residency" and not staff_notes:
-            raise ValueError("This residency case needs human review. Enter staff notes explaining the verified exception or use LOA.")
+        if review["recommendation"] != "Eligible for Residency":
+            # The handbook (Residency Enrollment, p. 51) allows residency only for its listed purposes;
+            # it has no staff override, so a note cannot turn "Needs Human Review" into a recorded residency.
+            raise ValueError(
+                "The residency policy checker says this case needs human review, so residency cannot be recorded. "
+                "Fix the record the checker flagged (or choose the matching purpose), or use leave of absence instead."
+            )
         term = AcademicTerm.query.get(safe_int(data.get("term_id"))) if data.get("term_id") else get_active_term()
         if not term:
             raise ValueError("No active semester is available for residency enrollment.")
