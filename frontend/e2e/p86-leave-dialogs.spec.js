@@ -135,6 +135,29 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await expect(opener).toBeFocused();
     });
 
+    // New in P5.3 (DecisionPanel): the refusal is said in words next to the box instead of a browser tooltip, and a
+    // reason made of spaces counts as empty. The old box relied on the browser's own "required" check.
+    test("Leave of Absence: an empty reason is refused with words; a reason of spaces too", async ({ page }) => {
+      await page.goto("/workflow/leave-of-absence");
+      const { dialog } = await open(page, "Benjamin Santos");
+      await footerAction(dialog, "Return to student").click();
+      const decision = top(page);
+      const box = decision.getByLabel("What should the student fix? (the student will see this)");
+      await expect(decision.getByText("Required for this step.")).toBeVisible();
+      await decision.getByRole("button", { name: "Return to student", exact: true }).last().click();
+      const message = decision.getByText("Please write the reason first. It is required for this step.");
+      await expect(message).toBeVisible();
+      await expect(box).toBeFocused();
+      await expect(box).toHaveAttribute("aria-invalid", "true");
+      await box.fill("   ");
+      await decision.getByRole("button", { name: "Return to student", exact: true }).last().click();
+      await expect(message).toBeVisible();
+      await box.fill("Attach the signed form.");
+      await expect(message).toHaveCount(0); // typing clears the message
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(1);
+    });
+
     test("Leave of Absence: Forward to Dean offers the eligibility result and a note; Start review has an optional note", async ({ page }) => {
       await page.goto("/workflow/leave-of-absence");
       const { dialog } = await open(page, "Benjamin Santos");

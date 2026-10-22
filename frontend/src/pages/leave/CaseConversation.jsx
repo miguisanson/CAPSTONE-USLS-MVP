@@ -4,7 +4,8 @@ import { api } from "../../api";
 import { ErrorNote } from "../../components/ui";
 import { Field, Select, Textarea } from "../../components/forms";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
-import { Banner, Block } from "./leaveUi";
+import { InlineNotice } from "../../components/ui/index.js";
+import { Block } from "./leaveUi";
 
 const NOTE_RECIPIENTS = [
   { value: "Student", label: "The student (they can read it)" },
@@ -62,7 +63,7 @@ function NoteForm({ slug, detail, onSent }) {
         <Textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} />
       </Field>
       <ErrorNote message={error} />
-      {done && <Banner tone="success">{done}</Banner>}
+      {done && <InlineNotice tone="success" icon>{done}</InlineNotice>}
       <button type="submit" disabled={busy} className="btn-ghost px-4 py-2">
         {busy ? "Saving..." : "Save note"}
       </button>

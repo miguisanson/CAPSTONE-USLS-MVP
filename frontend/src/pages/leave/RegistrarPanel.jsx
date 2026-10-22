@@ -7,7 +7,7 @@ import { EmptyState, ErrorNote, Spinner } from "../../components/ui";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
 import { LeaveStatusBadge } from "../../components/leaveStatus";
-import { Banner } from "./leaveUi";
+import { InlineNotice } from "../../components/ui/index.js";
 import { plural, whenText } from "./leaveHelpers";
 
 const HANDOFF_TONE = {
@@ -141,7 +141,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
 
       <div className="mt-4 space-y-3">
         {message && (
-          <Banner tone={message.tone} onDismiss={() => setMessage(null)}>
+          <InlineNotice tone={message.tone} icon onDismiss={() => setMessage(null)}>
             <p>{message.text}</p>
             {message.skipped?.length > 0 && (
               <div className="mt-2 font-normal">
@@ -155,7 +155,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
                 </ul>
               </div>
             )}
-          </Banner>
+          </InlineNotice>
         )}
 
         {rows.length === 0 ? (
