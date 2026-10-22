@@ -3225,6 +3225,9 @@ def task_dict(task: Task) -> dict:
     elif "leave of absence" in task.title.lower() or "leave extension" in task.title.lower() or "leave is ending" in task.title.lower() or "leave ended" in task.title.lower():
         action_url = "/workflow/leave-of-absence"
         action_label = "Open Leave of Absence"
+    elif "withdrawal" in task.title.lower() and normalize_owner_label(task.owner_role) not in {ROLE_LABELS["dean"], ROLE_LABELS["student"]}:
+        action_url = "/workflow/withdrawal"
+        action_label = "Open Withdrawal"
     return {
         "id": task.id,
         "student_id": task.student_id,
