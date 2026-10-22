@@ -150,7 +150,7 @@ test.describe("Subject-needs report (staff, Course Adjustments)", () => {
     await expect(card.getByText("SPEC 102", { exact: false }).first()).toBeVisible();
     await expect(card.getByText("SPEC 201")).toHaveCount(0);
     const later = card.getByRole("button", { name: /Later in the curriculum · 1 subject nobody needs yet/ });
-    await expect(later).toHaveAttribute("aria-expanded", /^(false)?$/); // CHANGED BY P87: was "" (a string, not a boolean) when closed
+    await expect(later).toHaveAttribute("aria-expanded", "false"); // CHANGED BY P87: was "" (not a boolean) when closed
     await later.click();
     await expect(later).toHaveAttribute("aria-expanded", "true");
     await expect(card.getByText("SPEC 201", { exact: false }).first()).toBeVisible();
@@ -165,7 +165,7 @@ test.describe("Subject-needs report (staff, Course Adjustments)", () => {
     await expect(row).toContainText("Retakes");
     await expect(row.getByRole("img", { name: "3 of 12 students" })).toBeVisible();
     const toggle = row.getByRole("button", { name: "Show students" });
-    await expect(toggle).toHaveAttribute("aria-expanded", /^(false)?$/); // CHANGED BY P87: was "" when closed
+    await expect(toggle).toHaveAttribute("aria-expanded", "false"); // CHANGED BY P87: was "" when closed
     await expect(row.getByRole("table")).toHaveCount(0);
     await toggle.click();
     await expect(row.getByRole("button", { name: "Hide students" })).toHaveAttribute("aria-expanded", "true");
