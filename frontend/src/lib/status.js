@@ -11,7 +11,7 @@ export const STATUS_GROUPS = {
     "Cleared","Record Updated","Passed","Pass","Present","Eligible","Eligible to Return","Compliant","Open","Complete",
     "Completed","Verified","Verified by staff","Done","Generated","Synced","Published","Offered","Sent to Registrar",
     "Dean Approved","Active planning","Approved","Taken","Endorsed","Acknowledged","Return Approved",
-    "Extension Approved - Refresher Required","Re-enrollment Completed","Revisions confirmed"],
+    "Extension Approved - Refresher Required","Re-enrollment Completed","Revisions confirmed","Received"],
   warning: ["At Risk of Delay","On Leave","Withdrawal In Progress","LOA","Needs Availability","Deferred","Defense Deferred",
     "Needs Re-confirmation","Revisions Pending","Under deliberation","Not entered","Revisions Required",
     "Pending Staff Action","Pending Review","MOA Under Review","Under Review","Dean Review","For Dean Review",
