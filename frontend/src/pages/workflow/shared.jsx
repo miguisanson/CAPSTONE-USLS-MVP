@@ -151,7 +151,7 @@ const WORKFLOW_GUIDES = {
   },
 };
 
-export function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClose }) {
+export function WorkflowSupportModal({ slug, mode, logs, policyQuestions = [], summary = "", actor = "", data = "", onClose }) {
   const guide = WORKFLOW_GUIDES[slug];
   const title = mode === "activity" ? "Recent workflow activity" : `How ${guide ? slug : "this workflow"} works`;
   return (
@@ -162,31 +162,45 @@ export function WorkflowSupportModal({ slug, mode, logs, policyQuestions, onClos
     >
       {mode === "activity" ? (
         <WorkflowActivityList logs={logs} collapsible={false} />
-      ) : guide ? (
+      ) : (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Detail label="Purpose" value={guide.purpose} />
-            <Detail label="Who submits" value={guide.submitter} />
-            <Detail label="Who reviews" value={guide.reviewers} />
-            <Detail label="When something is incomplete" value={guide.incomplete} />
+            {guide ? (
+              <>
+                <Detail label="Purpose" value={guide.purpose} />
+                <Detail label="Who submits" value={guide.submitter} />
+                <Detail label="Who reviews" value={guide.reviewers} />
+                <Detail label="When something is incomplete" value={guide.incomplete} />
+              </>
+            ) : (
+              <div className="sm:col-span-2"><Detail label="Purpose" value={summary} /></div>
+            )}
+            <Detail label="Used by" value={actor} />
+            <Detail label="What it records" value={data} />
           </div>
-          <div>
-            <p className="eyebrow">Main stages</p>
-            <ol className="mt-2 grid gap-2 sm:grid-cols-2">
-              {guide.stages.map((stage, index) => (
-                <li key={stage} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs text-brand-700">{index + 1}</span>
-                  {stage}
-                </li>
-              ))}
-            </ol>
-          </div>
-          <InlineNotice tone="success" title="What completion means">{guide.final}</InlineNotice>
-          <InlineNotice tone="warning" title="Admin note · confirm with Sir De Paula / GS office before production">
-            <ul className="mt-1 space-y-1.5">{policyQuestions.map((question) => <li key={question}>• {question}</li>)}</ul>
-          </InlineNotice>
+          {guide && (
+            <>
+              <div>
+                <p className="eyebrow">Main stages</p>
+                <ol className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {guide.stages.map((stage, index) => (
+                    <li key={stage} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700">
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs text-brand-700">{index + 1}</span>
+                      {stage}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <InlineNotice tone="success" title="What completion means">{guide.final}</InlineNotice>
+            </>
+          )}
+          {policyQuestions.length > 0 && (
+            <InlineNotice tone="warning" title="Admin note · confirm with Sir De Paula / GS office before production">
+              <ul className="mt-1 space-y-1.5">{policyQuestions.map((question) => <li key={question}>• {question}</li>)}</ul>
+            </InlineNotice>
+          )}
         </div>
-      ) : null}
+      )}
     </WorkflowCaseModal>
   );
 }

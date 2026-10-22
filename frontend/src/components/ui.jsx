@@ -49,7 +49,7 @@ export function Pill({ children, tone = "slate" }) {
     P1: "bg-amber-100 text-amber-800",
   };
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide ${tones[tone] || tones.slate}`}>
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-2xs font-semibold tracking-wide ${tones[tone] || tones.slate}`}>
       {children}
     </span>
   );
