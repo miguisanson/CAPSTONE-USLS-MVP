@@ -206,5 +206,16 @@ class SectionJBackendTests(unittest.TestCase):
                 self.assertEqual(db.session.get(Student, student_id).enrollment_tag, "Enrolled")
 
 
+    # ------------------------------------------------------------------ I-005 (J5)
+    def test_research_coordinator_student_search_finds_a_student_by_name_and_number(self):
+        """J5: the student picker in Research Gate calls GET /api/students?q=...; it must answer for this role."""
+        research = self._role_client(self.research_id, "research_coordinator")
+        for query in ("Workflow", "Student", "GS-2026-TEST"):
+            response = research.get("/api/students", query_string={"q": query, "page_size": 50})
+            self.assertEqual(response.status_code, 200, (query, response.get_json()))
+            numbers = [item["student_number"] for item in response.get_json()["items"]]
+            self.assertIn("GS-2026-TEST", numbers, query)
+
+
 if __name__ == "__main__":
     unittest.main()
