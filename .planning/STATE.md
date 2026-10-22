@@ -5,10 +5,8 @@
 Branch `v5.3-migui_test` is pushed and green at the last merge (python gate 661 OK on e7be427; later merges were
 frontend-only, each checked with targeted e2e). Three helpers were still running when the limit hit; their work is
 on branches, NOT merged:
-1. `pkt/be4` (wt/be4) - notifications on decisions (I-059), GETs/login stop writing (I-071, I-072), coordinator
-   dashboard API (I-066), N+1 /api/students (I-093), daily-changes student_id (I-047). Review its commits
-   (`git log v5.3-migui_test..pkt/be4`), run tests/test_v53_backend2.py + test_reads_do_not_write.py, merge, then the
-   full gate in wt/gate. If it has uncommitted changes, finish or discard them.
+1. MERGED `pkt/be4` (96ded3d; R-014). Full gate on it running -> `gate53/gate_be4.txt`. `pkt/wire` (wt/wire, port 5334)
+   wires the new POSTs (bell, staff Refresh) and builds the coordinator homes.
 2. MERGED `pkt/p8` (a14d173): Phase 5 DONE - check:ui --strict all zeros, shims deleted, AGENTS.md gate updated.
 3. `pkt/iso` (wt/iso) - e2e order-independence class fix (I-100/I-113/I-121): DATA-OWNERSHIP.md + guard.
 In flight since: `pkt/conA` (wt/conA, port 5332: Dean Practicum board, Dean Course Adjustments DecisionPanel, Dean board copy - I-122, I-127) and `pkt/conC` (wt/conC, port 5333: guide/activity in one place, Practicum/Graduation summary + 'View details' - I-123, I-126). Remaining consistency packets B (list toolbars/Activity Log, I-124/I-125), D (student pages, I-128 part), E (faculty/Layout nits).
