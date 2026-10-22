@@ -89,6 +89,43 @@ class V53BackendTests(unittest.TestCase):
             signed_in = client.post("/api/auth/demo-students/practicum-andrea/reset", json={})
             self.assertEqual(signed_in.status_code, 200, signed_in.get_json())
 
+    # ------------------------------------------------------------------ I-056 (F-02)
+    def test_wrong_passwords_from_one_address_never_block_the_right_password_from_another(self):
+        clock = {"now": 1000.0}
+        with patch.object(LOGIN_THROTTLE, "clock", lambda: clock["now"]):
+            for _ in range(7):
+                self._login(STAFF_EMAIL, "wrong-password", ip="10.0.0.1")
+            _, other_address = self._login(STAFF_EMAIL, ip="10.0.0.2")
+            self.assertEqual(other_address.status_code, 200, other_address.get_json())
+
+    def test_throttle_is_a_short_growing_delay_not_a_five_minute_lock(self):
+        clock = {"now": 1000.0}
+        with patch.object(LOGIN_THROTTLE, "clock", lambda: clock["now"]):
+            for _ in range(7):
+                self._login(STAFF_EMAIL, "wrong-password", ip="10.0.0.1")
+            _, blocked = self._login(STAFF_EMAIL, ip="10.0.0.1")
+            self.assertEqual(blocked.status_code, 429, blocked.get_json())
+            retry = int(blocked.headers["Retry-After"])
+            self.assertTrue(1 <= retry <= 30, retry)
+            clock["now"] += 31
+            _, allowed = self._login(STAFF_EMAIL, ip="10.0.0.1")
+            self.assertEqual(allowed.status_code, 200, allowed.get_json())
+
+    def test_throttle_delay_doubles_and_stops_at_thirty_seconds(self):
+        clock = {"now": 1000.0}
+        with patch.object(LOGIN_THROTTLE, "clock", lambda: clock["now"]):
+            for _ in range(5):
+                self.assertEqual(self._login(STAFF_EMAIL, "wrong-password")[1].status_code, 401)
+            delays = []
+            for _ in range(7):
+                _, blocked = self._login(STAFF_EMAIL, "wrong-password")
+                self.assertEqual(blocked.status_code, 429)
+                delays.append(int(blocked.headers["Retry-After"]))
+                clock["now"] += delays[-1]
+                # once the delay is over the next wrong password is counted again
+                self.assertEqual(self._login(STAFF_EMAIL, "wrong-password")[1].status_code, 401)
+            self.assertEqual(delays, [2, 4, 8, 16, 30, 30, 30])
+
 
 if __name__ == "__main__":
     unittest.main()
