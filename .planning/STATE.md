@@ -7,7 +7,8 @@
 ode_modules` so the main node_modules is not deleted):**
   - MERGED `pkt/be` (I-010, I-012, I-005, I-002; R-011).
   - MERGED `pkt/be2` (I-055..I-058, I-036, I-073; R-012).
-  - `seed2` / `pkt/seed2` — the only app.py editor: seed quality I-060 advisers<=limit and never on own panel, I-062 Dean queues seeded, I-061 stage vs units/titles/departments, I-070 dates spread, I-094, I-095 (new `tests/test_seed_quality.py`, port 5311).
+  - MERGED `pkt/seed2` (I-060, I-061, I-062, I-070, I-095; R-013; AD8 for I-094). Gate on e7be427 running: python -> `gate53/gate_e7be427.txt`, e2e -> `gate53/e2e_e7be427.txt`.
+  - `be4` / `pkt/be4` — the only app.py editor: I-059 notifications on decisions, I-071/I-072 GETs and login stop writing, I-066 coordinator home API, I-093 N+1 /api/students, I-047 daily changes student_id (port 5322).
   - MERGED `pkt/shell` (I-103, I-101, I-112); RoleSidebar.jsx deleted (unused).
   - MERGED `pkt/enr` (P6.7/P6.8, I-082, I-081 part). Folder wt/enr locked by a helper process; delete later.
   - MERGED `pkt/lists` (I-075, I-083, I-098, I-104, I-109). I-116 filed.
