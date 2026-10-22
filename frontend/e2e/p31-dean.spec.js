@@ -64,7 +64,8 @@ const STUDENT_EMAIL = "practicum.andrea@usls.edu.ph";
 
 /** Take Andrea from a fresh practicum to "Report Sent to Dean" (the only state the Dean can decide on). */
 async function practicumToDean(playwright) {
-  const reset = await playwright.request.newContext({ baseURL: BASE_URL });
+  // The reset needs a signed-in session (I-055), as the sign-in page does it.
+  const reset = await apiAs(playwright, "staff@usls.edu.ph");
   await okJson(await reset.post("/api/auth/demo-students/practicum-andrea/reset", { data: {} }), "reset practicum-andrea");
   await reset.dispose();
 

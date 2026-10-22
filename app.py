@@ -12342,9 +12342,14 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/api/auth/demo-students/<demo_key>/reset", methods=["POST"])
     def auth_demo_student_reset(demo_key: str):
-        """Reset a whitelisted demo student before authentication (demo mode only)."""
+        """Reset a whitelisted demo student (demo mode only; a signed-in session is required).
+
+        The sign-in page signs in first, then calls this, so a stranger on the same network
+        cannot wipe a presenter's case."""
         if not demo_mode_enabled():
             return demo_mode_off_response()
+        if not current_account():
+            return no_store(jsonify({"error": "Please sign in to continue."})), 401
         config = WORKFLOW_DEMO_STUDENTS.get(demo_key)
         if not config:
             return jsonify({"error": "Demo student not found."}), 404
@@ -37313,4 +37318,5 @@ if __name__ == "__main__":
     elif os.getenv("RAG_PREWARM", "1").strip().lower() not in {"0", "false", "no"}:
         threading.Thread(target=prewarm_keyword_index, name="rag-keyword-prewarm", daemon=True).start()
     print(f"USLS Graduate School platform running at http://localhost:{port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    # Local only unless FLASK_HOST says otherwise (e.g. FLASK_HOST=0.0.0.0 to show the demo on a LAN).
+    app.run(host=os.getenv("FLASK_HOST", "127.0.0.1"), port=port, debug=False)

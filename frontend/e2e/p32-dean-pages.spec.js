@@ -49,7 +49,7 @@ const CHECKLIST = [
 
 /** Put three leave cases and one course-offering plan in front of the Dean. */
 async function putWorkInFrontOfTheDean(playwright) {
-  const reset = await playwright.request.newContext({ baseURL: BASE_URL });
+  const reset = await apiAs(playwright, "staff@usls.edu.ph"); // the reset needs a signed-in session (I-055)
   for (const key of ["leave-of-absence-maureen", "leave-of-absence-daniel", "readmission-gabriel"]) {
     await okJson(await reset.post(`/api/auth/demo-students/${key}/reset`, { data: {} }), `reset ${key}`);
   }

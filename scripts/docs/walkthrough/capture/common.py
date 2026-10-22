@@ -74,14 +74,21 @@ class Runtime:
 
     # -- demo data ------------------------------------------------------------
     def reset(self, *keys: str) -> None:
-        """Reset demo students from the public demo endpoint (same call the
-        sign-in page's reset button makes)."""
+        """Reset demo students through the demo endpoint (same call the sign-in
+        page's reset button makes: it signs in first, because the reset needs a session)."""
+        import http.cookiejar
         import urllib.request
 
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        login = urllib.request.Request(
+            f"{BASE}/api/auth/login", method="POST",
+            data=json.dumps({"email": "staff@usls.edu.ph", "password": PASSWORD}).encode(),
+            headers={"Content-Type": "application/json"})
+        opener.open(login, timeout=60).read()
         for key in keys:
             req = urllib.request.Request(f"{BASE}/api/auth/demo-students/{key}/reset", method="POST", data=b"{}",
                                          headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=180) as resp:
+            with opener.open(req, timeout=180) as resp:
                 body = json.loads(resp.read().decode())
             self.note(f"reset {key}: {body.get('message')}")
 

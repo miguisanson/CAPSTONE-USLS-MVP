@@ -174,7 +174,30 @@ export default function Login() {
     setDemoNotice("");
     setResetBusy(student.key);
     try {
-      const result = await api.resetDemoStudent(student.key);
+      // The server only resets for a signed-in session, so sign in first (as the student, or as a
+      // demo staff account if the student's password was changed), reset, then sign out again.
+      const signInOptions = [
+        { email: student.email, password: student.password },
+        ...demoAccounts.filter((account) => account.role === "staff").map(({ email, password }) => ({ email, password })),
+      ];
+      let signedIn = false;
+      for (const credentials of signInOptions) {
+        if (!credentials.email || !credentials.password) continue;
+        try {
+          await api.login(credentials);
+          signedIn = true;
+          break;
+        } catch {
+          /* try the next demo account */
+        }
+      }
+      if (!signedIn) throw new Error(`Could not sign in to reset ${student.name}. Sign in as Graduate School Staff and reset from there.`);
+      let result;
+      try {
+        result = await api.resetDemoStudent(student.key);
+      } finally {
+        await api.logout().catch(() => {});
+      }
       if (result.item) {
         setDemoStudents((items) => items.map((item) => (item.key === student.key ? result.item : item)));
       }

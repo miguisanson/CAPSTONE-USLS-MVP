@@ -3522,14 +3522,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             withdrawal_student_id = withdrawal_student.id
             research_student_id = research_student.id
 
-        reset_response = app.test_client().post(
+        reset_response = self._staff_client().post(
             f"/api/auth/demo-students/{research_item['key']}/reset",
             json={},
         )
         self.assertEqual(reset_response.status_code, 200, reset_response.get_json())
         self.assertGreater(reset_response.get_json()["records_removed"], 0)
 
-        reset_response = app.test_client().post(
+        reset_response = self._staff_client().post(
             f"/api/auth/demo-students/{practicum_item['key']}/reset",
             json={},
         )
@@ -3537,7 +3537,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         self.assertEqual(reset_response.get_json()["records_removed"], 1)
         self.assertEqual(reset_response.get_json()["messages_removed"], 1)
 
-        reset_response = app.test_client().post(
+        reset_response = self._staff_client().post(
             f"/api/auth/demo-students/{withdrawal_item['key']}/reset",
             json={},
         )
@@ -3545,7 +3545,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         self.assertEqual(reset_response.get_json()["records_removed"], 1)
         self.assertEqual(reset_response.get_json()["messages_removed"], 1)
 
-        reset_response = app.test_client().post(
+        reset_response = self._staff_client().post(
             f"/api/auth/demo-students/{graduation_item['key']}/reset",
             json={},
         )

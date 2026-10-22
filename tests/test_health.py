@@ -218,9 +218,11 @@ class DemoModeTests(HealthTestBase):
         self.assertNotIn("staff@usls.edu.ph", emails)
         self.assertIn("dean@usls.edu.ph", emails)
 
-    def test_demo_reset_requires_no_session_only_while_demo_mode_is_on(self):
+    def test_demo_reset_needs_a_session_and_only_while_demo_mode_is_on(self):
+        # I-055: it used to answer without a session; now the sign-in page signs in first.
         with patch.dict(os.environ, {"DEMO_MODE": "1"}):
-            response = app.test_client().post("/api/auth/demo-students/not-a-demo-key/reset", json={})
+            self.assertEqual(app.test_client().post("/api/auth/demo-students/not-a-demo-key/reset", json={}).status_code, 401)
+            response = self.signed_in("staff").post("/api/auth/demo-students/not-a-demo-key/reset", json={})
             self.assertEqual(response.status_code, 404)
             self.assertIn("Demo student not found", response.get_json()["error"])
         # The workflow reset button is a staff tool even in demo mode.
