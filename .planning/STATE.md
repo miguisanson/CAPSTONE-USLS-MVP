@@ -9,9 +9,9 @@ on branches, NOT merged:
    dashboard API (I-066), N+1 /api/students (I-093), daily-changes student_id (I-047). Review its commits
    (`git log v5.3-migui_test..pkt/be4`), run tests/test_v53_backend2.py + test_reads_do_not_write.py, merge, then the
    full gate in wt/gate. If it has uncommitted changes, finish or discard them.
-2. `pkt/p8` (wt/p8) - Phase 5 close-out: last check:ui hits, shims removed, `check:ui --strict` in npm run e2e,
-   ModalShell out (I-118). After merging, change the AGENTS.md gate line it reports.
+2. MERGED `pkt/p8` (a14d173): Phase 5 DONE - check:ui --strict all zeros, shims deleted, AGENTS.md gate updated.
 3. `pkt/iso` (wt/iso) - e2e order-independence class fix (I-100/I-113/I-121): DATA-OWNERSHIP.md + guard.
+In flight since: `pkt/conA` (wt/conA, port 5332: Dean Practicum board, Dean Course Adjustments DecisionPanel, Dean board copy - I-122, I-127) and `pkt/conC` (wt/conC, port 5333: guide/activity in one place, Practicum/Graduation summary + 'View details' - I-123, I-126). Remaining consistency packets B (list toolbars/Activity Log, I-124/I-125), D (student pages, I-128 part), E (faculty/Layout nits).
 Then: consistency findings I-122..I-128 (`research/CONSISTENCY-2026-10-22.md` ends with a 5-packet split A-E;
 packets touching FacultyPages/DeanReportPages/Layout must not run together); I-120 a11y follow-ups; Reports rebuild
 IM20 (I-068, needs app.py) + coordinator home frontend on be4's API; I-119 server strings; I-105 batch 'Next: Dean'.

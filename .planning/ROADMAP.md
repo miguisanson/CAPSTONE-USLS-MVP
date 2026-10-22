@@ -20,7 +20,7 @@ Rules for every phase:
 - [x] **Phase 2: Role walkthroughs** (done 2026-10-17: `npm run e2e`, 7 roles, 116 pages, negative control) - Playwright per role on the seeded data, screenshots at 1366/1920/390
 - [ ] **Phase 3: Section J bugs** - close I-001…I-014 with tests
 - [ ] **Phase 4: Backend split** - `app.py` into models, services and blueprints; duplicates merged
-- [ ] **Phase 5: Design system** - tokens, shared components, every page migrated, cheap ideas X-01…X-05
+- [x] **Phase 5: Design system** (done 2026-10-22 on v5.3: every page on the library, `check:ui --strict` all zeros, shims deleted) - tokens, shared components, every page migrated, cheap ideas X-01…X-05
 - [ ] **Phase 6: Performance and final cleanup** - N+1 queries, pagination, lazy-loaded pages, remaining dead code, docs in sync
 
 **Lanes.** Phase 2 can start once Phase 1's seed is deterministic (it needs fixed data). Phase 3
