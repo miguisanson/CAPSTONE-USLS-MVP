@@ -80,9 +80,12 @@ with `page.route` (p41, p42, p82 forms, p86 dialogs, p87 shared parts, p88 login
   That is the only way a signed-in test can find the Login form, so: sign in through the API, then wait until
   `/api/auth/me` answers with the account before opening the page (done in `p42` `formPage`). A signed-in spec must never
   `page.goto("/login")` or call logout on a shared storage-state account (`.auth/<role>.json`).
-- Known cause of failed API reads in combined runs: SQLite `database is locked` (500s on `GET /api/student-portal/context`
-  were in the v5.3 gate log) when several workers write. That is an app/database setting (busy timeout), not a spec problem;
-  it is listed in the packet report.
+- Known causes of a signed-in page finding no user, none of them another spec: (1) Windows running out of socket buffers
+  (`page.goto: net::ERR_NO_BUFFER_SPACE`, I-041: seen at `--workers=1` while other test runs shared the machine, and
+  once as the Login form in p42 of the v5.3 gate run) - a failed `/api/auth/me` fetch is a signed-out user to the front end;
+  (2) SQLite `database is locked` (500s on `GET /api/student-portal/context` in the same gate log) when several workers
+  write. Close other test runs before a combined run; (2) is an app/database setting (busy timeout), listed in the
+  packet report.
 
 ## Adding a spec
 

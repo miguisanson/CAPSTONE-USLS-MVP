@@ -637,6 +637,10 @@ test("My Calendar: header and the shared calendar view", async ({ page }) => {
 // ================================================================================================ Availability
 test.describe("My Availability", () => {
   test("page: header, notice, weekly hours, specific dates form, requests, calendar card, other windows", async ({ page }) => {
+    // The "specific dates" test below adds and removes one date in the real database; when it runs in another worker at the
+    // same time this page would list that date. So the page gets the REAL availability with an empty "Your dates" list.
+    const realAvailability = await (await page.request.get("/api/faculty-portal/availability")).json();
+    await mockJson(page, "**/api/faculty-portal/availability", () => ({ ...realAvailability, exceptions: [] }));
     await openFromSidebar(page, "My Availability", "My Availability");
     await expect(page.getByText("Tell the Graduate School when you can sit in a defense. All times are Philippine time.")).toBeVisible();
     await expect(page.getByRole("link", { name: "See your calendar" })).toHaveAttribute("href", "/faculty-portal/calendar");
