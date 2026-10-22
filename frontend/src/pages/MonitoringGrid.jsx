@@ -250,14 +250,28 @@ export default function MonitoringGrid() {
       {savedNotice && <InlineNotice tone="success" onDismiss={() => setSavedNotice("")}>{savedNotice}</InlineNotice>}
 
       <Card pad="sm">
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
-          <Select aria-label="Program" placeholder="" value={programId} options={programOptions} onChange={(e) => updateFilters({ program_id: e.target.value })} />
-          <Select aria-label="Semester" placeholder="" value={selectedTermId || String(grid?.selected_term?.id || "")} options={termOptions} onChange={(e) => updateFilters({ term_id: e.target.value })} />
-          <Select aria-label="Progress" placeholder="All progress" value={selectedProgress} options={PROGRESS_OPTIONS} onChange={(e) => updateFilters({ progress: e.target.value })} />
-          <Select aria-label="Risk" placeholder="All risk" value={selectedRisk} options={RISK_OPTIONS} onChange={(e) => updateFilters({ risk: e.target.value })} />
-          <Select aria-label="Enrollment status" placeholder="All enrollment" value={selectedEnrollment} options={ENROLLMENT_OPTIONS} onChange={(e) => updateFilters({ enrollment: e.target.value })} />
-          <Select aria-label="Sort monitoring sheet" placeholder="" value={sortBy} options={SORT_OPTIONS} onChange={(e) => updateFilters({ sort: e.target.value })} />
-          <Button variant="secondary" icon={Download} onClick={exportCsv} disabled={!grid}>Export CSV</Button>
+        {/* I-098: the Program select is as wide as its longest option ("MSGC - Master of Science in Guidance and Counseling");
+            the other filters share the rest of the row and wrap under it when the screen is narrower. */}
+        <div className="flex flex-wrap gap-2">
+          <div className="w-full sm:w-[26rem]">
+            <Select aria-label="Program" placeholder="" value={programId} options={programOptions} onChange={(e) => updateFilters({ program_id: e.target.value })} />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
+            <Select aria-label="Semester" placeholder="" value={selectedTermId || String(grid?.selected_term?.id || "")} options={termOptions} onChange={(e) => updateFilters({ term_id: e.target.value })} />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
+            <Select aria-label="Progress" placeholder="All progress" value={selectedProgress} options={PROGRESS_OPTIONS} onChange={(e) => updateFilters({ progress: e.target.value })} />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
+            <Select aria-label="Risk" placeholder="All risk" value={selectedRisk} options={RISK_OPTIONS} onChange={(e) => updateFilters({ risk: e.target.value })} />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-44 sm:flex-1">
+            <Select aria-label="Enrollment status" placeholder="All enrollment" value={selectedEnrollment} options={ENROLLMENT_OPTIONS} onChange={(e) => updateFilters({ enrollment: e.target.value })} />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-48 sm:flex-1">
+            <Select aria-label="Sort monitoring sheet" placeholder="" value={sortBy} options={SORT_OPTIONS} onChange={(e) => updateFilters({ sort: e.target.value })} />
+          </div>
+          <Button variant="secondary" icon={Download} onClick={exportCsv} disabled={!grid} className="w-full sm:w-auto">Export CSV</Button>
         </div>
       </Card>
 

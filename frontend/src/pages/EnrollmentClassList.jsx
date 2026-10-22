@@ -122,29 +122,36 @@ export default function EnrollmentClassList() {
       />
 
       <Card>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Select
-            aria-label="Program"
-            placeholder=""
-            value={programId}
-            options={programOptions}
-            onChange={(event) => {
-              setProgramId(event.target.value);
-              keepAllViewOrReset();
-            }}
-          />
-          <Select
-            aria-label="Semester"
-            placeholder=""
-            value={termId}
-            options={termOptions}
-            onChange={(event) => {
-              setTermId(event.target.value);
-              keepAllViewOrReset();
-            }}
-          />
-          <Select aria-label="Class list view" placeholder="" value={courseId} options={viewOptions} onChange={(event) => setCourseId(event.target.value)} />
-          <Button variant="secondary" icon={Download} onClick={exportCsv} disabled={!data}>
+        {/* I-098: the Program select is as wide as its longest option; the other filters share the rest of the row. */}
+        <div className="flex flex-wrap gap-2">
+          <div className="w-full sm:w-[26rem]">
+            <Select
+              aria-label="Program"
+              placeholder=""
+              value={programId}
+              options={programOptions}
+              onChange={(event) => {
+                setProgramId(event.target.value);
+                keepAllViewOrReset();
+              }}
+            />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
+            <Select
+              aria-label="Semester"
+              placeholder=""
+              value={termId}
+              options={termOptions}
+              onChange={(event) => {
+                setTermId(event.target.value);
+                keepAllViewOrReset();
+              }}
+            />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-48 sm:flex-1">
+            <Select aria-label="Class list view" placeholder="" value={courseId} options={viewOptions} onChange={(event) => setCourseId(event.target.value)} />
+          </div>
+          <Button variant="secondary" icon={Download} onClick={exportCsv} disabled={!data} className="w-full sm:w-auto">
             Export CSV
           </Button>
         </div>

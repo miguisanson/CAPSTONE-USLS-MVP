@@ -139,13 +139,14 @@ test.describe("program selects", () => {
       await expect(page.locator("main h1")).toBeVisible();
       await page.waitForLoadState("networkidle");
       const select = page.getByLabel("Program", { exact: true });
+      // the closed select shows the chosen option, so the longest option must fit as well as the current one
       await select.selectOption(String(longest.id));
-      await page.waitForLoadState("networkidle");
+      await expect(select).toHaveValue(String(longest.id));
       const fit = await select.evaluate((sel) => {
         const cs = getComputedStyle(sel);
         const ctx = document.createElement("canvas").getContext("2d");
         ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-        const text = ctx.measureText(sel.options[sel.selectedIndex].textContent).width;
+        const text = Math.max(...[...sel.options].map((o) => ctx.measureText(o.textContent).width));
         const arrow = 24; // the native drop-down arrow
         return { text, room: sel.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - arrow };
       });
