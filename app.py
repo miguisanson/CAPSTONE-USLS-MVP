@@ -17,7 +17,7 @@ import math
 import threading
 import zipfile
 import xml.etree.ElementTree as ET
-from collections import Counter, OrderedDict
+from collections import Counter, OrderedDict, defaultdict
 from functools import wraps
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -32,7 +32,7 @@ from flask import Flask, Response, has_app_context, has_request_context, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event, func, inspect, or_, text, true
 from sqlalchemy import event as _sa_event
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 from sqlalchemy.orm.attributes import get_history as _sa_get_history
 from werkzeug.exceptions import NotFound
 from werkzeug.exceptions import BadRequestKeyError
@@ -2182,8 +2182,15 @@ def faculty_dict(faculty: Faculty) -> dict:
     }
 
 
-def student_brief(student: Student) -> dict:
-    course_year = student_current_course_year(student)
+_TERM_NOT_GIVEN = object()
+
+
+def student_brief(student: Student, active_term=_TERM_NOT_GIVEN) -> dict:
+    # A caller that builds many briefs passes the active term (or None) it already looked up.
+    if active_term is _TERM_NOT_GIVEN:
+        course_year = student_current_course_year(student)
+    else:
+        course_year = years_in_program(student, term=active_term)
     return {
         "id": student.id,
         "student_number": student.student_number,
@@ -2312,21 +2319,33 @@ def monitoring_template_codes(program_code: str) -> list[str]:
     return [monitoring_course_code(program_code, suffix) for suffix, *_ in MONITORING_CURRICULUM_TEMPLATE]
 
 
-def monitoring_curriculum_courses(program: Program) -> list[Course]:
-    """Prefer the AC template columns for monitoring when the program has them."""
+def monitoring_curriculum_courses(program: Program, program_courses: list[Course] | None = None) -> list[Course]:
+    """Prefer the AC template columns for monitoring when the program has them.
+
+    ``program_courses`` is every Course row of the program when the caller already loaded them (one query
+    for a whole page of students); the answer is the same as asking the database here.
+    """
     authoritative = AUTHORITATIVE_CURRICULA.get(program.code)
     if authoritative:
         codes = [row[0] for row in authoritative["courses"]]
-        by_code = {
-            course.code: course
-            for course in Course.query.filter_by(program_id=program.id).filter(Course.code.in_(codes)).all()
-        }
+        if program_courses is None:
+            candidates = Course.query.filter_by(program_id=program.id).filter(Course.code.in_(codes)).all()
+        else:
+            wanted = set(codes)
+            candidates = [course for course in program_courses if course.code in wanted]
+        by_code = {course.code: course for course in candidates}
         return [by_code[code] for code in codes if code in by_code]
     template_codes = monitoring_template_codes(program.code)
-    courses = (
-        Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter())
-        .order_by(Course.category, Course.code).all()
-    )
+    if program_courses is None:
+        courses = (
+            Course.query.filter_by(program_id=program.id).filter(curriculum_course_filter())
+            .order_by(Course.category, Course.code).all()
+        )
+    else:  # the same filter and the same order (NULL category first) the query above uses
+        courses = sorted(
+            (course for course in program_courses if (course.category or "Core") != MONITORING_FREE_FORM_CATEGORY),
+            key=lambda course: (course.category is not None, course.category or "", course.code),
+        )
     by_code = {course.code: course for course in courses}
     template_courses = [by_code[code] for code in template_codes if code in by_code]
     return template_courses if template_courses else courses
@@ -2417,9 +2436,9 @@ def ensure_monitoring_template_courses() -> int:
     return changed
 
 
-def comprehensive_exam_eligibility(student: Student) -> dict:
+def comprehensive_exam_eligibility(student: Student, audit: dict | None = None) -> dict:
     """Apply program unit requirements without treating subjects as prerequisites."""
-    audit = compute_course_audit(student)
+    audit = audit if audit is not None else compute_course_audit(student)
     completed = {row["category"]: row["completed_units"] for row in audit.get("by_category", [])}
     failed_count = sum(1 for row in audit.get("incomplete", []) if row.get("status") == "Failed")
     if student.program.code in AUTHORITATIVE_CURRICULA:
@@ -2477,6 +2496,34 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         "failed_subjects": failed_count,
         "required_subjects": len(audit.get("completed", [])) + missing_count,
     }
+
+
+def comprehensive_eligibility_for(students: list[Student]) -> dict[int, dict]:
+    """comprehensive_exam_eligibility() for many students: the same answers, a fixed number of queries.
+
+    Loads the course records of the students and the courses of their programs once per block of 400
+    students instead of once per student.
+    """
+    result: dict[int, dict] = {}
+    for start in range(0, len(students), 400):
+        block = students[start:start + 400]
+        records_by_student: dict[int, dict] = defaultdict(dict)
+        for record in CourseRecord.query.filter(CourseRecord.student_id.in_([item.id for item in block])).all():
+            records_by_student[record.student_id][record.course_id] = record
+        programs = {item.program_id: item.program for item in block}
+        courses_by_program: dict[int, list[Course]] = defaultdict(list)
+        for course in Course.query.filter(Course.program_id.in_(list(programs))).all():
+            courses_by_program[course.program_id].append(course)
+        curricula = {
+            program_id: monitoring_curriculum_courses(program, courses_by_program[program_id])
+            for program_id, program in programs.items()
+        }
+        for item in block:
+            audit = compute_course_audit(
+                item, records=records_by_student.get(item.id, {}), required_courses=curricula[item.program_id],
+            )
+            result[item.id] = comprehensive_exam_eligibility(item, audit=audit)
+    return result
 
 
 def monitoring_research_milestones(student: Student) -> dict:
@@ -12805,7 +12852,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/students")
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def students_list():
-        query = Student.query.join(Program)
+        query = Student.query.join(Program).options(contains_eager(Student.program))
         q = request.args.get("q", "").strip()
         if q:
             pattern = f"%{q}%"
@@ -12838,7 +12885,9 @@ def register_routes(app: Flask) -> None:
         elif student_status == "loa":
             query = query.filter(on_leave_clause())
         elif student_status == "compre-eligible":
-            eligible_ids = [student.id for student in query.all() if comprehensive_exam_eligibility(student)["eligible"]]
+            everyone = query.all()
+            eligibility = comprehensive_eligibility_for(everyone)
+            eligible_ids = [student.id for student in everyone if eligibility[student.id]["eligible"]]
             query = query.filter(Student.id.in_(eligible_ids or [-1]))
 
         page = max(request.args.get("page", 1, type=int), 1)
@@ -12850,9 +12899,13 @@ def register_routes(app: Flask) -> None:
             .limit(page_size)
             .all()
         )
+        eligibility = comprehensive_eligibility_for(items)
         return jsonify(
             {
-                "items": [{**student_directory_brief(s), "compre_eligibility": comprehensive_exam_eligibility(s)} for s in items],
+                "items": [
+                    {**brief, "compre_eligibility": eligibility[student.id]}
+                    for student, brief in zip(items, student_directory_briefs(items))
+                ],
                 "total": total,
                 "page": page,
                 "page_size": page_size,
@@ -24352,13 +24405,28 @@ def student_search_label(student: Student | None) -> str:
     return f"{student.student_number} - {student.last_name}, {student.first_name} - {student.program.code}"
 
 
-def student_directory_brief(student: Student) -> dict:
-    payload = student_brief(student)
-    research_case = (
-        ResearchCase.query.filter_by(student_id=student.id)
-        .order_by(ResearchCase.opened_at.desc())
-        .first()
-    )
+def student_directory_briefs(students: list[Student]) -> list[dict]:
+    """student_directory_brief() for a page of students with the lookups done once for the whole page."""
+    if not students:
+        return []
+    active_term = get_active_term()
+    cases: dict[int, ResearchCase] = {}
+    for case in (
+        ResearchCase.query.filter(ResearchCase.student_id.in_([item.id for item in students]))
+        .order_by(ResearchCase.opened_at.desc()).all()
+    ):
+        cases.setdefault(case.student_id, case)
+    return [student_directory_brief(item, research_case=cases.get(item.id), active_term=active_term) for item in students]
+
+
+def student_directory_brief(student: Student, research_case=_TERM_NOT_GIVEN, active_term=_TERM_NOT_GIVEN) -> dict:
+    payload = student_brief(student, active_term)
+    if research_case is _TERM_NOT_GIVEN:
+        research_case = (
+            ResearchCase.query.filter_by(student_id=student.id)
+            .order_by(ResearchCase.opened_at.desc())
+            .first()
+        )
     gate = research_case.current_gate if research_case else None
     stage_by_gate = {
         "Form 1 - Title Defense": "Title Defense",
@@ -33303,11 +33371,14 @@ def readmission_requirements() -> list[str]:
     ]
 
 
-def compute_course_audit(student: Student) -> dict:
+def compute_course_audit(student: Student, *, records: dict | None = None, required_courses: list | None = None) -> dict:
     # Builds the student's curriculum picture from required program subjects and
-    # recorded subject statuses.
-    required_courses = monitoring_curriculum_courses(student.program)
-    records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
+    # recorded subject statuses. A caller that already loaded a page of students' records and curricula
+    # passes them in (see comprehensive_eligibility_for) so the page costs a fixed number of queries.
+    if required_courses is None:
+        required_courses = monitoring_curriculum_courses(student.program)
+    if records is None:
+        records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
     completed = []
     current = []
     missing = []

@@ -427,6 +427,16 @@ class V53Backend2Tests(unittest.TestCase):
                 expected = comprehensive_exam_eligibility(db.session.get(Student, row["id"]))
                 self.assertEqual(row["compre_eligibility"], expected, row["id"])
         self.assertTrue(any(row["program_code"] for row in rows))
+        # the "eligible for the comprehensive exam" filter keeps exactly the students the per-student rule keeps
+        listed = staff.get("/api/students", query_string={"student_status": "compre-eligible", "page_size": 100}).get_json()
+        with app.app_context():
+            expected = {
+                student.id for student in Student.query.all()
+                if comprehensive_exam_eligibility(student)["eligible"]
+            }
+        self.assertLessEqual(len(expected), 100)
+        self.assertEqual({row["id"] for row in listed["items"]}, expected)
+        self.assertEqual(listed["total"], len(expected))
 
 
 if __name__ == "__main__":
