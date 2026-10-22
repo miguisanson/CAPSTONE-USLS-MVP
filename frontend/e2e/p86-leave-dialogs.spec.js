@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packets P5.3-P5.5 (Phase 5 design system, stream D): pins what the leave / process dialogs DO, so moving
 // pages/leave/* and pages/process/* onto the component library (Modal, DecisionPanel, InlineNotice, HistoryPanel,
 // SearchInput, StatusChip, DataTable) cannot change it. Written against the old code; it must pass on both.

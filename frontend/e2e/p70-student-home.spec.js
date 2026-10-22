@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P7.0 (owner decision IM19, one action-first home layout for every role): pins what the STUDENT home shows.
 // Written BEFORE the change and red on the old home. Through the real UI, as three demo students (read-only: nothing is
 // clicked except navigation links, no data changes):

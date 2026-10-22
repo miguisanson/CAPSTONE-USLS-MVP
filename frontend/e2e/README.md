@@ -94,6 +94,21 @@ passes alone can fail in the full run because another spec answered an invitatio
 2. A spec that changes data uses its own demo student (see `section-j.spec.js`) and never one another spec reads.
 3. Before a packet merges, its new spec must pass in the combined run
    `node scripts/e2e.mjs test --project=sweep --project=section-j --project=pages`, not only alone.
+4. Every spec starts with a header line `// e2e-writes: <keys>` (or `none`). The guard `e2e/support/check-ownership.mjs`
+   runs at the start of every `playwright test` (from `playwright.config.js`) and fails when a spec has no header, when two
+   specs declare the same key, or when a `none` spec calls a data-changing API directly. Run it alone with
+   `node e2e/support/check-ownership.mjs`. Who writes and reads what: [`DATA-OWNERSHIP.md`](DATA-OWNERSHIP.md).
+5. Sessions are shared too: never sign out or re-login an account another spec uses (see DATA-OWNERSHIP.md, "Sessions").
+
+### Order checks
+
+The default order hides collisions that point one way. Before a merge, also run:
+
+```bash
+cd frontend
+node scripts/e2e.mjs test --project=sweep --project=section-j --project=pages --workers=1   # exact file order
+node e2e/support/reverse-run.mjs --workers=1        # reverse file order (pages first, section-j, sweep last)
+```
 
 ## Section J bug tests (data-changing)
 

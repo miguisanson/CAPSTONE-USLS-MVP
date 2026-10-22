@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P6.5 (Phase 5 migration of pages/CourseAdjustments.jsx, CourseOfferings.jsx, CoursePlanning.jsx,
 // TermSettings.jsx, PolicyDocuments.jsx; issues I-069 = review F-15, I-081 part = F-27, I-063 part = F-09).
 //

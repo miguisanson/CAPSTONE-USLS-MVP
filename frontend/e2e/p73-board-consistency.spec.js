@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P7.3 (owner decision IM24, issue I-049): boards of the same kind behave the same.
 // The owner could move Leave of Absence and Readmission cards but not AWOL & Residency cards, and nothing said why.
 // Cause: an "AWOL flagged" card waits for the student (no step for staff), so the board silently refuses to drag it.

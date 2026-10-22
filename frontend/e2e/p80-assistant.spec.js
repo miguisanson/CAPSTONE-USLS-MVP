@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Behaviour pin for the Policy Assistant rebuild (owner decision IM21, packet pkt/assistant).
 // There is no Gemini key in the e2e run, so this exercises the offline path and every UI state: the chat list, the
 // "Offline answer" label, the sources under an answer (document, page, section), the calm "not covered" state, a

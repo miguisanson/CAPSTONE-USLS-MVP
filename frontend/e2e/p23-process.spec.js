@@ -1,3 +1,4 @@
+// e2e-writes: coursework-report-draft
 // Packet P2.3 (Phase 5 design system, shared components stream): pins what the shared process components DO, so moving
 // ProcessGates.jsx, ProcessBoardPage.jsx, StageBoard.jsx, leaveStatus.jsx and WorkflowTimeline.jsx onto the component
 // library (InlineNotice, StatusChip, Stepper, PageHeader) cannot change it. Written against the old code; it must pass on

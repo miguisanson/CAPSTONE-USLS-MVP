@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Page sweep: for each role, sign-in is reused from auth.setup.js, the sidebar is READ at runtime,
 // and every link is visited at three viewports. Read-only: nothing is clicked except navigation.
 import { test, expect } from "@playwright/test";

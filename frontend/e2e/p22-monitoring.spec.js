@@ -1,3 +1,4 @@
+// e2e-writes: monitoring-created
 // Packet P2.2 (Phase 5 design system, shared components): pins what the Monitoring Sheet dialogs and the calendar
 // views DO, so moving them onto Modal / Drawer / StatusChip / Field / Button cannot change it. It was written against
 // the old code and must pass on both. Through the real UI, as GS staff (and a faculty member for the calendar):

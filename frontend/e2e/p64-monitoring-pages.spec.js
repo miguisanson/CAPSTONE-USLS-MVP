@@ -1,3 +1,4 @@
+// e2e-writes: bea-salonga-flag
 // Behaviour pin for packet P6.4 (Phase 5 migration of pages/MonitoringGrid.jsx, pages/EnrollmentClassList.jsx,
 // pages/AdviserRecordCard.jsx). Written BEFORE the migration and green on the old code, so it proves the migrated pages
 // keep the same headings, filters, table columns, rows, flag dialog and form rules. Everything is reached through the

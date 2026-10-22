@@ -1,3 +1,4 @@
+// e2e-writes: clarissa
 // Packet P7.9 (senior review F-20 = I-074, F-30 = I-084, and I-106 for the Dean): the Dean's pages tell one story.
 // Written BEFORE the change; red on the old code. Through the real UI, as the Dean (read only; the API answers that
 // need a fixed scenario are edited in the browser with page.route, so no other spec's data matters):
@@ -68,9 +69,9 @@ async function apiAs(playwright, email) {
   return ctx;
 }
 
-/** Martin Gonzales (used only by p72 and this spec) files a Leave of Absence and staff forward it, so it waits on the Dean. */
+/** Clarissa (enrollment-clarissa, used only by this spec; p72 has Martin) files a Leave of Absence and staff forward it, so it waits on the Dean. */
 async function leaveToDean(playwright) {
-  const student = await apiAs(playwright, "enrollment.martin@usls.edu.ph");
+  const student = await apiAs(playwright, "enrollment.clarissa@usls.edu.ph");
   const filed = await student.post("/api/student-portal/requests/leave-of-absence", {
     data: { effective_start: "AY 2026-2027 2nd Semester", effective_end: "AY 2026-2027 2nd Semester", reason_category: "Medical / health", reason_remarks: "Surgery and recovery." },
   });
@@ -81,7 +82,7 @@ async function leaveToDean(playwright) {
     expect(moved.ok(), "staff forward the leave").toBeTruthy();
     await staff.dispose();
   } else {
-    expect(filed.status(), `Martin files a leave: ${await filed.text()}`).toBe(409); // a re-run: already with the Dean
+    expect(filed.status(), `Clarissa files a leave: ${await filed.text()}`).toBe(409); // a re-run: already with the Dean
   }
   await student.dispose();
 }

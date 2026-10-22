@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P7.6 (issues I-076, I-077, I-078, I-080; review findings F-22, F-23, F-24, F-26).
 // One vocabulary: a page has ONE name, and the sidebar link, the breadcrumb and the page's own title all say it.
 // Written BEFORE the change; red on the old code. Read-only, through the real UI, every role:

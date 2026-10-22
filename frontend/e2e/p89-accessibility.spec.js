@@ -1,3 +1,4 @@
+// e2e-writes: none
 // UX research check 15 / issue I-092 (review F-38): an automated accessibility scan with axe-core
 // (@axe-core/playwright, tags wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa) on the pages a thesis panel will open:
 // every role's home, one board (Leave of Absence, staff), one list (Students), one record (a student), one form with its

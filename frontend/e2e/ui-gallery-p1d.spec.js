@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Component gallery proof for packet P1d (Phase 5, UI-SPEC sections 4 and 5): DataTable and the Feedback set
 // (EmptyState, Spinner, Skeleton, InlineNotice, SearchInput, Pagination). Opens /__ui at 1366, 1920 and 390 and
 // checks the P1d block of the gallery (data-gallery="p1d"):

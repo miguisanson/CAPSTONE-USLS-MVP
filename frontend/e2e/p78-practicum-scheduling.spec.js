@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet wf4 (Phase 5 P7.5, I-063 / I-089 / I-102): pins what the Practicum board, Defense scheduling and the availability
 // workspace show and do BEFORE they are moved onto the component library. Written first and green on the old markup; it
 // must stay green after the restyle, except the lines marked CHANGED BY WF4 (listed in the commit that changes them).

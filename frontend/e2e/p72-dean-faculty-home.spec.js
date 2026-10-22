@@ -1,3 +1,4 @@
+// e2e-writes: martin
 // Packet P7.2 (owner decisions IM19 + AD7): pins the Dean home and the faculty home on the shared RoleHome layout.
 // Written BEFORE the change and red on the old homes. Through the real UI:
 //   - Dean: the first section is "Needs your action" and lists the decisions waiting on the Dean, oldest first, each

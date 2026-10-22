@@ -1,3 +1,4 @@
+// e2e-writes: isabel-flores, dean-queue-graduation
 // Packet P3.3 (Phase 5 design system, dean stream, last packet): pins what the Dean's report pages and the graduation page
 // DO that the sweep only photographs, so the restyle of DeanReportPages.jsx and DeanGraduationPage.jsx (and the stage-check
 // list in DeanParts.jsx) onto the component library cannot change it. Written against the old code; it must pass on both.

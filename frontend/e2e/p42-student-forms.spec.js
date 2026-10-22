@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P4.2 (Phase 5 design system, student stream): pins what the student request forms DO, so moving
 // pages/student/{RequestForms,ResearchForms,CompletionForms}.jsx onto the component library (Field/Input/Select/Textarea,
 // InlineNotice, StatusChip, Button) cannot change it. Written against the old code; it passes on both.
@@ -39,6 +40,9 @@ async function formPage(browser, mutate, { failPath, failMessage = "Spec: the se
   const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 768 } });
   const res = await context.request.post("/api/auth/login", { data: { email: EMAIL, password: PASSWORD } });
   expect(res.ok(), `sign in as ${EMAIL}`).toBeTruthy();
+  // The session must be usable before the page starts (a page that finds no user shows the Login screen, which once failed a
+  // whole test with "main" holding the sign-in form). Sessions are per sign-in, so no other spec can end this one (DATA-OWNERSHIP.md).
+  await expect.poll(async () => (await (await context.request.get("/api/auth/me")).json()).user?.email, { message: "the new session is signed in" }).toBe(EMAIL);
   const info = { studentId: null };
   const writes = [];
   await context.route("**/api/student-portal/context", async (route) => {

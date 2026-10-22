@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P7.7 (senior review F-11 = I-065, and I-051): Graduation is the third board style. It must look and behave like
 // the Leave of Absence board (ProcessBoardPage + StageBoard).
 // Cause: GraduationRoster built its own column header (numbered "1 · ... — Awaiting ...", a paragraph of description,

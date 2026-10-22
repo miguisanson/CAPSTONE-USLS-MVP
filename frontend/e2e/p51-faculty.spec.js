@@ -1,3 +1,4 @@
+// e2e-writes: faculty-availability
 // Behaviour pin for packets P5.1 and P5.2 (Phase 5 migration of pages/faculty/*: FacultyPages, FacultyClasses,
 // FacultyAdviserPanel, FacultyInvitationsPage, FacultyCalendar, FacultyAvailabilityEditor, FacultyContext, FacultyRoutes).
 // Written BEFORE the migration and green on the old code, so it proves the migrated pages keep the same headings, data,
@@ -204,7 +205,15 @@ test.describe("My Advisees", () => {
     await expect(page.getByRole("heading", { name: "Advisees", exact: true })).toBeVisible();
     await expect(main(page).getByText(/\d+ of \d+ advisees/).first()).toBeVisible();
     await expect(main(page).getByText(/You are at the limit|places? left/)).toBeVisible();
-    await expect(page.getByText("No adviser requests are waiting for you.")).toBeVisible();
+    // The inbox as the API gives it now (p63 appoints advisers to this faculty member, so a request may be waiting):
+    // empty means the empty note is shown; otherwise the note is gone and every waiting student is on the page.
+    const requests = await (await page.request.get("/api/faculty-portal/adviser-requests")).json();
+    const waitingRequests = [...(requests.inbox || []), ...(requests.consents || [])];
+    if (waitingRequests.length === 0) await expect(page.getByText("No adviser requests are waiting for you.")).toBeVisible();
+    else {
+      await expect(page.getByText("No adviser requests are waiting for you.")).toHaveCount(0);
+      for (const item of waitingRequests) await expect(main(page).getByText(item.student_name, { exact: true }).first(), `request of ${item.student_name}`).toBeVisible();
+    }
     await expect(page.getByRole("heading", { name: "Your advisees" })).toBeVisible();
     await expect(page.getByText("Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1.")).toBeVisible();
 

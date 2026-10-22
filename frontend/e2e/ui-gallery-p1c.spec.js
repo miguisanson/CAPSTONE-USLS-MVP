@@ -1,3 +1,4 @@
+// e2e-writes: none
 // P1c proof (Phase 5, UI-SPEC section 4 "Modal" row and section 5 "Modals"): Modal sizes sm/md/lg/xl, Drawer and the
 // ConfirmProvider that is built on Modal. Opens each one from the /__ui gallery at 1366x768 and 390x844 and checks:
 //   - the panel fits the viewport; header and footer stay put while the body scrolls; the footer button is reachable;

@@ -1,3 +1,4 @@
+// e2e-writes: none
 // NEGATIVE CONTROL. Runs the same checker as the sweep against a deliberately broken target and
 // MUST fail. Only matched when E2E_NEGATIVE=1 (`npm run e2e:negative`). If this ever passes, the
 // checker has stopped detecting problems and the sweep result cannot be trusted.

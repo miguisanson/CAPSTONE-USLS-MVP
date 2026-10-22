@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P6.6 + I-116 (pkt/p66): pins the student record, the Policy Assistant, Change password and the sign-in page,
 // and the three small staff-home / Work Queue fixes of I-116.
 // Part 1 ("pins") was written BEFORE the migration and is green on the old pages: it proves the move onto the component
@@ -233,7 +234,9 @@ test.describe("sign-in page", () => {
 
   test("pin: resetting a demo student signs in first, resets, then signs out (I-055); the call is mocked", async ({ page, context }) => {
     const students = (await (await context.request.get("/api/auth/demo-students")).json()).items;
-    const target = students.find((s) => s.workflow === "withdrawal") || students[0];
+    // Elena Navarro (withdrawal-elena) is used by no other spec: this test really signs in as her and signs out her own session
+    // (the server ends only that one session, but no other spec's account is touched either way).
+    const target = students.find((s) => s.key === "withdrawal-elena") || students.find((s) => s.workflow === "withdrawal") || students[0];
     expect(target, "a demo student exists").toBeTruthy();
     const calls = [];
     await page.route("**/api/auth/demo-students/*/reset", (route) => {

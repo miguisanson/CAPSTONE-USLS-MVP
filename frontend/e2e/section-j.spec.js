@@ -1,3 +1,4 @@
+// e2e-writes: joshua, miguel, paolo
 // Section J bugs from the defense walkthrough (DEFENSE_REVISIONS.md J1, J4, J8; ISSUES.md I-001, I-004, I-008).
 // One test per bug. Each walks the real UI as the role that met the bug. Unlike the read-only sweep these
 // tests CHANGE data (they save a dropped subject, endorse a Form 1, mark a practicum report reviewed) - the

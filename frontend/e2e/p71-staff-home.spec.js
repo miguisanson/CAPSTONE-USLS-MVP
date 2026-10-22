@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P7.1 (owner decisions IM19 + AD7 + IM20): pins the back-office home and the analytics that moved to Reports.
 // Written BEFORE the change and red on the old home. Through the real UI, read-only (nothing but navigation and
 // dialogs is touched, no data changes):

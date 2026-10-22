@@ -1,3 +1,4 @@
+// e2e-writes: andrea
 // Packet P3.1 (Phase 5 design system, dean stream): pins what the Dean's case page DOES, so the restyle onto
 // Modal / DataTable / StatusChip / DecisionPanel / HistoryPanel cannot change it. It was written against the old
 // code and must pass on both. Through the real UI, as the Dean:

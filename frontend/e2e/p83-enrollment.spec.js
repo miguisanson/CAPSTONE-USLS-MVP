@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Behaviour pin for packet P8.3 (Phase 5 migration of pages/Enrollment.jsx: P6.7 modals + Field, P6.8 tables + history,
 // plus I-081 "developer jargon widget" and I-082 "two student pickers"). Part 1 was written BEFORE the migration and is
 // green on the old code, so it proves the migrated page keeps the same heading, filters, offered-subjects table, the

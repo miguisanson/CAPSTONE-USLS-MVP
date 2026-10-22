@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P2.4 (Phase 5, UI-SPEC section 8): the shared parts that appear on many pages -- the Subject-needs report
 // (Course Adjustments), the Handoff import result, "Rules applied on this screen", the assistant's sources, the case
 // discussion thread, and the defense scheduling parts (availability request panel, slot check, calendar page and its

@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Behaviour pin for packet P6.1 (Phase 5 migration of pages/Students.jsx, pages/Dashboard.jsx, pages/WorkQueue.jsx).
 // Written BEFORE the migration and green on the old code, so it proves the migrated pages keep the same data, the same
 // API query parameters, the same filters, the same links and the same actions. It reaches everything through the real

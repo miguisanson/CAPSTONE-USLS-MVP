@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P7.4 (issues I-067, I-088; senior review F-13, F-34): a board must not hide its columns without a cue,
 // and an empty column must look like every other empty state.
 //
