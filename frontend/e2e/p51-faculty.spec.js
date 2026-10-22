@@ -201,11 +201,11 @@ test.describe("My Advisees", () => {
     await expect(page.getByRole("link", { name: "Signatures", exact: true })).toHaveCount(1); // I-079: one Signatures action, in the page header
     await expect(page.getByRole("link", { name: "Signatures", exact: true })).toHaveAttribute("href", "/faculty-portal/signatures");
     // the adviser panel: meter and the empty inbox note
-    await expect(page.getByRole("heading", { name: "Advisees", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Advisee places", exact: true })).toBeVisible(); // conE: the meter card no longer repeats the page title
     await expect(main(page).getByText(/\d+ of \d+ advisees/).first()).toBeVisible();
     await expect(main(page).getByText(/You are at the limit|places? left/)).toBeVisible();
     await expect(page.getByText("No adviser requests are waiting for you.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Your advisees" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contracts and signatures" })).toBeVisible();
     await expect(page.getByText("Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1.")).toBeVisible();
 
     // I-079: ONE table, every student once, all the columns.
@@ -792,8 +792,7 @@ test.describe("Assigned Classes", () => {
   test("rosters: header, read-only note, term and subject selects, roster table, print button, empty state", async ({ page }) => {
     const firstCount = await rosterRows(page, () => openFromSidebar(page, "Assigned Classes", "Assigned Classes"));
     await expect(page.getByText("Class rosters for your assigned subjects.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Assigned class rosters" })).toBeVisible();
-    await expect(page.getByText("Review assigned subjects and students.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Assigned class rosters" }), "conE: the card title that repeated the page title is gone").toHaveCount(0);
     await expect(page.getByText("Grades and subject outcomes are encoded and maintained in their authorized source systems. The Monitoring Sheet is a synchronized, read-only view.")).toBeVisible();
 
     const term = page.getByLabel("Semester");

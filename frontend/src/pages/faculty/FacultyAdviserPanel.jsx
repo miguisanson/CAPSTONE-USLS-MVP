@@ -21,7 +21,7 @@ function AdviseeMeter({ meter }) {
   const full = active >= max;
   return (
     <Card>
-      <SectionTitle title="Advisees" subtitle={`You can advise at most ${max} students.`} icon={Users} />
+      <SectionTitle title="Advisee places" subtitle={`You can advise at most ${max} students.`} icon={Users} />
       <div className="space-y-2">
         <p className={`text-sm font-semibold ${full ? "text-amber-800" : "text-ink"}`}>
           {active} of {max} advisees{pending > 0 ? ` · ${pending} pending` : ""}
@@ -266,7 +266,7 @@ function AdviseeTable({ rows }) {
   const phone = useIsPhone();
   return (
     <Card>
-      <SectionTitle title="Your advisees" subtitle="Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1." icon={Handshake} />
+      <SectionTitle title="Contracts and signatures" subtitle="Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1." icon={Handshake} />
       {phone && rows.length > 0 ? (
         <AdviseeCards rows={rows} />
       ) : (

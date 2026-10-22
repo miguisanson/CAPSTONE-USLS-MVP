@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClipboardCheck, Lock, Printer } from "lucide-react";
 import { api } from "../../api";
-import { Button, DataTable, Field, InlineNotice, SectionTitle, Select, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, Field, InlineNotice, Select, StatusChip } from "../../components/ui/index.js";
 import { printDataTable } from "../../lib/print";
 
 const ROSTER_COLUMNS = [
@@ -31,9 +31,11 @@ export function FacultyClasses({ subjects, terms }) {
   useEffect(() => {
     if (!courseId || !term) return;
     setNotice("");
+    let stale = false; // an answer for an earlier subject or semester must not replace the one now chosen
     api.courseAuditRoster(courseId, term).then((res) => {
-      setRoster(res);
-    }).catch((err) => setNotice(err.message));
+      if (!stale) setRoster(res);
+    }).catch((err) => { if (!stale) setNotice(err.message); });
+    return () => { stale = true; };
   }, [courseId, term]);
 
   function printRoster() {
@@ -52,7 +54,7 @@ export function FacultyClasses({ subjects, terms }) {
 
   return (
     <div>
-      <SectionTitle title="Assigned class rosters" subtitle="Review assigned subjects and students." icon={ClipboardCheck} />
+      {/* No card title here: the page header already says "Assigned Classes" and describes it (consistency finding 11). */}
       <div className="space-y-4">
         <InlineNotice tone="neutral" icon={Lock}>
           <span className="font-normal">

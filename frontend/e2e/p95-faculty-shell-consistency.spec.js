@@ -147,7 +147,7 @@ test.describe("finding 15: Work Queue", () => {
     expect((await titles())[0]).toBe("Zulu decision on the withdrawal request");
     await expect(main(page).locator("thead th", { hasText: "Task" })).toHaveAttribute("aria-sort", "descending");
     await expect(main(page).locator("thead th", { hasText: "Action" }).getByRole("button")).toHaveCount(0);
-    for (const name of ["Owner", "Student", "Due", "Status"]) await expect(main(page).getByRole("button", { name, exact: true }), `${name} sorts`).toHaveCount(1);
+    for (const name of ["Owner", "Student", "Due", "Status"]) await expect(main(page).locator("thead th").getByRole("button", { name, exact: true }), `${name} sorts`).toHaveCount(1);
   });
 
   test("the staff Faculty list sorts too", async ({ page }) => {

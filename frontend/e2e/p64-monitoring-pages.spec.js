@@ -519,7 +519,7 @@ test.describe("Record an adviser appointed outside the portal (GS staff)", () =>
     });
 
     await page.goto("/");
-    await sidebarLink(page, "4 · Research Gate").click();
+    await sidebarLink(page, "5 · Research Gate").click();
     await page.getByRole("tab", { name: "Adviser designation" }).click();
     await expect(page).toHaveURL(/view=adviser/);
 

@@ -5,7 +5,7 @@
 //            scrolled into view in the sidebar when the page loads (the last items used to be cut off with no sign of them);
 //            the phone menu (drawer) obeys the same rule on a short screen;
 //   - I-101  a role that may open Course Audit (staff, academic coordinator, administrator) has a sidebar link for it,
-//            between "3 · Enrollment" and "4 · Research Gate", and it opens the page; the other roles do not get the link;
+//            between "3 · Enrollment" and "5 · Research Gate", and it opens the page; the other roles do not get the link;
 //   - I-112  the faculty pages' titles use the one-name table (Title Case) and Research Gate's title is "Research Gate".
 import { test, expect } from "@playwright/test";
 import { join } from "node:path";
@@ -136,13 +136,13 @@ test.describe("I-101: Course Audit has a sidebar entry for the roles that may op
         await page.goto(entry.home);
         await expect(page.locator("aside:visible nav a").first()).toBeVisible();
         const labels = (await page.locator("aside:visible nav a").allInnerTexts()).map(norm);
-        const audit = labels.findIndex((label) => /^Course Audit/.test(label));
+        const audit = labels.findIndex((label) => /^4 · Course Audit/.test(label)); // conE: Course Audit is step 4 (every lifecycle step is numbered)
         expect(audit, `sidebar: ${labels.join(" | ")}`).toBeGreaterThanOrEqual(0);
         const enrollment = labels.findIndex((label) => /^3 · Enrollment/.test(label));
-        const gate = labels.findIndex((label) => /^4 · Research Gate/.test(label));
+        const gate = labels.findIndex((label) => /^5 · Research Gate/.test(label));
         expect(audit).toBeGreaterThan(enrollment);
         expect(audit).toBeLessThan(gate);
-        await page.locator("aside:visible nav a", { hasText: /^\s*Course Audit/ }).click();
+        await page.locator("aside:visible nav a", { hasText: /^\s*4 · Course Audit/ }).click();
         await expect(page).toHaveURL(/\/workflow\/course-audit$/);
         await expect(page.locator("main").getByRole("heading", { level: 1, name: "Course Audit", exact: true })).toBeVisible();
         const crumbs = (await page.locator('nav[aria-label="Breadcrumb"] li').allInnerTexts()).map(norm);

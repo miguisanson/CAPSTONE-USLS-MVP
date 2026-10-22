@@ -7,6 +7,7 @@ import { Button, Card, DataTable, EmptyState, Field, InlineNotice, PageHeader, P
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { useAuth } from "../auth";
 import { PAGE, openPageLabel } from "../lib/labels.js";
+import { taskTarget } from "../lib/staffHome.js";
 
 const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
 const PAGE_SIZE = 50;
@@ -152,7 +153,7 @@ const AT_RISK_COLUMNS = [
     align: "right",
     cell: (row) => (
       <Link to={`/students/${row.student_id}`} className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
-        Open <ArrowRight className="h-3.5 w-3.5" />
+        {openPageLabel(`/students/${row.student_id}`)} <ArrowRight className="h-3.5 w-3.5" />
       </Link>
     ),
   },
@@ -200,10 +201,7 @@ function TasksPanel({ user }) {
     {
       key: "action",
       header: "Action",
-      cell: (task) =>
-        task.action_url ? (
-          <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">{openPageLabel(task.action_url, task.action_label || "Open")}</Link>
-        ) : null,
+      cell: (task) => <ActionCell task={task} role={user?.role} />,
     },
   ];
 
@@ -250,6 +248,20 @@ function TasksPanel({ user }) {
       )}
     </div>
   );
+}
+
+// The Action column always says something (finding 15): the page that handles the task, or who acts when it is not this
+// office's. A Dean task has a Dean-only page the other roles cannot open, so it says who decides.
+function ActionCell({ task, role }) {
+  if (task.action_url) {
+    return <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">{openPageLabel(task.action_url, task.action_label || "Open")}</Link>;
+  }
+  const owner = String(task.owner_role || "").trim();
+  if (owner === "Dean") return <span className="text-slate-600">Dean decides</span>;
+  if (owner === "Student") return <span className="text-slate-600">Student acts</span>;
+  const target = taskTarget(task, role);
+  if (target.to.split("?")[0] === "/work-queue") return <span className="text-slate-500">No linked page</span>;
+  return <Link to={target.to} className="font-semibold text-brand-700 hover:underline">{target.label}</Link>;
 }
 
 function ConflictsPanel({ state }) {

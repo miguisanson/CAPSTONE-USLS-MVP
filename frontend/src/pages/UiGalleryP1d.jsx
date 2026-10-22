@@ -43,7 +43,7 @@ const STUDENT_COLUMNS = [
   { key: "status", header: "Status", sortable: true, cell: (r) => <StatusChip status={r.status} size="sm" />, sortValue: (r) => r.status },
   { key: "units", header: "Units", sortable: true, align: "right" },
   { key: "updated", header: "Updated" },
-  { key: "adviser", header: "Adviser", hideBelow: "lg" },
+  { key: "adviser", header: "Adviser", sortable: false, hideBelow: "lg" },
 ];
 
 const SERVER_ROWS = Array.from({ length: 12 }, (_, k) => ({ id: k + 1, name: `Server row ${pad(k + 1)}`, note: `Page data ${k + 1}` }));
