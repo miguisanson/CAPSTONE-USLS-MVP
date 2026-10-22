@@ -3664,7 +3664,9 @@ RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Dropped",
     "Withdrawn",
 }
-NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken", "Planned"}
+# "Not Started" is what the demo seed/reset and the withdrawal and leave resets write for a subject
+# the student has not taken; the monitoring sheet already treats it as "no row" (I-002 / J2).
+NOT_TAKEN_SUBJECT_STATUSES = {"", "Missing", "Not Taken", "Not Started", "Planned"}
 # Statuses a person may type into the Monitoring Sheet in the portal. Grades and
 # pass/fail outcomes stay out of scope; "Missing" means "no row" and is what a
 # removed row goes back to.
