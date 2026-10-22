@@ -137,7 +137,13 @@ class ReportsIm20Base(unittest.TestCase):
                 transaction_slug="withdrawal", student_id=cls.s5.id, actor_role="Student", result="Withdrawal closed",
                 next_owner="None", created_at=now_utc() - timedelta(days=50),
             )
-            db.session.add_all([waiting, closed])
+            # An import event is a record of what happened, not a request anybody has to answer.
+            imported = TransactionLog(
+                transaction_slug="student-handoff", student_id=cls.s7.id, actor_role="Graduate School Staff",
+                result="Standing imported from the monitoring sheet", next_owner="Academic Coordinator",
+                created_at=now_utc() - timedelta(days=60),
+            )
+            db.session.add_all([waiting, closed, imported])
             cls.waiting_since = (waiting.created_at).date()
 
             # Terms: one covering 45..15 days ago, one covering 14 days ago .. 60 days ahead.
@@ -205,7 +211,7 @@ class ReportsIm20Base(unittest.TestCase):
 
     def export(self, name, fmt, role="staff", **params):
         response = self.client(role).get(f"/api/reports/{name}", query_string={**params, "format": fmt})
-        self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+        self.assertEqual(response.status_code, 200, response.data[:300])
         return response
 
     @staticmethod
@@ -262,7 +268,7 @@ class CohortReportTests(ReportsIm20Base):
         labels = {column["key"]: column["label"] for column in payload["columns"]}
         result = {}
         for row in payload["rows"]:
-            counts = {labels[key]: value for key, value in row.items() if key in labels and labels[key] not in ("Program", "Entry", "Students")}
+            counts = {labels[key]: value for key, value in row.items() if key in labels and key not in ("program", "entry", "total")}
             result[(row["program"], row["entry"])] = (row["total"], {stage: n for stage, n in counts.items() if n})
         return result
 
@@ -309,6 +315,9 @@ class OverdueReportTests(ReportsIm20Base):
         self.assertEqual((request["kind"], request["office"]), ("Pending request", "Dean"))
         self.assertIn("Withdrawal", request["item"])
         self.assertEqual(request["since"], self.waiting_since.isoformat())
+
+    def test_a_monitoring_import_is_not_a_pending_request(self):
+        self.assertNotIn(self.ids["s7"], self.student_ids(self.report("overdue")))
 
     def test_never_lists_a_task_not_yet_due_a_done_task_or_a_closed_request(self):
         ids = self.student_ids(self.report("overdue"))
@@ -370,7 +379,7 @@ class GraduationReportTests(ReportsIm20Base):
         self.assertEqual(sorted(rows), self.expected_ids("s4", "s6"))
         batched = rows[self.ids["s6"]]
         self.assertEqual(batched["batch_status"], "Dean Approved")
-        self.assertEqual(batched["review_window"], "2025-2026")
+        self.assertEqual(batched["review_window"], "AY 2025-2026")  # the app writes a review window as "AY <year>-<year>" everywhere
         unbatched = rows[self.ids["s4"]]
         self.assertEqual(unbatched["batch_status"], "Not in a batch")
         for row in rows.values():
@@ -440,7 +449,14 @@ class ReportExportTests(ReportsIm20Base):
         self.assertLess(self.report("at-risk", **params)["count"], everything)
 
     def test_pdf_is_a_valid_document_listing_the_filtered_rows(self):
-        import fitz
+        import unicodedata
+
+        import pymupdf as fitz
+
+        def pdf_text(data):
+            # The PDF font joins "ffi" and "fi" into one glyph; fold them back so the words can be compared.
+            pages = [page.get_text() for page in fitz.open(stream=data, filetype="pdf")]
+            return unicodedata.normalize("NFKC", chr(10).join(pages))
 
         for name in REPORTS:
             response = self.export(name, "pdf", **self.filters_for(name))
@@ -448,14 +464,12 @@ class ReportExportTests(ReportsIm20Base):
             self.assertIn(".pdf", response.headers["Content-Disposition"], name)
             data = response.get_data()
             self.assertTrue(data.startswith(b"%PDF-"), name)
-            document = fitz.open(stream=data, filetype="pdf")
-            text = "\n".join(page.get_text() for page in document)
+            text = pdf_text(data)
             payload = self.report(name, **self.filters_for(name))
             self.assertIn(payload["title"], text, name)
             for column in payload["columns"][:2]:
                 self.assertIn(column["label"], text, name)
-        document = fitz.open(stream=self.export("at-risk", "pdf", program_id=self.rb_id).get_data(), filetype="pdf")
-        text = "\n".join(page.get_text() for page in document)
+        text = pdf_text(self.export("at-risk", "pdf", program_id=self.rb_id).get_data())
         self.assertIn("Dan Dela", text)
         self.assertNotIn("Ana Alpha", text)
 
