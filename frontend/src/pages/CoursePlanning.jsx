@@ -1,6 +1,6 @@
-import { BookOpenCheck, SlidersHorizontal } from "lucide-react";
+import { BookOpenCheck, ClipboardList, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { Card } from "../components/ui";
+import { PageHeader } from "../components/ui/index.js";
 import { CourseworkReportPanel } from "../components/ProcessGates";
 import { useAuth } from "../auth";
 import PolicyRules from "../components/PolicyRules";
@@ -21,47 +21,44 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
   }
 
   return (
-    <div className="space-y-5 animate-fade-up">
-      <Card className="p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Academic lifecycle · Step 2</p>
-            <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{PAGE.courseAdjustments}</h1>
-            <p className="mt-1 max-w-3xl text-sm text-slate-600">
-              Review subject demand, decide what to offer, then complete the semester schedule and faculty assignments in one workspace.
-            </p>
-          </div>
-          <div className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1 lg:w-auto" role="tablist" aria-label="Course adjustment screens">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "adjustments"}
-              onClick={() => switchView("adjustments")}
-              className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${view === "adjustments" ? "bg-white text-brand-700 shadow-sm" : "text-slate-600 hover:text-ink"}`}
-            >
-              <SlidersHorizontal className="h-4 w-4" /> Demand & adjustments
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "offerings"}
-              onClick={() => switchView("offerings")}
-              className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${view === "offerings" ? "bg-white text-brand-700 shadow-sm" : "text-slate-600 hover:text-ink"}`}
-            >
-              <BookOpenCheck className="h-4 w-4" /> Offering setup
-            </button>
-          </div>
-        </div>
-      </Card>
+    <div className="page-stack animate-fade-up">
+      <PageHeader
+        icon={ClipboardList}
+        title={PAGE.courseAdjustments}
+        description="Review subject demand, decide what to offer, then complete the semester schedule and faculty assignments in one workspace."
+      />
+
+      <div className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1 lg:w-fit" role="tablist" aria-label="Course adjustment screens">
+        <TabButton active={view === "adjustments"} onClick={() => switchView("adjustments")} icon={SlidersHorizontal}>
+          Demand & adjustments
+        </TabButton>
+        <TabButton active={view === "offerings"} onClick={() => switchView("offerings")} icon={BookOpenCheck}>
+          Offering setup
+        </TabButton>
+      </div>
 
       <PolicyRules process="course_adjustment" title="Adding or changing a subject: rules applied" />
 
       <div role="tabpanel">
-        {view === "adjustments" ? <CourseAdjustments embedded /> : <CourseOfferings embedded />}
+        {view === "adjustments" ? <CourseAdjustments /> : <CourseOfferings />}
       </div>
 
       {/* BPMN 4 Coursework: the status report the Academic Coordinator sends to the Dean. */}
       {view === "adjustments" ? <CourseworkReportPanel role={user?.role} /> : null}
     </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, children }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 max-sm:min-h-11 ${active ? "bg-white text-brand-700 shadow-card" : "text-slate-600 hover:text-ink"}`}
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" /> {children}
+    </button>
   );
 }
