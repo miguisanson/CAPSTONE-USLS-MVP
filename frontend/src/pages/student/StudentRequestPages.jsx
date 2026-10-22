@@ -14,10 +14,10 @@ import {
   UserX,
   Users,
 } from "lucide-react";
-import { Card, PageHeader, SectionTitle, StatusBadge } from "../../components/ui";
+import { Button, Card, InlineNotice, PageHeader, SectionCard, StatusChip } from "../../components/ui/index.js";
 import { useStudentPortal } from "./StudentPortalContext";
 import { STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel, StudentSchedulePanel, isLiveSchedule } from "./shared";
-import { ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
+import { BOOKABLE_DEFENSES, ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
 import PolicyRules from "../../components/PolicyRules";
 
 // Which business-rules process each request page applies (shown as "Rules applied").
@@ -88,6 +88,21 @@ const REQUEST_PAGES = {
   },
 };
 
+// The state of the defense the student is working toward. A booked defense wins; else the latest booking for the stage the
+// student is at (deferred, held, cancelled...); a stage with nothing booked yet says "No request", so the title chip never
+// shows an earlier defense as "Finished" while the form below asks for the next one (I-086).
+function scheduleStatus(data) {
+  const schedules = data.schedules || [];
+  const stateOf = (schedule) => schedule.display_status || schedule.status;
+  const live = schedules.find(isLiveSchedule);
+  if (live) return stateOf(live);
+  const stage = data.research_progress?.stage;
+  const forStage = schedules.find((schedule) => schedule.defense_type === stage);
+  if (forStage) return stateOf(forStage);
+  if (BOOKABLE_DEFENSES.includes(stage)) return "No request";
+  return schedules[0] ? stateOf(schedules[0]) : "No request";
+}
+
 // Human-readable current status of each request, shown in the Request Center.
 function requestStatus(id, data) {
   const latestLog = (slug) => (data.logs || []).find((item) => item.transaction_slug === slug);
@@ -95,10 +110,7 @@ function requestStatus(id, data) {
     case "research":
       return data.research_progress?.status || data.research_case?.status || "Not started";
     case "schedule":
-      {
-      const current = (data.schedules || []).find(isLiveSchedule) || data.schedules?.[0];
-      return current?.display_status || current?.status || "No request";
-    }
+      return scheduleStatus(data);
     case "loa":
       return data.leave_overview
         ? leaveRequestStatus(data, "loa")
@@ -128,27 +140,24 @@ export function StudentRequestPage({ id, aside = null }) {
   const messageSlug = STUDENT_MESSAGE_SLUG_BY_VIEW[id];
   const Icon = page.icon;
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className="page-stack animate-fade-up">
       <PageHeader
         title={page.title}
         description={page.description}
         icon={Icon}
-        badge={<StatusBadge value={requestStatus(id, data)} dot={false} />}
+        badge={<StatusChip status={requestStatus(id, data)} dot={false} />}
         actions={
-          <Link to="/student/requests" className="btn-ghost">
-            <ArrowLeft className="h-4 w-4" /> All requests
-          </Link>
+          <Button as={Link} to="/student/requests" variant="secondary" icon={ArrowLeft}>
+            All requests
+          </Button>
         }
       />
       {aside}
-      <Card className="p-4 sm:p-6">
+      <Card pad="lg">
         {messageSlug && <StudentClarificationPanel slug={messageSlug} data={data} onSaved={refetch} />}
         {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} className="mb-4" />}
         {locked ? (
-          <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-            <p>{lockedReasonFor(item, data)}</p>
-          </div>
+          <InlineNotice tone="neutral" icon={Lock}>{lockedReasonFor(item, data)}</InlineNotice>
         ) : (
           page.render(data, refetch)
         )}
@@ -157,33 +166,34 @@ export function StudentRequestPage({ id, aside = null }) {
   );
 }
 
-function AdviserPanelCard({ data }) {
+// `showScheduleLink` is false on the Defense Schedule page itself: a link to the page you are on goes nowhere (I-086).
+function AdviserPanelCard({ data, showScheduleLink = true }) {
   const panel = data.panel || [];
   return (
-    <Card className="p-6">
-      <SectionTitle
-        title="Adviser and panel"
-        subtitle="Assigned after Panel Matching; scheduling opens once a panel is in place"
-        icon={Users}
-        action={<Link to="/student/defense-schedule" className="btn-ghost px-3 py-1.5 text-xs">Defense schedule <ArrowRight className="h-3.5 w-3.5" /></Link>}
-      />
-      <p className="mb-3 text-sm text-slate-600">Adviser: <span className="font-semibold text-ink">{data.student.adviser_name || data.research_case?.adviser_name || "Not assigned"}</span></p>
+    <SectionCard
+      pad="lg"
+      title="Adviser and panel"
+      subtitle="Assigned after Panel Matching; scheduling opens once a panel is in place"
+      icon={Users}
+      action={showScheduleLink ? <Button as={Link} to="/student/defense-schedule" variant="secondary" size="sm">Defense schedule <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Button> : null}
+    >
+      <p className="text-sm text-slate-600">Adviser: <span className="font-semibold text-ink">{data.student.adviser_name || data.research_case?.adviser_name || "Not assigned"}</span></p>
       {panel.length ? (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {panel.map((member) => (
             <li key={member.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-ink">{member.faculty_name}</p>
-                <p className="truncate text-xs text-slate-500">{member.specialization || member.college}</p>
+                <p className="meta truncate">{member.specialization || member.college}</p>
               </div>
-              <StatusBadge value={member.panel_role} dot={false} />
+              <StatusChip status={member.panel_role} tone="neutral" dot={false} />
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-slate-500">No panel has been matched yet. The Research Coordinator does this after your title-defense package is endorsed.</p>
+        <p className="meta">No panel has been matched yet. The Research Coordinator does this after your title-defense package is endorsed.</p>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -199,7 +209,7 @@ export function StudentDefensePage() {
       id="schedule"
       aside={
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <AdviserPanelCard data={data} />
+          <AdviserPanelCard data={data} showScheduleLink={false} />
           <StudentSchedulePanel schedules={data.schedules || []} />
         </div>
       }
@@ -210,7 +220,7 @@ export function StudentDefensePage() {
 export function StudentRequestCenter() {
   const { data } = useStudentPortal();
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.requestCenter}
         description="Every request you can file, with its current status. Choose the one that matches your situation."
@@ -218,9 +228,9 @@ export function StudentRequestCenter() {
       />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         {REQUEST_GROUPS.map((group) => (
-          <Card key={group.title} className="p-5">
-            <h2 className="text-base font-semibold text-ink">{group.title}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">{group.description}</p>
+          <Card key={group.title}>
+            <h2 className="card-title">{group.title}</h2>
+            <p className="meta mt-1 leading-relaxed">{group.description}</p>
             <ul className="mt-4 space-y-2">
               {group.items.map((item) => {
                 const Icon = item.icon;
@@ -236,7 +246,7 @@ export function StudentRequestCenter() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold">{item.label}</span>
-                        <span className="block truncate text-xs text-slate-500">{locked ? lockedReasonFor(item, data) : requestStatus(item.id, data)}</span>
+                        <span className="meta block truncate">{locked ? lockedReasonFor(item, data) : requestStatus(item.id, data)}</span>
                       </span>
                       {locked ? <Lock className="h-4 w-4 shrink-0 text-slate-400" aria-label="Locked" /> : <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />}
                     </Link>

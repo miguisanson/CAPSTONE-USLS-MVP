@@ -283,7 +283,7 @@ export function ConceptPaperCompliance({ compliance }) {
   );
 }
 
-const BOOKABLE_DEFENSES = ["Title Defense", "Proposal Defense", "Final Defense"];
+export const BOOKABLE_DEFENSES = ["Title Defense", "Proposal Defense", "Final Defense"];
 
 // After a verdict that asks for revisions: send the revised manuscript (and a note) for confirmation.
 function RevisionSubmitForm({ followUp, onSaved }) {
