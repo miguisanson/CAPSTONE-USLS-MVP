@@ -132,7 +132,7 @@ test.describe("program selects", () => {
   test.use({ storageState: join(AUTH_DIR, "staff.json"), viewport: { width: 1366, height: 768 } });
 
   for (const [path, name] of [["/monitoring-sheet", "Monitoring Sheet"], ["/enrollment-class-list", "Class list"]]) {
-    test(`I-098: the Program select on the ${name} fits the longest program name at 1366`, async ({ page, context }) => {
+    test(`I-098: the Program and Semester selects on the ${name} fit their longest option at 1366`, async ({ page, context }) => {
       const meta = await (await context.request.get("/api/meta")).json();
       const longest = [...meta.programs].sort((a, b) => `${b.code} — ${b.name}`.length - `${a.code} — ${a.name}`.length)[0];
       await page.goto(path);
@@ -142,15 +142,17 @@ test.describe("program selects", () => {
       // the closed select shows the chosen option, so the longest option must fit as well as the current one
       await select.selectOption(String(longest.id));
       await expect(select).toHaveValue(String(longest.id));
-      const fit = await select.evaluate((sel) => {
-        const cs = getComputedStyle(sel);
-        const ctx = document.createElement("canvas").getContext("2d");
-        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-        const text = Math.max(...[...sel.options].map((o) => ctx.measureText(o.textContent).width));
-        const arrow = 24; // the native drop-down arrow
-        return { text, room: sel.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - arrow };
-      });
-      expect(fit.text, `"${longest.code} — ${longest.name}" needs ${Math.round(fit.text)}px, the select has ${Math.round(fit.room)}px`).toBeLessThanOrEqual(fit.room);
+      for (const label of ["Program", "Semester"]) {
+        const fit = await page.getByLabel(label, { exact: true }).evaluate((sel) => {
+          const cs = getComputedStyle(sel);
+          const ctx = document.createElement("canvas").getContext("2d");
+          ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          const text = Math.max(...[...sel.options].map((o) => ctx.measureText(o.textContent).width));
+          const arrow = 24; // the native drop-down arrow
+          return { text, room: sel.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - arrow };
+        });
+        expect(fit.text, `${label}: the longest option needs ${Math.round(fit.text)}px, the select has ${Math.round(fit.room)}px (longest program: "${longest.code} — ${longest.name}")`).toBeLessThanOrEqual(fit.room);
+      }
       await shot(page, `${path.slice(1)}-1366.png`);
     });
   }

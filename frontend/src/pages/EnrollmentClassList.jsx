@@ -136,7 +136,7 @@ export default function EnrollmentClassList() {
               }}
             />
           </div>
-          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
+          <div className="w-full sm:w-[19rem]">
             <Select
               aria-label="Semester"
               placeholder=""

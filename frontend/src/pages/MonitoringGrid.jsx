@@ -256,7 +256,7 @@ export default function MonitoringGrid() {
           <div className="w-full sm:w-[26rem]">
             <Select aria-label="Program" placeholder="" value={programId} options={programOptions} onChange={(e) => updateFilters({ program_id: e.target.value })} />
           </div>
-          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
+          <div className="w-full sm:w-[19rem]">
             <Select aria-label="Semester" placeholder="" value={selectedTermId || String(grid?.selected_term?.id || "")} options={termOptions} onChange={(e) => updateFilters({ term_id: e.target.value })} />
           </div>
           <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
