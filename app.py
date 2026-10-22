@@ -35137,6 +35137,24 @@ def ensure_panel_matching_demo_data() -> dict[str, int]:
     return changes
 
 
+def demo_adviser_name(student: Student) -> str:
+    """The seeded research adviser of a workflow demo student (spread so nobody exceeds the advisee limit)."""
+    from panel_demo_data import DEMO_ADVISER_FALLBACK, DEMO_STUDENT_ADVISERS
+
+    return DEMO_STUDENT_ADVISERS.get(student.student_number, DEMO_ADVISER_FALLBACK)
+
+
+def demo_panel_replacement(student: Student, panel_spec) -> str:
+    """Who sits in the seat of a panel member who is the student's adviser."""
+    from panel_demo_data import DEMO_ADVISER_FALLBACK, DEMO_PANEL_REPLACEMENT
+
+    taken = {name for name, _role in panel_spec} | {student.adviser_name}
+    for name in (DEMO_PANEL_REPLACEMENT, DEMO_ADVISER_FALLBACK):
+        if name not in taken:
+            return name
+    return DEMO_ADVISER_FALLBACK
+
+
 def seed_maed_personas() -> None:
     """Create the policy-valid MAED workflow cohort from the monitoring sheet.
 
@@ -35217,7 +35235,7 @@ def seed_maed_personas() -> None:
         if not presentation or presentation["source_type"] != "student_upload":
             return
         required_count = presentation["required_file_count"]
-        adviser = Faculty.query.filter_by(name=student.adviser_name or "Dr. Liwayway Bautista").first()
+        adviser = Faculty.query.filter_by(name=student.adviser_name or demo_adviser_name(student)).first()
         gate_slug = re.sub(r"[^a-z0-9]+", "-", document.gate.lower()).strip("-")[:28]
         item_slug = re.sub(r"[^a-z0-9]+", "-", document.item_name.lower()).strip("-")[:42]
         for file_number in range(1, required_count + 1):
@@ -35321,6 +35339,9 @@ def seed_maed_personas() -> None:
 
         assignments = []
         for faculty_name, role in panel_spec:
+            if faculty_name == student.adviser_name:
+                # An adviser never sits on their own advisee's panel (Research Protocol).
+                faculty_name = demo_panel_replacement(student, panel_spec)
             faculty = Faculty.query.filter_by(name=faculty_name).first()
             if not faculty:
                 continue
@@ -35398,7 +35419,7 @@ def seed_maed_personas() -> None:
 
     def seed_completed_research(student: Student, title: str) -> None:
         student.comprehensive_exam_status = "Passed"
-        student.adviser_name = "Dr. Liwayway Bautista"
+        student.adviser_name = demo_adviser_name(student)
         if not Form1Endorsement.query.filter_by(student_id=student.id).first():
             db.session.add(Form1Endorsement(
                 student_id=student.id,
@@ -35523,7 +35544,7 @@ def seed_maed_personas() -> None:
         miguel.enrollment_tag = "Enrolled"
         miguel.comprehensive_exam_status = "Passed"
         miguel.risk_level = "On Track"
-        miguel.adviser_name = "Dr. Liwayway Bautista"
+        miguel.adviser_name = demo_adviser_name(miguel)
         set_term_status(miguel, "Confirmed")
         title = "Learning Analytics for Graduate Student Engagement"
         if not Form1Endorsement.query.filter_by(student_id=miguel.id).first():
@@ -36442,7 +36463,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     )
     student.comprehensive_exam_status = "Not Taken" if (is_withdrawal_demo or is_enrollment_demo or is_adjustments_demo or is_loa_demo) else "Passed"
     student.risk_level = "Not Yet Assessed"
-    student.adviser_name = student.adviser_name or "Dr. Liwayway Bautista"
+    student.adviser_name = student.adviser_name or demo_adviser_name(student)
     student.updated_at = now_utc()
     if has_leave_case:
         student.standing, student.enrollment_tag, student.current_stage, student.risk_level = leave_snapshot

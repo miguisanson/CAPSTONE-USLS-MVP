@@ -365,3 +365,39 @@ UPCOMING_DEFENSE_DEMO = [
         "days_ahead": 19, "start": "10:00", "end": "11:30", "mode": "In person", "venue": "Graduate School Conference Room",
     },
 ]
+
+
+# Research advisers of the workflow demo students (I-060). The faculty limit is 5 advisees each
+# (business rule faculty.max_advisees), so the demo cohort is spread over five faculty members, and
+# an adviser never sits on the panel of their own advisee. Students that panel-matching demo data
+# places (GS-2026-PM-xx) and the sheet students keep the adviser they were seeded with.
+DEMO_ADVISER_FALLBACK = "Dr. Daniel Uy"
+DEMO_PANEL_REPLACEMENT = "Dr. Celeste Tan"
+DEMO_STUDENT_ADVISERS = {
+    # Dr. Liwayway Bautista (5 with GS-2026-PM-02, who is placed by PANEL_MATCHING_DEMO_STUDENTS)
+    "2260007": "Dr. Liwayway Bautista",
+    "GS-2026-READ-01": "Dr. Liwayway Bautista",
+    "GS-2026-READ-02": "Dr. Liwayway Bautista",
+    "GS-2026-AWOL-01": "Dr. Liwayway Bautista",
+    # Dr. Marlon Geronimo (4 with GS-2026-PM-03)
+    "GS-2026-WD-01": "Dr. Marlon Geronimo",
+    "GS-2026-WD-02": "Dr. Marlon Geronimo",
+    "GS-2026-ENR-01": "Dr. Marlon Geronimo",
+    # Dr. Patricia Salvador
+    "GS-2026-ENR-02": "Dr. Patricia Salvador",
+    "GS-2026-HO-01": "Dr. Patricia Salvador",
+    "GS-2026-HO-02": "Dr. Patricia Salvador",
+    "GS-2026-CA-01": "Dr. Patricia Salvador",
+    "GS-2026-CA-02": "Dr. Patricia Salvador",
+    # Dr. Teodoro Ramos (5 with GS-2026-PM-01)
+    "GS-2026-LOA-01": "Dr. Teodoro Ramos",
+    "GS-2026-LOA-02": "Dr. Teodoro Ramos",
+    "GS-2026-GRAD-01": "Dr. Teodoro Ramos",
+    "GS-2026-GRAD-02": "Dr. Teodoro Ramos",
+    # Dr. Celeste Tan: not on the panel of the MAED research cohort, so she can advise its members
+    "2260004": "Dr. Celeste Tan",
+    "2360008": "Dr. Celeste Tan",
+    "GS-2026-PRAC-01": "Dr. Celeste Tan",
+    "GS-2026-PRAC-02": "Dr. Celeste Tan",
+    "GS-2026-RES-01": "Dr. Celeste Tan",
+}
