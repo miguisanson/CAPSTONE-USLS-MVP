@@ -94,7 +94,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await expect(page.getByText(/Enrollment and student profiles are synchronized \(\d+ rows checked\)/)).toBeVisible();
 
     // legend
-    for (const word of ["Officially completed", "Taken", "Enrolled", "Failed", "Dropped", "Planned", "INC", "Not taken", "Manual entry"]) {
+    for (const word of ["Officially completed", "Taken", "Enrolled", "Failed", "Dropped", "Planned", "INC", "Withdrawn", "Not taken", "Manual entry"]) {
       await expect(page.getByText(word, { exact: true }).filter({ visible: true }).first(), `legend: ${word}`).toBeVisible();
     }
 
@@ -151,18 +151,25 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     // a filter nobody matches -> the empty state, with the add button for editors
     expect(grid.students.filter((s) => s.risk === "Delayed")).toHaveLength(0);
     await select("Risk").selectOption("Delayed");
-    await expect(page.getByText("No students in this program yet")).toBeVisible();
-    await expect(page.getByText("Add a student here, or import a monitoring workbook under Student Handoff.")).toBeVisible();
+    // P6.4: with a filter on, the empty state says the filter is the reason and offers "Clear filters" (it used to
+    // claim "No students in this program yet").
+    await expect(page.getByText("No students match these filters")).toBeVisible();
+    await expect(page.getByText("Clear a filter to see the other students of this program.")).toBeVisible();
     await expect(page.locator("main table")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Add student", exact: true })).toHaveCount(2); // header + empty state
+    await expect(page.getByRole("button", { name: "Add student", exact: true })).toHaveCount(1); // the header's
     await shotAll(page, "monitoring-empty");
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await expect(page).not.toHaveURL(/risk=/);
+    await expect(rows.first()).toBeVisible();
+    await select("Risk").selectOption("Delayed");
+    await expect(page.getByText("No students match these filters")).toBeVisible();
 
     // clear it again, then the other filters
     await select("Risk").selectOption("");
     await expect(rows.first()).toBeVisible();
     await select("Enrollment status").selectOption("LOA");
     await expect(page).toHaveURL(/enrollment=LOA/);
-    await expect(rows.or(page.getByText("No students in this program yet")).first()).toBeVisible();
+    await expect(rows.or(page.getByText("No students match these filters")).first()).toBeVisible();
     await select("Enrollment status").selectOption("");
     await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(grid.students.length); // wait for this answer before the next filter, so answers cannot cross
     await select("Progress").selectOption("not-started");
@@ -174,13 +181,18 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await select("Progress").selectOption("");
     await expect(rows.first()).toBeVisible();
 
-    // sorting writes the URL. (Known defect pinned as it is today: choosing a sort on its own does not
-    // re-sort the rows or keep the choice in the select, because the sort state is only re-read when another filter
-    // changes. P6.4 fixes that and then tightens this step to check the order.)
+    // sorting writes the URL, re-sorts the rows and keeps the choice in the select. (P6.4 fixed a defect: the sort
+    // state used to be re-read only when another filter changed, so choosing a sort on its own did nothing.)
+    const ayColumn = () => page.locator("main table tbody tr td:nth-child(2)").allTextContents().then((all) => all.map((t) => t.trim()).filter((t) => t && t !== "—"));
     await select("Sort monitoring sheet").selectOption("entry-newest");
     await expect(page).toHaveURL(/sort=entry-newest/);
+    await expect(select("Sort monitoring sheet")).toHaveValue("entry-newest");
+    await expect.poll(async () => { const keys = await ayColumn(); return keys.every((v, i) => i === 0 || keys[i - 1] >= v); }).toBe(true);
+    await select("Sort monitoring sheet").selectOption("entry-oldest");
+    await expect.poll(async () => { const keys = await ayColumn(); return keys.every((v, i) => i === 0 || keys[i - 1] <= v); }).toBe(true);
     await select("Sort monitoring sheet").selectOption("name");
     await expect(page).not.toHaveURL(/sort=/);
+    await expect(rows.first()).toContainText("Bernardo, Camille");
 
     // program and semester
     await select("Semester").selectOption({ index: 1 });
@@ -193,6 +205,24 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await expect(page.getByRole("link", { name: "Export workbook" })).toHaveAttribute("href", new RegExp(`program_id=${mba.id}`));
   });
 
+  test("a program with no students shows the plain empty state with an Add student button", async ({ page }) => {
+    const grid = await okJson(await page.request.get("/api/monitoring/grid"), "grid");
+    let empty = null;
+    for (const program of grid.programs) {
+      const g = await okJson(await page.request.get(`/api/monitoring/grid?program_id=${program.id}`), "grid");
+      if (!g.students.length) { empty = program; break; }
+    }
+    expect(empty, "a seeded program with no students").toBeTruthy();
+    await page.goto("/monitoring-sheet");
+    await expect(page.locator("main table tbody tr").first()).toBeVisible();
+    await page.getByLabel("Program", { exact: true }).selectOption(String(empty.id));
+    await expect(page.getByText("No students in this program yet")).toBeVisible();
+    await expect(page.getByText("Add a student here, or import a monitoring workbook under Student Handoff.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add student", exact: true })).toHaveCount(2); // header + empty state
+    await expect(page.getByRole("button", { name: "Clear filters" })).toHaveCount(0);
+    await shotAll(page, "monitoring-empty-program");
+  });
+
   test("Export CSV downloads the sheet in the current order", async ({ page }) => {
     const grid = await okJson(await page.request.get("/api/monitoring/grid"), "grid");
     const courses = grid.categories.flatMap((c) => c.courses);
@@ -200,9 +230,13 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await expect(page.locator("main table tbody tr").first()).toBeVisible();
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);
     expect(download.suggestedFilename()).toBe(`monitoring-${grid.program.code}.csv`);
-    const text = readFileSync(await download.path(), "utf8");
-    const lines = text.split("\n");
-    expect(lines[0]).toBe(["Student", "IDNO", "AY Entry", "YR", ...courses.map((c) => c.code), "Completed", "Total", "% Complete"].join(","));
+    // P6.4: every field is quoted, the file starts with a byte-order mark (Excel reads names such as "Niño") and
+    // lines end with CRLF, like every other export of the app.
+    const raw = readFileSync(await download.path(), "utf8");
+    expect(raw.charCodeAt(0)).toBe(0xfeff);
+    const text = raw.slice(1);
+    const lines = text.split("\r\n");
+    expect(lines[0]).toBe(["Student", "IDNO", "AY Entry", "YR", ...courses.map((c) => c.code), "Completed", "Total", "% Complete"].map((v) => `"${v}"`).join(","));
     expect(lines.length).toBeGreaterThan(grid.students.length);
     expect(lines[1]).toContain('"Bernardo, Camille"');
     expect(text).toContain('"Salonga, Bea"');
@@ -322,7 +356,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await expect(dialog).toContainText("Other");
     await expect(dialog).toContainText(`On: ${subject.code} — ${subject.title}`);
     await expect(dialog).toContainText("Pinned by the P6.4 spec");
-    await expect(dialog.getByText("Open", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Open flag", { exact: true })).toBeVisible(); // P6.4: the chip reads "Open flag" (a bare "Open" would map to the green success tone)
     await shotAll(page, "monitoring-flag-open", { full: false });
 
     // resolving needs a note; Cancel leaves the flag open
