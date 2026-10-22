@@ -3,9 +3,9 @@ import { Navigate } from "react-router-dom";
 import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { homePath } from "../lib/homePaths.js";
 import { Button, InlineNotice, Input, PageHeader } from "../components/ui/index.js";
 
-const HOME = { staff: "/", academic_coordinator: "/monitoring-sheet", research_coordinator: "/workflow/graduation", admin: "/", dean: "/dean", student: "/student", faculty: "/faculty-portal" };
 
 const STUDENT_LIFECYCLE_DEMOS = [
   {
@@ -132,7 +132,7 @@ export default function Login() {
     };
   }, [demoMode, demoOpen, demoLoaded]);
 
-  if (user?.role) return <Navigate to={HOME[user.role] || "/"} replace />;
+  if (user?.role) return <Navigate to={homePath(user.role)} replace />;
 
   async function signIn(credentials) {
     // The role is decided by the server from the account; the form never sends one.

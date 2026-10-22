@@ -1,18 +1,21 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, LayoutDashboard, PieChart } from "lucide-react";
+import { FileText, LayoutDashboard, PieChart, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
 import { Button, InlineNotice, Spinner, StatusChip } from "../components/ui/index.js";
 import RoleHome from "../components/RoleHome.jsx";
 import { formatDate, relativeDays } from "../lib/format";
-import { firstNameOf, officeActions, officeActivity, officeOf, officeStats, officeWaiting } from "../lib/staffHome.js";
+import { canOpen, firstNameOf, officeActions, officeActivity, officeOf, officeStats, officeWaiting } from "../lib/staffHome.js";
 
 // IM19 + AD7: the back-office home is action first - what waits on this office, what other offices hold, four key
 // numbers, recent activity. The charts and the filter bar that used to fill this page are on Reports > Analytics
 // (IM20). It serves the Graduate School office and the administrator (who also get the dashboard figures and the
-// activity feed) and, when they open "/", the two coordinators (tasks only: the dashboard and activity APIs are the
-// Graduate School's).
+// activity feed, the analytics and the "Refresh data" button) and, since I-066, the two coordinators too: the same
+// layout with the figures of their own caseload (the dashboard API answers them with that), their own tasks and the
+// recent activity of their own students - and no link to a page their role cannot open (the drill-down, the activity
+// log and the analytics are the Graduate School's).
 
 const ROLE_NAMES = {
   staff: "Graduate School Staff",
@@ -45,16 +48,33 @@ export default function Dashboard() {
   const { user } = useAuth();
   const role = user?.role;
   const office = officeOf(role);
-  const hasFigures = GS_ROLES.has(role);
+  const isGraduateSchool = GS_ROLES.has(role);
+  const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState(null); // { tone, text } after "Refresh data"
   const { data, loading, error, refetch } = useApi(
     () =>
       Promise.all([
         api.tasks({ owner: office, page_size: TASK_PAGE }),
         api.tasks({ page_size: TASK_PAGE }),
-        hasFigures ? api.dashboard({}) : Promise.resolve(null),
+        api.dashboard({}), // a coordinator is answered with their own caseload (viewer.owner)
       ]).then(([own, all, dashboard]) => ({ own, all, dashboard })),
     [role]
   );
+
+  // I-071: the date-driven sweeps no longer run when a page is viewed. This runs them on request, then reads the home again.
+  async function refreshData() {
+    setRefreshing(true);
+    setNotice(null);
+    try {
+      const result = await api.maintenanceRefresh();
+      setNotice({ tone: "success", text: result.message || "Data refreshed." });
+      refetch();
+    } catch (err) {
+      setNotice({ tone: "danger", text: err.message || "Could not refresh the data." });
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   if (loading && !data) return <Spinner label="Loading your home…" />;
   if (error) {
@@ -75,14 +95,14 @@ export default function Dashboard() {
   const stats = officeStats({ role, own: { ...actions, total: data.own.total ?? actions.total }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
   const queue = `/work-queue?owner=${encodeURIComponent(office)}`;
   const activity = data.dashboard
-    ? officeActivity(data.dashboard.recent_logs).map((entry) => ({
+    ? officeActivity(data.dashboard.recent_logs, undefined, role).map((entry) => ({
         key: entry.key,
         title: entry.title,
         detail: entry.detail,
         time: formatDate(entry.at),
         to: entry.to,
       }))
-    : null; // a coordinator may not read the activity log: leave the card out
+    : null;
   const firstName = firstNameOf(user?.full_name) || ROLE_NAMES[role];
 
   return (
@@ -93,14 +113,21 @@ export default function Dashboard() {
         icon: LayoutDashboard,
         actions: (
           <>
-            {hasFigures && (
+            {isGraduateSchool && (
+              <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={refreshData}>
+                Refresh data
+              </Button>
+            )}
+            {isGraduateSchool && (
               <Button as={Link} to="/reports?workflow_type=analytics" variant="secondary" icon={PieChart}>
                 Analytics
               </Button>
             )}
-            <Button as={Link} to="/reports" variant="secondary" icon={FileText}>
-              Reports
-            </Button>
+            {canOpen("/reports", role) && (
+              <Button as={Link} to="/reports" variant="secondary" icon={FileText}>
+                Reports
+              </Button>
+            )}
           </>
         ),
       }}
@@ -116,8 +143,15 @@ export default function Dashboard() {
       }}
       stats={stats}
       activity={activity}
-      activityAll={activity ? { to: "/activity", label: "View all" } : undefined}
+      activityAll={activity && isGraduateSchool ? { to: "/activity", label: "View all" } : undefined}
       activityEmpty={{ title: "No activity yet", hint: "Complete a workflow to populate this feed." }}
+      notice={
+        notice && (
+          <InlineNotice tone={notice.tone} onDismiss={() => setNotice(null)}>
+            {notice.text}
+          </InlineNotice>
+        )
+      }
     />
   );
 }

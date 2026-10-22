@@ -215,7 +215,9 @@ test.describe("Academic Coordinator home links", () => {
     await page.goto("/");
     await expect(page.locator("main h1")).toBeVisible();
     await page.waitForLoadState("networkidle");
-    const hrefs = await main(page).locator("li a").evaluateAll((els) => els.map((a) => a.getAttribute("href")));
+    // the two task rows only: the coordinator home also has a "Recent activity" card whose rows link to student records (I-066)
+    const mine = main(page).locator("section", { has: page.getByRole("heading", { name: "Needs your action", exact: true }) });
+    const hrefs = await mine.locator("li a").evaluateAll((els) => els.map((a) => a.getAttribute("href")));
     expect(hrefs.length, "both tasks still have a way in").toBe(2);
     for (const href of hrefs) expect(href, "Defense Scheduling is the Research Coordinator's page").not.toContain("/workflow/defense-scheduling");
   });

@@ -9,6 +9,7 @@ import { csvCell, downloadBlob } from "../lib/format";
 import { printDataTable } from "../lib/print";
 import AnalyticsSection from "./reports/AnalyticsSection.jsx";
 import { PAGE } from "../lib/labels.js";
+import { homePath } from "../lib/homePaths.js";
 
 const REPORT_TABS = [
   { id: "summary", label: "Dashboard summary", icon: FileText },
@@ -134,7 +135,7 @@ export default function Reports() {
       <PageHeader
         title={PAGE.reportsAnalytics}
         description="Filterable monitoring reports generated from student records, tasks, and workflow cases."
-        actions={<Button as={Link} to="/" variant="secondary">Back to dashboard</Button>}
+        actions={<Button as={Link} to={homePath(user?.role)} variant="secondary">Back to dashboard</Button>}
       />
 
       <ReportFilters data={data} filters={filters} updateFilter={updateFilter} clear={() => setSearchParams({}, { replace: true })} />

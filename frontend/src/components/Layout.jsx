@@ -101,10 +101,11 @@ const ROLE_LABELS = {
   faculty: "Faculty",
 };
 
+// The pages a coordinator may open (I-066: the Dashboard at "/" is every back-office role's home).
 const ROLE_PATHS = {
-  academic_coordinator: new Set(["/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
+  academic_coordinator: new Set(["/", "/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
   // Protocol: the Research Coordinator nominates the panel and informs panel and student of the date.
-  research_coordinator: new Set(["/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
+  research_coordinator: new Set(["/", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
 };
 
 function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {

@@ -26,22 +26,15 @@ import { FacultyProvider, FacultyRoutes } from "./pages/faculty/FacultyRoutes";
 import TermSettings from "./pages/TermSettings";
 import PolicyDocuments from "./pages/PolicyDocuments";
 import BusinessRules from "./pages/BusinessRules";
+import { homePath } from "./lib/homePaths.js";
 
 // The component gallery (/__ui) exists only in dev and in the e2e/demo build (VITE_UI_GALLERY=1); in a normal
 // production build the condition is false at build time and the page is left out of the bundle. No sidebar link.
 const UI_GALLERY_ON = import.meta.env.DEV || import.meta.env.VITE_UI_GALLERY === "1";
 const UiGallery = UI_GALLERY_ON ? lazy(() => import("./pages/UiGallery")) : null;
 
-// Where each role lands by default.
-function homeFor(user) {
-  if (!user) return "/login";
-  if (user.role === "student") return "/student";
-  if (user.role === "faculty") return "/faculty-portal";
-  if (user.role === "dean") return "/dean";
-  if (user.role === "academic_coordinator") return "/monitoring-sheet";
-  if (user.role === "research_coordinator") return "/workflow/research-gate";
-  return "/";
-}
+// Where each role lands by default (the one map is lib/homePaths.js).
+const homeFor = (user) => homePath(user?.role);
 
 const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coordinator", "admin"]);
 

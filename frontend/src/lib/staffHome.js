@@ -64,16 +64,17 @@ const CAN_OPEN_STUDENTS = new Set(["staff", "admin", "academic_coordinator"]);
 // never lead a role to a page it cannot open.
 const COORDINATOR_PAGES = Object.freeze({
   academic_coordinator: new Set([
-    "/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment",
+    "/", "/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment",
     "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum",
     "/workflow/graduation", "/workflow/awol", "/work-queue",
   ]),
   research_coordinator: new Set([
-    "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation",
+    "/", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation",
     "/monitoring-sheet", "/work-queue",
   ]),
 });
-const canOpen = (to, role) => {
+/** Whether a role can open an app path: always for staff and the administrator, by the sidebar list for a coordinator. */
+export const canOpen = (to, role) => {
   const pages = COORDINATOR_PAGES[role];
   if (!pages) return true;
   const path = String(to).split(/[?#]/)[0];
@@ -186,8 +187,10 @@ export function officeWaiting(tasks, role) {
 }
 
 /**
- * The key numbers (3-4, each once). The Graduate School office and the administrator have the dashboard figures;
- * a coordinator has only what the work queue tells (the dashboard API is not theirs to call).
+ * The key numbers (3-4, each once). The Graduate School office and the administrator have the school-wide dashboard
+ * figures; a coordinator has the figures of their own caseload (the students with open work owned by their role,
+ * which is what /api/dashboard answers them) - and every number links to a list page that role can open.
+ * Without `kpis` the numbers come from the work queue alone.
  * @param own      officeActions() result
  * @param waiting  { total } of officeWaiting()
  * @param kpis     /api/dashboard `kpis`, or null
@@ -203,6 +206,22 @@ export function officeStats({ role, own, waiting, kpis }) {
     tone: own.overdue ? "danger" : own.total ? "warning" : "neutral",
     to: queue,
   };
+  if (kpis && COORDINATOR_PAGES[role]) {
+    const soon = { key: "soon", label: "Due in 7 days", value: own.dueSoon, sub: "Your tasks, not yet overdue", tone: own.dueSoon ? "warning" : "neutral", to: queue };
+    const students = {
+      key: "students",
+      label: "Students with open work",
+      value: kpis.total_students,
+      sub: "Your tasks are about them",
+      tone: "success",
+      to: canOpen("/students", role) ? "/students" : "/monitoring-sheet",
+    };
+    // the Academic Coordinator watches risk; the Research Coordinator watches the defenses it schedules
+    const focus = canOpen("/students", role)
+      ? { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" }
+      : { key: "defenses", label: "Confirmed defenses", value: kpis.confirmed_schedules, sub: `${kpis.needs_availability} awaiting availability`, tone: "info", to: "/workflow/defense-scheduling" };
+    return [tasks, students, focus, soon];
+  }
   if (kpis) {
     return [
       tasks,
@@ -233,10 +252,11 @@ export function activityTitle(result) {
 
 /**
  * Recent activity: the latest recorded transactions, newest first.
- * @param logs /api/dashboard `recent_logs`
+ * @param logs  /api/dashboard `recent_logs`
+ * @param role  the viewer's role: an entry links to its student's record only if that role has a Students page
  * @returns [{ key, title, detail, at, to? }]
  */
-export function officeActivity(logs, limit = 6) {
+export function officeActivity(logs, limit = 6, role = "") {
   return [...(logs || [])]
     .sort((a, b) => time(b.created_at) - time(a.created_at))
     .slice(0, limit)
@@ -245,7 +265,7 @@ export function officeActivity(logs, limit = 6) {
       title: activityTitle(log.result),
       detail: `${log.student_name || log.source_reference || "Workflow"} · next: ${log.next_owner || "—"}`,
       at: log.created_at,
-      to: log.student_id ? `/students/${log.student_id}` : undefined,
+      to: log.student_id && canOpen(`/students/${log.student_id}`, role) ? `/students/${log.student_id}` : undefined,
     }));
 }
 
