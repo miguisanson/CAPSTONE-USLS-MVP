@@ -159,6 +159,8 @@ function SingleWorkflowPage() {
   const subviewTabs = SUBVIEW_TABS[slug] || null;
   const subview = subviewTabs && subviewTabs.some((tab) => tab.key && tab.key === searchParams.get("view")) ? searchParams.get("view") : "";
   const hideSideRail = overviewWorkflow || slug === "course-audit" || Boolean(subview);
+  // Pages without the side guide carry "How this works" and "View recent activity" in the header instead.
+  const hasGuideButtons = overviewWorkflow || slug === "course-audit";
   // Panel Matching holds a wide ranked table: the notes move under it so the table gets the full page width.
   const railBelow = slug === "panel-matching";
 
@@ -229,23 +231,25 @@ function SingleWorkflowPage() {
 
   return (
     <div className="page-stack animate-fade-up">
-      <Card pad="lg">
+      <div className="space-y-2">
         <PageHeader
           title={tx.title}
           description={tx.short}
           icon={Icon}
-          actions={overviewWorkflow ? (
+          actions={hasGuideButtons ? (
             <>
               <Button variant="secondary" icon={HelpCircle} onClick={() => setSupportModal("guide")}>How this works</Button>
               <Button variant="secondary" icon={History} onClick={() => setSupportModal("activity")}>View recent activity</Button>
             </>
           ) : null}
         />
-        <div className="meta mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:pl-14">
-          <p><span className="eyebrow">Who uses it · </span>{tx.actor}</p>
-          <p><span className="eyebrow">Data captured · </span>{tx.data}</p>
-        </div>
-      </Card>
+        {slug === "practicum" && (
+          <p className="meta flex items-center gap-1.5">
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Practicum applies to Psychology and MSGC students only; other programs are not listed.
+          </p>
+        )}
+      </div>
 
       <PolicyRules process={RULE_PROCESS_BY_SLUG[slug]} />
 
@@ -296,13 +300,15 @@ function SingleWorkflowPage() {
             </Card>
           ) : slug === "research-gate" ? (
             <ResearchGateForm {...formProps} />
+          ) : slug === "practicum" ? (
+            <PracticumRoster {...formProps} />
+          ) : slug === "defense-scheduling" ? (
+            <DefenseSchedulingForm {...formProps} />
           ) : (
             <Card pad="lg">
               {slug === "student-handoff" && <HandoffPanel {...formProps} />}
               {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
               {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
-              {slug === "defense-scheduling" && <DefenseSchedulingForm {...formProps} />}
-              {slug === "practicum" && <PracticumRoster {...formProps} />}
               {slug === "graduation" && <GraduationRoster {...formProps} />}
             </Card>
           )}
@@ -320,6 +326,10 @@ function SingleWorkflowPage() {
             <Card pad="lg">
               <SectionTitle title="How this works" icon={Sparkles} />
               <p className="text-sm leading-relaxed text-slate-600">{workflowGuidance(slug)}</p>
+              <dl className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                <div><dt className="eyebrow">Used by</dt><dd className="mt-1 text-sm text-slate-600">{tx.actor}</dd></div>
+                <div><dt className="eyebrow">What it records</dt><dd className="mt-1 text-sm text-slate-600">{tx.data}</dd></div>
+              </dl>
             </Card>
             <Card pad="lg">
               <SectionTitle title="Recent in this workflow" icon={Info} />
@@ -347,6 +357,9 @@ function SingleWorkflowPage() {
           slug={slug}
           mode={supportModal}
           logs={context?.recent_logs || []}
+          summary={workflowGuidance(slug)}
+          actor={tx.actor}
+          data={tx.data}
           policyQuestions={context?.deployment_policy_questions || []}
           onClose={() => setSupportModal("")}
         />
