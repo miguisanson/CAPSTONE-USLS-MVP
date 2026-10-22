@@ -1,6 +1,6 @@
 import { BellRing } from "lucide-react";
 import { formatDate } from "../../lib/format";
-import { LeaveStatusBadge } from "../../components/leaveStatus";
+import { Button, StatusChip } from "../../components/ui/index.js";
 import { plural } from "./leaveHelpers";
 
 /**
@@ -18,7 +18,7 @@ export default function FollowUpStrip({ cases, onOpen, onRunAction }) {
           <BellRing className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold text-ink">Needs follow-up ({rows.length})</h3>
+          <h3 className="card-title">Needs follow-up ({rows.length})</h3>
           <p className="mt-0.5 text-sm text-slate-600">
             The leave ended and no return was filed. This is only a proposal - you confirm it.
           </p>
@@ -30,30 +30,24 @@ export default function FollowUpStrip({ cases, onOpen, onRunAction }) {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-ink">
                       {item.student.name}{" "}
-                      <span className="text-xs font-normal text-slate-500">{item.student.student_number}</span>
+                      <span className="meta font-normal">{item.student.student_number}</span>
                     </p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                       <span>Leave ends {formatDate(item.period?.end_date)}</span>
                       {item.overdue_days > 0 && (
-                        <LeaveStatusBadge label={`Overdue ${plural(item.overdue_days, "day")}`} tone="bad" className="!text-[11px]" />
+                        <StatusChip label={`Overdue ${plural(item.overdue_days, "day")}`} tone="bad" size="sm" dot={false} />
                       )}
-                      {item.awol_proposed && (
-                        <LeaveStatusBadge label="AWOL proposed" tone="warn" className="!text-[11px]" />
-                      )}
+                      {item.awol_proposed && <StatusChip label="AWOL proposed" tone="warn" size="sm" dot={false} />}
                     </p>
                   </div>
-                  <div className="flex shrink-0 gap-2">
-                    <button type="button" onClick={() => onOpen(item)} className="btn-ghost cursor-pointer px-3 py-1.5">
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => onOpen(item)}>
                       View details
-                    </button>
+                    </Button>
                     {confirm && (
-                      <button
-                        type="button"
-                        onClick={() => onRunAction(item, confirm)}
-                        className="btn bg-red-600 px-3 py-1.5 text-white hover:bg-red-700"
-                      >
+                      <Button variant="danger" size="sm" onClick={() => onRunAction(item, confirm)}>
                         Confirm AWOL
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </li>
