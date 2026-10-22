@@ -9,7 +9,7 @@ on branches, NOT merged:
    data, coordinator homes), `pkt/conA` (Dean consistency). In flight: `pkt/rep` (wt/rep, port 5335, the only app.py
    editor: Reports rebuild IM20 = five real reports + short analytics, I-068), `pkt/conD` (wt/conD, port 5336: student
    consistency I-128 part), `pkt/conE` (wt/conE, port 5337: faculty/Layout nits, I-129, AD9 in standalone_process.py), `pkt/iso` (e2e order class).
-   MERGED since: `pkt/conC`. Next: packet B (list toolbars/Activity Log I-124/I-125 - after pkt/rep), I-120 a11y.
+   MERGED since: `pkt/conC`, `pkt/conD` (+ I-131 sign-out race fix). `pkt/a11y2` (wt/a11y2, port 5338): I-120 a11y follow-ups + p89 scans every sidebar page. Next: packet B (list toolbars/Activity Log I-124/I-125 - after pkt/rep), I-120 a11y.
 2. MERGED `pkt/p8` (a14d173): Phase 5 DONE - check:ui --strict all zeros, shims deleted, AGENTS.md gate updated.
 3. `pkt/iso` (wt/iso) - e2e order-independence class fix (I-100/I-113/I-121): DATA-OWNERSHIP.md + guard.
 In flight since: `pkt/conA` (wt/conA, port 5332: Dean Practicum board, Dean Course Adjustments DecisionPanel, Dean board copy - I-122, I-127) and `pkt/conC` (wt/conC, port 5333: guide/activity in one place, Practicum/Graduation summary + 'View details' - I-123, I-126). Remaining consistency packets B (list toolbars/Activity Log, I-124/I-125), D (student pages, I-128 part), E (faculty/Layout nits).
