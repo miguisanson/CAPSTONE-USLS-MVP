@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   BookOpenCheck,
+  CalendarCheck2,
   CalendarClock,
   CalendarDays,
   Clock3,
@@ -18,9 +19,9 @@ import { facultyActions, facultyStats, facultyUpcoming, facultyWaiting } from ".
 import { firstNameOf } from "../../lib/staffHome.js";
 import { formatDate } from "../../lib/format";
 import FacultyResearchWorkspace from "../../components/FacultyResearchWorkspace";
+import FacultyVerdicts from "./FacultyVerdicts";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 import { FacultyAdviserPanel } from "./FacultyAdviserPanel";
-import { FacultyCalendarConnection } from "./FacultyCalendar";
 import { FacultyClasses } from "./FacultyClasses";
 
 function CalendarNotice() {
@@ -35,6 +36,18 @@ function CalendarNotice() {
           ? "Google Calendar connection was cancelled."
           : "Google Calendar could not be connected. Please try again."}
     </InlineNotice>
+  );
+}
+
+// I-085: Google OAuth cannot be completed in a demo, so the home only points to the connection card, which lives
+// on My Availability. A small line, never the biggest element on the page.
+function CalendarLink({ calendar }) {
+  return (
+    <p className="meta flex flex-wrap items-center gap-x-2 gap-y-1">
+      <CalendarCheck2 className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+      <span>Google Calendar {calendar?.connected ? "connected" : "not connected"}.</span>
+      <Link to="/faculty-portal/availability" className="font-semibold text-brand-700 hover:underline">Calendar connection</Link>
+    </p>
   );
 }
 
@@ -83,7 +96,7 @@ export function FacultyDashboard() {
           all: waiting.total > MAX_WAITING ? { to: "/faculty-portal/advisees", label: "View all" } : undefined,
         }}
         stats={stats}
-        extra={<FacultyCalendarConnection calendar={faculty?.calendar} />}
+        extra={<CalendarLink calendar={faculty?.calendar} />}
         activityTitle="Upcoming defenses"
         activity={upcoming}
         activityAll={{ to: "/faculty-portal/defenses", label: "View schedule" }}
@@ -100,19 +113,6 @@ const nameCell = (name, sub) => (
   </>
 );
 
-const ADVISEE_COLUMNS = [
-  { key: "student", header: "Student", cell: (row) => nameCell(row.student.name, row.student.student_number), sortable: true, sortValue: (row) => row.student.name },
-  { key: "program", header: "Program", cell: (row) => row.student.program_code, sortable: true, sortValue: (row) => row.student.program_code },
-  { key: "stage", header: "Stage", cell: (row) => <StatusChip status={row.student.current_stage} dot={false} />, sortable: true, sortValue: (row) => row.student.current_stage },
-  { key: "documents", header: "Documents", cell: (row) => row.documents.length, sortable: true, sortValue: (row) => row.documents.length },
-  {
-    key: "pending",
-    header: "Needs signature",
-    cell: (row) => (row.pending_count ? <StatusChip status="Pending" label={`${row.pending_count} pending`} dot={false} /> : <span className="meta">None</span>),
-    sortable: true, sortValue: (row) => row.pending_count || 0,
-  },
-];
-
 export function FacultyAdviseesPage() {
   const { data } = useFaculty();
   const advisees = data.advisees || [];
@@ -124,16 +124,7 @@ export function FacultyAdviseesPage() {
         icon={Users}
         actions={<Button as={Link} variant="secondary" icon={FileSignature} to="/faculty-portal/signatures">Signatures</Button>}
       />
-      <FacultyAdviserPanel />
-      <DataTable
-        caption="Advisees and the research documents that need your signature"
-        columns={ADVISEE_COLUMNS}
-        rows={advisees}
-        rowKey={(row) => row.student.id}
-        pageSize={0}
-        minWidth="md"
-        empty={{ icon: Users, title: "No advisees yet", hint: "Students appear here once they are assigned to you as their adviser." }}
-      />
+      <FacultyAdviserPanel portalAdvisees={advisees} />
     </div>
   );
 }
@@ -266,7 +257,7 @@ export function FacultyVerdictsPage() {
         description="The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff have read-only access."
         icon={Scale}
       />
-      <FacultyResearchWorkspace advisees={data.advisees || []} panels={data.panels || []} refetch={refetch} view="verdicts" />
+      <FacultyVerdicts panels={data.panels || []} refetch={refetch} />
     </div>
   );
 }

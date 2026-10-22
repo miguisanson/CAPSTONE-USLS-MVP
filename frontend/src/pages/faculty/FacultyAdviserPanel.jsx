@@ -120,31 +120,69 @@ function Detail({ label, children }) {
 
 const contractStatus = (contract) => contract?.status || "Not applicable";
 
+// I-079: ONE row per student. The portal context knows the documents and signatures, the adviser-requests API knows
+// the appointment and its contract; they are joined on the student id. An appointment the portal context does not
+// list yet still gets a row (no documents).
+export function adviseeRows(appointments = [], portalAdvisees = []) {
+  const byStudent = new Map(appointments.filter((a) => a.student_id != null).map((a) => [a.student_id, a]));
+  const used = new Set();
+  const rows = portalAdvisees.map((entry) => {
+    const appointment = byStudent.get(entry.student.id);
+    if (appointment) used.add(appointment);
+    return {
+      key: `student-${entry.student.id}`,
+      name: entry.student.name,
+      number: entry.student.student_number,
+      program: entry.student.program_code,
+      stage: entry.student.current_stage,
+      contract: appointment?.contract,
+      documents: (entry.documents || []).length,
+      pending: entry.pending_count || 0,
+    };
+  });
+  appointments.forEach((appointment) => {
+    if (used.has(appointment)) return;
+    rows.push({
+      key: `appointment-${appointment.id}`,
+      name: appointment.student_name,
+      number: appointment.student_number,
+      program: appointment.program_code,
+      stage: appointment.stage,
+      contract: appointment.contract,
+      documents: 0,
+      pending: 0,
+    });
+  });
+  // who needs the adviser first: most signatures waiting, then by name
+  return rows.sort((left, right) => right.pending - left.pending || String(left.name).localeCompare(String(right.name)));
+}
+
 const ADVISEE_COLUMNS = [
   {
     key: "student",
     header: "Student",
     cell: (row) => (
       <>
-        <p className="font-semibold text-ink">{row.student_name}</p>
-        <p className="meta">{row.student_number}</p>
+        <p className="font-semibold text-ink">{row.name}</p>
+        <p className="meta">{row.number}</p>
       </>
     ),
     sortable: true,
-    sortValue: (row) => row.student_name,
+    sortValue: (row) => row.name,
   },
-  { key: "program", header: "Program", cell: (row) => row.program_code, sortable: true, sortValue: (row) => row.program_code },
+  { key: "program", header: "Program", cell: (row) => row.program, sortable: true, sortValue: (row) => row.program },
   { key: "stage", header: "Stage", cell: (row) => row.stage || "Not set", sortable: true, sortValue: (row) => row.stage },
-  { key: "appointed", header: "Appointed", cell: (row) => (row.appointed_on ? formatDay(row.appointed_on) : "Not set"), sortable: true, sortValue: (row) => row.appointed_on },
   {
     key: "contract",
-    header: "Contract (Forms 3.2 / 3.3)",
+    header: "Adviser contract",
     cell: (row) => {
-      const overdue = row.contract?.status === "Overdue";
-      const showDue = row.contract?.due_on && row.contract.status !== "Received" && row.contract.status !== "Not applicable";
+      const status = contractStatus(row.contract);
+      if (status === "Not applicable") return <span className="meta">Not applicable</span>;
+      const overdue = status === "Overdue";
+      const showDue = row.contract?.due_on && status !== "Received";
       return (
         <>
-          <StatusChip status={contractStatus(row.contract)} dot={false} />
+          <StatusChip status={status} dot={false} />
           {showDue && (
             <span className={`meta mt-1 block ${overdue ? "font-semibold text-red-700" : ""}`}>
               {overdue ? "Overdue since" : "Due"} {formatDay(row.contract.due_on)}
@@ -156,9 +194,44 @@ const ADVISEE_COLUMNS = [
     sortable: true,
     sortValue: (row) => contractStatus(row.contract),
   },
+  { key: "documents", header: "Documents", cell: (row) => row.documents, align: "right", sortable: true, sortValue: (row) => row.documents },
+  {
+    key: "pending",
+    header: "Needs signature",
+    cell: (row) =>
+      row.pending ? (
+        <>
+          <StatusChip status="Pending" label={`${row.pending} pending`} dot={false} />
+          <Link to="/faculty-portal/signatures" aria-label={`Review and sign for ${row.name}`} className="meta mt-1 block font-semibold text-brand-700 hover:underline">
+            Review and sign
+          </Link>
+        </>
+      ) : (
+        <span className="meta">None</span>
+      ),
+    sortable: true,
+    sortValue: (row) => row.pending,
+  },
 ];
 
-export function FacultyAdviserPanel() {
+function AdviseeTable({ rows }) {
+  return (
+    <Card>
+      <SectionTitle title="Your advisees" subtitle="Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1." icon={Handshake} />
+      <DataTable
+        caption="Your advisees, the state of their adviser contract and the research documents that need your signature"
+        columns={ADVISEE_COLUMNS}
+        rows={rows}
+        rowKey="key"
+        pageSize={0}
+        minWidth="md"
+        empty={{ icon: Users, title: "No appointed advisees yet", hint: "Students appear here once you accept their request." }}
+      />
+    </Card>
+  );
+}
+
+export function FacultyAdviserPanel({ portalAdvisees = [] }) {
   const { refetch: refetchPortal } = useFaculty();
   const { data, loading, error, refetch } = useApi(() => api.facultyAdviserRequests(), []);
 
@@ -168,11 +241,17 @@ export function FacultyAdviserPanel() {
   };
 
   if (loading && !data) return <Card><Spinner label="Loading adviser requests..." /></Card>;
-  if (!data) return <ErrorLine message={error || "Could not load your adviser requests."} />;
+  if (!data) {
+    return (
+      <div className="space-y-5">
+        <ErrorLine message={error || "Could not load your adviser requests."} />
+        <AdviseeTable rows={adviseeRows([], portalAdvisees)} />
+      </div>
+    );
+  }
 
   const inbox = data.inbox || [];
   const consents = data.consents || [];
-  const advisees = data.advisees || [];
 
   return (
     <div className="space-y-5">
@@ -234,25 +313,7 @@ export function FacultyAdviserPanel() {
         <InlineNotice>No adviser requests are waiting for you.</InlineNotice>
       )}
 
-      <Card>
-        <SectionTitle
-          title="Your advisees"
-          subtitle="Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1."
-          icon={Handshake}
-          action={<Button as={Link} variant="secondary" size="sm" to="/faculty-portal/signatures">Signatures</Button>}
-        />
-        {advisees.length ? (
-          <DataTable
-            caption="Your appointed advisees and the state of their adviser contract"
-            columns={ADVISEE_COLUMNS}
-            rows={advisees}
-            pageSize={0}
-            minWidth="md"
-          />
-        ) : (
-          <p className="text-sm text-slate-500">No appointed advisees yet. Students appear here once you accept their request.</p>
-        )}
-      </Card>
+      <AdviseeTable rows={adviseeRows(data.advisees || [], portalAdvisees)} />
     </div>
   );
 }
