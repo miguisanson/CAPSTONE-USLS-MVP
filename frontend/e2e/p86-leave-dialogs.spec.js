@@ -294,6 +294,17 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
     });
 
     test("Leave of Absence: the Registrar list shows the approved requests, ticks, and the export history", async ({ page }) => {
+      // Other specs move handoff states, so every listed request is shown as already acknowledged here (nothing is
+      // downloadable, so the test cannot export anything); the download call is also cut off.
+      await page.route(/\/api\/process-cases\?slug=leave-of-absence/, async (route) => {
+        const response = await route.fetch();
+        const json = await response.json();
+        json.cases = json.cases.map((item) =>
+          item.registrar?.status && item.registrar.status !== "Not Ready" ? { ...item, registrar: { ...item.registrar, status: "Acknowledged" } } : item,
+        );
+        await route.fulfill({ response, json });
+      });
+      await page.route("**/api/leave-cases/registrar-export", (route) => route.abort());
       await page.goto("/workflow/leave-of-absence");
       const api = (await (await page.request.get("/api/process-cases?slug=leave-of-absence")).json()).cases;
       const listed = api.filter((item) => item.registrar?.status && item.registrar.status !== "Not Ready");
@@ -437,6 +448,8 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await expect(dialog).toHaveCount(1);
       await expect(dialog.getByRole("heading", { level: 2, name: "Record residency", exact: true })).toBeVisible();
       await expect(dialog).toContainText("AWOL cannot be declared manually");
+      await page.waitForTimeout(700); // the result list, if it opened, loads after 250 ms
+      await expect(dialog.getByText(/type to narrow|students$/)).toHaveCount(0); // the student list does not open by itself
       const record = dialog.getByRole("button", { name: "Record residency", exact: true });
       await expect(record).toBeDisabled(); // nothing is checked yet
       await shot(page, "residency-1366.png");

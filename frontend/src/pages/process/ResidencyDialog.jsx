@@ -128,7 +128,9 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
             />
           </div>
           <Field label="Residency purpose" required>
+            {/* The dialog's first focus goes here, not to the student search: that box opens its result list the moment it is focused and the list would cover the form. */}
             <Select
+              data-autofocus=""
               value={reason}
               onChange={(event) => {
                 setReason(event.target.value);
